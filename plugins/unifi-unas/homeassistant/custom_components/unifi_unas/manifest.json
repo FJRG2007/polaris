@@ -4,9 +4,9 @@
   "codeowners": ["@FJRG2007"],
   "config_flow": true,
   "dependencies": ["mqtt"],
-  "documentation": "https://github.com/FJRG2007/polaris-unifi-unas/blob/main/README.md",
+  "documentation": "https://github.com/FJRG2007/polaris/blob/main/plugins/unifi-unas/homeassistant/README.md",
   "iot_class": "local_polling",
-  "issue_tracker": "https://github.com/FJRG2007/polaris-unifi-unas/issues",
+  "issue_tracker": "https://github.com/FJRG2007/polaris/issues",
   "requirements": ["asyncssh==2.21.1"],
   "version": "0.1.0"
 }

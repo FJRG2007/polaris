@@ -1,6 +1,5 @@
 # UniFi UNAS for Home Assistant (Polaris)
 
-[![HACS Custom](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 Monitoring and fan control for UniFi UNAS with native Home Assistant integration.
@@ -69,17 +68,12 @@ Assistant devices and entities.
 
 ## Installation
 
-### Via HACS (recommended)
+This integration is part of the [Polaris monorepo](https://github.com/FJRG2007/polaris),
+so it is installed manually. HACS installs one integration per repository from the
+repository root, which a monorepo subdirectory cannot satisfy.
 
-[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=FJRG2007&repository=polaris-unifi-unas&category=integration)
-
-1. Click the button above, or in HACS: three-dot menu -> Custom repositories -> add this repository with category `Integration`.
-2. Install "UniFi UNAS (Polaris)" and restart Home Assistant.
-
-### Manual
-
-1. Download the latest release ZIP (it bundles the prebuilt agent binary).
-2. Extract it to `custom_components/unifi_unas/`.
+1. Download `unifi_unas.zip` from the [latest release](https://github.com/FJRG2007/polaris/releases) (it bundles the prebuilt agent binary).
+2. Extract it into your Home Assistant `/config` directory so the files land in `/config/custom_components/unifi_unas/`.
 3. Restart Home Assistant.
 
 ## Setup

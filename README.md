@@ -25,11 +25,8 @@ three contexts behave identically.
 
 ### UniFi UNAS - monitoring and fan control
 
-[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=FJRG2007&repository=polaris-unifi-unas&category=integration)
-[![Open your Home Assistant instance and start setting up a new integration.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=unifi_unas)
-
 Drive SMART data, system metrics, storage pools, shares and fan control for
-UniFi UNAS. See [`plugins/unifi-unas`](plugins/unifi-unas/README.md).
+UniFi UNAS. Install and setup instructions: [`plugins/unifi-unas`](plugins/unifi-unas/README.md).
 
 ## Layout
 
@@ -52,10 +49,11 @@ plugin actually needs it (not before).
 
 ## Distribution
 
-Each plugin's `homeassistant/` directory is a self-contained, HACS-valid
-integration root. A release workflow publishes each one to its own repository so
-HACS can install it, while development stays in this monorepo. See each plugin's
-README for its install instructions.
+Plugins are installed manually from this repository's GitHub Releases: a release
+workflow builds the on-device agent and attaches an installable ZIP. HACS is not
+used - it installs one integration per repository from the repo root, which a
+monorepo subdirectory cannot satisfy. See each plugin's README for its install
+instructions.
 
 ## Development
 

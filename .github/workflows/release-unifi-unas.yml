@@ -1,12 +1,9 @@
 name: Release unifi-unas
 
-# Publishes the UniFi UNAS plugin: builds the on-device agent binaries, bundles
-# them into the Home Assistant integration, pushes that integration subtree to
-# its standalone HACS repo, and creates a release there with the HACS ZIP asset.
-#
-# Prerequisites (one-time):
-#   - Create the standalone repo (default: FJRG2007/polaris-unifi-unas).
-#   - Add a repository secret PUBLISH_TOKEN: a PAT with `repo` scope on it.
+# Builds the on-device agent binaries and publishes an installable ZIP as a
+# GitHub Release on this monorepo. No separate repository is used; the plugin
+# is installed manually from the release asset (HACS cannot install an
+# integration nested in a monorepo subdirectory).
 #
 # Trigger: push a tag like `unifi-unas-v0.1.0`.
 
@@ -15,8 +12,10 @@ on:
     tags:
       - "unifi-unas-v*"
 
+permissions:
+  contents: write
+
 env:
-  PUBLISH_REPO: FJRG2007/polaris-unifi-unas
   PLUGIN_DIR: plugins/unifi-unas
   INTEGRATION_SUBDIR: custom_components/unifi_unas
 
@@ -38,38 +37,23 @@ jobs:
             cross build --release --target "$target" -p polaris-unas-agent
           done
 
-      - name: Stage integration payload
+      - name: Assemble installable ZIP
         run: |
           set -euo pipefail
-          STAGE="$RUNNER_TEMP/publish"
+          STAGE="$RUNNER_TEMP/stage"
           rm -rf "$STAGE"
-          cp -r "$PLUGIN_DIR/homeassistant" "$STAGE"
-          BIN_DIR="$STAGE/$INTEGRATION_SUBDIR/bin"
+          mkdir -p "$STAGE/custom_components"
+          cp -r "$PLUGIN_DIR/$INTEGRATION_SUBDIR" "$STAGE/custom_components/unifi_unas"
+          BIN_DIR="$STAGE/custom_components/unifi_unas/bin"
           cp target/aarch64-unknown-linux-musl/release/polaris-unas-agent "$BIN_DIR/polaris-unas-agent-aarch64"
           cp target/x86_64-unknown-linux-musl/release/polaris-unas-agent "$BIN_DIR/polaris-unas-agent-x86_64"
-          # HACS zip_release asset: contents of the integration folder at the zip root.
-          ( cd "$STAGE/$INTEGRATION_SUBDIR" && zip -r "$RUNNER_TEMP/unifi_unas.zip" . )
-          echo "STAGE=$STAGE" >> "$GITHUB_ENV"
+          # Archive contains custom_components/unifi_unas/... so it extracts
+          # cleanly into a Home Assistant /config directory.
+          ( cd "$STAGE" && zip -r "$RUNNER_TEMP/unifi_unas.zip" custom_components )
 
-      - name: Push integration to standalone repo
-        run: |
-          set -euo pipefail
-          cd "$STAGE"
-          git init -q
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add -A
-          git commit -q -m "Release ${GITHUB_REF_NAME}"
-          git branch -M main
-          git push --force "https://x-access-token:${PUBLISH_TOKEN}@github.com/${PUBLISH_REPO}.git" main
-        env:
-          PUBLISH_TOKEN: ${{ secrets.PUBLISH_TOKEN }}
-
-      - name: Create release on standalone repo
+      - name: Create release
         uses: softprops/action-gh-release@v2
         with:
-          repository: ${{ env.PUBLISH_REPO }}
-          token: ${{ secrets.PUBLISH_TOKEN }}
           tag_name: ${{ github.ref_name }}
           name: ${{ github.ref_name }}
           files: ${{ runner.temp }}/unifi_unas.zip

@@ -10,7 +10,7 @@ binary over SSH and starts it as a systemd service.
 ## Quick start
 
 1. Install the MQTT integration and a broker (Mosquitto add-on) first.
-2. Install this integration via HACS.
+2. Install this integration manually from the repository releases (see the README).
 3. Add the integration in Settings and enter the UNAS IP and SSH credentials.
 4. Sensors and controls appear automatically over MQTT discovery.
 
@@ -21,4 +21,4 @@ binary over SSH and starts it as a systemd service.
 
 ## Links
 
-[Documentation](https://github.com/FJRG2007/polaris-unifi-unas) - [Issues](https://github.com/FJRG2007/polaris-unifi-unas/issues)
+[Documentation](https://github.com/FJRG2007/polaris/tree/main/plugins/unifi-unas) - [Issues](https://github.com/FJRG2007/polaris/issues)
