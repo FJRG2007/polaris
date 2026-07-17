@@ -9,14 +9,21 @@ the Home Assistant entities behave exactly as upstream.
 
 ## Install
 
-This plugin lives inside the Polaris monorepo, so it is installed manually
-(HACS installs one integration per repository from the repo root, which a
-monorepo subdirectory is not).
+Run this on the Home Assistant host (Terminal & SSH add-on, the HA container, or
+a Core host):
 
-1. Download `unifi_unas.zip` from the [latest release](https://github.com/FJRG2007/polaris/releases).
-2. Extract it into your Home Assistant `/config` directory so the files land in `/config/custom_components/unifi_unas/`.
-3. Restart Home Assistant.
-4. Settings -> Devices & Services -> Add Integration -> "UniFi UNAS".
+```sh
+curl -fsSL https://raw.githubusercontent.com/FJRG2007/polaris/main/plugins/unifi-unas/homeassistant/install.sh | sh
+```
+
+It downloads the latest release and installs it into
+`<config>/custom_components/unifi_unas/`. Then restart Home Assistant and add the
+integration (Settings -> Devices & Services -> Add Integration -> "UniFi UNAS").
+
+Prefer to review first? Download [`install.sh`](homeassistant/install.sh), read
+it, and run `sh install.sh`. Fully manual: download `unifi_unas.zip` from the
+[releases](https://github.com/FJRG2007/polaris/releases) and extract it into your
+`/config` directory.
 
 Full setup fields, SSH key auth and troubleshooting are in the
 [integration README](homeassistant/README.md).

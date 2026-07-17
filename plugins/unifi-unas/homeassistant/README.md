@@ -68,13 +68,21 @@ Assistant devices and entities.
 
 ## Installation
 
-This integration is part of the [Polaris monorepo](https://github.com/FJRG2007/polaris),
-so it is installed manually. HACS installs one integration per repository from the
-repository root, which a monorepo subdirectory cannot satisfy.
+Run the installer on the Home Assistant host (Terminal & SSH add-on, the HA
+container, or a Core host):
 
-1. Download `unifi_unas.zip` from the [latest release](https://github.com/FJRG2007/polaris/releases) (it bundles the prebuilt agent binary).
-2. Extract it into your Home Assistant `/config` directory so the files land in `/config/custom_components/unifi_unas/`.
-3. Restart Home Assistant.
+```sh
+curl -fsSL https://raw.githubusercontent.com/FJRG2007/polaris/main/plugins/unifi-unas/homeassistant/install.sh | sh
+```
+
+It downloads the latest release (which bundles the prebuilt agent binary) and
+installs it into `<config>/custom_components/unifi_unas/`, then restart Home
+Assistant.
+
+Prefer to do it by hand? Download [`install.sh`](install.sh) and review it, or
+download `unifi_unas.zip` from the [releases](https://github.com/FJRG2007/polaris/releases)
+and extract it into your `/config` directory so the files land in
+`/config/custom_components/unifi_unas/`. Restart Home Assistant afterwards.
 
 ## Setup
 
