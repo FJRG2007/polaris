@@ -21,7 +21,7 @@ Assistant entities are unchanged.
 | 1 | Monorepo structure, workspace, gitignore | done |
 | 2 | `polaris-unas-core`: model, SMART parse, bays, topics, fan PI (20 tests) | done |
 | 3 | `polaris-unas-agent`: system/drive/storage/net collectors, MQTT, fan loop | done (compiles, 25 tests, clippy/fmt clean; on-device runtime untested) |
-| 4 | Cross-compile (aarch64-musl via `cross`/Docker) + systemd unit | tooling done (`cross-build.sh` + unit); binary built by the release workflow in CI (local Docker build intentionally not run) |
+| 4 | Cross-compile (aarch64-musl via `cross`/Docker) + systemd unit | done - agent built in CI for aarch64 + x86_64 musl and published in release `unifi-unas-v0.1.0` (static ELF verified) |
 | 5 | Home Assistant glue: deploy binary instead of scripts; keep entities | done (Python compiles; entities reused, deploy swapped to single binary + env + unit) |
 | 6 | Integration packaging (manifest, info.md, dashboard card) | done |
 | 7 | Release workflow: build agent + attach installable ZIP to monorepo releases | done (manual install; HACS not used - it cannot install from a monorepo subdirectory) |
