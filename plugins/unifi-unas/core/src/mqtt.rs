@@ -1,16 +1,33 @@
 //! MQTT topic layout.
 //!
 //! The topic tree is the contract between the on-device agent and the Home
-//! Assistant entities. It mirrors the upstream layout exactly so existing HA
-//! subscriptions keep working: `unas/<id>/...` where `<id>` is the first eight
-//! characters of the config entry id.
+//! Assistant entities. It is the single source of truth: the Python side is
+//! generated from these segment names (see `examples/gen_python.rs`), so the
+//! two ends can never drift. Layout: `unas/<id>/...` where `<id>` is the first
+//! eight characters of the config entry id.
+
+/// Topic segment names. Shared by [`Topics`] and the Python code generator so
+/// both ends of the protocol stay identical.
+pub mod seg {
+    pub const PREFIX: &str = "unas";
+    pub const AVAILABILITY: &str = "availability";
+    pub const CONTROL: &str = "control";
+    pub const SYSTEM: &str = "system";
+    pub const HDD: &str = "hdd";
+    pub const NVME: &str = "nvme";
+    pub const POOL: &str = "pool";
+    pub const SMB: &str = "smb";
+    pub const NFS: &str = "nfs";
+    pub const SHARE: &str = "share";
+}
 
 /// Root prefix for every topic belonging to one integration entry.
 ///
-/// Only the first eight characters of the entry id are used, matching upstream.
+/// Only the first eight characters of the entry id are used, matching the
+/// Python side.
 pub fn root(entry_id: &str) -> String {
     let short: String = entry_id.chars().take(8).collect();
-    format!("unas/{short}")
+    format!("{}/{short}", seg::PREFIX)
 }
 
 /// The fixed set of topics derived from a root prefix.
@@ -33,56 +50,56 @@ impl Topics {
     }
 
     pub fn availability(&self) -> String {
-        format!("{}/availability", self.root)
+        format!("{}/{}", self.root, seg::AVAILABILITY)
     }
 
     pub fn system(&self, metric: &str) -> String {
-        format!("{}/system/{metric}", self.root)
+        format!("{}/{}/{metric}", self.root, seg::SYSTEM)
     }
 
     pub fn hdd(&self, bay: &str, metric: &str) -> String {
-        format!("{}/hdd/{bay}/{metric}", self.root)
+        format!("{}/{}/{bay}/{metric}", self.root, seg::HDD)
     }
 
     pub fn nvme(&self, slot: &str, metric: &str) -> String {
-        format!("{}/nvme/{slot}/{metric}", self.root)
+        format!("{}/{}/{slot}/{metric}", self.root, seg::NVME)
     }
 
     pub fn pool(&self, num: u32, metric: &str) -> String {
-        format!("{}/pool/{num}/{metric}", self.root)
+        format!("{}/{}/{num}/{metric}", self.root, seg::POOL)
     }
 
     pub fn share(&self, name: &str, metric: &str) -> String {
-        format!("{}/share/{name}/{metric}", self.root)
+        format!("{}/{}/{name}/{metric}", self.root, seg::SHARE)
     }
 
     pub fn smb(&self, leaf: &str) -> String {
-        format!("{}/smb/{leaf}", self.root)
+        format!("{}/{}/{leaf}", self.root, seg::SMB)
     }
 
     pub fn nfs(&self, leaf: &str) -> String {
-        format!("{}/nfs/{leaf}", self.root)
+        format!("{}/{}/{leaf}", self.root, seg::NFS)
     }
 
     /// Interval control topic the agent subscribes to for live re-tuning.
     pub fn monitor_interval(&self) -> String {
-        format!("{}/control/monitor_interval", self.root)
+        format!("{}/{}/monitor_interval", self.root, seg::CONTROL)
     }
 
     /// Fan mode control topic (`unas_managed`, `auto`, `target_temp`, or a raw
     /// PWM integer for fixed speed).
     pub fn fan_mode(&self) -> String {
-        format!("{}/control/fan/mode", self.root)
+        format!("{}/{}/fan/mode", self.root, seg::CONTROL)
     }
 
     /// A single fan curve parameter (`min_temp`, `max_fan`, `target_temp`, ...).
     pub fn fan_curve(&self, param: &str) -> String {
-        format!("{}/control/fan/curve/{param}", self.root)
+        format!("{}/{}/fan/curve/{param}", self.root, seg::CONTROL)
     }
 
     /// Wildcard covering every fan curve parameter, for a single subscription.
     pub fn fan_curve_wildcard(&self) -> String {
-        format!("{}/control/fan/curve/+", self.root)
+        format!("{}/{}/fan/curve/+", self.root, seg::CONTROL)
     }
 }
 

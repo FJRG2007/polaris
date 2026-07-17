@@ -19,8 +19,33 @@ pub enum DeviceModel {
 }
 
 impl DeviceModel {
-    /// Parse the upstream config key (e.g. `"UNAS_PRO"`). Unknown keys fall back
-    /// to `UnasPro`, matching the original default.
+    /// Every supported model, in display order. Drives both the Rust logic and
+    /// the generated Home Assistant model list.
+    pub const ALL: [DeviceModel; 7] = [
+        Self::UnasPro,
+        Self::UnasPro8,
+        Self::UnasPro4,
+        Self::Unas4,
+        Self::Unas2,
+        Self::Unvr,
+        Self::UnvrPro,
+    ];
+
+    /// Human-readable label shown in the Home Assistant model dropdown.
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::UnasPro => "UNAS Pro (7-bay)",
+            Self::UnasPro8 => "UNAS Pro 8",
+            Self::UnasPro4 => "UNAS Pro 4",
+            Self::Unas4 => "UNAS 4",
+            Self::Unas2 => "UNAS 2",
+            Self::Unvr => "UNVR",
+            Self::UnvrPro => "UNVR Pro",
+        }
+    }
+
+    /// Parse the config key (e.g. `"UNAS_PRO"`). Unknown keys fall back to
+    /// `UnasPro`, matching the default.
     pub fn from_key(key: &str) -> Self {
         match key {
             "UNAS_PRO" => Self::UnasPro,

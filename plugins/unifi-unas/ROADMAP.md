@@ -53,6 +53,17 @@ Packaging / release (phases 6-7):
 - [x] Monorepo CI (Rust fmt/clippy/test + Python compile)
 - [x] Release workflow builds aarch64/x86_64 agents, bundles the HACS zip, publishes the subtree + release to the standalone repo
 
+## Single source of truth (Rust -> Python)
+
+Home Assistant integrations must be Python (HA loads them in-process and they
+subclass HA's Python classes), so the entity/config-flow glue cannot be Rust.
+The only data shared with the Rust agent - the MQTT topic layout and the device
+model list - lives once in `core` (`mqtt.rs`, `bays.rs`) and is emitted to Python
+by `core/examples/gen_python.rs` into `custom_components/unifi_unas/_generated.py`.
+CI regenerates it and fails if the committed file drifts, so the two ends of the
+protocol can never diverge. No compiled dependency is installed into Home
+Assistant; the generated file is plain Python.
+
 ## Notes / deliberate differences
 
 - Rounding: fan math uses round-half-away-from-zero vs the shell's round-half-to-even.

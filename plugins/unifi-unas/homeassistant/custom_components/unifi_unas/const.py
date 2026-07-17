@@ -2,6 +2,10 @@ from pathlib import Path
 
 from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 
+# MQTT topic layout and device-model list are generated from polaris-unas-core
+# (the on-device agent's single source of truth). Do not hand-edit _generated.py.
+from ._generated import DEVICE_MODELS, get_mqtt_root, get_mqtt_topics
+
 DOMAIN = "unifi_unas"
 
 CONF_HOST = "host"
@@ -48,16 +52,6 @@ CONF_DEVICE_MODEL = "device_model"
 CONF_DEVICE_NAME = "device_name"
 DEFAULT_DEVICE_MODEL = "UNAS_PRO"
 
-DEVICE_MODELS = {
-    "UNAS_PRO": "UNAS Pro (7-bay)",
-    "UNAS_PRO_8": "UNAS Pro 8",
-    "UNAS_PRO_4": "UNAS Pro 4",
-    "UNAS_4": "UNAS 4",
-    "UNAS_2": "UNAS 2",
-    "UNVR": "UNVR",
-    "UNVR_PRO": "UNVR Pro",
-}
-
 
 def get_device_info(entry_data: dict) -> tuple[str, str]:
     device_model = entry_data[CONF_DEVICE_MODEL]
@@ -92,26 +86,6 @@ def format_schedule(schedule):
     if weekdays == "*":
         return f"Daily at {time}"
     return f"{weekdays} at {time}"
-
-
-# MQTT topic structure
-def get_mqtt_root(entry_id: str) -> str:
-    return f"unas/{entry_id[:8]}"
-
-def get_mqtt_topics(entry_id: str):
-    root = get_mqtt_root(entry_id)
-    return {
-        "root": root,
-        "availability": f"{root}/availability",
-        "control": f"{root}/control",
-        "system": f"{root}/system",
-        "hdd": f"{root}/hdd",
-        "nvme": f"{root}/nvme",
-        "pool": f"{root}/pool",
-        "smb": f"{root}/smb",
-        "nfs": f"{root}/nfs",
-        "share": f"{root}/share",
-    }
 
 
 def get_backup_device_info(entry_id: str, entry_data: dict, task: dict) -> DeviceInfo:
