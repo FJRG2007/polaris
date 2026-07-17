@@ -1,0 +1,13 @@
+# Normalize all text to LF in the repository. The agent, shell scripts and
+# systemd unit run on Linux, so CRLF must never leak into them.
+* text=auto eol=lf
+
+# Explicit LF for files that break with CRLF on the target.
+*.sh text eol=lf
+*.service text eol=lf
+*.rs text eol=lf
+*.py text eol=lf
+
+# Binary assets (none tracked yet, but keep git from touching them).
+*.png binary
+*.zip binary

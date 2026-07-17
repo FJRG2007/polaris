@@ -1,0 +1,30 @@
+# Polaris workspace.
+# Shared Rust crates that power both the Home Assistant plugins (on-device
+# agents) and the future native Polaris dashboard. Each plugin keeps its own
+# crates under plugins/<name>/; cross-plugin code graduates to crates/ later.
+[workspace]
+resolver = "2"
+members = [
+    "plugins/unifi-unas/core",
+    "plugins/unifi-unas/agent",
+]
+
+[workspace.package]
+edition = "2021"
+rust-version = "1.85"
+license = "MIT"
+repository = "https://github.com/FJRG2007/polaris"
+authors = ["FJRG2007"]
+
+[workspace.dependencies]
+serde = { version = "1.0.219", features = ["derive"] }
+serde_json = "1.0.140"
+thiserror = "2.0.12"
+
+# Small, static on-device binaries: optimize for size over raw speed.
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

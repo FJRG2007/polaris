@@ -1,0 +1,20 @@
+[package]
+name = "polaris-unas-agent"
+version = "0.1.0"
+description = "On-device UniFi UNAS agent: collects metrics and drives fan control, publishing to MQTT. Replaces the upstream Python + Bash scripts with one static binary."
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[[bin]]
+name = "polaris-unas-agent"
+path = "src/main.rs"
+
+[dependencies]
+polaris-unas-core = { path = "../core" }
+serde_json = { workspace = true }
+# TCP-only MQTT keeps the static musl binary small and provider-free. TLS is a
+# tracked follow-up (ROADMAP phase 3b) and slots into src/broker.rs.
+rumqttc = { version = "0.24", default-features = false }

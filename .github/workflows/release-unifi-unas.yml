@@ -1,0 +1,75 @@
+name: Release unifi-unas
+
+# Publishes the UniFi UNAS plugin: builds the on-device agent binaries, bundles
+# them into the Home Assistant integration, pushes that integration subtree to
+# its standalone HACS repo, and creates a release there with the HACS ZIP asset.
+#
+# Prerequisites (one-time):
+#   - Create the standalone repo (default: FJRG2007/polaris-unifi-unas).
+#   - Add a repository secret PUBLISH_TOKEN: a PAT with `repo` scope on it.
+#
+# Trigger: push a tag like `unifi-unas-v0.1.0`.
+
+on:
+  push:
+    tags:
+      - "unifi-unas-v*"
+
+env:
+  PUBLISH_REPO: FJRG2007/polaris-unifi-unas
+  PLUGIN_DIR: plugins/unifi-unas
+  INTEGRATION_SUBDIR: custom_components/unifi_unas
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Install cross
+        run: cargo install cross --locked
+
+      - name: Build agent binaries
+        run: |
+          set -euo pipefail
+          for target in aarch64-unknown-linux-musl x86_64-unknown-linux-musl; do
+            cross build --release --target "$target" -p polaris-unas-agent
+          done
+
+      - name: Stage integration payload
+        run: |
+          set -euo pipefail
+          STAGE="$RUNNER_TEMP/publish"
+          rm -rf "$STAGE"
+          cp -r "$PLUGIN_DIR/homeassistant" "$STAGE"
+          BIN_DIR="$STAGE/$INTEGRATION_SUBDIR/bin"
+          cp target/aarch64-unknown-linux-musl/release/polaris-unas-agent "$BIN_DIR/polaris-unas-agent-aarch64"
+          cp target/x86_64-unknown-linux-musl/release/polaris-unas-agent "$BIN_DIR/polaris-unas-agent-x86_64"
+          # HACS zip_release asset: contents of the integration folder at the zip root.
+          ( cd "$STAGE/$INTEGRATION_SUBDIR" && zip -r "$RUNNER_TEMP/unifi_unas.zip" . )
+          echo "STAGE=$STAGE" >> "$GITHUB_ENV"
+
+      - name: Push integration to standalone repo
+        run: |
+          set -euo pipefail
+          cd "$STAGE"
+          git init -q
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Release ${GITHUB_REF_NAME}"
+          git branch -M main
+          git push --force "https://x-access-token:${PUBLISH_TOKEN}@github.com/${PUBLISH_REPO}.git" main
+        env:
+          PUBLISH_TOKEN: ${{ secrets.PUBLISH_TOKEN }}
+
+      - name: Create release on standalone repo
+        uses: softprops/action-gh-release@v2
+        with:
+          repository: ${{ env.PUBLISH_REPO }}
+          token: ${{ secrets.PUBLISH_TOKEN }}
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          files: ${{ runner.temp }}/unifi_unas.zip

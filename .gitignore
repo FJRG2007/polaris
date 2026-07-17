@@ -1,0 +1,37 @@
+# References: cloned upstream repos kept locally for study, never committed
+/references/
+
+# Rust
+target/
+**/*.rs.bk
+*.pdb
+
+# Python (Home Assistant glue)
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Build artifacts
+dist/
+build/
+*.whl
+
+# Prebuilt on-device agent binaries (produced by CI, never committed)
+plugins/*/homeassistant/custom_components/*/bin/polaris-unas-agent-*
+
+# Secrets / local env / logs - never commit
+.env
+*.env
+!*.env.example
+*.log
+secrets.*
+*.pem
+*.key
+
+# Editor / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

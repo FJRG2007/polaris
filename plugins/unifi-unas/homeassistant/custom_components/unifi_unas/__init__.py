@@ -1,0 +1,464 @@
+from __future__ import annotations
+
+import asyncio
+import logging
+import time
+from datetime import timedelta
+
+from packaging.version import Version, InvalidVersion
+
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import Platform
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.exceptions import ConfigEntryNotReady
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from homeassistant.components import mqtt
+from homeassistant.helpers import issue_registry as ir
+from homeassistant.loader import async_get_integration
+
+from .const import (
+    DOMAIN,
+    CONF_HOST,
+    CONF_USERNAME,
+    CONF_PASSWORD,
+    CONF_MQTT_HOST,
+    CONF_MQTT_USER,
+    CONF_MQTT_PASSWORD,
+    CONF_MQTT_PORT,
+    CONF_MQTT_TLS,
+    CONF_MQTT_TLS_INSECURE,
+    CONF_SCAN_INTERVAL,
+    CONF_DEVICE_MODEL,
+    DEFAULT_SCAN_INTERVAL,
+    DEFAULT_DEVICE_MODEL,
+    DEFAULT_MQTT_PORT,
+    AGENT_SERVICE,
+    AGENT_BINARY_REMOTE,
+    AGENT_ENV_REMOTE,
+    AGENT_UNIT_REMOTE,
+    get_mqtt_root,
+    get_mqtt_topics,
+)
+from .ssh_manager import SSHManager
+from .mqtt_client import UNASMQTTClient
+
+_LOGGER = logging.getLogger(__name__)
+
+PLATFORMS: list[Platform] = [
+    Platform.BINARY_SENSOR,
+    Platform.BUTTON,
+    Platform.SENSOR,
+    Platform.SELECT,
+    Platform.NUMBER,
+    Platform.SWITCH,
+]
+
+SSH_UNAVAILABLE_THRESHOLD = 600
+LAST_CLEANUP_VERSION_KEY = "last_cleanup_version"
+LAST_DEPLOY_VERSION_KEY = "last_deploy_version"
+PERFORM_MQTT_CLEANUP = True
+
+
+async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    if entry.version == 1:
+        new_data = {**entry.data}
+        if CONF_DEVICE_MODEL not in new_data:
+            new_data[CONF_DEVICE_MODEL] = DEFAULT_DEVICE_MODEL
+            _LOGGER.info("Migrated config entry to version 2, added device model: %s", DEFAULT_DEVICE_MODEL)
+
+        hass.config_entries.async_update_entry(entry, data=new_data, version=2)
+        return True
+
+    return True
+
+
+def _version_at_least(stored: str | None, target: str) -> bool:
+    if stored is None:
+        return False
+    try:
+        return Version(stored.replace("-dev", "")) >= Version(target.replace("-dev", ""))
+    except InvalidVersion:
+        return stored == target
+
+
+async def _cleanup_old_mqtt_configs_on_upgrade(
+    hass: HomeAssistant, entry: ConfigEntry
+) -> None:
+    if not PERFORM_MQTT_CLEANUP:
+        return
+
+    integration = await async_get_integration(hass, DOMAIN)
+    current_version = str(integration.version)
+    last_cleanup_version = entry.data.get(LAST_CLEANUP_VERSION_KEY)
+
+    if _version_at_least(last_cleanup_version, current_version):
+        return
+
+    _LOGGER.info(
+        "Integration upgraded from %s to %s - running MQTT config cleanup",
+        last_cleanup_version or "unknown",
+        current_version,
+    )
+
+    topics_to_clear = [
+        "unas_uptime",
+        "unas_os_version",
+        "unas_drive_version",
+        "unas_cpu_usage",
+        "unas_memory_used",
+        "unas_memory_total",
+        "unas_memory_usage",
+        "unas_cpu",
+        "unas_fan_speed",
+        "unas_fan_speed_percent",
+    ]
+
+    for i in range(1, 6):
+        topics_to_clear.extend(
+            [
+                f"unas_pool{i}_usage",
+                f"unas_pool{i}_size",
+                f"unas_pool{i}_used",
+                f"unas_pool{i}_available",
+            ]
+        )
+
+    for bay in range(1, 8):
+        topics_to_clear.extend(
+            [
+                f"unas_hdd_{bay}_temperature",
+                f"unas_hdd_{bay}_model",
+                f"unas_hdd_{bay}_serial",
+                f"unas_hdd_{bay}_rpm",
+                f"unas_hdd_{bay}_firmware",
+                f"unas_hdd_{bay}_status",
+                f"unas_hdd_{bay}_total_size",
+                f"unas_hdd_{bay}_power_hours",
+                f"unas_hdd_{bay}_bad_sectors",
+            ]
+        )
+
+    cleared_count = 0
+    for topic in topics_to_clear:
+        try:
+            await mqtt.async_publish(
+                hass,
+                f"homeassistant/sensor/{topic}/config",
+                "",
+                qos=0,
+                retain=True,
+            )
+            cleared_count += 1
+        except Exception as err:
+            _LOGGER.debug("Failed to clear MQTT config for %s: %s", topic, err)
+
+    _LOGGER.info("Cleared %d old MQTT auto-discovery configs", cleared_count)
+
+    new_data = dict(entry.data)
+    new_data[LAST_CLEANUP_VERSION_KEY] = current_version
+    hass.config_entries.async_update_entry(entry, data=new_data)
+
+
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    manager = SSHManager(
+        host=entry.data[CONF_HOST],
+        username=entry.data[CONF_USERNAME],
+        password=entry.data.get(CONF_PASSWORD),
+        mqtt_host=entry.data.get(CONF_MQTT_HOST),
+        mqtt_user=entry.data.get(CONF_MQTT_USER),
+        mqtt_password=entry.data.get(CONF_MQTT_PASSWORD),
+        mqtt_port=entry.data.get(CONF_MQTT_PORT, DEFAULT_MQTT_PORT),
+        mqtt_tls=entry.data.get(CONF_MQTT_TLS, False),
+        mqtt_tls_insecure=entry.data.get(CONF_MQTT_TLS_INSECURE, False),
+        scan_interval=entry.data.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL),
+    )
+
+    integration = await async_get_integration(hass, DOMAIN)
+    current_version = str(integration.version)
+    last_deploy_version = entry.data.get(LAST_DEPLOY_VERSION_KEY)
+    is_dev_version = '-dev' in current_version
+    device_model = entry.data[CONF_DEVICE_MODEL]
+    is_existing_installation = last_deploy_version is not None
+
+    ssh_connected = False
+    try:
+        await manager.connect()
+        ssh_connected = True
+        _LOGGER.info("SSH connection established to %s", entry.data[CONF_HOST])
+
+        scripts_installed = await manager.scripts_installed()
+        if last_deploy_version != current_version or not scripts_installed or is_dev_version:
+            mqtt_root = get_mqtt_topics(entry.entry_id)["root"]
+            await manager.deploy_scripts(device_model, mqtt_root)
+            new_data = dict(entry.data)
+            new_data[LAST_DEPLOY_VERSION_KEY] = current_version
+            hass.config_entries.async_update_entry(entry, data=new_data)
+
+    except Exception as err:
+        if not is_existing_installation:
+            raise ConfigEntryNotReady(
+                f"Cannot connect to UNAS at {entry.data[CONF_HOST]} for initial setup: {err}"
+            ) from err
+        _LOGGER.warning(
+            "UNAS at %s is offline, will reconnect when available: %s",
+            entry.data[CONF_HOST],
+            err,
+        )
+
+    pending_script_deploy = not ssh_connected and (
+        last_deploy_version != current_version or is_dev_version
+    )
+
+    mqtt_client_instance = UNASMQTTClient(hass, entry.entry_id)
+    coordinator = UNASDataUpdateCoordinator(hass, manager, mqtt_client_instance, entry, pending_script_deploy)
+    mqtt_client_instance._coordinator = coordinator
+
+    await coordinator.async_config_entry_first_refresh()
+
+    hass.data.setdefault(DOMAIN, {})
+    hass.data[DOMAIN][entry.entry_id] = {
+        "coordinator": coordinator,
+        "ssh_manager": manager,
+        "mqtt_client": mqtt_client_instance,
+    }
+
+    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    await mqtt_client_instance.async_subscribe()
+    await _cleanup_old_mqtt_configs_on_upgrade(hass, entry)
+
+    topics = get_mqtt_topics(entry.entry_id)
+    scan_interval = entry.data.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
+    await mqtt.async_publish(
+        hass,
+        f"{topics['control']}/monitor_interval",
+        str(scan_interval),
+        qos=0,
+        retain=True,
+    )
+
+    return True
+
+
+async def _clear_retained_mqtt_topics(hass: HomeAssistant, entry_id: str) -> None:
+    if mqtt.DOMAIN not in hass.data:
+        return
+    mqtt_root = get_mqtt_root(entry_id)
+    collected: list[str] = []
+
+    @callback
+    def on_message(msg):
+        collected.append(msg.topic)
+
+    try:
+        unsub = await mqtt.async_subscribe(hass, f"{mqtt_root}/#", on_message, qos=0)
+        await asyncio.sleep(0.5)
+        unsub()
+        for topic in collected:
+            await mqtt.async_publish(hass, topic, "", qos=0, retain=True)
+        if collected:
+            _LOGGER.info("Cleared %d retained MQTT topics under %s", len(collected), mqtt_root)
+    except Exception:
+        _LOGGER.debug("Failed to clear retained MQTT topics for %s", mqtt_root)
+
+
+async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    if unload_ok := await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
+        data = hass.data[DOMAIN].pop(entry.entry_id)
+        await data["mqtt_client"].async_unsubscribe()
+        await _clear_retained_mqtt_topics(hass, entry.entry_id)
+
+        manager = data["ssh_manager"]
+        try:
+            # Remove the agent and restore stock fan control. No packages were
+            # installed on the device, so nothing needs uninstalling.
+            await manager.execute_command(f"systemctl stop {AGENT_SERVICE} || true")
+            await manager.execute_command(f"systemctl disable {AGENT_SERVICE} || true")
+            await manager.execute_command(f"rm -f {AGENT_UNIT_REMOTE}")
+            await manager.execute_command(f"rm -f {AGENT_BINARY_REMOTE}")
+            await manager.execute_command(f"rm -f {AGENT_ENV_REMOTE}")
+            await manager.execute_command("systemctl daemon-reload")
+            await manager.execute_command("echo 2 > /sys/class/hwmon/hwmon0/pwm1_enable || true")
+            await manager.execute_command("echo 2 > /sys/class/hwmon/hwmon0/pwm2_enable || true")
+            await manager.kick_native_fan_control()
+        except Exception as err:
+            _LOGGER.error("Failed to clean up UNAS (non-critical): %s", err)
+
+        await manager.disconnect()
+
+    return unload_ok
+
+
+class UNASDataUpdateCoordinator(DataUpdateCoordinator):
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        ssh_manager: SSHManager,
+        mqtt_client: UNASMQTTClient,
+        entry: ConfigEntry,
+        pending_script_deploy: bool = False,
+    ) -> None:
+        self.ssh_manager = ssh_manager
+        self.mqtt_client = mqtt_client
+        self.entry = entry
+        self.pending_script_deploy = pending_script_deploy
+        self.ssh_failed_since: float | None = None
+        self.discovered_bays: set[str] = set()
+        self.discovered_nvmes: set[str] = set()
+        self.discovered_pools: set[str] = set()
+        self.discovered_shares: set[str] = set()
+        self.discovered_backup_task_sensors: set[str] = set()
+        self.discovered_backup_task_buttons: set[str] = set()
+        self.discovered_backup_task_switches: set[str] = set()
+        self.sensor_add_entities = None
+        self.button_add_entities = None
+        self.switch_add_entities = None
+
+        super().__init__(
+            hass,
+            _LOGGER,
+            name=DOMAIN,
+            update_interval=timedelta(seconds=entry.data.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)),
+        )
+
+    async def _async_update_data(self):
+        if mqtt.DOMAIN not in self.hass.data:
+            _LOGGER.error("MQTT integration removed - UNAS Pro requires MQTT")
+            ir.async_create_issue(
+                self.hass,
+                DOMAIN,
+                "mqtt_missing",
+                is_fixable=False,
+                severity=ir.IssueSeverity.ERROR,
+                translation_key="mqtt_missing",
+            )
+            raise UpdateFailed("MQTT integration is required but not found")
+
+        recent_machine_ids = self.mqtt_client.get_recent_machine_ids()
+        duplicate_issue_id = f"duplicate_publishers_{self.entry.entry_id}"
+        if len(recent_machine_ids) > 1:
+            _LOGGER.warning(
+                "Multiple devices publishing to the same MQTT topic: %s",
+                ", ".join(sorted(recent_machine_ids)),
+            )
+            ir.async_create_issue(
+                self.hass,
+                DOMAIN,
+                duplicate_issue_id,
+                is_fixable=False,
+                severity=ir.IssueSeverity.WARNING,
+                translation_key="duplicate_publishers",
+                translation_placeholders={
+                    "machine_ids": ", ".join(sorted(recent_machine_ids)),
+                },
+            )
+        else:
+            ir.async_delete_issue(self.hass, DOMAIN, duplicate_issue_id)
+
+        data = {
+            "scripts_installed": False,
+            "ssh_connected": False,
+            "monitor_running": False,
+            "fan_control_running": False,
+            "mqtt_data": self.mqtt_client.get_data(),
+        }
+
+        try:
+            scripts_installed = await self.ssh_manager.scripts_installed()
+
+            if not scripts_installed or self.pending_script_deploy:
+                reason = "missing" if not scripts_installed else "pending upgrade"
+                _LOGGER.info("Scripts %s, deploying...", reason)
+                device_model = self.entry.data[CONF_DEVICE_MODEL]
+                mqtt_root = get_mqtt_topics(self.entry.entry_id)["root"]
+                await self.ssh_manager.deploy_scripts(device_model, mqtt_root)
+                self.pending_script_deploy = False
+                integration = await async_get_integration(self.hass, DOMAIN)
+                new_data = dict(self.entry.data)
+                new_data[LAST_DEPLOY_VERSION_KEY] = str(integration.version)
+                self.hass.config_entries.async_update_entry(self.entry, data=new_data)
+                scripts_installed = True
+
+            # One agent process now performs both roles, so both service flags
+            # reflect the single unit's state.
+            agent_running = await self.ssh_manager.service_running(AGENT_SERVICE)
+
+            data.update({
+                "scripts_installed": scripts_installed,
+                "ssh_connected": True,
+                "monitor_running": agent_running,
+                "fan_control_running": agent_running,
+            })
+
+            if self.ssh_failed_since is not None:
+                _LOGGER.info("SSH connection restored to %s", self.entry.data[CONF_HOST])
+                self.ssh_failed_since = None
+            ssh_issue_id = f"ssh_unavailable_{self.entry.entry_id}"
+            ir.async_delete_issue(self.hass, DOMAIN, ssh_issue_id)
+
+            try:
+                result = await self.ssh_manager.execute_backup_api("GET", "/api/v1/remote-backup/tasks")
+                if result.get("data"):
+                    data["backup_tasks"] = result["data"]
+                else:
+                    data["backup_tasks"] = []
+            except Exception as err:
+                _LOGGER.debug("Could not fetch backup tasks: %s", err)
+                data["backup_tasks"] = []
+
+        except Exception as err:
+            _LOGGER.warning("SSH connection temporarily unavailable: %s", err)
+            now = time.time()
+            if self.ssh_failed_since is None:
+                self.ssh_failed_since = now
+            elif now - self.ssh_failed_since > SSH_UNAVAILABLE_THRESHOLD:
+                ssh_issue_id = f"ssh_unavailable_{self.entry.entry_id}"
+                ir.async_create_issue(
+                    self.hass,
+                    DOMAIN,
+                    ssh_issue_id,
+                    is_fixable=False,
+                    severity=ir.IssueSeverity.WARNING,
+                    translation_key="ssh_unavailable",
+                    translation_placeholders={
+                        "host": self.entry.data[CONF_HOST],
+                    },
+                )
+
+        try:
+            if self.sensor_add_entities is not None:
+                from .sensor import (
+                    _discover_and_add_drive_sensors,
+                    _discover_and_add_nvme_sensors,
+                    _discover_and_add_pool_sensors,
+                    _discover_and_add_share_sensors,
+                    _discover_and_add_backup_sensors,
+                )
+                await _discover_and_add_drive_sensors(self, self.sensor_add_entities)
+                await _discover_and_add_nvme_sensors(self, self.sensor_add_entities)
+                await _discover_and_add_pool_sensors(self, self.sensor_add_entities)
+                await _discover_and_add_share_sensors(self, self.sensor_add_entities)
+                await _discover_and_add_backup_sensors(self, self.sensor_add_entities)
+
+            if self.button_add_entities is not None:
+                from .button import _discover_and_add_backup_buttons
+                await _discover_and_add_backup_buttons(self, self.button_add_entities)
+
+            if self.switch_add_entities is not None:
+                from .switch import _discover_and_add_backup_switches
+                await _discover_and_add_backup_switches(self, self.switch_add_entities)
+        except Exception as err:
+            _LOGGER.error("Error during entity discovery: %s", err)
+
+        return data
+
+    def find_backup_task(self, task_id: str):
+        for task in self.data.get("backup_tasks", []):
+            if task["id"] == task_id:
+                return task
+        return None
+
+    async def async_reinstall_scripts(self) -> None:
+        device_model = self.entry.data[CONF_DEVICE_MODEL]
+        mqtt_root = get_mqtt_topics(self.entry.entry_id)["root"]
+        await self.ssh_manager.deploy_scripts(device_model, mqtt_root)
+        await self.async_request_refresh()

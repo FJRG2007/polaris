@@ -1,0 +1,8 @@
+[toolchain]
+channel = "stable"
+components = ["rustfmt", "clippy"]
+# On-device agents are cross-compiled to static musl binaries. The UNAS Pro
+# line is aarch64; UNVR variants are also aarch64. Cross builds run through
+# `cross` (Docker), so these targets are pulled on demand rather than required
+# on the host toolchain.
+targets = ["aarch64-unknown-linux-musl", "x86_64-unknown-linux-musl"]
