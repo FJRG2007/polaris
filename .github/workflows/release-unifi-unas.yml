@@ -16,8 +16,7 @@ permissions:
   contents: write
 
 env:
-  PLUGIN_DIR: plugins/unifi-unas
-  INTEGRATION_SUBDIR: custom_components/unifi_unas
+  INTEGRATION_SRC: plugins/unifi-unas/homeassistant/custom_components/unifi_unas
 
 jobs:
   release:
@@ -43,7 +42,7 @@ jobs:
           STAGE="$RUNNER_TEMP/stage"
           rm -rf "$STAGE"
           mkdir -p "$STAGE/custom_components"
-          cp -r "$PLUGIN_DIR/$INTEGRATION_SUBDIR" "$STAGE/custom_components/unifi_unas"
+          cp -r "$INTEGRATION_SRC" "$STAGE/custom_components/unifi_unas"
           BIN_DIR="$STAGE/custom_components/unifi_unas/bin"
           cp target/aarch64-unknown-linux-musl/release/polaris-unas-agent "$BIN_DIR/polaris-unas-agent-aarch64"
           cp target/x86_64-unknown-linux-musl/release/polaris-unas-agent "$BIN_DIR/polaris-unas-agent-x86_64"
