@@ -54,6 +54,23 @@ Point `POLARIS_SSH_USER` at a dedicated account in the `docker` group - the key
 grants Docker access, which is root-equivalent on the host. Override the target
 with `POLARIS_SSH_USER`, `POLARIS_SSH_HOST`, or `POLARIS_SSH_FROM` before running.
 
+## Local access (polaris.local)
+
+Like Home Assistant's `homeassistant.local`, the stack advertises itself on the
+local network so you can reach it by name instead of an IP:
+
+- **`polaris.local`** - resolved LAN-wide by the `mdns` service (mDNS/zeroconf),
+  so any phone or laptop on the network reaches `http://polaris.local`.
+- **`polaris`** - the installer adds a `127.0.0.1 polaris polaris.local` hosts
+  entry on the machine running Polaris, so the local host resolves it too.
+
+mDNS needs the host network, so the `mdns` service uses `network_mode: host`;
+this works on Linux and WSL. Docker Desktop (macOS/Windows) restricts host
+networking, so there `polaris.local` relies on the hosts-file entry on the local
+machine. Change the advertised name with `POLARIS_MDNS_HOSTNAME`. Caddy serves
+these names over plain HTTP (a `.local` name cannot get a public certificate),
+and both are already trusted origins for authentication.
+
 ## Configuration
 
 Every setting lives in `.env` (see [`.env.example`](.env.example)). Two values

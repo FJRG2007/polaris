@@ -1,8 +1,7 @@
 # Polaris reverse proxy. Terminates TLS and forwards to the web container.
-#
-# The site address comes from the environment: a domain (e.g. polaris.example.com)
-# gets automatic HTTPS via Let's Encrypt; `:80` or `:443` serve an IP-only host.
-{$POLARIS_SITE_ADDRESS} {
+
+# Shared proxy behavior, imported by each site below.
+(proxy) {
 	encode zstd gzip
 
 	# Large uploads: Drive streams multi-gigabyte files through the app, so the
@@ -14,8 +13,6 @@
 	}
 
 	header {
-		# Force HTTPS for a year, including subdomains.
-		Strict-Transport-Security "max-age=31536000; includeSubDomains"
 		# Deny framing and MIME sniffing; keep referrers off external origins.
 		X-Content-Type-Options "nosniff"
 		X-Frame-Options "DENY"
@@ -25,4 +22,20 @@
 	}
 
 	reverse_proxy web:3000
+}
+
+# Public site. A domain (e.g. polaris.example.com) gets automatic HTTPS via
+# Let's Encrypt; `:80` or `:443` serve an IP-only host.
+{$POLARIS_SITE_ADDRESS} {
+	import proxy
+	# Force HTTPS for a year, including subdomains (ignored on plain-HTTP sites).
+	header Strict-Transport-Security "max-age=31536000; includeSubDomains"
+}
+
+# Local-network names, Home-Assistant style. Served over plain HTTP on :80 so
+# there is no certificate to trust for a `.local` name. The `mdns` service makes
+# polaris.local resolve across the LAN; the installer adds a hosts entry so the
+# local machine also resolves bare `polaris`.
+http://polaris.local, http://polaris {
+	import proxy
 }

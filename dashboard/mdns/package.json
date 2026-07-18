@@ -1,0 +1,17 @@
+{
+    "name": "polaris-mdns",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "description": "mDNS responder that advertises polaris.local on the local network.",
+    "license": "Apache-2.0",
+    "bin": {
+        "polaris-mdns": "responder.mjs"
+    },
+    "scripts": {
+        "start": "node responder.mjs"
+    },
+    "dependencies": {
+        "multicast-dns": "7.2.5"
+    }
+}

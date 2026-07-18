@@ -24,6 +24,14 @@ const envSchema = z.object({
     /** Public origin the dashboard is served from (used by auth + share links). */
     POLARIS_APP_URL: z.string().url().default("http://localhost:3000"),
 
+    /**
+     * Local-network hostname advertised over mDNS (like homeassistant.local).
+     * Its http(s)://<name>.local and http://<name> origins are trusted by auth so
+     * the dashboard is reachable by name on the LAN. Keep in sync with the mdns
+     * service's POLARIS_MDNS_HOSTNAME.
+     */
+    POLARIS_LOCAL_HOSTNAME: z.string().default("polaris"),
+
     /** better-auth signing secret. Must be set to a long random value in production. */
     POLARIS_AUTH_SECRET: z.string().min(16, "POLARIS_AUTH_SECRET must be at least 16 chars"),
 

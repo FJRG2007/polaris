@@ -53,6 +53,21 @@ function Invoke-PolarisInstall {
         return [System.Convert]::ToBase64String($buffer)
     }
 
+    # Map polaris / polaris.local to loopback on this machine so they resolve even
+    # without mDNS. Best effort and idempotent; editing hosts needs Administrator.
+    function Set-PolarisHostnames {
+        $hostsPath = Join-Path $env:SystemRoot "System32\drivers\etc\hosts"
+        $marker = "# polaris-dashboard"
+        try {
+            if (Select-String -Path $hostsPath -SimpleMatch $marker -ErrorAction SilentlyContinue) { return }
+            Add-Content -Path $hostsPath -Value "127.0.0.1 polaris polaris.local $marker" -ErrorAction Stop
+            Write-Log "mapped polaris and polaris.local to 127.0.0.1 in hosts"
+        }
+        catch {
+            Write-Host "polaris: could not edit hosts (run as Administrator to enable 'polaris'/'polaris.local'); add manually: 127.0.0.1 polaris polaris.local" -ForegroundColor Yellow
+        }
+    }
+
     # Locate the compose directory: run in place inside a checkout, otherwise
     # clone (or fast-forward) one into the install dir.
     if ((Test-Path "docker/docker-compose.yml") -and (Test-Path "docker/.env.example")) {
@@ -96,6 +111,8 @@ function Invoke-PolarisInstall {
         else {
             Write-Log ".env already present, keeping it"
         }
+
+        Set-PolarisHostnames
 
         if ($Full) {
             Write-Log "enabling the full edition (privileged host daemon)"

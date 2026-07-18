@@ -23,11 +23,23 @@ const SESSION_UPDATE_AGE = 60 * 60 * 24;
 
 export function createAuth() {
     const env = loadEnv();
+    const localName = env.POLARIS_LOCAL_HOSTNAME;
+    // Trust the public origin plus the local-network names (homeassistant.local
+    // style) so the dashboard works whether reached by domain, polaris.local, or
+    // bare polaris. Deduplicated in case the app URL is already one of them.
+    const trustedOrigins = Array.from(
+        new Set([
+            env.POLARIS_APP_URL,
+            `http://${localName}.local`,
+            `https://${localName}.local`,
+            `http://${localName}`
+        ])
+    );
     return betterAuth({
         appName: "Polaris",
         secret: env.POLARIS_AUTH_SECRET,
         baseURL: env.POLARIS_APP_URL,
-        trustedOrigins: [env.POLARIS_APP_URL],
+        trustedOrigins,
         database: prismaAdapter(prisma, { provider: env.POLARIS_DB_PROVIDER }),
         emailAndPassword: {
             enabled: true,

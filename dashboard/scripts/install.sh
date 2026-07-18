@@ -38,6 +38,31 @@ compose_cmd() {
     fi
 }
 
+# Map polaris / polaris.local to loopback on this machine so it resolves even
+# without mDNS (the compose `mdns` service advertises polaris.local LAN-wide).
+# Best effort and idempotent: needs root, so it warns rather than fails.
+setup_hostnames() {
+    hosts_file="/etc/hosts"
+    marker="# polaris-dashboard"
+    entry="127.0.0.1 polaris polaris.local ${marker}"
+    if grep -q "$marker" "$hosts_file" 2>/dev/null; then
+        return 0
+    fi
+    if [ -w "$hosts_file" ]; then
+        printf '%s\n' "$entry" >> "$hosts_file"
+    elif command -v sudo >/dev/null 2>&1; then
+        printf '%s\n' "$entry" | sudo tee -a "$hosts_file" >/dev/null 2>&1 || {
+            err "could not edit $hosts_file; add manually: $entry"
+            return 0
+        }
+    else
+        err "could not add polaris/polaris.local to $hosts_file (need root); add manually:"
+        err "  $entry"
+        return 0
+    fi
+    log "mapped polaris and polaris.local to 127.0.0.1 in $hosts_file"
+}
+
 # Fill the three secrets in a freshly copied .env, in place, using # as the sed
 # delimiter so base64 '/' characters pass through untouched.
 generate_env() {
@@ -98,6 +123,8 @@ main() {
     else
         log ".env already present, keeping it"
     fi
+
+    setup_hostnames
 
     # The web container always bind-mounts this directory read-only; keep it
     # present (empty is fine) so `up` never fails when SSH access is not set up.

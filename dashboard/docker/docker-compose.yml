@@ -38,6 +38,9 @@ services:
     restart: unless-stopped
     env_file:
       - .env
+    environment:
+      # Trust the local-network names for auth; kept in sync with the mdns service.
+      POLARIS_LOCAL_HOSTNAME: ${POLARIS_MDNS_HOSTNAME:-polaris}
     depends_on:
       postgres:
         condition: service_healthy
@@ -73,6 +76,20 @@ services:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - polaris-caddy-data:/data
       - polaris-caddy-config:/config
+
+  # --- Local network discovery (polaris.local) ------------------------------
+  # Advertises polaris.local over mDNS, the way Home Assistant publishes
+  # homeassistant.local. Needs the host network because multicast does not cross
+  # a bridged docker network (works on Linux/WSL; Docker Desktop restricts host
+  # networking, where the installer's hosts entry covers the local machine).
+  mdns:
+    build:
+      context: ../mdns
+    network_mode: host
+    restart: unless-stopped
+    environment:
+      POLARIS_MDNS_HOSTNAME: ${POLARIS_MDNS_HOSTNAME:-polaris}
+      POLARIS_MDNS_PORT: ${POLARIS_MDNS_PORT:-80}
 
   # --- Full edition only ----------------------------------------------------
   # Privileged host daemon. Runs the static musl `polaris-hostd` binary and
