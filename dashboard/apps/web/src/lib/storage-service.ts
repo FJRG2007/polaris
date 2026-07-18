@@ -31,9 +31,18 @@ async function loadConnection(connectionId: string, ownerId: string) {
     return row;
 }
 
-/** Build a connected driver for a connection owned by the given user. */
-export async function getDriver(connectionId: string, ownerId: string): Promise<StorageDriver> {
-    const row = await loadConnection(connectionId, ownerId);
+/** The minimal storage-connection row this module needs to build a driver. */
+type ConnectionRow = {
+    id: string;
+    kind: string;
+    config: string;
+    encryptedCredential: Uint8Array | null;
+    credentialNonce: Uint8Array | null;
+    credentialKeyId: string | null;
+};
+
+/** Decrypt a row's credentials and build a connected driver for it. */
+async function buildDriver(row: ConnectionRow): Promise<StorageDriver> {
     const env = loadEnv();
     const config = JSON.parse(row.config) as StorageConfig;
     const credentials: StorageCredentials =
@@ -63,6 +72,23 @@ export async function getDriver(connectionId: string, ownerId: string): Promise<
     });
     await driver.connect();
     return driver;
+}
+
+/** Build a connected driver for a connection owned by the given user. */
+export async function getDriver(connectionId: string, ownerId: string): Promise<StorageDriver> {
+    return buildDriver(await loadConnection(connectionId, ownerId));
+}
+
+/**
+ * Build a driver for a connection WITHOUT an owner check. Only for server-trusted
+ * public paths (share/file-request access) where a validated token row is the
+ * authorization; never call this from a user-facing action, which must scope to
+ * the caller with getDriver().
+ */
+export async function getDriverForConnection(connectionId: string): Promise<StorageDriver> {
+    const row = await prisma.storageConnection.findUnique({ where: { id: connectionId } });
+    if (!row) throw new Error("Connection not found");
+    return buildDriver(row);
 }
 
 /** Native UniFi UNAS metrics for a connection (via the UniFi OS console API). */

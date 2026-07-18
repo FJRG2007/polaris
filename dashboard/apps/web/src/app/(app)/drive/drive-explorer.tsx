@@ -17,6 +17,7 @@ import { Badge, Button, cn } from "@polaris/ui";
 import type { UnasMetrics as UnasMetricsData } from "@/lib/unifi-unas";
 import { deleteEntryAction, mkdirAction } from "./actions";
 import { ConnectionDialog } from "./connection-dialog";
+import { ShareButton } from "./share-dialog";
 import { UnasMetrics } from "./unas-metrics";
 import type { ConnectionSummary, DriveEntry } from "./types";
 
@@ -216,15 +217,23 @@ export function DriveExplorer({
                                                 {new Date(entry.modifiedAt).toLocaleString()}
                                             </td>
                                             <td className="px-3 py-2 text-right">
-                                                <Button
-                                                    size="icon"
-                                                    variant="ghost"
-                                                    onClick={() => onDelete(entry.path)}
-                                                    disabled={pending}
-                                                    aria-label={`Delete ${entry.name}`}
-                                                >
-                                                    <Trash2 className="size-4" />
-                                                </Button>
+                                                <div className="flex items-center justify-end gap-1">
+                                                    <ShareButton
+                                                        connectionId={connectionId}
+                                                        path={entry.path}
+                                                        name={entry.name}
+                                                        isDir={entry.kind === "dir"}
+                                                    />
+                                                    <Button
+                                                        size="icon"
+                                                        variant="ghost"
+                                                        onClick={() => onDelete(entry.path)}
+                                                        disabled={pending}
+                                                        aria-label={`Delete ${entry.name}`}
+                                                    >
+                                                        <Trash2 className="size-4" />
+                                                    </Button>
+                                                </div>
                                             </td>
                                         </tr>
                                     ))

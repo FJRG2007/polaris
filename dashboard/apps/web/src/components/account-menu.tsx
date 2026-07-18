@@ -1,6 +1,6 @@
 "use client";
 
-import { Activity, LogOut, Settings, Users } from "lucide-react";
+import { Activity, Link2, LogOut, Settings, Users } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
     DropdownMenu,
@@ -33,6 +33,12 @@ export function AccountMenu({ name, email, isAdmin }: { name: string; email: str
                     <span className="block truncate">{email}</span>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                    <a href="/shared">
+                        <Link2 className="size-4" />
+                        Shared links
+                    </a>
+                </DropdownMenuItem>
                 {isAdmin ? (
                     <>
                         <DropdownMenuItem asChild>
