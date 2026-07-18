@@ -10,7 +10,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Container, FolderOpen, Link2, type LucideIcon } from "lucide-react";
+import { Container, FolderOpen, LayoutDashboard, Link2, type LucideIcon } from "lucide-react";
 import { cn } from "@polaris/ui";
 import { POLARIS_APPS } from "@/lib/apps";
 
@@ -23,6 +23,7 @@ interface SidebarItem {
 /** Options per app id. Apps not listed here render no rail. */
 const APP_SIDEBARS: Record<string, SidebarItem[]> = {
     drive: [
+        { label: "Overview", href: "/overview", icon: LayoutDashboard },
         { label: "Files", href: "/drive", icon: FolderOpen },
         { label: "Shared links", href: "/shared", icon: Link2 }
     ],

@@ -13,6 +13,20 @@
 
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
 
+/**
+ * Raised when stored credentials cannot be decrypted - almost always because the
+ * POLARIS_MASTER_KEY that encrypted them differs from the current one (it was
+ * regenerated). The raw Node error ("Unsupported state or unable to authenticate
+ * data") is opaque; call sites catch this to tell the user to re-add the
+ * connection instead.
+ */
+export class CredentialDecryptError extends Error {
+    public constructor(message: string) {
+        super(message);
+        this.name = "CredentialDecryptError";
+    }
+}
+
 const ALGORITHM = "aes-256-gcm";
 const KEY_BYTES = 32;
 const NONCE_BYTES = 12;
@@ -63,11 +77,24 @@ export function decryptSecret(blob: EncryptedBlob, masterKeyB64: string): string
     if (blob.ciphertext.length < TAG_BYTES) {
         throw new Error("Ciphertext too short to contain an auth tag");
     }
+    // If the row records a different key fingerprint than the current key, it was
+    // encrypted with a master key that has since changed; say so precisely.
+    if (blob.keyId && blob.keyId !== keyFingerprint(masterKeyB64)) {
+        throw new CredentialDecryptError(
+            "This connection's saved credentials were encrypted with a different master key. Remove and re-add the connection."
+        );
+    }
     const body = blob.ciphertext.subarray(0, blob.ciphertext.length - TAG_BYTES);
     const tag = blob.ciphertext.subarray(blob.ciphertext.length - TAG_BYTES);
     const decipher = createDecipheriv(ALGORITHM, key, blob.nonce);
     decipher.setAuthTag(tag);
-    return Buffer.concat([decipher.update(body), decipher.final()]).toString("utf8");
+    try {
+        return Buffer.concat([decipher.update(body), decipher.final()]).toString("utf8");
+    } catch {
+        throw new CredentialDecryptError(
+            "This connection's saved credentials could not be decrypted (the master key may have changed). Remove and re-add the connection."
+        );
+    }
 }
 
 /** Convenience: encrypt a credentials object as JSON. */

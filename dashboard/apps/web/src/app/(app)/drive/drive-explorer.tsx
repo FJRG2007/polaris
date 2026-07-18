@@ -1,19 +1,17 @@
 "use client";
 
 /**
- * The Drive browser for one connection, split into two sub-tabs: "Files" (the
- * explorer - browse, upload, download, share) and "Hardware" (device metrics and
- * properties). Navigation is URL-driven (?c=connection&p=path) so it is linkable
- * and the back button works; the tab is local state that defaults to whichever
- * makes sense for the backend (a UNAS opens on Hardware, a file store on Files).
- *
- * Content loads on the client, not in the server render, so the shell paints
- * immediately and a slow NAS streams in behind a skeleton. UNAS metrics are
- * cached in localStorage briefly and revalidated in the background.
+ * The Files browser: a connection rail on the left, a breadcrumb and file table
+ * on the right for the selected NAS. Device metrics live on the Overview page;
+ * this view is purely files. Navigation is URL-driven (?c=connection&p=path) so
+ * it is linkable and the back button works. Content loads on the client behind a
+ * skeleton so a slow NAS never stalls the whole navigation. A UNAS browses over
+ * SMB, reusing its stored account; if no share is set yet it prompts to pick one.
  */
 
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ChevronRight, File, Folder, FolderPlus, HardDrive, Info, Trash2, Upload } from "lucide-react";
 import { formatBytes } from "@polaris/core";
 import {
@@ -31,38 +29,16 @@ import {
     Skeleton,
     cn
 } from "@polaris/ui";
-import type { UnasMetrics as UnasMetricsData } from "@/lib/unifi-unas";
-import { deleteEntryAction, discoverUnasSharesAction, mkdirAction, setUnasShareAction } from "./actions";
+import {
+    deleteConnectionAction,
+    deleteEntryAction,
+    discoverUnasSharesAction,
+    mkdirAction,
+    setUnasShareAction
+} from "./actions";
 import { ConnectionDialog } from "./connection-dialog";
-import { HardwarePanel } from "./hardware-panel";
 import { ShareButton } from "./share-dialog";
-import { UnasMetrics } from "./unas-metrics";
 import type { ConnectionSummary, DriveEntry } from "./types";
-
-type DriveView = "files" | "hardware";
-
-/** How long a cached UNAS metrics snapshot is served before revalidating. */
-const METRICS_TTL_MS = 30_000;
-
-function readCache<T>(key: string, ttlMs: number): T | null {
-    try {
-        const raw = window.localStorage.getItem(key);
-        if (!raw) return null;
-        const parsed = JSON.parse(raw) as { t: number; v: T };
-        if (Date.now() - parsed.t > ttlMs) return null;
-        return parsed.v;
-    } catch {
-        return null;
-    }
-}
-
-function writeCache<T>(key: string, value: T): void {
-    try {
-        window.localStorage.setItem(key, JSON.stringify({ t: Date.now(), v: value }));
-    } catch {
-        // Ignore quota / private-mode failures; the cache is only an optimization.
-    }
-}
 
 export function DriveExplorer({
     connections,
@@ -73,94 +49,53 @@ export function DriveExplorer({
     connectionId: string | null;
     path: string;
 }) {
+    const router = useRouter();
     const fileInput = useRef<HTMLInputElement>(null);
     const [pending, startTransition] = useTransition();
     const [uploading, setUploading] = useState(false);
 
-    const [view, setView] = useState<DriveView>("files");
     const [entries, setEntries] = useState<DriveEntry[]>([]);
-    const [metrics, setMetrics] = useState<UnasMetricsData | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [needsSmbShare, setNeedsSmbShare] = useState(false);
     const [newFolderOpen, setNewFolderOpen] = useState(false);
     const [newFolderName, setNewFolderName] = useState("");
     const [deleteTarget, setDeleteTarget] = useState<DriveEntry | null>(null);
+    const [deleteConn, setDeleteConn] = useState<ConnectionSummary | null>(null);
 
-    const selected = connections.find((connection) => connection.id === connectionId) ?? null;
-    const isUnas = selected?.kind === "unifi-unas";
     const segments = path ? path.split("/") : [];
-
-    // Each connection opens on its natural tab: a UNAS on Hardware (its native
-    // connection is metrics-only for now), a file store on Files.
-    useEffect(() => {
-        setView(isUnas ? "hardware" : "files");
-    }, [connectionId, isUnas]);
 
     const load = useCallback(
         async (signal?: AbortSignal) => {
             setError(null);
             if (!connectionId) {
                 setEntries([]);
-                setMetrics(null);
                 return;
             }
-            if (view === "hardware" && isUnas) {
-                const cacheKey = `polaris:unas:${connectionId}`;
-                const cached = readCache<UnasMetricsData>(cacheKey, METRICS_TTL_MS);
-                if (cached) {
-                    setMetrics(cached);
-                    setLoading(false);
+            setNeedsSmbShare(false);
+            setLoading(true);
+            try {
+                const query = new URLSearchParams({ c: connectionId });
+                if (path) query.set("p", path);
+                const res = await fetch(`/api/drive/list?${query.toString()}`, { signal });
+                const body = await res.json();
+                if (signal?.aborted) return;
+                if (body.needsSmbShare) {
+                    setEntries([]);
+                    setNeedsSmbShare(true);
+                } else if (!res.ok) {
+                    setEntries([]);
+                    setError(body.error ?? "Unable to list this location");
                 } else {
-                    setMetrics(null);
-                    setLoading(true);
+                    setEntries(body.entries as DriveEntry[]);
                 }
-                try {
-                    const res = await fetch(`/api/drive/unas-metrics?c=${encodeURIComponent(connectionId)}`, { signal });
-                    const body = await res.json();
-                    if (signal?.aborted) return;
-                    if (!res.ok) {
-                        if (!cached) setError(body.error ?? "Unable to reach the UNAS console");
-                    } else {
-                        setMetrics(body.metrics as UnasMetricsData);
-                        writeCache(cacheKey, body.metrics);
-                    }
-                } catch {
-                    if (!signal?.aborted && !cached) setError("Unable to reach the UNAS console");
-                } finally {
-                    if (!signal?.aborted) setLoading(false);
-                }
-                return;
-            }
-            if (view === "files") {
-                // File listings are not cached: freshness matters after uploads/deletes.
-                // A UNAS browses over SMB (same account); if no share is set yet the
-                // API asks us to prompt for it.
-                setNeedsSmbShare(false);
-                setLoading(true);
-                try {
-                    const query = new URLSearchParams({ c: connectionId });
-                    if (path) query.set("p", path);
-                    const res = await fetch(`/api/drive/list?${query.toString()}`, { signal });
-                    const body = await res.json();
-                    if (signal?.aborted) return;
-                    if (body.needsSmbShare) {
-                        setEntries([]);
-                        setNeedsSmbShare(true);
-                    } else if (!res.ok) {
-                        setEntries([]);
-                        setError(body.error ?? "Unable to list this location");
-                    } else {
-                        setEntries(body.entries as DriveEntry[]);
-                    }
-                } catch {
-                    if (!signal?.aborted) setError("Unable to list this location");
-                } finally {
-                    if (!signal?.aborted) setLoading(false);
-                }
+            } catch {
+                if (!signal?.aborted) setError("Unable to list this location");
+            } finally {
+                if (!signal?.aborted) setLoading(false);
             }
         },
-        [connectionId, isUnas, path, view]
+        [connectionId, path]
     );
 
     useEffect(() => {
@@ -204,11 +139,21 @@ export function DriveExplorer({
         if (!connectionId || !deleteTarget) return;
         const target = deleteTarget;
         setDeleteTarget(null);
-        // Optimistic: drop the row now; a failed delete reloads the true listing.
         setEntries((prev) => prev.filter((entry) => entry.path !== target.path));
         startTransition(async () => {
             await deleteEntryAction(connectionId, target.path);
             void load();
+        });
+    }
+
+    function confirmDeleteConnection() {
+        if (!deleteConn) return;
+        const target = deleteConn;
+        setDeleteConn(null);
+        startTransition(async () => {
+            await deleteConnectionAction(target.id);
+            router.push("/drive");
+            router.refresh();
         });
     }
 
@@ -224,18 +169,27 @@ export function DriveExplorer({
                         <p className="text-sm text-muted-foreground">No connections yet.</p>
                     ) : (
                         connections.map((connection) => (
-                            <Link
-                                key={connection.id}
-                                href={href(connection.id, "")}
-                                className={cn(
-                                    "flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-muted",
-                                    connection.id === connectionId && "bg-muted font-medium"
-                                )}
-                            >
-                                <HardDrive className="size-4 text-muted-foreground" />
-                                <span className="flex-1 truncate">{connection.name}</span>
-                                {connection.requiresHostd ? <Badge variant="neutral">host</Badge> : null}
-                            </Link>
+                            <div key={connection.id} className="group flex items-center gap-1">
+                                <Link
+                                    href={href(connection.id, "")}
+                                    className={cn(
+                                        "flex flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-muted",
+                                        connection.id === connectionId && "bg-muted font-medium"
+                                    )}
+                                >
+                                    <HardDrive className="size-4 text-muted-foreground" />
+                                    <span className="flex-1 truncate">{connection.name}</span>
+                                    {connection.requiresHostd ? <Badge variant="neutral">host</Badge> : null}
+                                </Link>
+                                <button
+                                    type="button"
+                                    onClick={() => setDeleteConn(connection)}
+                                    className="rounded-md p-1 text-muted-foreground opacity-0 transition-opacity hover:text-danger group-hover:opacity-100"
+                                    aria-label={`Remove ${connection.name}`}
+                                >
+                                    <Trash2 className="size-4" />
+                                </button>
+                            </div>
                         ))
                     )}
                 </nav>
@@ -246,48 +200,23 @@ export function DriveExplorer({
                     <div className="rounded-md border border-border bg-card p-8 text-center text-sm text-muted-foreground">
                         Add a storage connection to start browsing.
                     </div>
+                ) : needsSmbShare ? (
+                    <UnasSmbSetup connectionId={connectionId} onSaved={() => void load()} />
                 ) : (
-                    <>
-                        <div className="mb-3 flex items-center gap-1 border-b border-border">
-                            <TabButton active={view === "files"} onClick={() => setView("files")}>
-                                Files
-                            </TabButton>
-                            <TabButton active={view === "hardware"} onClick={() => setView("hardware")}>
-                                Hardware
-                            </TabButton>
-                        </div>
-
-                        {view === "hardware" ? (
-                            isUnas ? (
-                                loading && !metrics ? (
-                                    <MetricsSkeleton />
-                                ) : error ? (
-                                    <ErrorBox message={error} />
-                                ) : metrics ? (
-                                    <UnasMetrics metrics={metrics} />
-                                ) : null
-                            ) : selected ? (
-                                <HardwarePanel connection={selected} />
-                            ) : null
-                        ) : needsSmbShare ? (
-                            <UnasSmbSetup connectionId={connectionId} onSaved={() => void load()} />
-                        ) : (
-                            <FilesView
-                                connectionId={connectionId}
-                                segments={segments}
-                                entries={entries}
-                                loading={loading}
-                                error={error}
-                                pending={pending}
-                                uploading={uploading}
-                                fileInput={fileInput}
-                                href={href}
-                                onNewFolder={() => setNewFolderOpen(true)}
-                                onUpload={onUpload}
-                                onDelete={(entry) => setDeleteTarget(entry)}
-                            />
-                        )}
-                    </>
+                    <FilesView
+                        connectionId={connectionId}
+                        segments={segments}
+                        entries={entries}
+                        loading={loading}
+                        error={error}
+                        pending={pending}
+                        uploading={uploading}
+                        fileInput={fileInput}
+                        href={href}
+                        onNewFolder={() => setNewFolderOpen(true)}
+                        onUpload={onUpload}
+                        onDelete={(entry) => setDeleteTarget(entry)}
+                    />
                 )}
             </section>
 
@@ -337,49 +266,42 @@ export function DriveExplorer({
                     </div>
                 </DialogContent>
             </Dialog>
+
+            <Dialog open={deleteConn !== null} onOpenChange={(open) => !open && setDeleteConn(null)}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Remove connection</DialogTitle>
+                        <DialogDescription>
+                            {deleteConn?.name} will be removed from Polaris. The device itself and its data are not
+                            touched - you can add it again anytime.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="flex justify-end gap-2">
+                        <Button type="button" variant="ghost" onClick={() => setDeleteConn(null)}>
+                            Cancel
+                        </Button>
+                        <Button type="button" variant="danger" onClick={confirmDeleteConnection}>
+                            Remove
+                        </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }
 
-function TabButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
-    return (
-        <button
-            type="button"
-            onClick={onClick}
-            className={cn(
-                "-mb-px border-b-2 px-3 py-2 text-sm font-medium transition-colors",
-                active
-                    ? "border-primary text-foreground"
-                    : "border-transparent text-muted-foreground hover:text-foreground"
-            )}
-        >
-            {children}
-        </button>
-    );
-}
-
-function ErrorBox({ message }: { message: string }) {
-    return (
-        <div className="rounded-md border border-danger/40 bg-danger/10 p-3 text-sm text-danger">{message}</div>
-    );
-}
-
 /**
- * One-time SMB share prompt for a UNAS: files live on the device's SMB share, and
- * the UNAS accepts the same UniFi account, so only the share name is needed - the
- * stored username/password are reused. Once saved, the Files tab browses over SMB.
+ * One-time SMB share prompt for a UNAS: Polaris auto-discovers the device's shares
+ * (reusing the stored UniFi account) so the user picks one; a manual field is the
+ * fallback, defaulting to the UNAS Pro's out-of-the-box "Personal-Drive".
  */
 function UnasSmbSetup({ connectionId, onSaved }: { connectionId: string; onSaved: () => void }) {
-    // Default to the UNAS Pro's out-of-the-box share so a bare "Connect" usually
-    // just works even if discovery finds nothing.
     const [share, setShare] = useState("Personal-Drive");
     const [shares, setShares] = useState<string[] | null>(null);
     const [discovering, setDiscovering] = useState(true);
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    // Ask Polaris to enumerate the device's SMB shares (reusing the stored UniFi
-    // account) so the user picks one instead of guessing a name.
     useEffect(() => {
         let active = true;
         setDiscovering(true);
@@ -463,7 +385,7 @@ function UnasSmbSetup({ connectionId, onSaved }: { connectionId: string; onSaved
                             className="h-9 rounded-md border border-input bg-surface px-3 text-sm"
                             value={share}
                             onChange={(event) => setShare(event.target.value)}
-                            placeholder="e.g. share, data, home"
+                            placeholder="e.g. Personal-Drive, data, home"
                         />
                     </label>
                     <Button type="submit" variant="ghost" disabled={pending || !share.trim()}>
@@ -549,7 +471,7 @@ function FilesView({
             {loading ? (
                 <ListingSkeleton />
             ) : error ? (
-                <ErrorBox message={error} />
+                <div className="rounded-md border border-danger/40 bg-danger/10 p-3 text-sm text-danger">{error}</div>
             ) : (
                 <div className="overflow-hidden rounded-lg border border-border">
                     <table className="w-full text-sm">
@@ -639,21 +561,6 @@ function ListingSkeleton() {
                     </div>
                 ))}
             </div>
-        </div>
-    );
-}
-
-/** Placeholder while the UNAS metrics snapshot loads. */
-function MetricsSkeleton() {
-    return (
-        <div className="flex flex-col gap-4">
-            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-                {Array.from({ length: 4 }).map((_, index) => (
-                    <Skeleton key={index} className="h-20" />
-                ))}
-            </div>
-            <Skeleton className="h-40" />
-            <Skeleton className="h-52" />
         </div>
     );
 }

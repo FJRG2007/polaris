@@ -8,17 +8,23 @@
  */
 
 import { cookies } from "next/headers";
-import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET(request: Request): Promise<Response> {
+export async function GET(): Promise<Response> {
     const store = await cookies();
+    // Expire every Polaris cookie (prefix "polaris" - the session token, its
+    // cache, any CSRF cookie). Set-Cookie is written straight onto the response so
+    // it applies even though we return a raw Response.
+    const headers = new Headers({ location: "/oauth/login" });
     for (const cookie of store.getAll()) {
-        // The cookiePrefix is "polaris" (see @polaris/auth), so this covers the
-        // session token, its cache, and any CSRF cookie better-auth set.
-        if (cookie.name.startsWith("polaris")) store.delete(cookie.name);
+        if (cookie.name.startsWith("polaris")) {
+            headers.append("set-cookie", `${cookie.name}=; Path=/; Max-Age=0`);
+        }
     }
-    return NextResponse.redirect(new URL("/oauth/login", request.url));
+    // Relative redirect: behind the reverse proxy request.url is the internal
+    // http://0.0.0.0:3000 upstream, so an absolute URL built from it points at a
+    // dead address. A relative Location resolves against the public URL used.
+    return new Response(null, { status: 302, headers });
 }
