@@ -9,3 +9,4 @@ export * from "./driver.js";
 export * from "./crypto.js";
 export * from "./registry.js";
 export { LocalDriver } from "./drivers/local.js";
+export { SftpDriver } from "./drivers/sftp.js";

@@ -11,6 +11,7 @@ import { prefersHostd, requiresHostd } from "@polaris/core";
 import type { StorageConfig, StorageCredentials, StorageProviderKind } from "@polaris/core";
 import type { Capabilities } from "@polaris/config";
 import { LocalDriver } from "./drivers/local.js";
+import { SftpDriver } from "./drivers/sftp.js";
 import { StorageError, type StorageDriver } from "./driver.js";
 
 /** A decrypted connection ready to drive. Credentials are already plaintext here. */
@@ -50,6 +51,19 @@ export function createDriver(record: ConnectionRecord, deps: DriverDeps): Storag
         case "local": {
             const config = record.config as Extract<StorageConfig, { kind: "local" }>;
             return new LocalDriver({ id: record.id, root: config.root });
+        }
+        case "sftp": {
+            const config = record.config as Extract<StorageConfig, { kind: "sftp" }>;
+            const creds = record.credentials as Extract<StorageCredentials, { kind: "sftp" }>;
+            return new SftpDriver({
+                id: record.id,
+                host: config.host,
+                port: config.port ?? 22,
+                username: config.username,
+                root: config.root,
+                password: creds.password,
+                privateKey: creds.privateKey
+            });
         }
         case "smb": {
             // Prefer a native mount when the daemon is present; the userspace SMB
