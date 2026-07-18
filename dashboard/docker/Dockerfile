@@ -68,6 +68,12 @@ COPY --from=builder /build/apps/web/public ./apps/web/public
 # Schema + migrations so the entrypoint can run `prisma migrate deploy`.
 COPY --from=builder /build/packages/db/prisma ./packages/db/prisma
 
+# The generated Prisma client (custom output dir) and, critically, its query
+# engine .node binary are loaded at runtime but the Next standalone tracer does
+# not reliably capture the engine, so copy the generated client explicitly. This
+# is what makes database queries (sign-in, etc.) work instead of 500-ing.
+COPY --from=builder /build/packages/db/generated ./packages/db/generated
+
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
