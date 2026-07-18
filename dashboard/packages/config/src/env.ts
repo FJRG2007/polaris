@@ -90,12 +90,27 @@ export type PolarisEnv = z.infer<typeof envSchema>;
 let cached: PolarisEnv | undefined;
 
 /**
+ * Inert placeholders used only while `next build` collects page data. The route
+ * modules are imported at build time, which constructs auth/db before any real
+ * environment exists; without these the build would fail on missing secrets even
+ * though nothing is actually served. Runtime never sees these - NEXT_PHASE is
+ * unset then, so validation stays strict.
+ */
+const BUILD_PLACEHOLDERS: Record<string, string> = {
+    POLARIS_DATABASE_URL: "postgresql://build:build@localhost:5432/build",
+    POLARIS_AUTH_SECRET: "build-time-placeholder-secret",
+    POLARIS_MASTER_KEY: "build-time-placeholder"
+};
+
+/**
  * Parse and cache process.env once. Throws a readable aggregated error listing
  * every invalid or missing key so an operator can fix them all in one pass.
  */
 export function loadEnv(source: NodeJS.ProcessEnv = process.env): PolarisEnv {
     if (cached) return cached;
-    const parsed = envSchema.safeParse(source);
+    const isBuild = source.NEXT_PHASE === "phase-production-build";
+    const effective = isBuild ? { ...BUILD_PLACEHOLDERS, ...source } : source;
+    const parsed = envSchema.safeParse(effective);
     if (!parsed.success) {
         const issues = parsed.error.issues
             .map((issue) => `  - ${issue.path.join(".")}: ${issue.message}`)
