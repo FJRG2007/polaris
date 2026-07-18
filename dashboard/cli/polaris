@@ -122,6 +122,20 @@ doctor() {
         fi
     fi
 
+    site=$(val POLARIS_SITE_ADDRESS)
+    appurl=$(val POLARIS_APP_URL)
+    case "${site}${appurl}" in
+        *example.com*)
+            printf '  %s[fail]%s POLARIS_SITE_ADDRESS / POLARIS_APP_URL still use the placeholder\n' "$red" "$r"
+            printf '         "example.com". Caddy loops forever trying to get a TLS cert for it and\n'
+            printf '         the site is unreachable even though the containers are healthy.\n'
+            printf '         For LAN use set, in %s:\n' "$ENV_FILE"
+            printf '           POLARIS_SITE_ADDRESS=:80\n'
+            printf '           POLARIS_APP_URL=http://polaris.local\n'
+            printf '         then: docker compose up -d --force-recreate caddy\n'
+            problems=$((problems + 1)) ;;
+    esac
+
     if [ "$problems" -eq 0 ]; then
         printf '  %sno known problems detected%s\n' "$green" "$r"
     else
