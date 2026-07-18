@@ -48,6 +48,10 @@ ENV NODE_ENV=production \
     # Next standalone server binds these; 0.0.0.0 so the proxy can reach it.
     PORT=3000 \
     HOSTNAME=0.0.0.0 \
+    # SMB (NTLM) auth needs MD4, which OpenSSL 3 gates behind the legacy provider;
+    # without this the SMB client throws ERR_OSSL_EVP_UNSUPPORTED as an uncaught
+    # exception and takes the whole web process down.
+    NODE_OPTIONS=--openssl-legacy-provider \
     POLARIS_BUILD_SHA=$POLARIS_BUILD_SHA
 
 # openssl for the Prisma engines; ca-certificates for TLS to Postgres; smbclient

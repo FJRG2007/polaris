@@ -370,7 +370,9 @@ function ErrorBox({ message }: { message: string }) {
  * stored username/password are reused. Once saved, the Files tab browses over SMB.
  */
 function UnasSmbSetup({ connectionId, onSaved }: { connectionId: string; onSaved: () => void }) {
-    const [share, setShare] = useState("");
+    // Default to the UNAS Pro's out-of-the-box share so a bare "Connect" usually
+    // just works even if discovery finds nothing.
+    const [share, setShare] = useState("Personal-Drive");
     const [shares, setShares] = useState<string[] | null>(null);
     const [discovering, setDiscovering] = useState(true);
     const [pending, setPending] = useState(false);
