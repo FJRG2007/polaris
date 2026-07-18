@@ -87,6 +87,19 @@ const envSchema = z.object({
     /** Master switch to disable auto-update even in the full edition. */
     POLARIS_AUTO_UPDATE: boolFromEnv.default("true"),
 
+    /** GitHub "owner/repo" the update checker compares the running build against. */
+    POLARIS_REPO: z.string().default("FJRG2007/polaris"),
+
+    /** Branch the update checker treats as the release line. */
+    POLARIS_UPDATE_BRANCH: z.string().default("main"),
+
+    /**
+     * Commit the running image was built from, baked in at build time. Lets the
+     * update checker report how many commits behind the latest branch head this
+     * deployment is. Empty in dev / source runs, where "up to date" is unknown.
+     */
+    POLARIS_BUILD_SHA: z.string().default(""),
+
     /**
      * Docker-over-SSH access provisioned by `install.sh --ssh`. When enabled, the
      * Containers app can reach the host Engine over a dedicated, forced-command

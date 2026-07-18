@@ -40,10 +40,15 @@ RUN mkdir -p /build/apps/web/public
 # ---------------------------------------------------------------------------
 FROM node:22-bookworm-slim AS runner
 
+# Commit this image was built from, passed by CI. Surfaced by the update checker
+# so the dashboard can report how far behind the release branch it is.
+ARG POLARIS_BUILD_SHA=""
+
 ENV NODE_ENV=production \
     # Next standalone server binds these; 0.0.0.0 so the proxy can reach it.
     PORT=3000 \
-    HOSTNAME=0.0.0.0
+    HOSTNAME=0.0.0.0 \
+    POLARIS_BUILD_SHA=$POLARIS_BUILD_SHA
 
 # openssl is required by the Prisma engines; ca-certificates for TLS to Postgres.
 RUN apt-get update \
