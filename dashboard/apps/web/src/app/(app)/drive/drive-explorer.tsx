@@ -32,7 +32,7 @@ import {
     cn
 } from "@polaris/ui";
 import type { UnasMetrics as UnasMetricsData } from "@/lib/unifi-unas";
-import { deleteEntryAction, mkdirAction, setUnasShareAction } from "./actions";
+import { deleteEntryAction, discoverUnasSharesAction, mkdirAction, setUnasShareAction } from "./actions";
 import { ConnectionDialog } from "./connection-dialog";
 import { HardwarePanel } from "./hardware-panel";
 import { ShareButton } from "./share-dialog";
@@ -371,14 +371,33 @@ function ErrorBox({ message }: { message: string }) {
  */
 function UnasSmbSetup({ connectionId, onSaved }: { connectionId: string; onSaved: () => void }) {
     const [share, setShare] = useState("");
+    const [shares, setShares] = useState<string[] | null>(null);
+    const [discovering, setDiscovering] = useState(true);
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    async function onSubmit(event: React.FormEvent) {
-        event.preventDefault();
+    // Ask Polaris to enumerate the device's SMB shares (reusing the stored UniFi
+    // account) so the user picks one instead of guessing a name.
+    useEffect(() => {
+        let active = true;
+        setDiscovering(true);
+        setError(null);
+        discoverUnasSharesAction(connectionId).then((result) => {
+            if (!active) return;
+            setDiscovering(false);
+            if (result.error) setError(result.error);
+            setShares(result.shares ?? []);
+        });
+        return () => {
+            active = false;
+        };
+    }, [connectionId]);
+
+    async function choose(name: string) {
+        if (!name.trim()) return;
         setPending(true);
         setError(null);
-        const result = await setUnasShareAction(connectionId, share);
+        const result = await setUnasShareAction(connectionId, name);
         setPending(false);
         if (result.error) {
             setError(result.error);
@@ -396,23 +415,56 @@ function UnasSmbSetup({ connectionId, onSaved }: { connectionId: string; onSaved
                         <span className="font-medium">Browse UNAS files over SMB</span>
                         <span className="text-muted-foreground">
                             Files are served from the device&apos;s SMB share, using the same UniFi account you
-                            already entered. Just tell Polaris the share name (enable SMB on the UNAS if it is not
-                            already).
+                            already entered. Pick the share to open.
                         </span>
                     </div>
                 </div>
-                <form onSubmit={onSubmit} className="flex flex-wrap items-end gap-2">
+
+                {discovering ? (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Skeleton className="h-8 w-24" />
+                        <Skeleton className="h-8 w-24" />
+                        <span>Detecting shares...</span>
+                    </div>
+                ) : shares && shares.length > 0 ? (
+                    <div className="flex flex-wrap gap-2">
+                        {shares.map((name) => (
+                            <Button
+                                key={name}
+                                type="button"
+                                variant="secondary"
+                                disabled={pending}
+                                onClick={() => choose(name)}
+                            >
+                                <Folder className="size-4" />
+                                {name}
+                            </Button>
+                        ))}
+                    </div>
+                ) : (
+                    <p className="text-sm text-muted-foreground">
+                        No shares were detected automatically. Enter the share name below (enable SMB on the UNAS if
+                        it is off).
+                    </p>
+                )}
+
+                <form
+                    onSubmit={(event) => {
+                        event.preventDefault();
+                        void choose(share);
+                    }}
+                    className="flex flex-wrap items-end gap-2"
+                >
                     <label className="flex flex-1 flex-col gap-1 text-sm">
-                        SMB share name
+                        Or type a share name
                         <input
                             className="h-9 rounded-md border border-input bg-surface px-3 text-sm"
                             value={share}
                             onChange={(event) => setShare(event.target.value)}
                             placeholder="e.g. share, data, home"
-                            autoFocus
                         />
                     </label>
-                    <Button type="submit" disabled={pending || !share.trim()}>
+                    <Button type="submit" variant="ghost" disabled={pending || !share.trim()}>
                         {pending ? "Connecting..." : "Connect"}
                     </Button>
                 </form>

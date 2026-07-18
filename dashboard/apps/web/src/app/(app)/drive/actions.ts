@@ -11,7 +11,13 @@
 import { revalidatePath } from "next/cache";
 import { createConnectionSchema, normalizeRelPath } from "@polaris/core";
 import { requirePermission } from "@/lib/session";
-import { createConnection, deleteConnection, getDriver, setUnasSmbShare } from "@/lib/storage-service";
+import {
+    createConnection,
+    deleteConnection,
+    discoverUnasShares,
+    getDriver,
+    setUnasSmbShare
+} from "@/lib/storage-service";
 import { detectHost, type NasDetection } from "@/lib/nas-detect";
 import { fetchUnasMetrics } from "@/lib/unifi-unas";
 import { recordAudit } from "@/lib/audit-service";
@@ -94,6 +100,18 @@ export async function createConnectionAction(input: unknown): Promise<{ error?: 
     });
     revalidatePath("/drive");
     return {};
+}
+
+/** Auto-discover the SMB shares a UNAS exposes (reusing its stored account). */
+export async function discoverUnasSharesAction(
+    connectionId: string
+): Promise<{ shares?: string[]; error?: string }> {
+    const user = await requirePermission("connections.manage");
+    try {
+        return { shares: await discoverUnasShares(user.id, connectionId) };
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not reach SMB on the device" };
+    }
 }
 
 /** Save the SMB share for a UNAS connection so its Files tab can browse over SMB. */

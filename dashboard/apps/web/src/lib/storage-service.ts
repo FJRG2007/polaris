@@ -21,6 +21,7 @@ import {
     type StorageDriver
 } from "@polaris/storage";
 import { fetchUnasMetrics, type UnasMetrics } from "@/lib/unifi-unas";
+import { listSmbShares } from "@/lib/smb-shares";
 
 /** Base path under which the host daemon mounts SMB/NFS shares. */
 const HOSTD_MOUNT_ROOT = "/mnt/polaris";
@@ -188,6 +189,26 @@ export async function createConnection(
 /** Delete a connection owned by the user. */
 export async function deleteConnection(ownerId: string, connectionId: string) {
     await prisma.storageConnection.deleteMany({ where: { id: connectionId, ownerId } });
+}
+
+/** Discover the SMB shares a UNAS exposes, reusing its stored UniFi account. */
+export async function discoverUnasShares(ownerId: string, connectionId: string): Promise<string[]> {
+    const row = await loadConnection(connectionId, ownerId);
+    if (row.kind !== "unifi-unas") throw new Error("Not a UniFi UNAS connection");
+    const env = loadEnv();
+    const config = JSON.parse(row.config) as Extract<StorageConfig, { kind: "unifi-unas" }>;
+    const creds =
+        row.encryptedCredential && row.credentialNonce
+            ? decryptCredentials<{ password?: string }>(
+                  {
+                      ciphertext: Buffer.from(row.encryptedCredential),
+                      nonce: Buffer.from(row.credentialNonce),
+                      keyId: row.credentialKeyId ?? ""
+                  },
+                  env.POLARIS_MASTER_KEY
+              )
+            : {};
+    return listSmbShares(config.host, config.username, creds.password ?? "");
 }
 
 /** Set the SMB share used to browse a UniFi UNAS connection's files. */

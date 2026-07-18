@@ -50,9 +50,11 @@ ENV NODE_ENV=production \
     HOSTNAME=0.0.0.0 \
     POLARIS_BUILD_SHA=$POLARIS_BUILD_SHA
 
-# openssl is required by the Prisma engines; ca-certificates for TLS to Postgres.
+# openssl for the Prisma engines; ca-certificates for TLS to Postgres; smbclient
+# so Polaris can enumerate and reach SMB shares (e.g. a UniFi UNAS) itself -
+# the user never has to install or run smbclient on the host.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends openssl ca-certificates \
+    && apt-get install -y --no-install-recommends openssl ca-certificates smbclient \
     && rm -rf /var/lib/apt/lists/*
 
 # Prisma CLI, pinned to the version used by @polaris/db, so `migrate deploy`
