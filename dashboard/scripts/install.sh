@@ -206,22 +206,38 @@ setup_done() {
     [ "$count" -gt 0 ]
 }
 
-# Postgres bakes its password into its data volume at first init and ignores
-# POSTGRES_PASSWORD forever after. So generating a fresh .env (new password) on
-# top of an existing volume guarantees an auth failure; warn and show the
-# data-preserving recovery instead of leaving a silent 502.
-warn_existing_db_volume() {
-    command -v docker >/dev/null 2>&1 || return 0
-    if docker volume inspect polaris_polaris-postgres >/dev/null 2>&1; then
-        err "WARNING: a Postgres data volume already exists, but a new .env was just"
-        err "generated with a fresh password. The database still holds the OLD password,"
-        err "so the web container will fail to authenticate (P1000). Either restore the"
-        err "previous .env, or reset the database password to match the new one:"
-        err "  cd $(pwd)"
-        err "  PW=\$(sed -n 's/^POSTGRES_PASSWORD=//p' .env | head -n1)"
-        err "  docker exec -i polaris-postgres-1 psql -U polaris -d polaris -c \"ALTER USER polaris WITH PASSWORD '\$PW';\""
-        err "  polaris restart web"
-    fi
+# Make POSTGRES_PASSWORD the single source of truth. Postgres only reads
+# POSTGRES_PASSWORD when it first initializes its data volume and ignores it ever
+# after, so a regenerated .env - or a database role left at some earlier password -
+# drifts from what the web presents and authentication fails (P1000). After the
+# stack is up, set the bundled role's password to match .env. The local socket
+# uses trust auth, so this needs no old password and loses no data. An external
+# database (a URL not pointing at the bundled `postgres`) is left untouched.
+align_db_password() {
+    pw=$(sed -n 's/^POSTGRES_PASSWORD=//p' .env | head -n1)
+    [ -n "$pw" ] || return 0
+    case "$(sed -n 's/^POLARIS_DATABASE_URL=//p' .env | head -n1)" in
+        *@postgres:5432/*) ;;
+        *) return 0 ;;
+    esac
+    user=$(sed -n 's/^POSTGRES_USER=//p' .env | head -n1)
+    user=${user:-polaris}
+    db=$(sed -n 's/^POSTGRES_DB=//p' .env | head -n1)
+    db=${db:-polaris}
+    esc=$(printf '%s' "$pw" | sed "s/'/''/g")
+    i=1
+    while [ "$i" -le 15 ]; do
+        if docker compose exec -T postgres pg_isready -U "$user" -d "$db" >/dev/null 2>&1; then
+            if docker compose exec -T postgres psql -U "$user" -d "$db" \
+                -c "ALTER USER \"$user\" WITH PASSWORD '$esc';" >/dev/null 2>&1; then
+                log "aligned the database password with .env"
+                return 0
+            fi
+        fi
+        sleep 2
+        i=$((i + 1))
+    done
+    err "could not align the database password automatically; run 'polaris doctor' if the web fails"
 }
 
 main() {
@@ -263,7 +279,6 @@ main() {
         log "generating .env with fresh secrets"
         generate_env ".env.example" ".env"
         err "review .env and set POLARIS_SITE_ADDRESS / POLARIS_APP_URL to your domain"
-        warn_existing_db_volume
     else
         log ".env present; reconciling any new settings"
         reconcile_env ".env.example" ".env"
@@ -310,6 +325,10 @@ main() {
         log "registry unavailable; building from source (also applies migrations)"
         $compose up -d --build --remove-orphans
     fi
+
+    # Keep the bundled database's password in lockstep with .env so the web can
+    # always authenticate, healing any earlier drift before we wait on health.
+    align_db_password
 
     url=$(sed -n 's#^POLARIS_APP_URL=##p' .env | head -n1)
 

@@ -144,18 +144,6 @@ function Invoke-PolarisInstall {
             # Write UTF-8 without BOM so Docker reads the env_file cleanly.
             [System.IO.File]::WriteAllText((Join-Path (Get-Location) ".env"), $content)
             Write-Host "polaris: review .env and set POLARIS_SITE_ADDRESS / POLARIS_APP_URL to your domain" -ForegroundColor Yellow
-
-            # Postgres bakes its password into its data volume at first init, so a
-            # fresh .env (new password) on top of an existing volume means the web
-            # can never authenticate. Warn and show the data-preserving recovery.
-            docker volume inspect polaris_polaris-postgres 2>$null | Out-Null
-            if ($LASTEXITCODE -eq 0) {
-                Write-Host "polaris: WARNING: a Postgres data volume already exists but .env was regenerated." -ForegroundColor Yellow
-                Write-Host "polaris: the database keeps its OLD password; reset it to match the new one:" -ForegroundColor Yellow
-                Write-Host '  $PW=(Select-String -Path .env -Pattern "^POSTGRES_PASSWORD=").Line -replace "^POSTGRES_PASSWORD=",""'
-                Write-Host '  docker exec -i polaris-postgres-1 psql -U polaris -d polaris -c "ALTER USER polaris WITH PASSWORD ''$PW'';"'
-                Write-Host "  polaris restart web"
-            }
         }
         else {
             Write-Log ".env present; reconciling any new settings"
@@ -196,6 +184,22 @@ function Invoke-PolarisInstall {
         }
         else {
             docker compose up -d --build --remove-orphans
+        }
+
+        # Make POSTGRES_PASSWORD the single source of truth: align the bundled
+        # database role's password with .env so the web can always authenticate,
+        # healing any drift (Postgres only reads POSTGRES_PASSWORD at first init).
+        # The local socket uses trust auth, so this needs no old password.
+        if ($pgPass -and $dbUrl -match "@postgres:5432/") {
+            $esc = $pgPass -replace "'", "''"
+            for ($i = 0; $i -lt 15; $i++) {
+                docker compose exec -T postgres pg_isready -U $pgUser -d $pgDb *> $null
+                if ($LASTEXITCODE -eq 0) {
+                    docker compose exec -T postgres psql -U $pgUser -d $pgDb -c "ALTER USER `"$pgUser`" WITH PASSWORD '$esc';" *> $null
+                    if ($LASTEXITCODE -eq 0) { Write-Log "aligned the database password with .env"; break }
+                }
+                Start-Sleep -Seconds 2
+            }
         }
 
         $appUrl = (Get-Content ".env" | Where-Object { $_ -match "^POLARIS_APP_URL=" } | Select-Object -First 1) -replace "^POLARIS_APP_URL=", ""
