@@ -276,7 +276,7 @@ export function ConnectionDialog() {
                                             <XCircle className="size-3.5" />
                                         )}
                                         {testResult.ok
-                                            ? `${testResult.device}${testResult.version ? ` (${testResult.version})` : ""} - ${testResult.pools} pools, ${testResult.shares} shares`
+                                            ? `${testResult.device}${testResult.firmware ? ` (fw ${testResult.firmware})` : ""} - ${testResult.pools} pools, ${testResult.bays} disks`
                                             : testResult.error}
                                     </span>
                                 ) : null}

@@ -20,9 +20,9 @@ import { recordAudit } from "@/lib/audit-service";
 export interface UnasTestResult {
     readonly ok: boolean;
     readonly device?: string;
-    readonly version?: string;
+    readonly firmware?: string;
     readonly pools?: number;
-    readonly shares?: number;
+    readonly bays?: number;
     readonly error?: string;
 }
 
@@ -54,18 +54,13 @@ export async function testUnasConnectionAction(input: {
         return {
             ok: true,
             device: metrics.system.name,
-            version: metrics.system.version || undefined,
+            firmware: metrics.system.firmware || undefined,
             pools: metrics.pools.length,
-            shares: metrics.shares.length
+            bays: metrics.slotsPopulated
         };
     } catch (caught) {
         const message = caught instanceof Error ? caught.message : "Could not reach the UNAS console";
-        // A login rejection almost always means an SSO/2FA account was used
-        // instead of a local console account - point the user at the fix.
-        const hint = /login failed/i.test(message)
-            ? `${message}. Use a LOCAL console account (Ubiquiti SSO accounts with 2FA cannot log in here).`
-            : message;
-        return { ok: false, error: hint };
+        return { ok: false, error: message };
     }
 }
 
