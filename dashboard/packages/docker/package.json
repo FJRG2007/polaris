@@ -1,0 +1,32 @@
+{
+    "name": "@polaris/docker",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "description": "Modular Docker Engine connector: transports (socket/ssh/tcp), driver, and registry.",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        },
+        "./schema": {
+            "types": "./dist/schema.d.ts",
+            "import": "./dist/schema.js"
+        }
+    },
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "scripts": {
+        "build": "tsup src/index.ts src/schema.ts --format esm --dts --clean",
+        "typecheck": "tsc --noEmit",
+        "test": "vitest run"
+    },
+    "dependencies": {
+        "@polaris/config": "0.1.0",
+        "@polaris/core": "0.1.0",
+        "ssh2": "1.16.0"
+    },
+    "devDependencies": {
+        "@types/ssh2": "1.15.1"
+    }
+}

@@ -42,12 +42,13 @@ model User {
     accounts     Account[]
     roles        UserRole[]
     invitesSent  Invite[]                @relation("InviteInviter")
-    connections  StorageConnection[]
-    shares       Share[]
-    shareInvites ShareInvite[]
-    fileRequests FileRequest[]
-    submissions  FileRequestSubmission[]
-    uploads      UploadSession[]
+    connections       StorageConnection[]
+    dockerConnections DockerConnection[]
+    shares            Share[]
+    shareInvites      ShareInvite[]
+    fileRequests      FileRequest[]
+    submissions       FileRequestSubmission[]
+    uploads           UploadSession[]
 }
 
 model Session {
@@ -159,6 +160,28 @@ model StorageConnection {
     shares       Share[]
     fileRequests FileRequest[]
     uploads      UploadSession[]
+
+    @@index([ownerId])
+}
+
+model DockerConnection {
+    id                  String   @id @default(cuid())
+    name                String
+    ownerId             String
+    // socket | ssh | tcp
+    transport           String
+    // Non-secret transport config (host, port, socket path) as JSON string.
+    config              String
+    // Envelope-encrypted credentials (pasted SSH key / TLS certs). Null for the
+    // socket transport and for SSH using the install-provisioned key.
+    encryptedCredential Bytes?
+    credentialNonce     Bytes?
+    credentialKeyId     String?
+    status              String   @default("active")
+    createdAt           DateTime @default(now())
+    updatedAt           DateTime @updatedAt
+
+    owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
 
     @@index([ownerId])
 }
