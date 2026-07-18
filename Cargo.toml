@@ -5,6 +5,7 @@
 [workspace]
 resolver = "2"
 members = [
+    "crates/polaris-hostd",
     "plugins/unifi-unas/core",
     "plugins/unifi-unas/agent",
 ]

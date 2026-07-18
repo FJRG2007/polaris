@@ -1,0 +1,20 @@
+[package]
+name = "polaris-hostd"
+version = "0.1.0"
+description = "Privileged host daemon for Polaris: brokers host-level operations (filesystem, mounts, and future orchestration) for the dashboard container over a Unix socket. Its presence flips the dashboard from the sandboxed edition to the full edition."
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[[bin]]
+name = "polaris-hostd"
+path = "src/main.rs"
+
+# Only serde is pulled in: the HTTP/1.1 server, Unix-socket transport, token
+# generation (/dev/urandom) and constant-time compare are hand-rolled on std to
+# keep the static musl binary tiny and dependency-light. No hyper/axum/rand.
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
