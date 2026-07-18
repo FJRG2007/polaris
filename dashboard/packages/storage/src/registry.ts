@@ -12,6 +12,7 @@ import type { StorageConfig, StorageCredentials, StorageProviderKind } from "@po
 import type { Capabilities } from "@polaris/config";
 import { LocalDriver } from "./drivers/local.js";
 import { SftpDriver } from "./drivers/sftp.js";
+import { SmbDriver } from "./drivers/smb.js";
 import { StorageError, type StorageDriver } from "./driver.js";
 
 /** A decrypted connection ready to drive. Credentials are already plaintext here. */
@@ -66,15 +67,23 @@ export function createDriver(record: ConnectionRecord, deps: DriverDeps): Storag
             });
         }
         case "smb": {
-            // Prefer a native mount when the daemon is present; the userspace SMB
-            // fallback is not implemented yet, so be explicit rather than pretend.
+            // Prefer a native kernel mount via the daemon when available (faster);
+            // otherwise fall back to the userspace SMB2 client so SMB works in the
+            // limited edition too.
             if (prefersHostd(record.kind) && deps.capabilities.nativeMounts && deps.hostdFactory) {
                 return deps.hostdFactory(record);
             }
-            throw new StorageError(
-                "not_supported",
-                "SMB currently requires the host daemon; the userspace fallback is pending"
-            );
+            const config = record.config as Extract<StorageConfig, { kind: "smb" }>;
+            const creds = record.credentials as Extract<StorageCredentials, { kind: "smb" }>;
+            return new SmbDriver({
+                id: record.id,
+                host: config.host,
+                port: config.port ?? 445,
+                share: config.share,
+                domain: config.domain,
+                username: config.username,
+                password: creds.password
+            });
         }
         default:
             throw new StorageError(
