@@ -277,7 +277,9 @@ fn mount_delete(state: &AppState, id: &str) -> Response {
 }
 
 enum MountError {
-    /// Non-Linux host: mounting is not available (dev shim).
+    /// Non-Linux host: mounting is not available (dev shim). Only produced by the
+    /// non-unix implementations, so it is dead code on a unix build.
+    #[cfg_attr(unix, allow(dead_code))]
     Unsupported,
     /// The `mount`/`umount` process returned a non-zero status. Only produced
     /// by the unix implementations.
