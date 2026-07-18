@@ -4,6 +4,8 @@
 #   curl -fsSL https://raw.githubusercontent.com/FJRG2007/polaris/main/dashboard/scripts/install.sh | sh
 #   # full edition (starts the privileged host daemon):
 #   curl -fsSL .../install.sh | sh -s -- --full
+#   # grant the container secure SSH access to the host Docker Engine:
+#   curl -fsSL .../install.sh | sh -s -- --ssh
 #
 # Idempotent: re-running reconciles the stack and never overwrites an existing
 # .env. Everything is wrapped in main() so a truncated download cannot execute a
@@ -56,9 +58,11 @@ generate_env() {
 
 main() {
     full="no"
+    ssh="no"
     for arg in "$@"; do
         case "$arg" in
             --full) full="yes" ;;
+            --ssh) ssh="yes" ;;
             *) err "unknown argument: $arg"; exit 1 ;;
         esac
     done
@@ -93,6 +97,16 @@ main() {
         err "review .env and set POLARIS_SITE_ADDRESS / POLARIS_APP_URL to your domain"
     else
         log ".env already present, keeping it"
+    fi
+
+    # The web container always bind-mounts this directory read-only; keep it
+    # present (empty is fine) so `up` never fails when SSH access is not set up.
+    mkdir -p secrets/ssh
+
+    if [ "$ssh" = "yes" ]; then
+        log "provisioning secure SSH access to the host Docker Engine"
+        need ssh-keygen "install openssh-client so the installer can generate the access key"
+        POLARIS_ENV_FILE="$(pwd)/.env" sh ../scripts/setup-ssh-access.sh
     fi
 
     set -- up -d

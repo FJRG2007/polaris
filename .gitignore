@@ -42,6 +42,12 @@ plugins/*/homeassistant/custom_components/*/bin/polaris-unas-agent-*
 *.env
 !.env.example
 !*.env.example
+# Generated SSH access keys for the Docker connector (never commit)
+secrets/
+**/secrets/ssh/
+id_ed25519
+id_ed25519.pub
+known_hosts
 *.log
 secrets.*
 *.pem

@@ -28,6 +28,32 @@ curl -fsSL .../install.sh | sh -s -- --full   # full edition
 
 Windows: `irm https://raw.githubusercontent.com/FJRG2007/polaris/main/dashboard/scripts/install.ps1 | iex`.
 
+## Docker over SSH (Containers app)
+
+So the container can view and manage the host's containers without mounting the
+docker socket, the installer can provision a dedicated SSH access to the host
+Engine:
+
+```sh
+curl -fsSL .../install.sh | sh -s -- --ssh
+```
+
+This runs [`scripts/setup-ssh-access.sh`](../scripts/setup-ssh-access.sh), which:
+
+- generates a unique ed25519 key under `secrets/ssh/` (0600, never committed),
+- authorizes it with a **forced command** `docker system dial-stdio` plus
+  `restrict` and a source `from="..."` allowlist - the key can only talk to the
+  Docker API, not open a shell or forward ports,
+- pins the host's SSH host key into `known_hosts` (no blind trust-on-first-use),
+- writes the `POLARIS_SSH_*` values into `.env`.
+
+Compose mounts the key read-only at `/run/polaris-ssh` and adds a
+`host.docker.internal` host entry so the connector reaches the host on Linux.
+
+Point `POLARIS_SSH_USER` at a dedicated account in the `docker` group - the key
+grants Docker access, which is root-equivalent on the host. Override the target
+with `POLARIS_SSH_USER`, `POLARIS_SSH_HOST`, or `POLARIS_SSH_FROM` before running.
+
 ## Configuration
 
 Every setting lives in `.env` (see [`.env.example`](.env.example)). Two values

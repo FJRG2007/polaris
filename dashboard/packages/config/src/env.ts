@@ -62,7 +62,19 @@ const envSchema = z.object({
         ),
 
     /** Master switch to disable auto-update even in the full edition. */
-    POLARIS_AUTO_UPDATE: boolFromEnv.default("true")
+    POLARIS_AUTO_UPDATE: boolFromEnv.default("true"),
+
+    /**
+     * Docker-over-SSH access provisioned by `install.sh --ssh`. When enabled, the
+     * Containers app can reach the host Engine over a dedicated, forced-command
+     * key without mounting the docker socket into the container.
+     */
+    POLARIS_SSH_ENABLED: boolFromEnv.default("false"),
+    POLARIS_SSH_HOST: z.string().default("host.docker.internal"),
+    POLARIS_SSH_USER: z.string().optional(),
+    POLARIS_SSH_PORT: z.coerce.number().int().positive().max(65535).default(22),
+    POLARIS_SSH_KEY: z.string().default("/run/polaris-ssh/id_ed25519"),
+    POLARIS_SSH_KNOWN_HOSTS: z.string().default("/run/polaris-ssh/known_hosts")
 });
 
 export type PolarisEnv = z.infer<typeof envSchema>;

@@ -41,11 +41,18 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    # Resolve the host from inside the container so the Docker-over-SSH connector
+    # can reach the host Engine at host.docker.internal on Linux too.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       # Socket + token shared with the daemon (populated only in the full edition).
       - polaris-run:/run/polaris
       # Container-local storage and upload scratch (POLARIS_DATA_DIR).
       - polaris-data:/var/lib/polaris
+      # Dedicated SSH key + pinned known_hosts for the Docker connector, mounted
+      # read-only. Populated by `install.sh --ssh`; empty (and ignored) otherwise.
+      - ./secrets/ssh:/run/polaris-ssh:ro
     # Not published to the host: Caddy is the only public entry point.
     expose:
       - "3000"
