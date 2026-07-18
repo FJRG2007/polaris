@@ -12,6 +12,17 @@ import { revalidatePath } from "next/cache";
 import { createConnectionSchema, normalizeRelPath } from "@polaris/core";
 import { requirePermission } from "@/lib/session";
 import { createConnection, deleteConnection, getDriver } from "@/lib/storage-service";
+import { detectHost, type NasDetection } from "@/lib/nas-detect";
+
+export async function detectNasAction(host: string): Promise<NasDetection | { error: string }> {
+    await requirePermission("connections.manage");
+    if (!host.trim()) return { error: "Enter an IP or hostname first" };
+    try {
+        return await detectHost(host);
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Detection failed" };
+    }
+}
 
 export async function createConnectionAction(input: unknown): Promise<{ error?: string }> {
     const user = await requirePermission("connections.manage");

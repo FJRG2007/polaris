@@ -10,7 +10,7 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { Plus } from "lucide-react";
+import { Plus, Radar } from "lucide-react";
 import { STORAGE_PROVIDER_KINDS, type StorageProviderKind } from "@polaris/core";
 import {
     Button,
@@ -23,7 +23,7 @@ import {
     DialogTrigger,
     Input
 } from "@polaris/ui";
-import { createConnectionAction } from "./actions";
+import { createConnectionAction, detectNasAction } from "./actions";
 
 interface FieldDef {
     name: string;
@@ -100,6 +100,29 @@ export function ConnectionDialog() {
     const [kind, setKind] = useState<StorageProviderKind>("local");
     const [error, setError] = useState<string | null>(null);
     const [pending, setPending] = useState(false);
+    const [detectIp, setDetectIp] = useState("");
+    const [detectedHost, setDetectedHost] = useState("");
+    const [detecting, setDetecting] = useState(false);
+    const [detectMsg, setDetectMsg] = useState<string | null>(null);
+
+    async function onDetect() {
+        if (!detectIp.trim()) return;
+        setDetecting(true);
+        setDetectMsg(null);
+        const result = await detectNasAction(detectIp.trim());
+        setDetecting(false);
+        if ("error" in result) {
+            setDetectMsg(result.error);
+            return;
+        }
+        if (result.suggested) setKind(result.suggested);
+        setDetectedHost(result.host);
+        setDetectMsg(
+            result.hints.length > 0
+                ? `Found: ${result.hints.join(", ")}${result.suggested ? ` - selected ${LABELS[result.suggested]}` : ""}`
+                : "Nothing recognizable answered on that host"
+        );
+    }
 
     async function onSubmit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
@@ -147,6 +170,23 @@ export function ConnectionDialog() {
                     <DialogDescription>Connect a NAS, cloud bucket, or local folder.</DialogDescription>
                 </DialogHeader>
                 <form onSubmit={onSubmit} className="flex flex-col gap-3">
+                    <div className="rounded-md border border-border bg-muted/30 p-2">
+                        <div className="flex items-end gap-2">
+                            <label className="flex flex-1 flex-col gap-1 text-xs text-muted-foreground">
+                                Detect a NAS by IP
+                                <Input
+                                    placeholder="192.168.1.145"
+                                    value={detectIp}
+                                    onChange={(event) => setDetectIp(event.target.value)}
+                                />
+                            </label>
+                            <Button type="button" size="sm" variant="ghost" onClick={onDetect} disabled={detecting}>
+                                <Radar className="size-4" />
+                                {detecting ? "Scanning..." : "Detect"}
+                            </Button>
+                        </div>
+                        {detectMsg ? <p className="mt-1 text-xs text-muted-foreground">{detectMsg}</p> : null}
+                    </div>
                     <label className="flex flex-col gap-1 text-sm">
                         Provider
                         <select
@@ -166,7 +206,7 @@ export function ConnectionDialog() {
                         <Input name="name" required placeholder="My NAS" />
                     </label>
                     {FIELDS[kind].map((field) => (
-                        <label key={field.name} className="flex flex-col gap-1 text-sm">
+                        <label key={`${field.name}:${detectedHost}`} className="flex flex-col gap-1 text-sm">
                             {field.type === "checkbox" ? (
                                 <span className="flex items-center gap-2">
                                     <input type="checkbox" name={field.name} className="size-4" />
@@ -180,6 +220,7 @@ export function ConnectionDialog() {
                                         type={field.type ?? "text"}
                                         required={field.required}
                                         placeholder={field.placeholder}
+                                        defaultValue={field.name === "host" ? detectedHost : undefined}
                                     />
                                 </>
                             )}
