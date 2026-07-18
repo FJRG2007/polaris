@@ -202,6 +202,12 @@ function Invoke-PolarisInstall {
             }
         }
 
+        # The Caddyfile is bind-mounted, so `up -d` does not restart Caddy when it
+        # changes. Reload its config live so proxy/TLS changes from an update take
+        # effect; fall back to recreating the container if a reload is not possible.
+        docker compose exec -T caddy caddy reload --config /etc/caddy/Caddyfile *> $null
+        if ($LASTEXITCODE -ne 0) { docker compose up -d --force-recreate caddy *> $null }
+
         $appUrl = (Get-Content ".env" | Where-Object { $_ -match "^POLARIS_APP_URL=" } | Select-Object -First 1) -replace "^POLARIS_APP_URL=", ""
         if (-not $appUrl) { $appUrl = "your configured POLARIS_APP_URL" }
 

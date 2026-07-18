@@ -343,6 +343,13 @@ main() {
         $compose up -d --force-recreate web >/dev/null 2>&1 || true
     fi
 
+    # The Caddyfile is bind-mounted, so `up -d` does NOT restart Caddy when it
+    # changes - which is why a proxy/TLS change from an update would silently not
+    # take effect. Reload its config live (fast, no downtime); if that is not
+    # possible, recreate the container so the new Caddyfile is always applied.
+    $compose exec -T caddy caddy reload --config /etc/caddy/Caddyfile >/dev/null 2>&1 \
+        || $compose up -d --force-recreate caddy >/dev/null 2>&1 || true
+
     url=$(sed -n 's#^POLARIS_APP_URL=##p' .env | head -n1)
 
     # Verify the deploy actually came up rather than reporting success blindly.
