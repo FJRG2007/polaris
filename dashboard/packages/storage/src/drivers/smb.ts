@@ -95,9 +95,23 @@ export class SmbDriver implements StorageDriver {
             autoCloseTimeout: 0
         });
         try {
-            // A listing of the root doubles as a connection/credential check.
-            await client.readdir("", { stats: true });
+            // A listing of the root doubles as a connection/credential check, with
+            // a timeout so a filtered port or a hung negotiation fails fast rather
+            // than leaving the request hanging.
+            await withTimeout(
+                client.readdir("", { stats: true }),
+                12_000,
+                "timed out reaching SMB on port 445 (is SMB enabled and the host reachable?)"
+            );
         } catch (error) {
+            try {
+                client.disconnect();
+            } catch {
+                // ignore
+            }
+            // Surface the real cause so the user can act: STATUS_LOGON_FAILURE ->
+            // wrong account, STATUS_BAD_NETWORK_NAME -> wrong share, ECONNREFUSED
+            // -> SMB off / port closed.
             throw new StorageError("connection_failed", `SMB connection failed: ${message(error)}`);
         }
         this.client = client;
@@ -122,8 +136,8 @@ export class SmbDriver implements StorageDriver {
         let raw: SmbStat[] | SmbStat[][];
         try {
             raw = await this.c().readdir(this.smbPath(rel), { stats: true });
-        } catch {
-            throw new StorageError("not_found", `Cannot list ${path}`);
+        } catch (error) {
+            throw new StorageError("io_error", `Cannot list ${path || "the share root"}: ${message(error)}`);
         }
         // The client may return either a flat list or an array of batches.
         const items = (Array.isArray(raw[0]) ? (raw as SmbStat[][]).flat() : (raw as SmbStat[])).filter(
@@ -247,4 +261,22 @@ function parentOf(rel: string): string {
 
 function message(error: unknown): string {
     return error instanceof Error ? error.message : String(error);
+}
+
+/** Reject with a clear message if a promise does not settle within `ms`. */
+function withTimeout<T>(promise: Promise<T>, ms: number, reason: string): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error(reason)), ms);
+        if (typeof timer.unref === "function") timer.unref();
+        promise.then(
+            (value) => {
+                clearTimeout(timer);
+                resolve(value);
+            },
+            (error) => {
+                clearTimeout(timer);
+                reject(error);
+            }
+        );
+    });
 }
