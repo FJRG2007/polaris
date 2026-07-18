@@ -1,7 +1,7 @@
 import type { StorageProviderKind } from "@polaris/core";
 import { PageHeader } from "@polaris/ui";
 import { requireUser } from "@/lib/session";
-import { listConnections } from "@/lib/storage-service";
+import { connectionWebUrl, listConnections } from "@/lib/storage-service";
 import { DriveExplorer } from "./drive-explorer";
 import type { ConnectionSummary } from "./types";
 
@@ -26,7 +26,8 @@ export default async function DrivePage({
         id: row.id,
         name: row.name,
         kind: row.kind as StorageProviderKind,
-        requiresHostd: row.requiresHostd
+        requiresHostd: row.requiresHostd,
+        webUrl: connectionWebUrl(row.kind, row.config)
     }));
 
     const connectionId = pick(params.c) ?? connections[0]?.id ?? null;

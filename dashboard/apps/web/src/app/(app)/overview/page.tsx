@@ -1,7 +1,7 @@
 import type { StorageProviderKind } from "@polaris/core";
 import { PageHeader } from "@polaris/ui";
 import { requireUser } from "@/lib/session";
-import { listConnections } from "@/lib/storage-service";
+import { connectionWebUrl, listConnections } from "@/lib/storage-service";
 import type { ConnectionSummary } from "../drive/types";
 import { OverviewView } from "./overview-view";
 
@@ -13,7 +13,8 @@ export default async function OverviewPage() {
         id: row.id,
         name: row.name,
         kind: row.kind as StorageProviderKind,
-        requiresHostd: row.requiresHostd
+        requiresHostd: row.requiresHostd,
+        webUrl: connectionWebUrl(row.kind, row.config)
     }));
 
     return (

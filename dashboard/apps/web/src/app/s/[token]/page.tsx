@@ -12,15 +12,17 @@ import { cookies } from "next/headers";
 import { loadEnv } from "@polaris/config";
 import { baseName, formatBytes, normalizeRelPath } from "@polaris/core";
 import { Badge, Card, CardBody, CardHeader, CardTitle, PolarisMark } from "@polaris/ui";
-import { ChevronRight, Download, File, Folder, FolderOpen } from "lucide-react";
+import { ChevronRight, Download, Eye, File, Folder, FolderOpen } from "lucide-react";
 import { getDriverForConnection } from "@/lib/storage-service";
 import {
     resolveShareByToken,
     resolveWithinShare,
+    shareIpAllowed,
     shareUnlockCookie,
     shareUsability,
     verifyShareUnlock
 } from "@/lib/share-service";
+import { clientIp } from "@/lib/request-context";
 import { SharePasswordForm } from "./share-password-form";
 
 export const runtime = "nodejs";
@@ -77,6 +79,10 @@ export default async function SharePage({
         return <Unavailable message={message} />;
     }
 
+    if (!shareIpAllowed(share.allowedCidrs, await clientIp())) {
+        return <Unavailable message="This link is not available from your network." />;
+    }
+
     if (share.passwordHash) {
         const cookieValue = (await cookies()).get(shareUnlockCookie(share.id))?.value;
         if (!verifyShareUnlock(share.id, cookieValue, loadEnv().POLARIS_AUTH_SECRET)) {
@@ -102,13 +108,28 @@ export default async function SharePage({
                                 <p className="text-xs text-muted-foreground">{formatBytes(stat.size)}</p>
                             </div>
                         </div>
-                        <a
-                            href={`/api/s/${token}/download?p=${encodeURIComponent(current)}`}
-                            className="inline-flex items-center gap-2 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-                        >
-                            <Download className="size-4" />
-                            Download
-                        </a>
+                        <div className="flex shrink-0 items-center gap-2">
+                            {share.allowPreview ? (
+                                <a
+                                    href={`/api/s/${token}/download?p=${encodeURIComponent(current)}&disposition=inline`}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm font-medium hover:bg-card-hover"
+                                >
+                                    <Eye className="size-4" />
+                                    Preview
+                                </a>
+                            ) : null}
+                            {share.allowDownload ? (
+                                <a
+                                    href={`/api/s/${token}/download?p=${encodeURIComponent(current)}`}
+                                    className="inline-flex items-center gap-2 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+                                >
+                                    <Download className="size-4" />
+                                    Download
+                                </a>
+                            ) : null}
+                        </div>
                     </CardBody>
                 </Card>
             );
@@ -156,17 +177,33 @@ export default async function SharePage({
                                                 <span className="flex-1 truncate">{entry.name}</span>
                                             </Link>
                                         ) : (
-                                            <a
-                                                href={`/api/s/${token}/download?p=${encodeURIComponent(entry.path)}`}
-                                                className="flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-card-hover"
-                                            >
+                                            <div className="flex items-center gap-3 px-4 py-2.5 text-sm">
                                                 <File className="size-4 text-muted-foreground" />
                                                 <span className="flex-1 truncate">{entry.name}</span>
                                                 <span className="text-xs text-muted-foreground">
                                                     {formatBytes(entry.size)}
                                                 </span>
-                                                <Download className="size-4 text-muted-foreground" />
-                                            </a>
+                                                {share.allowPreview ? (
+                                                    <a
+                                                        href={`/api/s/${token}/download?p=${encodeURIComponent(entry.path)}&disposition=inline`}
+                                                        target="_blank"
+                                                        rel="noreferrer"
+                                                        className="text-muted-foreground hover:text-foreground"
+                                                        aria-label={`Preview ${entry.name}`}
+                                                    >
+                                                        <Eye className="size-4" />
+                                                    </a>
+                                                ) : null}
+                                                {share.allowDownload ? (
+                                                    <a
+                                                        href={`/api/s/${token}/download?p=${encodeURIComponent(entry.path)}`}
+                                                        className="text-muted-foreground hover:text-foreground"
+                                                        aria-label={`Download ${entry.name}`}
+                                                    >
+                                                        <Download className="size-4" />
+                                                    </a>
+                                                ) : null}
+                                            </div>
                                         )}
                                     </li>
                                 ))}

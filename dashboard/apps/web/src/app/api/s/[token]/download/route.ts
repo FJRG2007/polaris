@@ -16,6 +16,7 @@ import {
     registerDownload,
     resolveShareByToken,
     resolveWithinShare,
+    shareIpAllowed,
     shareUnlockCookie,
     shareUsability,
     verifyShareUnlock
@@ -35,7 +36,8 @@ export async function GET(
     const share = await resolveShareByToken(token);
     if (!share) return new Response("Not found", { status: 404 });
 
-    const ipHash = hashForLog(await clientIp());
+    const ip = await clientIp();
+    const ipHash = hashForLog(ip);
     const userAgentHash = hashForLog(await clientUserAgent());
     const deny = (status: number, reason: string) => {
         void logShareAccess({ shareId: share.id, action: "download", reason, ipHash, userAgentHash });
@@ -45,12 +47,20 @@ export async function GET(
     const usable = shareUsability(share);
     if (!usable.ok) return deny(410, usable.reason);
 
+    if (!shareIpAllowed(share.allowedCidrs, ip)) return deny(403, "ip_not_allowed");
+
     if (share.passwordHash) {
         const cookieValue = (await cookies()).get(shareUnlockCookie(share.id))?.value;
         if (!verifyShareUnlock(share.id, cookieValue, loadEnv().POLARIS_AUTH_SECRET)) {
             return deny(401, "password_required");
         }
     }
+
+    // An inline request is a browser preview; an attachment request is a download.
+    // Each is gated by its own permission so a share can allow one without the other.
+    const inline = new URL(request.url).searchParams.get("disposition") === "inline";
+    if (inline && !share.allowPreview) return deny(403, "preview_disabled");
+    if (!inline && !share.allowDownload) return deny(403, "downloads_disabled");
 
     const requested = new URL(request.url).searchParams.get("p");
     const target = resolveWithinShare(share.path, requested);
@@ -72,7 +82,7 @@ export async function GET(
         const responseHeaders = new Headers({
             "content-type": stat.mime ?? "application/octet-stream",
             "accept-ranges": "bytes",
-            "content-disposition": `attachment; filename*=UTF-8''${encodeURIComponent(baseName(target))}`
+            "content-disposition": `${inline ? "inline" : "attachment"}; filename*=UTF-8''${encodeURIComponent(baseName(target))}`
         });
 
         const rangeHeader = headerStore.get("range");

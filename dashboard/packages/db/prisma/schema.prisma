@@ -241,6 +241,11 @@ model Share {
     downloadCount Int       @default(0)
     expiresAt     DateTime?
     allowUpload   Boolean   @default(false)
+    // Whether recipients may download the bytes / preview inline in the browser.
+    allowDownload Boolean   @default(true)
+    allowPreview  Boolean   @default(true)
+    // JSON string array of IP/CIDR rules; empty means anyone with the link.
+    allowedCidrs  String    @default("[]")
     createdAt     DateTime  @default(now())
     revokedAt     DateTime?
 

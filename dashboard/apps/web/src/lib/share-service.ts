@@ -9,7 +9,7 @@
 
 import { createHmac, timingSafeEqual } from "node:crypto";
 import type { CreateShareInput } from "@polaris/core";
-import { normalizeRelPath } from "@polaris/core";
+import { ipAllowed, normalizeRelPath } from "@polaris/core";
 import { generateToken, hashToken } from "@polaris/core/tokens";
 import { hashLinkPassword, verifyLinkPassword } from "@polaris/core/link-password";
 import { prisma } from "@polaris/db";
@@ -41,6 +41,9 @@ export async function createShare(
             maxDownloads: input.maxDownloads ?? null,
             expiresAt: input.expiresAt ?? null,
             allowUpload: input.allowUpload,
+            allowDownload: input.allowDownload,
+            allowPreview: input.allowPreview,
+            allowedCidrs: JSON.stringify(input.allowedCidrs),
             invites:
                 input.kind === "invite"
                     ? { create: input.inviteUserIds.map((userId) => ({ userId })) }
@@ -93,10 +96,31 @@ export async function resolveShareByToken(token: string) {
             downloadCount: true,
             expiresAt: true,
             allowUpload: true,
+            allowDownload: true,
+            allowPreview: true,
+            allowedCidrs: true,
             revokedAt: true,
             connection: { select: { name: true } }
         }
     });
+}
+
+/**
+ * Whether a client IP is permitted by a share's IP/CIDR allowlist. An empty or
+ * unparseable rule list means no restriction (anyone with the link). Enforced on
+ * every public access before any bytes or listing are served.
+ */
+export function shareIpAllowed(allowedCidrsJson: string, ip: string | undefined): boolean {
+    let rules: string[] = [];
+    try {
+        const parsed = JSON.parse(allowedCidrsJson);
+        if (Array.isArray(parsed)) rules = parsed.filter((value): value is string => typeof value === "string");
+    } catch {
+        return true;
+    }
+    if (rules.length === 0) return true;
+    if (!ip) return false;
+    return ipAllowed(ip, rules);
 }
 
 /** Whether a share is currently serveable (not revoked, expired, or exhausted). */

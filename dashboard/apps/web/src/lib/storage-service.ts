@@ -155,9 +155,28 @@ export async function getUnasMetrics(connectionId: string, ownerId: string): Pro
 export async function listConnections(ownerId: string) {
     return prisma.storageConnection.findMany({
         where: { ownerId },
-        select: { id: true, name: true, kind: true, status: true, requiresHostd: true, createdAt: true },
+        select: { id: true, name: true, kind: true, status: true, requiresHostd: true, config: true, createdAt: true },
         orderBy: { createdAt: "asc" }
     });
+}
+
+/**
+ * The device's own local web console URL, when the connection points at one that
+ * serves a UI (a UniFi UNAS console). Used to offer a "open the device dashboard"
+ * shortcut next to the cloud (unifi.ui.com) option. Best-effort: returns
+ * undefined for kinds without a console or when the host is not parseable.
+ */
+export function connectionWebUrl(kind: string, configJson: string): string | undefined {
+    if (kind !== "unifi-unas") return undefined;
+    try {
+        const config = JSON.parse(configJson) as { host?: string; port?: number; secure?: boolean };
+        if (!config.host) return undefined;
+        const scheme = config.secure === false ? "http" : "https";
+        const port = config.port && config.port !== 443 && config.port !== 80 ? `:${config.port}` : "";
+        return `${scheme}://${config.host}${port}`;
+    } catch {
+        return undefined;
+    }
 }
 
 /** Persist a new connection, encrypting its credentials at rest. */

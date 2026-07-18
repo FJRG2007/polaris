@@ -7,6 +7,8 @@ export interface ConnectionSummary {
     name: string;
     kind: StorageProviderKind;
     requiresHostd: boolean;
+    /** The device's own local console URL (UniFi UNAS), for a direct-open shortcut. */
+    webUrl?: string;
 }
 
 export interface DriveEntry {

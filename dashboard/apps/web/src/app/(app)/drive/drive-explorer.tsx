@@ -6,14 +6,14 @@
  * this view is purely files. Navigation is URL-driven (?c=connection&p=path) so
  * it is linkable and the back button works. Content loads on the client behind a
  * skeleton so a slow NAS never stalls the whole navigation. A UNAS browses over
- * SMB, reusing its stored account; if no share is set yet it prompts to pick one.
+ * SMB, reusing its stored account; if no share is set yet it prompts to pick one,
+ * and (being a UniFi device) it also offers a shortcut to its own console.
  */
 
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronRight, File, Folder, FolderPlus, HardDrive, Info, Trash2, Upload } from "lucide-react";
-import { formatBytes } from "@polaris/core";
+import { Folder, HardDrive, Info, Trash2 } from "lucide-react";
 import {
     Badge,
     Button,
@@ -34,11 +34,20 @@ import {
     deleteEntryAction,
     discoverUnasSharesAction,
     mkdirAction,
+    renameAction,
     setUnasShareAction
 } from "./actions";
 import { ConnectionDialog } from "./connection-dialog";
-import { ShareButton } from "./share-dialog";
+import { FilesView } from "./files-view";
+import { ShareDialog, type ShareTarget } from "./share-dialog";
+import { UnifiConsoleButton } from "./unifi-console-button";
 import type { ConnectionSummary, DriveEntry } from "./types";
+
+/** Parent path of a relative path ("a/b/c" -> "a/b", "a" -> ""). */
+function parentOf(path: string): string {
+    const slash = path.lastIndexOf("/");
+    return slash >= 0 ? path.slice(0, slash) : "";
+}
 
 export function DriveExplorer({
     connections,
@@ -60,10 +69,12 @@ export function DriveExplorer({
     const [needsSmbShare, setNeedsSmbShare] = useState(false);
     const [newFolderOpen, setNewFolderOpen] = useState(false);
     const [newFolderName, setNewFolderName] = useState("");
-    const [deleteTarget, setDeleteTarget] = useState<DriveEntry | null>(null);
+    const [deleteTargets, setDeleteTargets] = useState<DriveEntry[] | null>(null);
     const [deleteConn, setDeleteConn] = useState<ConnectionSummary | null>(null);
+    const [shareTarget, setShareTarget] = useState<ShareTarget | null>(null);
 
     const segments = path ? path.split("/") : [];
+    const selectedConnection = connections.find((connection) => connection.id === connectionId) ?? null;
 
     const load = useCallback(
         async (signal?: AbortSignal) => {
@@ -135,13 +146,29 @@ export function DriveExplorer({
         });
     }
 
-    function confirmDelete() {
-        if (!connectionId || !deleteTarget) return;
-        const target = deleteTarget;
-        setDeleteTarget(null);
-        setEntries((prev) => prev.filter((entry) => entry.path !== target.path));
+    function onRename(entry: DriveEntry, nextName: string) {
+        if (!connectionId) return;
+        const parent = parentOf(entry.path);
+        const to = parent ? `${parent}/${nextName}` : nextName;
+        setEntries((prev) =>
+            prev.map((row) => (row.path === entry.path ? { ...row, name: nextName, path: to } : row))
+        );
         startTransition(async () => {
-            await deleteEntryAction(connectionId, target.path);
+            await renameAction(connectionId, entry.path, to);
+            void load();
+        });
+    }
+
+    function confirmDelete() {
+        if (!connectionId || !deleteTargets) return;
+        const targets = deleteTargets;
+        setDeleteTargets(null);
+        const paths = new Set(targets.map((entry) => entry.path));
+        setEntries((prev) => prev.filter((entry) => !paths.has(entry.path)));
+        startTransition(async () => {
+            for (const entry of targets) {
+                await deleteEntryAction(connectionId, entry.path);
+            }
             void load();
         });
     }
@@ -196,6 +223,12 @@ export function DriveExplorer({
             </aside>
 
             <section className="min-w-0">
+                {selectedConnection?.kind === "unifi-unas" ? (
+                    <div className="mb-3 flex items-center justify-end">
+                        <UnifiConsoleButton webUrl={selectedConnection.webUrl} />
+                    </div>
+                ) : null}
+
                 {!connectionId ? (
                     <div className="rounded-md border border-border bg-card p-8 text-center text-sm text-muted-foreground">
                         Add a storage connection to start browsing.
@@ -205,6 +238,7 @@ export function DriveExplorer({
                 ) : (
                     <FilesView
                         connectionId={connectionId}
+                        path={path}
                         segments={segments}
                         entries={entries}
                         loading={loading}
@@ -215,10 +249,21 @@ export function DriveExplorer({
                         href={href}
                         onNewFolder={() => setNewFolderOpen(true)}
                         onUpload={onUpload}
-                        onDelete={(entry) => setDeleteTarget(entry)}
+                        onDelete={(items) => setDeleteTargets(items)}
+                        onRename={onRename}
+                        onShare={(entry) =>
+                            setShareTarget({
+                                connectionId,
+                                path: entry.path,
+                                name: entry.name,
+                                isDir: entry.kind === "dir"
+                            })
+                        }
                     />
                 )}
             </section>
+
+            <ShareDialog target={shareTarget} onOpenChange={(open) => !open && setShareTarget(null)} />
 
             <Dialog open={newFolderOpen} onOpenChange={setNewFolderOpen}>
                 <DialogContent>
@@ -247,17 +292,20 @@ export function DriveExplorer({
                 </DialogContent>
             </Dialog>
 
-            <Dialog open={deleteTarget !== null} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+            <Dialog open={deleteTargets !== null} onOpenChange={(open) => !open && setDeleteTargets(null)}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>Delete {deleteTarget?.kind === "dir" ? "folder" : "file"}</DialogTitle>
+                        <DialogTitle>
+                            Delete {deleteTargets && deleteTargets.length > 1 ? `${deleteTargets.length} items` : "item"}
+                        </DialogTitle>
                         <DialogDescription className="truncate">
-                            {deleteTarget?.name} will be permanently deleted
-                            {deleteTarget?.kind === "dir" ? ", along with everything inside it" : ""}.
+                            {deleteTargets && deleteTargets.length === 1
+                                ? `${deleteTargets[0]?.name} will be permanently deleted${deleteTargets[0]?.kind === "dir" ? ", along with everything inside it" : ""}.`
+                                : "The selected items will be permanently deleted, along with everything inside any folders."}
                         </DialogDescription>
                     </DialogHeader>
                     <div className="flex justify-end gap-2">
-                        <Button type="button" variant="ghost" onClick={() => setDeleteTarget(null)}>
+                        <Button type="button" variant="ghost" onClick={() => setDeleteTargets(null)}>
                             Cancel
                         </Button>
                         <Button type="button" variant="danger" onClick={confirmDelete}>
@@ -395,172 +443,5 @@ function UnasSmbSetup({ connectionId, onSaved }: { connectionId: string; onSaved
                 {error ? <p className="text-sm text-danger">{error}</p> : null}
             </CardBody>
         </Card>
-    );
-}
-
-function FilesView({
-    connectionId,
-    segments,
-    entries,
-    loading,
-    error,
-    pending,
-    uploading,
-    fileInput,
-    href,
-    onNewFolder,
-    onUpload,
-    onDelete
-}: {
-    connectionId: string;
-    segments: string[];
-    entries: DriveEntry[];
-    loading: boolean;
-    error: string | null;
-    pending: boolean;
-    uploading: boolean;
-    fileInput: React.RefObject<HTMLInputElement | null>;
-    href: (id: string, target: string) => string;
-    onNewFolder: () => void;
-    onUpload: (files: FileList | null) => void;
-    onDelete: (entry: DriveEntry) => void;
-}) {
-    return (
-        <>
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                <div className="flex min-w-0 items-center gap-1 text-sm text-muted-foreground">
-                    <Link href={href(connectionId, "")} className="hover:text-foreground">
-                        Home
-                    </Link>
-                    {segments.map((segment, index) => {
-                        const target = segments.slice(0, index + 1).join("/");
-                        return (
-                            <span key={target} className="flex items-center gap-1">
-                                <ChevronRight className="size-3" />
-                                <Link href={href(connectionId, target)} className="truncate hover:text-foreground">
-                                    {segment}
-                                </Link>
-                            </span>
-                        );
-                    })}
-                </div>
-                <div className="flex items-center gap-2">
-                    <Button size="sm" variant="ghost" onClick={onNewFolder} disabled={pending}>
-                        <FolderPlus className="size-4" />
-                        New folder
-                    </Button>
-                    <Button
-                        size="sm"
-                        variant="secondary"
-                        onClick={() => fileInput.current?.click()}
-                        disabled={uploading}
-                    >
-                        <Upload className="size-4" />
-                        {uploading ? "Uploading..." : "Upload"}
-                    </Button>
-                    <input
-                        ref={fileInput}
-                        type="file"
-                        multiple
-                        hidden
-                        onChange={(event) => onUpload(event.target.files)}
-                    />
-                </div>
-            </div>
-
-            {loading ? (
-                <ListingSkeleton />
-            ) : error ? (
-                <div className="rounded-md border border-danger/40 bg-danger/10 p-3 text-sm text-danger">{error}</div>
-            ) : (
-                <div className="overflow-hidden rounded-lg border border-border">
-                    <table className="w-full text-sm">
-                        <thead className="bg-surface/60 text-left text-xs text-muted-foreground">
-                            <tr>
-                                <th className="px-3 py-2 font-medium">Name</th>
-                                <th className="px-3 py-2 font-medium">Size</th>
-                                <th className="hidden px-3 py-2 font-medium sm:table-cell">Modified</th>
-                                <th className="px-3 py-2" />
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {entries.length === 0 ? (
-                                <tr>
-                                    <td colSpan={4} className="px-3 py-8 text-center text-muted-foreground">
-                                        This folder is empty.
-                                    </td>
-                                </tr>
-                            ) : (
-                                entries.map((entry) => (
-                                    <tr key={entry.path} className="border-t border-border hover:bg-card-hover">
-                                        <td className="px-3 py-2">
-                                            {entry.kind === "dir" ? (
-                                                <Link
-                                                    href={href(connectionId, entry.path)}
-                                                    className="flex items-center gap-2 hover:text-primary"
-                                                >
-                                                    <Folder className="size-4 text-primary" />
-                                                    {entry.name}
-                                                </Link>
-                                            ) : (
-                                                <a
-                                                    href={`/api/drive/download?c=${connectionId}&p=${encodeURIComponent(entry.path)}`}
-                                                    className="flex items-center gap-2 hover:text-primary"
-                                                >
-                                                    <File className="size-4 text-muted-foreground" />
-                                                    {entry.name}
-                                                </a>
-                                            )}
-                                        </td>
-                                        <td className="px-3 py-2 text-muted-foreground">
-                                            {entry.kind === "dir" ? "-" : formatBytes(BigInt(entry.size))}
-                                        </td>
-                                        <td className="hidden px-3 py-2 text-muted-foreground sm:table-cell">
-                                            {new Date(entry.modifiedAt).toLocaleString()}
-                                        </td>
-                                        <td className="px-3 py-2 text-right">
-                                            <div className="flex items-center justify-end gap-1">
-                                                <ShareButton
-                                                    connectionId={connectionId}
-                                                    path={entry.path}
-                                                    name={entry.name}
-                                                    isDir={entry.kind === "dir"}
-                                                />
-                                                <Button
-                                                    size="icon"
-                                                    variant="ghost"
-                                                    onClick={() => onDelete(entry)}
-                                                    disabled={pending}
-                                                    aria-label={`Delete ${entry.name}`}
-                                                >
-                                                    <Trash2 className="size-4" />
-                                                </Button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))
-                            )}
-                        </tbody>
-                    </table>
-                </div>
-            )}
-        </>
-    );
-}
-
-/** Placeholder while a directory listing loads. */
-function ListingSkeleton() {
-    return (
-        <div className="overflow-hidden rounded-lg border border-border">
-            <div className="flex flex-col divide-y divide-border">
-                {Array.from({ length: 6 }).map((_, index) => (
-                    <div key={index} className="flex items-center gap-3 px-3 py-2.5">
-                        <Skeleton className="size-4 rounded" />
-                        <Skeleton className="h-4 flex-1 max-w-[40%]" />
-                        <Skeleton className="ml-auto h-4 w-16" />
-                    </div>
-                ))}
-            </div>
-        </div>
     );
 }
