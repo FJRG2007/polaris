@@ -20,7 +20,7 @@ from homeassistant.helpers.selector import (
 from homeassistant import config_entries
 from homeassistant.components import mqtt
 from homeassistant.const import CONF_HOST, CONF_PASSWORD, CONF_USERNAME
-from homeassistant.data_entry_flow import FlowResult
+from homeassistant.data_entry_flow import FlowResult, FlowResultType
 
 from .const import (
     DOMAIN,
@@ -196,9 +196,6 @@ class UNASProConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> FlowResult:
         errors: dict[str, str] = {}
 
-        if mqtt.DOMAIN not in self.hass.data:
-            return self.async_abort(reason="mqtt_required")
-
         if user_input is not None:
             if error_key := await self._test_ssh(user_input[CONF_HOST], user_input[CONF_USERNAME],
                                                  user_input.get(CONF_PASSWORD)):
@@ -210,17 +207,7 @@ class UNASProConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                                                     user_input[CONF_MQTT_PASSWORD]):
                 errors["base"] = error_key
             else:
-                await self.async_set_unique_id(user_input[CONF_HOST])
-                self._abort_if_unique_id_configured()
-
-                device_name = (
-                    user_input.get(CONF_DEVICE_NAME)
-                    or DEVICE_MODELS[user_input[CONF_DEVICE_MODEL]]
-                )
-                return self.async_create_entry(
-                    title=f"{device_name} ({user_input[CONF_HOST]})",
-                    data=user_input,
-                )
+                return await self._finish(user_input)
 
         return self.async_show_form(step_id="user", data_schema=STEP_USER_DATA_SCHEMA, errors=errors)
 
@@ -238,17 +225,7 @@ class UNASProConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             ):
                 errors["base"] = error_key
             else:
-                await self.async_set_unique_id(merged[CONF_HOST])
-                self._abort_if_unique_id_configured()
-
-                device_name = (
-                    merged.get(CONF_DEVICE_NAME)
-                    or DEVICE_MODELS[merged[CONF_DEVICE_MODEL]]
-                )
-                return self.async_create_entry(
-                    title=f"{device_name} ({merged[CONF_HOST]})",
-                    data=merged,
-                )
+                return await self._finish(merged)
 
         schema = vol.Schema({
             vol.Optional(CONF_MQTT_PORT, default=DEFAULT_MQTT_TLS_PORT): NumberSelector(
@@ -257,6 +234,56 @@ class UNASProConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             vol.Optional(CONF_MQTT_TLS_INSECURE, default=False): BooleanSelector(),
         })
         return self.async_show_form(step_id="mqtt_tls", data_schema=schema, errors=errors)
+
+    async def _finish(self, data: dict[str, Any]) -> FlowResult:
+        # The broker connection was already validated. If Home Assistant's MQTT
+        # integration is not set up yet, configure it automatically from the same
+        # broker details so the user does not have to add it separately.
+        if mqtt.DOMAIN not in self.hass.data and not await self._ensure_mqtt(data):
+            return self.async_abort(reason="mqtt_required")
+
+        await self.async_set_unique_id(data[CONF_HOST])
+        self._abort_if_unique_id_configured()
+
+        device_name = data.get(CONF_DEVICE_NAME) or DEVICE_MODELS[data[CONF_DEVICE_MODEL]]
+        return self.async_create_entry(
+            title=f"{device_name} ({data[CONF_HOST]})",
+            data=data,
+        )
+
+    async def _ensure_mqtt(self, data: dict[str, Any]) -> bool:
+        # Drive the core MQTT config flow with the broker details we already
+        # collected and validated. Guarded end to end: any failure (e.g. a future
+        # change to the MQTT flow) falls back to asking the user to add it
+        # manually, so this can never leave a broken half-configured broker.
+        broker = {
+            "broker": data[CONF_MQTT_HOST],
+            "port": int(data.get(CONF_MQTT_PORT, DEFAULT_MQTT_PORT)),
+            "username": data[CONF_MQTT_USER],
+            "password": data[CONF_MQTT_PASSWORD],
+        }
+        try:
+            result = await self.hass.config_entries.flow.async_init(
+                mqtt.DOMAIN, context={"source": config_entries.SOURCE_USER}
+            )
+            for _ in range(4):
+                kind = result["type"]
+                if kind == FlowResultType.CREATE_ENTRY:
+                    _LOGGER.info("Automatically configured the MQTT integration")
+                    return True
+                if kind == FlowResultType.MENU:
+                    result = await self.hass.config_entries.flow.async_configure(
+                        result["flow_id"], {"next_step_id": "broker"}
+                    )
+                elif kind == FlowResultType.FORM:
+                    result = await self.hass.config_entries.flow.async_configure(
+                        result["flow_id"], broker
+                    )
+                else:
+                    break
+        except Exception as err:  # best effort; fall back to manual setup
+            _LOGGER.warning("Automatic MQTT setup failed (%s); asking the user to add it", err)
+        return False
 
     async def _test_ssh(self, host: str, username: str, password: str | None) -> str | None:
         try:

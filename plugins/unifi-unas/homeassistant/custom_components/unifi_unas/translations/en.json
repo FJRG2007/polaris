@@ -68,7 +68,7 @@
     "error": {
       "cannot_connect": "Failed to connect to UniFi UNAS. Please check the IP address and password/SSH key configuration.",
       "timeout_connect": "Connection timed out. Please check that SSH is enabled on your UniFi UNAS.",
-      "mqtt_cannot_connect": "Failed to connect to MQTT broker. Please verify the MQTT host IP address.",
+      "mqtt_cannot_connect": "Failed to connect to the MQTT broker. Verify the host and credentials. If you don't have a broker yet, install the Mosquitto broker add-on and set a login in its configuration.",
       "mqtt_invalid_auth": "MQTT authentication failed. Please check your MQTT username and password.",
       "mqtt_timeout": "MQTT connection timed out. Please verify the broker is running and accessible.",
       "mqtt_library_missing": "MQTT library not available. Please restart Home Assistant.",
@@ -78,7 +78,7 @@
     },
     "abort": {
       "already_configured": "This UniFi UNAS is already configured.",
-      "mqtt_required": "MQTT integration must be installed and configured before setting up UniFi UNAS. Please add the MQTT integration first, then try again.",
+      "mqtt_required": "Home Assistant's MQTT integration is required and could not be configured automatically. Install a broker such as the [Mosquitto broker add-on](https://my.home-assistant.io/redirect/supervisor_addon/?addon=core_mosquitto) (set a username and password in its configuration), then [add the MQTT integration](https://my.home-assistant.io/redirect/config_flow_start/?domain=mqtt) and start UniFi UNAS again.",
       "reconfigure_successful": "Configuration updated successfully. The integration is reconnecting with the new settings."
     }
   },
