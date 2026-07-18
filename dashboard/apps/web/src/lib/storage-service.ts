@@ -19,6 +19,7 @@ import {
     type ConnectionRecord,
     type StorageDriver
 } from "@polaris/storage";
+import { fetchUnasMetrics, type UnasMetrics } from "@/lib/unifi-unas";
 
 /** Base path under which the host daemon mounts SMB/NFS shares. */
 const HOSTD_MOUNT_ROOT = "/mnt/polaris";
@@ -62,6 +63,32 @@ export async function getDriver(connectionId: string, ownerId: string): Promise<
     });
     await driver.connect();
     return driver;
+}
+
+/** Native UniFi UNAS metrics for a connection (via the UniFi OS console API). */
+export async function getUnasMetrics(connectionId: string, ownerId: string): Promise<UnasMetrics> {
+    const row = await loadConnection(connectionId, ownerId);
+    if (row.kind !== "unifi-unas") throw new Error("Not a UniFi UNAS connection");
+    const env = loadEnv();
+    const config = JSON.parse(row.config) as Extract<StorageConfig, { kind: "unifi-unas" }>;
+    const credentials =
+        row.encryptedCredential && row.credentialNonce
+            ? decryptCredentials<{ password?: string }>(
+                  {
+                      ciphertext: Buffer.from(row.encryptedCredential),
+                      nonce: Buffer.from(row.credentialNonce),
+                      keyId: row.credentialKeyId ?? ""
+                  },
+                  env.POLARIS_MASTER_KEY
+              )
+            : {};
+    return fetchUnasMetrics({
+        host: config.host,
+        port: config.port,
+        username: config.username,
+        password: credentials.password ?? "",
+        secure: config.secure
+    });
 }
 
 /** All connections owned by a user, without secret material. */

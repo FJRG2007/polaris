@@ -91,7 +91,12 @@ const FIELDS: Record<StorageProviderKind, FieldDef[]> = {
         { name: "password", label: "Password", type: "password", required: true, group: "credentials" }
     ],
     truenas: [host, { name: "apiKey", label: "API key", type: "password", required: true, group: "credentials" }],
-    "unifi-unas": [host, { name: "apiKey", label: "API key", type: "password", group: "credentials" }]
+    "unifi-unas": [
+        host,
+        port,
+        { name: "username", label: "Console username", required: true, group: "config" },
+        { name: "password", label: "Console password", type: "password", group: "credentials" }
+    ]
 };
 
 export function ConnectionDialog() {

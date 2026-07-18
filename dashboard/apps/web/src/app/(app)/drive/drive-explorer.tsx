@@ -14,8 +14,10 @@ import { useRouter } from "next/navigation";
 import { ChevronRight, File, Folder, FolderPlus, HardDrive, Trash2, Upload } from "lucide-react";
 import { formatBytes } from "@polaris/core";
 import { Badge, Button, cn } from "@polaris/ui";
+import type { UnasMetrics as UnasMetricsData } from "@/lib/unifi-unas";
 import { deleteEntryAction, mkdirAction } from "./actions";
 import { ConnectionDialog } from "./connection-dialog";
+import { UnasMetrics } from "./unas-metrics";
 import type { ConnectionSummary, DriveEntry } from "./types";
 
 export function DriveExplorer({
@@ -23,13 +25,15 @@ export function DriveExplorer({
     connectionId,
     path,
     entries,
-    error
+    error,
+    unasMetrics
 }: {
     connections: ConnectionSummary[];
     connectionId: string | null;
     path: string;
     entries: DriveEntry[];
     error: string | null;
+    unasMetrics: UnasMetricsData | null;
 }) {
     const router = useRouter();
     const fileInput = useRef<HTMLInputElement>(null);
@@ -107,7 +111,7 @@ export function DriveExplorer({
             <section className="min-w-0">
                 <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                     <div className="flex min-w-0 items-center gap-1 text-sm text-muted-foreground">
-                        {connectionId ? (
+                        {connectionId && !unasMetrics ? (
                             <>
                                 <Link href={href(connectionId, "")} className="hover:text-foreground">
                                     Home
@@ -129,7 +133,7 @@ export function DriveExplorer({
                             </>
                         ) : null}
                     </div>
-                    {connectionId ? (
+                    {connectionId && !unasMetrics ? (
                         <div className="flex items-center gap-2">
                             <Button size="sm" variant="ghost" onClick={onNewFolder} disabled={pending}>
                                 <FolderPlus className="size-4" />
@@ -163,6 +167,8 @@ export function DriveExplorer({
                     <div className="rounded-md border border-border bg-card p-8 text-center text-sm text-muted-foreground">
                         Add a storage connection to start browsing.
                     </div>
+                ) : unasMetrics ? (
+                    <UnasMetrics metrics={unasMetrics} />
                 ) : (
                     <div className="overflow-hidden rounded-lg border border-border">
                         <table className="w-full text-sm">

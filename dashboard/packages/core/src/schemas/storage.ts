@@ -53,7 +53,14 @@ export const storageConfigSchema = z.discriminatedUnion("kind", [
     z.object({ ...hostPort.shape, kind: z.literal("synology"), secure: z.boolean().default(true), username: z.string().min(1) }),
     z.object({ ...hostPort.shape, kind: z.literal("qnap"), secure: z.boolean().default(true), username: z.string().min(1) }),
     z.object({ ...hostPort.shape, kind: z.literal("truenas"), secure: z.boolean().default(true) }),
-    z.object({ ...hostPort.shape, kind: z.literal("unifi-unas") })
+    z.object({
+        ...hostPort.shape,
+        kind: z.literal("unifi-unas"),
+        // UniFi OS console over HTTPS (SSH is off by default on the UNAS), so
+        // metrics come from the Drive API via the console with UniFi credentials.
+        username: z.string().min(1),
+        secure: z.boolean().default(true)
+    })
 ]);
 
 export type StorageConfig = z.infer<typeof storageConfigSchema>;
@@ -70,7 +77,7 @@ export const storageCredentialsSchema = z.discriminatedUnion("kind", [
     z.object({ kind: z.literal("synology"), password: z.string().min(1) }),
     z.object({ kind: z.literal("qnap"), password: z.string().min(1) }),
     z.object({ kind: z.literal("truenas"), apiKey: z.string().min(1) }),
-    z.object({ kind: z.literal("unifi-unas"), apiKey: z.string().optional() })
+    z.object({ kind: z.literal("unifi-unas"), password: z.string().optional(), apiKey: z.string().optional() })
 ]);
 
 export type StorageCredentials = z.infer<typeof storageCredentialsSchema>;
