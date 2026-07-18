@@ -1,0 +1,37 @@
+name: Dashboard CI
+
+# Typecheck, lint, test and build the dashboard monorepo on any change under
+# dashboard/. Runs independently of the Rust/Python CI in ci.yml.
+
+on:
+  push:
+    paths:
+      - "dashboard/**"
+      - ".github/workflows/dashboard-ci.yml"
+  pull_request:
+    paths:
+      - "dashboard/**"
+      - ".github/workflows/dashboard-ci.yml"
+
+defaults:
+  run:
+    working-directory: dashboard
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: dashboard/package-lock.json
+
+      - run: npm ci
+      - run: npm run db:generate
+      - run: npm run typecheck
+      - run: npm run lint --if-present
+      - run: npm run test
+      - run: npm run build

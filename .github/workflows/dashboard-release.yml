@@ -1,0 +1,91 @@
+name: Dashboard Release
+
+# Publishes the dashboard on a `dashboard-v*` tag:
+#   - builds and pushes the web image to GHCR with provenance + SBOM;
+#   - cross-compiles the polaris-hostd static musl binaries (aarch64 + x86_64)
+#     and attaches them to the GitHub Release (mirrors release-unifi-unas.yml).
+#
+# Trigger: push a tag like `dashboard-v0.1.0`.
+
+on:
+  push:
+    tags:
+      - "dashboard-v*"
+
+permissions:
+  contents: write
+  packages: write
+
+env:
+  IMAGE: ghcr.io/fjrg2007/polaris-dashboard
+
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Derive image tags
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE }}
+          tags: |
+            type=match,pattern=dashboard-v(.*),group=1
+            type=raw,value=latest
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: dashboard
+          file: dashboard/docker/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          provenance: true
+          sbom: true
+
+  # TODO: the `full` compose profile references a ghcr.io/fjrg2007/polaris-hostd
+  # container image. This job only publishes the raw binaries (for bare-metal
+  # installs). Wrapping the binary in a pushed image is a follow-up.
+  hostd:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Install cross
+        run: cargo install cross --locked
+
+      - name: Build hostd binaries
+        run: |
+          set -euo pipefail
+          for target in aarch64-unknown-linux-musl x86_64-unknown-linux-musl; do
+            cross build --release --target "$target" -p polaris-hostd
+          done
+
+      - name: Stage binaries
+        run: |
+          set -euo pipefail
+          STAGE="$RUNNER_TEMP/hostd"
+          rm -rf "$STAGE"
+          mkdir -p "$STAGE"
+          cp target/aarch64-unknown-linux-musl/release/polaris-hostd "$STAGE/polaris-hostd-aarch64"
+          cp target/x86_64-unknown-linux-musl/release/polaris-hostd "$STAGE/polaris-hostd-x86_64"
+
+      - name: Attach to release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          files: ${{ runner.temp }}/hostd/polaris-hostd-*

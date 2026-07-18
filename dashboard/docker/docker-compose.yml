@@ -1,0 +1,103 @@
+# Polaris dashboard stack.
+#
+# Two editions share this one file:
+#   - Limited (default): `docker compose up -d` starts postgres + web + caddy.
+#     Cloud/API and userspace storage providers work; host access is disabled.
+#   - Full:  `docker compose --profile full up -d` additionally starts the
+#     privileged `hostd` daemon, which unlocks kernel mounts (SMB/NFS), host
+#     filesystem access, container/systemd control and daemon-driven updates.
+#
+# The privileged daemon is deliberately behind a compose profile so the limited
+# edition never grants host access by accident: an operator must opt in with
+# `--profile full`, and even then the dashboard only reports the `full` edition
+# once the daemon answers over the shared socket with a valid token.
+name: polaris
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-polaris}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:-polaris}
+    volumes:
+      - polaris-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-polaris} -d ${POSTGRES_DB:-polaris}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  web:
+    # Prebuilt image (release workflow) with a local-build fallback for dev.
+    image: ghcr.io/fjrg2007/polaris-dashboard:${POLARIS_IMAGE_TAG:-latest}
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      # Socket + token shared with the daemon (populated only in the full edition).
+      - polaris-run:/run/polaris
+      # Container-local storage and upload scratch (POLARIS_DATA_DIR).
+      - polaris-data:/var/lib/polaris
+    # Not published to the host: Caddy is the only public entry point.
+    expose:
+      - "3000"
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - web
+    environment:
+      # Public site address (domain, or :443 / :80 for IP-only setups).
+      POLARIS_SITE_ADDRESS: ${POLARIS_SITE_ADDRESS:-:80}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - polaris-caddy-data:/data
+      - polaris-caddy-config:/config
+
+  # --- Full edition only ----------------------------------------------------
+  # Privileged host daemon. Runs the static musl `polaris-hostd` binary and
+  # brokers host access for the web container over the shared unix socket. Kept
+  # in the `full` profile so it is never started by the default `up`.
+  hostd:
+    profiles: ["full"]
+    # The release pipeline publishes the polaris-hostd static musl binaries as
+    # GitHub Release assets; this image wraps that binary. See the TODO in
+    # dashboard-release.yml about producing the container image.
+    image: ghcr.io/fjrg2007/polaris-hostd:${POLARIS_IMAGE_TAG:-latest}
+    restart: unless-stopped
+    # Required for kernel mounts (SMB/NFS) and host filesystem access.
+    privileged: true
+    environment:
+      POLARIS_HOSTD_SOCKET: /run/polaris/hostd.sock
+      POLARIS_HOSTD_TOKEN_FILE: /run/polaris/hostd.token
+    volumes:
+      # Same socket/token volume the web container reads.
+      - polaris-run:/run/polaris
+      # Docker control for the container-management app.
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Mount root, shared so mounts the daemon creates propagate to the host.
+      - type: bind
+        source: /mnt/polaris
+        target: /mnt/polaris
+        bind:
+          propagation: rshared
+
+volumes:
+  polaris-postgres:
+  polaris-run:
+  polaris-data:
+  polaris-caddy-data:
+  polaris-caddy-config:

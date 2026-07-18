@@ -1,0 +1,28 @@
+# Polaris reverse proxy. Terminates TLS and forwards to the web container.
+#
+# The site address comes from the environment: a domain (e.g. polaris.example.com)
+# gets automatic HTTPS via Let's Encrypt; `:80` or `:443` serve an IP-only host.
+{$POLARIS_SITE_ADDRESS} {
+	encode zstd gzip
+
+	# Large uploads: Drive streams multi-gigabyte files through the app, so the
+	# proxy must not cap the body. 32 GiB is a generous ceiling that still stops
+	# a runaway request from being truly unbounded; raise it if you move larger
+	# objects. The app enforces its own per-request limits on top of this.
+	request_body {
+		max_size 32GB
+	}
+
+	header {
+		# Force HTTPS for a year, including subdomains.
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		# Deny framing and MIME sniffing; keep referrers off external origins.
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		# Never advertise the server software.
+		-Server
+	}
+
+	reverse_proxy web:3000
+}
