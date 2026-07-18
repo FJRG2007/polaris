@@ -1,5 +1,13 @@
 # Polaris reverse proxy. Terminates TLS and forwards to the web container.
 
+# Global options: serve HTTPS on the local names (internal CA) but never force a
+# redirect from HTTP, so http://polaris.local stays plain HTTP with no browser
+# certificate warning, while https://polaris.local is there for browsers that
+# insist on HTTPS. A configured public domain still gets normal automatic HTTPS.
+{
+	auto_https disable_redirects
+}
+
 # Shared proxy behavior, imported by each site below.
 (proxy) {
 	encode zstd gzip
