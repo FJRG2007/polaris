@@ -325,23 +325,25 @@ main() {
     fi
 
     # Install and update are the same command: prefer the published `latest` image
-    # (fast), falling back to building from source if the registry is unavailable
-    # or the image is not published yet. The web entrypoint applies pending
-    # migrations either way, so nothing else is needed from the user.
+    # (fast), falling back to building from source if the registry is unavailable.
+    build_flag=""
     if $compose pull 2>/dev/null; then
         log "starting from the published image (also applies database migrations)"
-        $compose up -d --remove-orphans
     else
         log "registry unavailable; building from source (also applies migrations)"
-        $compose up -d --build --remove-orphans
+        build_flag="--build"
     fi
 
-    # Keep the bundled database's password in lockstep with .env so the web can
-    # always authenticate, healing any earlier drift, then recreate the web so it
-    # reloads .env and restarts against the aligned role before we wait on health.
-    if align_db_password; then
-        $compose up -d --force-recreate web >/dev/null 2>&1 || true
-    fi
+    # Bring up the database first and align its password with .env BEFORE anything
+    # connects. Postgres only reads POSTGRES_PASSWORD at first init, so a drifted
+    # volume password would otherwise make the web fail auth on startup (P1000) and
+    # restart in a loop; aligning first means the web connects cleanly the first
+    # time - no race, no restart churn.
+    $compose up -d $build_flag postgres
+    align_db_password
+
+    # Now bring up the rest against the already-aligned database.
+    $compose up -d $build_flag --remove-orphans
 
     # The Caddyfile is bind-mounted, so `up -d` does NOT restart Caddy when it
     # changes - which is why a proxy/TLS change from an update would silently not

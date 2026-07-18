@@ -179,17 +179,12 @@ function Invoke-PolarisInstall {
         # back to a source build; the web entrypoint applies pending migrations.
         Write-Log "starting the stack (also applies database migrations)"
         docker compose pull 2>$null
-        if ($LASTEXITCODE -eq 0) {
-            docker compose up -d --remove-orphans
-        }
-        else {
-            docker compose up -d --build --remove-orphans
-        }
+        $buildFlag = @()
+        if ($LASTEXITCODE -ne 0) { $buildFlag = @("--build") }
 
-        # Make POSTGRES_PASSWORD the single source of truth: align the bundled
-        # database role's password with .env so the web can always authenticate,
-        # healing any drift (Postgres only reads POSTGRES_PASSWORD at first init).
-        # The local socket uses trust auth, so this needs no old password.
+        # Bring the database up first and align its password with .env BEFORE the
+        # web connects, so it authenticates cleanly the first time (no P1000 race).
+        docker compose up -d @buildFlag postgres
         if ($pgPass -and $dbUrl -match "@postgres:5432/") {
             $esc = $pgPass -replace "'", "''"
             for ($i = 0; $i -lt 15; $i++) {
@@ -201,6 +196,9 @@ function Invoke-PolarisInstall {
                 Start-Sleep -Seconds 2
             }
         }
+
+        # Now bring up the rest against the already-aligned database.
+        docker compose up -d @buildFlag --remove-orphans
 
         # The Caddyfile is bind-mounted, so `up -d` does not restart Caddy when it
         # changes. Reload its config live so proxy/TLS changes from an update take
