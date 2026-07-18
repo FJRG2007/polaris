@@ -47,11 +47,16 @@ export async function findValidInvite(token: string) {
 }
 
 /** Claim an invite: create the credentialed user and assign the invited role. */
-export async function acceptInvite(token: string, name: string, password: string): Promise<void> {
+export async function acceptInvite(
+    token: string,
+    name: string,
+    username: string,
+    password: string
+): Promise<void> {
     const invite = await findValidInvite(token);
     if (!invite) throw new Error("This invite is invalid, expired, or already used");
 
-    const user = await provisionUser(auth, { email: invite.email, name, password });
+    const user = await provisionUser(auth, { email: invite.email, name, username, password });
     if (invite.roleId) {
         const role = await prisma.role.findUnique({ where: { id: invite.roleId }, select: { name: true } });
         if (role) await assignRole(user.id, role.name);

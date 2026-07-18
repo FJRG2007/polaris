@@ -11,11 +11,11 @@ import { acceptInviteAction } from "./actions";
 export function AcceptInviteForm({ token, email }: { token: string; email: string }) {
     const router = useRouter();
     const form = useZodForm(acceptInviteSchema);
-    const [values, setValues] = useState({ name: "", password: "" });
+    const [values, setValues] = useState({ name: "", username: "", password: "" });
     const [error, setError] = useState<string | null>(null);
     const [pending, setPending] = useState(false);
 
-    function update(field: "name" | "password", value: string) {
+    function update(field: "name" | "username" | "password", value: string) {
         const next = { ...values, [field]: value };
         setValues(next);
         form.revalidate(next);
@@ -27,7 +27,12 @@ export function AcceptInviteForm({ token, email }: { token: string; email: strin
         if (!parsed) return;
         setPending(true);
         setError(null);
-        const result = await acceptInviteAction({ token, name: parsed.name, password: parsed.password });
+        const result = await acceptInviteAction({
+            token,
+            name: parsed.name,
+            username: parsed.username,
+            password: parsed.password
+        });
         if (result.error) {
             setPending(false);
             setError(result.error);
@@ -60,6 +65,20 @@ export function AcceptInviteForm({ token, email }: { token: string; email: strin
                                 aria-invalid={Boolean(form.error("name"))}
                             />
                             {form.error("name") ? <p className="text-xs text-danger">{form.error("name")}</p> : null}
+                        </div>
+                        <div className="flex flex-col gap-1">
+                            <label className="text-sm">Username</label>
+                            <Input
+                                autoComplete="username"
+                                placeholder="ada"
+                                value={values.username}
+                                onChange={(event) => update("username", event.target.value)}
+                                onBlur={() => form.markTouched("username")}
+                                aria-invalid={Boolean(form.error("username"))}
+                            />
+                            {form.error("username") ? (
+                                <p className="text-xs text-danger">{form.error("username")}</p>
+                            ) : null}
                         </div>
                         <div className="flex flex-col gap-1">
                             <label className="text-sm">Password</label>

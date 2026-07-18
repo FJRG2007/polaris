@@ -29,6 +29,7 @@ export async function completeSetupAction(input: unknown): Promise<{ error?: str
         const user = await provisionUser(auth, {
             email: parsed.data.email,
             name: parsed.data.name,
+            username: parsed.data.username,
             password: parsed.data.password
         });
         await setUserAdmin(user.id);

@@ -8,18 +8,27 @@ import { z } from "zod";
 
 export const emailField = z.string().trim().min(1, "Email is required").email("Enter a valid email");
 export const nameField = z.string().trim().min(1, "Name is required").max(120);
+export const usernameField = z
+    .string()
+    .trim()
+    .toLowerCase()
+    .min(3, "At least 3 characters")
+    .max(30, "At most 30 characters")
+    .regex(/^[a-z0-9_-]+$/, "Use letters, numbers, - or _");
 export const passwordField = z
     .string()
     .min(10, "Use at least 10 characters")
     .max(256, "Too long");
 
 export const loginSchema = z.object({
-    email: emailField,
+    // Email or username.
+    identifier: z.string().trim().min(1, "Email or username is required"),
     password: z.string().min(1, "Password is required")
 });
 
 export const setupSchema = z.object({
     name: nameField,
+    username: usernameField,
     email: emailField,
     password: passwordField,
     token: z.string().trim().min(1, "Setup token is required")
@@ -27,6 +36,7 @@ export const setupSchema = z.object({
 
 export const acceptInviteSchema = z.object({
     name: nameField,
+    username: usernameField,
     password: passwordField
 });
 

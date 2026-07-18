@@ -31,6 +31,8 @@ model User {
     id            String   @id @default(cuid())
     name          String
     email         String   @unique
+    // Unique handle; sign-in accepts either this or the email.
+    username      String?  @unique
     emailVerified Boolean  @default(false)
     image         String?
     // Second gate for admin-only routes, independent of role permissions.

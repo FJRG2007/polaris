@@ -8,7 +8,7 @@ import { signIn } from "@/lib/auth-client";
 import { useZodForm } from "@/lib/use-zod-form";
 import { completeSetupAction } from "./actions";
 
-type Field = "name" | "email" | "password";
+type Field = "name" | "username" | "email" | "password";
 
 export function SetupForm({
     tokenConfigured,
@@ -19,7 +19,13 @@ export function SetupForm({
 }) {
     const router = useRouter();
     const form = useZodForm(setupSchema);
-    const [values, setValues] = useState({ name: "", email: "", password: "", token: initialToken });
+    const [values, setValues] = useState({
+        name: "",
+        username: "",
+        email: "",
+        password: "",
+        token: initialToken
+    });
     const [error, setError] = useState<string | null>(null);
     const [pending, setPending] = useState(false);
 
@@ -78,6 +84,7 @@ export function SetupForm({
 
     const fields: Array<{ name: Field; label: string; type?: string; autoComplete?: string; placeholder?: string }> = [
         { name: "name", label: "Your name", autoComplete: "name", placeholder: "Ada Lovelace" },
+        { name: "username", label: "Username", autoComplete: "username", placeholder: "ada" },
         { name: "email", label: "Email", type: "email", autoComplete: "email", placeholder: "you@example.com" },
         { name: "password", label: "Password", type: "password", autoComplete: "new-password", placeholder: "10+ characters" }
     ];

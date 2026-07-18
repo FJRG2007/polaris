@@ -56,7 +56,9 @@ export function createAuth() {
         user: {
             additionalFields: {
                 // Server-only flag; never accepted from client input.
-                isAdmin: { type: "boolean", required: false, defaultValue: false, input: false }
+                isAdmin: { type: "boolean", required: false, defaultValue: false, input: false },
+                // Unique handle, set server-side during setup/invite provisioning.
+                username: { type: "string", required: false, input: false }
             }
         },
         advanced: {

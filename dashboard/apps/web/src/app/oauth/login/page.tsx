@@ -6,24 +6,26 @@ import { loginSchema } from "@polaris/core";
 import { Button, Card, CardBody, CardHeader, CardTitle, Input, PolarisMark } from "@polaris/ui";
 import { signIn } from "@/lib/auth-client";
 import { useZodForm } from "@/lib/use-zod-form";
+import { resolveIdentifier } from "./actions";
 
-/** Where the last-used email is remembered so the field is prefilled next time. */
-const LAST_EMAIL_KEY = "polaris:last-email";
+/** Where the last-used identifier is remembered so the field is prefilled. */
+const LAST_IDENTIFIER_KEY = "polaris:last-identifier";
+const GENERIC_ERROR = "Invalid email/username or password";
 
 export default function LoginPage() {
     const router = useRouter();
     const form = useZodForm(loginSchema);
-    const [values, setValues] = useState({ email: "", password: "" });
+    const [values, setValues] = useState({ identifier: "", password: "" });
     const [error, setError] = useState<string | null>(null);
     const [pending, setPending] = useState(false);
 
-    // Prefill the email with the one used last on this device.
+    // Prefill the identifier with the one used last on this device.
     useEffect(() => {
-        const remembered = window.localStorage.getItem(LAST_EMAIL_KEY);
-        if (remembered) setValues((prev) => ({ ...prev, email: remembered }));
+        const remembered = window.localStorage.getItem(LAST_IDENTIFIER_KEY);
+        if (remembered) setValues((prev) => ({ ...prev, identifier: remembered }));
     }, []);
 
-    function update(field: "email" | "password", value: string) {
+    function update(field: "identifier" | "password", value: string) {
         const next = { ...values, [field]: value };
         setValues(next);
         form.revalidate(next);
@@ -35,13 +37,20 @@ export default function LoginPage() {
         if (!parsed) return;
         setPending(true);
         setError(null);
-        const { error: signInError } = await signIn.email(parsed);
-        setPending(false);
-        if (signInError) {
-            setError(signInError.message ?? "Sign-in failed");
+        // An identifier may be an email or a username; resolve it to the email.
+        const email = await resolveIdentifier(parsed.identifier);
+        if (!email) {
+            setPending(false);
+            setError(GENERIC_ERROR);
             return;
         }
-        window.localStorage.setItem(LAST_EMAIL_KEY, parsed.email);
+        const { error: signInError } = await signIn.email({ email, password: parsed.password });
+        setPending(false);
+        if (signInError) {
+            setError(GENERIC_ERROR);
+            return;
+        }
+        window.localStorage.setItem(LAST_IDENTIFIER_KEY, parsed.identifier);
         router.push("/drive");
         router.refresh();
     }
@@ -57,16 +66,15 @@ export default function LoginPage() {
                     <form onSubmit={onSubmit} noValidate className="flex flex-col gap-3">
                         <div className="flex flex-col gap-1">
                             <Input
-                                type="email"
-                                placeholder="you@example.com"
-                                autoComplete="email"
-                                value={values.email}
-                                onChange={(event) => update("email", event.target.value)}
-                                onBlur={() => form.markTouched("email")}
-                                aria-invalid={Boolean(form.error("email"))}
+                                placeholder="Email or username"
+                                autoComplete="username"
+                                value={values.identifier}
+                                onChange={(event) => update("identifier", event.target.value)}
+                                onBlur={() => form.markTouched("identifier")}
+                                aria-invalid={Boolean(form.error("identifier"))}
                             />
-                            {form.error("email") ? (
-                                <p className="text-xs text-danger">{form.error("email")}</p>
+                            {form.error("identifier") ? (
+                                <p className="text-xs text-danger">{form.error("identifier")}</p>
                             ) : null}
                         </div>
                         <div className="flex flex-col gap-1">
