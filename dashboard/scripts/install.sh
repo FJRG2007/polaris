@@ -266,6 +266,15 @@ main() {
         if [ -d "$INSTALL_DIR/.git" ]; then
             log "updating existing checkout in $INSTALL_DIR"
             git -C "$INSTALL_DIR" pull --ff-only
+            # The pull may have updated THIS script. A shell keeps executing the
+            # version it already parsed, so any fix in the new installer would only
+            # take effect one run later. Re-exec the freshly pulled copy once (a
+            # guard env var prevents a loop) so the newest logic always runs now.
+            if [ -z "${POLARIS_INSTALL_REEXEC:-}" ] && [ -f "$INSTALL_DIR/dashboard/scripts/install.sh" ]; then
+                POLARIS_INSTALL_REEXEC=1
+                export POLARIS_INSTALL_REEXEC
+                exec sh "$INSTALL_DIR/dashboard/scripts/install.sh" "$@"
+            fi
         else
             log "cloning $REPO_URL into $INSTALL_DIR"
             git clone --depth 1 "$REPO_URL" "$INSTALL_DIR"
@@ -327,8 +336,11 @@ main() {
     fi
 
     # Keep the bundled database's password in lockstep with .env so the web can
-    # always authenticate, healing any earlier drift before we wait on health.
-    align_db_password
+    # always authenticate, healing any earlier drift, then recreate the web so it
+    # reloads .env and restarts against the aligned role before we wait on health.
+    if align_db_password; then
+        $compose up -d --force-recreate web >/dev/null 2>&1 || true
+    fi
 
     url=$(sed -n 's#^POLARIS_APP_URL=##p' .env | head -n1)
 
