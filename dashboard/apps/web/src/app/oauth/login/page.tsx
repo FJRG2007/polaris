@@ -80,7 +80,7 @@ export default function LoginPage() {
                     </form>
                     <p className="mt-4 text-center text-xs text-muted-foreground">
                         New accounts are by invitation. Setting up a new instance?{" "}
-                        <a href="/setup" className="text-primary hover:underline">
+                        <a href="/oauth/setup" className="text-primary hover:underline">
                             Create the administrator
                         </a>
                         .

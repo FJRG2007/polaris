@@ -26,7 +26,7 @@ export default async function AcceptInvitePage({
                             This invite link is invalid, expired, or already used. Ask an
                             administrator for a new one.
                         </p>
-                        <a href="/login" className="mt-4 block text-center text-sm text-primary hover:underline">
+                        <a href="/oauth/login" className="mt-4 block text-center text-sm text-primary hover:underline">
                             Go to sign in
                         </a>
                     </CardBody>

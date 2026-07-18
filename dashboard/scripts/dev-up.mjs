@@ -80,8 +80,7 @@ log("Generating Prisma client and pushing the schema");
 run(npx, ["prisma", "generate", `--schema=${sqliteSchema}`], env);
 run(npx, ["prisma", "db", "push", `--schema=${sqliteSchema}`, "--skip-generate", "--accept-data-loss"], env);
 
-log("First run? Create the admin at http://localhost:3000/setup");
-log(`Setup token: ${env.POLARIS_SETUP_TOKEN}`);
+log(`First run? Open http://localhost:3000/oauth/setup?token=${env.POLARIS_SETUP_TOKEN}`);
 log("Starting the dashboard at http://localhost:3000 (Ctrl+C to stop)");
 const dev = spawn(npx, ["next", "dev"], { cwd: webDir, env, stdio: "inherit", shell: isWindows });
 dev.on("exit", (code) => process.exit(code ?? 0));

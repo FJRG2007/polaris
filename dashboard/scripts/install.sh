@@ -193,8 +193,8 @@ main() {
     setup_token=$(sed -n 's#^POLARIS_SETUP_TOKEN=##p' .env | head -n1)
     log "done. Polaris should be reachable at: ${url:-your configured POLARIS_APP_URL}"
     printf '\npolaris: ----------------------------------------------------------\n' >&2
-    printf 'polaris: First run - create the administrator at http://polaris.local/setup\n' >&2
-    printf 'polaris: Setup token: %s\n' "$setup_token" >&2
+    printf 'polaris: First run - open this link to create the administrator:\n' >&2
+    printf 'polaris:   http://polaris.local/oauth/setup?token=%s\n' "$setup_token" >&2
     printf 'polaris: (registration is otherwise invite-only)\n' >&2
     printf 'polaris: ----------------------------------------------------------\n\n' >&2
     log "check status with: (cd $(pwd) && $compose ps)"

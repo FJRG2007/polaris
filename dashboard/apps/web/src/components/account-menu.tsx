@@ -18,7 +18,7 @@ export function AccountMenu({ name, email, isAdmin }: { name: string; email: str
 
     async function onSignOut() {
         await signOut();
-        router.push("/login");
+        router.push("/oauth/login");
         router.refresh();
     }
 

@@ -27,7 +27,7 @@ export async function getSession() {
 /** Resolve the current user or redirect to sign-in. */
 export async function requireUser(): Promise<SessionUser> {
     const session = await getSession();
-    if (!session?.user) redirect("/login");
+    if (!session?.user) redirect("/oauth/login");
     const user = session.user as { id: string; email: string; name: string; image?: string | null };
     const isAdmin = (session.user as { isAdmin?: boolean }).isAdmin === true;
     return { id: user.id, email: user.email, name: user.name, image: user.image, isAdmin };

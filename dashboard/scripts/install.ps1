@@ -166,8 +166,8 @@ function Invoke-PolarisInstall {
         if (-not $appUrl) { $appUrl = "your configured POLARIS_APP_URL" }
         $token = (Get-Content ".env" | Where-Object { $_ -match "^POLARIS_SETUP_TOKEN=" } | Select-Object -First 1) -replace "^POLARIS_SETUP_TOKEN=", ""
         Write-Log "done. Polaris should be reachable at: $appUrl"
-        Write-Host "polaris: First run - create the administrator at http://polaris.local/setup" -ForegroundColor Yellow
-        Write-Host "polaris: Setup token: $token" -ForegroundColor Yellow
+        Write-Host "polaris: First run - open this link to create the administrator:" -ForegroundColor Yellow
+        Write-Host "polaris:   http://polaris.local/oauth/setup?token=$token" -ForegroundColor Yellow
         Write-Host "polaris: (registration is otherwise invite-only)" -ForegroundColor Yellow
         Write-Log "check status with: docker compose ps (from $(Get-Location))"
     }

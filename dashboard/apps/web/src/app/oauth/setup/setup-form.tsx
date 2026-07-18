@@ -10,10 +10,16 @@ import { completeSetupAction } from "./actions";
 
 type Field = "name" | "email" | "password" | "token";
 
-export function SetupForm({ tokenConfigured }: { tokenConfigured: boolean }) {
+export function SetupForm({
+    tokenConfigured,
+    initialToken
+}: {
+    tokenConfigured: boolean;
+    initialToken: string;
+}) {
     const router = useRouter();
     const form = useZodForm(setupSchema);
-    const [values, setValues] = useState({ name: "", email: "", password: "", token: "" });
+    const [values, setValues] = useState({ name: "", email: "", password: "", token: initialToken });
     const [error, setError] = useState<string | null>(null);
     const [pending, setPending] = useState(false);
 
@@ -86,7 +92,7 @@ export function SetupForm({ tokenConfigured }: { tokenConfigured: boolean }) {
                     </form>
                     <p className="mt-4 text-center text-xs text-muted-foreground">
                         Already set up?{" "}
-                        <a href="/login" className="text-primary hover:underline">
+                        <a href="/oauth/login" className="text-primary hover:underline">
                             Sign in
                         </a>
                     </p>

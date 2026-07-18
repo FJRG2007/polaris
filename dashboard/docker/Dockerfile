@@ -71,8 +71,11 @@ COPY --from=builder /build/packages/db/prisma ./packages/db/prisma
 # The generated Prisma client (custom output dir) and, critically, its query
 # engine .node binary are loaded at runtime but the Next standalone tracer does
 # not reliably capture the engine, so copy the generated client explicitly. This
-# is what makes database queries (sign-in, etc.) work instead of 500-ing.
+# is what makes database queries (sign-in, setup, etc.) work instead of 500-ing.
+# Cover both layouts the standalone tracer may produce for the workspace package:
+# a real path under packages/db, and a copy under node_modules/@polaris/db.
 COPY --from=builder /build/packages/db/generated ./packages/db/generated
+COPY --from=builder /build/packages/db/generated ./node_modules/@polaris/db/generated
 
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
