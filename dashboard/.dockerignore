@@ -1,0 +1,21 @@
+# Keep the build context small and free of host artifacts so the builder
+# installs and generates everything fresh (e.g. the Linux Prisma engine, not a
+# Windows one copied from a dev machine).
+**/node_modules
+**/.next
+**/dist
+**/.turbo
+**/*.tsbuildinfo
+packages/db/generated
+.dev-data
+*.db
+*.db-journal
+**/.env
+**/.env.*
+!**/.env.example
+secrets
+**/secrets
+.git
+.gitignore
+*.log
+coverage
