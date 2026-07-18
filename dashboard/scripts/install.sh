@@ -296,14 +296,15 @@ main() {
     # Guarantee the app's database URL and the Postgres password always agree.
     sync_database_url ".env"
 
-    # A placeholder domain makes Caddy loop on ACME and the site unreachable.
-    case "$(sed -n 's/^POLARIS_SITE_ADDRESS=//p' .env | head -n1)" in
-        *example.com*)
-            err "WARNING: POLARIS_SITE_ADDRESS is still the placeholder domain; Caddy cannot"
-            err "get a certificate for it and the site will be unreachable. Set it to ':80'"
-            err "for LAN/HTTP (with POLARIS_APP_URL=http://polaris.local), or to your real"
-            err "domain for public HTTPS, then re-run this installer." ;;
-    esac
+    # The placeholder example.com domain can never get a certificate (RFC 2606
+    # reserves it), so leaving it makes Caddy loop on ACME forever while the site
+    # is unreachable - every time. Rewrite it to a working LAN default; a real
+    # domain a user actually configured is never example.com, so this is safe.
+    if grep -qE '^POLARIS_SITE_ADDRESS=.*example\.com' .env || grep -qE '^POLARIS_APP_URL=.*example\.com' .env; then
+        sed -i 's#^POLARIS_SITE_ADDRESS=.*#POLARIS_SITE_ADDRESS=:80#' .env
+        sed -i 's#^POLARIS_APP_URL=.*#POLARIS_APP_URL=http://polaris.local#' .env
+        log "replaced the placeholder example.com address with the LAN default (:80, http://polaris.local)"
+    fi
 
     setup_hostnames
     install_cli

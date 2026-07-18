@@ -85,6 +85,28 @@ pretty_status() {
     else
         printf '  %s%s service(s) not healthy%s - inspect logs: %spolaris logs web%s\n' "$red" "$down" "$r" "$cyan" "$r"
     fi
+
+    # Container health is not reachability: a bad POLARIS_SITE_ADDRESS can loop on
+    # ACME and refuse connections while every container is "healthy". Actually
+    # probe the site through the proxy so status reflects what a browser sees.
+    site=$(val POLARIS_SITE_ADDRESS)
+    case "$site" in
+        *example.com*)
+            printf '  %ssite address is the placeholder example.com%s - the site is unreachable; fix it with %spolaris doctor%s\n' \
+                "$red" "$r" "$cyan" "$r" ;;
+        *)
+            if command -v curl >/dev/null 2>&1; then
+                host=$(val POLARIS_MDNS_HOSTNAME)
+                host=${host:-polaris}
+                if curl -fsS -m 5 -o /dev/null -H "Host: ${host}.local" "http://127.0.0.1/api/health" 2>/dev/null \
+                    || curl -fsSk -m 5 -o /dev/null "https://127.0.0.1/api/health" 2>/dev/null; then
+                    printf '  %ssite reachable through the proxy%s\n' "$green" "$r"
+                else
+                    printf '  %ssite NOT reachable through the proxy%s - check the proxy: %spolaris logs caddy%s\n' \
+                        "$red" "$r" "$cyan" "$r"
+                fi
+            fi ;;
+    esac
     printf '\n'
 }
 
