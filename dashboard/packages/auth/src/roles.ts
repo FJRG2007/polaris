@@ -57,19 +57,6 @@ export async function assignRole(userId: string, roleName: string): Promise<void
     });
 }
 
-/**
- * Make the very first user an admin so a new deployment has an operator. Returns
- * true if this user was bootstrapped. Safe to call on every sign-up.
- */
-export async function bootstrapFirstAdmin(userId: string): Promise<boolean> {
-    const count = await prisma.user.count();
-    if (count !== 1) return false;
-    await prisma.user.update({ where: { id: userId }, data: { isAdmin: true } });
-    await seedDefaultRoles();
-    await assignRole(userId, "admin");
-    return true;
-}
-
 /** Parse a stored permissions JSON string into a validated grant array. */
 function parseGrants(raw: string): GrantedPermission[] {
     try {

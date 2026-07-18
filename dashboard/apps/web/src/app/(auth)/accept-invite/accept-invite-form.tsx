@@ -2,19 +2,20 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { loginSchema } from "@polaris/core";
+import { acceptInviteSchema } from "@polaris/core";
 import { Button, Card, CardBody, CardHeader, CardTitle, Input, PolarisMark } from "@polaris/ui";
 import { signIn } from "@/lib/auth-client";
 import { useZodForm } from "@/lib/use-zod-form";
+import { acceptInviteAction } from "./actions";
 
-export default function LoginPage() {
+export function AcceptInviteForm({ token, email }: { token: string; email: string }) {
     const router = useRouter();
-    const form = useZodForm(loginSchema);
-    const [values, setValues] = useState({ email: "", password: "" });
+    const form = useZodForm(acceptInviteSchema);
+    const [values, setValues] = useState({ name: "", password: "" });
     const [error, setError] = useState<string | null>(null);
     const [pending, setPending] = useState(false);
 
-    function update(field: "email" | "password", value: string) {
+    function update(field: "name" | "password", value: string) {
         const next = { ...values, [field]: value };
         setValues(next);
         form.revalidate(next);
@@ -26,12 +27,13 @@ export default function LoginPage() {
         if (!parsed) return;
         setPending(true);
         setError(null);
-        const { error: signInError } = await signIn.email(parsed);
-        setPending(false);
-        if (signInError) {
-            setError(signInError.message ?? "Sign-in failed");
+        const result = await acceptInviteAction({ token, name: parsed.name, password: parsed.password });
+        if (result.error) {
+            setPending(false);
+            setError(result.error);
             return;
         }
+        await signIn.email({ email, password: parsed.password });
         router.push("/drive");
         router.refresh();
     }
@@ -41,29 +43,30 @@ export default function LoginPage() {
             <Card className="w-full max-w-sm">
                 <CardHeader className="items-center">
                     <PolarisMark className="mb-1" />
-                    <CardTitle>Sign in to Polaris</CardTitle>
+                    <CardTitle>Accept your invite</CardTitle>
                 </CardHeader>
                 <CardBody>
+                    <p className="mb-3 text-sm text-muted-foreground">
+                        Joining as <span className="font-medium text-foreground">{email}</span>.
+                    </p>
                     <form onSubmit={onSubmit} noValidate className="flex flex-col gap-3">
                         <div className="flex flex-col gap-1">
+                            <label className="text-sm">Your name</label>
                             <Input
-                                type="email"
-                                placeholder="you@example.com"
-                                autoComplete="email"
-                                value={values.email}
-                                onChange={(event) => update("email", event.target.value)}
-                                onBlur={() => form.markTouched("email")}
-                                aria-invalid={Boolean(form.error("email"))}
+                                autoComplete="name"
+                                value={values.name}
+                                onChange={(event) => update("name", event.target.value)}
+                                onBlur={() => form.markTouched("name")}
+                                aria-invalid={Boolean(form.error("name"))}
                             />
-                            {form.error("email") ? (
-                                <p className="text-xs text-danger">{form.error("email")}</p>
-                            ) : null}
+                            {form.error("name") ? <p className="text-xs text-danger">{form.error("name")}</p> : null}
                         </div>
                         <div className="flex flex-col gap-1">
+                            <label className="text-sm">Password</label>
                             <Input
                                 type="password"
-                                placeholder="Password"
-                                autoComplete="current-password"
+                                autoComplete="new-password"
+                                placeholder="10+ characters"
                                 value={values.password}
                                 onChange={(event) => update("password", event.target.value)}
                                 onBlur={() => form.markTouched("password")}
@@ -75,16 +78,9 @@ export default function LoginPage() {
                         </div>
                         {error ? <p className="text-sm text-danger">{error}</p> : null}
                         <Button type="submit" disabled={pending}>
-                            {pending ? "Signing in..." : "Sign in"}
+                            {pending ? "Joining..." : "Join Polaris"}
                         </Button>
                     </form>
-                    <p className="mt-4 text-center text-xs text-muted-foreground">
-                        New accounts are by invitation. Setting up a new instance?{" "}
-                        <a href="/setup" className="text-primary hover:underline">
-                            Create the administrator
-                        </a>
-                        .
-                    </p>
                 </CardBody>
             </Card>
         </main>

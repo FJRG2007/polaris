@@ -15,7 +15,6 @@ import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { loadEnv } from "@polaris/config";
 import { prisma } from "@polaris/db";
-import { bootstrapFirstAdmin } from "./roles.js";
 
 /** Session lifetime: 7 days, refreshed at most once per day. */
 const SESSION_MAX_AGE = 60 * 60 * 24 * 7;
@@ -43,6 +42,10 @@ export function createAuth() {
         database: prismaAdapter(prisma, { provider: env.POLARIS_DB_PROVIDER }),
         emailAndPassword: {
             enabled: true,
+            // Public registration is closed: the only paths to an account are the
+            // one-time admin setup and an admin invite, both of which create the
+            // user server-side (see provisionUser). Sign-in stays open.
+            disableSignUp: true,
             requireEmailVerification: false,
             minPasswordLength: 10
         },
@@ -58,17 +61,6 @@ export function createAuth() {
         },
         advanced: {
             cookiePrefix: "polaris"
-        },
-        databaseHooks: {
-            user: {
-                create: {
-                    // The first account to register becomes the operator, and the
-                    // built-in roles are seeded on that first sign-up.
-                    after: async (user) => {
-                        await bootstrapFirstAdmin(user.id);
-                    }
-                }
-            }
         }
     });
 }

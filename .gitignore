@@ -18,6 +18,10 @@ dist/
 build/
 *.whl
 
+# Private local-only working folders - never commit (folders included)
+/docs/tasks/
+/internal/
+
 # Node / dashboard pillar
 node_modules/
 .next/

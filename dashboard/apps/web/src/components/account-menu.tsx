@@ -1,6 +1,6 @@
 "use client";
 
-import { LogOut } from "lucide-react";
+import { LogOut, Users } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
     DropdownMenu,
@@ -12,7 +12,7 @@ import {
 } from "@polaris/ui";
 import { signOut } from "@/lib/auth-client";
 
-export function AccountMenu({ name, email }: { name: string; email: string }) {
+export function AccountMenu({ name, email, isAdmin }: { name: string; email: string; isAdmin: boolean }) {
     const router = useRouter();
     const initial = name.trim().charAt(0).toUpperCase() || "?";
 
@@ -33,6 +33,14 @@ export function AccountMenu({ name, email }: { name: string; email: string }) {
                     <span className="block truncate">{email}</span>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
+                {isAdmin ? (
+                    <DropdownMenuItem asChild>
+                        <a href="/admin/users">
+                            <Users className="size-4" />
+                            Users
+                        </a>
+                    </DropdownMenuItem>
+                ) : null}
                 <DropdownMenuItem onSelect={onSignOut}>
                     <LogOut className="size-4" />
                     Sign out

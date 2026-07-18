@@ -71,10 +71,12 @@ generate_env() {
     master_key=$(openssl rand -base64 32)
     auth_secret=$(openssl rand -base64 48)
     pg_password=$(openssl rand -hex 24)
+    setup_token=$(openssl rand -hex 24)
 
     sed \
         -e "s#REPLACE_ME_openssl_rand_base64_32#${master_key}#" \
         -e "s#REPLACE_ME_long_random_string#${auth_secret}#" \
+        -e "s#REPLACE_ME_setup_token#${setup_token}#" \
         -e "s#REPLACE_ME_strong_password#${pg_password}#g" \
         "$example" > "$target"
 
@@ -149,7 +151,13 @@ main() {
     $compose "$@"
 
     url=$(sed -n 's#^POLARIS_APP_URL=##p' .env | head -n1)
+    setup_token=$(sed -n 's#^POLARIS_SETUP_TOKEN=##p' .env | head -n1)
     log "done. Polaris should be reachable at: ${url:-your configured POLARIS_APP_URL}"
+    printf '\npolaris: ----------------------------------------------------------\n' >&2
+    printf 'polaris: First run - create the administrator at http://polaris.local/setup\n' >&2
+    printf 'polaris: Setup token: %s\n' "$setup_token" >&2
+    printf 'polaris: (registration is otherwise invite-only)\n' >&2
+    printf 'polaris: ----------------------------------------------------------\n\n' >&2
     log "check status with: (cd $(pwd) && $compose ps)"
 }
 

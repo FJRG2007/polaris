@@ -49,6 +49,7 @@ function ensureEnv() {
         POLARIS_DATABASE_URL: `file:${toUrlPath(join(prismaDir, "polaris-dev.db"))}`,
         POLARIS_AUTH_SECRET: randomBytes(24).toString("hex"),
         POLARIS_MASTER_KEY: randomBytes(32).toString("base64"),
+        POLARIS_SETUP_TOKEN: randomBytes(18).toString("hex"),
         POLARIS_APP_URL: "http://localhost:3000",
         POLARIS_DATA_DIR: toUrlPath(dataDir)
     };
@@ -79,6 +80,8 @@ log("Generating Prisma client and pushing the schema");
 run(npx, ["prisma", "generate", `--schema=${sqliteSchema}`], env);
 run(npx, ["prisma", "db", "push", `--schema=${sqliteSchema}`, "--skip-generate", "--accept-data-loss"], env);
 
+log("First run? Create the admin at http://localhost:3000/setup");
+log(`Setup token: ${env.POLARIS_SETUP_TOKEN}`);
 log("Starting the dashboard at http://localhost:3000 (Ctrl+C to stop)");
 const dev = spawn(npx, ["next", "dev"], { cwd: webDir, env, stdio: "inherit", shell: isWindows });
 dev.on("exit", (code) => process.exit(code ?? 0));

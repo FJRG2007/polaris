@@ -10,6 +10,6 @@ export {
     seedDefaultRoles,
     getUserPermissions,
     userHasPermission,
-    assignRole,
-    bootstrapFirstAdmin
+    assignRole
 } from "./roles.js";
+export { provisionUser, hasAnyUser, setUserAdmin, type ProvisionInput } from "./provision.js";

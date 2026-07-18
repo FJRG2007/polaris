@@ -21,7 +21,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
                 account={
                     <>
                         <EditionBadge />
-                        <AccountMenu name={user.name} email={user.email} />
+                        <AccountMenu name={user.name} email={user.email} isAdmin={user.isAdmin} />
                     </>
                 }
             >

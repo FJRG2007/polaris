@@ -99,10 +99,12 @@ function Invoke-PolarisInstall {
             $masterKey = New-Secret -Bytes 32
             $authSecret = New-Secret -Bytes 48
             $pgPassword = New-Secret -Bytes 24 -Hex
+            $setupToken = New-Secret -Bytes 24 -Hex
 
             $content = Get-Content ".env.example" -Raw
             $content = $content.Replace("REPLACE_ME_openssl_rand_base64_32", $masterKey)
             $content = $content.Replace("REPLACE_ME_long_random_string", $authSecret)
+            $content = $content.Replace("REPLACE_ME_setup_token", $setupToken)
             $content = $content.Replace("REPLACE_ME_strong_password", $pgPassword)
             # Write UTF-8 without BOM so Docker reads the env_file cleanly.
             [System.IO.File]::WriteAllText((Join-Path (Get-Location) ".env"), $content)
@@ -128,7 +130,11 @@ function Invoke-PolarisInstall {
 
         $appUrl = (Get-Content ".env" | Where-Object { $_ -match "^POLARIS_APP_URL=" } | Select-Object -First 1) -replace "^POLARIS_APP_URL=", ""
         if (-not $appUrl) { $appUrl = "your configured POLARIS_APP_URL" }
+        $token = (Get-Content ".env" | Where-Object { $_ -match "^POLARIS_SETUP_TOKEN=" } | Select-Object -First 1) -replace "^POLARIS_SETUP_TOKEN=", ""
         Write-Log "done. Polaris should be reachable at: $appUrl"
+        Write-Host "polaris: First run - create the administrator at http://polaris.local/setup" -ForegroundColor Yellow
+        Write-Host "polaris: Setup token: $token" -ForegroundColor Yellow
+        Write-Host "polaris: (registration is otherwise invite-only)" -ForegroundColor Yellow
         Write-Log "check status with: docker compose ps (from $(Get-Location))"
     }
     finally {
