@@ -19,9 +19,19 @@ export interface SessionUser {
     isAdmin: boolean;
 }
 
-/** The current session, or null when unauthenticated. */
+/**
+ * The current session, or null when unauthenticated. A cookie that cannot be
+ * verified (for example one signed with a previous POLARIS_AUTH_SECRET) makes
+ * better-auth throw "Unsupported state or unable to authenticate data"; treat
+ * that as simply logged-out so the user is sent to sign in again with a fresh
+ * cookie, instead of the raw error surfacing on a protected page.
+ */
 export async function getSession() {
-    return auth.api.getSession({ headers: await headers() });
+    try {
+        return await auth.api.getSession({ headers: await headers() });
+    } catch {
+        return null;
+    }
 }
 
 /** Resolve the current user or redirect to sign-in. */
