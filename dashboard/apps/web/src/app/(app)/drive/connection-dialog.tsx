@@ -126,7 +126,8 @@ const FIELDS: Record<StorageProviderKind, FieldDef[]> = {
         host,
         port,
         { name: "username", label: "Console username", required: true, group: "config" },
-        { name: "password", label: "Console password", type: "password", group: "credentials" }
+        { name: "password", label: "Console password", type: "password", group: "credentials" },
+        { name: "smbShare", label: "SMB share (optional, for file browsing)", group: "config" }
     ]
 };
 

@@ -16,6 +16,7 @@ import {
     decryptCredentials,
     encryptCredentials,
     LocalDriver,
+    SmbDriver,
     type ConnectionRecord,
     type StorageDriver
 } from "@polaris/storage";
@@ -23,6 +24,18 @@ import { fetchUnasMetrics, type UnasMetrics } from "@/lib/unifi-unas";
 
 /** Base path under which the host daemon mounts SMB/NFS shares. */
 const HOSTD_MOUNT_ROOT = "/mnt/polaris";
+
+/**
+ * Raised when a UniFi UNAS connection is asked to browse files but has no SMB
+ * share configured yet. The Drive UI catches this to prompt for the share name
+ * (credentials are reused) rather than showing a generic failure.
+ */
+export class SmbShareRequiredError extends Error {
+    public constructor() {
+        super("SMB_SHARE_REQUIRED");
+        this.name = "SmbShareRequiredError";
+    }
+}
 
 /** Load a connection scoped to its owner, or throw. */
 async function loadConnection(connectionId: string, ownerId: string) {
@@ -56,6 +69,26 @@ async function buildDriver(row: ConnectionRow): Promise<StorageDriver> {
                   env.POLARIS_MASTER_KEY
               )
             : ({ kind: row.kind } as StorageCredentials);
+
+    // A UniFi UNAS is a metrics connection, but its files are reachable over the
+    // SMB share on the same device - and the UNAS accepts the same UniFi account,
+    // so we reuse the stored username/password and only need the share name. When
+    // the share is set, browse over SMB; otherwise signal the UI to ask for it.
+    if (row.kind === "unifi-unas") {
+        const cfg = config as Extract<StorageConfig, { kind: "unifi-unas" }>;
+        if (!cfg.smbShare) throw new SmbShareRequiredError();
+        const creds = credentials as Extract<StorageCredentials, { kind: "unifi-unas" }>;
+        const driver = new SmbDriver({
+            id: row.id,
+            host: cfg.host,
+            port: 445,
+            share: cfg.smbShare,
+            username: cfg.username,
+            password: creds.password
+        });
+        await driver.connect();
+        return driver;
+    }
 
     const record: ConnectionRecord = {
         id: row.id,
@@ -155,4 +188,16 @@ export async function createConnection(
 /** Delete a connection owned by the user. */
 export async function deleteConnection(ownerId: string, connectionId: string) {
     await prisma.storageConnection.deleteMany({ where: { id: connectionId, ownerId } });
+}
+
+/** Set the SMB share used to browse a UniFi UNAS connection's files. */
+export async function setUnasSmbShare(ownerId: string, connectionId: string, share: string): Promise<void> {
+    const row = await loadConnection(connectionId, ownerId);
+    if (row.kind !== "unifi-unas") throw new Error("Not a UniFi UNAS connection");
+    const config = JSON.parse(row.config) as Record<string, unknown>;
+    config.smbShare = share.trim();
+    await prisma.storageConnection.update({
+        where: { id: connectionId },
+        data: { config: JSON.stringify(config) }
+    });
 }

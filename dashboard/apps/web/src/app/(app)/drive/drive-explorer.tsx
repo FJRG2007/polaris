@@ -18,7 +18,7 @@ import { ChevronRight, File, Folder, FolderPlus, HardDrive, Info, Trash2, Upload
 import { formatBytes } from "@polaris/core";
 import { Badge, Button, Card, CardBody, Skeleton, cn } from "@polaris/ui";
 import type { UnasMetrics as UnasMetricsData } from "@/lib/unifi-unas";
-import { deleteEntryAction, mkdirAction } from "./actions";
+import { deleteEntryAction, mkdirAction, setUnasShareAction } from "./actions";
 import { ConnectionDialog } from "./connection-dialog";
 import { HardwarePanel } from "./hardware-panel";
 import { ShareButton } from "./share-dialog";
@@ -68,6 +68,7 @@ export function DriveExplorer({
     const [metrics, setMetrics] = useState<UnasMetricsData | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [needsSmbShare, setNeedsSmbShare] = useState(false);
 
     const selected = connections.find((connection) => connection.id === connectionId) ?? null;
     const isUnas = selected?.kind === "unifi-unas";
@@ -114,8 +115,11 @@ export function DriveExplorer({
                 }
                 return;
             }
-            if (view === "files" && !isUnas) {
+            if (view === "files") {
                 // File listings are not cached: freshness matters after uploads/deletes.
+                // A UNAS browses over SMB (same account); if no share is set yet the
+                // API asks us to prompt for it.
+                setNeedsSmbShare(false);
                 setLoading(true);
                 try {
                     const query = new URLSearchParams({ c: connectionId });
@@ -123,7 +127,10 @@ export function DriveExplorer({
                     const res = await fetch(`/api/drive/list?${query.toString()}`, { signal });
                     const body = await res.json();
                     if (signal?.aborted) return;
-                    if (!res.ok) {
+                    if (body.needsSmbShare) {
+                        setEntries([]);
+                        setNeedsSmbShare(true);
+                    } else if (!res.ok) {
                         setEntries([]);
                         setError(body.error ?? "Unable to list this location");
                     } else {
@@ -241,8 +248,8 @@ export function DriveExplorer({
                             ) : selected ? (
                                 <HardwarePanel connection={selected} />
                             ) : null
-                        ) : isUnas ? (
-                            <UnasFilesNotice />
+                        ) : needsSmbShare ? (
+                            <UnasSmbSetup connectionId={connectionId} onSaved={() => void load()} />
                         ) : (
                             <FilesView
                                 connectionId={connectionId}
@@ -289,19 +296,59 @@ function ErrorBox({ message }: { message: string }) {
     );
 }
 
-/** UNAS native connection is metrics-only until its file API is wired. */
-function UnasFilesNotice() {
+/**
+ * One-time SMB share prompt for a UNAS: files live on the device's SMB share, and
+ * the UNAS accepts the same UniFi account, so only the share name is needed - the
+ * stored username/password are reused. Once saved, the Files tab browses over SMB.
+ */
+function UnasSmbSetup({ connectionId, onSaved }: { connectionId: string; onSaved: () => void }) {
+    const [share, setShare] = useState("");
+    const [pending, setPending] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    async function onSubmit(event: React.FormEvent) {
+        event.preventDefault();
+        setPending(true);
+        setError(null);
+        const result = await setUnasShareAction(connectionId, share);
+        setPending(false);
+        if (result.error) {
+            setError(result.error);
+            return;
+        }
+        onSaved();
+    }
+
     return (
         <Card>
-            <CardBody className="flex items-start gap-3 text-sm">
-                <Info className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-                <div className="flex flex-col gap-1">
-                    <span className="font-medium">File browsing over the UNAS API is coming.</span>
-                    <span className="text-muted-foreground">
-                        The native UniFi UNAS connection currently provides hardware metrics (see the Hardware tab).
-                        To browse and upload files now, add an SMB or SFTP connection to the same device.
-                    </span>
+            <CardBody className="flex flex-col gap-3">
+                <div className="flex items-start gap-3 text-sm">
+                    <Info className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                    <div className="flex flex-col gap-1">
+                        <span className="font-medium">Browse UNAS files over SMB</span>
+                        <span className="text-muted-foreground">
+                            Files are served from the device&apos;s SMB share, using the same UniFi account you
+                            already entered. Just tell Polaris the share name (enable SMB on the UNAS if it is not
+                            already).
+                        </span>
+                    </div>
                 </div>
+                <form onSubmit={onSubmit} className="flex flex-wrap items-end gap-2">
+                    <label className="flex flex-1 flex-col gap-1 text-sm">
+                        SMB share name
+                        <input
+                            className="h-9 rounded-md border border-input bg-surface px-3 text-sm"
+                            value={share}
+                            onChange={(event) => setShare(event.target.value)}
+                            placeholder="e.g. share, data, home"
+                            autoFocus
+                        />
+                    </label>
+                    <Button type="submit" disabled={pending || !share.trim()}>
+                        {pending ? "Connecting..." : "Connect"}
+                    </Button>
+                </form>
+                {error ? <p className="text-sm text-danger">{error}</p> : null}
             </CardBody>
         </Card>
     );

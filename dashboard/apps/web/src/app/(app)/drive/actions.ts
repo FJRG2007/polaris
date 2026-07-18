@@ -11,7 +11,7 @@
 import { revalidatePath } from "next/cache";
 import { createConnectionSchema, normalizeRelPath } from "@polaris/core";
 import { requirePermission } from "@/lib/session";
-import { createConnection, deleteConnection, getDriver } from "@/lib/storage-service";
+import { createConnection, deleteConnection, getDriver, setUnasSmbShare } from "@/lib/storage-service";
 import { detectHost, type NasDetection } from "@/lib/nas-detect";
 import { fetchUnasMetrics } from "@/lib/unifi-unas";
 import { recordAudit } from "@/lib/audit-service";
@@ -92,6 +92,19 @@ export async function createConnectionAction(input: unknown): Promise<{ error?: 
         targetId: created.id,
         metadata: { name: parsed.data.name, kind: parsed.data.config.kind }
     });
+    revalidatePath("/drive");
+    return {};
+}
+
+/** Save the SMB share for a UNAS connection so its Files tab can browse over SMB. */
+export async function setUnasShareAction(connectionId: string, share: string): Promise<{ error?: string }> {
+    const user = await requirePermission("connections.manage");
+    if (!share.trim()) return { error: "Enter the SMB share name" };
+    try {
+        await setUnasSmbShare(user.id, connectionId, share);
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not save the share" };
+    }
     revalidatePath("/drive");
     return {};
 }

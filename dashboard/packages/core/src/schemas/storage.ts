@@ -59,7 +59,11 @@ export const storageConfigSchema = z.discriminatedUnion("kind", [
         // UniFi OS console over HTTPS (SSH is off by default on the UNAS), so
         // metrics come from the Drive API via the console with UniFi credentials.
         username: z.string().min(1),
-        secure: z.boolean().default(true)
+        secure: z.boolean().default(true),
+        // Optional SMB share on the same device for file browsing. The UNAS
+        // usually accepts the same UniFi account for SMB, so only the share name
+        // is needed - the username/password above are reused.
+        smbShare: z.string().optional()
     })
 ]);
 

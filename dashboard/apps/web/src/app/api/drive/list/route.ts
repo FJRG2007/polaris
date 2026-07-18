@@ -9,7 +9,7 @@
 import { normalizeRelPath } from "@polaris/core";
 import { userHasPermission } from "@polaris/auth";
 import { requireUser } from "@/lib/session";
-import { getDriver } from "@/lib/storage-service";
+import { getDriver, SmbShareRequiredError } from "@/lib/storage-service";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -31,7 +31,19 @@ export async function GET(request: Request): Promise<Response> {
         return Response.json({ error: "Invalid path" }, { status: 400 });
     }
 
-    const driver = await getDriver(connectionId, user.id);
+    let driver;
+    try {
+        driver = await getDriver(connectionId, user.id);
+    } catch (caught) {
+        // A UNAS with no SMB share yet: tell the client to ask for the share name
+        // rather than surfacing a generic failure (credentials are reused).
+        if (caught instanceof SmbShareRequiredError) {
+            return Response.json({ needsSmbShare: true });
+        }
+        const message = caught instanceof Error ? caught.message : "Unable to connect";
+        return Response.json({ error: message }, { status: 502 });
+    }
+
     try {
         const listing = await driver.list(path);
         const entries = listing.entries.map((entry) => ({
