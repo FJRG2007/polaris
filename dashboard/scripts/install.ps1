@@ -200,12 +200,39 @@ function Invoke-PolarisInstall {
 
         $appUrl = (Get-Content ".env" | Where-Object { $_ -match "^POLARIS_APP_URL=" } | Select-Object -First 1) -replace "^POLARIS_APP_URL=", ""
         if (-not $appUrl) { $appUrl = "your configured POLARIS_APP_URL" }
-        $token = (Get-Content ".env" | Where-Object { $_ -match "^POLARIS_SETUP_TOKEN=" } | Select-Object -First 1) -replace "^POLARIS_SETUP_TOKEN=", ""
-        Write-Log "done. Polaris should be reachable at: $appUrl"
-        Write-Host "polaris: First run - open this link to create the administrator:" -ForegroundColor Yellow
-        Write-Host "polaris:   http://polaris.local/oauth/setup?token=$token" -ForegroundColor Yellow
-        Write-Host "polaris: (registration is otherwise invite-only)" -ForegroundColor Yellow
-        Write-Log "check status with: docker compose ps (from $(Get-Location))"
+
+        # Verify the deploy came up (health if the image has a healthcheck, else
+        # "running") instead of reporting success blindly.
+        $ready = $false
+        for ($i = 0; $i -lt 45; $i++) {
+            $wid = (docker compose ps -q web 2>$null)
+            if ($wid) {
+                $state = (docker inspect --format '{{.State.Status}}' $wid 2>$null)
+                $health = (docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{end}}' $wid 2>$null)
+                if (($health -and $health -eq "healthy") -or (-not $health -and $state -eq "running")) { $ready = $true; break }
+                if ($state -eq "exited") { break }
+            }
+            Start-Sleep -Seconds 2
+        }
+        if (-not $ready) {
+            Write-Host "polaris: the web service did not become healthy. Recent logs:" -ForegroundColor Red
+            docker compose logs --tail 30 web
+            Write-Host "polaris: diagnose with 'polaris doctor' (or 'polaris logs web')" -ForegroundColor Red
+            return
+        }
+
+        Write-Log "done. Polaris is running at: $appUrl"
+
+        # Only advertise the first-run setup link while setup is still pending.
+        $userCount = (docker compose exec -T postgres psql -U polaris -d polaris -tAc 'SELECT count(*) FROM "User";' 2>$null)
+        if ($userCount) { $userCount = $userCount.Trim() }
+        if ($userCount -notmatch '^\d+$' -or [int]$userCount -eq 0) {
+            $token = (Get-Content ".env" | Where-Object { $_ -match "^POLARIS_SETUP_TOKEN=" } | Select-Object -First 1) -replace "^POLARIS_SETUP_TOKEN=", ""
+            Write-Host "polaris: First run - open this link to create the administrator:" -ForegroundColor Yellow
+            Write-Host "polaris:   http://polaris.local/oauth/setup?token=$token" -ForegroundColor Yellow
+            Write-Host "polaris: (registration is otherwise invite-only)" -ForegroundColor Yellow
+        }
+        Write-Log "check status with: polaris status"
     }
     finally {
         Pop-Location

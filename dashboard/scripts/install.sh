@@ -162,6 +162,50 @@ sync_database_url() {
     fi
 }
 
+# Whether the web container is serving. Prefers the container healthcheck; on an
+# older image that has none, settles for "running and not restarting".
+web_ready() {
+    id=$(docker compose ps -q web 2>/dev/null)
+    [ -n "$id" ] || return 1
+    state=$(docker inspect --format '{{.State.Status}}' "$id" 2>/dev/null || echo "")
+    health=$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{end}}' "$id" 2>/dev/null || echo "")
+    if [ -n "$health" ]; then
+        [ "$health" = "healthy" ]
+    else
+        [ "$state" = "running" ]
+    fi
+}
+
+# Wait up to ~90s for the web service to come up, so a broken deploy fails loudly
+# here instead of silently as a 502. Returns 1 if it never becomes ready.
+verify_deploy() {
+    i=1
+    while [ "$i" -le 45 ]; do
+        if web_ready; then
+            return 0
+        fi
+        id=$(docker compose ps -q web 2>/dev/null)
+        if [ -n "$id" ] && [ "$(docker inspect --format '{{.State.Status}}' "$id" 2>/dev/null)" = "exited" ]; then
+            return 1
+        fi
+        sleep 2
+        i=$((i + 1))
+    done
+    return 1
+}
+
+# True once at least one account exists, so the installer can stop advertising the
+# first-run setup token after setup is complete. Unknown (DB not reachable / table
+# not yet created on a fresh install) counts as "not done" so a genuine first run
+# still shows the link.
+setup_done() {
+    count=$(docker compose exec -T postgres \
+        psql -U "${POSTGRES_USER:-polaris}" -d "${POSTGRES_DB:-polaris}" -tAc 'SELECT count(*) FROM "User";' \
+        2>/dev/null | tr -d '[:space:]')
+    case "$count" in "" | *[!0-9]*) return 1 ;; esac
+    [ "$count" -gt 0 ]
+}
+
 # Postgres bakes its password into its data volume at first init and ignores
 # POSTGRES_PASSWORD forever after. So generating a fresh .env (new password) on
 # top of an existing volume guarantees an auth failure; warn and show the
@@ -259,14 +303,27 @@ main() {
     fi
 
     url=$(sed -n 's#^POLARIS_APP_URL=##p' .env | head -n1)
-    setup_token=$(sed -n 's#^POLARIS_SETUP_TOKEN=##p' .env | head -n1)
-    log "done. Polaris should be reachable at: ${url:-your configured POLARIS_APP_URL}"
-    printf '\npolaris: ----------------------------------------------------------\n' >&2
-    printf 'polaris: First run - open this link to create the administrator:\n' >&2
-    printf 'polaris:   http://polaris.local/oauth/setup?token=%s\n' "$setup_token" >&2
-    printf 'polaris: (registration is otherwise invite-only)\n' >&2
-    printf 'polaris: ----------------------------------------------------------\n\n' >&2
-    log "check status with: (cd $(pwd) && $compose ps)"
+
+    # Verify the deploy actually came up rather than reporting success blindly.
+    if ! verify_deploy; then
+        err "the web service did not become healthy. Recent logs:"
+        $compose logs --tail 30 web >&2 || true
+        err "diagnose with 'polaris doctor' (or 'polaris logs web'); the stack is left running so you can inspect it"
+        exit 1
+    fi
+
+    log "done. Polaris is running at: ${url:-your configured POLARIS_APP_URL}"
+    # Only advertise the first-run setup link while setup is still pending; once an
+    # administrator exists, registration is invite-only and the token is inert.
+    if ! setup_done; then
+        setup_token=$(sed -n 's#^POLARIS_SETUP_TOKEN=##p' .env | head -n1)
+        printf '\npolaris: ----------------------------------------------------------\n' >&2
+        printf 'polaris: First run - open this link to create the administrator:\n' >&2
+        printf 'polaris:   http://polaris.local/oauth/setup?token=%s\n' "$setup_token" >&2
+        printf 'polaris: (registration is otherwise invite-only)\n' >&2
+        printf 'polaris: ----------------------------------------------------------\n\n' >&2
+    fi
+    log "check status with: polaris status"
 }
 
 main "$@"

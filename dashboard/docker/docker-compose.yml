@@ -59,6 +59,17 @@ services:
     # Not published to the host: Caddy is the only public entry point.
     expose:
       - "3000"
+    # Readiness: 200 from /api/health means the app is serving AND its database
+    # answers. start_period covers first-boot migrations so they do not count as
+    # failures. `polaris status` and the installer's post-deploy check read this.
+    healthcheck:
+      test:
+        - "CMD-SHELL"
+        - "node -e \"fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
 
   caddy:
     image: caddy:2-alpine
