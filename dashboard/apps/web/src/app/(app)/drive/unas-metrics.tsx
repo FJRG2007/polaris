@@ -8,10 +8,17 @@
  */
 
 import type { ReactNode } from "react";
-import { Cpu, Database, HardDrive, Thermometer, TriangleAlert } from "lucide-react";
+import { HardDrive, MemoryStick, TriangleAlert } from "lucide-react";
 import { formatBytes } from "@polaris/core";
-import { Badge, Card, CardBody, CardHeader, CardTitle } from "@polaris/ui";
+import { Badge, Card, CardBody, CardHeader, CardTitle, RadialGauge, type GaugeTone } from "@polaris/ui";
 import type { UnasMetrics as UnasMetricsData } from "@/lib/unifi-unas";
+
+/** Pick a gauge color from a 0..1 ratio: calm, then warning, then danger. */
+function ratioTone(ratio: number, warn = 0.75, bad = 0.9): GaugeTone {
+    if (ratio >= bad) return "danger";
+    if (ratio >= warn) return "warning";
+    return "primary";
+}
 
 /** Seconds -> "3d 12h" / "12h 4m" / "4m". */
 function formatUptime(seconds: number): string {
@@ -39,27 +46,38 @@ export function UnasMetrics({ metrics }: { metrics: UnasMetricsData }) {
                 </div>
             ) : null}
 
-            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-                <Stat
-                    icon={<Database className="size-4" />}
-                    label="Storage"
-                    value={`${formatBytes(metrics.usedBytes)} / ${formatBytes(metrics.totalBytes)}`}
-                    hint={`${usedPct}% used`}
-                />
+            <Card>
+                <CardBody className="grid grid-cols-3 gap-2 py-5">
+                    <RadialGauge
+                        value={usedPct / 100}
+                        label={`${usedPct}%`}
+                        sublabel="Storage used"
+                        tone={ratioTone(usedPct / 100)}
+                    />
+                    <RadialGauge
+                        value={metrics.system.cpuLoad ?? 0}
+                        label={metrics.system.cpuLoad !== null ? `${Math.round(metrics.system.cpuLoad * 100)}%` : "-"}
+                        sublabel="CPU load"
+                        tone={ratioTone(metrics.system.cpuLoad ?? 0)}
+                    />
+                    <RadialGauge
+                        value={(metrics.system.cpuTemp ?? 0) / 90}
+                        label={metrics.system.cpuTemp !== null ? `${metrics.system.cpuTemp} C` : "-"}
+                        sublabel="CPU temp"
+                        tone={ratioTone((metrics.system.cpuTemp ?? 0) / 90, 0.66, 0.83)}
+                    />
+                </CardBody>
+            </Card>
+
+            <div className="grid grid-cols-2 gap-3">
                 <Stat
                     icon={<HardDrive className="size-4" />}
                     label="Slots"
                     value={`${metrics.slotsPopulated} / ${metrics.slotsTotal}`}
-                    hint="populated"
+                    hint={`${formatBytes(metrics.usedBytes)} / ${formatBytes(metrics.totalBytes)}`}
                 />
                 <Stat
-                    icon={<Cpu className="size-4" />}
-                    label="CPU"
-                    value={metrics.system.cpuLoad !== null ? `${Math.round(metrics.system.cpuLoad * 100)}%` : "-"}
-                    hint={metrics.system.cpuTemp !== null ? `${metrics.system.cpuTemp} C` : "load"}
-                />
-                <Stat
-                    icon={<Thermometer className="size-4" />}
+                    icon={<MemoryStick className="size-4" />}
                     label="Memory"
                     value={`${formatBytes(metrics.system.memoryUsedBytes)} / ${formatBytes(metrics.system.memoryTotalBytes)}`}
                     hint={`up ${formatUptime(metrics.system.uptimeSeconds)}`}

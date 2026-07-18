@@ -10,6 +10,8 @@ export { Button, buttonVariants, type ButtonProps } from "./components/button.js
 export { Input, type InputProps } from "./components/input.js";
 export { Badge, type BadgeProps } from "./components/badge.js";
 export { Card, CardHeader, CardTitle, CardBody } from "./components/card.js";
+export { Skeleton } from "./components/skeleton.js";
+export { RadialGauge, type GaugeTone } from "./components/charts.js";
 export * from "./components/dropdown-menu.js";
 export * from "./components/dialog.js";
 export * from "./shell/capabilities.js";
