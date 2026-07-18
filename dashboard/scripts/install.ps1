@@ -144,10 +144,40 @@ function Invoke-PolarisInstall {
             # Write UTF-8 without BOM so Docker reads the env_file cleanly.
             [System.IO.File]::WriteAllText((Join-Path (Get-Location) ".env"), $content)
             Write-Host "polaris: review .env and set POLARIS_SITE_ADDRESS / POLARIS_APP_URL to your domain" -ForegroundColor Yellow
+
+            # Postgres bakes its password into its data volume at first init, so a
+            # fresh .env (new password) on top of an existing volume means the web
+            # can never authenticate. Warn and show the data-preserving recovery.
+            docker volume inspect polaris_polaris-postgres 2>$null | Out-Null
+            if ($LASTEXITCODE -eq 0) {
+                Write-Host "polaris: WARNING: a Postgres data volume already exists but .env was regenerated." -ForegroundColor Yellow
+                Write-Host "polaris: the database keeps its OLD password; reset it to match the new one:" -ForegroundColor Yellow
+                Write-Host '  $PW=(Select-String -Path .env -Pattern "^POSTGRES_PASSWORD=").Line -replace "^POSTGRES_PASSWORD=",""'
+                Write-Host '  docker exec -i polaris-postgres-1 psql -U polaris -d polaris -c "ALTER USER polaris WITH PASSWORD ''$PW'';"'
+                Write-Host "  polaris restart web"
+            }
         }
         else {
             Write-Log ".env present; reconciling any new settings"
             Sync-Env
+        }
+
+        # Keep POLARIS_DATABASE_URL's password in lockstep with POSTGRES_PASSWORD so
+        # the two can never drift apart. Only touches a URL for the bundled postgres.
+        $envLines = Get-Content ".env"
+        $pgUser = (($envLines | Where-Object { $_ -match "^POSTGRES_USER=" } | Select-Object -First 1) -replace "^POSTGRES_USER=", "")
+        $pgPass = (($envLines | Where-Object { $_ -match "^POSTGRES_PASSWORD=" } | Select-Object -First 1) -replace "^POSTGRES_PASSWORD=", "")
+        $pgDb = (($envLines | Where-Object { $_ -match "^POSTGRES_DB=" } | Select-Object -First 1) -replace "^POSTGRES_DB=", "")
+        $dbUrl = (($envLines | Where-Object { $_ -match "^POLARIS_DATABASE_URL=" } | Select-Object -First 1) -replace "^POLARIS_DATABASE_URL=", "")
+        if ($pgPass -and $dbUrl -match "@postgres:5432/") {
+            if (-not $pgUser) { $pgUser = "polaris" }
+            if (-not $pgDb) { $pgDb = "polaris" }
+            $desired = "postgresql://${pgUser}:${pgPass}@postgres:5432/${pgDb}"
+            if ($dbUrl -ne $desired) {
+                $updated = $envLines -replace "^POLARIS_DATABASE_URL=.*", "POLARIS_DATABASE_URL=$desired"
+                [System.IO.File]::WriteAllLines((Join-Path (Get-Location) ".env"), $updated)
+                Write-Log "kept POLARIS_DATABASE_URL consistent with POSTGRES_PASSWORD"
+            }
         }
 
         Set-PolarisHostnames

@@ -143,6 +143,43 @@ reconcile_env() {
     fi
 }
 
+# Keep POLARIS_DATABASE_URL's password in lockstep with POSTGRES_PASSWORD so the
+# two can never drift apart (the classic P1000 auth failure). Only rewrites a URL
+# that targets the bundled `postgres` service; an external database URL is left
+# untouched.
+sync_database_url() {
+    target="$1"
+    pg_user=$(sed -n 's/^POSTGRES_USER=//p' "$target" | head -n1)
+    pg_pw=$(sed -n 's/^POSTGRES_PASSWORD=//p' "$target" | head -n1)
+    pg_db=$(sed -n 's/^POSTGRES_DB=//p' "$target" | head -n1)
+    [ -n "$pg_pw" ] || return 0
+    current=$(sed -n 's/^POLARIS_DATABASE_URL=//p' "$target" | head -n1)
+    case "$current" in *@postgres:5432/*) ;; *) return 0 ;; esac
+    desired="postgresql://${pg_user:-polaris}:${pg_pw}@postgres:5432/${pg_db:-polaris}"
+    if [ "$current" != "$desired" ]; then
+        sed -i "s#^POLARIS_DATABASE_URL=.*#POLARIS_DATABASE_URL=${desired}#" "$target"
+        log "kept POLARIS_DATABASE_URL consistent with POSTGRES_PASSWORD"
+    fi
+}
+
+# Postgres bakes its password into its data volume at first init and ignores
+# POSTGRES_PASSWORD forever after. So generating a fresh .env (new password) on
+# top of an existing volume guarantees an auth failure; warn and show the
+# data-preserving recovery instead of leaving a silent 502.
+warn_existing_db_volume() {
+    command -v docker >/dev/null 2>&1 || return 0
+    if docker volume inspect polaris_polaris-postgres >/dev/null 2>&1; then
+        err "WARNING: a Postgres data volume already exists, but a new .env was just"
+        err "generated with a fresh password. The database still holds the OLD password,"
+        err "so the web container will fail to authenticate (P1000). Either restore the"
+        err "previous .env, or reset the database password to match the new one:"
+        err "  cd $(pwd)"
+        err "  PW=\$(sed -n 's/^POSTGRES_PASSWORD=//p' .env | head -n1)"
+        err "  docker exec -i polaris-postgres-1 psql -U polaris -d polaris -c \"ALTER USER polaris WITH PASSWORD '\$PW';\""
+        err "  polaris restart web"
+    fi
+}
+
 main() {
     full="no"
     ssh="no"
@@ -182,10 +219,14 @@ main() {
         log "generating .env with fresh secrets"
         generate_env ".env.example" ".env"
         err "review .env and set POLARIS_SITE_ADDRESS / POLARIS_APP_URL to your domain"
+        warn_existing_db_volume
     else
         log ".env present; reconciling any new settings"
         reconcile_env ".env.example" ".env"
     fi
+
+    # Guarantee the app's database URL and the Postgres password always agree.
+    sync_database_url ".env"
 
     setup_hostnames
     install_cli

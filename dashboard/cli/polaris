@@ -28,6 +28,107 @@ compose() {
     (cd "$COMPOSE_DIR" && docker compose "$@")
 }
 
+# Pretty stack status: one colored line per service with its health and restart
+# count, plus a one-line verdict, instead of the raw compose table (still on `ps`).
+pretty_status() {
+    if ! command -v docker >/dev/null 2>&1; then
+        echo "polaris: docker is required for this command" >&2
+        exit 1
+    fi
+    esc=$(printf '\033'); r="${esc}[0m"; bold="${esc}[1m"; dim="${esc}[90m"
+    green="${esc}[32m"; yellow="${esc}[33m"; red="${esc}[31m"; cyan="${esc}[36m"
+
+    ids=$(docker ps -a --filter "label=com.docker.compose.project=polaris" --format '{{.ID}}')
+    if [ -z "$ids" ]; then
+        printf '\n  %sPolaris%s  stack status\n\n' "$bold" "$r"
+        printf '  %sno containers found%s - the stack is not running.\n' "$yellow" "$r"
+        printf '  start it with: %spolaris start%s\n\n' "$cyan" "$r"
+        return 0
+    fi
+
+    printf '\n  %sPolaris%s  %sstack status%s\n\n' "$bold" "$r" "$dim" "$r"
+    down=0
+    for id in $ids; do
+        info=$(docker inspect \
+            --format '{{index .Config.Labels "com.docker.compose.service"}}|{{.State.Status}}|{{if .State.Health}}{{.State.Health.Status}}{{end}}|{{.RestartCount}}' \
+            "$id")
+        svc=${info%%|*}; rest=${info#*|}
+        state=${rest%%|*}; rest=${rest#*|}
+        health=${rest%%|*}; restarts=${rest#*|}
+        human=$(docker ps -a --filter "id=$id" --format '{{.Status}}')
+
+        color="$dim"; label="$state"
+        case "$state" in
+            running)
+                if [ -z "$health" ] || [ "$health" = "healthy" ]; then
+                    color="$green"; label="running${health:+ ($health)}"
+                elif [ "$health" = "starting" ]; then
+                    color="$yellow"; label="starting"
+                else
+                    color="$red"; label="running ($health)"; down=$((down + 1))
+                fi ;;
+            restarting) color="$red"; label="restarting"; down=$((down + 1)) ;;
+            exited | dead | created | paused) color="$red"; down=$((down + 1)) ;;
+        esac
+
+        printf '  %s#%s %s%-9s%s %s%-22s%s %s%s\n' \
+            "$color" "$r" "$bold" "$svc" "$r" "$color" "$label" "$r" "$dim" "$human"
+        if [ "${restarts:-0}" -gt 0 ]; then
+            printf '            %srestarted %s time(s) - check: polaris logs %s%s\n' "$yellow" "$restarts" "$svc" "$r"
+        fi
+    done
+
+    url=$(val POLARIS_APP_URL)
+    printf '\n'
+    if [ "$down" -eq 0 ]; then
+        printf '  %sall services healthy%s%s\n' "$green" "$r" "${url:+  -  $url}"
+    else
+        printf '  %s%s service(s) not healthy%s - inspect logs: %spolaris logs web%s\n' "$red" "$down" "$r" "$cyan" "$r"
+    fi
+    printf '\n'
+}
+
+# Diagnose common deployment faults without mutating anything. Today it catches
+# the DB password desync (P1000): the password baked into the postgres volume at
+# first init no longer matches the one in .env, so the web can never authenticate.
+doctor() {
+    esc=$(printf '\033'); r="${esc}[0m"; green="${esc}[32m"; yellow="${esc}[33m"; red="${esc}[31m"
+    problems=0
+
+    pg_pw=$(val POSTGRES_PASSWORD)
+    url=$(val POLARIS_DATABASE_URL)
+    # The password segment of postgresql://user:PASSWORD@host/db.
+    url_pw=$(printf '%s' "$url" | sed -n 's#^[a-z]*://[^:]*:\([^@]*\)@.*#\1#p')
+    if [ -n "$pg_pw" ] && [ -n "$url_pw" ] && [ "$pg_pw" != "$url_pw" ]; then
+        printf '  %s[fail]%s .env is inconsistent: POSTGRES_PASSWORD and the password in\n' "$red" "$r"
+        printf '         POLARIS_DATABASE_URL differ. The web will fail to authenticate.\n'
+        printf '         Fix: make POLARIS_DATABASE_URL use POSTGRES_PASSWORD, then run\n'
+        printf '         "polaris restart web".\n'
+        problems=$((problems + 1))
+    fi
+
+    if command -v docker >/dev/null 2>&1; then
+        if docker ps -a --filter "label=com.docker.compose.project=polaris" --filter "name=polaris-web-1" --format '{{.ID}}' | grep -q .; then
+            if docker logs --tail 40 polaris-web-1 2>&1 | grep -q "P1000"; then
+                printf '  %s[fail]%s the web container is hitting P1000 (Postgres auth failed).\n' "$red" "$r"
+                printf '         The password in the postgres volume does not match .env.\n'
+                printf '         Recover WITHOUT data loss by resetting the DB role password:\n'
+                printf '           PW=$(sed -n '"'"'s/^POSTGRES_PASSWORD=//p'"'"' %s | head -n1)\n' "$ENV_FILE"
+                printf '           docker exec -i polaris-postgres-1 psql -U polaris -d polaris \\\n'
+                printf '             -c "ALTER USER polaris WITH PASSWORD '"'"'${PW}'"'"';"\n'
+                printf '           polaris restart web\n'
+                problems=$((problems + 1))
+            fi
+        fi
+    fi
+
+    if [ "$problems" -eq 0 ]; then
+        printf '  %sno known problems detected%s\n' "$green" "$r"
+    else
+        printf '\n  %s%s problem(s) found%s\n' "$yellow" "$problems" "$r"
+    fi
+}
+
 print_setup_link() {
     token=$(val POLARIS_SETUP_TOKEN)
     if [ -z "$token" ]; then
@@ -44,7 +145,9 @@ cmd="${1:-help}"
 case "$cmd" in
     setup) print_setup_link ;;
     token) val POLARIS_SETUP_TOKEN && echo ;;
-    status | ps) compose ps ;;
+    status) pretty_status ;;
+    ps) compose ps ;;
+    doctor) doctor ;;
     logs) compose logs "$@" ;;
     start | up) compose up -d ;;
     stop) compose stop ;;
@@ -56,7 +159,9 @@ polaris - manage a Polaris deployment
 
   polaris setup        Print the link to create the administrator
   polaris token        Print the current setup token
-  polaris status       Show container status
+  polaris status       Show a clean, colored view of every service
+  polaris ps           Show the raw docker compose status table
+  polaris doctor       Diagnose common faults (e.g. Postgres auth mismatch)
   polaris logs [svc]   Show container logs
   polaris start        Start the stack
   polaris stop         Stop the stack
