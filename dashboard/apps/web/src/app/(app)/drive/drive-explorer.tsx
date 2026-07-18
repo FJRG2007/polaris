@@ -16,7 +16,21 @@ import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { ChevronRight, File, Folder, FolderPlus, HardDrive, Info, Trash2, Upload } from "lucide-react";
 import { formatBytes } from "@polaris/core";
-import { Badge, Button, Card, CardBody, Skeleton, cn } from "@polaris/ui";
+import {
+    Badge,
+    Button,
+    Card,
+    CardBody,
+    Dialog,
+    DialogClose,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    Input,
+    Skeleton,
+    cn
+} from "@polaris/ui";
 import type { UnasMetrics as UnasMetricsData } from "@/lib/unifi-unas";
 import { deleteEntryAction, mkdirAction, setUnasShareAction } from "./actions";
 import { ConnectionDialog } from "./connection-dialog";
@@ -69,6 +83,9 @@ export function DriveExplorer({
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [needsSmbShare, setNeedsSmbShare] = useState(false);
+    const [newFolderOpen, setNewFolderOpen] = useState(false);
+    const [newFolderName, setNewFolderName] = useState("");
+    const [deleteTarget, setDeleteTarget] = useState<DriveEntry | null>(null);
 
     const selected = connections.find((connection) => connection.id === connectionId) ?? null;
     const isUnas = selected?.kind === "unifi-unas";
@@ -171,22 +188,26 @@ export function DriveExplorer({
         void load();
     }
 
-    function onNewFolder() {
-        if (!connectionId) return;
-        const name = window.prompt("New folder name");
-        if (!name) return;
+    function submitNewFolder(event: React.FormEvent) {
+        event.preventDefault();
+        const name = newFolderName.trim();
+        if (!connectionId || !name) return;
+        setNewFolderOpen(false);
+        setNewFolderName("");
         startTransition(async () => {
             await mkdirAction(connectionId, path, name);
             void load();
         });
     }
 
-    function onDelete(entryPath: string) {
-        if (!connectionId || !window.confirm("Delete this item?")) return;
+    function confirmDelete() {
+        if (!connectionId || !deleteTarget) return;
+        const target = deleteTarget;
+        setDeleteTarget(null);
         // Optimistic: drop the row now; a failed delete reloads the true listing.
-        setEntries((prev) => prev.filter((entry) => entry.path !== entryPath));
+        setEntries((prev) => prev.filter((entry) => entry.path !== target.path));
         startTransition(async () => {
-            await deleteEntryAction(connectionId, entryPath);
+            await deleteEntryAction(connectionId, target.path);
             void load();
         });
     }
@@ -261,14 +282,61 @@ export function DriveExplorer({
                                 uploading={uploading}
                                 fileInput={fileInput}
                                 href={href}
-                                onNewFolder={onNewFolder}
+                                onNewFolder={() => setNewFolderOpen(true)}
                                 onUpload={onUpload}
-                                onDelete={onDelete}
+                                onDelete={(entry) => setDeleteTarget(entry)}
                             />
                         )}
                     </>
                 )}
             </section>
+
+            <Dialog open={newFolderOpen} onOpenChange={setNewFolderOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>New folder</DialogTitle>
+                        <DialogDescription>Create a folder in the current location.</DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={submitNewFolder} className="flex flex-col gap-3">
+                        <Input
+                            autoFocus
+                            value={newFolderName}
+                            onChange={(event) => setNewFolderName(event.target.value)}
+                            placeholder="Folder name"
+                        />
+                        <div className="flex justify-end gap-2">
+                            <DialogClose asChild>
+                                <Button type="button" variant="ghost">
+                                    Cancel
+                                </Button>
+                            </DialogClose>
+                            <Button type="submit" disabled={!newFolderName.trim()}>
+                                Create
+                            </Button>
+                        </div>
+                    </form>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={deleteTarget !== null} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Delete {deleteTarget?.kind === "dir" ? "folder" : "file"}</DialogTitle>
+                        <DialogDescription className="truncate">
+                            {deleteTarget?.name} will be permanently deleted
+                            {deleteTarget?.kind === "dir" ? ", along with everything inside it" : ""}.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="flex justify-end gap-2">
+                        <Button type="button" variant="ghost" onClick={() => setDeleteTarget(null)}>
+                            Cancel
+                        </Button>
+                        <Button type="button" variant="danger" onClick={confirmDelete}>
+                            Delete
+                        </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }
@@ -379,7 +447,7 @@ function FilesView({
     href: (id: string, target: string) => string;
     onNewFolder: () => void;
     onUpload: (files: FileList | null) => void;
-    onDelete: (entryPath: string) => void;
+    onDelete: (entry: DriveEntry) => void;
 }) {
     return (
         <>
@@ -485,7 +553,7 @@ function FilesView({
                                                 <Button
                                                     size="icon"
                                                     variant="ghost"
-                                                    onClick={() => onDelete(entry.path)}
+                                                    onClick={() => onDelete(entry)}
                                                     disabled={pending}
                                                     aria-label={`Delete ${entry.name}`}
                                                 >
