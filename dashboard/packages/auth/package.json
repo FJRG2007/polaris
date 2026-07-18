@@ -1,0 +1,26 @@
+{
+    "name": "@polaris/auth",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "description": "Polaris authentication: better-auth setup, roles, invites, and server-side guards.",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        }
+    },
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "scripts": {
+        "build": "tsup src/index.ts --format esm --dts --clean",
+        "typecheck": "tsc --noEmit",
+        "test": "vitest run"
+    },
+    "dependencies": {
+        "@polaris/config": "0.1.0",
+        "@polaris/core": "0.1.0",
+        "@polaris/db": "0.1.0",
+        "better-auth": "1.6.23"
+    }
+}

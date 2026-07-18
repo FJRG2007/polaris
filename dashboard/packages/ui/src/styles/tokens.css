@@ -1,0 +1,65 @@
+/*
+ * Polaris design tokens. A calm, dark, control-plane aesthetic in the spirit of
+ * a network appliance console: near-black surfaces, low-chroma grays, hairline
+ * borders, and a single confident blue accent. Dark is the default; the .light
+ * class flips to a bright theme. Colors are HSL channels so Tailwind utilities
+ * can compose them with alpha via hsl(var(--token) / <alpha>).
+ */
+
+:root {
+    --background: 222 20% 7%;
+    --surface: 222 18% 9%;
+    --card: 222 16% 11%;
+    --card-hover: 222 16% 14%;
+    --foreground: 210 20% 92%;
+    --muted: 222 12% 16%;
+    --muted-foreground: 216 12% 60%;
+    --border: 222 12% 18%;
+    --input: 222 14% 20%;
+    --ring: 211 100% 62%;
+
+    --primary: 211 100% 60%;
+    --primary-foreground: 210 40% 98%;
+    --accent: 189 94% 55%;
+    --accent-foreground: 200 40% 10%;
+
+    --success: 152 60% 45%;
+    --warning: 38 92% 55%;
+    --danger: 358 72% 58%;
+    --danger-foreground: 210 40% 98%;
+
+    --radius: 0.75rem;
+}
+
+:root.light {
+    --background: 210 40% 98%;
+    --surface: 0 0% 100%;
+    --card: 0 0% 100%;
+    --card-hover: 210 30% 96%;
+    --foreground: 222 24% 14%;
+    --muted: 214 24% 94%;
+    --muted-foreground: 216 12% 40%;
+    --border: 214 20% 88%;
+    --input: 214 20% 86%;
+    --ring: 211 100% 50%;
+
+    --primary: 211 100% 48%;
+    --primary-foreground: 0 0% 100%;
+    --accent: 189 94% 42%;
+    --accent-foreground: 0 0% 100%;
+
+    --success: 152 55% 38%;
+    --warning: 34 90% 46%;
+    --danger: 358 66% 50%;
+    --danger-foreground: 0 0% 100%;
+}
+
+* {
+    border-color: hsl(var(--border));
+}
+
+body {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+}
