@@ -8,7 +8,7 @@ import { signIn } from "@/lib/auth-client";
 import { useZodForm } from "@/lib/use-zod-form";
 import { completeSetupAction } from "./actions";
 
-type Field = "name" | "email" | "password" | "token";
+type Field = "name" | "email" | "password";
 
 export function SetupForm({
     tokenConfigured,
@@ -41,17 +41,45 @@ export function SetupForm({
             setError(result.error);
             return;
         }
-        // Sign the new administrator straight in.
+        // Sign the new administrator straight in - no second login step.
         await signIn.email({ email: parsed.email, password: parsed.password });
         router.push("/drive");
         router.refresh();
     }
 
+    // The setup token arrives through the link the CLI prints - never typed. If it
+    // is missing, guide the operator to generate one rather than showing a field.
+    if (!initialToken) {
+        return (
+            <main className="grid min-h-screen place-items-center p-4">
+                <Card className="w-full max-w-sm">
+                    <CardHeader className="items-center">
+                        <PolarisMark className="mb-1" />
+                        <CardTitle>Set up Polaris</CardTitle>
+                    </CardHeader>
+                    <CardBody>
+                        <p className="text-sm text-muted-foreground">
+                            To create the administrator, run this on the server and open the link it
+                            prints:
+                        </p>
+                        <pre className="mt-2 rounded-md border border-border bg-muted/40 p-2 text-sm">
+                            polaris setup
+                        </pre>
+                        {tokenConfigured ? null : (
+                            <p className="mt-3 text-xs text-warning">
+                                No setup token is configured yet. Re-run the installer to generate one.
+                            </p>
+                        )}
+                    </CardBody>
+                </Card>
+            </main>
+        );
+    }
+
     const fields: Array<{ name: Field; label: string; type?: string; autoComplete?: string; placeholder?: string }> = [
         { name: "name", label: "Your name", autoComplete: "name", placeholder: "Ada Lovelace" },
         { name: "email", label: "Email", type: "email", autoComplete: "email", placeholder: "you@example.com" },
-        { name: "password", label: "Password", type: "password", autoComplete: "new-password", placeholder: "10+ characters" },
-        { name: "token", label: "Setup token", placeholder: "From the installer output" }
+        { name: "password", label: "Password", type: "password", autoComplete: "new-password", placeholder: "10+ characters" }
     ];
 
     return (
@@ -62,11 +90,6 @@ export function SetupForm({
                     <CardTitle>Set up Polaris</CardTitle>
                 </CardHeader>
                 <CardBody>
-                    {tokenConfigured ? null : (
-                        <p className="mb-3 rounded-md border border-warning/40 bg-warning/10 p-2 text-xs text-warning">
-                            No setup token is configured. Set POLARIS_SETUP_TOKEN and restart.
-                        </p>
-                    )}
                     <form onSubmit={onSubmit} noValidate className="flex flex-col gap-3">
                         {fields.map((field) => (
                             <div key={field.name} className="flex flex-col gap-1">
@@ -90,12 +113,6 @@ export function SetupForm({
                             {pending ? "Creating..." : "Create administrator"}
                         </Button>
                     </form>
-                    <p className="mt-4 text-center text-xs text-muted-foreground">
-                        Already set up?{" "}
-                        <a href="/oauth/login" className="text-primary hover:underline">
-                            Sign in
-                        </a>
-                    </p>
                 </CardBody>
             </Card>
         </main>

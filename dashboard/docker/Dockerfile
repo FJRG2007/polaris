@@ -79,6 +79,11 @@ COPY --from=builder /build/packages/db/generated/client/*.node ./apps/web/.next/
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
+# The polaris CLI inside the container: `docker exec polaris-web-1 polaris setup`
+# reads POLARIS_SETUP_TOKEN from the container env.
+COPY cli/polaris /usr/local/bin/polaris
+RUN chmod +x /usr/local/bin/polaris && ln -sf /usr/local/bin/polaris /usr/local/bin/plr
+
 # Run as the unprivileged `node` user shipped with the base image.
 RUN chown -R node:node /app
 USER node

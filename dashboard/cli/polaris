@@ -1,0 +1,71 @@
+#!/bin/sh
+# polaris - manage a Polaris dashboard deployment. Works on the host (drives the
+# Docker Compose stack) and inside the web container (reads its environment).
+# Installed as both `polaris` and `plr`. The installer bakes the deployment path
+# into __POLARIS_INSTALL_DIR__; override with POLARIS_INSTALL_DIR.
+set -eu
+
+INSTALL_DIR="${POLARIS_INSTALL_DIR:-__POLARIS_INSTALL_DIR__}"
+COMPOSE_DIR="$INSTALL_DIR/dashboard/docker"
+ENV_FILE="$COMPOSE_DIR/.env"
+
+# Read a setting: prefer the process environment (inside the container), then the
+# deployment's .env (on the host).
+val() {
+    eval "found=\${$1:-}"
+    if [ -n "$found" ]; then
+        printf '%s' "$found"
+        return 0
+    fi
+    [ -f "$ENV_FILE" ] && sed -n "s#^$1=##p" "$ENV_FILE" | head -n1
+}
+
+compose() {
+    if ! command -v docker >/dev/null 2>&1; then
+        echo "polaris: docker is required for this command" >&2
+        exit 1
+    fi
+    (cd "$COMPOSE_DIR" && docker compose "$@")
+}
+
+print_setup_link() {
+    token=$(val POLARIS_SETUP_TOKEN)
+    if [ -z "$token" ]; then
+        echo "polaris: setup is already complete (no setup token available)."
+        return 1
+    fi
+    echo "Open this link to create the administrator:"
+    echo "  http://polaris.local/oauth/setup?token=$token"
+}
+
+cmd="${1:-help}"
+[ "$#" -gt 0 ] && shift
+
+case "$cmd" in
+    setup) print_setup_link ;;
+    token) val POLARIS_SETUP_TOKEN && echo ;;
+    status | ps) compose ps ;;
+    logs) compose logs "$@" ;;
+    start | up) compose up -d ;;
+    stop) compose stop ;;
+    restart) compose restart "$@" ;;
+    update) sh "$INSTALL_DIR/dashboard/scripts/install.sh" "$@" ;;
+    help | --help | -h)
+        cat <<'USAGE'
+polaris - manage a Polaris deployment
+
+  polaris setup        Print the link to create the administrator
+  polaris token        Print the current setup token
+  polaris status       Show container status
+  polaris logs [svc]   Show container logs
+  polaris start        Start the stack
+  polaris stop         Stop the stack
+  polaris restart [s]  Restart the stack (or one service)
+  polaris update       Pull the latest and redeploy
+USAGE
+        ;;
+    *)
+        echo "polaris: unknown command '$cmd' (try 'polaris help')" >&2
+        exit 1
+        ;;
+esac

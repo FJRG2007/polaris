@@ -66,6 +66,28 @@ setup_hostnames() {
     log "mapped polaris and polaris.local to 127.0.0.1 in $hosts_file"
 }
 
+# Install the `polaris` (and `plr`) management CLI on the host, baking in this
+# deployment's path so `polaris setup`, `polaris logs`, etc. just work. Must run
+# from the docker workdir so ../cli resolves; best effort (needs root).
+install_cli() {
+    src="../cli/polaris"
+    [ -f "$src" ] || return 0
+    root=$(cd ../.. && pwd)
+    tmp=$(mktemp)
+    sed "s|__POLARIS_INSTALL_DIR__|${root}|" "$src" > "$tmp"
+    dest="/usr/local/bin"
+    if [ -w "$dest" ]; then
+        cp "$tmp" "$dest/polaris" && chmod +x "$dest/polaris" && ln -sf "$dest/polaris" "$dest/plr" \
+            && log "installed the 'polaris' (and 'plr') command"
+    elif command -v sudo >/dev/null 2>&1; then
+        sudo cp "$tmp" "$dest/polaris" && sudo chmod +x "$dest/polaris" && sudo ln -sf "$dest/polaris" "$dest/plr" \
+            && log "installed the 'polaris' (and 'plr') command"
+    else
+        err "could not install the polaris CLI to $dest (need root); copy $src there by hand"
+    fi
+    rm -f "$tmp"
+}
+
 # Fill the three secrets in a freshly copied .env, in place, using # as the sed
 # delimiter so base64 '/' characters pass through untouched.
 generate_env() {
@@ -166,6 +188,7 @@ main() {
     fi
 
     setup_hostnames
+    install_cli
 
     # The web container always bind-mounts this directory read-only; keep it
     # present (empty is fine) so `up` never fails when SSH access is not set up.

@@ -60,7 +60,10 @@ export function createAuth() {
             }
         },
         advanced: {
-            cookiePrefix: "polaris"
+            cookiePrefix: "polaris",
+            // Off by default so sign-in works over plain HTTP (polaris.local on the
+            // LAN); set POLARIS_SECURE_COOKIES=true for an HTTPS deployment.
+            useSecureCookies: env.POLARIS_SECURE_COOKIES
         }
     });
 }

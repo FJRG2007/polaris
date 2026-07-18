@@ -1,11 +1,14 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { loginSchema } from "@polaris/core";
 import { Button, Card, CardBody, CardHeader, CardTitle, Input, PolarisMark } from "@polaris/ui";
 import { signIn } from "@/lib/auth-client";
 import { useZodForm } from "@/lib/use-zod-form";
+
+/** Where the last-used email is remembered so the field is prefilled next time. */
+const LAST_EMAIL_KEY = "polaris:last-email";
 
 export default function LoginPage() {
     const router = useRouter();
@@ -13,6 +16,12 @@ export default function LoginPage() {
     const [values, setValues] = useState({ email: "", password: "" });
     const [error, setError] = useState<string | null>(null);
     const [pending, setPending] = useState(false);
+
+    // Prefill the email with the one used last on this device.
+    useEffect(() => {
+        const remembered = window.localStorage.getItem(LAST_EMAIL_KEY);
+        if (remembered) setValues((prev) => ({ ...prev, email: remembered }));
+    }, []);
 
     function update(field: "email" | "password", value: string) {
         const next = { ...values, [field]: value };
@@ -32,6 +41,7 @@ export default function LoginPage() {
             setError(signInError.message ?? "Sign-in failed");
             return;
         }
+        window.localStorage.setItem(LAST_EMAIL_KEY, parsed.email);
         router.push("/drive");
         router.refresh();
     }
@@ -79,11 +89,9 @@ export default function LoginPage() {
                         </Button>
                     </form>
                     <p className="mt-4 text-center text-xs text-muted-foreground">
-                        New accounts are by invitation. Setting up a new instance?{" "}
-                        <a href="/oauth/setup" className="text-primary hover:underline">
-                            Create the administrator
-                        </a>
-                        .
+                        New accounts are by invitation. Setting up a new instance? Run{" "}
+                        <code className="rounded bg-muted px-1">polaris setup</code> on the server for a
+                        setup link.
                     </p>
                 </CardBody>
             </Card>

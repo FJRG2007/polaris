@@ -25,6 +25,14 @@ const envSchema = z.object({
     POLARIS_APP_URL: z.string().url().default("http://localhost:3000"),
 
     /**
+     * Mark session cookies Secure. Off by default so login works over plain HTTP
+     * (the polaris.local LAN case). Set true only when the dashboard is served
+     * over HTTPS end to end, or the browser will drop the cookie and sign-in will
+     * appear to succeed but bounce back to the login page.
+     */
+    POLARIS_SECURE_COOKIES: boolFromEnv.default("false"),
+
+    /**
      * Local-network hostname advertised over mDNS (like homeassistant.local).
      * Its http(s)://<name>.local and http://<name> origins are trusted by auth so
      * the dashboard is reachable by name on the LAN. Keep in sync with the mdns
