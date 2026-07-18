@@ -32,10 +32,16 @@
 	header Strict-Transport-Security "max-age=31536000; includeSubDomains"
 }
 
-# Local-network names, Home-Assistant style. Served over plain HTTP on :80 so
-# there is no certificate to trust for a `.local` name. The `mdns` service makes
-# polaris.local resolve across the LAN; the installer adds a hosts entry so the
-# local machine also resolves bare `polaris`.
+# Local-network names, appliance-style (like a UniFi/Synology box): reachable over
+# BOTH plain HTTP and HTTPS. HTTPS uses Caddy's internal CA (self-signed, so a
+# one-time browser warning), so a browser that insists on HTTPS still connects
+# instead of hitting a dead :443 - while http:// keeps working with no warning.
+# No ACME is involved for these names. The `mdns` service makes polaris.local
+# resolve across the LAN; the installer adds a hosts entry for bare `polaris`.
 http://polaris.local, http://polaris {
+	import proxy
+}
+https://polaris.local, https://polaris {
+	tls internal
 	import proxy
 }
