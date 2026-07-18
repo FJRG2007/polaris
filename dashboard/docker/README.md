@@ -84,8 +84,14 @@ Set `POLARIS_SITE_ADDRESS` to your domain for automatic HTTPS via Caddy, and
 
 ## Updates
 
+Updating is the same one command as installing - re-run it and it pulls the
+latest source, adds any new settings to `.env` for you, rebuilds, and restarts
+(applying migrations). Nothing else to manage.
+
 ```sh
-./scripts/update.sh   # pull newest images, redeploy, prune old layers
+curl -fsSL https://raw.githubusercontent.com/FJRG2007/polaris/main/dashboard/scripts/install.sh | sh
+# or, from a checkout:
+./scripts/update.sh
 ```
 
 In the full edition the daemon can also update in-band via `POST /v1/update`,

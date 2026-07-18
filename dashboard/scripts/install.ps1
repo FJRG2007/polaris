@@ -1,4 +1,6 @@
-# Polaris dashboard one-command installer (Windows PowerShell).
+# Polaris dashboard one-command installer AND updater (Windows PowerShell). Run
+# the same line to set up or to update: it pulls the latest source, adds any new
+# settings to .env automatically, rebuilds, and restarts (applying migrations).
 #
 #   irm https://raw.githubusercontent.com/FJRG2007/polaris/main/dashboard/scripts/install.ps1 | iex
 #   # full edition: set the flag first, then run the same line
@@ -51,6 +53,39 @@ function Invoke-PolarisInstall {
             return -join ($buffer | ForEach-Object { $_.ToString("x2") })
         }
         return [System.Convert]::ToBase64String($buffer)
+    }
+
+    # Turn a known secret placeholder into a fresh value, or pass it through.
+    function Get-Materialized {
+        param($Value)
+        switch ($Value) {
+            "REPLACE_ME_openssl_rand_base64_32" { return (New-Secret -Bytes 32) }
+            "REPLACE_ME_long_random_string" { return (New-Secret -Bytes 48) }
+            "REPLACE_ME_setup_token" { return (New-Secret -Bytes 24 -Hex) }
+            "REPLACE_ME_strong_password" { return (New-Secret -Bytes 24 -Hex) }
+            default { return $Value }
+        }
+    }
+
+    # Append any settings added in a newer version to an existing .env (generating
+    # their secrets), so re-running to update never needs manual .env edits.
+    function Sync-Env {
+        $present = @{}
+        foreach ($line in (Get-Content ".env")) {
+            if ($line -match "^([^#=]+)=") { $present[$Matches[1]] = $true }
+        }
+        $added = @()
+        foreach ($line in (Get-Content ".env.example")) {
+            if ($line -match "^\s*#") { continue }
+            if ($line -notmatch "^([^=]+)=(.*)$") { continue }
+            $key = $Matches[1]
+            if (-not $present.ContainsKey($key)) {
+                $value = Get-Materialized $Matches[2]
+                Add-Content -Path ".env" -Value "$key=$value"
+                $added += $key
+            }
+        }
+        if ($added.Count -gt 0) { Write-Log ("added new settings to .env: " + ($added -join ", ")) }
     }
 
     # Map polaris / polaris.local to loopback on this machine so they resolve even
@@ -111,7 +146,8 @@ function Invoke-PolarisInstall {
             Write-Host "polaris: review .env and set POLARIS_SITE_ADDRESS / POLARIS_APP_URL to your domain" -ForegroundColor Yellow
         }
         else {
-            Write-Log ".env already present, keeping it"
+            Write-Log ".env present; reconciling any new settings"
+            Sync-Env
         }
 
         Set-PolarisHostnames
@@ -121,12 +157,10 @@ function Invoke-PolarisInstall {
             $env:COMPOSE_PROFILES = "full"
         }
 
-        Write-Log "pulling images (falling back to a local build)"
-        docker compose pull
-        if ($LASTEXITCODE -ne 0) { docker compose build }
-
-        Write-Log "starting the stack"
-        docker compose up -d
+        # One step for install and update: rebuild from the pulled source and
+        # (re)start; the web entrypoint applies pending migrations.
+        Write-Log "building and starting the stack (also applies database migrations)"
+        docker compose up -d --build --remove-orphans
 
         $appUrl = (Get-Content ".env" | Where-Object { $_ -match "^POLARIS_APP_URL=" } | Select-Object -First 1) -replace "^POLARIS_APP_URL=", ""
         if (-not $appUrl) { $appUrl = "your configured POLARIS_APP_URL" }

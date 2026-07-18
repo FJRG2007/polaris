@@ -1,5 +1,8 @@
 #!/bin/sh
-# Polaris dashboard one-command installer.
+# Polaris dashboard one-command installer AND updater. Run the same line to set
+# it up or to update later: it pulls the latest source, adds any new settings to
+# .env automatically, rebuilds, and restarts (applying migrations). Nothing else
+# to manage.
 #
 #   curl -fsSL https://raw.githubusercontent.com/FJRG2007/polaris/main/dashboard/scripts/install.sh | sh
 #   # full edition (starts the privileged host daemon):
@@ -83,6 +86,41 @@ generate_env() {
     chmod 600 "$target"
 }
 
+# Substitute a known secret placeholder with a freshly generated value, or echo
+# the value unchanged. Keeps updates hands-off: new secrets appear automatically.
+materialize() {
+    case "$1" in
+        REPLACE_ME_openssl_rand_base64_32) openssl rand -base64 32 ;;
+        REPLACE_ME_long_random_string) openssl rand -base64 48 ;;
+        REPLACE_ME_setup_token) openssl rand -hex 24 ;;
+        REPLACE_ME_strong_password) openssl rand -hex 24 ;;
+        *) printf '%s' "$1" ;;
+    esac
+}
+
+# Reconcile an existing .env against the example: append any keys that were added
+# in a newer version (generating their secrets), so re-running the installer to
+# update never requires the user to touch .env by hand. Existing values are kept.
+reconcile_env() {
+    example="$1"
+    target="$2"
+    added=""
+    while IFS= read -r line; do
+        case "$line" in ""|\#*) continue ;; esac
+        case "$line" in *=*) ;; *) continue ;; esac
+        key=${line%%=*}
+        if ! grep -q "^${key}=" "$target" 2>/dev/null; then
+            value=$(materialize "${line#*=}")
+            printf '%s=%s\n' "$key" "$value" >> "$target"
+            added="$added $key"
+        fi
+    done < "$example"
+    chmod 600 "$target"
+    if [ -n "$added" ]; then
+        log "added new settings to .env (auto-generated):$added"
+    fi
+}
+
 main() {
     full="no"
     ssh="no"
@@ -123,7 +161,8 @@ main() {
         generate_env ".env.example" ".env"
         err "review .env and set POLARIS_SITE_ADDRESS / POLARIS_APP_URL to your domain"
     else
-        log ".env already present, keeping it"
+        log ".env present; reconciling any new settings"
+        reconcile_env ".env.example" ".env"
     fi
 
     setup_hostnames
@@ -138,16 +177,16 @@ main() {
         POLARIS_ENV_FILE="$(pwd)/.env" sh ../scripts/setup-ssh-access.sh
     fi
 
-    set -- up -d
+    set -- up -d --build --remove-orphans
     if [ "$full" = "yes" ]; then
         log "enabling the full edition (privileged host daemon)"
         export COMPOSE_PROFILES="full"
     fi
 
-    log "pulling images (falling back to a local build)"
-    $compose pull || $compose build
-
-    log "starting the stack"
+    # One step for both install and update: rebuild the image from the freshly
+    # pulled source and (re)start. The web entrypoint applies pending migrations,
+    # so an update needs nothing else from the user.
+    log "building and starting the stack (also applies database migrations)"
     $compose "$@"
 
     url=$(sed -n 's#^POLARIS_APP_URL=##p' .env | head -n1)
