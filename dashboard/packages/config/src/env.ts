@@ -18,6 +18,9 @@ const envSchema = z.object({
     /** Prisma connection string. Postgres in production, SQLite for local/dev. */
     POLARIS_DATABASE_URL: z.string().min(1, "POLARIS_DATABASE_URL is required"),
 
+    /** Which engine POLARIS_DATABASE_URL points at. Drives the auth adapter. */
+    POLARIS_DB_PROVIDER: z.enum(["postgresql", "sqlite"]).default("postgresql"),
+
     /** Public origin the dashboard is served from (used by auth + share links). */
     POLARIS_APP_URL: z.string().url().default("http://localhost:3000"),
 

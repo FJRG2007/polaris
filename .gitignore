@@ -28,6 +28,8 @@ next-env.d.ts
 coverage/
 # Prisma generated client + local dev database
 dashboard/packages/db/generated/
+dashboard/packages/db/prisma/schema.sqlite.prisma
+dashboard/.dev-data/
 *.db
 *.db-journal
 

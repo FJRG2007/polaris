@@ -22,7 +22,8 @@
         "format:check": "prettier --check \"**/*.{ts,tsx,mjs,json,md}\"",
         "db:generate": "npm run generate --workspace @polaris/db",
         "db:migrate": "npm run migrate --workspace @polaris/db",
-        "web:dev": "npm run dev --workspace @polaris/web"
+        "web:dev": "npm run dev --workspace @polaris/web",
+        "dev:up": "node scripts/dev-up.mjs"
     },
     "devDependencies": {
         "@types/node": "22.10.7",

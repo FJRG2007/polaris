@@ -28,7 +28,7 @@ export function createAuth() {
         secret: env.POLARIS_AUTH_SECRET,
         baseURL: env.POLARIS_APP_URL,
         trustedOrigins: [env.POLARIS_APP_URL],
-        database: prismaAdapter(prisma, { provider: "postgresql" }),
+        database: prismaAdapter(prisma, { provider: env.POLARIS_DB_PROVIDER }),
         emailAndPassword: {
             enabled: true,
             requireEmailVerification: false,
