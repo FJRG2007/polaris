@@ -5,9 +5,11 @@
  * (token hashing) use node:crypto and must stay server-side.
  */
 
+// Note: token hashing (./tokens.js) uses node:crypto and is intentionally NOT
+// re-exported here so this barrel stays client-safe. Import it from
+// "@polaris/core/tokens" in server-only code.
 export * from "./cidr.js";
 export * from "./paths.js";
-export * from "./tokens.js";
 export * from "./format.js";
 export * from "./permissions.js";
 export * from "./schemas/storage.js";

@@ -1,0 +1,69 @@
+"use server";
+
+/**
+ * Drive server actions. Each one re-resolves the session and validates its input
+ * server-side before touching storage, so the client can never drive an
+ * operation it is not entitled to or with a path it has not been given. Metadata
+ * mutations (folders, delete, rename) go here; the byte-streaming upload and
+ * download paths are Route Handlers instead, because Server Actions buffer.
+ */
+
+import { revalidatePath } from "next/cache";
+import { createConnectionSchema, normalizeRelPath } from "@polaris/core";
+import { requirePermission } from "@/lib/session";
+import { createConnection, deleteConnection, getDriver } from "@/lib/storage-service";
+
+export async function createConnectionAction(input: unknown): Promise<{ error?: string }> {
+    const user = await requirePermission("connections.manage");
+    const parsed = createConnectionSchema.safeParse(input);
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid connection" };
+    await createConnection(
+        user.id,
+        parsed.data.name,
+        parsed.data.config.kind,
+        parsed.data.config,
+        parsed.data.credentials
+    );
+    revalidatePath("/drive");
+    return {};
+}
+
+export async function deleteConnectionAction(connectionId: string): Promise<void> {
+    const user = await requirePermission("connections.manage");
+    await deleteConnection(user.id, connectionId);
+    revalidatePath("/drive");
+}
+
+export async function mkdirAction(connectionId: string, path: string, name: string): Promise<void> {
+    const user = await requirePermission("drive.write");
+    const target = normalizeRelPath(path ? `${path}/${name}` : name);
+    const driver = await getDriver(connectionId, user.id);
+    try {
+        await driver.mkdir(target);
+    } finally {
+        await driver.dispose();
+    }
+    revalidatePath("/drive");
+}
+
+export async function deleteEntryAction(connectionId: string, path: string): Promise<void> {
+    const user = await requirePermission("drive.delete");
+    const driver = await getDriver(connectionId, user.id);
+    try {
+        await driver.delete(normalizeRelPath(path), { recursive: true });
+    } finally {
+        await driver.dispose();
+    }
+    revalidatePath("/drive");
+}
+
+export async function renameAction(connectionId: string, from: string, to: string): Promise<void> {
+    const user = await requirePermission("drive.write");
+    const driver = await getDriver(connectionId, user.id);
+    try {
+        await driver.move(normalizeRelPath(from), normalizeRelPath(to));
+    } finally {
+        await driver.dispose();
+    }
+    revalidatePath("/drive");
+}

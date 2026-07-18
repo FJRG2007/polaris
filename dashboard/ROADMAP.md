@@ -18,23 +18,23 @@ See [`README.md`](README.md) and the plan for the full rationale.
 | 0 | Workspace scaffolding, tsconfig/prettier presets, gitignore, package skeletons | done |
 | 1a | `@polaris/config` - edition + capability flags, Zod env schema | done (3 tests) |
 | 1b | `@polaris/db` - Prisma schema (all models), client, PG + SQLite portable | done (schema validates, client generates, init migration laid down) |
-| 1c | `@polaris/ui` - shell, theme tokens, app switcher, primitives | pending |
-| 1d | `@polaris/core` - Zod schemas, CIDR, tokens, permissions, path sanitize | done (10 tests) |
-| - | Interface-freeze gate: StorageDriver, Prisma schema, hostd API v1 | StorageDriver + Prisma frozen; hostd API in progress |
-| 2a | `@polaris/auth` - better-auth + Prisma adapter, roles, invites | pending |
-| 2b | `@polaris/hostd-client` + `crates/polaris-hostd` skeleton | in progress (Rust daemon delegated) |
-| 2c | `@polaris/storage` - interface, registry, credential crypto, in-process drivers | done: interface + crypto + registry + local driver (5 tests); other drivers pending |
-| 3 | `apps/web` skeleton - App Router, auth, app switcher, Drive shell, capabilities | pending |
-| 4a | Drive browser - list/nav/mkdir/move/rename/delete/search | pending |
-| 4b | hostd-routed SMB/NFS + mount lifecycle + limited-edition degradation | pending |
-| 4c | Chunked/resumable upload + range/streaming download | pending |
-| 5a | Sharing - public links, password, download/expiry limits, invite users, logs | pending |
-| 5b | File requests - token URL, anon+login upload, size/format/CIDR/expiry | pending |
-| 5c | Admin - user management, roles, invites | pending |
-| 6a | Docker - Dockerfile + compose (web + postgres + Caddy + hostd) | pending |
-| 6b | One-command install (install.sh / install.ps1) + auto-update | pending |
+| 1c | `@polaris/ui` - shell, theme tokens, app switcher, primitives | done (dark token system, Radix primitives, capability context) |
+| 1d | `@polaris/core` - Zod schemas, CIDR, tokens, permissions, path sanitize | done (10 tests); tokens split to `@polaris/core/tokens` for client safety |
+| - | Interface-freeze gate: StorageDriver, Prisma schema, hostd API v1 | done - all three frozen |
+| 2a | `@polaris/auth` - better-auth + Prisma adapter, roles, invites | done: email/password, roles, first-user admin bootstrap (invites model exists; invite UI pending) |
+| 2b | `@polaris/hostd-client` + `crates/polaris-hostd` | done: Rust daemon (12 tests) + TS client (health probe + mounts) |
+| 2c | `@polaris/storage` - interface, registry, credential crypto, in-process drivers | done: interface + crypto + registry + local driver (5 tests); SFTP/WebDAV/S3/SMB/NFS/vendor drivers pending |
+| 3 | `apps/web` skeleton - App Router, auth, app switcher, Drive shell, capabilities | done (`next build` green) |
+| 4a | Drive browser - list/nav/mkdir/move/rename/delete/search | done for local driver (search UI pending) |
+| 4b | hostd-routed SMB/NFS + mount lifecycle + limited-edition degradation | partial: registry routing + local-on-mount path; mount activation lifecycle (HostdClient.createMount wiring) pending |
+| 4c | Chunked/resumable upload + range/streaming download | streaming upload + range download done; chunked/tus resumable UI + UploadSession wiring pending |
+| 5a | Sharing - public links, password, download/expiry limits, invite users, logs | models + schemas done; endpoints + UI pending |
+| 5b | File requests - token URL, anon+login upload, size/format/CIDR/expiry | models + schemas + constraint checks done; endpoints + UI pending |
+| 5c | Admin - user management, roles, invites | roles/permissions engine done; admin UI pending |
+| 6a | Docker - Dockerfile + compose (web + postgres + Caddy + hostd) | done (files written + syntax-validated; runtime `docker compose up` not yet exercised) |
+| 6b | One-command install (install.sh / install.ps1) + auto-update | done (scripts written + syntax-validated; not yet run end-to-end) |
 | 6c | Landing (Astro) + demo (seeded Next) | pending |
-| 7 | GitHub Actions (CI, release, deploy, agent maintenance) | pending |
+| 7 | GitHub Actions (CI, release, deploy, agent maintenance) | done (dashboard-ci, dashboard-release, dashboard-agent-maintenance) |
 
 ## Feature parity checklist
 
@@ -72,3 +72,9 @@ Platform:
   (shared or requested items), avoiding an unwinnable sync problem.
 - Prisma schema stays SQLite-portable (no Postgres-only types/enums/arrays; JSON
   stored as stringified `String`; byte sizes as `BigInt`).
+- Accepted dependency risk: two moderate advisories remain against `postcss@8.4.31`
+  bundled inside Next.js's private build toolchain (an XSS-in-CSS-stringify path
+  that our app never exercises - build-time only, no untrusted CSS). The direct
+  postcss is pinned to a patched version via an npm override; npm cannot rewrite
+  Next's internal copy, and the only "fix" npm offers is an absurd next@9
+  downgrade. Re-evaluate when Next bumps its bundled postcss.
