@@ -13,7 +13,61 @@ import { createConnectionSchema, normalizeRelPath } from "@polaris/core";
 import { requirePermission } from "@/lib/session";
 import { createConnection, deleteConnection, getDriver } from "@/lib/storage-service";
 import { detectHost, type NasDetection } from "@/lib/nas-detect";
+import { fetchUnasMetrics } from "@/lib/unifi-unas";
 import { recordAudit } from "@/lib/audit-service";
+
+/** Result of a UNAS connection dry-run: what the console reported, or why not. */
+export interface UnasTestResult {
+    readonly ok: boolean;
+    readonly device?: string;
+    readonly version?: string;
+    readonly pools?: number;
+    readonly shares?: number;
+    readonly error?: string;
+}
+
+/**
+ * Dry-run a UniFi UNAS connection before it is saved: log in to the console and
+ * read the metrics once, so the user gets immediate, specific feedback (wrong
+ * host, bad credentials, SSO/2FA account) instead of a connection that silently
+ * shows nothing later. Nothing is persisted; credentials stay server-side.
+ */
+export async function testUnasConnectionAction(input: {
+    host: string;
+    port?: number;
+    username: string;
+    password: string;
+    secure?: boolean;
+}): Promise<UnasTestResult> {
+    await requirePermission("connections.manage");
+    if (!input.host?.trim()) return { ok: false, error: "Enter the console host or IP" };
+    if (!input.username?.trim()) return { ok: false, error: "Enter the console username" };
+    if (!input.password) return { ok: false, error: "Enter the console password" };
+    try {
+        const metrics = await fetchUnasMetrics({
+            host: input.host.trim(),
+            port: input.port,
+            username: input.username.trim(),
+            password: input.password,
+            secure: input.secure
+        });
+        return {
+            ok: true,
+            device: metrics.system.name,
+            version: metrics.system.version || undefined,
+            pools: metrics.pools.length,
+            shares: metrics.shares.length
+        };
+    } catch (caught) {
+        const message = caught instanceof Error ? caught.message : "Could not reach the UNAS console";
+        // A login rejection almost always means an SSO/2FA account was used
+        // instead of a local console account - point the user at the fix.
+        const hint = /login failed/i.test(message)
+            ? `${message}. Use a LOCAL console account (Ubiquiti SSO accounts with 2FA cannot log in here).`
+            : message;
+        return { ok: false, error: hint };
+    }
+}
 
 export async function detectNasAction(host: string): Promise<NasDetection | { error: string }> {
     await requirePermission("connections.manage");

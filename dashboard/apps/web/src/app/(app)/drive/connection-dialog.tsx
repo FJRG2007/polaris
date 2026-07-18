@@ -10,7 +10,7 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Radar } from "lucide-react";
+import { CheckCircle2, Plus, Radar, XCircle } from "lucide-react";
 import { STORAGE_PROVIDER_KINDS, type StorageProviderKind } from "@polaris/core";
 import {
     Button,
@@ -23,7 +23,7 @@ import {
     DialogTrigger,
     Input
 } from "@polaris/ui";
-import { createConnectionAction, detectNasAction } from "./actions";
+import { createConnectionAction, detectNasAction, testUnasConnectionAction, type UnasTestResult } from "./actions";
 
 interface FieldDef {
     name: string;
@@ -109,6 +109,25 @@ export function ConnectionDialog() {
     const [detectedHost, setDetectedHost] = useState("");
     const [detecting, setDetecting] = useState(false);
     const [detectMsg, setDetectMsg] = useState<string | null>(null);
+    const [testing, setTesting] = useState(false);
+    const [testResult, setTestResult] = useState<UnasTestResult | null>(null);
+
+    /** Read the current form values for a live UNAS dry-run. */
+    async function onTestUnas(form: HTMLFormElement | null) {
+        if (!form) return;
+        const data = new FormData(form);
+        const portRaw = data.get("port");
+        setTesting(true);
+        setTestResult(null);
+        const result = await testUnasConnectionAction({
+            host: String(data.get("host") ?? ""),
+            port: portRaw ? Number(portRaw) : undefined,
+            username: String(data.get("username") ?? ""),
+            password: String(data.get("password") ?? "")
+        });
+        setTesting(false);
+        setTestResult(result);
+    }
 
     async function onDetect() {
         if (!detectIp.trim()) return;
@@ -231,6 +250,39 @@ export function ConnectionDialog() {
                             )}
                         </label>
                     ))}
+                    {kind === "unifi-unas" ? (
+                        <div className="flex flex-col gap-2 rounded-md border border-border bg-muted/30 p-2">
+                            <p className="text-xs text-muted-foreground">
+                                Use a <strong>local console account</strong> (not a Ubiquiti SSO login with 2FA).
+                                Polaris reads metrics from the UniFi OS console over HTTPS; SSH stays off.
+                            </p>
+                            <div className="flex items-center gap-2">
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="ghost"
+                                    disabled={testing}
+                                    onClick={(event) => onTestUnas(event.currentTarget.form)}
+                                >
+                                    {testing ? "Testing..." : "Test connection"}
+                                </Button>
+                                {testResult ? (
+                                    <span
+                                        className={`flex items-center gap-1 text-xs ${testResult.ok ? "text-success" : "text-danger"}`}
+                                    >
+                                        {testResult.ok ? (
+                                            <CheckCircle2 className="size-3.5" />
+                                        ) : (
+                                            <XCircle className="size-3.5" />
+                                        )}
+                                        {testResult.ok
+                                            ? `${testResult.device}${testResult.version ? ` (${testResult.version})` : ""} - ${testResult.pools} pools, ${testResult.shares} shares`
+                                            : testResult.error}
+                                    </span>
+                                ) : null}
+                            </div>
+                        </div>
+                    ) : null}
                     {error ? <p className="text-sm text-danger">{error}</p> : null}
                     <div className="mt-2 flex justify-end gap-2">
                         <DialogClose asChild>
