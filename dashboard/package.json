@@ -5,7 +5,7 @@
     "type": "module",
     "description": "Polaris web control plane - dashboard pillar (Drive and future apps).",
     "author": "FJRG2007 <fjrg2007@tpeoficial.com>",
-    "license": "MIT",
+    "license": "Apache-2.0",
     "engines": {
         "node": ">=20"
     },

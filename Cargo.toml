@@ -13,7 +13,7 @@ members = [
 [workspace.package]
 edition = "2021"
 rust-version = "1.85"
-license = "MIT"
+license = "Apache-2.0"
 repository = "https://github.com/FJRG2007/polaris"
 authors = ["FJRG2007"]
 
