@@ -57,6 +57,14 @@ File requests (upload-in):
 - [ ] Per-request max size, destination, allowed formats, allowed CIDRs, expiry
 - [ ] Anonymous-upload hardening (streamed size limit, sniffed MIME, rate limit)
 
+Containers app (Docker):
+- [x] Secure per-install SSH access provisioning (`install.sh --ssh`): unique key, forced-command `docker system dial-stdio`, `restrict` + `from=`, pinned known_hosts
+- [x] Modular `@polaris/docker` connector: transports (socket / SSH / TCP), driver, registry (4 tests)
+- [x] Containers app: host overview (CPU/mem/counts), container table with live stats, start/stop/restart; DockerConnection model
+- [ ] Live end-to-end run against a real Docker host (built + unit-tested; not yet exercised on this Docker-off dev machine)
+- [ ] Remote-host SSH host-key pinning per connection, TLS-cert/pasted-key credential paths (encryption wired; UI present)
+- [ ] Container logs, images, compose stacks, and Kubernetes (future apps)
+
 Platform:
 - [ ] User management, roles/permissions, invites
 - [ ] Edition/capability boundary + graceful degradation

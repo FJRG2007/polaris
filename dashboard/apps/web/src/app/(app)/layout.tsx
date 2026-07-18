@@ -1,8 +1,8 @@
 import type { ReactNode } from "react";
 import { getCapabilities } from "@polaris/config";
-import { AppShell, AppSwitcher, CapabilityProvider, EditionBadge } from "@polaris/ui";
-import { POLARIS_APPS } from "@/lib/apps";
+import { AppShell, CapabilityProvider, EditionBadge } from "@polaris/ui";
 import { AccountMenu } from "@/components/account-menu";
+import { AppNav } from "@/components/app-nav";
 import { requireUser } from "@/lib/session";
 
 /**
@@ -17,7 +17,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     return (
         <CapabilityProvider capabilities={capabilities}>
             <AppShell
-                switcher={<AppSwitcher apps={POLARIS_APPS} currentAppId="drive" />}
+                switcher={<AppNav />}
                 account={
                     <>
                         <EditionBadge />

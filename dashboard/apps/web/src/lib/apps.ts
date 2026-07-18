@@ -18,7 +18,7 @@ export interface AppEntry {
 
 export const POLARIS_APPS: AppEntry[] = [
     { id: "drive", label: "Drive", description: "Files across every NAS", icon: HardDrive, href: "/drive" },
-    { id: "containers", label: "Containers", description: "Docker & Compose", icon: Container, href: "/apps/containers", locked: true },
+    { id: "containers", label: "Containers", description: "Docker & Compose", icon: Container, href: "/apps/containers" },
     { id: "kubernetes", label: "Kubernetes", description: "Clusters & workloads", icon: Boxes, href: "/apps/kubernetes", locked: true },
     { id: "servers", label: "Servers", description: "Hosts, VMs & deploys", icon: Server, href: "/apps/servers", locked: true },
     { id: "home", label: "Home", description: "Home Assistant", icon: Home, href: "/apps/home", locked: true }
