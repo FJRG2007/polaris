@@ -1,6 +1,6 @@
 "use client";
 
-import { LogOut, Users } from "lucide-react";
+import { Activity, LogOut, Users } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
     DropdownMenu,
@@ -34,12 +34,20 @@ export function AccountMenu({ name, email, isAdmin }: { name: string; email: str
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 {isAdmin ? (
-                    <DropdownMenuItem asChild>
-                        <a href="/admin/users">
-                            <Users className="size-4" />
-                            Users
-                        </a>
-                    </DropdownMenuItem>
+                    <>
+                        <DropdownMenuItem asChild>
+                            <a href="/admin/users">
+                                <Users className="size-4" />
+                                Users
+                            </a>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem asChild>
+                            <a href="/admin/activity">
+                                <Activity className="size-4" />
+                                Activity
+                            </a>
+                        </DropdownMenuItem>
+                    </>
                 ) : null}
                 <DropdownMenuItem onSelect={onSignOut}>
                     <LogOut className="size-4" />

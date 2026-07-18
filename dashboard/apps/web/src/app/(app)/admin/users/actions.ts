@@ -6,12 +6,19 @@ import { revalidatePath } from "next/cache";
 import { createInviteSchema } from "@polaris/core";
 import { requireAdmin } from "@/lib/session";
 import { createInvite, revokeInvite } from "@/lib/invite-service";
+import { recordAudit } from "@/lib/audit-service";
 
 export async function createInviteAction(input: unknown): Promise<{ token?: string; error?: string }> {
     const admin = await requireAdmin();
     const parsed = createInviteSchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
     const { token } = await createInvite(admin.id, parsed.data.email, parsed.data.role);
+    await recordAudit({
+        actorId: admin.id,
+        action: "invite.create",
+        targetType: "invite",
+        metadata: { email: parsed.data.email, role: parsed.data.role }
+    });
     revalidatePath("/admin/users");
     return { token };
 }

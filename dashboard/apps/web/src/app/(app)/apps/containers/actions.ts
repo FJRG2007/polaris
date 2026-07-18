@@ -11,6 +11,7 @@ import { revalidatePath } from "next/cache";
 import { createDockerConnectionSchema, createDockerDriver } from "@polaris/docker";
 import { requirePermission } from "@/lib/session";
 import { createDockerConnection, deleteDockerConnection, getDockerDriver } from "@/lib/docker-service";
+import { recordAudit } from "@/lib/audit-service";
 
 const CONTAINERS_PATH = "/apps/containers";
 
@@ -33,7 +34,19 @@ export async function createDockerConnectionAction(input: unknown): Promise<{ er
         return { error: caught instanceof Error ? caught.message : "Connection failed" };
     }
 
-    await createDockerConnection(user.id, parsed.data.name, parsed.data.config, parsed.data.credentials);
+    const created = await createDockerConnection(
+        user.id,
+        parsed.data.name,
+        parsed.data.config,
+        parsed.data.credentials
+    );
+    await recordAudit({
+        actorId: user.id,
+        action: "docker.connection.create",
+        targetType: "docker",
+        targetId: created.id,
+        metadata: { name: parsed.data.name, transport: parsed.data.config.transport }
+    });
     revalidatePath(CONTAINERS_PATH);
     return {};
 }
@@ -41,6 +54,7 @@ export async function createDockerConnectionAction(input: unknown): Promise<{ er
 export async function deleteDockerConnectionAction(connectionId: string): Promise<void> {
     const user = await requirePermission("system.manage");
     await deleteDockerConnection(user.id, connectionId);
+    await recordAudit({ actorId: user.id, action: "docker.connection.delete", targetType: "docker", targetId: connectionId });
     revalidatePath(CONTAINERS_PATH);
 }
 
@@ -60,6 +74,13 @@ export async function containerAction(
     } finally {
         await driver.dispose();
     }
+    await recordAudit({
+        actorId: user.id,
+        action: `docker.container.${action}`,
+        targetType: "container",
+        targetId: containerId,
+        metadata: { connectionId }
+    });
     revalidatePath(CONTAINERS_PATH);
     return {};
 }

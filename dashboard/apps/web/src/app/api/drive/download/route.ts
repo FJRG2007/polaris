@@ -8,6 +8,7 @@ import { baseName, normalizeRelPath } from "@polaris/core";
 import { userHasPermission } from "@polaris/auth";
 import { requireUser } from "@/lib/session";
 import { getDriver } from "@/lib/storage-service";
+import { recordAudit } from "@/lib/audit-service";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -35,6 +36,14 @@ export async function GET(request: Request): Promise<Response> {
     const driver = await getDriver(connectionId, user.id);
     const stat = await driver.stat(path);
     if (stat.kind !== "file") return new Response("Not a file", { status: 400 });
+
+    await recordAudit({
+        actorId: user.id,
+        action: "drive.download",
+        targetType: "connection",
+        targetId: connectionId,
+        metadata: { path, size: stat.size.toString() }
+    });
 
     const headers = new Headers({
         "content-type": stat.mime ?? "application/octet-stream",

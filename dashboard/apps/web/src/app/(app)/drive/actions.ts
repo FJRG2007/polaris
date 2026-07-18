@@ -13,6 +13,7 @@ import { createConnectionSchema, normalizeRelPath } from "@polaris/core";
 import { requirePermission } from "@/lib/session";
 import { createConnection, deleteConnection, getDriver } from "@/lib/storage-service";
 import { detectHost, type NasDetection } from "@/lib/nas-detect";
+import { recordAudit } from "@/lib/audit-service";
 
 export async function detectNasAction(host: string): Promise<NasDetection | { error: string }> {
     await requirePermission("connections.manage");
@@ -28,13 +29,20 @@ export async function createConnectionAction(input: unknown): Promise<{ error?: 
     const user = await requirePermission("connections.manage");
     const parsed = createConnectionSchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid connection" };
-    await createConnection(
+    const created = await createConnection(
         user.id,
         parsed.data.name,
         parsed.data.config.kind,
         parsed.data.config,
         parsed.data.credentials
     );
+    await recordAudit({
+        actorId: user.id,
+        action: "connection.create",
+        targetType: "connection",
+        targetId: created.id,
+        metadata: { name: parsed.data.name, kind: parsed.data.config.kind }
+    });
     revalidatePath("/drive");
     return {};
 }
@@ -42,6 +50,7 @@ export async function createConnectionAction(input: unknown): Promise<{ error?: 
 export async function deleteConnectionAction(connectionId: string): Promise<void> {
     const user = await requirePermission("connections.manage");
     await deleteConnection(user.id, connectionId);
+    await recordAudit({ actorId: user.id, action: "connection.delete", targetType: "connection", targetId: connectionId });
     revalidatePath("/drive");
 }
 
@@ -54,6 +63,7 @@ export async function mkdirAction(connectionId: string, path: string, name: stri
     } finally {
         await driver.dispose();
     }
+    await recordAudit({ actorId: user.id, action: "drive.mkdir", targetType: "connection", targetId: connectionId, metadata: { path: target } });
     revalidatePath("/drive");
 }
 
@@ -65,6 +75,7 @@ export async function deleteEntryAction(connectionId: string, path: string): Pro
     } finally {
         await driver.dispose();
     }
+    await recordAudit({ actorId: user.id, action: "drive.delete", targetType: "connection", targetId: connectionId, metadata: { path } });
     revalidatePath("/drive");
 }
 
@@ -76,5 +87,6 @@ export async function renameAction(connectionId: string, from: string, to: strin
     } finally {
         await driver.dispose();
     }
+    await recordAudit({ actorId: user.id, action: "drive.move", targetType: "connection", targetId: connectionId, metadata: { from, to } });
     revalidatePath("/drive");
 }

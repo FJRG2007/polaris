@@ -9,6 +9,7 @@ import { normalizeRelPath } from "@polaris/core";
 import { userHasPermission } from "@polaris/auth";
 import { requireUser } from "@/lib/session";
 import { getDriver } from "@/lib/storage-service";
+import { recordAudit } from "@/lib/audit-service";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -38,6 +39,13 @@ export async function PUT(request: Request): Promise<Response> {
     const driver = await getDriver(connectionId, user.id);
     try {
         const stat = await driver.writeStream(target, request.body, { offset });
+        await recordAudit({
+            actorId: user.id,
+            action: "drive.upload",
+            targetType: "connection",
+            targetId: connectionId,
+            metadata: { path: target, size: stat.size.toString() }
+        });
         return Response.json({ ok: true, path: stat.path, size: stat.size.toString() });
     } catch (error) {
         return new Response(error instanceof Error ? error.message : "Upload failed", { status: 500 });
