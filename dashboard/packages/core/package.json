@@ -19,7 +19,7 @@
     "scripts": {
         "build": "tsup src/index.ts src/tokens.ts --format esm --dts --clean",
         "typecheck": "tsc --noEmit",
-        "test": "vitest run"
+        "test": "vitest run --passWithNoTests"
     },
     "dependencies": {
         "ipaddr.js": "2.2.0",

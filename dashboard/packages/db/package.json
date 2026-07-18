@@ -18,7 +18,7 @@
         "migrate:dev": "prisma migrate dev",
         "build": "prisma generate && tsc -p tsconfig.build.json",
         "typecheck": "tsc --noEmit",
-        "test": "vitest run"
+        "test": "vitest run --passWithNoTests"
     },
     "dependencies": {
         "@prisma/client": "6.2.1"

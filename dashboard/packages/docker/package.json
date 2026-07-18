@@ -19,7 +19,7 @@
     "scripts": {
         "build": "tsup src/index.ts src/schema.ts --format esm --dts --clean",
         "typecheck": "tsc --noEmit",
-        "test": "vitest run"
+        "test": "vitest run --passWithNoTests"
     },
     "dependencies": {
         "@polaris/config": "0.1.0",

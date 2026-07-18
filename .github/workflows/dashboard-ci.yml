@@ -31,7 +31,9 @@ jobs:
 
       - run: npm ci
       - run: npm run db:generate
+      # Packages consume each other's built declarations, so build before the
+      # type/test gates; the build itself is dependency-ordered.
+      - run: npm run build
       - run: npm run typecheck
       - run: npm run lint --if-present
       - run: npm run test
-      - run: npm run build
