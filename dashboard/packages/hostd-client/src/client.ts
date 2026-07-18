@@ -1,0 +1,128 @@
+/**
+ * Client for the polaris-hostd daemon. The daemon listens on a Unix socket and
+ * authenticates each call with a per-run bearer token it writes to a file that
+ * is mounted read-only into this container. We read that token per request (it
+ * rotates when the daemon restarts) and speak plain HTTP/1.1 over node:http,
+ * which supports Unix sockets natively via socketPath - no extra dependency.
+ *
+ * Every response is treated as untrusted input: the daemon is privileged, but a
+ * compromised or buggy daemon must not be able to corrupt the dashboard, so
+ * shapes are validated before use and failures degrade to "daemon absent".
+ */
+
+import { readFile } from "node:fs/promises";
+import { request as httpRequest, type RequestOptions } from "node:http";
+import { loadEnv } from "@polaris/config";
+import type { HostdHealth } from "@polaris/config";
+
+export interface MountSpec {
+    readonly id: string;
+    readonly kind: "smb" | "nfs";
+    readonly source: string;
+    readonly target: string;
+    readonly options?: string;
+}
+
+export interface MountResult {
+    readonly id: string;
+    readonly mountPath: string;
+}
+
+interface RawResponse {
+    readonly status: number;
+    readonly body: string;
+}
+
+export class HostdClient {
+    private readonly socketPath?: string;
+    private readonly tcpUrl?: string;
+    private readonly tokenFile: string;
+
+    public constructor(options?: { socketPath?: string; tcpUrl?: string; tokenFile?: string }) {
+        const env = loadEnv();
+        this.socketPath = options?.socketPath ?? env.POLARIS_HOSTD_SOCKET;
+        this.tcpUrl = options?.tcpUrl ?? env.POLARIS_HOSTD_URL;
+        this.tokenFile = options?.tokenFile ?? env.POLARIS_HOSTD_TOKEN_FILE;
+    }
+
+    /**
+     * Probe the daemon's health. Returns the parsed capability report, or null if
+     * the daemon is absent, unreachable, unauthorized, or replies with anything
+     * unexpected. Null is the signal that keeps the dashboard in the limited
+     * edition - the safe default.
+     */
+    public async health(): Promise<HostdHealth | null> {
+        try {
+            const response = await this.call("GET", "/v1/health");
+            if (response.status !== 200) return null;
+            const parsed = JSON.parse(response.body) as unknown;
+            return isHealth(parsed) ? parsed : null;
+        } catch {
+            return null;
+        }
+    }
+
+    /** Request a native mount. Throws if the daemon rejects or is unreachable. */
+    public async createMount(spec: MountSpec): Promise<MountResult> {
+        const response = await this.call("POST", "/v1/mounts", JSON.stringify(spec));
+        if (response.status !== 201) {
+            throw new Error(`hostd mount failed (${response.status}): ${response.body}`);
+        }
+        const parsed = JSON.parse(response.body) as MountResult;
+        return parsed;
+    }
+
+    /** Release a mount previously created through createMount. */
+    public async deleteMount(id: string): Promise<void> {
+        const response = await this.call("DELETE", `/v1/mounts/${encodeURIComponent(id)}`);
+        if (response.status !== 200 && response.status !== 204) {
+            throw new Error(`hostd unmount failed (${response.status}): ${response.body}`);
+        }
+    }
+
+    private async token(): Promise<string> {
+        return (await readFile(this.tokenFile, "utf8")).trim();
+    }
+
+    private async call(method: string, path: string, body?: string): Promise<RawResponse> {
+        const token = await this.token();
+        const headers: Record<string, string> = { authorization: `Bearer ${token}` };
+        if (body !== undefined) {
+            headers["content-type"] = "application/json";
+            headers["content-length"] = String(Buffer.byteLength(body));
+        }
+        const options: RequestOptions = this.tcpUrl
+            ? { ...splitTcp(this.tcpUrl), path, method, headers }
+            : { socketPath: this.socketPath, path, method, headers };
+        return new Promise<RawResponse>((resolve, reject) => {
+            const req = httpRequest(options, (res) => {
+                const chunks: Buffer[] = [];
+                res.on("data", (chunk: Buffer) => chunks.push(chunk));
+                res.on("end", () =>
+                    resolve({ status: res.statusCode ?? 0, body: Buffer.concat(chunks).toString("utf8") })
+                );
+            });
+            req.on("error", reject);
+            if (body !== undefined) req.write(body);
+            req.end();
+        });
+    }
+}
+
+function splitTcp(url: string): { host: string; port: number } {
+    const parsed = new URL(url);
+    return { host: parsed.hostname, port: Number(parsed.port) || 80 };
+}
+
+/** Structural check on an untrusted health payload. */
+function isHealth(value: unknown): value is HostdHealth {
+    if (typeof value !== "object" || value === null) return false;
+    const record = value as Record<string, unknown>;
+    if (typeof record.version !== "string") return false;
+    const caps = record.capabilities;
+    if (typeof caps !== "object" || caps === null) return false;
+    const flags = caps as Record<string, unknown>;
+    return ["hostFilesystem", "nativeMounts", "docker", "kubernetes", "systemd", "autoUpdate"].every(
+        (key) => typeof flags[key] === "boolean"
+    );
+}

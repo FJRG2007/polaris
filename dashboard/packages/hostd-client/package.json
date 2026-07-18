@@ -1,0 +1,23 @@
+{
+    "name": "@polaris/hostd-client",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "description": "Typed client for the polaris-hostd daemon: capability probe and mount lifecycle.",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        }
+    },
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "scripts": {
+        "build": "tsup src/index.ts --format esm --dts --clean",
+        "typecheck": "tsc --noEmit",
+        "test": "vitest run"
+    },
+    "dependencies": {
+        "@polaris/config": "0.1.0"
+    }
+}
