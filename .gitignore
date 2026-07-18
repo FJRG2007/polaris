@@ -18,6 +18,19 @@ dist/
 build/
 *.whl
 
+# Node / dashboard pillar
+node_modules/
+.next/
+.turbo/
+*.tsbuildinfo
+next-env.d.ts
+.astro/
+coverage/
+# Prisma generated client + local dev database
+dashboard/packages/db/generated/
+*.db
+*.db-journal
+
 # Prebuilt on-device agent binaries (produced by CI, never committed)
 plugins/*/homeassistant/custom_components/*/bin/polaris-unas-agent-*
 

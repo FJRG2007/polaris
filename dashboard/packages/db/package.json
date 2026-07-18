@@ -1,0 +1,29 @@
+{
+    "name": "@polaris/db",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "description": "Polaris Prisma schema, generated client, and the shared database singleton.",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        }
+    },
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "scripts": {
+        "generate": "prisma generate",
+        "migrate": "prisma migrate deploy",
+        "migrate:dev": "prisma migrate dev",
+        "build": "prisma generate && tsup src/index.ts --format esm --dts --clean",
+        "typecheck": "tsc --noEmit",
+        "test": "vitest run"
+    },
+    "dependencies": {
+        "@prisma/client": "6.2.1"
+    },
+    "devDependencies": {
+        "prisma": "6.2.1"
+    }
+}

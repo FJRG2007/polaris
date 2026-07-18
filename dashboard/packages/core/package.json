@@ -1,0 +1,24 @@
+{
+    "name": "@polaris/core",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "description": "Pure Polaris domain logic: schemas, CIDR matching, tokens, permissions, path safety.",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        }
+    },
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "scripts": {
+        "build": "tsup src/index.ts --format esm --dts --clean",
+        "typecheck": "tsc --noEmit",
+        "test": "vitest run"
+    },
+    "dependencies": {
+        "ipaddr.js": "2.2.0",
+        "zod": "3.24.1"
+    }
+}

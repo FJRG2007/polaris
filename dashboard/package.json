@@ -1,0 +1,37 @@
+{
+    "name": "polaris-dashboard",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "description": "Polaris web control plane - dashboard pillar (Drive and future apps).",
+    "author": "FJRG2007 <fjrg2007@tpeoficial.com>",
+    "license": "MIT",
+    "engines": {
+        "node": ">=20"
+    },
+    "workspaces": [
+        "packages/*",
+        "apps/*"
+    ],
+    "scripts": {
+        "build": "npm run build --workspaces --if-present",
+        "typecheck": "npm run typecheck --workspaces --if-present",
+        "lint": "npm run lint --workspaces --if-present",
+        "test": "npm run test --workspaces --if-present",
+        "format": "prettier --write \"**/*.{ts,tsx,mjs,json,md}\"",
+        "format:check": "prettier --check \"**/*.{ts,tsx,mjs,json,md}\"",
+        "db:generate": "npm run generate --workspace @polaris/db",
+        "db:migrate": "npm run migrate --workspace @polaris/db",
+        "web:dev": "npm run dev --workspace @polaris/web"
+    },
+    "devDependencies": {
+        "@types/node": "22.10.7",
+        "prettier": "3.4.2",
+        "tsup": "8.3.5",
+        "typescript": "5.7.3",
+        "vitest": "4.1.10"
+    },
+    "overrides": {
+        "esbuild": ">=0.25.0"
+    }
+}

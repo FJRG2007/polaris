@@ -1,0 +1,12 @@
+{
+    "extends": "../../tsconfig.base.json",
+    "compilerOptions": {
+        "rootDir": "src",
+        "outDir": "dist",
+        "types": ["node"],
+        "noUnusedLocals": false,
+        "noUnusedParameters": false
+    },
+    "include": ["src"],
+    "exclude": ["generated"]
+}

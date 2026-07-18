@@ -1,0 +1,363 @@
+// Polaris data model.
+//
+// Design constraints (do not relitigate):
+//   - Postgres in production, but kept SQLite-portable: no Postgres-only column
+//     types, no native enums (String + app-level Zod unions), no scalar arrays
+//     or JSONB columns (JSON is stored as a stringified String). Swapping the
+//     datasource provider to sqlite must not require schema surgery.
+//   - Byte counts use BigInt (files can exceed 2^53) and are handled as bigint
+//     in application code, never coerced through a lossy Number.
+//   - Polaris is a control plane, not a file mirror: the Node table holds rows
+//     only for objects Polaris must track (shared or requested items). Live
+//     directory listings come from the storage driver and are never persisted.
+//   - better-auth owns the User/Session/Account/Verification core fields; the
+//     extra columns and the Role/UserRole tables are Polaris additions.
+
+generator client {
+    provider = "prisma-client-js"
+    output   = "../generated/client"
+}
+
+datasource db {
+    provider = "postgresql"
+    url      = env("POLARIS_DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Identity and access
+// ---------------------------------------------------------------------------
+
+model User {
+    id            String   @id @default(cuid())
+    name          String
+    email         String   @unique
+    emailVerified Boolean  @default(false)
+    image         String?
+    // Second gate for admin-only routes, independent of role permissions.
+    isAdmin       Boolean  @default(false)
+    createdAt     DateTime @default(now())
+    updatedAt     DateTime @updatedAt
+
+    sessions     Session[]
+    accounts     Account[]
+    roles        UserRole[]
+    invitesSent  Invite[]                @relation("InviteInviter")
+    connections  StorageConnection[]
+    shares       Share[]
+    shareInvites ShareInvite[]
+    fileRequests FileRequest[]
+    submissions  FileRequestSubmission[]
+    uploads      UploadSession[]
+}
+
+model Session {
+    id        String   @id @default(cuid())
+    token     String   @unique
+    expiresAt DateTime
+    ipAddress String?
+    userAgent String?
+    userId    String
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@index([userId])
+}
+
+model Account {
+    id                    String    @id @default(cuid())
+    accountId             String
+    providerId            String
+    userId                String
+    accessToken           String?
+    refreshToken          String?
+    idToken               String?
+    accessTokenExpiresAt  DateTime?
+    refreshTokenExpiresAt DateTime?
+    scope                 String?
+    password              String?
+    createdAt             DateTime  @default(now())
+    updatedAt             DateTime  @updatedAt
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@index([userId])
+}
+
+model Verification {
+    id         String   @id @default(cuid())
+    identifier String
+    value      String
+    expiresAt  DateTime
+    createdAt  DateTime @default(now())
+    updatedAt  DateTime @updatedAt
+
+    @@index([identifier])
+}
+
+model Role {
+    id          String     @id @default(cuid())
+    name        String     @unique
+    // JSON array of permission keys (or the "*" wildcard). Stored as a string
+    // for SQLite portability; validated by @polaris/core on read.
+    permissions String
+    isSystem    Boolean    @default(false)
+    createdAt   DateTime   @default(now())
+    users       UserRole[]
+}
+
+model UserRole {
+    userId String
+    roleId String
+    user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+    role   Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+    @@id([userId, roleId])
+    @@index([roleId])
+}
+
+model Invite {
+    id          String    @id @default(cuid())
+    email       String
+    // SHA-256 of the invite token; the raw token lives only in the emailed link.
+    tokenHash   String    @unique
+    roleId      String?
+    invitedById String
+    expiresAt   DateTime
+    acceptedAt  DateTime?
+    createdAt   DateTime  @default(now())
+
+    invitedBy User @relation("InviteInviter", fields: [invitedById], references: [id], onDelete: Cascade)
+
+    @@index([email])
+}
+
+// ---------------------------------------------------------------------------
+// Storage
+// ---------------------------------------------------------------------------
+
+model StorageConnection {
+    id                  String   @id @default(cuid())
+    name                String
+    kind                String
+    ownerId             String
+    // Non-secret connection config (host, port, share path) as JSON string.
+    config              String
+    // Envelope-encrypted credentials (AES-256-GCM). Null for anonymous providers.
+    encryptedCredential Bytes?
+    credentialNonce     Bytes?
+    credentialKeyId     String?
+    requiresHostd       Boolean  @default(false)
+    status              String   @default("active")
+    createdAt           DateTime @default(now())
+    updatedAt           DateTime @updatedAt
+
+    owner        User            @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+    mount        StorageMount?
+    nodes        Node[]
+    shares       Share[]
+    fileRequests FileRequest[]
+    uploads      UploadSession[]
+
+    @@index([ownerId])
+}
+
+model StorageMount {
+    id            String    @id @default(cuid())
+    connectionId  String    @unique
+    mountPath     String
+    state         String    @default("pending")
+    error         String?
+    lastCheckedAt DateTime?
+    createdAt     DateTime  @default(now())
+
+    connection StorageConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+}
+
+model Node {
+    id           String   @id @default(cuid())
+    connectionId String
+    path         String
+    kind         String
+    size         BigInt   @default(0)
+    mime         String?
+    etag         String?
+    ownerId      String?
+    createdAt    DateTime @default(now())
+    updatedAt    DateTime @updatedAt
+
+    connection  StorageConnection       @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+    shares      Share[]
+    submissions FileRequestSubmission[]
+
+    @@unique([connectionId, path])
+    @@index([connectionId])
+}
+
+// ---------------------------------------------------------------------------
+// Sharing (files out)
+// ---------------------------------------------------------------------------
+
+model Share {
+    id            String    @id @default(cuid())
+    connectionId  String
+    // Snapshot of the shared path; a Node row backs it when a stable referent is
+    // needed (the remote file may be listed live and can vanish out of band).
+    path          String
+    nodeId        String?
+    ownerId       String
+    kind          String    @default("public")
+    // SHA-256 of the share token; lookups are by hash so a DB dump yields no links.
+    tokenHash     String    @unique
+    // argon2 hash of the optional link password.
+    passwordHash  String?
+    maxDownloads  Int?
+    downloadCount Int       @default(0)
+    expiresAt     DateTime?
+    allowUpload   Boolean   @default(false)
+    createdAt     DateTime  @default(now())
+    revokedAt     DateTime?
+
+    connection StorageConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+    node       Node?             @relation(fields: [nodeId], references: [id], onDelete: SetNull)
+    owner      User              @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+    invites    ShareInvite[]
+    accessLogs ShareAccessLog[]
+
+    @@index([ownerId])
+    @@index([connectionId])
+}
+
+model ShareInvite {
+    id         String @id @default(cuid())
+    shareId    String
+    userId     String
+    permission String @default("download")
+
+    share Share @relation(fields: [shareId], references: [id], onDelete: Cascade)
+    user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@unique([shareId, userId])
+    @@index([userId])
+}
+
+model ShareAccessLog {
+    id            String   @id @default(cuid())
+    shareId       String
+    at            DateTime @default(now())
+    // Client IP is stored hashed for privacy while still supporting abuse review.
+    ipHash        String?
+    userAgentHash String?
+    action        String
+    reason        String?
+
+    share Share @relation(fields: [shareId], references: [id], onDelete: Cascade)
+
+    @@index([shareId])
+}
+
+// ---------------------------------------------------------------------------
+// File requests (files in)
+// ---------------------------------------------------------------------------
+
+model FileRequest {
+    id                      String    @id @default(cuid())
+    ownerId                 String
+    tokenHash               String    @unique
+    title                   String
+    instructions            String?
+    destinationConnectionId String
+    destinationPath         String
+    requireLogin            Boolean   @default(false)
+    maxSizeBytes            BigInt
+    maxFiles                Int?
+    // JSON string arrays validated by @polaris/core.
+    allowedExtensions       String    @default("[]")
+    allowedMimeTypes        String    @default("[]")
+    allowedCidrs            String    @default("[]")
+    expiresAt               DateTime?
+    createdAt               DateTime  @default(now())
+    revokedAt               DateTime?
+
+    owner       User                    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+    destination StorageConnection       @relation(fields: [destinationConnectionId], references: [id], onDelete: Cascade)
+    submissions FileRequestSubmission[]
+
+    @@index([ownerId])
+}
+
+model FileRequestSubmission {
+    id                String   @id @default(cuid())
+    requestId         String
+    submittedByUserId String?
+    ipHash            String?
+    fileName          String
+    size              BigInt
+    storedNodeId      String?
+    storedPath        String
+    status            String   @default("stored")
+    at                DateTime @default(now())
+
+    request     FileRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+    submittedBy User?       @relation(fields: [submittedByUserId], references: [id], onDelete: SetNull)
+    storedNode  Node?       @relation(fields: [storedNodeId], references: [id], onDelete: SetNull)
+
+    @@index([requestId])
+}
+
+// ---------------------------------------------------------------------------
+// Uploads (resumable, both directions)
+// ---------------------------------------------------------------------------
+
+model UploadSession {
+    id            String   @id @default(cuid())
+    kind          String
+    ownerId       String?
+    connectionId  String
+    targetPath    String
+    totalSize     BigInt
+    receivedBytes BigInt   @default(0)
+    chunkSize     Int
+    // JSON record of received parts (offset + etag) for tus-style resume.
+    partsJson     String   @default("[]")
+    mime          String?
+    fileRequestId String?
+    status        String   @default("open")
+    expiresAt     DateTime
+    createdAt     DateTime @default(now())
+
+    owner      User?             @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+    connection StorageConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+
+    @@index([connectionId])
+    @@index([status])
+}
+
+// ---------------------------------------------------------------------------
+// Operations
+// ---------------------------------------------------------------------------
+
+model AuditLog {
+    id         String   @id @default(cuid())
+    actorId    String?
+    action     String
+    targetType String?
+    targetId   String?
+    metadata   String?
+    ipHash     String?
+    at         DateTime @default(now())
+
+    @@index([actorId])
+    @@index([action])
+}
+
+model Setting {
+    id     String  @id @default(cuid())
+    key    String  @unique
+    value  String
+    scope  String  @default("global")
+    userId String?
+
+    @@index([scope])
+}
