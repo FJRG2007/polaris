@@ -1,0 +1,57 @@
+name: Publish dashboard image
+
+# Build and push the dashboard images to GHCR on every change to main, keeping
+# only the `latest` tag (no versioned tags). Installs then pull instead of
+# building from source. The packages must be made public once in GitHub
+# (Settings -> Packages -> change visibility) so unauthenticated pulls work.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "dashboard/apps/**"
+      - "dashboard/packages/**"
+      - "dashboard/docker/**"
+      - "dashboard/mdns/**"
+      - "dashboard/package.json"
+      - "dashboard/package-lock.json"
+      - ".github/workflows/dashboard-publish.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push web (latest only)
+        uses: docker/build-push-action@v6
+        with:
+          context: dashboard
+          file: dashboard/docker/Dockerfile
+          push: true
+          tags: ghcr.io/fjrg2007/polaris-dashboard:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push mdns (latest only)
+        uses: docker/build-push-action@v6
+        with:
+          context: dashboard/mdns
+          push: true
+          tags: ghcr.io/fjrg2007/polaris-mdns:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

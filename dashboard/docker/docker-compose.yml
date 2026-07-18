@@ -83,6 +83,7 @@ services:
   # a bridged docker network (works on Linux/WSL; Docker Desktop restricts host
   # networking, where the installer's hosts entry covers the local machine).
   mdns:
+    image: ghcr.io/fjrg2007/polaris-mdns:${POLARIS_IMAGE_TAG:-latest}
     build:
       context: ../mdns
     network_mode: host

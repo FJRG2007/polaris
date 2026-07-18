@@ -157,10 +157,16 @@ function Invoke-PolarisInstall {
             $env:COMPOSE_PROFILES = "full"
         }
 
-        # One step for install and update: rebuild from the pulled source and
-        # (re)start; the web entrypoint applies pending migrations.
-        Write-Log "building and starting the stack (also applies database migrations)"
-        docker compose up -d --build --remove-orphans
+        # Install and update are the same: prefer the published image, falling
+        # back to a source build; the web entrypoint applies pending migrations.
+        Write-Log "starting the stack (also applies database migrations)"
+        docker compose pull 2>$null
+        if ($LASTEXITCODE -eq 0) {
+            docker compose up -d --remove-orphans
+        }
+        else {
+            docker compose up -d --build --remove-orphans
+        }
 
         $appUrl = (Get-Content ".env" | Where-Object { $_ -match "^POLARIS_APP_URL=" } | Select-Object -First 1) -replace "^POLARIS_APP_URL=", ""
         if (-not $appUrl) { $appUrl = "your configured POLARIS_APP_URL" }

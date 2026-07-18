@@ -200,17 +200,22 @@ main() {
         POLARIS_ENV_FILE="$(pwd)/.env" sh ../scripts/setup-ssh-access.sh
     fi
 
-    set -- up -d --build --remove-orphans
     if [ "$full" = "yes" ]; then
         log "enabling the full edition (privileged host daemon)"
         export COMPOSE_PROFILES="full"
     fi
 
-    # One step for both install and update: rebuild the image from the freshly
-    # pulled source and (re)start. The web entrypoint applies pending migrations,
-    # so an update needs nothing else from the user.
-    log "building and starting the stack (also applies database migrations)"
-    $compose "$@"
+    # Install and update are the same command: prefer the published `latest` image
+    # (fast), falling back to building from source if the registry is unavailable
+    # or the image is not published yet. The web entrypoint applies pending
+    # migrations either way, so nothing else is needed from the user.
+    if $compose pull 2>/dev/null; then
+        log "starting from the published image (also applies database migrations)"
+        $compose up -d --remove-orphans
+    else
+        log "registry unavailable; building from source (also applies migrations)"
+        $compose up -d --build --remove-orphans
+    fi
 
     url=$(sed -n 's#^POLARIS_APP_URL=##p' .env | head -n1)
     setup_token=$(sed -n 's#^POLARIS_SETUP_TOKEN=##p' .env | head -n1)
