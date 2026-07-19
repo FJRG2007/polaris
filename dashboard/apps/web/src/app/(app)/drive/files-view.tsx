@@ -9,7 +9,7 @@
  * and does not re-hit the NAS on every keystroke.
  */
 
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useVirtualizer } from "@tanstack/react-virtual";
@@ -168,7 +168,8 @@ export function FilesView({
     onSetNote,
     onMove,
     onCopy,
-    onManageAccess
+    onManageAccess,
+    headerActions
 }: {
     connectionId: string;
     path: string;
@@ -195,6 +196,8 @@ export function FilesView({
     onCopy: (entry: DriveEntry, destFolderPath: string) => void;
     /** Manage per-path access (ACL grants and the password lock). Owner/admin only. */
     onManageAccess?: (entry: DriveEntry) => void;
+    /** Connection-level actions (Access, Open console) rendered in the toolbar, left of the panel. */
+    headerActions?: ReactNode;
 }) {
     const [query, setQuery] = useState("");
     // Search scope: the current folder only, or a recursive walk from here.
@@ -660,6 +663,8 @@ export function FilesView({
 
     return (
         <>
+            <div className="flex items-stretch gap-4">
+            <div className="flex min-w-0 flex-1 flex-col">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                 <div className="flex min-w-0 items-center gap-1 text-sm text-muted-foreground">
                     <Link href={href(connectionId, "")} className="hover:text-foreground">
@@ -678,6 +683,7 @@ export function FilesView({
                     })}
                 </div>
                 <div className="flex items-center gap-2">
+                    {headerActions}
                     {clipboard ? (
                         <Button size="sm" variant="ghost" onClick={paste} disabled={pending}>
                             <ClipboardPaste className="size-4" />
@@ -919,7 +925,6 @@ export function FilesView({
                 </div>
             ) : null}
 
-            <div className="flex items-stretch gap-4">
             <ContextMenu>
             <ContextMenuTrigger asChild>
             <div
@@ -1341,6 +1346,7 @@ export function FilesView({
                 ) : null}
             </ContextMenuContent>
             </ContextMenu>
+            </div>
             {selectedEntries.length === 1 && selectedEntries[0] ? (
                 <aside className="hidden w-72 shrink-0 flex-col gap-4 self-stretch overflow-auto rounded-lg border border-border p-4 lg:flex">
                     <div className="flex flex-col items-center gap-2 text-center">

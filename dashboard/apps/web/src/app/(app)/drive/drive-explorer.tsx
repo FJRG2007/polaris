@@ -343,30 +343,6 @@ export function DriveExplorer({
             </aside>
 
             <section className="min-w-0">
-                {connectionId && (selectedConnection?.kind === "unifi-unas" || selectedConnection?.canManageAccess) ? (
-                    <div className="mb-3 flex items-center justify-end gap-2">
-                        {selectedConnection?.canManageAccess ? (
-                            <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() =>
-                                    setAccessTarget({
-                                        connectionId,
-                                        path,
-                                        name: segments[segments.length - 1] ?? selectedConnection?.name ?? "This folder"
-                                    })
-                                }
-                            >
-                                <ShieldCheck className="size-4" />
-                                Access
-                            </Button>
-                        ) : null}
-                        {selectedConnection?.kind === "unifi-unas" ? (
-                            <UnifiConsoleButton webUrl={selectedConnection.webUrl} />
-                        ) : null}
-                    </div>
-                ) : null}
-
                 {!connectionId ? (
                     <div className="rounded-md border border-border bg-card p-8 text-center text-sm text-muted-foreground">
                         Add a storage connection to start browsing.
@@ -419,6 +395,34 @@ export function DriveExplorer({
                                 ? (entry) =>
                                       setAccessTarget({ connectionId, path: entry.path, name: entry.name })
                                 : undefined
+                        }
+                        headerActions={
+                            selectedConnection?.canManageAccess || selectedConnection?.kind === "unifi-unas" ? (
+                                <>
+                                    {selectedConnection?.canManageAccess ? (
+                                        <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            onClick={() =>
+                                                setAccessTarget({
+                                                    connectionId,
+                                                    path,
+                                                    name:
+                                                        segments[segments.length - 1] ??
+                                                        selectedConnection?.name ??
+                                                        "This folder"
+                                                })
+                                            }
+                                        >
+                                            <ShieldCheck className="size-4" />
+                                            Access
+                                        </Button>
+                                    ) : null}
+                                    {selectedConnection?.kind === "unifi-unas" ? (
+                                        <UnifiConsoleButton webUrl={selectedConnection.webUrl} />
+                                    ) : null}
+                                </>
+                            ) : undefined
                         }
                     />
                 )}
