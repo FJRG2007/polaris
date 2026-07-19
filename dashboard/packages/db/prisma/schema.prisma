@@ -261,8 +261,31 @@ model StorageConnection {
     trashItems   TrashItem[]
     acls         DriveAcl[]
     locks        AccessLock[]
+    scheduledDeletions ScheduledDeletion[]
 
     @@index([ownerId])
+}
+
+// A deletion scheduled for a future time. Polaris has no always-on scheduler, so
+// due rows are swept lazily (whenever the connection is next browsed) and by an
+// optional cron endpoint for exact timing - the same lazy-evaluation approach the
+// rest of the app uses for share/link expiry. `permanent` picks delete-for-good
+// over the recycle bin.
+model ScheduledDeletion {
+    id           String   @id @default(cuid())
+    ownerId      String
+    connectionId String
+    path         String
+    name         String
+    permanent    Boolean  @default(false)
+    deleteAt     DateTime
+    createdAt    DateTime @default(now())
+
+    connection StorageConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+
+    @@index([ownerId])
+    @@index([connectionId])
+    @@index([deleteAt])
 }
 
 // A Polaris-managed recycle bin entry. "Move to Trash" relocates the item into a

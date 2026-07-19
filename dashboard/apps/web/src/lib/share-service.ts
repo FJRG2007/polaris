@@ -72,6 +72,7 @@ export async function listSharesForOwner(ownerId: string) {
             id: true,
             path: true,
             kind: true,
+            connectionId: true,
             allowUpload: true,
             allowDownload: true,
             allowPreview: true,

@@ -51,6 +51,14 @@ const envSchema = z.object({
     POLARIS_SETUP_TOKEN: z.string().optional(),
 
     /**
+     * Bearer token that authorizes the scheduled-deletion cron endpoint
+     * (/api/cron/scheduled-deletions). Optional: when unset the endpoint is
+     * disabled and due deletions are only swept lazily as connections are browsed.
+     * Set it and have an external scheduler POST with this token for exact timing.
+     */
+    POLARIS_CRON_SECRET: z.string().optional(),
+
+    /**
      * Base64-encoded 32-byte master key for envelope-encrypting stored storage
      * credentials (AES-256-GCM). Rotating it means bumping the key id; old
      * ciphertexts keep decrypting under their recorded key id.

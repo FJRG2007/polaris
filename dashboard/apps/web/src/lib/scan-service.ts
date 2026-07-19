@@ -18,9 +18,7 @@ import { getIntegrationState, getIntegrationSecret } from "@/lib/integration-ser
 import { readVirusTotalConfig, type ScanAction } from "@/lib/integrations/registry";
 import { lookupBySha256, uploadAndScan, VT_MAX_UPLOAD_BYTES, type VtVerdict } from "@/lib/integrations/virustotal";
 import { createNotification, type NotificationLevel } from "@/lib/notification-service";
-
-/** Folder (per connection root) flagged files are moved into on quarantine. */
-const QUARANTINE_DIR = ".polaris-quarantine";
+import { QUARANTINE_DIR } from "@/lib/system-paths";
 
 export interface ScanOutcome {
     /** Whether a scan actually ran (false when the integration is off/misconfigured). */
@@ -161,7 +159,7 @@ export async function scanDropPointUpload(request: ScanRequest): Promise<ScanOut
             level: "info",
             title: "Upload could not be scanned",
             body: `"${request.fileName}" uploaded to "${request.dropPointTitle}" could not be scanned (${detail}). It was kept.`,
-            href: "/requests",
+            href: "/drive/drop-points",
             metadata: { connectionId: request.connectionId, submissionId: request.submissionId }
         });
         return { scanned: true, blocked: false, verdict: "error", action: "none", detail };
@@ -215,7 +213,7 @@ async function enforce(
             level: alert.level,
             title: alert.title,
             body: alert.body,
-            href: verdict.permalink ?? "/requests",
+            href: verdict.permalink ?? "/drive/drop-points",
             metadata: {
                 connectionId: request.connectionId,
                 submissionId: request.submissionId,

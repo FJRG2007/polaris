@@ -53,6 +53,113 @@ export async function createFileRequest(
     return { id: request.id, token };
 }
 
+/** One drop point owned by the user, with the full config the detail/edit view needs. */
+export async function getFileRequestForOwner(ownerId: string, requestId: string) {
+    return prisma.fileRequest.findFirst({
+        where: { id: requestId, ownerId },
+        select: {
+            id: true,
+            title: true,
+            instructions: true,
+            destinationConnectionId: true,
+            destinationPath: true,
+            requireLogin: true,
+            passwordHash: true,
+            maxSizeBytes: true,
+            maxFiles: true,
+            allowedExtensions: true,
+            allowedMimeTypes: true,
+            allowedCidrs: true,
+            allowedCountries: true,
+            allowedContinents: true,
+            expiresAt: true,
+            revokedAt: true,
+            createdAt: true,
+            destination: { select: { name: true } },
+            _count: { select: { submissions: true } }
+        }
+    });
+}
+
+/** Files collected by one drop point (owner-scoped), newest first. Doubles as its activity log. */
+export async function listSubmissionsForRequest(ownerId: string, requestId: string, limit = 200) {
+    const owns = await prisma.fileRequest.count({ where: { id: requestId, ownerId } });
+    if (owns === 0) return [];
+    return prisma.fileRequestSubmission.findMany({
+        where: { requestId },
+        orderBy: { at: "desc" },
+        take: limit,
+        select: {
+            id: true,
+            fileName: true,
+            size: true,
+            storedPath: true,
+            status: true,
+            at: true,
+            submittedByUserId: true
+        }
+    });
+}
+
+/** Fields a drop point's owner may change after creation. Only defined fields apply. */
+export interface UpdateFileRequestInput {
+    title?: string;
+    instructions?: string | null;
+    requireLogin?: boolean;
+    /** New PIN, `null` to clear it, or `undefined` to keep the current one. */
+    password?: string | null;
+    maxSizeBytes?: number;
+    maxFiles?: number | null;
+    allowedExtensions?: string[];
+    allowedMimeTypes?: string[];
+    allowedCidrs?: string[];
+    allowedCountries?: string[];
+    allowedContinents?: string[];
+    expiresAt?: Date | null;
+}
+
+/** Update a drop point's guardrails/config. Owner-scoped; only the given fields change. */
+export async function updateFileRequest(
+    ownerId: string,
+    requestId: string,
+    input: UpdateFileRequestInput
+): Promise<void> {
+    const data: Record<string, unknown> = {};
+    if (input.title !== undefined) data.title = input.title;
+    if (input.instructions !== undefined) data.instructions = input.instructions;
+    if (input.requireLogin !== undefined) data.requireLogin = input.requireLogin;
+    if (input.password !== undefined) {
+        data.passwordHash = input.password ? await hashLinkPassword(input.password) : null;
+    }
+    if (input.maxSizeBytes !== undefined) data.maxSizeBytes = BigInt(input.maxSizeBytes);
+    if (input.maxFiles !== undefined) data.maxFiles = input.maxFiles;
+    if (input.allowedExtensions !== undefined) data.allowedExtensions = JSON.stringify(input.allowedExtensions);
+    if (input.allowedMimeTypes !== undefined) data.allowedMimeTypes = JSON.stringify(input.allowedMimeTypes);
+    if (input.allowedCidrs !== undefined) data.allowedCidrs = JSON.stringify(input.allowedCidrs);
+    if (input.allowedCountries !== undefined) data.allowedCountries = JSON.stringify(input.allowedCountries);
+    if (input.allowedContinents !== undefined) data.allowedContinents = JSON.stringify(input.allowedContinents);
+    if (input.expiresAt !== undefined) data.expiresAt = input.expiresAt;
+    await prisma.fileRequest.updateMany({ where: { id: requestId, ownerId }, data });
+}
+
+/**
+ * Reopen a closed drop point so it accepts uploads again. Clears the revoked mark
+ * and, if the expiry has already elapsed, clears it too so the point is genuinely
+ * open (the owner can set a fresh expiry from the edit form). Owner-scoped.
+ */
+export async function reopenFileRequest(ownerId: string, requestId: string): Promise<void> {
+    const request = await prisma.fileRequest.findFirst({
+        where: { id: requestId, ownerId },
+        select: { expiresAt: true }
+    });
+    if (!request) return;
+    const expired = request.expiresAt !== null && request.expiresAt.getTime() <= Date.now();
+    await prisma.fileRequest.updateMany({
+        where: { id: requestId, ownerId },
+        data: { revokedAt: null, ...(expired ? { expiresAt: null } : {}) }
+    });
+}
+
 /** Every file request owned by a user, with its destination name, newest first. */
 export async function listFileRequestsForOwner(ownerId: string) {
     return prisma.fileRequest.findMany({

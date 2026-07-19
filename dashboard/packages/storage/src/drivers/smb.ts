@@ -206,8 +206,9 @@ export class SmbDriver implements StorageDriver {
         await this.mkdirp(parentOf(dstRel));
         try {
             await this.c().rename(this.smbPath(normalizeRelPath(from)), this.smbPath(dstRel));
-        } catch {
-            throw new StorageError("io_error", `Failed to move ${from}`);
+        } catch (caught) {
+            const detail = caught instanceof Error && caught.message ? `: ${caught.message}` : "";
+            throw new StorageError("io_error", `Failed to move ${from}${detail}`);
         }
     }
 

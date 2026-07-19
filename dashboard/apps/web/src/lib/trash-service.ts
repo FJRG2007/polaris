@@ -11,9 +11,9 @@ import { randomBytes } from "node:crypto";
 import { baseName, normalizeRelPath } from "@polaris/core";
 import { prisma } from "@polaris/db";
 import { getDriver } from "@/lib/storage-service";
+import { POLARIS_DIR, TRASH_DIR } from "@/lib/system-paths";
 
-/** Hidden folder (per connection) that holds trashed items. */
-export const TRASH_DIR = ".polaris-trash";
+export { TRASH_DIR };
 
 type Driver = Awaited<ReturnType<typeof getDriver>>;
 
@@ -42,7 +42,8 @@ async function freeDestination(driver: Driver, path: string): Promise<string> {
 /** Move an item into the connection's trash folder and record it. */
 export async function moveToTrash(ownerId: string, connectionId: string, path: string): Promise<void> {
     const source = normalizeRelPath(path);
-    if (!source || source === TRASH_DIR || source.startsWith(`${TRASH_DIR}/`)) return;
+    // Never trash Polaris's own hidden folder (the bin, quarantine, ...).
+    if (!source || source === POLARIS_DIR || source.startsWith(`${POLARIS_DIR}/`)) return;
     const driver = await getDriver(connectionId, ownerId);
     try {
         const stat = await driver.stat(source);

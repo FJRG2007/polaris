@@ -14,6 +14,7 @@ import { requireUser } from "@/lib/session";
 import { getDriverForConnection, SmbShareRequiredError } from "@/lib/storage-service";
 import { authorizeDrive, DriveAccessError, DriveLockedError } from "@/lib/drive-authz";
 import { listLocks } from "@/lib/access-lock-service";
+import { isReservedRootPath } from "@/lib/system-paths";
 import { recordAudit } from "@/lib/audit-service";
 import { createZipStream, type ZipSource } from "@/lib/zip-stream";
 import type { StorageDriver } from "@polaris/storage";
@@ -114,7 +115,7 @@ export async function GET(request: Request): Promise<Response> {
                 continue;
             }
             for (const entry of listing.entries) {
-                if (entry.path === ".polaris-trash" || entry.path === ".polaris-quarantine") continue;
+                if (isReservedRootPath(entry.path)) continue;
                 const archivePath = `${current.archive}/${entry.name}`;
                 if (entry.kind === "dir") {
                     if (lockedRoots.has(entry.path)) continue; // never descend a locked subtree

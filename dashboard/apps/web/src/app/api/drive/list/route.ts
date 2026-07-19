@@ -16,6 +16,8 @@ import { getDriverForConnection, SmbShareRequiredError } from "@/lib/storage-ser
 import { authorizeDrive, DriveAccessError, DriveLockedError } from "@/lib/drive-authz";
 import { getMetaMap, resolveUserNames } from "@/lib/drive-meta-service";
 import { listLocks } from "@/lib/access-lock-service";
+import { isReservedRootPath } from "@/lib/system-paths";
+import { sweepDueDeletions } from "@/lib/scheduled-deletion-service";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -48,6 +50,14 @@ export async function GET(request: Request): Promise<Response> {
         throw caught;
     }
 
+    // Lazily run any deletions that came due on this connection (Polaris has no
+    // standing scheduler); never let a sweep failure block the listing.
+    try {
+        await sweepDueDeletions(connectionId);
+    } catch {
+        // Best effort; a failed sweep is retried on the next browse or the cron.
+    }
+
     let driver;
     try {
         driver = await getDriverForConnection(connectionId);
@@ -63,11 +73,9 @@ export async function GET(request: Request): Promise<Response> {
 
     try {
         const listing = await driver.list(path);
-        // Hide the Polaris-managed folders (trash, quarantine) from normal browsing;
-        // they live at the root of each connection and are managed elsewhere.
-        const visibleEntries = listing.entries.filter(
-            (entry) => entry.path !== ".polaris-trash" && entry.path !== ".polaris-quarantine"
-        );
+        // Hide Polaris's own hidden folder (trash, quarantine) from normal browsing;
+        // it lives at the root of each connection and is managed elsewhere.
+        const visibleEntries = listing.entries.filter((entry) => !isReservedRootPath(entry.path));
         const [meta, locks] = await Promise.all([
             getMetaMap(
                 connectionId,

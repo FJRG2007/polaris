@@ -15,6 +15,7 @@ import { getDriverForConnection, SmbShareRequiredError } from "@/lib/storage-ser
 import { authorizeDrive, DriveAccessError, DriveLockedError } from "@/lib/drive-authz";
 import { listLocks } from "@/lib/access-lock-service";
 import { getMetaMap } from "@/lib/drive-meta-service";
+import { isReservedRootPath } from "@/lib/system-paths";
 import { parseSearch, matchesStructured, normalizePathTarget } from "@/app/(app)/drive/search-query";
 
 export const runtime = "nodejs";
@@ -102,7 +103,7 @@ export async function GET(request: Request): Promise<Response> {
                 continue; // Unreadable folder: skip it rather than failing the whole search.
             }
             for (const entry of listing.entries) {
-                if (entry.path === ".polaris-trash" || entry.path === ".polaris-quarantine") continue;
+                if (isReservedRootPath(entry.path)) continue;
                 if (entry.kind === "dir" && !lockedRoots.has(entry.path)) queue.push(entry.path);
                 if (matches(entry.name, entry.path)) {
                     if (results.length >= MAX_RESULTS) {
