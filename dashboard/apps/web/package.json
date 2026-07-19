@@ -22,6 +22,7 @@
         "better-auth": "1.6.23",
         "fuse.js": "7.0.0",
         "lucide-react": "0.469.0",
+        "mammoth": "1.8.0",
         "next": "15.5.20",
         "plyr": "3.7.8",
         "react": "19.0.0",
