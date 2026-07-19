@@ -52,6 +52,7 @@ model User {
     fileRequests      FileRequest[]
     submissions       FileRequestSubmission[]
     uploads           UploadSession[]
+    notifications     Notification[]
 }
 
 model Session {
@@ -287,14 +288,16 @@ model TrashItem {
 }
 
 // Per-path presentation metadata for a browsed item (not a mirror of the tree):
-// custom icon, hidden flag. Keyed by (connection, path); rows exist only for
-// items the user has customized. Cascades away with its connection.
+// custom icon, hidden flag, starred flag. Keyed by (connection, path); rows exist
+// only for items the user has customized. Cascades away with its connection.
 model DriveItemMeta {
     id           String   @id @default(cuid())
     ownerId      String
     connectionId String
     path         String
     hidden       Boolean  @default(false)
+    // Whether the owner has starred the item; the Favorites view lists these.
+    favorite     Boolean  @default(false)
     icon         String?
     iconColor    String?
     note         String?
@@ -305,6 +308,7 @@ model DriveItemMeta {
 
     @@unique([connectionId, path])
     @@index([ownerId])
+    @@index([ownerId, favorite])
 }
 
 model DockerConnection {
@@ -488,6 +492,11 @@ model FileRequestSubmission {
     storedNodeId      String?
     storedPath        String
     status            String   @default("stored")
+    // Malware-scan lifecycle from an enabled integration (e.g. VirusTotal):
+    // none | pending | clean | malicious | error. scanResult holds a small JSON
+    // summary (engine stats + report link) for the flagged/clean detail.
+    scanStatus        String   @default("none")
+    scanResult        String?
     at                DateTime @default(now())
 
     request     FileRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
@@ -551,4 +560,50 @@ model Setting {
     userId String?
 
     @@index([scope])
+}
+
+// ---------------------------------------------------------------------------
+// Integrations (the marketplace)
+// ---------------------------------------------------------------------------
+
+// A configured third-party integration (one row per provider, e.g. "virustotal").
+// A row exists only once the provider has been set up. Non-secret options live in
+// `config` (a JSON string); an API key or token is envelope-encrypted with the
+// same AES-256-GCM scheme as storage credentials, so a DB dump yields no secrets.
+model Integration {
+    id                  String   @id @default(cuid())
+    provider            String   @unique
+    enabled             Boolean  @default(false)
+    // Non-secret provider options (feature toggles, thresholds) as a JSON string.
+    config              String   @default("{}")
+    encryptedCredential Bytes?
+    credentialNonce     Bytes?
+    credentialKeyId     String?
+    createdAt           DateTime @default(now())
+    updatedAt           DateTime @updatedAt
+}
+
+// ---------------------------------------------------------------------------
+// Notifications
+// ---------------------------------------------------------------------------
+
+// An in-app notification for a single user (a bell-menu item). Kept generic: a
+// short type string drives the icon/label, `data` carries a JSON payload (e.g. a
+// deep link), and `readAt` marks it seen. Rows are per-recipient, so a broadcast
+// is many rows. Cascades away with the user.
+model Notification {
+    id        String    @id @default(cuid())
+    userId    String
+    type      String
+    title     String
+    body      String?
+    // Optional JSON payload (deep link, related ids) as a stringified String.
+    data      String?
+    readAt    DateTime?
+    createdAt DateTime  @default(now())
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@index([userId, readAt])
+    @@index([userId, createdAt])
 }

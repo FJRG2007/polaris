@@ -10,6 +10,7 @@ import { prisma } from "@polaris/db";
 
 export interface ItemMeta {
     hidden: boolean;
+    favorite: boolean;
     icon: string | null;
     iconColor: string | null;
     note: string | null;
@@ -20,12 +21,18 @@ export async function getMetaMap(connectionId: string, paths: string[]): Promise
     if (paths.length === 0) return new Map();
     const rows = await prisma.driveItemMeta.findMany({
         where: { connectionId, path: { in: paths } },
-        select: { path: true, hidden: true, icon: true, iconColor: true, note: true }
+        select: { path: true, hidden: true, favorite: true, icon: true, iconColor: true, note: true }
     });
     return new Map(
         rows.map((row) => [
             row.path,
-            { hidden: row.hidden, icon: row.icon, iconColor: row.iconColor, note: row.note }
+            {
+                hidden: row.hidden,
+                favorite: row.favorite,
+                icon: row.icon,
+                iconColor: row.iconColor,
+                note: row.note
+            }
         ])
     );
 }
@@ -49,6 +56,42 @@ export async function setItemHidden(
         create: { ownerId, connectionId, path, hidden },
         update: { hidden }
     });
+}
+
+/** Star or unstar an item (surfaces it in the Favorites view). */
+export async function setItemFavorite(
+    ownerId: string,
+    connectionId: string,
+    path: string,
+    favorite: boolean
+): Promise<void> {
+    await assertOwns(ownerId, connectionId);
+    await prisma.driveItemMeta.upsert({
+        where: { connectionId_path: { connectionId, path } },
+        create: { ownerId, connectionId, path, favorite },
+        update: { favorite }
+    });
+}
+
+/** A starred item, with the connection it lives on, for the Favorites view. */
+export interface FavoriteItem {
+    connectionId: string;
+    connectionName: string;
+    path: string;
+}
+
+/** Every item the user has starred, newest first, across all their connections. */
+export async function listFavorites(ownerId: string): Promise<FavoriteItem[]> {
+    const rows = await prisma.driveItemMeta.findMany({
+        where: { ownerId, favorite: true },
+        orderBy: { updatedAt: "desc" },
+        select: { connectionId: true, path: true, connection: { select: { name: true } } }
+    });
+    return rows.map((row) => ({
+        connectionId: row.connectionId,
+        connectionName: row.connection.name,
+        path: row.path
+    }));
 }
 
 /** Set (or clear, with nulls) an item's custom icon and color. */

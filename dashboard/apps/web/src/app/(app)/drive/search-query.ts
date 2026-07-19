@@ -4,9 +4,13 @@
  *   - glob wildcards:      *-presentacion.pptx   report-2024-??.pdf
  *   - explicit regex:      /invoice_\d+/          (optionally with flags)
  *   - extension filter:    ext:pptx,pdf,key
+ *   - path search:         documentos/doc.pdf     c:/users/me/report.pdf
  *   - free text:           anything else -> fuzzy match (fuse.js)
- * Tokens combine with AND (all must match); free-text words are fuzzy-matched
- * against whatever survives the structured filters. Pure and side-effect free.
+ * A query that contains a path separator is treated as a path search: it matches
+ * against an item's full relative path rather than its name (and, in the UI, is
+ * run recursively so nested matches surface). Otherwise tokens combine with AND;
+ * free-text words are fuzzy-matched against whatever survives the structured
+ * filters. Pure and side-effect free.
  */
 
 export interface ParsedQuery {
@@ -16,8 +20,43 @@ export interface ParsedQuery {
     patterns: RegExp[];
     /** Remaining free text for a fuzzy pass. */
     fuzzy: string;
+    /**
+     * Set when the query is a path (contains a separator): a predicate over an
+     * item's full relative path. When present, name-based structured/fuzzy matching
+     * is bypassed and this is the sole criterion.
+     */
+    pathMatcher?: (relPath: string) => boolean;
     /** Set when an explicit /regex/ failed to compile. */
     error?: string;
+}
+
+/**
+ * Normalize a path for comparison: lowercase, backslashes to forward slashes, a
+ * leading drive letter ("c:") dropped, and leading/duplicate slashes collapsed.
+ * So "C:\\Users\\Me\\a.pdf" and "/users/me/a.pdf" both reduce to "users/me/a.pdf".
+ */
+function normalizePath(value: string): string {
+    return value
+        .toLowerCase()
+        .replace(/\\/g, "/")
+        .replace(/^[a-z]:/, "")
+        .replace(/^\/+/, "")
+        .replace(/\/+/g, "/");
+}
+
+/** A predicate matching an item's relative path against a path query, or null. */
+function buildPathMatcher(raw: string): ((relPath: string) => boolean) | null {
+    const needle = normalizePath(raw.trim());
+    if (!needle) return null;
+    if (/[*?]/.test(needle)) {
+        const source = needle
+            .replace(/[.+^${}()|[\]\\]/g, "\\$&")
+            .replace(/\*/g, ".*")
+            .replace(/\?/g, ".");
+        const regex = new RegExp(source, "i");
+        return (relPath) => regex.test(normalizePath(relPath));
+    }
+    return (relPath) => normalizePath(relPath).includes(needle);
 }
 
 /** Convert a glob (with * and ?) into an anchored, case-insensitive RegExp. */
@@ -43,6 +82,13 @@ export function parseSearch(query: string): ParsedQuery {
         } catch {
             result.error = "Invalid regular expression";
         }
+        return result;
+    }
+
+    // A query with a path separator searches by full relative path, not by name.
+    if (/[\\/]/.test(trimmed)) {
+        const pathMatcher = buildPathMatcher(trimmed);
+        if (pathMatcher) result.pathMatcher = pathMatcher;
         return result;
     }
 

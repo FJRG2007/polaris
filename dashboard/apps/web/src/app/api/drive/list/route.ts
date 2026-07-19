@@ -84,6 +84,7 @@ export async function GET(request: Request): Promise<Response> {
                 modifiedAt: entry.modifiedAt.toISOString(),
                 createdAt: (entry.createdAt ?? entry.modifiedAt).toISOString(),
                 hidden: item?.hidden ?? false,
+                favorite: item?.favorite ?? false,
                 icon: item?.icon ?? null,
                 iconColor: item?.iconColor ?? null,
                 note: item?.note ?? null,

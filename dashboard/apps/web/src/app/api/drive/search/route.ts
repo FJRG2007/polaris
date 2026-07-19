@@ -45,7 +45,11 @@ export async function GET(request: Request): Promise<Response> {
     const parsed = parseSearch(rawQuery);
     if (parsed.error) return Response.json({ error: parsed.error }, { status: 400 });
     const fuzzyWords = parsed.fuzzy ? parsed.fuzzy.toLowerCase().split(/\s+/).filter(Boolean) : [];
-    const hasCriteria = parsed.extensions.length > 0 || parsed.patterns.length > 0 || fuzzyWords.length > 0;
+    const hasCriteria =
+        parsed.pathMatcher !== undefined ||
+        parsed.extensions.length > 0 ||
+        parsed.patterns.length > 0 ||
+        fuzzyWords.length > 0;
     if (!hasCriteria) return Response.json({ entries: [], truncated: false });
 
     try {
@@ -72,8 +76,13 @@ export async function GET(request: Request): Promise<Response> {
     // recurse into it, everything beneath it).
     const lockedRoots = new Set((await listLocks(connectionId)).map((lock) => lock.path).filter(Boolean));
 
-    /** Whether a filename satisfies the whole query (structured plus fuzzy words). */
-    const matches = (name: string): boolean => {
+    /**
+     * Whether an entry satisfies the whole query. A path query matches against the
+     * item's full relative path; otherwise it is the structured filters plus the
+     * fuzzy words against the name.
+     */
+    const matches = (name: string, entryPath: string): boolean => {
+        if (parsed.pathMatcher) return parsed.pathMatcher(entryPath);
         if (!matchesStructured(name, parsed)) return false;
         if (fuzzyWords.length === 0) return true;
         const lower = name.toLowerCase();
@@ -102,7 +111,7 @@ export async function GET(request: Request): Promise<Response> {
             for (const entry of listing.entries) {
                 if (entry.path === ".polaris-trash") continue;
                 if (entry.kind === "dir" && !lockedRoots.has(entry.path)) queue.push(entry.path);
-                if (matches(entry.name)) {
+                if (matches(entry.name, entry.path)) {
                     if (results.length >= MAX_RESULTS) {
                         truncated = true;
                         break;

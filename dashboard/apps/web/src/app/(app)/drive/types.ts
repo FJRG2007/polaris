@@ -27,6 +27,8 @@ export interface DriveEntry {
     createdAt: string;
     /** User-set presentation metadata (merged from DriveItemMeta), when present. */
     hidden?: boolean;
+    /** Whether the owner has starred this item (shown in Favorites). */
+    favorite?: boolean;
     icon?: string | null;
     iconColor?: string | null;
     note?: string | null;

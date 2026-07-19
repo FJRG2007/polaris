@@ -42,6 +42,8 @@ import {
     Share2,
     ShieldCheck,
     SlidersHorizontal,
+    Star,
+    StarOff,
     StickyNote,
     Trash2,
     Upload,
@@ -95,6 +97,51 @@ function triggerDownload(connectionId: string, entry: DriveEntry) {
     anchor.remove();
 }
 
+/**
+ * Download several items (files and/or folders) as one ZIP. A form POST is used
+ * rather than many anchor clicks - browsers throttle/deny rapid successive
+ * downloads, which is why multi-select "Download" was unreliable, and a folder
+ * has no single-file form at all. The attachment response streams to disk while
+ * the page stays put.
+ */
+function downloadZip(connectionId: string, paths: string[]) {
+    if (paths.length === 0) return;
+    const form = document.createElement("form");
+    form.method = "POST";
+    form.action = "/api/drive/download-zip";
+    const connectionField = document.createElement("input");
+    connectionField.type = "hidden";
+    connectionField.name = "c";
+    connectionField.value = connectionId;
+    form.appendChild(connectionField);
+    for (const path of paths) {
+        const field = document.createElement("input");
+        field.type = "hidden";
+        field.name = "p";
+        field.value = path;
+        form.appendChild(field);
+    }
+    document.body.appendChild(form);
+    form.submit();
+    form.remove();
+}
+
+/**
+ * Download a selection the smartest way: a single file streams directly (fast,
+ * resumable, Range-friendly); anything else - multiple items or any folder - is
+ * bundled into one ZIP.
+ */
+function downloadSelection(connectionId: string, entries: DriveEntry[]) {
+    if (entries.length === 1 && entries[0] && entries[0].kind === "file") {
+        triggerDownload(connectionId, entries[0]);
+        return;
+    }
+    downloadZip(
+        connectionId,
+        entries.map((entry) => entry.path)
+    );
+}
+
 export function FilesView({
     connectionId,
     path,
@@ -114,6 +161,7 @@ export function FilesView({
     onShare,
     onRequestFiles,
     onToggleHidden,
+    onToggleFavorite,
     onSetIcon,
     onSetNote,
     onMove,
@@ -138,6 +186,7 @@ export function FilesView({
     onShare: (entry: DriveEntry) => void;
     onRequestFiles: (path: string, name: string) => void;
     onToggleHidden: (entry: DriveEntry) => void;
+    onToggleFavorite: (entry: DriveEntry) => void;
     onSetIcon: (entry: DriveEntry, icon: string | null, color: string | null) => void;
     onSetNote: (entry: DriveEntry, note: string | null) => void;
     onMove: (entry: DriveEntry, destFolderPath: string) => void;
@@ -167,6 +216,7 @@ export function FilesView({
     const [renameValue, setRenameValue] = useState("");
     const [viewerTarget, setViewerTarget] = useState<ViewerTarget | null>(null);
     const [showHidden, setShowHidden] = useState(false);
+    const [starredOnly, setStarredOnly] = useState(false);
     const [iconTarget, setIconTarget] = useState<DriveEntry | null>(null);
     const [detailsTarget, setDetailsTarget] = useState<DriveEntry | null>(null);
     const [noteTarget, setNoteTarget] = useState<DriveEntry | null>(null);
@@ -319,10 +369,16 @@ export function FilesView({
         lastIndex.current = null;
     }, [connectionId, path]);
 
+    // A path query ("docs/report.pdf", "c:/users/me/...") matches on full paths and
+    // only makes sense as a recursive walk, so it forces recursive scope regardless
+    // of the toggle.
+    const isPathQuery = useMemo(() => parseSearch(query).pathMatcher !== undefined, [query]);
+    const effectiveScope: "current" | "recursive" = isPathQuery ? "recursive" : searchScope;
+
     // Recursive search: when the scope is "recursive" and there is a query, walk
     // the subtree server-side (debounced) instead of filtering the local listing.
     useEffect(() => {
-        if (searchScope !== "recursive" || !query.trim()) {
+        if (effectiveScope !== "recursive" || !query.trim()) {
             setRemoteEntries(null);
             setSearchTruncated(false);
             setSearching(false);
@@ -351,11 +407,11 @@ export function FilesView({
             controller.abort();
             clearTimeout(timer);
         };
-    }, [searchScope, query, connectionId, path]);
+    }, [effectiveScope, query, connectionId, path]);
 
     // The rows the pipeline operates on: recursive results when searching a
     // subtree, otherwise the current folder's listing.
-    const source = searchScope === "recursive" && remoteEntries !== null ? remoteEntries : entries;
+    const source = effectiveScope === "recursive" && remoteEntries !== null ? remoteEntries : entries;
 
     const hasFilters =
         categories.size > 0 || extFilter.trim() !== "" || minMb !== "" || maxMb !== "" || dateFrom !== "" || dateTo !== "";
@@ -369,6 +425,7 @@ export function FilesView({
 
         let rows = source.filter((entry) => {
             if (!showHidden && entry.hidden) return false;
+            if (starredOnly && !entry.favorite) return false;
             const isDir = entry.kind === "dir";
             const entryExt = isDir ? "" : extensionOf(entry.name);
             if (categories.size > 0) {
@@ -389,10 +446,16 @@ export function FilesView({
         });
 
         const parsed = parseSearch(query);
-        rows = rows.filter((entry) => matchesStructured(entry.name, parsed));
-        if (parsed.fuzzy) {
-            const fuse = new Fuse(rows, { keys: ["name"], threshold: 0.4, ignoreLocation: true });
-            rows = fuse.search(parsed.fuzzy).map((result) => result.item);
+        if (parsed.pathMatcher) {
+            // Path query: match on the full relative path, no name fuzzy pass.
+            const matcher = parsed.pathMatcher;
+            rows = rows.filter((entry) => matcher(entry.path));
+        } else {
+            rows = rows.filter((entry) => matchesStructured(entry.name, parsed));
+            if (parsed.fuzzy) {
+                const fuse = new Fuse(rows, { keys: ["name"], threshold: 0.4, ignoreLocation: true });
+                rows = fuse.search(parsed.fuzzy).map((result) => result.item);
+            }
         }
 
         const direction = sortDir === "asc" ? 1 : -1;
@@ -410,7 +473,7 @@ export function FilesView({
             }
             return a.name.localeCompare(b.name) * direction;
         });
-    }, [source, categories, extFilter, minMb, maxMb, dateFrom, dateTo, query, sortKey, sortDir, showHidden]);
+    }, [source, categories, extFilter, minMb, maxMb, dateFrom, dateTo, query, sortKey, sortDir, showHidden, starredOnly]);
 
     const selectedEntries = visible.filter((entry) => selected.has(entry.path));
     const allSelected = visible.length > 0 && selectedEntries.length === visible.length;
@@ -653,25 +716,28 @@ export function FilesView({
                     <Input
                         value={query}
                         onChange={(event) => setQuery(event.target.value)}
-                        placeholder="Search - try *.pdf, ext:pptx,pdf, /regex/"
-                        title="Wildcards (*, ?), ext:pptx,pdf for extensions, /pattern/ for regex, or plain text for a fuzzy match"
+                        placeholder="Search - try *.pdf, ext:pptx,pdf, docs/report.pdf, /regex/"
+                        title="Wildcards (*, ?), ext:pptx,pdf for extensions, a path like docs/report.pdf, /pattern/ for regex, or plain text for a fuzzy match"
                         className={cn("pl-8 pr-9", searchError && "border-danger")}
                     />
                     <button
                         type="button"
                         onClick={() => setSearchScope((prev) => (prev === "current" ? "recursive" : "current"))}
                         aria-label="Toggle search scope"
+                        disabled={isPathQuery}
                         title={
-                            searchScope === "recursive"
-                                ? "Searching this folder and all subfolders. Click to search only this folder."
-                                : "Searching only this folder. Click to search all subfolders too."
+                            isPathQuery
+                                ? "Path search always walks this folder and all subfolders."
+                                : effectiveScope === "recursive"
+                                  ? "Searching this folder and all subfolders. Click to search only this folder."
+                                  : "Searching only this folder. Click to search all subfolders too."
                         }
                         className={cn(
-                            "absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-1 transition-colors hover:bg-muted",
-                            searchScope === "recursive" ? "text-primary" : "text-muted-foreground"
+                            "absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-1 transition-colors hover:bg-muted disabled:cursor-not-allowed",
+                            effectiveScope === "recursive" ? "text-primary" : "text-muted-foreground"
                         )}
                     >
-                        {searchScope === "recursive" ? (
+                        {effectiveScope === "recursive" ? (
                             <FolderTree className="size-4" />
                         ) : (
                             <Folder className="size-4" />
@@ -719,9 +785,18 @@ export function FilesView({
                     {showHidden ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                     Hidden
                 </Button>
+                <Button
+                    size="sm"
+                    variant={starredOnly ? "secondary" : "ghost"}
+                    onClick={() => setStarredOnly((prev) => !prev)}
+                    aria-label={starredOnly ? "Show all items" : "Show starred only"}
+                >
+                    <Star className={cn("size-4", starredOnly && "fill-amber-400 text-amber-400")} />
+                    Starred
+                </Button>
             </div>
 
-            {searchScope === "recursive" && query.trim() ? (
+            {effectiveScope === "recursive" && query.trim() ? (
                 <p className="mb-3 -mt-1 text-xs text-muted-foreground">
                     {searching
                         ? "Searching this folder and all subfolders..."
@@ -798,11 +873,7 @@ export function FilesView({
                         <Button
                             size="sm"
                             variant="ghost"
-                            onClick={() =>
-                                selectedEntries
-                                    .filter((entry) => entry.kind !== "dir")
-                                    .forEach((entry) => triggerDownload(connectionId, entry))
-                            }
+                            onClick={() => downloadSelection(connectionId, selectedEntries)}
                         >
                             <Download className="size-4" />
                             Download
@@ -858,7 +929,7 @@ export function FilesView({
                     </div>
                     {visible.length === 0 ? (
                         <p className="px-3 py-8 text-center text-sm text-muted-foreground">
-                            {searchScope === "recursive" && query.trim()
+                            {effectiveScope === "recursive" && query.trim()
                                 ? searching
                                     ? "Searching..."
                                     : "No matches in this folder or its subfolders."
@@ -970,7 +1041,7 @@ export function FilesView({
                                                             >
                                                                 <EntryIcon entry={entry} />
                                                                 {entry.name}
-                                                                {searchScope === "recursive" && entry.path.includes("/") ? (
+                                                                {effectiveScope === "recursive" && entry.path.includes("/") ? (
                                                                     <span className="shrink truncate text-xs text-muted-foreground">
                                                                         in /{parentOf(entry.path)}
                                                                     </span>
@@ -979,6 +1050,12 @@ export function FilesView({
                                                                     <Lock
                                                                         className="size-3 shrink-0 text-muted-foreground"
                                                                         aria-label="Access-gated"
+                                                                    />
+                                                                ) : null}
+                                                                {entry.favorite ? (
+                                                                    <Star
+                                                                        className="size-3 shrink-0 fill-amber-400 text-amber-400"
+                                                                        aria-label="Starred"
                                                                     />
                                                                 ) : null}
                                                                 {entry.note ? (
@@ -997,10 +1074,16 @@ export function FilesView({
                                                             >
                                                                 <EntryIcon entry={entry} />
                                                                 {entry.name}
-                                                                {searchScope === "recursive" && entry.path.includes("/") ? (
+                                                                {effectiveScope === "recursive" && entry.path.includes("/") ? (
                                                                     <span className="shrink truncate text-xs text-muted-foreground">
                                                                         in /{parentOf(entry.path)}
                                                                     </span>
+                                                                ) : null}
+                                                                {entry.favorite ? (
+                                                                    <Star
+                                                                        className="size-3 shrink-0 fill-amber-400 text-amber-400"
+                                                                        aria-label="Starred"
+                                                                    />
                                                                 ) : null}
                                                                 {entry.note ? (
                                                                     <StickyNote
@@ -1043,6 +1126,17 @@ export function FilesView({
                                                             </Link>
                                                         </ContextMenuItem>
                                                         <ContextMenuItem
+                                                            onSelect={() =>
+                                                                downloadSelection(
+                                                                    connectionId,
+                                                                    selected.has(entry.path) ? selectedEntries : [entry]
+                                                                )
+                                                            }
+                                                        >
+                                                            <Download className="size-4" />
+                                                            Download as ZIP
+                                                        </ContextMenuItem>
+                                                        <ContextMenuItem
                                                             onSelect={() => onRequestFiles(entry.path, entry.name)}
                                                         >
                                                             <Inbox className="size-4" />
@@ -1073,7 +1167,12 @@ export function FilesView({
                                                             </ContextMenuItem>
                                                         ) : null}
                                                         <ContextMenuItem
-                                                            onSelect={() => triggerDownload(connectionId, entry)}
+                                                            onSelect={() =>
+                                                                downloadSelection(
+                                                                    connectionId,
+                                                                    selected.has(entry.path) ? selectedEntries : [entry]
+                                                                )
+                                                            }
                                                         >
                                                             <Download className="size-4" />
                                                             Download
@@ -1136,6 +1235,14 @@ export function FilesView({
                                                     Share
                                                 </ContextMenuItem>
                                                 <ContextMenuSeparator />
+                                                <ContextMenuItem onSelect={() => onToggleFavorite(entry)}>
+                                                    {entry.favorite ? (
+                                                        <StarOff className="size-4" />
+                                                    ) : (
+                                                        <Star className="size-4" />
+                                                    )}
+                                                    {entry.favorite ? "Remove star" : "Add to favorites"}
+                                                </ContextMenuItem>
                                                 <ContextMenuItem onSelect={() => setIconTarget(entry)}>
                                                     <Palette className="size-4" />
                                                     Change icon

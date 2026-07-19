@@ -28,7 +28,7 @@ import {
 } from "@/lib/storage-service";
 import { detectHost, type NasDetection } from "@/lib/nas-detect";
 import { fetchUnasMetrics } from "@/lib/unifi-unas";
-import { moveItemMeta, setItemHidden, setItemIcon, setItemNote } from "@/lib/drive-meta-service";
+import { moveItemMeta, setItemFavorite, setItemHidden, setItemIcon, setItemNote } from "@/lib/drive-meta-service";
 import { deleteTrashForever, emptyTrash, moveToTrash, restoreTrash } from "@/lib/trash-service";
 import { recordAudit } from "@/lib/audit-service";
 
@@ -306,6 +306,18 @@ export async function setItemNoteAction(connectionId: string, path: string, note
     const user = await requirePermission("drive.write");
     await setItemNote(user.id, connectionId, normalizeRelPath(path), note);
     revalidatePath("/drive");
+}
+
+/** Star or unstar an item so it appears in the Favorites view. */
+export async function setItemFavoriteAction(
+    connectionId: string,
+    path: string,
+    favorite: boolean
+): Promise<void> {
+    const user = await requireUser();
+    await setItemFavorite(user.id, connectionId, normalizeRelPath(path), favorite);
+    revalidatePath("/drive");
+    revalidatePath("/favorites");
 }
 
 type Driver = Awaited<ReturnType<typeof getDriver>>;
