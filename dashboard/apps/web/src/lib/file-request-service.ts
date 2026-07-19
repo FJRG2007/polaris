@@ -85,6 +85,7 @@ export async function resolveFileRequestByToken(token: string) {
         where: { tokenHash: hashToken(token) },
         select: {
             id: true,
+            ownerId: true,
             title: true,
             instructions: true,
             destinationConnectionId: true,
@@ -173,7 +174,7 @@ export async function countSubmissions(requestId: string): Promise<number> {
     return prisma.fileRequestSubmission.count({ where: { requestId } });
 }
 
-/** Record a stored submission against a request. */
+/** Record a stored submission against a request; returns its id. */
 export async function recordSubmission(entry: {
     requestId: string;
     submittedByUserId?: string | null;
@@ -181,8 +182,8 @@ export async function recordSubmission(entry: {
     fileName: string;
     size: bigint;
     storedPath: string;
-}): Promise<void> {
-    await prisma.fileRequestSubmission.create({
+}): Promise<{ id: string }> {
+    return prisma.fileRequestSubmission.create({
         data: {
             requestId: entry.requestId,
             submittedByUserId: entry.submittedByUserId ?? null,
@@ -191,6 +192,7 @@ export async function recordSubmission(entry: {
             size: entry.size,
             storedPath: entry.storedPath,
             status: "stored"
-        }
+        },
+        select: { id: true }
     });
 }

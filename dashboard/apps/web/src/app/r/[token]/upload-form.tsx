@@ -26,6 +26,7 @@ function explain(status: number, body: string): string {
     if (status === 413 || body === "too_large") return "Too large";
     if (status === 422 && body === "extension") return "File type not allowed";
     if (status === 422 && body === "size") return "Too large";
+    if (status === 422 && body === "file_rejected") return "Blocked by security scan";
     if (status === 409 || body === "full") return "This drop point is full";
     if (status === 401) return "Sign-in required";
     if (status === 403) return "Not allowed from your network";

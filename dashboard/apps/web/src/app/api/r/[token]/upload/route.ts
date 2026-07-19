@@ -27,6 +27,7 @@ import {
     verifyFileRequestUnlock
 } from "@/lib/file-request-service";
 import { clientIp, hashForLog } from "@/lib/request-context";
+import { scanDropPointUpload } from "@/lib/scan-service";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -118,7 +119,7 @@ export async function PUT(
     const driver = await getDriverForConnection(fileRequest.destinationConnectionId);
     try {
         const stat = await driver.writeStream(destination, limitSize(request.body, maxSizeBytes), {});
-        await recordSubmission({
+        const submission = await recordSubmission({
             requestId: fileRequest.id,
             submittedByUserId: userId,
             ipHash: hashForLog(ip),
@@ -126,7 +127,28 @@ export async function PUT(
             size: stat.size,
             storedPath: destination
         });
-        return Response.json({ ok: true, name: safeName, size: stat.size.toString() });
+
+        // Security scan (VirusTotal, when enabled). Runs before acknowledging the
+        // upload so the configured action - block by default - can be enforced on a
+        // flagged file. The drop point's owner is alerted with the verdict.
+        const scan = await scanDropPointUpload({
+            driver,
+            connectionId: fileRequest.destinationConnectionId,
+            storedPath: destination,
+            fileName: safeName,
+            ownerId: fileRequest.ownerId,
+            dropPointTitle: fileRequest.title,
+            submissionId: submission.id,
+            size: Number(stat.size)
+        });
+        if (scan.blocked) return new Response("file_rejected", { status: 422 });
+
+        return Response.json({
+            ok: true,
+            name: safeName,
+            size: stat.size.toString(),
+            ...(scan.scanned ? { scan: scan.verdict } : {})
+        });
     } catch (error) {
         const message = error instanceof Error ? error.message : "upload_failed";
         // A mid-stream size abort surfaces as a 413 so the client can explain it.

@@ -1,0 +1,233 @@
+"use client";
+
+/**
+ * The integrations marketplace grid and the per-integration configure dialog.
+ * Only VirusTotal exists today, so the dialog renders its scan settings directly;
+ * a second integration would branch on the slug. Toggling and saving go through
+ * the admin-gated server actions.
+ */
+
+import { useState, useTransition } from "react";
+import { CheckCircle2, ExternalLink, Loader2, ShieldCheck } from "lucide-react";
+import {
+    Badge,
+    Button,
+    Card,
+    CardBody,
+    Checkbox,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    Input,
+    cn
+} from "@polaris/ui";
+import { SCAN_ACTIONS, type ScanAction } from "@/lib/integrations/registry";
+import { IntegrationLogo } from "@/components/logos";
+import { saveVirusTotalAction, testVirusTotalKeyAction } from "./actions";
+
+export interface IntegrationCard {
+    slug: string;
+    name: string;
+    category: string;
+    summary: string;
+    description: string;
+    docsUrl: string;
+    requiresApiKey: boolean;
+    apiKeyLabel?: string;
+    apiKeyHelp?: string;
+    enabled: boolean;
+    hasSecret: boolean;
+    scanDropPoints: boolean;
+    onDetection: ScanAction;
+}
+
+export function IntegrationsView({ cards }: { cards: IntegrationCard[] }) {
+    const [configuring, setConfiguring] = useState<IntegrationCard | null>(null);
+
+    return (
+        <>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {cards.map((card) => (
+                    <Card key={card.slug}>
+                        <CardBody className="flex flex-col gap-3">
+                            <div className="flex items-start gap-3">
+                                <div className="grid size-10 shrink-0 place-items-center rounded-md border border-border bg-surface">
+                                    <IntegrationLogo slug={card.slug} className="size-6" />
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                    <div className="flex items-center gap-2">
+                                        <h2 className="truncate text-sm font-medium">{card.name}</h2>
+                                        <Badge variant="neutral">{card.category}</Badge>
+                                    </div>
+                                    <p className="mt-0.5 text-xs text-muted-foreground">{card.summary}</p>
+                                </div>
+                                {card.enabled ? (
+                                    <Badge variant="success">On</Badge>
+                                ) : card.hasSecret ? (
+                                    <Badge variant="neutral">Off</Badge>
+                                ) : null}
+                            </div>
+                            <div className="flex items-center justify-end gap-2">
+                                <a
+                                    href={card.docsUrl}
+                                    target="_blank"
+                                    rel="noreferrer noopener"
+                                    className="mr-auto inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                                >
+                                    Docs
+                                    <ExternalLink className="size-3" />
+                                </a>
+                                <Button size="sm" variant="secondary" onClick={() => setConfiguring(card)}>
+                                    {card.hasSecret ? "Configure" : "Set up"}
+                                </Button>
+                            </div>
+                        </CardBody>
+                    </Card>
+                ))}
+            </div>
+
+            {configuring?.slug === "virustotal" ? (
+                <VirusTotalDialog card={configuring} onClose={() => setConfiguring(null)} />
+            ) : null}
+        </>
+    );
+}
+
+function VirusTotalDialog({ card, onClose }: { card: IntegrationCard; onClose: () => void }) {
+    const [enabled, setEnabled] = useState(card.enabled);
+    const [scanDropPoints, setScanDropPoints] = useState(card.scanDropPoints);
+    const [onDetection, setOnDetection] = useState<ScanAction>(card.onDetection);
+    const [apiKey, setApiKey] = useState("");
+    const [error, setError] = useState<string | null>(null);
+    const [tested, setTested] = useState<string | null>(null);
+    const [testing, startTest] = useTransition();
+    const [saving, startSave] = useTransition();
+
+    function onTest() {
+        setError(null);
+        setTested(null);
+        startTest(async () => {
+            const result = await testVirusTotalKeyAction(apiKey);
+            if (result.ok) setTested("The key works.");
+            else setError(result.error ?? "The key was rejected");
+        });
+    }
+
+    function onSave() {
+        setError(null);
+        startSave(async () => {
+            const result = await saveVirusTotalAction({ enabled, scanDropPoints, onDetection, apiKey });
+            if (result.error) setError(result.error);
+            else onClose();
+        });
+    }
+
+    return (
+        <Dialog open onOpenChange={(open) => !open && onClose()}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2">
+                        <IntegrationLogo slug="virustotal" className="size-5" />
+                        VirusTotal
+                    </DialogTitle>
+                    <DialogDescription>{card.description}</DialogDescription>
+                </DialogHeader>
+
+                <div className="flex flex-col gap-4">
+                    <label className="flex flex-col gap-1 text-sm">
+                        <span className="font-medium">{card.apiKeyLabel ?? "API key"}</span>
+                        <div className="flex gap-2">
+                            <Input
+                                type="password"
+                                autoComplete="off"
+                                value={apiKey}
+                                onChange={(event) => setApiKey(event.target.value)}
+                                placeholder={card.hasSecret ? "Saved - enter a new key to replace it" : "Paste your key"}
+                            />
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                onClick={onTest}
+                                disabled={testing || !apiKey.trim()}
+                            >
+                                {testing ? <Loader2 className="size-4 animate-spin" /> : "Test"}
+                            </Button>
+                        </div>
+                        {card.apiKeyHelp ? <span className="text-xs text-muted-foreground">{card.apiKeyHelp}</span> : null}
+                        {tested ? (
+                            <span className="flex items-center gap-1 text-xs text-success">
+                                <CheckCircle2 className="size-3" />
+                                {tested}
+                            </span>
+                        ) : null}
+                    </label>
+
+                    <label className="flex items-start gap-2 text-sm">
+                        <Checkbox checked={scanDropPoints} onChange={() => setScanDropPoints((prev) => !prev)} />
+                        <span>
+                            <span className="font-medium">Scan drop-point uploads</span>
+                            <span className="block text-xs text-muted-foreground">
+                                Every file uploaded to a drop point is scanned before it is accepted.
+                            </span>
+                        </span>
+                    </label>
+
+                    <div className="flex flex-col gap-1.5">
+                        <span className="text-sm font-medium">When a file is flagged</span>
+                        <div className="flex flex-col gap-1.5">
+                            {SCAN_ACTIONS.map((action) => (
+                                <button
+                                    key={action.value}
+                                    type="button"
+                                    onClick={() => setOnDetection(action.value)}
+                                    className={cn(
+                                        "flex items-start gap-2 rounded-md border p-2.5 text-left text-sm transition-colors",
+                                        onDetection === action.value
+                                            ? "border-primary bg-primary/5"
+                                            : "border-border hover:bg-muted"
+                                    )}
+                                >
+                                    <span
+                                        className={cn(
+                                            "mt-0.5 grid size-4 shrink-0 place-items-center rounded-full border",
+                                            onDetection === action.value ? "border-primary" : "border-muted-foreground"
+                                        )}
+                                    >
+                                        {onDetection === action.value ? (
+                                            <span className="size-2 rounded-full bg-primary" />
+                                        ) : null}
+                                    </span>
+                                    <span>
+                                        <span className="font-medium">{action.label}</span>
+                                        <span className="block text-xs text-muted-foreground">{action.help}</span>
+                                    </span>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    <label className="flex items-center gap-2 rounded-md border border-border p-2.5 text-sm">
+                        <Checkbox checked={enabled} onChange={() => setEnabled((prev) => !prev)} />
+                        <span className="flex items-center gap-1.5 font-medium">
+                            <ShieldCheck className="size-4 text-primary" />
+                            Enable VirusTotal
+                        </span>
+                    </label>
+
+                    {error ? <p className="text-sm text-danger">{error}</p> : null}
+
+                    <div className="flex justify-end gap-2">
+                        <Button type="button" variant="ghost" onClick={onClose}>
+                            Cancel
+                        </Button>
+                        <Button type="button" onClick={onSave} disabled={saving}>
+                            {saving ? <Loader2 className="size-4 animate-spin" /> : "Save"}
+                        </Button>
+                    </div>
+                </div>
+            </DialogContent>
+        </Dialog>
+    );
+}

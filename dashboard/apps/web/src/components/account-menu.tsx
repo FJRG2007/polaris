@@ -1,6 +1,6 @@
 "use client";
 
-import { Activity, Link2, LogOut, Settings, ShieldCheck, Users, UsersRound } from "lucide-react";
+import { Activity, Bell, Blocks, Link2, LogOut, Settings, ShieldCheck, Users, UsersRound } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
     DropdownMenu,
@@ -34,6 +34,12 @@ export function AccountMenu({ name, email, isAdmin }: { name: string; email: str
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
+                    <a href="/notifications">
+                        <Bell className="size-4" />
+                        Notifications
+                    </a>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
                     <a href="/shared">
                         <Link2 className="size-4" />
                         Shared links
@@ -41,6 +47,12 @@ export function AccountMenu({ name, email, isAdmin }: { name: string; email: str
                 </DropdownMenuItem>
                 {isAdmin ? (
                     <>
+                        <DropdownMenuItem asChild>
+                            <a href="/integrations">
+                                <Blocks className="size-4" />
+                                Integrations
+                            </a>
+                        </DropdownMenuItem>
                         <DropdownMenuItem asChild>
                             <a href="/admin/users">
                                 <Users className="size-4" />
