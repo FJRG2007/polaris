@@ -1,6 +1,6 @@
 {
     "name": "polaris-dashboard",
-    "version": "0.3.7",
+    "version": "0.3.8",
     "private": true,
     "type": "module",
     "description": "Polaris web control plane - dashboard pillar (Drive and future apps).",
