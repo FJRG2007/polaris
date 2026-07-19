@@ -10,7 +10,7 @@
  * source of truth.
  */
 
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, CheckCircle2, ChevronRight, Plus, Radar, XCircle } from "lucide-react";
 import { type StorageProviderKind } from "@polaris/core";
@@ -30,7 +30,7 @@ import { createConnectionAction, detectNasAction, testUnasConnectionAction, type
 interface FieldDef {
     name: string;
     label: string;
-    type?: "text" | "number" | "password" | "checkbox";
+    type?: "text" | "number" | "password" | "checkbox" | "keyfile";
     required?: boolean;
     placeholder?: string;
     group: "config" | "credentials";
@@ -78,6 +78,36 @@ const PROVIDER_ORDER: StorageProviderKind[] = [
     "truenas"
 ];
 
+/** SSH private-key input: paste it, or load it from a file into the textarea. */
+function KeyFileField({ name, label }: { name: string; label: string }) {
+    const ref = useRef<HTMLTextAreaElement>(null);
+    async function onFile(event: ChangeEvent<HTMLInputElement>) {
+        const file = event.target.files?.[0];
+        if (!file || !ref.current) return;
+        ref.current.value = await file.text();
+        event.target.value = "";
+    }
+    return (
+        <>
+            <span className="flex items-center justify-between gap-2">
+                {label}
+                <label className="cursor-pointer text-xs text-primary hover:underline">
+                    Upload key file
+                    <input type="file" hidden onChange={onFile} />
+                </label>
+            </span>
+            <textarea
+                ref={ref}
+                name={name}
+                rows={3}
+                spellCheck={false}
+                placeholder="Paste your private key (-----BEGIN OPENSSH PRIVATE KEY-----) or upload a file"
+                className="rounded-md border border-input bg-surface px-3 py-2 font-mono text-xs"
+            />
+        </>
+    );
+}
+
 const host: FieldDef = { name: "host", label: "Host", required: true, group: "config" };
 const port: FieldDef = { name: "port", label: "Port", type: "number", group: "config" };
 
@@ -85,10 +115,11 @@ const FIELDS: Record<StorageProviderKind, FieldDef[]> = {
     local: [{ name: "root", label: "Root path", required: true, group: "config" }],
     sftp: [
         host,
-        port,
+        { name: "port", label: "Port", type: "number", placeholder: "22 (default)", group: "config" },
         { name: "username", label: "Username", required: true, group: "config" },
         { name: "root", label: "Base path", placeholder: "/", group: "config" },
-        { name: "password", label: "Password", type: "password", group: "credentials" }
+        { name: "password", label: "Password (or use a key)", type: "password", group: "credentials" },
+        { name: "privateKey", label: "Private key (optional)", type: "keyfile", group: "credentials" }
     ],
     webdav: [
         { name: "baseUrl", label: "Base URL", required: true, group: "config" },
@@ -306,6 +337,8 @@ export function ConnectionDialog() {
                                         <input type="checkbox" name={field.name} className="size-4" />
                                         {field.label}
                                     </span>
+                                ) : field.type === "keyfile" ? (
+                                    <KeyFileField name={field.name} label={field.label} />
                                 ) : (
                                     <>
                                         {field.label}
