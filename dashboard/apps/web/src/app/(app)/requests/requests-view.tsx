@@ -56,7 +56,7 @@ export function RequestsView({ requests }: { requests: RequestRow[] }) {
         return (
             <Card>
                 <CardBody className="p-8 text-center text-sm text-muted-foreground">
-                    No drop points yet. Use &quot;Request files&quot; on a folder in Files to create one.
+                    No drop points yet. Use &quot;New drop point&quot; above, or &quot;Request files&quot; on a folder in Files.
                 </CardBody>
             </Card>
         );

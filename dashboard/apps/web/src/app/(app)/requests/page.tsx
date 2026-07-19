@@ -7,13 +7,18 @@
 
 import { requireUser } from "@/lib/session";
 import { listFileRequestsForOwner } from "@/lib/file-request-service";
+import { listConnections } from "@/lib/storage-service";
+import { NewDropPointButton } from "./new-drop-point-button";
 import { RequestsView, type RequestRow } from "./requests-view";
 
 export const dynamic = "force-dynamic";
 
 export default async function RequestsPage() {
     const user = await requireUser();
-    const requests = await listFileRequestsForOwner(user.id);
+    const [requests, connections] = await Promise.all([
+        listFileRequestsForOwner(user.id),
+        listConnections(user.id)
+    ]);
     const rows: RequestRow[] = requests.map((request) => ({
         id: request.id,
         title: request.title,
@@ -29,11 +34,14 @@ export default async function RequestsPage() {
 
     return (
         <div className="mx-auto flex max-w-3xl flex-col gap-4">
-            <div>
-                <h1 className="text-lg font-semibold">Drop points</h1>
-                <p className="text-sm text-muted-foreground">
-                    Links that collect uploads into your folders. Create one from the Files page.
-                </p>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                    <h1 className="text-lg font-semibold">Drop points</h1>
+                    <p className="text-sm text-muted-foreground">
+                        Links that collect uploads into your folders.
+                    </p>
+                </div>
+                <NewDropPointButton connections={connections.map((row) => ({ id: row.id, name: row.name }))} />
             </div>
             <RequestsView requests={rows} />
         </div>

@@ -24,16 +24,25 @@ export interface RequestTarget {
 
 export function RequestDialog({
     target,
-    onOpenChange
+    onOpenChange,
+    connections
 }: {
     target: RequestTarget | null;
     onOpenChange: (open: boolean) => void;
+    /** When the target has no connectionId, these let the user pick a destination. */
+    connections?: { id: string; name: string }[];
 }) {
     const [categories, setCategories] = useState<Set<FileCategory>>(new Set());
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [url, setUrl] = useState<string | null>(null);
     const [copied, setCopied] = useState(false);
+    const [pickConnection, setPickConnection] = useState("");
+    const [pickPath, setPickPath] = useState("");
+
+    // Picker mode: opened from the Drop points page with no fixed folder, so the
+    // user chooses which connection and folder to collect into.
+    const needsPicker = target !== null && target.connectionId === "" && (connections?.length ?? 0) > 0;
 
     function handleOpenChange(next: boolean) {
         if (next) {
@@ -41,6 +50,8 @@ export function RequestDialog({
             setError(null);
             setUrl(null);
             setCopied(false);
+            setPickConnection(connections?.[0]?.id ?? "");
+            setPickPath("");
         }
         onOpenChange(next);
     }
@@ -79,11 +90,19 @@ export function RequestDialog({
         const maxMb = Number(form.get("maxMb") ?? 0);
         const expiresAt = form.get("expiresAt");
 
+        const destinationConnectionId = needsPicker ? pickConnection : target.connectionId;
+        const destinationPath = needsPicker ? pickPath.trim().replace(/^\/+|\/+$/g, "") : target.path;
+        if (!destinationConnectionId) {
+            setPending(false);
+            setError("Choose a connection to collect into");
+            return;
+        }
+
         const result = await createFileRequestAction({
             title: String(form.get("title") ?? "").trim(),
             instructions: String(form.get("instructions") ?? "").trim() || undefined,
-            destinationConnectionId: target.connectionId,
-            destinationPath: target.path,
+            destinationConnectionId,
+            destinationPath,
             requireLogin: form.get("requireLogin") === "on",
             maxSizeBytes: maxMb > 0 ? Math.floor(maxMb * 1024 * 1024) : 1024 * 1024 * 1024,
             maxFiles: maxFiles ? Number(maxFiles) : undefined,
@@ -112,7 +131,9 @@ export function RequestDialog({
                 <DialogHeader>
                     <DialogTitle>Request files</DialogTitle>
                     <DialogDescription className="truncate">
-                        Collect uploads into {target?.name ? `"${target.name}"` : "this connection"}.
+                        {needsPicker
+                            ? "Choose where uploads should be collected."
+                            : `Collect uploads into ${target?.name ? `"${target.name}"` : "this connection"}.`}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -135,6 +156,33 @@ export function RequestDialog({
                     </div>
                 ) : (
                     <form onSubmit={onSubmit} className="flex flex-col gap-3">
+                        {needsPicker ? (
+                            <div className="grid grid-cols-2 gap-3">
+                                <label className="flex flex-col gap-1 text-sm">
+                                    Connection
+                                    <select
+                                        value={pickConnection}
+                                        onChange={(event) => setPickConnection(event.target.value)}
+                                        className="h-9 rounded-md border border-input bg-surface px-3 text-sm"
+                                    >
+                                        {connections?.map((connection) => (
+                                            <option key={connection.id} value={connection.id}>
+                                                {connection.name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </label>
+                                <label className="flex flex-col gap-1 text-sm">
+                                    Destination folder
+                                    <Input
+                                        value={pickPath}
+                                        onChange={(event) => setPickPath(event.target.value)}
+                                        placeholder="Root (leave empty)"
+                                        autoComplete="off"
+                                    />
+                                </label>
+                            </div>
+                        ) : null}
                         <label className="flex flex-col gap-1 text-sm">
                             Title
                             <Input name="title" required placeholder="e.g. Send me your photos" autoComplete="off" />
