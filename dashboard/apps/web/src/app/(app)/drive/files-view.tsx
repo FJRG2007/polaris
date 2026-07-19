@@ -61,6 +61,7 @@ import {
 import { FILE_CATEGORIES, categoryOfExtension, extensionOf, type FileCategory } from "./file-categories";
 import { FileViewer, isViewable, type ViewerTarget } from "./file-viewer";
 import { ITEM_ICONS, ITEM_ICON_COLORS, iconColorClass, iconComponent } from "./item-icons";
+import { matchesStructured, parseSearch } from "./search-query";
 import type { DriveEntry } from "./types";
 
 type SortKey = "name" | "size" | "modified";
@@ -287,10 +288,11 @@ export function FilesView({
             return true;
         });
 
-        const term = query.trim();
-        if (term) {
+        const parsed = parseSearch(query);
+        rows = rows.filter((entry) => matchesStructured(entry.name, parsed));
+        if (parsed.fuzzy) {
             const fuse = new Fuse(rows, { keys: ["name"], threshold: 0.4, ignoreLocation: true });
-            rows = fuse.search(term).map((result) => result.item);
+            rows = fuse.search(parsed.fuzzy).map((result) => result.item);
         }
 
         const direction = sortDir === "asc" ? 1 : -1;
@@ -309,6 +311,7 @@ export function FilesView({
 
     const selectedEntries = visible.filter((entry) => selected.has(entry.path));
     const allSelected = visible.length > 0 && selectedEntries.length === visible.length;
+    const searchError = useMemo(() => parseSearch(query).error, [query]);
 
     function toggleCategory(id: FileCategory) {
         setCategories((prev) => {
@@ -443,8 +446,9 @@ export function FilesView({
                     <Input
                         value={query}
                         onChange={(event) => setQuery(event.target.value)}
-                        placeholder="Search this folder"
-                        className="pl-8"
+                        placeholder="Search - try *.pdf, ext:pptx,pdf, /regex/"
+                        title="Wildcards (*, ?), ext:pptx,pdf for extensions, /pattern/ for regex, or plain text for a fuzzy match"
+                        className={cn("pl-8", searchError && "border-danger")}
                     />
                 </div>
                 <div className="flex items-center gap-1 rounded-md border border-border p-0.5">
