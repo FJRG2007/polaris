@@ -11,6 +11,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import type { CreateShareInput } from "@polaris/core";
 import { ipAllowed, normalizeRelPath } from "@polaris/core";
 import { geoAllowedForIp } from "@/lib/geo-service";
+import { sharingBaseUrl } from "@/lib/domain-service";
 import { generateToken, hashToken } from "@polaris/core/tokens";
 import { hashLinkPassword, verifyLinkPassword } from "@polaris/core/link-password";
 import { loadEnv } from "@polaris/config";
@@ -103,7 +104,7 @@ export async function revealShareLink(ownerId: string, shareId: string): Promise
         },
         loadEnv().POLARIS_MASTER_KEY
     );
-    return `${loadEnv().POLARIS_APP_URL}/s/${token}`;
+    return `${await sharingBaseUrl()}/s/${token}`;
 }
 
 /** Update a share's guardrails. Owner-scoped; only the given fields change. */

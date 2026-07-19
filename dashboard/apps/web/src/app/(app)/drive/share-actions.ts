@@ -11,6 +11,7 @@
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { loadEnv } from "@polaris/config";
+import { sharingBaseUrl } from "@/lib/domain-service";
 import { createShareSchema, isCidr, isIpAddress } from "@polaris/core";
 import { requirePermission } from "@/lib/session";
 import {
@@ -75,7 +76,7 @@ export async function createShareAction(
         }
     });
     revalidatePath("/drive/shared-links");
-    return { url: `${loadEnv().POLARIS_APP_URL}/s/${token}` };
+    return { url: `${await sharingBaseUrl()}/s/${token}` };
 }
 
 /** Reveal a share's link again (owner-only; decrypts the stored token). */
