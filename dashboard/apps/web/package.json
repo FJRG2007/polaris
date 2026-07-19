@@ -1,6 +1,6 @@
 {
     "name": "@polaris/web",
-    "version": "0.3.8",
+    "version": "0.3.9",
     "private": true,
     "type": "module",
     "description": "Polaris dashboard - the Next.js control-plane app.",
