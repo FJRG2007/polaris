@@ -62,6 +62,36 @@ export function readVirusTotalConfig(config: Record<string, unknown> | undefined
     };
 }
 
+/** Dymo's non-secret config, with enforced defaults. */
+export interface DymoConfig {
+    /** Verify the visitor's IP on share-link and drop-point access. On by default. */
+    verifyAccessIp: boolean;
+    /** Dymo IP conditions that deny access (NegativeIPRules), e.g. FRAUD, PROXY, VPN. */
+    deny: string[];
+}
+
+/** The IP rules an operator can toggle. Some are Dymo premium features. */
+export const DYMO_IP_RULES: ReadonlyArray<{ value: string; label: string; premium?: boolean }> = [
+    { value: "FRAUD", label: "Fraudulent / malicious" },
+    { value: "PROXY", label: "Proxy" },
+    { value: "VPN", label: "VPN" },
+    { value: "TOR_NETWORK", label: "Tor exit node", premium: true },
+    { value: "HIGH_RISK_SCORE", label: "High risk score", premium: true }
+];
+
+export const DYMO_DEFAULTS: DymoConfig = { verifyAccessIp: true, deny: ["FRAUD"] };
+
+/** Read a stored Dymo config, keeping only known rules and applying defaults. */
+export function readDymoConfig(config: Record<string, unknown> | undefined): DymoConfig {
+    const valid = new Set(DYMO_IP_RULES.map((rule) => rule.value));
+    const raw = Array.isArray(config?.deny) ? (config?.deny as unknown[]) : [];
+    const deny = raw.filter((value): value is string => typeof value === "string" && valid.has(value));
+    return {
+        verifyAccessIp: config?.verifyAccessIp !== false,
+        deny: deny.length > 0 ? deny : DYMO_DEFAULTS.deny
+    };
+}
+
 export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
     {
         slug: "virustotal",
@@ -74,6 +104,18 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         requiresApiKey: true,
         apiKeyLabel: "Public API key",
         apiKeyHelp: "Find it under your VirusTotal profile -> API key. The free Public API allows about 4 lookups per minute."
+    },
+    {
+        slug: "dymo",
+        name: "Dymo API",
+        category: "Security",
+        summary: "Verify a visitor's IP and block fraud, proxies and VPNs.",
+        description:
+            "When someone opens a share link or a drop point, Polaris checks their IP with the Dymo API and blocks access if it matches the conditions you choose (fraudulent, proxy, VPN, ...). Fails open on an API error so a hiccup never locks out your visitors.",
+        docsUrl: "https://docs.tpeoficial.com/docs/dymo-api/private/ip-validation",
+        requiresApiKey: true,
+        apiKeyLabel: "API key",
+        apiKeyHelp: "Get one at https://tpe.li/new-api-key."
     }
 ];
 

@@ -9,9 +9,10 @@
 
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/session";
-import { findIntegration, type ScanAction } from "@/lib/integrations/registry";
+import { DYMO_IP_RULES, findIntegration, type ScanAction } from "@/lib/integrations/registry";
 import { getIntegrationState, upsertIntegration } from "@/lib/integration-service";
 import { verifyKey } from "@/lib/integrations/virustotal";
+import { verifyIp } from "@/lib/integrations/dymo";
 import { recordAudit } from "@/lib/audit-service";
 
 const SCAN_ACTIONS = new Set<ScanAction>(["block", "quarantine", "notify"]);
@@ -55,6 +56,62 @@ export async function saveVirusTotalAction(input: {
     });
     revalidatePath("/integrations");
     return {};
+}
+
+/** Verify a Dymo key by making one benign IP check; a bad key throws. */
+async function testDymoKey(apiKey: string): Promise<{ ok: boolean; error?: string }> {
+    try {
+        await verifyIp(apiKey, "8.8.8.8", ["FRAUD"]);
+        return { ok: true };
+    } catch (caught) {
+        return { ok: false, error: caught instanceof Error ? caught.message : "The API key was rejected" };
+    }
+}
+
+/** Save Dymo's settings (enabled flag, IP-verify toggle, deny rules, and API key). */
+export async function saveDymoAction(input: {
+    enabled: boolean;
+    verifyAccessIp: boolean;
+    deny: string[];
+    apiKey?: string;
+}): Promise<{ error?: string }> {
+    const user = await requireAdmin();
+    const provider = "dymo";
+    const existing = await getIntegrationState(provider);
+    const newKey = input.apiKey && input.apiKey.trim() ? input.apiKey.trim() : undefined;
+    const willHaveKey = Boolean(newKey) || Boolean(existing?.hasSecret);
+    if (input.enabled && !willHaveKey) return { error: "Add a Dymo API key before enabling it" };
+
+    const known = new Set(DYMO_IP_RULES.map((rule) => rule.value));
+    const deny = input.deny.filter((value) => known.has(value));
+
+    if (newKey) {
+        const check = await testDymoKey(newKey);
+        if (!check.ok) return { error: check.error ?? "The API key was rejected" };
+    }
+
+    await upsertIntegration(provider, {
+        enabled: input.enabled,
+        config: { verifyAccessIp: input.verifyAccessIp, deny: deny.length > 0 ? deny : ["FRAUD"] },
+        secret: newKey,
+        installedById: user.id
+    });
+    await recordAudit({
+        actorId: user.id,
+        action: "integration.configure",
+        targetType: "integration",
+        targetId: provider,
+        metadata: { enabled: input.enabled }
+    });
+    revalidatePath("/integrations");
+    return {};
+}
+
+/** Verify a Dymo API key without saving it (the configure dialog's Test button). */
+export async function testDymoKeyAction(apiKey: string): Promise<{ ok: boolean; error?: string }> {
+    await requireAdmin();
+    if (!apiKey.trim()) return { ok: false, error: "Enter an API key first" };
+    return testDymoKey(apiKey.trim());
 }
 
 /** Turn an integration off without forgetting its configuration. */

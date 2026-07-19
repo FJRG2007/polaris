@@ -4,6 +4,8 @@
  * external requests. Add a new mark here when adding an integration.
  */
 
+import { Blocks } from "lucide-react";
+
 interface LogoProps {
     className?: string;
     /** Render in the brand color instead of currentColor. */
@@ -28,5 +30,5 @@ export function VirusTotalLogo({ className = "size-6", brand }: LogoProps) {
 /** The logo for a marketplace integration slug (a neutral fallback otherwise). */
 export function IntegrationLogo({ slug, className }: { slug: string; className?: string }) {
     if (slug === "virustotal") return <VirusTotalLogo className={className} brand />;
-    return null;
+    return <Blocks className={className} />;
 }

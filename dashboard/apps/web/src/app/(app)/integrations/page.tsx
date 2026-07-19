@@ -4,7 +4,7 @@
  */
 
 import { requireAdmin } from "@/lib/session";
-import { INTEGRATIONS, readVirusTotalConfig } from "@/lib/integrations/registry";
+import { INTEGRATIONS, readDymoConfig, readVirusTotalConfig } from "@/lib/integrations/registry";
 import { listIntegrationStates } from "@/lib/integration-service";
 import { IntegrationsView, type IntegrationCard } from "./integrations-view";
 
@@ -17,6 +17,7 @@ export default async function IntegrationsPage() {
     const cards: IntegrationCard[] = INTEGRATIONS.map((entry) => {
         const state = states.get(entry.slug);
         const virustotal = entry.slug === "virustotal" ? readVirusTotalConfig(state?.config) : undefined;
+        const dymo = entry.slug === "dymo" ? readDymoConfig(state?.config) : undefined;
         return {
             slug: entry.slug,
             name: entry.name,
@@ -30,7 +31,9 @@ export default async function IntegrationsPage() {
             enabled: state?.enabled ?? false,
             hasSecret: state?.hasSecret ?? false,
             scanDropPoints: virustotal?.scanDropPoints ?? true,
-            onDetection: virustotal?.onDetection ?? "block"
+            onDetection: virustotal?.onDetection ?? "block",
+            verifyAccessIp: dymo?.verifyAccessIp ?? true,
+            deny: dymo?.deny ?? ["FRAUD"]
         };
     });
 

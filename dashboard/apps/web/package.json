@@ -23,6 +23,7 @@
         "@tanstack/react-virtual": "3.11.2",
         "better-auth": "1.6.23",
         "dompurify": "3.2.4",
+        "dymo-api": "1.2.44",
         "fuse.js": "7.0.0",
         "lucide-react": "0.469.0",
         "mammoth": "1.8.0",

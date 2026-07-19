@@ -29,6 +29,7 @@ import {
 } from "@/lib/file-request-service";
 import { clientIp, hashForLog } from "@/lib/request-context";
 import { geoAllowedForIp } from "@/lib/geo-service";
+import { dymoIpAllowed } from "@/lib/dymo-service";
 import { scanDropPointUpload } from "@/lib/scan-service";
 
 export const runtime = "nodejs";
@@ -83,6 +84,9 @@ export async function PUT(
     ) {
         return new Response("country_not_allowed", { status: 403 });
     }
+
+    // Dymo IP-fraud gate (no-op unless the integration is enabled). Fails open.
+    if (!(await dymoIpAllowed(ip)).allowed) return new Response("ip_flagged", { status: 403 });
 
     if (fileRequest.passwordHash) {
         const cookieValue = (await cookies()).get(fileRequestUnlockCookie(fileRequest.id))?.value;

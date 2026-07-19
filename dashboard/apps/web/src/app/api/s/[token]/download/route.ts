@@ -24,6 +24,7 @@ import {
     verifyShareUnlock
 } from "@/lib/share-service";
 import { clientIp, clientUserAgent, hashForLog } from "@/lib/request-context";
+import { dymoIpAllowed } from "@/lib/dymo-service";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -54,6 +55,9 @@ export async function GET(
     if (!(await shareGeoAllowed(share.allowedCountries, share.allowedContinents, ip))) {
         return deny(403, "country_not_allowed");
     }
+
+    // Dymo IP-fraud gate (no-op unless the integration is enabled). Fails open.
+    if (!(await dymoIpAllowed(ip)).allowed) return deny(403, "ip_flagged");
 
     if (share.passwordHash) {
         const cookieValue = (await cookies()).get(shareUnlockCookie(share.id))?.value;

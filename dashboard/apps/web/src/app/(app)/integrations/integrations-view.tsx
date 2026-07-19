@@ -23,9 +23,9 @@ import {
     Switch,
     cn
 } from "@polaris/ui";
-import { SCAN_ACTIONS, type ScanAction } from "@/lib/integrations/registry";
+import { DYMO_IP_RULES, SCAN_ACTIONS, type ScanAction } from "@/lib/integrations/registry";
 import { IntegrationLogo } from "@/components/logos";
-import { saveVirusTotalAction, testVirusTotalKeyAction } from "./actions";
+import { saveDymoAction, saveVirusTotalAction, testDymoKeyAction, testVirusTotalKeyAction } from "./actions";
 
 export interface IntegrationCard {
     slug: string;
@@ -41,6 +41,10 @@ export interface IntegrationCard {
     hasSecret: boolean;
     scanDropPoints: boolean;
     onDetection: ScanAction;
+    /** Dymo: verify visitor IPs on share/drop-point access. */
+    verifyAccessIp: boolean;
+    /** Dymo: IP deny rules (FRAUD, PROXY, ...). */
+    deny: string[];
 }
 
 export function IntegrationsView({ cards }: { cards: IntegrationCard[] }) {
@@ -90,8 +94,144 @@ export function IntegrationsView({ cards }: { cards: IntegrationCard[] }) {
 
             {configuring?.slug === "virustotal" ? (
                 <VirusTotalDialog card={configuring} onClose={() => setConfiguring(null)} />
+            ) : configuring?.slug === "dymo" ? (
+                <DymoDialog card={configuring} onClose={() => setConfiguring(null)} />
             ) : null}
         </>
+    );
+}
+
+function DymoDialog({ card, onClose }: { card: IntegrationCard; onClose: () => void }) {
+    const [enabled, setEnabled] = useState(card.enabled);
+    const [verifyAccessIp, setVerifyAccessIp] = useState(card.verifyAccessIp);
+    const [deny, setDeny] = useState<Set<string>>(new Set(card.deny));
+    const [apiKey, setApiKey] = useState("");
+    const [error, setError] = useState<string | null>(null);
+    const [tested, setTested] = useState<string | null>(null);
+    const [testing, startTest] = useTransition();
+    const [saving, startSave] = useTransition();
+
+    function toggleRule(value: string) {
+        setDeny((prev) => {
+            const next = new Set(prev);
+            if (next.has(value)) next.delete(value);
+            else next.add(value);
+            return next;
+        });
+    }
+
+    function onTest() {
+        setError(null);
+        setTested(null);
+        startTest(async () => {
+            const result = await testDymoKeyAction(apiKey);
+            if (result.ok) setTested("The key works.");
+            else setError(result.error ?? "The key was rejected");
+        });
+    }
+
+    function onSave() {
+        setError(null);
+        startSave(async () => {
+            const result = await saveDymoAction({ enabled, verifyAccessIp, deny: [...deny], apiKey });
+            if (result.error) setError(result.error);
+            else onClose();
+        });
+    }
+
+    return (
+        <Dialog open onOpenChange={(open) => !open && onClose()}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2">
+                        <IntegrationLogo slug="dymo" className="size-5" />
+                        Dymo API
+                    </DialogTitle>
+                    <DialogDescription>{card.description}</DialogDescription>
+                </DialogHeader>
+
+                <div className="flex flex-col gap-4">
+                    <label className="flex flex-col gap-1 text-sm">
+                        <span className="font-medium">{card.apiKeyLabel ?? "API key"}</span>
+                        <div className="flex gap-2">
+                            <Input
+                                type="password"
+                                autoComplete="off"
+                                value={apiKey}
+                                onChange={(event) => setApiKey(event.target.value)}
+                                placeholder={card.hasSecret ? "Saved - enter a new key to replace it" : "Paste your key"}
+                            />
+                            <Button type="button" variant="ghost" onClick={onTest} disabled={testing || !apiKey.trim()}>
+                                {testing ? <Loader2 className="size-4 animate-spin" /> : "Test"}
+                            </Button>
+                        </div>
+                        {card.apiKeyHelp ? <span className="text-xs text-muted-foreground">{card.apiKeyHelp}</span> : null}
+                        {tested ? (
+                            <span className="flex items-center gap-1 text-xs text-success">
+                                <CheckCircle2 className="size-3" />
+                                {tested}
+                            </span>
+                        ) : null}
+                    </label>
+
+                    <div className="flex items-start justify-between gap-3 text-sm">
+                        <span>
+                            <span className="font-medium">Verify visitor IPs on access</span>
+                            <span className="block text-xs text-muted-foreground">
+                                Check the IP when someone opens a share link or drop point, and block the ones that
+                                match your rules.
+                            </span>
+                        </span>
+                        <Switch
+                            checked={verifyAccessIp}
+                            onChange={setVerifyAccessIp}
+                            aria-label="Verify visitor IPs on access"
+                        />
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                        <span className="text-sm font-medium">Block IPs that are</span>
+                        <div className="flex flex-wrap gap-1.5">
+                            {DYMO_IP_RULES.map((rule) => (
+                                <button
+                                    key={rule.value}
+                                    type="button"
+                                    onClick={() => toggleRule(rule.value)}
+                                    className={cn(
+                                        "rounded-full border px-3 py-1 text-xs transition-colors",
+                                        deny.has(rule.value)
+                                            ? "border-primary bg-primary/10 text-primary"
+                                            : "border-border text-muted-foreground hover:bg-muted"
+                                    )}
+                                >
+                                    {rule.label}
+                                    {rule.premium ? " (premium)" : ""}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-3 rounded-md border border-border p-2.5 text-sm">
+                        <span className="flex items-center gap-1.5 font-medium">
+                            <ShieldCheck className="size-4 text-primary" />
+                            Enable Dymo API
+                        </span>
+                        <Switch checked={enabled} onChange={setEnabled} aria-label="Enable Dymo API" />
+                    </div>
+
+                    {error ? <p className="text-sm text-danger">{error}</p> : null}
+
+                    <div className="flex justify-end gap-2">
+                        <Button type="button" variant="ghost" onClick={onClose}>
+                            Cancel
+                        </Button>
+                        <Button type="button" onClick={onSave} disabled={saving}>
+                            {saving ? <Loader2 className="size-4 animate-spin" /> : "Save"}
+                        </Button>
+                    </div>
+                </div>
+            </DialogContent>
+        </Dialog>
     );
 }
 
