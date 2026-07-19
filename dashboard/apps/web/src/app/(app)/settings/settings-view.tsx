@@ -7,17 +7,10 @@
  */
 
 import { useState, useTransition } from "react";
-import { CheckCircle2, Database, Download, DownloadCloud, HardDriveDownload, RefreshCw, Trash2, TriangleAlert } from "lucide-react";
-import { formatBytes } from "@polaris/core";
+import { CheckCircle2, DownloadCloud, RefreshCw, TriangleAlert } from "lucide-react";
 import { Button, Card, CardBody, CardHeader, CardTitle } from "@polaris/ui";
 import type { UpdateStatus } from "@/lib/update-service";
-import type { BackupInfo } from "@/lib/backup-service";
-import {
-    checkUpdatesAction,
-    createBackupAction,
-    deleteBackupAction,
-    triggerHostUpdateAction
-} from "./actions";
+import { checkUpdatesAction, triggerHostUpdateAction } from "./actions";
 
 interface Deployment {
     readonly appUrl: string;
@@ -34,20 +27,13 @@ function formatChecked(iso: string): string {
 
 export function SettingsView({
     initialStatus,
-    initialBackups,
     deployment
 }: {
     initialStatus: UpdateStatus;
-    initialBackups: BackupInfo[];
     deployment: Deployment;
 }) {
     const [status, setStatus] = useState(initialStatus);
     const [pending, startTransition] = useTransition();
-    const [backups, setBackups] = useState(initialBackups);
-    const [backingUp, setBackingUp] = useState(false);
-    const [backupError, setBackupError] = useState<string | null>(null);
-    const [busyBackup, setBusyBackup] = useState<string | null>(null);
-
     const [updating, setUpdating] = useState(false);
     const [updateMsg, setUpdateMsg] = useState<string | null>(null);
     const [showManual, setShowManual] = useState(false);
@@ -76,22 +62,6 @@ export function SettingsView({
             setUpdateMsg("Couldn't reach the host agent. Use the manual command below.");
             setShowManual(true);
         }
-    }
-
-    async function onBackup() {
-        setBackingUp(true);
-        setBackupError(null);
-        const result = await createBackupAction();
-        setBackingUp(false);
-        if (result.error) setBackupError(result.error);
-        else if (result.backups) setBackups(result.backups);
-    }
-
-    async function onDeleteBackup(name: string) {
-        setBusyBackup(name);
-        const result = await deleteBackupAction(name);
-        setBackups(result.backups);
-        setBusyBackup(null);
     }
 
     const behind = typeof status.behindBy === "number" && status.behindBy > 0;
@@ -173,73 +143,6 @@ export function SettingsView({
                             ) : null}
                         </div>
                     ) : null}
-                </CardBody>
-            </Card>
-
-            <Card>
-                <CardHeader>
-                    <div className="flex items-center justify-between gap-2">
-                        <CardTitle>Backups</CardTitle>
-                        <Button size="sm" onClick={onBackup} disabled={backingUp}>
-                            <HardDriveDownload className={`size-4 ${backingUp ? "animate-pulse" : ""}`} />
-                            {backingUp ? "Backing up..." : "Back up database"}
-                        </Button>
-                    </div>
-                </CardHeader>
-                <CardBody className="flex flex-col gap-3">
-                    <p className="text-xs text-muted-foreground">
-                        Take a full copy of the Polaris database before an upgrade or a migration. Backups are kept on
-                        the host and can be downloaded. NAS and other-app backups are coming next.
-                    </p>
-                    {backups.some((backup) => backup.ephemeral) ? (
-                        <p className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-warning">
-                            The data dir isn&apos;t writable, so backups are being kept in a temporary location and
-                            won&apos;t survive a restart - download them now. Redeploy to pick up the writable data
-                            dir.
-                        </p>
-                    ) : null}
-                    {backupError ? <p className="text-sm text-danger">{backupError}</p> : null}
-                    {backups.length === 0 ? (
-                        <p className="rounded-md border border-dashed border-border px-3 py-4 text-center text-xs text-muted-foreground">
-                            No backups yet.
-                        </p>
-                    ) : (
-                        <ul className="flex flex-col gap-1.5">
-                            {backups.map((backup) => (
-                                <li
-                                    key={backup.name}
-                                    className="flex items-center justify-between gap-2 rounded-md border border-border px-2.5 py-2 text-sm"
-                                >
-                                    <div className="flex min-w-0 items-center gap-2">
-                                        <Database className="size-4 shrink-0 text-muted-foreground" />
-                                        <div className="min-w-0">
-                                            <p className="truncate font-medium">{backup.name}</p>
-                                            <p className="text-xs text-muted-foreground">
-                                                {formatBytes(BigInt(backup.sizeBytes))} -{" "}
-                                                {new Date(backup.createdAt).toLocaleString()}
-                                            </p>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-1">
-                                        <Button size="icon" variant="ghost" asChild aria-label="Download backup">
-                                            <a href={`/api/backups/${encodeURIComponent(backup.name)}`} download>
-                                                <Download className="size-4" />
-                                            </a>
-                                        </Button>
-                                        <Button
-                                            size="icon"
-                                            variant="ghost"
-                                            aria-label="Delete backup"
-                                            disabled={busyBackup === backup.name}
-                                            onClick={() => onDeleteBackup(backup.name)}
-                                        >
-                                            <Trash2 className="size-4" />
-                                        </Button>
-                                    </div>
-                                </li>
-                            ))}
-                        </ul>
-                    )}
                 </CardBody>
             </Card>
 

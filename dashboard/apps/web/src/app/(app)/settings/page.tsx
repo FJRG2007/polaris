@@ -2,7 +2,6 @@ import { loadEnv } from "@polaris/config";
 import { PageHeader } from "@polaris/ui";
 import { requireAdmin } from "@/lib/session";
 import { getUpdateStatus } from "@/lib/update-service";
-import { listBackups } from "@/lib/backup-service";
 import { SettingsView } from "./settings-view";
 
 export const dynamic = "force-dynamic";
@@ -15,14 +14,13 @@ export const dynamic = "force-dynamic";
 export default async function SettingsPage() {
     await requireAdmin();
     const env = loadEnv();
-    const [status, backups] = await Promise.all([getUpdateStatus(), listBackups()]);
+    const status = await getUpdateStatus();
 
     return (
         <>
             <PageHeader title="Settings" description="General configuration for this Polaris deployment." />
             <SettingsView
                 initialStatus={status}
-                initialBackups={backups}
                 deployment={{
                     appUrl: env.POLARIS_APP_URL,
                     hostname: env.POLARIS_LOCAL_HOSTNAME,
