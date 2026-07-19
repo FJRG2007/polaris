@@ -9,7 +9,7 @@
  */
 
 import { revalidatePath } from "next/cache";
-import { createConnectionSchema, normalizeRelPath } from "@polaris/core";
+import { baseName, createConnectionSchema, normalizeRelPath } from "@polaris/core";
 import { requirePermission } from "@/lib/session";
 import {
     createConnection,
@@ -192,5 +192,81 @@ export async function setItemIconAction(
 ): Promise<void> {
     const user = await requirePermission("drive.write");
     await setItemIcon(user.id, connectionId, normalizeRelPath(path), icon, iconColor);
+    revalidatePath("/drive");
+}
+
+type Driver = Awaited<ReturnType<typeof getDriver>>;
+
+/** Whether a path exists (stat succeeds) on a driver. */
+async function pathExists(driver: Driver, path: string): Promise<boolean> {
+    try {
+        await driver.stat(path);
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+/** Insert a suffix before a file's extension (or at the end for a folder/name). */
+function withSuffix(path: string, suffix: string): string {
+    const slash = path.lastIndexOf("/");
+    const dir = slash >= 0 ? path.slice(0, slash + 1) : "";
+    const name = slash >= 0 ? path.slice(slash + 1) : path;
+    const dot = name.lastIndexOf(".");
+    if (dot > 0) return `${dir}${name.slice(0, dot)}${suffix}${name.slice(dot)}`;
+    return `${dir}${name}${suffix}`;
+}
+
+/** Find a non-colliding destination path, appending " copy" as needed. */
+async function freeName(driver: Driver, to: string): Promise<string> {
+    if (!(await pathExists(driver, to))) return to;
+    for (let index = 1; index < 100; index++) {
+        const candidate = withSuffix(to, index === 1 ? " copy" : ` copy ${index}`);
+        if (!(await pathExists(driver, candidate))) return candidate;
+    }
+    return withSuffix(to, ` copy ${Date.now()}`);
+}
+
+/** Copy a file or a folder (recursively) from one path to another on a driver. */
+async function copyRecursive(driver: Driver, from: string, to: string): Promise<void> {
+    const stat = await driver.stat(from);
+    if (stat.kind === "dir") {
+        await driver.mkdir(to);
+        const { entries } = await driver.list(from);
+        for (const entry of entries) {
+            await copyRecursive(driver, entry.path, `${to}/${entry.name}`);
+        }
+    } else {
+        const stream = await driver.readStream(from);
+        await driver.writeStream(to, stream, {});
+    }
+}
+
+/**
+ * Copy an item into a destination folder within the same connection. The driver
+ * has a native move but no copy, so this streams file bytes and walks folders.
+ * Collisions get a " copy" suffix so pasting into the source folder is safe.
+ */
+export async function copyAction(connectionId: string, from: string, destFolder: string): Promise<void> {
+    const user = await requirePermission("drive.write");
+    const source = normalizeRelPath(from);
+    const base = baseName(source);
+    const driver = await getDriver(connectionId, user.id);
+    try {
+        const destination = await freeName(
+            driver,
+            normalizeRelPath(destFolder ? `${destFolder}/${base}` : base)
+        );
+        await copyRecursive(driver, source, destination);
+    } finally {
+        await driver.dispose();
+    }
+    await recordAudit({
+        actorId: user.id,
+        action: "drive.copy",
+        targetType: "connection",
+        targetId: connectionId,
+        metadata: { from: source, to: destFolder }
+    });
     revalidatePath("/drive");
 }

@@ -13,7 +13,7 @@
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Folder, HardDrive, Info, Trash2 } from "lucide-react";
+import { Folder, HardDrive, Info, Loader2, Trash2 } from "lucide-react";
 import {
     Badge,
     Button,
@@ -30,6 +30,7 @@ import {
     cn
 } from "@polaris/ui";
 import {
+    copyAction,
     deleteConnectionAction,
     deleteEntryAction,
     discoverUnasSharesAction,
@@ -76,6 +77,22 @@ export function DriveExplorer({
     const [deleteConn, setDeleteConn] = useState<ConnectionSummary | null>(null);
     const [shareTarget, setShareTarget] = useState<ShareTarget | null>(null);
     const [requestTarget, setRequestTarget] = useState<RequestTarget | null>(null);
+    const [ops, setOps] = useState<{ id: string; label: string }[]>([]);
+
+    /** Run a mutating operation in the background: shows in the operations panel,
+     * keeps the dashboard usable (a transition), and refreshes the listing after. */
+    function runOp(label: string, fn: () => Promise<void>) {
+        const id = crypto.randomUUID();
+        setOps((prev) => [...prev, { id, label }]);
+        startTransition(async () => {
+            try {
+                await fn();
+            } finally {
+                setOps((prev) => prev.filter((op) => op.id !== id));
+                void load();
+            }
+        });
+    }
 
     const segments = path ? path.split("/") : [];
     const selectedConnection = connections.find((connection) => connection.id === connectionId) ?? null;
@@ -188,10 +205,12 @@ export function DriveExplorer({
         if (!connectionId) return;
         const to = destFolderPath ? `${destFolderPath}/${entry.name}` : entry.name;
         setEntries((prev) => prev.filter((row) => row.path !== entry.path));
-        startTransition(async () => {
-            await renameAction(connectionId, entry.path, to);
-            void load();
-        });
+        runOp(`Moving ${entry.name}`, () => renameAction(connectionId, entry.path, to));
+    }
+
+    function onCopy(entry: DriveEntry, destFolderPath: string) {
+        if (!connectionId) return;
+        runOp(`Copying ${entry.name}`, () => copyAction(connectionId, entry.path, destFolderPath));
     }
 
     function confirmDelete() {
@@ -200,11 +219,12 @@ export function DriveExplorer({
         setDeleteTargets(null);
         const paths = new Set(targets.map((entry) => entry.path));
         setEntries((prev) => prev.filter((entry) => !paths.has(entry.path)));
-        startTransition(async () => {
+        const label =
+            targets.length === 1 ? `Deleting ${targets[0]?.name}` : `Deleting ${targets.length} items`;
+        runOp(label, async () => {
             for (const entry of targets) {
                 await deleteEntryAction(connectionId, entry.path);
             }
-            void load();
         });
     }
 
@@ -300,9 +320,22 @@ export function DriveExplorer({
                         onToggleHidden={onToggleHidden}
                         onSetIcon={onSetIcon}
                         onMove={onMove}
+                        onCopy={onCopy}
                     />
                 )}
             </section>
+
+            {ops.length > 0 ? (
+                <div className="fixed bottom-4 right-4 z-50 flex w-72 flex-col gap-2 rounded-lg border border-border bg-card p-3 shadow-lg">
+                    <p className="text-xs font-medium text-muted-foreground">Working in the background</p>
+                    {ops.map((op) => (
+                        <div key={op.id} className="flex items-center gap-2 text-sm">
+                            <Loader2 className="size-4 shrink-0 animate-spin text-primary" />
+                            <span className="truncate">{op.label}</span>
+                        </div>
+                    ))}
+                </div>
+            ) : null}
 
             <ShareDialog target={shareTarget} onOpenChange={(open) => !open && setShareTarget(null)} />
             <RequestDialog target={requestTarget} onOpenChange={(open) => !open && setRequestTarget(null)} />

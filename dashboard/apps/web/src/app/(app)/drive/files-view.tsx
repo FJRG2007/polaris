@@ -18,6 +18,8 @@ import {
     ArrowUpAZ,
     ChevronRight,
     ClipboardCopy,
+    ClipboardPaste,
+    Copy,
     Download,
     Eye,
     EyeOff,
@@ -28,6 +30,7 @@ import {
     Info,
     Palette,
     Pencil,
+    Scissors,
     Search,
     Share2,
     SlidersHorizontal,
@@ -96,7 +99,8 @@ export function FilesView({
     onRequestFiles,
     onToggleHidden,
     onSetIcon,
-    onMove
+    onMove,
+    onCopy
 }: {
     connectionId: string;
     path: string;
@@ -117,6 +121,7 @@ export function FilesView({
     onToggleHidden: (entry: DriveEntry) => void;
     onSetIcon: (entry: DriveEntry, icon: string | null, color: string | null) => void;
     onMove: (entry: DriveEntry, destFolderPath: string) => void;
+    onCopy: (entry: DriveEntry, destFolderPath: string) => void;
 }) {
     const [query, setQuery] = useState("");
     const [sortKey, setSortKey] = useState<SortKey>("name");
@@ -138,8 +143,19 @@ export function FilesView({
     const [iconTarget, setIconTarget] = useState<DriveEntry | null>(null);
     const [detailsTarget, setDetailsTarget] = useState<DriveEntry | null>(null);
     const [dragUpload, setDragUpload] = useState(false);
+    const [clipboard, setClipboard] = useState<{ entries: DriveEntry[]; mode: "copy" | "cut" } | null>(null);
     const dragPath = useRef<string | null>(null);
     const router = useRouter();
+
+    /** Paste the clipboard into the current folder: copy duplicates, cut moves. */
+    function paste() {
+        if (!clipboard) return;
+        for (const entry of clipboard.entries) {
+            if (clipboard.mode === "cut") onMove(entry, path);
+            else onCopy(entry, path);
+        }
+        if (clipboard.mode === "cut") setClipboard(null);
+    }
 
     function openViewer(entry: DriveEntry) {
         setViewerTarget({ connectionId, path: entry.path, name: entry.name });
@@ -175,10 +191,21 @@ export function FilesView({
         startRename(entry);
     }
 
-    /** Keyboard: F2 renames, Enter opens, Delete removes the current selection. */
+    /** Keyboard: F2 renames, Enter opens, Delete removes, Ctrl+C/X/V copy/cut/paste. */
     function onListKeyDown(event: KeyboardEvent) {
         if (renaming) return;
-        if (event.key === "F2" && selectedEntries.length === 1 && selectedEntries[0]) {
+        const mod = event.ctrlKey || event.metaKey;
+        const key = event.key.toLowerCase();
+        if (mod && key === "c" && selectedEntries.length > 0) {
+            event.preventDefault();
+            setClipboard({ entries: selectedEntries, mode: "copy" });
+        } else if (mod && key === "x" && selectedEntries.length > 0) {
+            event.preventDefault();
+            setClipboard({ entries: selectedEntries, mode: "cut" });
+        } else if (mod && key === "v" && clipboard) {
+            event.preventDefault();
+            paste();
+        } else if (event.key === "F2" && selectedEntries.length === 1 && selectedEntries[0]) {
             event.preventDefault();
             startRename(selectedEntries[0]);
         } else if (event.key === "Enter" && selectedEntries.length === 1 && selectedEntries[0]) {
@@ -366,6 +393,12 @@ export function FilesView({
                     })}
                 </div>
                 <div className="flex items-center gap-2">
+                    {clipboard ? (
+                        <Button size="sm" variant="ghost" onClick={paste} disabled={pending}>
+                            <ClipboardPaste className="size-4" />
+                            Paste ({clipboard.entries.length})
+                        </Button>
+                    ) : null}
                     <Button
                         size="sm"
                         variant="ghost"
@@ -709,6 +742,21 @@ export function FilesView({
                                                             <Inbox className="size-4" />
                                                             Request files here
                                                         </ContextMenuItem>
+                                                        {clipboard ? (
+                                                            <ContextMenuItem
+                                                                onSelect={() => {
+                                                                    for (const item of clipboard.entries) {
+                                                                        if (clipboard.mode === "cut")
+                                                                            onMove(item, entry.path);
+                                                                        else onCopy(item, entry.path);
+                                                                    }
+                                                                    if (clipboard.mode === "cut") setClipboard(null);
+                                                                }}
+                                                            >
+                                                                <ClipboardPaste className="size-4" />
+                                                                Paste here
+                                                            </ContextMenuItem>
+                                                        ) : null}
                                                     </>
                                                 ) : (
                                                     <>
@@ -729,6 +777,28 @@ export function FilesView({
                                                 <ContextMenuItem onSelect={() => startRename(entry)}>
                                                     <Pencil className="size-4" />
                                                     Rename
+                                                </ContextMenuItem>
+                                                <ContextMenuItem
+                                                    onSelect={() =>
+                                                        setClipboard({
+                                                            entries: selected.has(entry.path) ? selectedEntries : [entry],
+                                                            mode: "copy"
+                                                        })
+                                                    }
+                                                >
+                                                    <Copy className="size-4" />
+                                                    Copy
+                                                </ContextMenuItem>
+                                                <ContextMenuItem
+                                                    onSelect={() =>
+                                                        setClipboard({
+                                                            entries: selected.has(entry.path) ? selectedEntries : [entry],
+                                                            mode: "cut"
+                                                        })
+                                                    }
+                                                >
+                                                    <Scissors className="size-4" />
+                                                    Cut
                                                 </ContextMenuItem>
                                                 <ContextMenuItem
                                                     onSelect={() => void navigator.clipboard.writeText(entry.path)}
