@@ -20,6 +20,7 @@ import {
     File,
     Folder,
     FolderPlus,
+    Inbox,
     Pencil,
     Search,
     Share2,
@@ -78,7 +79,8 @@ export function FilesView({
     onUpload,
     onDelete,
     onRename,
-    onShare
+    onShare,
+    onRequestFiles
 }: {
     connectionId: string;
     path: string;
@@ -95,6 +97,7 @@ export function FilesView({
     onDelete: (entries: DriveEntry[]) => void;
     onRename: (entry: DriveEntry, nextName: string) => void;
     onShare: (entry: DriveEntry) => void;
+    onRequestFiles: (path: string, name: string) => void;
 }) {
     const [query, setQuery] = useState("");
     const [sortKey, setSortKey] = useState<SortKey>("name");
@@ -262,6 +265,15 @@ export function FilesView({
                     })}
                 </div>
                 <div className="flex items-center gap-2">
+                    <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => onRequestFiles(path, segments[segments.length - 1] ?? "")}
+                        disabled={pending}
+                    >
+                        <Inbox className="size-4" />
+                        Request files
+                    </Button>
                     <Button size="sm" variant="ghost" onClick={onNewFolder} disabled={pending}>
                         <FolderPlus className="size-4" />
                         New folder
@@ -539,12 +551,20 @@ export function FilesView({
                                             <ContextMenuContent>
                                                 <ContextMenuLabel>{entry.name}</ContextMenuLabel>
                                                 {entry.kind === "dir" ? (
-                                                    <ContextMenuItem asChild>
-                                                        <Link href={href(connectionId, entry.path)}>
-                                                            <Folder className="size-4" />
-                                                            Open
-                                                        </Link>
-                                                    </ContextMenuItem>
+                                                    <>
+                                                        <ContextMenuItem asChild>
+                                                            <Link href={href(connectionId, entry.path)}>
+                                                                <Folder className="size-4" />
+                                                                Open
+                                                            </Link>
+                                                        </ContextMenuItem>
+                                                        <ContextMenuItem
+                                                            onSelect={() => onRequestFiles(entry.path, entry.name)}
+                                                        >
+                                                            <Inbox className="size-4" />
+                                                            Request files here
+                                                        </ContextMenuItem>
+                                                    </>
                                                 ) : (
                                                     <ContextMenuItem onSelect={() => triggerDownload(connectionId, entry)}>
                                                         <Download className="size-4" />

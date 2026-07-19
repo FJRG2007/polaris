@@ -39,6 +39,7 @@ import {
 } from "./actions";
 import { ConnectionDialog } from "./connection-dialog";
 import { FilesView } from "./files-view";
+import { RequestDialog, type RequestTarget } from "./request-dialog";
 import { ShareDialog, type ShareTarget } from "./share-dialog";
 import { UnifiConsoleButton } from "./unifi-console-button";
 import type { ConnectionSummary, DriveEntry } from "./types";
@@ -72,6 +73,7 @@ export function DriveExplorer({
     const [deleteTargets, setDeleteTargets] = useState<DriveEntry[] | null>(null);
     const [deleteConn, setDeleteConn] = useState<ConnectionSummary | null>(null);
     const [shareTarget, setShareTarget] = useState<ShareTarget | null>(null);
+    const [requestTarget, setRequestTarget] = useState<RequestTarget | null>(null);
 
     const segments = path ? path.split("/") : [];
     const selectedConnection = connections.find((connection) => connection.id === connectionId) ?? null;
@@ -259,11 +261,15 @@ export function DriveExplorer({
                                 isDir: entry.kind === "dir"
                             })
                         }
+                        onRequestFiles={(target, name) =>
+                            setRequestTarget({ connectionId, path: target, name })
+                        }
                     />
                 )}
             </section>
 
             <ShareDialog target={shareTarget} onOpenChange={(open) => !open && setShareTarget(null)} />
+            <RequestDialog target={requestTarget} onOpenChange={(open) => !open && setRequestTarget(null)} />
 
             <Dialog open={newFolderOpen} onOpenChange={setNewFolderOpen}>
                 <DialogContent>

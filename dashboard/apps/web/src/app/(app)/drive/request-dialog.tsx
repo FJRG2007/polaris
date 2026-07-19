@@ -1,0 +1,216 @@
+"use client";
+
+/**
+ * Create-a-drop-point dialog. A drop point is a public link that collects
+ * uploads into the chosen folder. Controlled by a `target` so it can be opened
+ * from the Files toolbar (the current folder) or a folder's context menu. The
+ * uploader can be constrained by file type (category presets and/or manual
+ * extensions), per-file size, total count, expiry, and an IP/CIDR allowlist -
+ * all re-validated server-side on every upload. The generated link is shown once.
+ */
+
+import { useState, type FormEvent } from "react";
+import { Check, Copy, Inbox } from "lucide-react";
+import { Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Input, cn } from "@polaris/ui";
+import { FILE_CATEGORIES, categoryDef, type FileCategory } from "./file-categories";
+import { createFileRequestAction } from "./request-actions";
+
+export interface RequestTarget {
+    connectionId: string;
+    path: string;
+    /** Folder name for the dialog heading; "" for the connection root. */
+    name: string;
+}
+
+export function RequestDialog({
+    target,
+    onOpenChange
+}: {
+    target: RequestTarget | null;
+    onOpenChange: (open: boolean) => void;
+}) {
+    const [categories, setCategories] = useState<Set<FileCategory>>(new Set());
+    const [pending, setPending] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [url, setUrl] = useState<string | null>(null);
+    const [copied, setCopied] = useState(false);
+
+    function handleOpenChange(next: boolean) {
+        if (next) {
+            setCategories(new Set());
+            setError(null);
+            setUrl(null);
+            setCopied(false);
+        }
+        onOpenChange(next);
+    }
+
+    function toggleCategory(id: FileCategory) {
+        setCategories((prev) => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    }
+
+    async function onSubmit(event: FormEvent<HTMLFormElement>) {
+        event.preventDefault();
+        if (!target) return;
+        setPending(true);
+        setError(null);
+        const form = new FormData(event.currentTarget);
+
+        // The allowed-type gate is expressed purely as extensions: category presets
+        // contribute their extension lists and the manual field adds any extras. An
+        // empty result means any file type is accepted.
+        const manual = String(form.get("extensions") ?? "")
+            .split(/[\s,]+/)
+            .map((value) => value.trim().replace(/^\./, "").toLowerCase())
+            .filter(Boolean);
+        const fromCategories = [...categories].flatMap((id) => categoryDef(id)?.extensions ?? []);
+        const allowedExtensions = Array.from(new Set([...fromCategories, ...manual]));
+
+        const allowedCidrs = String(form.get("allowedCidrs") ?? "")
+            .split(/[\s,]+/)
+            .map((value) => value.trim())
+            .filter(Boolean);
+        const maxFiles = form.get("maxFiles");
+        const maxMb = Number(form.get("maxMb") ?? 0);
+        const expiresAt = form.get("expiresAt");
+
+        const result = await createFileRequestAction({
+            title: String(form.get("title") ?? "").trim(),
+            instructions: String(form.get("instructions") ?? "").trim() || undefined,
+            destinationConnectionId: target.connectionId,
+            destinationPath: target.path,
+            requireLogin: form.get("requireLogin") === "on",
+            maxSizeBytes: maxMb > 0 ? Math.floor(maxMb * 1024 * 1024) : 1024 * 1024 * 1024,
+            maxFiles: maxFiles ? Number(maxFiles) : undefined,
+            allowedExtensions,
+            allowedMimeTypes: [],
+            allowedCidrs,
+            expiresAt: expiresAt ? String(expiresAt) : undefined
+        });
+        setPending(false);
+        if (result.error) {
+            setError(result.error);
+            return;
+        }
+        setUrl(result.url ?? null);
+    }
+
+    async function onCopy() {
+        if (!url) return;
+        await navigator.clipboard.writeText(url);
+        setCopied(true);
+    }
+
+    return (
+        <Dialog open={target !== null} onOpenChange={handleOpenChange}>
+            <DialogContent className="max-h-[85vh] overflow-y-auto">
+                <DialogHeader>
+                    <DialogTitle>Request files</DialogTitle>
+                    <DialogDescription className="truncate">
+                        Collect uploads into {target?.name ? `"${target.name}"` : "this connection"}.
+                    </DialogDescription>
+                </DialogHeader>
+
+                {url ? (
+                    <div className="flex flex-col gap-3">
+                        <p className="text-sm text-muted-foreground">
+                            Share this link to collect files. It is shown only once - copy it now.
+                        </p>
+                        <div className="flex items-center gap-2">
+                            <Input readOnly value={url} className="font-mono text-xs" />
+                            <Button type="button" size="icon" variant="secondary" onClick={onCopy}>
+                                {copied ? <Check className="size-4 text-success" /> : <Copy className="size-4" />}
+                            </Button>
+                        </div>
+                        <div className="flex justify-end">
+                            <Button type="button" onClick={() => onOpenChange(false)}>
+                                Done
+                            </Button>
+                        </div>
+                    </div>
+                ) : (
+                    <form onSubmit={onSubmit} className="flex flex-col gap-3">
+                        <label className="flex flex-col gap-1 text-sm">
+                            Title
+                            <Input name="title" required placeholder="e.g. Send me your photos" autoComplete="off" />
+                        </label>
+                        <label className="flex flex-col gap-1 text-sm">
+                            Instructions (optional)
+                            <textarea
+                                name="instructions"
+                                rows={2}
+                                placeholder="What should people upload?"
+                                className="rounded-md border border-input bg-surface px-3 py-2 text-sm"
+                            />
+                        </label>
+
+                        <div className="flex flex-col gap-1.5 text-sm">
+                            <span>Allowed file types</span>
+                            <div className="flex flex-wrap gap-1.5">
+                                {FILE_CATEGORIES.map((category) => (
+                                    <button
+                                        key={category.id}
+                                        type="button"
+                                        onClick={() => toggleCategory(category.id)}
+                                        className={cn(
+                                            "rounded-full border px-3 py-1 text-xs transition-colors",
+                                            categories.has(category.id)
+                                                ? "border-primary bg-primary/10 text-primary"
+                                                : "border-border text-muted-foreground hover:bg-muted"
+                                        )}
+                                    >
+                                        {category.label}
+                                    </button>
+                                ))}
+                            </div>
+                            <span className="text-xs text-muted-foreground">
+                                Leave all off to allow any file type.
+                            </span>
+                        </div>
+                        <label className="flex flex-col gap-1 text-sm">
+                            Also allow these extensions (optional)
+                            <Input name="extensions" placeholder="e.g. psd, ai, sketch" autoComplete="off" />
+                        </label>
+
+                        <div className="grid grid-cols-3 gap-3">
+                            <label className="flex flex-col gap-1 text-sm">
+                                Max size (MB)
+                                <Input name="maxMb" type="number" min="1" placeholder="1024" />
+                            </label>
+                            <label className="flex flex-col gap-1 text-sm">
+                                Max files
+                                <Input name="maxFiles" type="number" min="1" placeholder="No limit" />
+                            </label>
+                            <label className="flex flex-col gap-1 text-sm">
+                                Expires
+                                <Input name="expiresAt" type="date" />
+                            </label>
+                        </div>
+
+                        <label className="flex flex-col gap-1 text-sm">
+                            Restrict to IPs / ranges (optional)
+                            <Input name="allowedCidrs" placeholder="e.g. 203.0.113.4, 10.0.0.0/24" autoComplete="off" />
+                        </label>
+                        <label className="flex items-center gap-2 text-sm">
+                            <input type="checkbox" name="requireLogin" className="size-4" />
+                            Require uploaders to sign in
+                        </label>
+
+                        {error ? <p className="text-sm text-danger">{error}</p> : null}
+                        <div className="mt-1 flex justify-end gap-2">
+                            <Button type="submit" disabled={pending}>
+                                <Inbox className="size-4" />
+                                {pending ? "Creating..." : "Create drop point"}
+                            </Button>
+                        </div>
+                    </form>
+                )}
+            </DialogContent>
+        </Dialog>
+    );
+}
