@@ -12,6 +12,7 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import Fuse from "fuse.js";
 import {
     ArrowDownAZ,
@@ -366,6 +367,17 @@ export function FilesView({
     const allSelected = visible.length > 0 && selectedEntries.length === visible.length;
     const searchError = useMemo(() => parseSearch(query).error, [query]);
 
+    // Windowed rendering: only the rows in view (plus a small overscan) are in the
+    // DOM, so a folder with millions of entries scrolls smoothly - rows that leave
+    // the viewport are removed and new ones added as you scroll.
+    const scrollRef = useRef<HTMLDivElement>(null);
+    const rowVirtualizer = useVirtualizer({
+        count: visible.length,
+        getScrollElement: () => scrollRef.current,
+        estimateSize: () => 40,
+        overscan: 12
+    });
+
     function toggleCategory(id: FileCategory) {
         setCategories((prev) => {
             const next = new Set(prev);
@@ -678,44 +690,57 @@ export function FilesView({
             ) : error ? (
                 <div className="rounded-md border border-danger/40 bg-danger/10 p-3 text-sm text-danger">{error}</div>
             ) : (
-                <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                        <thead className="text-left text-xs text-muted-foreground">
-                            <tr>
-                                <th className="w-9 px-3 py-2">
-                                    <label className="flex cursor-pointer items-center">
-                                        <Checkbox
-                                            checked={allSelected}
-                                            indeterminate={!allSelected && selectedEntries.length > 0}
-                                            onChange={toggleAll}
-                                            aria-label="Select all"
-                                        />
-                                    </label>
-                                </th>
-                                <th className="px-3 py-2 font-medium">Name</th>
-                                <th className="hidden px-3 py-2 font-medium lg:table-cell">Created on</th>
-                                <th className="hidden px-3 py-2 font-medium sm:table-cell">Last Modified</th>
-                                <th className="px-3 py-2 font-medium">Size</th>
-                                <th className="px-3 py-2" />
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {visible.length === 0 ? (
-                                <tr>
-                                    <td colSpan={6} className="px-3 py-8 text-center text-muted-foreground">
-                                        {entries.length === 0
-                                            ? "This folder is empty."
-                                            : "Nothing matches your search or filters."}
-                                    </td>
-                                </tr>
-                            ) : (
-                                visible.map((entry, index) => {
+                <div>
+                    <div className="flex h-9 items-center border-b border-border text-left text-xs font-medium text-muted-foreground">
+                        <div className="flex w-9 shrink-0 items-center justify-center">
+                            <label className="flex cursor-pointer items-center">
+                                <Checkbox
+                                    checked={allSelected}
+                                    indeterminate={!allSelected && selectedEntries.length > 0}
+                                    onChange={toggleAll}
+                                    aria-label="Select all"
+                                />
+                            </label>
+                        </div>
+                        <div className="min-w-0 flex-1 px-1">Name</div>
+                        <div className="hidden w-44 shrink-0 px-2 lg:block">Created on</div>
+                        <div className="hidden w-44 shrink-0 px-2 sm:block">Last Modified</div>
+                        <div className="w-24 shrink-0 px-2">Size</div>
+                        <div className="w-12 shrink-0 px-2" />
+                    </div>
+                    {visible.length === 0 ? (
+                        <p className="px-3 py-8 text-center text-sm text-muted-foreground">
+                            {entries.length === 0
+                                ? "This folder is empty."
+                                : "Nothing matches your search or filters."}
+                        </p>
+                    ) : (
+                        <div ref={scrollRef} className="max-h-[65vh] overflow-auto">
+                            <div
+                                style={{
+                                    height: `${rowVirtualizer.getTotalSize()}px`,
+                                    position: "relative",
+                                    width: "100%"
+                                }}
+                            >
+                                {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                                    const index = virtualRow.index;
+                                    const entry = visible[index];
+                                    if (!entry) return null;
                                     const isSelected = selected.has(entry.path);
                                     const isRenaming = renaming === entry.path;
                                     return (
                                         <ContextMenu key={entry.path}>
                                             <ContextMenuTrigger asChild>
-                                                <tr
+                                                <div
+                                                    style={{
+                                                        position: "absolute",
+                                                        top: 0,
+                                                        left: 0,
+                                                        width: "100%",
+                                                        height: `${virtualRow.size}px`,
+                                                        transform: `translateY(${virtualRow.start}px)`
+                                                    }}
                                                     onClick={(event) => rowClick(event, index, entry)}
                                                     onDoubleClick={() => {
                                                         if (!isRenaming) openEntry(entry);
@@ -749,12 +774,12 @@ export function FilesView({
                                                             : undefined
                                                     }
                                                     className={cn(
-                                                        "transition-colors",
+                                                        "flex h-10 items-center text-sm transition-colors",
                                                         isSelected ? "bg-primary/5" : "hover:bg-card-hover",
                                                         entry.hidden && "opacity-50"
                                                     )}
                                                 >
-                                                    <td className="px-3 py-2">
+                                                    <div className="flex w-9 shrink-0 items-center justify-center">
                                                         <label
                                                             className="flex cursor-pointer items-center"
                                                             onClick={(e) => e.stopPropagation()}
@@ -766,8 +791,8 @@ export function FilesView({
                                                                 aria-label={`Select ${entry.name}`}
                                                             />
                                                         </label>
-                                                    </td>
-                                                    <td className="px-3 py-2">
+                                                    </div>
+                                                    <div className="min-w-0 flex-1 truncate px-1">
                                                         {isRenaming ? (
                                                             <Input
                                                                 autoFocus
@@ -810,17 +835,17 @@ export function FilesView({
                                                                 ) : null}
                                                             </a>
                                                         )}
-                                                    </td>
-                                                    <td className="hidden px-3 py-2 text-muted-foreground lg:table-cell">
+                                                    </div>
+                                                    <div className="hidden w-44 shrink-0 truncate px-2 text-muted-foreground lg:block">
                                                         <RelativeTime iso={entry.createdAt} />
-                                                    </td>
-                                                    <td className="hidden px-3 py-2 text-muted-foreground sm:table-cell">
+                                                    </div>
+                                                    <div className="hidden w-44 shrink-0 truncate px-2 text-muted-foreground sm:block">
                                                         <RelativeTime iso={entry.modifiedAt} />
-                                                    </td>
-                                                    <td className="px-3 py-2 text-muted-foreground">
+                                                    </div>
+                                                    <div className="w-24 shrink-0 px-2 text-muted-foreground">
                                                         {entry.kind === "dir" ? "-" : formatBytes(BigInt(entry.size))}
-                                                    </td>
-                                                    <td className="px-3 py-2 text-right">
+                                                    </div>
+                                                    <div className="flex w-12 shrink-0 justify-end px-2">
                                                         <Button
                                                             size="icon"
                                                             variant="ghost"
@@ -829,8 +854,8 @@ export function FilesView({
                                                         >
                                                             <Share2 className="size-4" />
                                                         </Button>
-                                                    </td>
-                                                </tr>
+                                                    </div>
+                                                </div>
                                             </ContextMenuTrigger>
                                             <ContextMenuContent>
                                                 <ContextMenuLabel>{entry.name}</ContextMenuLabel>
@@ -965,10 +990,10 @@ export function FilesView({
                                             </ContextMenuContent>
                                         </ContextMenu>
                                     );
-                                })
-                            )}
-                        </tbody>
-                    </table>
+                                })}
+                            </div>
+                        </div>
+                    )}
                 </div>
             )}
                 {dragUpload ? (

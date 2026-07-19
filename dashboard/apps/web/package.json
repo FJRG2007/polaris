@@ -20,6 +20,7 @@
         "@polaris/hostd-client": "0.1.0",
         "@polaris/storage": "0.1.0",
         "@polaris/ui": "0.1.0",
+        "@tanstack/react-virtual": "3.11.2",
         "better-auth": "1.6.23",
         "fuse.js": "7.0.0",
         "lucide-react": "0.469.0",
