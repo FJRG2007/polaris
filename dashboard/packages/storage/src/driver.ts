@@ -38,6 +38,8 @@ export interface StatEntry {
     /** Size in bytes; bigint because files can exceed 2^53. */
     readonly size: bigint;
     readonly modifiedAt: Date;
+    /** Creation/birth time when the backend reports one (falls back to modified). */
+    readonly createdAt?: Date;
     /** Backend change token, when available (used for resume + cache validation). */
     readonly etag?: string;
     readonly mime?: string;

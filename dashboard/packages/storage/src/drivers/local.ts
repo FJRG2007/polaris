@@ -107,7 +107,8 @@ export class LocalDriver implements StorageDriver {
             path: rel,
             kind: info.isDirectory() ? "dir" : info.isSymbolicLink() ? "symlink" : "file",
             size: BigInt(info.size),
-            modifiedAt: info.mtime
+            modifiedAt: info.mtime,
+            createdAt: info.birthtime
         };
     }
 

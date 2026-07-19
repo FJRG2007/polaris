@@ -59,6 +59,7 @@ export async function GET(request: Request): Promise<Response> {
                 kind: entry.kind,
                 size: entry.size.toString(),
                 modifiedAt: entry.modifiedAt.toISOString(),
+                createdAt: (entry.createdAt ?? entry.modifiedAt).toISOString(),
                 hidden: item?.hidden ?? false,
                 icon: item?.icon ?? null,
                 iconColor: item?.iconColor ?? null,

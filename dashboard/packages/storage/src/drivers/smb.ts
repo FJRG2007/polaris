@@ -51,6 +51,9 @@ interface SmbStat {
     name?: string;
     size: number;
     mtime: Date;
+    /** Birth/creation time, when the SMB server reports it. */
+    btime?: Date;
+    birthtime?: Date;
     isDirectory(): boolean;
 }
 
@@ -250,7 +253,8 @@ function toEntry(name: string, path: string, stat: SmbStat): StatEntry {
         path,
         kind: stat.isDirectory() ? "dir" : "file",
         size: BigInt(Math.max(0, Math.trunc(Number(stat.size ?? 0)) || 0)),
-        modifiedAt: stat.mtime instanceof Date ? stat.mtime : new Date(Number(stat.mtime ?? 0))
+        modifiedAt: stat.mtime instanceof Date ? stat.mtime : new Date(Number(stat.mtime ?? 0)),
+        createdAt: stat.btime instanceof Date ? stat.btime : stat.birthtime instanceof Date ? stat.birthtime : undefined
     };
 }
 

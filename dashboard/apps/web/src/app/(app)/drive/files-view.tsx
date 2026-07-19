@@ -70,7 +70,7 @@ import { ITEM_ICONS, ITEM_ICON_COLORS, iconColorClass, iconComponent } from "./i
 import { matchesStructured, parseSearch } from "./search-query";
 import type { DriveEntry } from "./types";
 
-type SortKey = "name" | "size" | "modified";
+type SortKey = "name" | "created" | "modified" | "size";
 type SortDir = "asc" | "desc";
 
 function downloadUrl(connectionId: string, path: string): string {
@@ -320,6 +320,9 @@ export function FilesView({
             const dirB = b.kind === "dir" ? 0 : 1;
             if (dirA !== dirB) return dirA - dirB;
             if (sortKey === "size") return (Number(a.size) - Number(b.size)) * direction;
+            if (sortKey === "created") {
+                return (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()) * direction;
+            }
             if (sortKey === "modified") {
                 return (new Date(a.modifiedAt).getTime() - new Date(b.modifiedAt).getTime()) * direction;
             }
@@ -494,7 +497,7 @@ export function FilesView({
                     />
                 </div>
                 <div className="flex items-center gap-1 rounded-md border border-border p-0.5">
-                    {(["name", "size", "modified"] as const).map((key) => (
+                    {(["name", "created", "modified", "size"] as const).map((key) => (
                         <button
                             key={key}
                             type="button"
@@ -656,15 +659,16 @@ export function FilesView({
                                     </label>
                                 </th>
                                 <th className="px-3 py-2 font-medium">Name</th>
+                                <th className="hidden px-3 py-2 font-medium lg:table-cell">Created on</th>
+                                <th className="hidden px-3 py-2 font-medium sm:table-cell">Last Modified</th>
                                 <th className="px-3 py-2 font-medium">Size</th>
-                                <th className="hidden px-3 py-2 font-medium sm:table-cell">Modified</th>
                                 <th className="px-3 py-2" />
                             </tr>
                         </thead>
                         <tbody>
                             {visible.length === 0 ? (
                                 <tr>
-                                    <td colSpan={5} className="px-3 py-8 text-center text-muted-foreground">
+                                    <td colSpan={6} className="px-3 py-8 text-center text-muted-foreground">
                                         {entries.length === 0
                                             ? "This folder is empty."
                                             : "Nothing matches your search or filters."}
@@ -773,11 +777,14 @@ export function FilesView({
                                                             </a>
                                                         )}
                                                     </td>
-                                                    <td className="px-3 py-2 text-muted-foreground">
-                                                        {entry.kind === "dir" ? "-" : formatBytes(BigInt(entry.size))}
+                                                    <td className="hidden px-3 py-2 text-muted-foreground lg:table-cell">
+                                                        {new Date(entry.createdAt).toLocaleString()}
                                                     </td>
                                                     <td className="hidden px-3 py-2 text-muted-foreground sm:table-cell">
                                                         {new Date(entry.modifiedAt).toLocaleString()}
+                                                    </td>
+                                                    <td className="px-3 py-2 text-muted-foreground">
+                                                        {entry.kind === "dir" ? "-" : formatBytes(BigInt(entry.size))}
                                                     </td>
                                                     <td className="px-3 py-2 text-right">
                                                         <Button
@@ -946,7 +953,11 @@ export function FilesView({
                             <dd className="break-all">/{selectedEntries[0].path.split("/").slice(0, -1).join("/")}</dd>
                         </div>
                         <div className="flex flex-col gap-0.5">
-                            <dt className="text-muted-foreground">Modified</dt>
+                            <dt className="text-muted-foreground">Created on</dt>
+                            <dd>{new Date(selectedEntries[0].createdAt).toLocaleString()}</dd>
+                        </div>
+                        <div className="flex flex-col gap-0.5">
+                            <dt className="text-muted-foreground">Last Modified</dt>
                             <dd>{new Date(selectedEntries[0].modifiedAt).toLocaleString()}</dd>
                         </div>
                     </dl>
@@ -993,7 +1004,8 @@ export function FilesView({
                         path: t.path,
                         kind: "file",
                         size: t.size ?? "0",
-                        modifiedAt: t.modifiedAt ?? new Date().toISOString()
+                        modifiedAt: t.modifiedAt ?? new Date().toISOString(),
+                        createdAt: t.modifiedAt ?? new Date().toISOString()
                     })
                 }
             />
