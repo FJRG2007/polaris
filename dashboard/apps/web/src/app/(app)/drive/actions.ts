@@ -28,7 +28,7 @@ import {
 } from "@/lib/storage-service";
 import { detectHost, type NasDetection } from "@/lib/nas-detect";
 import { fetchUnasMetrics } from "@/lib/unifi-unas";
-import { moveItemMeta, setItemHidden, setItemIcon, setItemNote } from "@/lib/drive-meta-service";
+import { moveItemMeta, setItemFavorite, setItemHidden, setItemIcon, setItemNote } from "@/lib/drive-meta-service";
 import { deleteTrashForever, emptyTrash, moveToTrash, restoreTrash } from "@/lib/trash-service";
 import { recordAudit } from "@/lib/audit-service";
 
@@ -286,6 +286,13 @@ export async function renameAction(connectionId: string, from: string, to: strin
 export async function setItemHiddenAction(connectionId: string, path: string, hidden: boolean): Promise<void> {
     const user = await requirePermission("drive.write");
     await setItemHidden(user.id, connectionId, normalizeRelPath(path), hidden);
+    revalidatePath("/drive");
+}
+
+/** Star or unstar an item (mark it a favorite). Presentation only. */
+export async function setItemFavoriteAction(connectionId: string, path: string, favorite: boolean): Promise<void> {
+    const user = await requirePermission("drive.write");
+    await setItemFavorite(user.id, connectionId, normalizeRelPath(path), favorite);
     revalidatePath("/drive");
 }
 

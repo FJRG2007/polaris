@@ -27,6 +27,7 @@ export interface DriveEntry {
     createdAt: string;
     /** User-set presentation metadata (merged from DriveItemMeta), when present. */
     hidden?: boolean;
+    favorite?: boolean;
     icon?: string | null;
     iconColor?: string | null;
     note?: string | null;

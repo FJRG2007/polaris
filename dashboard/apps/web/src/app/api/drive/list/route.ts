@@ -63,9 +63,11 @@ export async function GET(request: Request): Promise<Response> {
 
     try {
         const listing = await driver.list(path);
-        // Hide the Polaris trash folder from normal browsing; it lives at the root
-        // of each connection and is managed through the Trash page instead.
-        const visibleEntries = listing.entries.filter((entry) => entry.path !== ".polaris-trash");
+        // Hide the Polaris-managed folders (trash, quarantine) from normal browsing;
+        // they live at the root of each connection and are managed elsewhere.
+        const visibleEntries = listing.entries.filter(
+            (entry) => entry.path !== ".polaris-trash" && entry.path !== ".polaris-quarantine"
+        );
         const [meta, locks] = await Promise.all([
             getMetaMap(
                 connectionId,
@@ -84,6 +86,7 @@ export async function GET(request: Request): Promise<Response> {
                 modifiedAt: entry.modifiedAt.toISOString(),
                 createdAt: (entry.createdAt ?? entry.modifiedAt).toISOString(),
                 hidden: item?.hidden ?? false,
+                favorite: item?.favorite ?? false,
                 icon: item?.icon ?? null,
                 iconColor: item?.iconColor ?? null,
                 note: item?.note ?? null,

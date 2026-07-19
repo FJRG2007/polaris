@@ -14,7 +14,8 @@ import { requireUser } from "@/lib/session";
 import { getDriverForConnection, SmbShareRequiredError } from "@/lib/storage-service";
 import { authorizeDrive, DriveAccessError, DriveLockedError } from "@/lib/drive-authz";
 import { listLocks } from "@/lib/access-lock-service";
-import { parseSearch, matchesStructured } from "@/app/(app)/drive/search-query";
+import { getMetaMap } from "@/lib/drive-meta-service";
+import { parseSearch, matchesStructured, normalizePathTarget } from "@/app/(app)/drive/search-query";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -72,12 +73,13 @@ export async function GET(request: Request): Promise<Response> {
     // recurse into it, everything beneath it).
     const lockedRoots = new Set((await listLocks(connectionId)).map((lock) => lock.path).filter(Boolean));
 
-    /** Whether a filename satisfies the whole query (structured plus fuzzy words). */
-    const matches = (name: string): boolean => {
-        if (!matchesStructured(name, parsed)) return false;
+    /** Whether an entry satisfies the whole query (structured plus fuzzy words).
+     *  In path mode the fuzzy words are matched against the full relative path. */
+    const matches = (name: string, path: string): boolean => {
+        if (!matchesStructured(name, path, parsed)) return false;
         if (fuzzyWords.length === 0) return true;
-        const lower = name.toLowerCase();
-        return fuzzyWords.every((word) => lower.includes(word));
+        const haystack = parsed.pathMode ? normalizePathTarget(path) : name.toLowerCase();
+        return fuzzyWords.every((word) => haystack.includes(word));
     };
 
     const results: Array<Record<string, string | boolean>> = [];
@@ -100,9 +102,9 @@ export async function GET(request: Request): Promise<Response> {
                 continue; // Unreadable folder: skip it rather than failing the whole search.
             }
             for (const entry of listing.entries) {
-                if (entry.path === ".polaris-trash") continue;
+                if (entry.path === ".polaris-trash" || entry.path === ".polaris-quarantine") continue;
                 if (entry.kind === "dir" && !lockedRoots.has(entry.path)) queue.push(entry.path);
-                if (matches(entry.name)) {
+                if (matches(entry.name, entry.path)) {
                     if (results.length >= MAX_RESULTS) {
                         truncated = true;
                         break;
@@ -118,6 +120,17 @@ export async function GET(request: Request): Promise<Response> {
                     });
                 }
             }
+        }
+        // Merge the caller's per-item metadata (star/hidden) onto the matches so
+        // search results carry the same badges as a normal listing.
+        const meta = await getMetaMap(
+            connectionId,
+            results.map((row) => String(row.path))
+        );
+        for (const row of results) {
+            const item = meta.get(String(row.path));
+            row.favorite = item?.favorite ?? false;
+            row.hidden = item?.hidden ?? false;
         }
         return Response.json({ entries: results, truncated });
     } catch (caught) {

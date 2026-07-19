@@ -37,6 +37,7 @@ import {
     mkdirAction,
     moveToTrashAction,
     renameAction,
+    setItemFavoriteAction,
     setItemHiddenAction,
     setItemIconAction,
     setItemNoteAction,
@@ -200,6 +201,15 @@ export function DriveExplorer({
         setEntries((prev) => prev.map((row) => (row.path === entry.path ? { ...row, hidden: next } : row)));
         startTransition(async () => {
             await setItemHiddenAction(connectionId, entry.path, next);
+            void load();
+        });
+    }
+
+    function onSetFavorite(entry: DriveEntry, favorite: boolean) {
+        if (!connectionId) return;
+        setEntries((prev) => prev.map((row) => (row.path === entry.path ? { ...row, favorite } : row)));
+        startTransition(async () => {
+            await setItemFavoriteAction(connectionId, entry.path, favorite);
             void load();
         });
     }
@@ -391,6 +401,7 @@ export function DriveExplorer({
                             setRequestTarget({ connectionId, path: target, name })
                         }
                         onToggleHidden={onToggleHidden}
+                        onSetFavorite={onSetFavorite}
                         onSetIcon={onSetIcon}
                         onSetNote={onSetNote}
                         onMove={onMove}

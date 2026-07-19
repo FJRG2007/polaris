@@ -42,6 +42,7 @@ import {
     Share2,
     ShieldCheck,
     SlidersHorizontal,
+    Star,
     StickyNote,
     Trash2,
     Upload,
@@ -95,6 +96,31 @@ function triggerDownload(connectionId: string, entry: DriveEntry) {
     anchor.remove();
 }
 
+/** URL of the ZIP endpoint bundling several paths (files and/or folders). */
+function zipUrl(connectionId: string, paths: string[]): string {
+    const params = new URLSearchParams({ c: connectionId });
+    for (const path of paths) params.append("p", path);
+    return `/api/drive/download-zip?${params.toString()}`;
+}
+
+/**
+ * Download a selection. A single file streams directly; anything else (multiple
+ * items, or a folder) is bundled server-side into one ZIP - a single navigation,
+ * so the browser never blocks it the way it blocks a burst of anchor clicks.
+ */
+function downloadSelection(connectionId: string, entries: DriveEntry[]) {
+    if (entries.length === 0) return;
+    if (entries.length === 1 && entries[0] && entries[0].kind !== "dir") {
+        triggerDownload(connectionId, entries[0]);
+        return;
+    }
+    const anchor = document.createElement("a");
+    anchor.href = zipUrl(connectionId, entries.map((entry) => entry.path));
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+}
+
 export function FilesView({
     connectionId,
     path,
@@ -114,6 +140,7 @@ export function FilesView({
     onShare,
     onRequestFiles,
     onToggleHidden,
+    onSetFavorite,
     onSetIcon,
     onSetNote,
     onMove,
@@ -138,6 +165,7 @@ export function FilesView({
     onShare: (entry: DriveEntry) => void;
     onRequestFiles: (path: string, name: string) => void;
     onToggleHidden: (entry: DriveEntry) => void;
+    onSetFavorite: (entry: DriveEntry, favorite: boolean) => void;
     onSetIcon: (entry: DriveEntry, icon: string | null, color: string | null) => void;
     onSetNote: (entry: DriveEntry, note: string | null) => void;
     onMove: (entry: DriveEntry, destFolderPath: string) => void;
@@ -154,6 +182,7 @@ export function FilesView({
     const [sortKey, setSortKey] = useState<SortKey>("name");
     const [sortDir, setSortDir] = useState<SortDir>("asc");
     const [filtersOpen, setFiltersOpen] = useState(false);
+    const [starredOnly, setStarredOnly] = useState(false);
     const [categories, setCategories] = useState<Set<FileCategory>>(new Set());
     const [extFilter, setExtFilter] = useState("");
     const [minMb, setMinMb] = useState("");
@@ -369,6 +398,7 @@ export function FilesView({
 
         let rows = source.filter((entry) => {
             if (!showHidden && entry.hidden) return false;
+            if (starredOnly && !entry.favorite) return false;
             const isDir = entry.kind === "dir";
             const entryExt = isDir ? "" : extensionOf(entry.name);
             if (categories.size > 0) {
@@ -389,9 +419,15 @@ export function FilesView({
         });
 
         const parsed = parseSearch(query);
-        rows = rows.filter((entry) => matchesStructured(entry.name, parsed));
+        rows = rows.filter((entry) => matchesStructured(entry.name, entry.path, parsed));
         if (parsed.fuzzy) {
-            const fuse = new Fuse(rows, { keys: ["name"], threshold: 0.4, ignoreLocation: true });
+            // In path mode the fuzzy pass ranks against the full relative path so a
+            // query like "documentos/doc.pdf" matches a nested item.
+            const fuse = new Fuse(rows, {
+                keys: [parsed.pathMode ? "path" : "name"],
+                threshold: 0.4,
+                ignoreLocation: true
+            });
             rows = fuse.search(parsed.fuzzy).map((result) => result.item);
         }
 
@@ -410,7 +446,7 @@ export function FilesView({
             }
             return a.name.localeCompare(b.name) * direction;
         });
-    }, [source, categories, extFilter, minMb, maxMb, dateFrom, dateTo, query, sortKey, sortDir, showHidden]);
+    }, [source, categories, extFilter, minMb, maxMb, dateFrom, dateTo, query, sortKey, sortDir, showHidden, starredOnly]);
 
     const selectedEntries = visible.filter((entry) => selected.has(entry.path));
     const allSelected = visible.length > 0 && selectedEntries.length === visible.length;
@@ -712,6 +748,15 @@ export function FilesView({
                 </Button>
                 <Button
                     size="sm"
+                    variant={starredOnly ? "secondary" : "ghost"}
+                    onClick={() => setStarredOnly((prev) => !prev)}
+                    aria-label={starredOnly ? "Show all items" : "Show starred only"}
+                >
+                    <Star className={cn("size-4", starredOnly && "fill-amber-400 text-amber-400")} />
+                    Starred
+                </Button>
+                <Button
+                    size="sm"
                     variant={showHidden ? "secondary" : "ghost"}
                     onClick={() => setShowHidden((prev) => !prev)}
                     aria-label={showHidden ? "Hide hidden items" : "Show hidden items"}
@@ -798,14 +843,12 @@ export function FilesView({
                         <Button
                             size="sm"
                             variant="ghost"
-                            onClick={() =>
-                                selectedEntries
-                                    .filter((entry) => entry.kind !== "dir")
-                                    .forEach((entry) => triggerDownload(connectionId, entry))
-                            }
+                            onClick={() => downloadSelection(connectionId, selectedEntries)}
                         >
                             <Download className="size-4" />
-                            Download
+                            {selectedEntries.length > 1 || selectedEntries.some((entry) => entry.kind === "dir")
+                                ? "Download ZIP"
+                                : "Download"}
                         </Button>
                         <Button size="sm" variant="ghost" onClick={() => onDelete(selectedEntries)} disabled={pending}>
                             <Trash2 className="size-4" />
@@ -975,6 +1018,12 @@ export function FilesView({
                                                                         in /{parentOf(entry.path)}
                                                                     </span>
                                                                 ) : null}
+                                                                {entry.favorite ? (
+                                                                    <Star
+                                                                        className="size-3 shrink-0 fill-amber-400 text-amber-400"
+                                                                        aria-label="Favorite"
+                                                                    />
+                                                                ) : null}
                                                                 {entry.locked ? (
                                                                     <Lock
                                                                         className="size-3 shrink-0 text-muted-foreground"
@@ -1001,6 +1050,12 @@ export function FilesView({
                                                                     <span className="shrink truncate text-xs text-muted-foreground">
                                                                         in /{parentOf(entry.path)}
                                                                     </span>
+                                                                ) : null}
+                                                                {entry.favorite ? (
+                                                                    <Star
+                                                                        className="size-3 shrink-0 fill-amber-400 text-amber-400"
+                                                                        aria-label="Favorite"
+                                                                    />
                                                                 ) : null}
                                                                 {entry.note ? (
                                                                     <StickyNote
@@ -1041,6 +1096,12 @@ export function FilesView({
                                                                 <Folder className="size-4" />
                                                                 Open
                                                             </Link>
+                                                        </ContextMenuItem>
+                                                        <ContextMenuItem
+                                                            onSelect={() => downloadSelection(connectionId, [entry])}
+                                                        >
+                                                            <Download className="size-4" />
+                                                            Download as ZIP
                                                         </ContextMenuItem>
                                                         <ContextMenuItem
                                                             onSelect={() => onRequestFiles(entry.path, entry.name)}
@@ -1136,6 +1197,17 @@ export function FilesView({
                                                     Share
                                                 </ContextMenuItem>
                                                 <ContextMenuSeparator />
+                                                <ContextMenuItem
+                                                    onSelect={() => onSetFavorite(entry, !entry.favorite)}
+                                                >
+                                                    <Star
+                                                        className={cn(
+                                                            "size-4",
+                                                            entry.favorite && "fill-amber-400 text-amber-400"
+                                                        )}
+                                                    />
+                                                    {entry.favorite ? "Remove from favorites" : "Add to favorites"}
+                                                </ContextMenuItem>
                                                 <ContextMenuItem onSelect={() => setIconTarget(entry)}>
                                                     <Palette className="size-4" />
                                                     Change icon
@@ -1275,6 +1347,22 @@ export function FilesView({
                         >
                             <ClipboardCopy className="size-4" />
                             Copy path
+                        </Button>
+                        <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() =>
+                                selectedEntries[0] &&
+                                onSetFavorite(selectedEntries[0], !selectedEntries[0].favorite)
+                            }
+                        >
+                            <Star
+                                className={cn(
+                                    "size-4",
+                                    selectedEntries[0].favorite && "fill-amber-400 text-amber-400"
+                                )}
+                            />
+                            {selectedEntries[0].favorite ? "Starred" : "Star"}
                         </Button>
                     </div>
                     <div className="flex flex-col gap-1 border-t border-border pt-3">
