@@ -52,6 +52,7 @@ model User {
     fileRequests      FileRequest[]
     submissions       FileRequestSubmission[]
     uploads           UploadSession[]
+    notifications     Notification[]
 }
 
 model Session {
@@ -295,6 +296,7 @@ model DriveItemMeta {
     connectionId String
     path         String
     hidden       Boolean  @default(false)
+    favorite     Boolean  @default(false)
     icon         String?
     iconColor    String?
     note         String?
@@ -551,4 +553,81 @@ model Setting {
     userId String?
 
     @@index([scope])
+}
+
+// ---------------------------------------------------------------------------
+// Integrations (marketplace) and notifications
+// ---------------------------------------------------------------------------
+
+// An installed marketplace integration, one row per provider (instance-wide).
+// The catalog of available integrations lives in code; this table records which
+// have been enabled and their config. Secret material (an API key) is envelope-
+// encrypted with the same AES-256-GCM master key as storage credentials, so a DB
+// dump yields no usable keys.
+model Integration {
+    id              String   @id @default(cuid())
+    // Catalog slug, e.g. "virustotal". One install per provider.
+    provider        String   @unique
+    enabled         Boolean  @default(false)
+    // Non-secret config as a stringified JSON object (SQLite-portable).
+    config          String   @default("{}")
+    // Envelope-encrypted secret (API key); null until configured.
+    encryptedSecret Bytes?
+    secretNonce     Bytes?
+    secretKeyId     String?
+    installedById   String?
+    createdAt       DateTime @default(now())
+    updatedAt       DateTime @updatedAt
+}
+
+// An in-app notification for one user. Written by server-side events (e.g. a
+// drop-point upload scanned by an integration) and surfaced by the bell and the
+// notifications page. Cascades away with the user.
+model Notification {
+    id        String    @id @default(cuid())
+    userId    String
+    // Category slug driving the icon, e.g. "scan.malicious", "scan.clean".
+    type      String
+    title     String
+    body      String?
+    // Optional in-app deep link (e.g. "/requests").
+    href      String?
+    // Styling severity: info | success | warning | danger.
+    level     String    @default("info")
+    // Stringified JSON metadata (connectionId, path, submissionId, ...).
+    metadata  String?
+    readAt    DateTime?
+    createdAt DateTime  @default(now())
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@index([userId, readAt])
+    @@index([userId, createdAt])
+}
+
+// The result of an integration scanning a stored file (e.g. VirusTotal on a
+// drop-point upload). Kept for the owner's audit trail and to avoid re-scanning
+// a known hash. Not FK-bound to the submission so a purged submission does not
+// erase the security record.
+model FileScan {
+    id           String   @id @default(cuid())
+    provider     String   @default("virustotal")
+    submissionId String?
+    connectionId String?
+    path         String?
+    sha256       String?
+    // pending | clean | suspicious | malicious | unknown | error | skipped
+    verdict      String   @default("pending")
+    malicious    Int      @default(0)
+    suspicious   Int      @default(0)
+    // Provider report permalink, when available.
+    permalink    String?
+    // Enforcement taken on a detection: none | blocked | quarantined | notified
+    action       String   @default("none")
+    detail       String?
+    createdAt    DateTime @default(now())
+    updatedAt    DateTime @updatedAt
+
+    @@index([submissionId])
+    @@index([sha256])
 }
