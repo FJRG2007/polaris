@@ -148,6 +148,27 @@ export async function mkdirAction(connectionId: string, path: string, name: stri
     revalidatePath("/drive");
 }
 
+/** Create an empty file (any name/extension) in the given folder. */
+export async function createFileAction(connectionId: string, path: string, name: string): Promise<void> {
+    const user = await requirePermission("drive.write");
+    const clean = name.trim();
+    if (!clean) throw new Error("Enter a file name");
+    const target = normalizeRelPath(path ? `${path}/${clean}` : clean);
+    const driver = await getDriver(connectionId, user.id);
+    try {
+        const empty = new ReadableStream<Uint8Array>({
+            start(controller) {
+                controller.close();
+            }
+        });
+        await driver.writeStream(target, empty, {});
+    } finally {
+        await driver.dispose();
+    }
+    await recordAudit({ actorId: user.id, action: "drive.create", targetType: "connection", targetId: connectionId, metadata: { path: target } });
+    revalidatePath("/drive");
+}
+
 export async function deleteEntryAction(connectionId: string, path: string): Promise<void> {
     const user = await requirePermission("drive.delete");
     const driver = await getDriver(connectionId, user.id);

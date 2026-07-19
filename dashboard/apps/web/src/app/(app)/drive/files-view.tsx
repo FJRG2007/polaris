@@ -24,6 +24,7 @@ import {
     Eye,
     EyeOff,
     File,
+    FilePlus,
     Folder,
     FolderPlus,
     FolderUp,
@@ -99,6 +100,7 @@ export function FilesView({
     fileInput,
     href,
     onNewFolder,
+    onNewFile,
     onUpload,
     onDelete,
     onRename,
@@ -121,6 +123,7 @@ export function FilesView({
     fileInput: React.RefObject<HTMLInputElement | null>;
     href: (id: string, target: string) => string;
     onNewFolder: () => void;
+    onNewFile: () => void;
     onUpload: (items: { file: File; relPath: string }[]) => void;
     onDelete: (entries: DriveEntry[]) => void;
     onRename: (entry: DriveEntry, nextName: string) => void;
@@ -628,6 +631,8 @@ export function FilesView({
             ) : null}
 
             <div className="flex items-start gap-4">
+            <ContextMenu>
+            <ContextMenuTrigger asChild>
             <div
                 tabIndex={0}
                 onKeyDown={onListKeyDown}
@@ -923,6 +928,33 @@ export function FilesView({
                     </div>
                 ) : null}
             </div>
+            </ContextMenuTrigger>
+            <ContextMenuContent>
+                <ContextMenuItem onSelect={onNewFolder}>
+                    <FolderPlus className="size-4" />
+                    New folder
+                </ContextMenuItem>
+                <ContextMenuItem onSelect={onNewFile}>
+                    <FilePlus className="size-4" />
+                    New file
+                </ContextMenuItem>
+                <ContextMenuSeparator />
+                <ContextMenuItem onSelect={() => fileInput.current?.click()}>
+                    <Upload className="size-4" />
+                    Upload files
+                </ContextMenuItem>
+                <ContextMenuItem onSelect={() => folderInput.current?.click()}>
+                    <FolderUp className="size-4" />
+                    Upload folder
+                </ContextMenuItem>
+                {clipboard ? (
+                    <ContextMenuItem onSelect={paste}>
+                        <ClipboardPaste className="size-4" />
+                        Paste
+                    </ContextMenuItem>
+                ) : null}
+            </ContextMenuContent>
+            </ContextMenu>
             {selectedEntries.length === 1 && selectedEntries[0] ? (
                 <aside className="hidden w-64 shrink-0 flex-col gap-4 rounded-lg border border-border p-4 lg:flex">
                     <div className="flex flex-col items-center gap-2 text-center">

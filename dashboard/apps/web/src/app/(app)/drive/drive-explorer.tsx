@@ -31,6 +31,7 @@ import {
 } from "@polaris/ui";
 import {
     copyAction,
+    createFileAction,
     deleteConnectionAction,
     deleteEntryAction,
     discoverUnasSharesAction,
@@ -74,6 +75,8 @@ export function DriveExplorer({
     const [needsSmbShare, setNeedsSmbShare] = useState(false);
     const [newFolderOpen, setNewFolderOpen] = useState(false);
     const [newFolderName, setNewFolderName] = useState("");
+    const [newFileOpen, setNewFileOpen] = useState(false);
+    const [newFileName, setNewFileName] = useState("Untitled.txt");
     const [deleteTargets, setDeleteTargets] = useState<DriveEntry[] | null>(null);
     const [deleteConn, setDeleteConn] = useState<ConnectionSummary | null>(null);
     const [shareTarget, setShareTarget] = useState<ShareTarget | null>(null);
@@ -204,6 +207,15 @@ export function DriveExplorer({
         });
     }
 
+    function submitNewFile(event: React.FormEvent) {
+        event.preventDefault();
+        const name = newFileName.trim();
+        if (!connectionId || !name) return;
+        setNewFileOpen(false);
+        setNewFileName("Untitled.txt");
+        runOp(`Creating ${name}`, () => createFileAction(connectionId, path, name));
+    }
+
     function onSetNote(entry: DriveEntry, note: string | null) {
         if (!connectionId) return;
         setEntries((prev) => prev.map((row) => (row.path === entry.path ? { ...row, note } : row)));
@@ -315,6 +327,7 @@ export function DriveExplorer({
                         fileInput={fileInput}
                         href={href}
                         onNewFolder={() => setNewFolderOpen(true)}
+                        onNewFile={() => setNewFileOpen(true)}
                         onUpload={onUpload}
                         onDelete={(items) => setDeleteTargets(items)}
                         onRename={onRename}
@@ -373,6 +386,35 @@ export function DriveExplorer({
                                 </Button>
                             </DialogClose>
                             <Button type="submit" disabled={!newFolderName.trim()}>
+                                Create
+                            </Button>
+                        </div>
+                    </form>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={newFileOpen} onOpenChange={setNewFileOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>New file</DialogTitle>
+                        <DialogDescription>
+                            Create an empty file here. Use any extension (e.g. .txt, .md, .json).
+                        </DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={submitNewFile} className="flex flex-col gap-3">
+                        <Input
+                            autoFocus
+                            value={newFileName}
+                            onChange={(event) => setNewFileName(event.target.value)}
+                            placeholder="Untitled.txt"
+                        />
+                        <div className="flex justify-end gap-2">
+                            <DialogClose asChild>
+                                <Button type="button" variant="ghost">
+                                    Cancel
+                                </Button>
+                            </DialogClose>
+                            <Button type="submit" disabled={!newFileName.trim()}>
                                 Create
                             </Button>
                         </div>
