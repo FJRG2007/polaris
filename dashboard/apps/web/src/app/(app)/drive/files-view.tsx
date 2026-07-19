@@ -663,8 +663,12 @@ export function FilesView({
 
     return (
         <>
-            <div className="flex items-stretch gap-4">
-            <div className="flex min-w-0 flex-1 flex-col">
+            <div
+                className={cn(
+                    "flex min-w-0 flex-1 flex-col",
+                    selectedEntries.length === 1 && "lg:pr-72"
+                )}
+            >
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                 <div className="flex min-w-0 items-center gap-1 text-sm text-muted-foreground">
                     <Link href={href(connectionId, "")} className="hover:text-foreground">
@@ -1348,7 +1352,7 @@ export function FilesView({
             </ContextMenu>
             </div>
             {selectedEntries.length === 1 && selectedEntries[0] ? (
-                <aside className="hidden w-72 shrink-0 flex-col gap-4 self-stretch overflow-auto rounded-lg border border-border p-4 lg:flex">
+                <aside className="fixed right-0 top-14 bottom-0 z-30 hidden w-72 flex-col gap-4 overflow-auto border-l border-border bg-surface/40 p-4 lg:flex">
                     <div className="flex flex-col items-center gap-2 text-center">
                         <EntryIcon entry={selectedEntries[0]} className="size-10" />
                         <span className="break-all text-sm font-medium">{selectedEntries[0].name}</span>
@@ -1475,7 +1479,6 @@ export function FilesView({
                     </div>
                 </aside>
             ) : null}
-            </div>
 
             <FileViewer
                 target={viewerTarget}
