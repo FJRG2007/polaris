@@ -2,16 +2,20 @@
 //
 // Design constraints (do not relitigate):
 //   - Postgres in production, but kept SQLite-portable: no Postgres-only column
-//     types, no native enums (String + app-level Zod unions), no scalar arrays
-//     or JSONB columns (JSON is stored as a stringified String). Swapping the
-//     datasource provider to sqlite must not require schema surgery.
+//     types beyond the id type, no native enums (String + app-level Zod unions),
+//     no scalar arrays or JSONB columns (JSON is stored as a stringified String).
+//     The gen-sqlite-schema script swaps the datasource provider and strips the
+//     Postgres-only @db.Uuid mapping (SQLite stores the uuid as TEXT).
+//   - Every surrogate primary key and id reference is a UUIDv7 stored in a native
+//     Postgres `uuid` column (@db.Uuid). Natural keys (GeoIpCache.ip) stay text.
 //   - Byte counts use BigInt (files can exceed 2^53) and are handled as bigint
 //     in application code, never coerced through a lossy Number.
 //   - Polaris is a control plane, not a file mirror: the Node table holds rows
 //     only for objects Polaris must track (shared or requested items). Live
 //     directory listings come from the storage driver and are never persisted.
 //   - better-auth owns the User/Session/Account/Verification core fields; the
-//     extra columns and the Role/UserRole tables are Polaris additions.
+//     extra columns and the Role/UserRole tables are Polaris additions. better-auth
+//     is configured to generate UUIDs so its inserts fit the uuid columns.
 
 generator client {
     provider = "prisma-client-js"
@@ -28,7 +32,7 @@ datasource db {
 // ---------------------------------------------------------------------------
 
 model User {
-    id            String   @id @default(cuid())
+    id            String   @id @default(uuid(7)) @db.Uuid
     name          String
     email         String   @unique
     // Unique handle; sign-in accepts either this or the email.
@@ -37,6 +41,9 @@ model User {
     image         String?
     // Second gate for admin-only routes, independent of role permissions.
     isAdmin       Boolean  @default(false)
+    // When set, the account is banned: sign-in is refused and sessions are void.
+    bannedAt      DateTime?
+    banReason     String?
     createdAt     DateTime @default(now())
     updatedAt     DateTime @updatedAt
 
@@ -56,12 +63,12 @@ model User {
 }
 
 model Session {
-    id        String   @id @default(cuid())
+    id        String   @id @default(uuid(7)) @db.Uuid
     token     String   @unique
     expiresAt DateTime
     ipAddress String?
     userAgent String?
-    userId    String
+    userId    String   @db.Uuid
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
 
@@ -71,10 +78,10 @@ model Session {
 }
 
 model Account {
-    id                    String    @id @default(cuid())
+    id                    String    @id @default(uuid(7)) @db.Uuid
     accountId             String
     providerId            String
-    userId                String
+    userId                String    @db.Uuid
     accessToken           String?
     refreshToken          String?
     idToken               String?
@@ -91,7 +98,7 @@ model Account {
 }
 
 model Verification {
-    id         String   @id @default(cuid())
+    id         String   @id @default(uuid(7)) @db.Uuid
     identifier String
     value      String
     expiresAt  DateTime
@@ -102,7 +109,7 @@ model Verification {
 }
 
 model Role {
-    id          String     @id @default(cuid())
+    id          String     @id @default(uuid(7)) @db.Uuid
     name        String     @unique
     // JSON array of permission keys (or the "*" wildcard). Stored as a string
     // for SQLite portability; validated by @polaris/core on read.
@@ -113,8 +120,8 @@ model Role {
 }
 
 model UserRole {
-    userId String
-    roleId String
+    userId String @db.Uuid
+    roleId String @db.Uuid
     user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
     role   Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
 
@@ -123,12 +130,12 @@ model UserRole {
 }
 
 model Invite {
-    id          String    @id @default(cuid())
+    id          String    @id @default(uuid(7)) @db.Uuid
     email       String
     // SHA-256 of the invite token; the raw token lives only in the emailed link.
     tokenHash   String    @unique
-    roleId      String?
-    invitedById String
+    roleId      String?   @db.Uuid
+    invitedById String    @db.Uuid
     expiresAt   DateTime
     acceptedAt  DateTime?
     createdAt   DateTime  @default(now())
@@ -141,7 +148,7 @@ model Invite {
 // A named bundle of users. Policies attach to a group so a grant applies to
 // everyone in it; group membership is the cheapest way to manage access at scale.
 model Group {
-    id          String        @id @default(cuid())
+    id          String        @id @default(uuid(7)) @db.Uuid
     name        String        @unique
     description String?
     isSystem    Boolean       @default(false)
@@ -150,8 +157,8 @@ model Group {
 }
 
 model GroupMember {
-    groupId String
-    userId  String
+    groupId String @db.Uuid
+    userId  String @db.Uuid
     group   Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
     user    User  @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -164,7 +171,7 @@ model GroupMember {
 // policy to a user, group, or role folds its statements into that principal's
 // effective permissions. Deny-by-default; an explicit deny overrides any allow.
 model Policy {
-    id          String             @id @default(cuid())
+    id          String             @id @default(uuid(7)) @db.Uuid
     name        String             @unique
     description String?
     // Stringified PolicyDocument JSON (SQLite-portable); validated on read/write.
@@ -179,10 +186,10 @@ model Policy {
 // principalId is that principal's id; kept generic (no FK) so one table covers
 // all three without three near-identical join tables.
 model PolicyAttachment {
-    id            String @id @default(cuid())
-    policyId      String
+    id            String @id @default(uuid(7)) @db.Uuid
+    policyId      String @db.Uuid
     principalType String
-    principalId   String
+    principalId   String @db.Uuid
 
     policy Policy @relation(fields: [policyId], references: [id], onDelete: Cascade)
 
@@ -195,16 +202,16 @@ model PolicyAttachment {
 // it. This is what lets a connection owner share specific folders with other
 // users/groups without handing over the whole connection.
 model DriveAcl {
-    id            String   @id @default(cuid())
-    connectionId  String
+    id            String   @id @default(uuid(7)) @db.Uuid
+    connectionId  String   @db.Uuid
     // "" means the whole connection; otherwise the subtree root (normalized).
     path          String   @default("")
     principalType String
-    principalId   String
+    principalId   String   @db.Uuid
     // JSON array of Drive verbs: read, write, rename, delete, copy, download.
     actions       String
     effect        String   @default("allow")
-    createdById   String
+    createdById   String   @db.Uuid
     createdAt     DateTime @default(now())
 
     connection StorageConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
@@ -218,11 +225,11 @@ model DriveAcl {
 // password first; the unlock is remembered in a signed, per-lock session cookie.
 // The password is stored with the same slow, salted KDF as share/link passwords.
 model AccessLock {
-    id           String   @id @default(cuid())
-    connectionId String
+    id           String   @id @default(uuid(7)) @db.Uuid
+    connectionId String   @db.Uuid
     path         String
     passwordHash String
-    createdById  String
+    createdById  String   @db.Uuid
     createdAt    DateTime @default(now())
 
     connection StorageConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
@@ -236,10 +243,10 @@ model AccessLock {
 // ---------------------------------------------------------------------------
 
 model StorageConnection {
-    id                  String   @id @default(cuid())
+    id                  String   @id @default(uuid(7)) @db.Uuid
     name                String
     kind                String
-    ownerId             String
+    ownerId             String   @db.Uuid
     // Non-secret connection config (host, port, share path) as JSON string.
     config              String
     // Envelope-encrypted credentials (AES-256-GCM). Null for anonymous providers.
@@ -272,9 +279,9 @@ model StorageConnection {
 // rest of the app uses for share/link expiry. `permanent` picks delete-for-good
 // over the recycle bin.
 model ScheduledDeletion {
-    id           String   @id @default(cuid())
-    ownerId      String
-    connectionId String
+    id           String   @id @default(uuid(7)) @db.Uuid
+    ownerId      String   @db.Uuid
+    connectionId String   @db.Uuid
     path         String
     name         String
     permanent    Boolean  @default(false)
@@ -293,9 +300,9 @@ model ScheduledDeletion {
 // it can be listed, restored to its original path, or permanently deleted. Works
 // for any backend; UniFi UNAS keeps its own trash, which can be reused later.
 model TrashItem {
-    id           String   @id @default(cuid())
-    ownerId      String
-    connectionId String
+    id           String   @id @default(uuid(7)) @db.Uuid
+    ownerId      String   @db.Uuid
+    connectionId String   @db.Uuid
     name         String
     // Where it lived before deletion, and where it now sits in the trash folder.
     originalPath String
@@ -314,16 +321,16 @@ model TrashItem {
 // custom icon, hidden flag. Keyed by (connection, path); rows exist only for
 // items the user has customized. Cascades away with its connection.
 model DriveItemMeta {
-    id           String   @id @default(cuid())
-    ownerId      String
-    connectionId String
+    id           String   @id @default(uuid(7)) @db.Uuid
+    ownerId      String   @db.Uuid
+    connectionId String   @db.Uuid
     path         String
     hidden       Boolean  @default(false)
     favorite     Boolean  @default(false)
     // The Polaris user who uploaded/created this item, when known (drop-point
     // uploads, dashboard uploads, new files/folders, copies). Null for items that
     // predate Polaris or were created out of band. Follows the item on move/rename.
-    creatorId    String?
+    creatorId    String?  @db.Uuid
     icon         String?
     iconColor    String?
     note         String?
@@ -337,9 +344,9 @@ model DriveItemMeta {
 }
 
 model DockerConnection {
-    id                  String   @id @default(cuid())
+    id                  String   @id @default(uuid(7)) @db.Uuid
     name                String
-    ownerId             String
+    ownerId             String   @db.Uuid
     // socket | ssh | tcp
     transport           String
     // Non-secret transport config (host, port, socket path) as JSON string.
@@ -359,8 +366,8 @@ model DockerConnection {
 }
 
 model StorageMount {
-    id            String    @id @default(cuid())
-    connectionId  String    @unique
+    id            String    @id @default(uuid(7)) @db.Uuid
+    connectionId  String    @unique @db.Uuid
     mountPath     String
     state         String    @default("pending")
     error         String?
@@ -371,14 +378,14 @@ model StorageMount {
 }
 
 model Node {
-    id           String   @id @default(cuid())
-    connectionId String
+    id           String   @id @default(uuid(7)) @db.Uuid
+    connectionId String   @db.Uuid
     path         String
     kind         String
     size         BigInt   @default(0)
     mime         String?
     etag         String?
-    ownerId      String?
+    ownerId      String?  @db.Uuid
     createdAt    DateTime @default(now())
     updatedAt    DateTime @updatedAt
 
@@ -395,13 +402,13 @@ model Node {
 // ---------------------------------------------------------------------------
 
 model Share {
-    id            String    @id @default(cuid())
-    connectionId  String
+    id            String    @id @default(uuid(7)) @db.Uuid
+    connectionId  String    @db.Uuid
     // Snapshot of the shared path; a Node row backs it when a stable referent is
     // needed (the remote file may be listed live and can vanish out of band).
     path          String
-    nodeId        String?
-    ownerId       String
+    nodeId        String?   @db.Uuid
+    ownerId       String    @db.Uuid
     kind          String    @default("public")
     // SHA-256 of the share token; lookups are by hash so a DB dump yields no links.
     tokenHash     String    @unique
@@ -439,9 +446,9 @@ model Share {
 }
 
 model ShareInvite {
-    id         String @id @default(cuid())
-    shareId    String
-    userId     String
+    id         String @id @default(uuid(7)) @db.Uuid
+    shareId    String @db.Uuid
+    userId     String @db.Uuid
     permission String @default("download")
 
     share Share @relation(fields: [shareId], references: [id], onDelete: Cascade)
@@ -452,8 +459,8 @@ model ShareInvite {
 }
 
 model ShareAccessLog {
-    id            String   @id @default(cuid())
-    shareId       String
+    id            String   @id @default(uuid(7)) @db.Uuid
+    shareId       String   @db.Uuid
     at            DateTime @default(now())
     // Client IP is stored hashed for privacy while still supporting abuse review.
     ipHash        String?
@@ -473,12 +480,12 @@ model ShareAccessLog {
 // ---------------------------------------------------------------------------
 
 model FileRequest {
-    id                      String    @id @default(cuid())
-    ownerId                 String
+    id                      String    @id @default(uuid(7)) @db.Uuid
+    ownerId                 String    @db.Uuid
     tokenHash               String    @unique
     title                   String
     instructions            String?
-    destinationConnectionId String
+    destinationConnectionId String    @db.Uuid
     destinationPath         String
     requireLogin            Boolean   @default(false)
     // argon2 hash of an optional access PIN/password gating the upload page.
@@ -507,7 +514,7 @@ model FileRequest {
 // Fixed-window rate-limit counters (e.g. password-guess throttling per link+IP).
 // A lightweight DB-backed limiter; a distributed deployment can swap in Redis.
 model RateLimitCounter {
-    id          String   @id @default(cuid())
+    id          String   @id @default(uuid(7)) @db.Uuid
     key         String   @unique
     count       Int      @default(0)
     windowStart DateTime @default(now())
@@ -516,13 +523,13 @@ model RateLimitCounter {
 }
 
 model FileRequestSubmission {
-    id                String   @id @default(cuid())
-    requestId         String
-    submittedByUserId String?
+    id                String   @id @default(uuid(7)) @db.Uuid
+    requestId         String   @db.Uuid
+    submittedByUserId String?  @db.Uuid
     ipHash            String?
     fileName          String
     size              BigInt
-    storedNodeId      String?
+    storedNodeId      String?  @db.Uuid
     storedPath        String
     status            String   @default("stored")
     at                DateTime @default(now())
@@ -539,10 +546,10 @@ model FileRequestSubmission {
 // ---------------------------------------------------------------------------
 
 model UploadSession {
-    id            String   @id @default(cuid())
+    id            String   @id @default(uuid(7)) @db.Uuid
     kind          String
-    ownerId       String?
-    connectionId  String
+    ownerId       String?  @db.Uuid
+    connectionId  String   @db.Uuid
     targetPath    String
     totalSize     BigInt
     receivedBytes BigInt   @default(0)
@@ -550,7 +557,7 @@ model UploadSession {
     // JSON record of received parts (offset + etag) for tus-style resume.
     partsJson     String   @default("[]")
     mime          String?
-    fileRequestId String?
+    fileRequestId String?  @db.Uuid
     status        String   @default("open")
     expiresAt     DateTime
     createdAt     DateTime @default(now())
@@ -567,11 +574,11 @@ model UploadSession {
 // ---------------------------------------------------------------------------
 
 model AuditLog {
-    id         String   @id @default(cuid())
-    actorId    String?
+    id         String   @id @default(uuid(7)) @db.Uuid
+    actorId    String?  @db.Uuid
     action     String
     targetType String?
-    targetId   String?
+    targetId   String?  @db.Uuid
     metadata   String?
     ipHash     String?
     at         DateTime @default(now())
@@ -581,18 +588,18 @@ model AuditLog {
 }
 
 model Setting {
-    id     String  @id @default(cuid())
+    id     String  @id @default(uuid(7)) @db.Uuid
     key    String  @unique
     value  String
     scope  String  @default("global")
-    userId String?
+    userId String? @db.Uuid
 
     @@index([scope])
 }
 
 // Cache of resolved IP geolocation, so a country/continent allowlist does not hit
 // an external provider on every access and a location is remembered for reuse.
-// Keyed by IP; refreshed lazily when a row ages out.
+// Keyed by IP (a natural key, not a surrogate uuid); refreshed lazily on age-out.
 model GeoIpCache {
     ip          String   @id
     countryCode String?
@@ -612,7 +619,7 @@ model GeoIpCache {
 // encrypted with the same AES-256-GCM master key as storage credentials, so a DB
 // dump yields no usable keys.
 model Integration {
-    id              String   @id @default(cuid())
+    id              String   @id @default(uuid(7)) @db.Uuid
     // Catalog slug, e.g. "virustotal". One install per provider.
     provider        String   @unique
     enabled         Boolean  @default(false)
@@ -622,7 +629,7 @@ model Integration {
     encryptedSecret Bytes?
     secretNonce     Bytes?
     secretKeyId     String?
-    installedById   String?
+    installedById   String?  @db.Uuid
     createdAt       DateTime @default(now())
     updatedAt       DateTime @updatedAt
 }
@@ -631,13 +638,13 @@ model Integration {
 // drop-point upload scanned by an integration) and surfaced by the bell and the
 // notifications page. Cascades away with the user.
 model Notification {
-    id        String    @id @default(cuid())
-    userId    String
+    id        String    @id @default(uuid(7)) @db.Uuid
+    userId    String    @db.Uuid
     // Category slug driving the icon, e.g. "scan.malicious", "scan.clean".
     type      String
     title     String
     body      String?
-    // Optional in-app deep link (e.g. "/requests").
+    // Optional in-app deep link (e.g. "/drive/drop-points").
     href      String?
     // Styling severity: info | success | warning | danger.
     level     String    @default("info")
@@ -657,10 +664,10 @@ model Notification {
 // a known hash. Not FK-bound to the submission so a purged submission does not
 // erase the security record.
 model FileScan {
-    id           String   @id @default(cuid())
+    id           String   @id @default(uuid(7)) @db.Uuid
     provider     String   @default("virustotal")
-    submissionId String?
-    connectionId String?
+    submissionId String?  @db.Uuid
+    connectionId String?  @db.Uuid
     path         String?
     sha256       String?
     // pending | clean | suspicious | malicious | unknown | error | skipped

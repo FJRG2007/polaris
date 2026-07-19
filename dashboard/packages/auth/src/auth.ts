@@ -11,6 +11,7 @@
  * and origin-check classes of issue this library has historically had.
  */
 
+import { randomUUID } from "node:crypto";
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { loadEnv } from "@polaris/config";
@@ -65,7 +66,11 @@ export function createAuth() {
             cookiePrefix: "polaris",
             // Off by default so sign-in works over plain HTTP (polaris.local on the
             // LAN); set POLARIS_SECURE_COOKIES=true for an HTTPS deployment.
-            useSecureCookies: env.POLARIS_SECURE_COOKIES
+            useSecureCookies: env.POLARIS_SECURE_COOKIES,
+            // The id columns are native uuid; better-auth generates the ids for its
+            // own tables (User/Session/Account/Verification), so emit UUIDs here to
+            // match. App-owned tables get UUIDv7 from the Prisma @default.
+            database: { generateId: () => randomUUID() }
         }
     });
 }
