@@ -8,7 +8,7 @@ import { createReadStream } from "node:fs";
 import { stat } from "node:fs/promises";
 import { Readable } from "node:stream";
 import { requireAdmin } from "@/lib/session";
-import { backupPath } from "@/lib/backup-service";
+import { backupFilePath } from "@/lib/backup-service";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -19,7 +19,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ nam
 
     let path: string;
     try {
-        path = backupPath(name);
+        path = await backupFilePath(name);
     } catch {
         return new Response("Invalid backup", { status: 400 });
     }

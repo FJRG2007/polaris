@@ -14,13 +14,13 @@ import {
     Button,
     Card,
     CardBody,
-    Checkbox,
     Dialog,
     DialogContent,
     DialogDescription,
     DialogHeader,
     DialogTitle,
     Input,
+    Switch,
     cn
 } from "@polaris/ui";
 import { SCAN_ACTIONS, type ScanAction } from "@/lib/integrations/registry";
@@ -164,15 +164,19 @@ function VirusTotalDialog({ card, onClose }: { card: IntegrationCard; onClose: (
                         ) : null}
                     </label>
 
-                    <label className="flex items-start gap-2 text-sm">
-                        <Checkbox checked={scanDropPoints} onChange={() => setScanDropPoints((prev) => !prev)} />
+                    <div className="flex items-start justify-between gap-3 text-sm">
                         <span>
                             <span className="font-medium">Scan drop-point uploads</span>
                             <span className="block text-xs text-muted-foreground">
                                 Every file uploaded to a drop point is scanned before it is accepted.
                             </span>
                         </span>
-                    </label>
+                        <Switch
+                            checked={scanDropPoints}
+                            onChange={setScanDropPoints}
+                            aria-label="Scan drop-point uploads"
+                        />
+                    </div>
 
                     <div className="flex flex-col gap-1.5">
                         <span className="text-sm font-medium">When a file is flagged</span>
@@ -208,13 +212,13 @@ function VirusTotalDialog({ card, onClose }: { card: IntegrationCard; onClose: (
                         </div>
                     </div>
 
-                    <label className="flex items-center gap-2 rounded-md border border-border p-2.5 text-sm">
-                        <Checkbox checked={enabled} onChange={() => setEnabled((prev) => !prev)} />
+                    <div className="flex items-center justify-between gap-3 rounded-md border border-border p-2.5 text-sm">
                         <span className="flex items-center gap-1.5 font-medium">
                             <ShieldCheck className="size-4 text-primary" />
                             Enable VirusTotal
                         </span>
-                    </label>
+                        <Switch checked={enabled} onChange={setEnabled} aria-label="Enable VirusTotal" />
+                    </div>
 
                     {error ? <p className="text-sm text-danger">{error}</p> : null}
 

@@ -143,6 +143,13 @@ export function SettingsView({
                         Take a full copy of the Polaris database before an upgrade or a migration. Backups are kept on
                         the host and can be downloaded. NAS and other-app backups are coming next.
                     </p>
+                    {backups.some((backup) => backup.ephemeral) ? (
+                        <p className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-warning">
+                            The data dir isn&apos;t writable, so backups are being kept in a temporary location and
+                            won&apos;t survive a restart - download them now. Redeploy to pick up the writable data
+                            dir.
+                        </p>
+                    ) : null}
                     {backupError ? <p className="text-sm text-danger">{backupError}</p> : null}
                     {backups.length === 0 ? (
                         <p className="rounded-md border border-dashed border-border px-3 py-4 text-center text-xs text-muted-foreground">

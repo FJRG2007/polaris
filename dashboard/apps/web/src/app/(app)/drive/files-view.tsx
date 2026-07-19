@@ -49,7 +49,8 @@ import {
     StickyNote,
     Trash2,
     Upload,
-    X
+    X,
+    type LucideIcon
 } from "lucide-react";
 import { formatBytes } from "@polaris/core";
 import {
@@ -109,6 +110,22 @@ const ACTIVITY_LABELS: Record<string, string> = {
 
 function activityLabel(action: string): string {
     return ACTIVITY_LABELS[action] ?? action.replace(/^drive\./, "");
+}
+
+/** Icon for an audit action shown beside its activity label. */
+const ACTIVITY_ICONS: Record<string, LucideIcon> = {
+    "drive.download": Download,
+    "drive.upload": Upload,
+    "drive.create": FilePlus,
+    "drive.mkdir": FolderPlus,
+    "drive.move": FolderInput,
+    "drive.copy": Copy,
+    "drive.trash": Trash2,
+    "drive.delete": Trash2
+};
+
+function activityIcon(action: string): LucideIcon {
+    return ACTIVITY_ICONS[action] ?? Info;
 }
 
 function downloadUrl(connectionId: string, path: string): string {
@@ -345,7 +362,11 @@ export function FilesView({
         if (renaming) return;
         const mod = event.ctrlKey || event.metaKey;
         const key = event.key.toLowerCase();
-        if (mod && key === "c" && selectedEntries.length > 0) {
+        if (event.key === "Escape" && selectedEntries.length > 0) {
+            event.preventDefault();
+            setSelected(new Set());
+            cursorRef.current = null;
+        } else if (mod && key === "c" && selectedEntries.length > 0) {
             event.preventDefault();
             setClipboard({ entries: selectedEntries, mode: "copy" });
         } else if (mod && key === "x" && selectedEntries.length > 0) {
@@ -1734,17 +1755,25 @@ export function FilesView({
                             <p className="text-xs text-muted-foreground/60">No recorded activity yet.</p>
                         ) : (
                             <ul className="flex flex-col gap-1.5">
-                                {activity.map((item) => (
-                                    <li key={item.id} className="flex flex-col text-xs">
-                                        <span>
-                                            {activityLabel(item.action)}
-                                            {item.actor ? ` by ${item.actor}` : ""}
-                                        </span>
-                                        <span className="text-muted-foreground/70">
-                                            <RelativeTime iso={item.at} />
-                                        </span>
-                                    </li>
-                                ))}
+                                {activity.map((item) => {
+                                    const Icon = activityIcon(item.action);
+                                    return (
+                                        <li key={item.id} className="flex items-start gap-2 text-xs">
+                                            <span className="mt-0.5 grid size-5 shrink-0 place-items-center rounded-full bg-muted text-muted-foreground">
+                                                <Icon className="size-3" />
+                                            </span>
+                                            <div className="flex min-w-0 flex-col">
+                                                <span>
+                                                    {activityLabel(item.action)}
+                                                    {item.actor ? ` by ${item.actor}` : ""}
+                                                </span>
+                                                <span className="text-muted-foreground/70">
+                                                    <RelativeTime iso={item.at} />
+                                                </span>
+                                            </div>
+                                        </li>
+                                    );
+                                })}
                             </ul>
                         )}
                     </div>
