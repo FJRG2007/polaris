@@ -572,11 +572,12 @@ export function FilesView({
                 </div>
             ) : null}
 
+            <div className="flex items-start gap-4">
             <div
                 tabIndex={0}
                 onKeyDown={onListKeyDown}
                 className={cn(
-                    "relative rounded-lg focus:outline-none",
+                    "relative min-w-0 flex-1 rounded-lg focus:outline-none",
                     dragUpload && "ring-2 ring-primary ring-offset-2 ring-offset-background"
                 )}
                 onDragOver={onUploadDragOver}
@@ -847,6 +848,56 @@ export function FilesView({
                     </div>
                 ) : null}
             </div>
+            {selectedEntries.length === 1 && selectedEntries[0] ? (
+                <aside className="hidden w-64 shrink-0 flex-col gap-4 rounded-lg border border-border p-4 lg:flex">
+                    <div className="flex flex-col items-center gap-2 text-center">
+                        <EntryIcon entry={selectedEntries[0]} className="size-10" />
+                        <span className="break-all text-sm font-medium">{selectedEntries[0].name}</span>
+                    </div>
+                    <dl className="flex flex-col gap-2 text-xs">
+                        <div className="flex justify-between gap-2">
+                            <dt className="text-muted-foreground">Type</dt>
+                            <dd className="truncate text-right">
+                                {selectedEntries[0].kind === "dir"
+                                    ? "Folder"
+                                    : extensionOf(selectedEntries[0].name)
+                                      ? `${extensionOf(selectedEntries[0].name).toUpperCase()} file`
+                                      : "File"}
+                            </dd>
+                        </div>
+                        <div className="flex justify-between gap-2">
+                            <dt className="text-muted-foreground">Size</dt>
+                            <dd className="text-right">
+                                {selectedEntries[0].kind === "dir"
+                                    ? "-"
+                                    : formatBytes(BigInt(selectedEntries[0].size))}
+                            </dd>
+                        </div>
+                        <div className="flex flex-col gap-0.5">
+                            <dt className="text-muted-foreground">Location</dt>
+                            <dd className="break-all">/{selectedEntries[0].path.split("/").slice(0, -1).join("/")}</dd>
+                        </div>
+                        <div className="flex flex-col gap-0.5">
+                            <dt className="text-muted-foreground">Modified</dt>
+                            <dd>{new Date(selectedEntries[0].modifiedAt).toLocaleString()}</dd>
+                        </div>
+                    </dl>
+                    <div className="flex flex-col gap-2">
+                        <Button size="sm" variant="secondary" onClick={() => selectedEntries[0] && openEntry(selectedEntries[0])}>
+                            Open
+                        </Button>
+                        <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => selectedEntries[0] && void navigator.clipboard.writeText(selectedEntries[0].path)}
+                        >
+                            <ClipboardCopy className="size-4" />
+                            Copy path
+                        </Button>
+                    </div>
+                </aside>
+            ) : null}
+            </div>
 
             <FileViewer target={viewerTarget} onOpenChange={(open) => !open && setViewerTarget(null)} />
 
@@ -954,13 +1005,13 @@ export function FilesView({
 }
 
 /** The icon for an entry - a user-set custom icon/color, or the default by kind. */
-function EntryIcon({ entry }: { entry: DriveEntry }) {
+function EntryIcon({ entry, className = "size-4" }: { entry: DriveEntry; className?: string }) {
     const Custom = iconComponent(entry.icon);
-    if (Custom) return <Custom className={cn("size-4", iconColorClass(entry.iconColor))} />;
+    if (Custom) return <Custom className={cn(className, iconColorClass(entry.iconColor))} />;
     return entry.kind === "dir" ? (
-        <Folder className="size-4 text-primary" />
+        <Folder className={cn(className, "text-primary")} />
     ) : (
-        <File className="size-4 text-muted-foreground" />
+        <File className={cn(className, "text-muted-foreground")} />
     );
 }
 
