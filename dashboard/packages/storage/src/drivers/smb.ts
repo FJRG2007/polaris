@@ -168,6 +168,15 @@ export class SmbDriver implements StorageDriver {
 
     public async readStream(path: string, _range?: ReadRange): Promise<ReadableStream<Uint8Array>> {
         const nodeStream = await this.c().createReadStream(this.smbPath(normalizeRelPath(path)));
+        // When a client aborts a download mid-stream, the SMB library tears down the
+        // file handle and can emit STATUS_FILE_CLOSED as an 'error' AFTER the web
+        // stream has already removed its own listener. With no listener that becomes
+        // an unhandled exception. Keep a persistent no-op listener so an aborted
+        // download is harmless; genuine read errors still reach the consumer via the
+        // web stream's own error propagation while it is active.
+        nodeStream.on("error", () => {
+            /* swallowed: abort/teardown races are expected here */
+        });
         return Readable.toWeb(nodeStream) as ReadableStream<Uint8Array>;
     }
 

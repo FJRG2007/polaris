@@ -71,6 +71,7 @@ import { FILE_CATEGORIES, categoryOfExtension, extensionOf, type FileCategory } 
 import { FileViewer, isViewable, type ViewerTarget } from "./file-viewer";
 import { ITEM_ICONS, ITEM_ICON_COLORS, iconColorClass, iconComponent } from "./item-icons";
 import { matchesStructured, parseSearch } from "./search-query";
+import { RelativeTime } from "@/components/relative-time";
 import type { DriveEntry } from "./types";
 
 type SortKey = "name" | "created" | "modified" | "size";
@@ -811,10 +812,10 @@ export function FilesView({
                                                         )}
                                                     </td>
                                                     <td className="hidden px-3 py-2 text-muted-foreground lg:table-cell">
-                                                        {new Date(entry.createdAt).toLocaleString()}
+                                                        <RelativeTime iso={entry.createdAt} />
                                                     </td>
                                                     <td className="hidden px-3 py-2 text-muted-foreground sm:table-cell">
-                                                        {new Date(entry.modifiedAt).toLocaleString()}
+                                                        <RelativeTime iso={entry.modifiedAt} />
                                                     </td>
                                                     <td className="px-3 py-2 text-muted-foreground">
                                                         {entry.kind === "dir" ? "-" : formatBytes(BigInt(entry.size))}
@@ -882,6 +883,7 @@ export function FilesView({
                                                 <ContextMenuItem onSelect={() => startRename(entry)}>
                                                     <Pencil className="size-4" />
                                                     Rename
+                                                    <span className="ml-auto pl-6 text-xs text-muted-foreground">F2</span>
                                                 </ContextMenuItem>
                                                 <ContextMenuItem
                                                     onSelect={() =>
@@ -893,6 +895,9 @@ export function FilesView({
                                                 >
                                                     <Copy className="size-4" />
                                                     Copy
+                                                    <span className="ml-auto pl-6 text-xs text-muted-foreground">
+                                                        Ctrl+C
+                                                    </span>
                                                 </ContextMenuItem>
                                                 <ContextMenuItem
                                                     onSelect={() =>
@@ -904,6 +909,9 @@ export function FilesView({
                                                 >
                                                     <Scissors className="size-4" />
                                                     Cut
+                                                    <span className="ml-auto pl-6 text-xs text-muted-foreground">
+                                                        Ctrl+X
+                                                    </span>
                                                 </ContextMenuItem>
                                                 <ContextMenuItem onSelect={() => duplicate(entry)}>
                                                     <Files className="size-4" />
@@ -952,6 +960,7 @@ export function FilesView({
                                                 <ContextMenuItem variant="danger" onSelect={() => onDelete([entry])}>
                                                     <Trash2 className="size-4" />
                                                     Delete
+                                                    <span className="ml-auto pl-6 text-xs text-muted-foreground">Del</span>
                                                 </ContextMenuItem>
                                             </ContextMenuContent>
                                         </ContextMenu>
