@@ -26,6 +26,7 @@ import {
     File,
     Folder,
     FolderPlus,
+    FolderUp,
     Inbox,
     Info,
     Palette,
@@ -54,6 +55,10 @@ import {
     DialogDescription,
     DialogHeader,
     DialogTitle,
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
     Input,
     Skeleton,
     cn
@@ -114,7 +119,7 @@ export function FilesView({
     fileInput: React.RefObject<HTMLInputElement | null>;
     href: (id: string, target: string) => string;
     onNewFolder: () => void;
-    onUpload: (files: FileList | null) => void;
+    onUpload: (items: { file: File; relPath: string }[]) => void;
     onDelete: (entries: DriveEntry[]) => void;
     onRename: (entry: DriveEntry, nextName: string) => void;
     onShare: (entry: DriveEntry) => void;
@@ -146,6 +151,7 @@ export function FilesView({
     const [dragUpload, setDragUpload] = useState(false);
     const [clipboard, setClipboard] = useState<{ entries: DriveEntry[]; mode: "copy" | "cut" } | null>(null);
     const dragPath = useRef<string | null>(null);
+    const folderInput = useRef<HTMLInputElement>(null);
     const router = useRouter();
 
     /** Paste the clipboard into the current folder: copy duplicates, cut moves. */
@@ -235,7 +241,9 @@ export function FilesView({
         if (!event.dataTransfer.types.includes("Files")) return;
         event.preventDefault();
         setDragUpload(false);
-        onUpload(event.dataTransfer.files);
+        // Copy the transfer synchronously; it is not available after the async walk.
+        const transfer = event.dataTransfer;
+        void gatherDropItems(transfer).then((items) => onUpload(items));
     }
 
     /** Drop a dragged row onto a folder to move it there (never into itself). */
@@ -421,21 +429,45 @@ export function FilesView({
                         <FolderPlus className="size-4" />
                         New folder
                     </Button>
-                    <Button
-                        size="sm"
-                        variant="secondary"
-                        onClick={() => fileInput.current?.click()}
-                        disabled={uploading}
-                    >
-                        <Upload className="size-4" />
-                        {uploading ? "Uploading..." : "Upload"}
-                    </Button>
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button size="sm" variant="secondary" disabled={uploading}>
+                                <Upload className="size-4" />
+                                {uploading ? "Uploading..." : "Upload"}
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                            <DropdownMenuItem onSelect={() => fileInput.current?.click()}>
+                                <Upload className="size-4" />
+                                Files
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onSelect={() => folderInput.current?.click()}>
+                                <FolderUp className="size-4" />
+                                Folder
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
                     <input
                         ref={fileInput}
                         type="file"
                         multiple
                         hidden
-                        onChange={(event) => onUpload(event.target.files)}
+                        onChange={(event) => {
+                            if (event.target.files) onUpload(filesToItems(event.target.files));
+                        }}
+                    />
+                    <input
+                        ref={(element) => {
+                            folderInput.current = element;
+                            // webkitdirectory is not a standard React prop; set it directly.
+                            if (element) element.setAttribute("webkitdirectory", "");
+                        }}
+                        type="file"
+                        hidden
+                        onChange={(event) => {
+                            if (event.target.files) onUpload(filesToItems(event.target.files));
+                            if (folderInput.current) folderInput.current.value = "";
+                        }}
                     />
                 </div>
             </div>
@@ -1035,6 +1067,71 @@ function EntryIcon({ entry, className = "size-4" }: { entry: DriveEntry; classNa
     ) : (
         <File className={cn(className, "text-muted-foreground")} />
     );
+}
+
+interface UploadItem {
+    file: File;
+    relPath: string;
+}
+
+/** Map a FileList to upload items, preserving folder structure when present. */
+function filesToItems(fileList: FileList): UploadItem[] {
+    return Array.from(fileList).map((file) => ({
+        file,
+        relPath: (file as File & { webkitRelativePath?: string }).webkitRelativePath || file.name
+    }));
+}
+
+/** Read every batch from a directory reader (readEntries returns in chunks). */
+function readAllEntries(reader: { readEntries: (cb: (entries: unknown[]) => void, err: (e: unknown) => void) => void }): Promise<unknown[]> {
+    return new Promise((resolve) => {
+        const all: unknown[] = [];
+        const next = () => {
+            reader.readEntries((batch) => {
+                if (batch.length === 0) resolve(all);
+                else {
+                    all.push(...batch);
+                    next();
+                }
+            }, () => resolve(all));
+        };
+        next();
+    });
+}
+
+/**
+ * Collect files (with folder-relative paths) from a drag-and-drop, walking any
+ * dropped directories via the FileSystem entry API. Falls back to the flat file
+ * list when the browser does not expose directory entries.
+ */
+async function gatherDropItems(dataTransfer: DataTransfer): Promise<UploadItem[]> {
+    const roots: unknown[] = [];
+    for (let index = 0; index < dataTransfer.items.length; index++) {
+        const item = dataTransfer.items[index] as DataTransferItem & { webkitGetAsEntry?: () => unknown };
+        const entry = item.webkitGetAsEntry?.();
+        if (entry) roots.push(entry);
+    }
+    if (roots.length === 0) return filesToItems(dataTransfer.files);
+
+    const out: UploadItem[] = [];
+    const walk = async (entry: unknown, prefix: string): Promise<void> => {
+        const node = entry as {
+            isFile?: boolean;
+            isDirectory?: boolean;
+            name: string;
+            file?: (cb: (file: File) => void, err: (e: unknown) => void) => void;
+            createReader?: () => { readEntries: (cb: (entries: unknown[]) => void, err: (e: unknown) => void) => void };
+        };
+        if (node.isFile && node.file) {
+            const file = await new Promise<File | null>((resolve) => node.file!(resolve, () => resolve(null)));
+            if (file) out.push({ file, relPath: `${prefix}${node.name}` });
+        } else if (node.isDirectory && node.createReader) {
+            const children = await readAllEntries(node.createReader());
+            for (const child of children) await walk(child, `${prefix}${node.name}/`);
+        }
+    };
+    for (const root of roots) await walk(root, "");
+    return out;
 }
 
 /** Placeholder while a directory listing loads. */

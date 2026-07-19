@@ -142,11 +142,13 @@ export function DriveExplorer({
         return `/drive?${query.toString()}`;
     }
 
-    async function onUpload(files: FileList | null) {
-        if (!files || !connectionId) return;
+    async function onUpload(items: { file: File; relPath: string }[]) {
+        if (!connectionId || items.length === 0) return;
         setUploading(true);
-        for (const file of Array.from(files)) {
-            const query = new URLSearchParams({ c: connectionId, name: file.name });
+        // relPath may be nested (a/b/file.txt) for a folder upload; the route
+        // creates the parent directories before writing.
+        for (const { file, relPath } of items) {
+            const query = new URLSearchParams({ c: connectionId, name: relPath });
             if (path) query.set("p", path);
             await fetch(`/api/drive/upload?${query.toString()}`, { method: "PUT", body: file });
         }

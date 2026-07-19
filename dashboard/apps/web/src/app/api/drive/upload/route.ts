@@ -38,6 +38,19 @@ export async function PUT(request: Request): Promise<Response> {
     const offset = offsetParam ? Number(offsetParam) : undefined;
     const driver = await getDriver(connectionId, user.id);
     try {
+        // A folder upload sends nested names (a/b/file.txt); make sure the parent
+        // directories exist before writing. mkdir on an existing dir is ignored.
+        const segments = target.split("/");
+        segments.pop();
+        let dir = "";
+        for (const segment of segments) {
+            dir = dir ? `${dir}/${segment}` : segment;
+            try {
+                await driver.mkdir(dir);
+            } catch {
+                // Already exists (or the driver made it implicitly); keep going.
+            }
+        }
         const stat = await driver.writeStream(target, request.body, { offset });
         await recordAudit({
             actorId: user.id,
