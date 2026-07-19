@@ -7,17 +7,22 @@
  */
 
 import Link from "next/link";
+import { cookies } from "next/headers";
+import { loadEnv } from "@polaris/config";
 import { formatBytes } from "@polaris/core";
 import { Badge, Card, CardBody, CardHeader, CardTitle, PolarisMark } from "@polaris/ui";
 import { getSession } from "@/lib/session";
 import { clientIp } from "@/lib/request-context";
 import {
     fileRequestIpAllowed,
+    fileRequestUnlockCookie,
     fileRequestUsability,
     parseStringArray,
-    resolveFileRequestByToken
+    resolveFileRequestByToken,
+    verifyFileRequestUnlock
 } from "@/lib/file-request-service";
 import { DropUploader } from "./upload-form";
+import { RequestPasswordForm } from "./request-password-form";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -66,6 +71,13 @@ export default async function DropPointPage({ params }: { params: Promise<{ toke
 
     if (!fileRequestIpAllowed(request.allowedCidrs, await clientIp())) {
         return <Notice title="Not available" message="This drop point is not available from your network." />;
+    }
+
+    if (request.passwordHash) {
+        const cookieValue = (await cookies()).get(fileRequestUnlockCookie(request.id))?.value;
+        if (!verifyFileRequestUnlock(request.id, cookieValue, loadEnv().POLARIS_AUTH_SECRET)) {
+            return <RequestPasswordForm token={token} title={request.title} />;
+        }
     }
 
     if (request.requireLogin) {

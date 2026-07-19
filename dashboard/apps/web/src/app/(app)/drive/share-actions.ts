@@ -26,6 +26,12 @@ import {
     verifySharePassword
 } from "@/lib/share-service";
 import { recordAudit } from "@/lib/audit-service";
+import { rateLimit, resetRateLimit } from "@/lib/rate-limit-service";
+import { clientIp, hashForLog } from "@/lib/request-context";
+
+/** Attempts allowed before a public password gate blocks, and the window. */
+const UNLOCK_LIMIT = 10;
+const UNLOCK_WINDOW_MS = 15 * 60 * 1000;
 
 /** Interface a share owner uses to edit an existing link's guardrails. */
 export interface UpdateShareInput {
@@ -135,9 +141,16 @@ export async function unlockShareAction(token: string, password: string): Promis
     const share = await resolveShareByToken(token);
     if (!share) return { error: "This link is not available." };
     if (!shareUsability(share).ok) return { error: "This link is no longer available." };
+
+    const limitKey = `share-unlock:${share.id}:${hashForLog(await clientIp()) ?? "unknown"}`;
+    if (!(await rateLimit(limitKey, UNLOCK_LIMIT, UNLOCK_WINDOW_MS)).ok) {
+        return { error: "Too many attempts. Please wait a few minutes and try again." };
+    }
+
     if (!(await verifySharePassword(share.passwordHash, password))) {
         return { error: "Incorrect password." };
     }
+    await resetRateLimit(limitKey);
     const env = loadEnv();
     const store = await cookies();
     store.set(shareUnlockCookie(share.id), signShareUnlock(share.id, env.POLARIS_AUTH_SECRET), {

@@ -31,6 +31,8 @@ export const createFileRequestSchema = z.object({
     destinationPath: z.string(),
     /** When false, anyone with the link may upload without authenticating. */
     requireLogin: z.boolean().default(false),
+    /** Optional access PIN/password gating the upload page. */
+    password: z.string().min(1).max(256).optional(),
     /** Hard per-file size ceiling, enforced by aborting the stream when exceeded. */
     maxSizeBytes: z.number().int().positive().max(Number.MAX_SAFE_INTEGER).default(DEFAULT_MAX_SIZE),
     /** Optional cap on how many files may be submitted in total. */

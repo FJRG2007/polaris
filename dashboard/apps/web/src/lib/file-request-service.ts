@@ -8,9 +8,11 @@
  * hash, so a dump yields no working links.
  */
 
+import { createHmac, timingSafeEqual } from "node:crypto";
 import type { CreateFileRequestInput } from "@polaris/core";
 import { ipAllowed, normalizeRelPath } from "@polaris/core";
 import { generateToken, hashToken } from "@polaris/core/tokens";
+import { hashLinkPassword, verifyLinkPassword } from "@polaris/core/link-password";
 import { prisma } from "@polaris/db";
 
 /** A file request as needed by the public upload path. */
@@ -36,6 +38,7 @@ export async function createFileRequest(
             destinationConnectionId: input.destinationConnectionId,
             destinationPath: normalizeRelPath(input.destinationPath),
             requireLogin: input.requireLogin,
+            passwordHash: input.password ? await hashLinkPassword(input.password) : null,
             maxSizeBytes: BigInt(input.maxSizeBytes),
             maxFiles: input.maxFiles ?? null,
             allowedExtensions: JSON.stringify(input.allowedExtensions),
@@ -87,6 +90,7 @@ export async function resolveFileRequestByToken(token: string) {
             destinationConnectionId: true,
             destinationPath: true,
             requireLogin: true,
+            passwordHash: true,
             maxSizeBytes: true,
             maxFiles: true,
             allowedExtensions: true,
@@ -127,6 +131,31 @@ export function fileRequestIpAllowed(allowedCidrsJson: string, ip: string | unde
     if (rules.length === 0) return true;
     if (!ip) return false;
     return ipAllowed(ip, rules);
+}
+
+/** Constant-time PIN/password check. No password set means always open. */
+export async function verifyFileRequestPassword(passwordHash: string | null, presented: string): Promise<boolean> {
+    if (!passwordHash) return true;
+    return verifyLinkPassword(presented, passwordHash);
+}
+
+/** Cookie name recording a solved PIN for one drop point. */
+export function fileRequestUnlockCookie(requestId: string): string {
+    return `polaris_drop_${requestId}`;
+}
+
+/** Sign an unlock marker so the "PIN solved" cookie cannot be forged. */
+export function signFileRequestUnlock(requestId: string, secret: string): string {
+    return createHmac("sha256", secret).update(`drop-unlock:${requestId}`).digest("base64url");
+}
+
+/** Constant-time check of an unlock cookie against the expected signature. */
+export function verifyFileRequestUnlock(requestId: string, value: string | undefined, secret: string): boolean {
+    if (!value) return false;
+    const expected = Buffer.from(signFileRequestUnlock(requestId, secret));
+    const presented = Buffer.from(value);
+    if (expected.length !== presented.length) return false;
+    return timingSafeEqual(presented, expected);
 }
 
 /** Parse a stored JSON string array back into a string[] (empty on any error). */

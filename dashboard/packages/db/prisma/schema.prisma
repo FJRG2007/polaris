@@ -329,6 +329,8 @@ model FileRequest {
     destinationConnectionId String
     destinationPath         String
     requireLogin            Boolean   @default(false)
+    // argon2 hash of an optional access PIN/password gating the upload page.
+    passwordHash            String?
     maxSizeBytes            BigInt
     maxFiles                Int?
     // JSON string arrays validated by @polaris/core.
@@ -344,6 +346,17 @@ model FileRequest {
     submissions FileRequestSubmission[]
 
     @@index([ownerId])
+}
+
+// Fixed-window rate-limit counters (e.g. password-guess throttling per link+IP).
+// A lightweight DB-backed limiter; a distributed deployment can swap in Redis.
+model RateLimitCounter {
+    id          String   @id @default(cuid())
+    key         String   @unique
+    count       Int      @default(0)
+    windowStart DateTime @default(now())
+
+    @@index([windowStart])
 }
 
 model FileRequestSubmission {

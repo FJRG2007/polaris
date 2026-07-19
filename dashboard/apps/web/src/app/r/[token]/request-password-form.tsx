@@ -1,22 +1,23 @@
 "use client";
 
 /**
- * Password gate for a protected share. Submits to the unlock action, which sets
- * the httpOnly unlock cookie on success and lets the page re-render into its
- * contents. Errors are deliberately generic so the form cannot be used to probe
- * which links exist or whether a guess was close.
+ * PIN gate for a protected drop point. Submits to the unlock action, which sets
+ * the httpOnly unlock cookie on success. A localStorage throttle imposes a short
+ * local cooldown after repeated failures - instant feedback that also spares the
+ * server; the server enforces the real rate limit. Errors are generic so the
+ * form cannot be used to probe which links exist.
  */
 
 import { useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Lock } from "lucide-react";
 import { Button, Card, CardBody, CardHeader, CardTitle, Input, PolarisMark } from "@polaris/ui";
-import { unlockShareAction } from "@/app/(app)/drive/share-actions";
+import { unlockFileRequestAction } from "@/app/(app)/drive/request-actions";
 import { clearAttempts, cooldownRemaining, recordFailure } from "@/lib/attempt-throttle";
 
-export function SharePasswordForm({ token }: { token: string }) {
+export function RequestPasswordForm({ token, title }: { token: string; title: string }) {
     const router = useRouter();
-    const [password, setPassword] = useState("");
+    const [pin, setPin] = useState("");
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
 
@@ -29,7 +30,7 @@ export function SharePasswordForm({ token }: { token: string }) {
             return;
         }
         startTransition(async () => {
-            const result = await unlockShareAction(token, password);
+            const result = await unlockFileRequestAction(token, pin);
             if (result.error) {
                 recordFailure(token);
                 setError(result.error);
@@ -50,25 +51,23 @@ export function SharePasswordForm({ token }: { token: string }) {
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                         <Lock className="size-4" />
-                        Password required
+                        {title}
                     </CardTitle>
                 </CardHeader>
                 <CardBody>
                     <form onSubmit={onSubmit} className="flex flex-col gap-3">
-                        <p className="text-sm text-muted-foreground">
-                            This link is protected. Enter its password to continue.
-                        </p>
+                        <p className="text-sm text-muted-foreground">Enter the PIN to upload to this drop point.</p>
                         <Input
                             type="password"
                             autoFocus
                             required
-                            value={password}
-                            onChange={(event) => setPassword(event.target.value)}
-                            placeholder="Password"
+                            value={pin}
+                            onChange={(event) => setPin(event.target.value)}
+                            placeholder="PIN"
                         />
                         {error ? <p className="text-sm text-danger">{error}</p> : null}
-                        <Button type="submit" disabled={pending || !password}>
-                            {pending ? "Checking..." : "Unlock"}
+                        <Button type="submit" disabled={pending || !pin}>
+                            {pending ? "Checking..." : "Continue"}
                         </Button>
                     </form>
                 </CardBody>

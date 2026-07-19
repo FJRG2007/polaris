@@ -104,6 +104,7 @@ export function RequestDialog({
             destinationConnectionId,
             destinationPath,
             requireLogin: form.get("requireLogin") === "on",
+            password: String(form.get("password") ?? "").trim() || undefined,
             maxSizeBytes: maxMb > 0 ? Math.floor(maxMb * 1024 * 1024) : 1024 * 1024 * 1024,
             maxFiles: maxFiles ? Number(maxFiles) : undefined,
             allowedExtensions,
@@ -243,6 +244,10 @@ export function RequestDialog({
                         <label className="flex flex-col gap-1 text-sm">
                             Restrict to IPs / ranges (optional)
                             <Input name="allowedCidrs" placeholder="e.g. 203.0.113.4, 10.0.0.0/24" autoComplete="off" />
+                        </label>
+                        <label className="flex flex-col gap-1 text-sm">
+                            Access PIN (optional)
+                            <Input name="password" type="password" placeholder="No PIN" autoComplete="off" />
                         </label>
                         <label className="flex items-center gap-2 text-sm">
                             <input type="checkbox" name="requireLogin" className="size-4" />

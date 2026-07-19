@@ -10,6 +10,8 @@
  */
 
 import { randomBytes } from "node:crypto";
+import { cookies } from "next/headers";
+import { loadEnv } from "@polaris/config";
 import { baseName, checkUploadCandidate, normalizeRelPath } from "@polaris/core";
 import { extensionOf } from "@/app/(app)/drive/file-categories";
 import { getSession } from "@/lib/session";
@@ -17,10 +19,12 @@ import { getDriverForConnection } from "@/lib/storage-service";
 import {
     countSubmissions,
     fileRequestIpAllowed,
+    fileRequestUnlockCookie,
     fileRequestUsability,
     parseStringArray,
     recordSubmission,
-    resolveFileRequestByToken
+    resolveFileRequestByToken,
+    verifyFileRequestUnlock
 } from "@/lib/file-request-service";
 import { clientIp, hashForLog } from "@/lib/request-context";
 
@@ -66,6 +70,13 @@ export async function PUT(
     const ip = await clientIp();
     if (!fileRequestIpAllowed(fileRequest.allowedCidrs, ip)) {
         return new Response("ip_not_allowed", { status: 403 });
+    }
+
+    if (fileRequest.passwordHash) {
+        const cookieValue = (await cookies()).get(fileRequestUnlockCookie(fileRequest.id))?.value;
+        if (!verifyFileRequestUnlock(fileRequest.id, cookieValue, loadEnv().POLARIS_AUTH_SECRET)) {
+            return new Response("pin_required", { status: 401 });
+        }
     }
 
     const session = await getSession();
