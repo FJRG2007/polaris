@@ -31,6 +31,11 @@ pub struct Config {
     pub mount_root: PathBuf,
     /// Whether the host reports the auto-update capability.
     pub auto_update: bool,
+    /// Shell command run (detached) to update and redeploy Polaris on the host,
+    /// e.g. `cd /root/polaris/dashboard/docker && docker compose pull && docker
+    /// compose up -d`. When unset, POST /v1/update reports not-implemented and the
+    /// dashboard shows the manual instruction instead of an "Update now" button.
+    pub update_cmd: Option<String>,
 }
 
 fn env(key: &str) -> Option<String> {
@@ -58,6 +63,7 @@ impl Config {
             auto_update: env("POLARIS_HOSTD_AUTOUPDATE")
                 .map(|v| !v.eq_ignore_ascii_case("false"))
                 .unwrap_or(true),
+            update_cmd: env("POLARIS_HOSTD_UPDATE_CMD"),
         }
     }
 }

@@ -80,6 +80,19 @@ export class HostdClient {
         }
     }
 
+    /**
+     * Trigger a host-side update + redeploy. "started" when the daemon kicked it
+     * off, "unavailable" when the host has no update command configured, "disabled"
+     * when auto-update is turned off; throws on a transport error.
+     */
+    public async update(): Promise<"started" | "unavailable" | "disabled"> {
+        const response = await this.call("POST", "/v1/update");
+        if (response.status === 202) return "started";
+        if (response.status === 501) return "unavailable";
+        if (response.status === 403) return "disabled";
+        throw new Error(`hostd update failed (${response.status}): ${response.body}`);
+    }
+
     private async token(): Promise<string> {
         return (await readFile(this.tokenFile, "utf8")).trim();
     }

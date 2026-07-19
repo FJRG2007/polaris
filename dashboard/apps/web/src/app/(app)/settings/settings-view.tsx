@@ -12,7 +12,12 @@ import { formatBytes } from "@polaris/core";
 import { Button, Card, CardBody, CardHeader, CardTitle } from "@polaris/ui";
 import type { UpdateStatus } from "@/lib/update-service";
 import type { BackupInfo } from "@/lib/backup-service";
-import { checkUpdatesAction, createBackupAction, deleteBackupAction } from "./actions";
+import {
+    checkUpdatesAction,
+    createBackupAction,
+    deleteBackupAction,
+    triggerHostUpdateAction
+} from "./actions";
 
 interface Deployment {
     readonly appUrl: string;
@@ -43,10 +48,34 @@ export function SettingsView({
     const [backupError, setBackupError] = useState<string | null>(null);
     const [busyBackup, setBusyBackup] = useState<string | null>(null);
 
+    const [updating, setUpdating] = useState(false);
+    const [updateMsg, setUpdateMsg] = useState<string | null>(null);
+    const [showManual, setShowManual] = useState(false);
+
     function onCheck() {
         startTransition(async () => {
             setStatus(await checkUpdatesAction());
         });
+    }
+
+    async function onUpdate() {
+        setUpdating(true);
+        setUpdateMsg(null);
+        setShowManual(false);
+        const { status: result } = await triggerHostUpdateAction();
+        setUpdating(false);
+        if (result === "started") {
+            setUpdateMsg("Update started - Polaris is pulling the new image and will restart. Refresh in a minute.");
+        } else if (result === "unavailable") {
+            setUpdateMsg("The host agent has no update command set (POLARIS_HOSTD_UPDATE_CMD). Use the manual command for now.");
+            setShowManual(true);
+        } else if (result === "disabled") {
+            setUpdateMsg("Auto-update is disabled on this host.");
+            setShowManual(true);
+        } else {
+            setUpdateMsg("Couldn't reach the host agent. Use the manual command below.");
+            setShowManual(true);
+        }
     }
 
     async function onBackup() {
@@ -117,12 +146,31 @@ export function SettingsView({
                     </dl>
 
                     {behind ? (
-                        <div className="rounded-md border border-border bg-muted/30 p-3 text-xs text-muted-foreground">
-                            Run <code className="text-foreground">polaris update</code> on the host to pull the latest
-                            image and redeploy.{" "}
-                            <a className="text-primary hover:underline" href={status.url} target="_blank" rel="noreferrer">
-                                View changes
-                            </a>
+                        <div className="flex flex-col gap-2 rounded-md border border-border bg-muted/30 p-3 text-xs text-muted-foreground">
+                            <div className="flex items-center justify-between gap-2">
+                                <span>
+                                    An update is available.{" "}
+                                    <a
+                                        className="text-primary hover:underline"
+                                        href={status.url}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                    >
+                                        View changes
+                                    </a>
+                                </span>
+                                <Button size="sm" onClick={onUpdate} disabled={updating}>
+                                    <DownloadCloud className={`size-4 ${updating ? "animate-pulse" : ""}`} />
+                                    {updating ? "Updating..." : "Update now"}
+                                </Button>
+                            </div>
+                            {updateMsg ? <p className="text-foreground">{updateMsg}</p> : null}
+                            {showManual ? (
+                                <p>
+                                    Run <code className="text-foreground">polaris update</code> on the host to pull the
+                                    latest image and redeploy.
+                                </p>
+                            ) : null}
                         </div>
                     ) : null}
                 </CardBody>

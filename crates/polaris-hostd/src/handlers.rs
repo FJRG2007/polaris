@@ -86,11 +86,7 @@ pub fn dispatch<R: Read>(state: &AppState, req: &Request, body: &mut R) -> Respo
     match (req.method.as_str(), path) {
         ("GET", "/v1/health") => health(state),
         ("POST", "/v1/mounts") => mount_create(state, req, body),
-        ("POST", "/v1/update") => {
-            // TODO(auto-update): perform the host-side image/binary update.
-            // Stubbed until the update channel and signature checks land.
-            Response::not_implemented("auto-update not yet implemented")
-        }
+        ("POST", "/v1/update") => update(state),
         _ if path.starts_with("/v1/fs/") => fs_handler(state, req, body),
         ("DELETE", _) if path.starts_with("/v1/mounts/") => {
             mount_delete(state, &path["/v1/mounts/".len()..])
@@ -114,6 +110,58 @@ fn health(state: &AppState) -> Response {
         "capabilities": capabilities(&state.config),
     });
     Response::json(200, "OK", &body)
+}
+
+/// Trigger a host-side update + redeploy. Runs the operator-configured update
+/// command detached (in its own session) so it survives this daemon being
+/// recreated by the redeploy it kicks off. Gated on the auto-update capability;
+/// reports not-implemented when no command is configured.
+fn update(state: &AppState) -> Response {
+    if !state.config.auto_update {
+        return Response::forbidden("auto-update is disabled on this host");
+    }
+    let cmd = match state.config.update_cmd.as_deref() {
+        Some(cmd) => cmd,
+        None => {
+            return Response::not_implemented(
+                "no update command configured (set POLARIS_HOSTD_UPDATE_CMD)",
+            );
+        }
+    };
+    match spawn_update(cmd) {
+        Ok(()) => Response::json(202, "Accepted", &serde_json::json!({ "status": "started" })),
+        Err(_) => Response::json(
+            500,
+            "Internal Server Error",
+            &serde_json::json!({ "error": "failed to start the update" }),
+        ),
+    }
+}
+
+/// Spawn the update command detached from this process. `setsid` puts it in a new
+/// session so a redeploy that recreates this daemon does not kill the update
+/// mid-flight; stdio is discarded. The command is the operator's own configured
+/// string - no network input ever reaches it.
+#[cfg(unix)]
+fn spawn_update(cmd: &str) -> std::io::Result<()> {
+    use std::process::{Command, Stdio};
+    Command::new("setsid")
+        .arg("sh")
+        .arg("-c")
+        .arg(cmd)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .map(|_| ())
+}
+
+#[cfg(not(unix))]
+fn spawn_update(_cmd: &str) -> std::io::Result<()> {
+    Err(std::io::Error::new(
+        std::io::ErrorKind::Unsupported,
+        "update is only supported on unix hosts",
+    ))
 }
 
 /// Map a path-resolution error to a safe 403/400 response.
