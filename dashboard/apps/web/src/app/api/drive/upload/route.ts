@@ -9,6 +9,7 @@ import { normalizeRelPath } from "@polaris/core";
 import { userHasPermission } from "@polaris/auth";
 import { requireUser } from "@/lib/session";
 import { requireDriveDriver, DriveAccessError, DriveLockedError } from "@/lib/drive-authz";
+import { recordItemCreator } from "@/lib/drive-meta-service";
 import { recordAudit } from "@/lib/audit-service";
 
 export const runtime = "nodejs";
@@ -60,6 +61,7 @@ export async function PUT(request: Request): Promise<Response> {
             }
         }
         const stat = await driver.writeStream(target, request.body, { offset });
+        await recordItemCreator(connectionId, target, user.id);
         await recordAudit({
             actorId: user.id,
             action: "drive.upload",

@@ -82,6 +82,29 @@ import type { DriveEntry } from "./types";
 type SortKey = "name" | "created" | "modified" | "size";
 type SortDir = "asc" | "desc";
 
+interface ActivityItem {
+    id: string;
+    action: string;
+    actor: string | null;
+    at: string;
+}
+
+/** Human label for an audit action shown in the activity feed. */
+const ACTIVITY_LABELS: Record<string, string> = {
+    "drive.download": "Downloaded",
+    "drive.upload": "Uploaded",
+    "drive.create": "Created",
+    "drive.mkdir": "Created",
+    "drive.move": "Moved or renamed",
+    "drive.copy": "Copied",
+    "drive.trash": "Moved to Trash",
+    "drive.delete": "Deleted"
+};
+
+function activityLabel(action: string): string {
+    return ACTIVITY_LABELS[action] ?? action.replace(/^drive\./, "");
+}
+
 function downloadUrl(connectionId: string, path: string): string {
     return `/api/drive/download?c=${connectionId}&p=${encodeURIComponent(path)}`;
 }
@@ -175,7 +198,8 @@ export function FilesView({
 }) {
     const [query, setQuery] = useState("");
     // Search scope: the current folder only, or a recursive walk from here.
-    const [searchScope, setSearchScope] = useState<"current" | "recursive">("current");
+    // Recursive by default so a search finds nested items without an extra click.
+    const [searchScope, setSearchScope] = useState<"current" | "recursive">("recursive");
     const [remoteEntries, setRemoteEntries] = useState<DriveEntry[] | null>(null);
     const [searching, setSearching] = useState(false);
     const [searchTruncated, setSearchTruncated] = useState(false);
@@ -202,6 +226,8 @@ export function FilesView({
     const [noteValue, setNoteValue] = useState("");
     const [moveTargets, setMoveTargets] = useState<DriveEntry[] | null>(null);
     const [moveDest, setMoveDest] = useState("");
+    const [activity, setActivity] = useState<ActivityItem[]>([]);
+    const [activityLoading, setActivityLoading] = useState(false);
 
     function openNote(entry: DriveEntry) {
         setNoteTarget(entry);
@@ -348,6 +374,13 @@ export function FilesView({
         lastIndex.current = null;
     }, [connectionId, path]);
 
+    // The clipboard holds paths from one connection; copy/move actions run against
+    // a single connection's driver, so a cut/copy cannot be pasted into a different
+    // connection. Drop it when the connection changes to avoid a silent no-op.
+    useEffect(() => {
+        setClipboard(null);
+    }, [connectionId]);
+
     // Recursive search: when the scope is "recursive" and there is a query, walk
     // the subtree server-side (debounced) instead of filtering the local listing.
     useEffect(() => {
@@ -451,6 +484,30 @@ export function FilesView({
     const selectedEntries = visible.filter((entry) => selected.has(entry.path));
     const allSelected = visible.length > 0 && selectedEntries.length === visible.length;
     const searchError = useMemo(() => parseSearch(query).error, [query]);
+
+    // Load the activity feed for a single selected item (downloads, renames, ...).
+    const singleSelectedPath = selectedEntries.length === 1 ? (selectedEntries[0]?.path ?? null) : null;
+    useEffect(() => {
+        if (!singleSelectedPath) {
+            setActivity([]);
+            return;
+        }
+        const controller = new AbortController();
+        setActivityLoading(true);
+        const params = new URLSearchParams({ c: connectionId, p: singleSelectedPath });
+        fetch(`/api/drive/activity?${params.toString()}`, { signal: controller.signal })
+            .then((res) => res.json())
+            .then((body) => {
+                if (!controller.signal.aborted) setActivity(Array.isArray(body.items) ? body.items : []);
+            })
+            .catch(() => {
+                if (!controller.signal.aborted) setActivity([]);
+            })
+            .finally(() => {
+                if (!controller.signal.aborted) setActivityLoading(false);
+            });
+        return () => controller.abort();
+    }, [connectionId, singleSelectedPath]);
 
     // Windowed rendering: only the rows in view (plus a small overscan) are in the
     // DOM, so a folder with millions of entries scrolls smoothly - rows that leave
@@ -862,7 +919,7 @@ export function FilesView({
                 </div>
             ) : null}
 
-            <div className="flex items-start gap-4">
+            <div className="flex items-stretch gap-4">
             <ContextMenu>
             <ContextMenuTrigger asChild>
             <div
@@ -1002,7 +1059,9 @@ export function FilesView({
                                                                 onChange={(e) => setRenameValue(e.target.value)}
                                                                 onKeyDown={(e) => onRenameKey(e, entry)}
                                                                 onBlur={() => submitRename(entry)}
-                                                                className="h-7 py-1"
+                                                                onClick={(e) => e.stopPropagation()}
+                                                                size={Math.max(renameValue.length + 1, 8)}
+                                                                className="h-7 !w-auto max-w-full py-1"
                                                             />
                                                         ) : entry.kind === "dir" ? (
                                                             <Link
@@ -1283,7 +1342,7 @@ export function FilesView({
             </ContextMenuContent>
             </ContextMenu>
             {selectedEntries.length === 1 && selectedEntries[0] ? (
-                <aside className="hidden w-64 shrink-0 flex-col gap-4 rounded-lg border border-border p-4 lg:flex">
+                <aside className="hidden w-72 shrink-0 flex-col gap-4 self-stretch overflow-auto rounded-lg border border-border p-4 lg:flex">
                     <div className="flex flex-col items-center gap-2 text-center">
                         <EntryIcon entry={selectedEntries[0]} className="size-10" />
                         <span className="break-all text-sm font-medium">{selectedEntries[0].name}</span>
@@ -1306,6 +1365,10 @@ export function FilesView({
                                     ? "-"
                                     : formatBytes(BigInt(selectedEntries[0].size))}
                             </dd>
+                        </div>
+                        <div className="flex justify-between gap-2">
+                            <dt className="text-muted-foreground">Owner</dt>
+                            <dd className="truncate text-right">{selectedEntries[0].owner ?? "Unknown"}</dd>
                         </div>
                         <div className="flex flex-col gap-0.5">
                             <dt className="text-muted-foreground">Location</dt>
@@ -1365,7 +1428,29 @@ export function FilesView({
                             {selectedEntries[0].favorite ? "Starred" : "Star"}
                         </Button>
                     </div>
-                    <div className="flex flex-col gap-1 border-t border-border pt-3">
+                    <div className="flex flex-col gap-1.5 border-t border-border pt-3">
+                        <span className="text-xs font-medium text-muted-foreground">Activity</span>
+                        {activityLoading ? (
+                            <p className="text-xs text-muted-foreground/60">Loading...</p>
+                        ) : activity.length === 0 ? (
+                            <p className="text-xs text-muted-foreground/60">No recorded activity yet.</p>
+                        ) : (
+                            <ul className="flex flex-col gap-1.5">
+                                {activity.map((item) => (
+                                    <li key={item.id} className="flex flex-col text-xs">
+                                        <span>
+                                            {activityLabel(item.action)}
+                                            {item.actor ? ` by ${item.actor}` : ""}
+                                        </span>
+                                        <span className="text-muted-foreground/70">
+                                            <RelativeTime iso={item.at} />
+                                        </span>
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                    </div>
+                    <div className="mt-auto flex flex-col gap-1 border-t border-border pt-3">
                         <div className="flex items-center justify-between">
                             <span className="text-xs font-medium text-muted-foreground">Note</span>
                             <button

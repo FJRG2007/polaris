@@ -13,7 +13,7 @@
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Folder, HardDrive, Info, Loader2, Pencil, ShieldCheck, Trash2 } from "lucide-react";
+import { Folder, HardDrive, Info, Loader2, Pencil, ShieldCheck, Trash2, X } from "lucide-react";
 import {
     Badge,
     Button,
@@ -87,15 +87,21 @@ export function DriveExplorer({
     const [shareTarget, setShareTarget] = useState<ShareTarget | null>(null);
     const [requestTarget, setRequestTarget] = useState<RequestTarget | null>(null);
     const [ops, setOps] = useState<{ id: string; label: string }[]>([]);
+    const [opError, setOpError] = useState<string | null>(null);
 
     /** Run a mutating operation in the background: shows in the operations panel,
-     * keeps the dashboard usable (a transition), and refreshes the listing after. */
-    function runOp(label: string, fn: () => Promise<void>) {
+     * keeps the dashboard usable (a transition), and refreshes the listing after.
+     * A structured or thrown error surfaces in a banner instead of failing silently. */
+    function runOp(label: string, fn: () => Promise<{ error?: string } | void>) {
         const id = crypto.randomUUID();
+        setOpError(null);
         setOps((prev) => [...prev, { id, label }]);
         startTransition(async () => {
             try {
-                await fn();
+                const result = await fn();
+                if (result && typeof result === "object" && result.error) setOpError(result.error);
+            } catch (caught) {
+                setOpError(caught instanceof Error && caught.message ? caught.message : `${label} failed`);
             } finally {
                 setOps((prev) => prev.filter((op) => op.id !== id));
                 void load();
@@ -189,8 +195,10 @@ export function DriveExplorer({
         setEntries((prev) =>
             prev.map((row) => (row.path === entry.path ? { ...row, name: nextName, path: to } : row))
         );
+        setOpError(null);
         startTransition(async () => {
-            await renameAction(connectionId, entry.path, to);
+            const result = await renameAction(connectionId, entry.path, to);
+            if (result?.error) setOpError(result.error);
             void load();
         });
     }
@@ -425,6 +433,21 @@ export function DriveExplorer({
                             <span className="truncate">{op.label}</span>
                         </div>
                     ))}
+                </div>
+            ) : null}
+
+            {opError ? (
+                <div className="fixed bottom-4 right-4 z-50 flex w-80 items-start gap-2 rounded-lg border border-danger/40 bg-danger/10 p-3 text-sm text-danger shadow-lg">
+                    <Info className="mt-0.5 size-4 shrink-0" />
+                    <span className="min-w-0 flex-1 break-words">{opError}</span>
+                    <button
+                        type="button"
+                        onClick={() => setOpError(null)}
+                        className="shrink-0 rounded p-0.5 hover:bg-danger/10"
+                        aria-label="Dismiss"
+                    >
+                        <X className="size-4" />
+                    </button>
                 </div>
             ) : null}
 

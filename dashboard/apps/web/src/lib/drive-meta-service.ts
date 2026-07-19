@@ -14,6 +14,7 @@ export interface ItemMeta {
     icon: string | null;
     iconColor: string | null;
     note: string | null;
+    creatorId: string | null;
 }
 
 /** Metadata for the given paths in a connection, as a path -> meta map. */
@@ -21,14 +22,53 @@ export async function getMetaMap(connectionId: string, paths: string[]): Promise
     if (paths.length === 0) return new Map();
     const rows = await prisma.driveItemMeta.findMany({
         where: { connectionId, path: { in: paths } },
-        select: { path: true, hidden: true, favorite: true, icon: true, iconColor: true, note: true }
+        select: { path: true, hidden: true, favorite: true, icon: true, iconColor: true, note: true, creatorId: true }
     });
     return new Map(
         rows.map((row) => [
             row.path,
-            { hidden: row.hidden, favorite: row.favorite, icon: row.icon, iconColor: row.iconColor, note: row.note }
+            {
+                hidden: row.hidden,
+                favorite: row.favorite,
+                icon: row.icon,
+                iconColor: row.iconColor,
+                note: row.note,
+                creatorId: row.creatorId
+            }
         ])
     );
+}
+
+/**
+ * Record who created/uploaded an item (a creation event, not a user-set flag), so
+ * the browser can show its owner. Not ownership-asserted - it is a system fact
+ * that also holds for items on connections shared to a grantee - so the meta row's
+ * ownerId is set to the connection's actual owner. No-op without a creator id.
+ */
+export async function recordItemCreator(
+    connectionId: string,
+    path: string,
+    creatorId: string | null
+): Promise<void> {
+    if (!creatorId) return;
+    const connection = await prisma.storageConnection.findUnique({
+        where: { id: connectionId },
+        select: { ownerId: true }
+    });
+    if (!connection) return;
+    await prisma.driveItemMeta.upsert({
+        where: { connectionId_path: { connectionId, path } },
+        create: { ownerId: connection.ownerId, connectionId, path, creatorId },
+        update: { creatorId }
+    });
+}
+
+/** Resolve a set of user ids to a display-name map (for showing item owners). */
+export async function resolveUserNames(userIds: string[]): Promise<Map<string, string>> {
+    const unique = [...new Set(userIds.filter(Boolean))];
+    if (unique.length === 0) return new Map();
+    const users = await prisma.user.findMany({ where: { id: { in: unique } }, select: { id: true, name: true } });
+    return new Map(users.map((user) => [user.id, user.name]));
 }
 
 /** Assert the connection is owned by the user (throws otherwise). */

@@ -17,7 +17,7 @@ import {
     storageCredentialsSchema
 } from "@polaris/core";
 import { requirePermission, requireUser } from "@/lib/session";
-import { authorizeDrive, requireDriveDriver } from "@/lib/drive-authz";
+import { authorizeDrive, requireDriveDriver, DriveAccessError, DriveLockedError } from "@/lib/drive-authz";
 import {
     createConnection,
     deleteConnection,
@@ -28,7 +28,7 @@ import {
 } from "@/lib/storage-service";
 import { detectHost, type NasDetection } from "@/lib/nas-detect";
 import { fetchUnasMetrics } from "@/lib/unifi-unas";
-import { moveItemMeta, setItemFavorite, setItemHidden, setItemIcon, setItemNote } from "@/lib/drive-meta-service";
+import { moveItemMeta, recordItemCreator, setItemFavorite, setItemHidden, setItemIcon, setItemNote } from "@/lib/drive-meta-service";
 import { deleteTrashForever, emptyTrash, moveToTrash, restoreTrash } from "@/lib/trash-service";
 import { recordAudit } from "@/lib/audit-service";
 
@@ -197,6 +197,7 @@ export async function mkdirAction(connectionId: string, path: string, name: stri
     } finally {
         await driver.dispose();
     }
+    await recordItemCreator(connectionId, target, user.id);
     await recordAudit({ actorId: user.id, action: "drive.mkdir", targetType: "connection", targetId: connectionId, metadata: { path: target } });
     revalidatePath("/drive");
 }
@@ -218,6 +219,7 @@ export async function createFileAction(connectionId: string, path: string, name:
     } finally {
         await driver.dispose();
     }
+    await recordItemCreator(connectionId, target, user.id);
     await recordAudit({ actorId: user.id, action: "drive.create", targetType: "connection", targetId: connectionId, metadata: { path: target } });
     revalidatePath("/drive");
 }
@@ -266,13 +268,32 @@ export async function emptyTrashAction(): Promise<void> {
     revalidatePath("/trash");
 }
 
-export async function renameAction(connectionId: string, from: string, to: string): Promise<void> {
+/** Human message for a Drive authorization/lock failure, else a fallback. */
+function driveErrorMessage(caught: unknown, fallback: string): string {
+    if (caught instanceof DriveLockedError) return "That location is locked.";
+    if (caught instanceof DriveAccessError) return "You do not have access to that location.";
+    return caught instanceof Error && caught.message ? caught.message : fallback;
+}
+
+/**
+ * Move or rename an item. Returns a structured error instead of throwing so the
+ * browser can surface why a move/paste failed (permission, lock, driver error)
+ * rather than silently doing nothing.
+ */
+export async function renameAction(connectionId: string, from: string, to: string): Promise<{ error?: string }> {
     const user = await requireUser();
     const normalizedFrom = normalizeRelPath(from);
     const normalizedTo = normalizeRelPath(to);
-    const driver = await requireDriveDriver(user.id, connectionId, from, "rename");
+    let driver;
+    try {
+        driver = await requireDriveDriver(user.id, connectionId, from, "rename");
+    } catch (caught) {
+        return { error: driveErrorMessage(caught, "You cannot move or rename this item.") };
+    }
     try {
         await driver.move(normalizedFrom, normalizedTo);
+    } catch (caught) {
+        return { error: driveErrorMessage(caught, "Could not move the item.") };
     } finally {
         await driver.dispose();
     }
@@ -280,6 +301,7 @@ export async function renameAction(connectionId: string, from: string, to: strin
     await moveItemMeta(connectionId, normalizedFrom, normalizedTo);
     await recordAudit({ actorId: user.id, action: "drive.move", targetType: "connection", targetId: connectionId, metadata: { from, to } });
     revalidatePath("/drive");
+    return {};
 }
 
 /** Hide or unhide an item in the browser (presentation only; the file is untouched). */
@@ -367,23 +389,29 @@ async function copyRecursive(driver: Driver, from: string, to: string): Promise<
  * has a native move but no copy, so this streams file bytes and walks folders.
  * Collisions get a " copy" suffix so pasting into the source folder is safe.
  */
-export async function copyAction(connectionId: string, from: string, destFolder: string): Promise<void> {
+export async function copyAction(connectionId: string, from: string, destFolder: string): Promise<{ error?: string }> {
     const user = await requireUser();
     const source = normalizeRelPath(from);
     const base = baseName(source);
     // Copy reads the source and writes into the destination folder; both ends must
     // be authorized.
-    await authorizeDrive(user.id, connectionId, destFolder, "write");
-    const driver = await requireDriveDriver(user.id, connectionId, from, "copy");
+    let driver;
     try {
-        const destination = await freeName(
-            driver,
-            normalizeRelPath(destFolder ? `${destFolder}/${base}` : base)
-        );
+        await authorizeDrive(user.id, connectionId, destFolder, "write");
+        driver = await requireDriveDriver(user.id, connectionId, from, "copy");
+    } catch (caught) {
+        return { error: driveErrorMessage(caught, "You cannot copy into that location.") };
+    }
+    let destination = "";
+    try {
+        destination = await freeName(driver, normalizeRelPath(destFolder ? `${destFolder}/${base}` : base));
         await copyRecursive(driver, source, destination);
+    } catch (caught) {
+        return { error: driveErrorMessage(caught, "Could not copy the item.") };
     } finally {
         await driver.dispose();
     }
+    await recordItemCreator(connectionId, destination, user.id);
     await recordAudit({
         actorId: user.id,
         action: "drive.copy",
@@ -392,4 +420,5 @@ export async function copyAction(connectionId: string, from: string, destFolder:
         metadata: { from: source, to: destFolder }
     });
     revalidatePath("/drive");
+    return {};
 }

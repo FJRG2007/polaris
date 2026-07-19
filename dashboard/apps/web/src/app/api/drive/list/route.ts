@@ -14,7 +14,7 @@ import { userHasPermission } from "@polaris/auth";
 import { requireUser } from "@/lib/session";
 import { getDriverForConnection, SmbShareRequiredError } from "@/lib/storage-service";
 import { authorizeDrive, DriveAccessError, DriveLockedError } from "@/lib/drive-authz";
-import { getMetaMap } from "@/lib/drive-meta-service";
+import { getMetaMap, resolveUserNames } from "@/lib/drive-meta-service";
 import { listLocks } from "@/lib/access-lock-service";
 
 export const runtime = "nodejs";
@@ -76,6 +76,10 @@ export async function GET(request: Request): Promise<Response> {
             listLocks(connectionId)
         ]);
         const lockedPaths = new Set(locks.map((lock) => lock.path));
+        // Resolve the creator ids present in this listing to display names once.
+        const names = await resolveUserNames(
+            [...meta.values()].map((item) => item.creatorId).filter((id): id is string => Boolean(id))
+        );
         const entries = visibleEntries.map((entry) => {
             const item = meta.get(entry.path);
             return {
@@ -90,6 +94,7 @@ export async function GET(request: Request): Promise<Response> {
                 icon: item?.icon ?? null,
                 iconColor: item?.iconColor ?? null,
                 note: item?.note ?? null,
+                owner: item?.creatorId ? (names.get(item.creatorId) ?? null) : null,
                 // A folder that is itself an access-gate root, for a lock badge.
                 locked: lockedPaths.has(entry.path)
             };

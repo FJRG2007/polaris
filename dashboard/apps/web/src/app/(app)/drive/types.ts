@@ -31,6 +31,8 @@ export interface DriveEntry {
     icon?: string | null;
     iconColor?: string | null;
     note?: string | null;
+    /** Display name of the Polaris user who uploaded/created this item, if known. */
+    owner?: string | null;
     /** True when this folder is itself an access-gate (lock) root. */
     locked?: boolean;
 }
