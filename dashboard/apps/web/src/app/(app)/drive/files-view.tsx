@@ -25,7 +25,9 @@ import {
     EyeOff,
     File,
     FilePlus,
+    Files,
     Folder,
+    FolderInput,
     FolderPlus,
     FolderUp,
     Inbox,
@@ -156,10 +158,36 @@ export function FilesView({
     const [detailsTarget, setDetailsTarget] = useState<DriveEntry | null>(null);
     const [noteTarget, setNoteTarget] = useState<DriveEntry | null>(null);
     const [noteValue, setNoteValue] = useState("");
+    const [moveTargets, setMoveTargets] = useState<DriveEntry[] | null>(null);
+    const [moveDest, setMoveDest] = useState("");
 
     function openNote(entry: DriveEntry) {
         setNoteTarget(entry);
         setNoteValue(entry.note ?? "");
+    }
+
+    /** Parent folder path of a relative path ("a/b/c" -> "a/b"). */
+    function parentOf(target: string): string {
+        const slash = target.lastIndexOf("/");
+        return slash >= 0 ? target.slice(0, slash) : "";
+    }
+
+    /** Copy an item into its own folder (a duplicate gets a " copy" suffix). */
+    function duplicate(entry: DriveEntry) {
+        onCopy(entry, parentOf(entry.path));
+    }
+
+    function openMove(entries: DriveEntry[]) {
+        setMoveTargets(entries);
+        setMoveDest(path);
+    }
+
+    function submitMove(event: React.FormEvent) {
+        event.preventDefault();
+        if (!moveTargets) return;
+        const dest = moveDest.trim().replace(/^\/+|\/+$/g, "");
+        for (const entry of moveTargets) onMove(entry, dest);
+        setMoveTargets(null);
     }
     const [dragUpload, setDragUpload] = useState(false);
     const [clipboard, setClipboard] = useState<{ entries: DriveEntry[]; mode: "copy" | "cut" } | null>(null);
@@ -877,6 +905,18 @@ export function FilesView({
                                                     <Scissors className="size-4" />
                                                     Cut
                                                 </ContextMenuItem>
+                                                <ContextMenuItem onSelect={() => duplicate(entry)}>
+                                                    <Files className="size-4" />
+                                                    Duplicate
+                                                </ContextMenuItem>
+                                                <ContextMenuItem
+                                                    onSelect={() =>
+                                                        openMove(selected.has(entry.path) ? selectedEntries : [entry])
+                                                    }
+                                                >
+                                                    <FolderInput className="size-4" />
+                                                    Move to...
+                                                </ContextMenuItem>
                                                 <ContextMenuItem
                                                     onSelect={() => void navigator.clipboard.writeText(entry.path)}
                                                 >
@@ -993,9 +1033,25 @@ export function FilesView({
                             <dd>{new Date(selectedEntries[0].modifiedAt).toLocaleString()}</dd>
                         </div>
                     </dl>
-                    <div className="flex flex-col gap-2">
+                    <div className="grid grid-cols-2 gap-2">
                         <Button size="sm" variant="secondary" onClick={() => selectedEntries[0] && openEntry(selectedEntries[0])}>
                             Open
+                        </Button>
+                        <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => selectedEntries[0] && duplicate(selectedEntries[0])}
+                        >
+                            <Files className="size-4" />
+                            Duplicate
+                        </Button>
+                        <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => selectedEntries[0] && openMove([selectedEntries[0]])}
+                        >
+                            <FolderInput className="size-4" />
+                            Move
                         </Button>
                         <Button
                             size="sm"
@@ -1179,6 +1235,33 @@ export function FilesView({
                             <Button type="submit" size="sm">
                                 Save
                             </Button>
+                        </div>
+                    </form>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={moveTargets !== null} onOpenChange={(open) => !open && setMoveTargets(null)}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>
+                            Move {moveTargets && moveTargets.length > 1 ? `${moveTargets.length} items` : "item"}
+                        </DialogTitle>
+                        <DialogDescription>
+                            Destination folder (relative to the connection root; empty means the root).
+                        </DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={submitMove} className="flex flex-col gap-3">
+                        <Input
+                            autoFocus
+                            value={moveDest}
+                            onChange={(event) => setMoveDest(event.target.value)}
+                            placeholder="e.g. Documents/Archive"
+                        />
+                        <div className="flex justify-end gap-2">
+                            <Button type="button" variant="ghost" onClick={() => setMoveTargets(null)}>
+                                Cancel
+                            </Button>
+                            <Button type="submit">Move</Button>
                         </div>
                     </form>
                 </DialogContent>
