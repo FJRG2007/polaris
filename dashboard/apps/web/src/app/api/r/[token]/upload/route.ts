@@ -16,6 +16,7 @@ import { baseName, checkUploadCandidate, normalizeRelPath } from "@polaris/core"
 import { extensionOf } from "@/app/(app)/drive/file-categories";
 import { getSession } from "@/lib/session";
 import { getDriverForConnection } from "@/lib/storage-service";
+import { recordItemCreator } from "@/lib/drive-meta-service";
 import {
     countSubmissions,
     fileRequestIpAllowed,
@@ -27,6 +28,7 @@ import {
     verifyFileRequestUnlock
 } from "@/lib/file-request-service";
 import { clientIp, hashForLog } from "@/lib/request-context";
+import { geoAllowedForIp } from "@/lib/geo-service";
 import { scanDropPointUpload } from "@/lib/scan-service";
 
 export const runtime = "nodejs";
@@ -71,6 +73,15 @@ export async function PUT(
     const ip = await clientIp();
     if (!fileRequestIpAllowed(fileRequest.allowedCidrs, ip)) {
         return new Response("ip_not_allowed", { status: 403 });
+    }
+    if (
+        !(await geoAllowedForIp(
+            ip,
+            parseStringArray(fileRequest.allowedCountries),
+            parseStringArray(fileRequest.allowedContinents)
+        ))
+    ) {
+        return new Response("country_not_allowed", { status: 403 });
     }
 
     if (fileRequest.passwordHash) {
@@ -127,6 +138,9 @@ export async function PUT(
             size: stat.size,
             storedPath: destination
         });
+        // Owner of record: the signed-in uploader, or the drop point's owner who
+        // collected it when the upload was anonymous.
+        await recordItemCreator(fileRequest.destinationConnectionId, destination, userId ?? fileRequest.ownerId);
 
         // Security scan (VirusTotal, when enabled). Runs before acknowledging the
         // upload so the configured action - block by default - can be enforced on a

@@ -44,6 +44,8 @@ export async function createFileRequest(
             allowedExtensions: JSON.stringify(input.allowedExtensions),
             allowedMimeTypes: JSON.stringify(input.allowedMimeTypes),
             allowedCidrs: JSON.stringify(input.allowedCidrs),
+            allowedCountries: JSON.stringify(input.allowedCountries),
+            allowedContinents: JSON.stringify(input.allowedContinents),
             expiresAt: input.expiresAt ?? null
         },
         select: { id: true }
@@ -97,6 +99,8 @@ export async function resolveFileRequestByToken(token: string) {
             allowedExtensions: true,
             allowedMimeTypes: true,
             allowedCidrs: true,
+            allowedCountries: true,
+            allowedContinents: true,
             expiresAt: true,
             revokedAt: true
         }

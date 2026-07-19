@@ -21,6 +21,7 @@ import {
     DialogTitle,
     Input
 } from "@polaris/ui";
+import { GeoPicker } from "@/components/geo-picker";
 import { createShareAction } from "./share-actions";
 
 export interface ShareTarget {
@@ -41,12 +42,16 @@ export function ShareDialog({
     const [error, setError] = useState<string | null>(null);
     const [url, setUrl] = useState<string | null>(null);
     const [copied, setCopied] = useState(false);
+    const [geoCountries, setGeoCountries] = useState<string[]>([]);
+    const [geoContinents, setGeoContinents] = useState<string[]>([]);
 
     function handleOpenChange(next: boolean) {
         if (next) {
             setError(null);
             setUrl(null);
             setCopied(false);
+            setGeoCountries([]);
+            setGeoContinents([]);
         }
         onOpenChange(next);
     }
@@ -74,7 +79,9 @@ export function ShareDialog({
             allowUpload: form.get("allowUpload") === "on",
             allowDownload: form.get("allowDownload") !== "off",
             allowPreview: form.get("allowPreview") !== "off",
-            allowedCidrs
+            allowedCidrs,
+            allowedCountries: geoCountries,
+            allowedContinents: geoContinents
         });
         setPending(false);
         if (result.error) {
@@ -139,6 +146,15 @@ export function ShareDialog({
                                 Comma or space separated. Empty means anyone with the link.
                             </span>
                         </label>
+                        <div className="flex flex-col gap-1 text-sm">
+                            Restrict by location (optional)
+                            <GeoPicker
+                                countries={geoCountries}
+                                continents={geoContinents}
+                                onCountries={setGeoCountries}
+                                onContinents={setGeoContinents}
+                            />
+                        </div>
                         <div className="flex flex-col gap-2 rounded-md border border-border p-3 text-sm">
                             <label className="flex items-center gap-2">
                                 <input type="checkbox" name="allowDownload" defaultChecked className="size-4" />

@@ -29,6 +29,7 @@ function explain(status: number, body: string): string {
     if (status === 422 && body === "file_rejected") return "Blocked by security scan";
     if (status === 409 || body === "full") return "This drop point is full";
     if (status === 401) return "Sign-in required";
+    if (status === 403 && body === "country_not_allowed") return "Not allowed from your location";
     if (status === 403) return "Not allowed from your network";
     if (status === 410) return "This drop point is closed";
     return "Upload failed";

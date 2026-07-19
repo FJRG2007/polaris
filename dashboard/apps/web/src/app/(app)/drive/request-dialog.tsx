@@ -12,6 +12,7 @@
 import { useState, type FormEvent } from "react";
 import { Check, Copy, Inbox } from "lucide-react";
 import { Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Input, cn } from "@polaris/ui";
+import { GeoPicker } from "@/components/geo-picker";
 import { FILE_CATEGORIES, categoryDef, type FileCategory } from "./file-categories";
 import { createFileRequestAction } from "./request-actions";
 
@@ -39,6 +40,8 @@ export function RequestDialog({
     const [copied, setCopied] = useState(false);
     const [pickConnection, setPickConnection] = useState("");
     const [pickPath, setPickPath] = useState("");
+    const [geoCountries, setGeoCountries] = useState<string[]>([]);
+    const [geoContinents, setGeoContinents] = useState<string[]>([]);
 
     // Picker mode: opened from the Drop points page with no fixed folder, so the
     // user chooses which connection and folder to collect into.
@@ -52,6 +55,8 @@ export function RequestDialog({
             setCopied(false);
             setPickConnection(connections?.[0]?.id ?? "");
             setPickPath("");
+            setGeoCountries([]);
+            setGeoContinents([]);
         }
         onOpenChange(next);
     }
@@ -110,6 +115,8 @@ export function RequestDialog({
             allowedExtensions,
             allowedMimeTypes: [],
             allowedCidrs,
+            allowedCountries: geoCountries,
+            allowedContinents: geoContinents,
             expiresAt: expiresAt ? String(expiresAt) : undefined
         });
         setPending(false);
@@ -187,6 +194,9 @@ export function RequestDialog({
                         <label className="flex flex-col gap-1 text-sm">
                             Title
                             <Input name="title" required placeholder="e.g. Send me your photos" autoComplete="off" />
+                            <span className="text-xs text-muted-foreground">
+                                Uploads collect in a folder named after this drop point, under &quot;Drop Points&quot;.
+                            </span>
                         </label>
                         <label className="flex flex-col gap-1 text-sm">
                             Instructions (optional)
@@ -245,6 +255,15 @@ export function RequestDialog({
                             Restrict to IPs / ranges (optional)
                             <Input name="allowedCidrs" placeholder="e.g. 203.0.113.4, 10.0.0.0/24" autoComplete="off" />
                         </label>
+                        <div className="flex flex-col gap-1 text-sm">
+                            Restrict by location (optional)
+                            <GeoPicker
+                                countries={geoCountries}
+                                continents={geoContinents}
+                                onCountries={setGeoCountries}
+                                onContinents={setGeoContinents}
+                            />
+                        </div>
                         <label className="flex flex-col gap-1 text-sm">
                             Access PIN (optional)
                             <Input name="password" type="password" placeholder="No PIN" autoComplete="off" />

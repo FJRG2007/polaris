@@ -17,6 +17,7 @@ import {
     registerDownload,
     resolveShareByToken,
     resolveWithinShare,
+    shareGeoAllowed,
     shareIpAllowed,
     shareUnlockCookie,
     shareUsability,
@@ -49,6 +50,10 @@ export async function GET(
     if (!usable.ok) return deny(410, usable.reason);
 
     if (!shareIpAllowed(share.allowedCidrs, ip)) return deny(403, "ip_not_allowed");
+
+    if (!(await shareGeoAllowed(share.allowedCountries, share.allowedContinents, ip))) {
+        return deny(403, "country_not_allowed");
+    }
 
     if (share.passwordHash) {
         const cookieValue = (await cookies()).get(shareUnlockCookie(share.id))?.value;

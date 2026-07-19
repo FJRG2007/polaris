@@ -10,6 +10,7 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import type { CreateShareInput } from "@polaris/core";
 import { ipAllowed, normalizeRelPath } from "@polaris/core";
+import { geoAllowedForIp } from "@/lib/geo-service";
 import { generateToken, hashToken } from "@polaris/core/tokens";
 import { hashLinkPassword, verifyLinkPassword } from "@polaris/core/link-password";
 import { loadEnv } from "@polaris/config";
@@ -50,6 +51,8 @@ export async function createShare(
             allowDownload: input.allowDownload,
             allowPreview: input.allowPreview,
             allowedCidrs: JSON.stringify(input.allowedCidrs),
+            allowedCountries: JSON.stringify(input.allowedCountries),
+            allowedContinents: JSON.stringify(input.allowedContinents),
             invites:
                 input.kind === "invite"
                     ? { create: input.inviteUserIds.map((userId) => ({ userId })) }
@@ -166,10 +169,22 @@ export async function resolveShareByToken(token: string) {
             allowDownload: true,
             allowPreview: true,
             allowedCidrs: true,
+            allowedCountries: true,
+            allowedContinents: true,
             revokedAt: true,
             connection: { select: { name: true } }
         }
     });
+}
+
+/** Parse a stored JSON string array into a string[] (empty on any error). */
+function parseStringList(json: string): string[] {
+    try {
+        const parsed = JSON.parse(json);
+        return Array.isArray(parsed) ? parsed.filter((value): value is string => typeof value === "string") : [];
+    } catch {
+        return [];
+    }
 }
 
 /**
@@ -178,16 +193,19 @@ export async function resolveShareByToken(token: string) {
  * every public access before any bytes or listing are served.
  */
 export function shareIpAllowed(allowedCidrsJson: string, ip: string | undefined): boolean {
-    let rules: string[] = [];
-    try {
-        const parsed = JSON.parse(allowedCidrsJson);
-        if (Array.isArray(parsed)) rules = parsed.filter((value): value is string => typeof value === "string");
-    } catch {
-        return true;
-    }
+    const rules = parseStringList(allowedCidrsJson);
     if (rules.length === 0) return true;
     if (!ip) return false;
     return ipAllowed(ip, rules);
+}
+
+/** Whether a client IP passes a share's country/continent allowlist (async: may resolve geo). */
+export async function shareGeoAllowed(
+    allowedCountriesJson: string,
+    allowedContinentsJson: string,
+    ip: string | undefined
+): Promise<boolean> {
+    return geoAllowedForIp(ip, parseStringList(allowedCountriesJson), parseStringList(allowedContinentsJson));
 }
 
 /** Whether a share is currently serveable (not revoked, expired, or exhausted). */
