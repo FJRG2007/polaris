@@ -12,6 +12,7 @@ export interface ItemMeta {
     hidden: boolean;
     icon: string | null;
     iconColor: string | null;
+    note: string | null;
 }
 
 /** Metadata for the given paths in a connection, as a path -> meta map. */
@@ -19,9 +20,14 @@ export async function getMetaMap(connectionId: string, paths: string[]): Promise
     if (paths.length === 0) return new Map();
     const rows = await prisma.driveItemMeta.findMany({
         where: { connectionId, path: { in: paths } },
-        select: { path: true, hidden: true, icon: true, iconColor: true }
+        select: { path: true, hidden: true, icon: true, iconColor: true, note: true }
     });
-    return new Map(rows.map((row) => [row.path, { hidden: row.hidden, icon: row.icon, iconColor: row.iconColor }]));
+    return new Map(
+        rows.map((row) => [
+            row.path,
+            { hidden: row.hidden, icon: row.icon, iconColor: row.iconColor, note: row.note }
+        ])
+    );
 }
 
 /** Assert the connection is owned by the user (throws otherwise). */
@@ -58,6 +64,22 @@ export async function setItemIcon(
         where: { connectionId_path: { connectionId, path } },
         create: { ownerId, connectionId, path, icon, iconColor },
         update: { icon, iconColor }
+    });
+}
+
+/** Set (or clear with null/empty) a free-text note on an item. */
+export async function setItemNote(
+    ownerId: string,
+    connectionId: string,
+    path: string,
+    note: string | null
+): Promise<void> {
+    await assertOwns(ownerId, connectionId);
+    const value = note && note.trim() ? note.trim() : null;
+    await prisma.driveItemMeta.upsert({
+        where: { connectionId_path: { connectionId, path } },
+        create: { ownerId, connectionId, path, note: value },
+        update: { note: value }
     });
 }
 

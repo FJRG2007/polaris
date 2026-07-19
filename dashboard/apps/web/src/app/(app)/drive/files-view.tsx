@@ -35,6 +35,7 @@ import {
     Search,
     Share2,
     SlidersHorizontal,
+    StickyNote,
     Trash2,
     Upload,
     X
@@ -105,6 +106,7 @@ export function FilesView({
     onRequestFiles,
     onToggleHidden,
     onSetIcon,
+    onSetNote,
     onMove,
     onCopy
 }: {
@@ -126,6 +128,7 @@ export function FilesView({
     onRequestFiles: (path: string, name: string) => void;
     onToggleHidden: (entry: DriveEntry) => void;
     onSetIcon: (entry: DriveEntry, icon: string | null, color: string | null) => void;
+    onSetNote: (entry: DriveEntry, note: string | null) => void;
     onMove: (entry: DriveEntry, destFolderPath: string) => void;
     onCopy: (entry: DriveEntry, destFolderPath: string) => void;
 }) {
@@ -148,6 +151,13 @@ export function FilesView({
     const [showHidden, setShowHidden] = useState(false);
     const [iconTarget, setIconTarget] = useState<DriveEntry | null>(null);
     const [detailsTarget, setDetailsTarget] = useState<DriveEntry | null>(null);
+    const [noteTarget, setNoteTarget] = useState<DriveEntry | null>(null);
+    const [noteValue, setNoteValue] = useState("");
+
+    function openNote(entry: DriveEntry) {
+        setNoteTarget(entry);
+        setNoteValue(entry.note ?? "");
+    }
     const [dragUpload, setDragUpload] = useState(false);
     const [clipboard, setClipboard] = useState<{ entries: DriveEntry[]; mode: "copy" | "cut" } | null>(null);
     const dragPath = useRef<string | null>(null);
@@ -738,6 +748,12 @@ export function FilesView({
                                                             >
                                                                 <EntryIcon entry={entry} />
                                                                 {entry.name}
+                                                                {entry.note ? (
+                                                                    <StickyNote
+                                                                        className="size-3 shrink-0 text-amber-500"
+                                                                        aria-label="Has a note"
+                                                                    />
+                                                                ) : null}
                                                             </Link>
                                                         ) : (
                                                             <a
@@ -748,6 +764,12 @@ export function FilesView({
                                                             >
                                                                 <EntryIcon entry={entry} />
                                                                 {entry.name}
+                                                                {entry.note ? (
+                                                                    <StickyNote
+                                                                        className="size-3 shrink-0 text-amber-500"
+                                                                        aria-label="Has a note"
+                                                                    />
+                                                                ) : null}
                                                             </a>
                                                         )}
                                                     </td>
@@ -866,6 +888,10 @@ export function FilesView({
                                                     )}
                                                     {entry.hidden ? "Unhide" : "Hide"}
                                                 </ContextMenuItem>
+                                                <ContextMenuItem onSelect={() => openNote(entry)}>
+                                                    <StickyNote className="size-4" />
+                                                    {entry.note ? "Edit note" : "Add note"}
+                                                </ContextMenuItem>
                                                 <ContextMenuItem onSelect={() => setDetailsTarget(entry)}>
                                                     <Info className="size-4" />
                                                     Details
@@ -936,6 +962,23 @@ export function FilesView({
                             <ClipboardCopy className="size-4" />
                             Copy path
                         </Button>
+                    </div>
+                    <div className="flex flex-col gap-1 border-t border-border pt-3">
+                        <div className="flex items-center justify-between">
+                            <span className="text-xs font-medium text-muted-foreground">Note</span>
+                            <button
+                                type="button"
+                                onClick={() => selectedEntries[0] && openNote(selectedEntries[0])}
+                                className="text-xs text-primary hover:underline"
+                            >
+                                {selectedEntries[0].note ? "Edit" : "Add"}
+                            </button>
+                        </div>
+                        {selectedEntries[0].note ? (
+                            <p className="whitespace-pre-line text-xs text-muted-foreground">{selectedEntries[0].note}</p>
+                        ) : (
+                            <p className="text-xs text-muted-foreground/60">No note</p>
+                        )}
                     </div>
                 </aside>
             ) : null}
@@ -1052,6 +1095,48 @@ export function FilesView({
                             <dd>{new Date(detailsTarget.modifiedAt).toLocaleString()}</dd>
                         </dl>
                     ) : null}
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={noteTarget !== null} onOpenChange={(open) => !open && setNoteTarget(null)}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Note</DialogTitle>
+                        <DialogDescription className="truncate">{noteTarget?.name}</DialogDescription>
+                    </DialogHeader>
+                    <form
+                        onSubmit={(event) => {
+                            event.preventDefault();
+                            if (noteTarget) onSetNote(noteTarget, noteValue.trim() || null);
+                            setNoteTarget(null);
+                        }}
+                        className="flex flex-col gap-3"
+                    >
+                        <textarea
+                            autoFocus
+                            value={noteValue}
+                            onChange={(event) => setNoteValue(event.target.value)}
+                            rows={4}
+                            placeholder="Add a note for this item..."
+                            className="rounded-md border border-input bg-surface px-3 py-2 text-sm"
+                        />
+                        <div className="flex justify-between">
+                            <Button
+                                type="button"
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => {
+                                    if (noteTarget) onSetNote(noteTarget, null);
+                                    setNoteTarget(null);
+                                }}
+                            >
+                                Remove
+                            </Button>
+                            <Button type="submit" size="sm">
+                                Save
+                            </Button>
+                        </div>
+                    </form>
                 </DialogContent>
             </Dialog>
         </>

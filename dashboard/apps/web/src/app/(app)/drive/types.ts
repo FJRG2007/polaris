@@ -22,4 +22,5 @@ export interface DriveEntry {
     hidden?: boolean;
     icon?: string | null;
     iconColor?: string | null;
+    note?: string | null;
 }

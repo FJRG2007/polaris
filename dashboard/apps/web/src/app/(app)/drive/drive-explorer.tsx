@@ -38,6 +38,7 @@ import {
     renameAction,
     setItemHiddenAction,
     setItemIconAction,
+    setItemNoteAction,
     setUnasShareAction
 } from "./actions";
 import { ConnectionDialog } from "./connection-dialog";
@@ -203,6 +204,15 @@ export function DriveExplorer({
         });
     }
 
+    function onSetNote(entry: DriveEntry, note: string | null) {
+        if (!connectionId) return;
+        setEntries((prev) => prev.map((row) => (row.path === entry.path ? { ...row, note } : row)));
+        startTransition(async () => {
+            await setItemNoteAction(connectionId, entry.path, note);
+            void load();
+        });
+    }
+
     function onMove(entry: DriveEntry, destFolderPath: string) {
         if (!connectionId) return;
         const to = destFolderPath ? `${destFolderPath}/${entry.name}` : entry.name;
@@ -321,6 +331,7 @@ export function DriveExplorer({
                         }
                         onToggleHidden={onToggleHidden}
                         onSetIcon={onSetIcon}
+                        onSetNote={onSetNote}
                         onMove={onMove}
                         onCopy={onCopy}
                     />

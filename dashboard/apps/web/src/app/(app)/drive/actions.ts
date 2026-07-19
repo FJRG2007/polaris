@@ -20,7 +20,7 @@ import {
 } from "@/lib/storage-service";
 import { detectHost, type NasDetection } from "@/lib/nas-detect";
 import { fetchUnasMetrics } from "@/lib/unifi-unas";
-import { moveItemMeta, setItemHidden, setItemIcon } from "@/lib/drive-meta-service";
+import { moveItemMeta, setItemHidden, setItemIcon, setItemNote } from "@/lib/drive-meta-service";
 import { recordAudit } from "@/lib/audit-service";
 
 /** Result of a UNAS connection dry-run: what the console reported, or why not. */
@@ -192,6 +192,13 @@ export async function setItemIconAction(
 ): Promise<void> {
     const user = await requirePermission("drive.write");
     await setItemIcon(user.id, connectionId, normalizeRelPath(path), icon, iconColor);
+    revalidatePath("/drive");
+}
+
+/** Set or clear a free-text note on an item. */
+export async function setItemNoteAction(connectionId: string, path: string, note: string | null): Promise<void> {
+    const user = await requirePermission("drive.write");
+    await setItemNote(user.id, connectionId, normalizeRelPath(path), note);
     revalidatePath("/drive");
 }
 

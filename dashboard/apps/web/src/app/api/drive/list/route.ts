@@ -61,7 +61,8 @@ export async function GET(request: Request): Promise<Response> {
                 modifiedAt: entry.modifiedAt.toISOString(),
                 hidden: item?.hidden ?? false,
                 icon: item?.icon ?? null,
-                iconColor: item?.iconColor ?? null
+                iconColor: item?.iconColor ?? null,
+                note: item?.note ?? null
             };
         });
         return Response.json({ entries });

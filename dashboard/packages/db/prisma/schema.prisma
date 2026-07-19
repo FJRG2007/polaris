@@ -178,6 +178,7 @@ model DriveItemMeta {
     hidden       Boolean  @default(false)
     icon         String?
     iconColor    String?
+    note         String?
     createdAt    DateTime @default(now())
     updatedAt    DateTime @updatedAt
 
