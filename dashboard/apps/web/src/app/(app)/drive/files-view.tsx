@@ -17,6 +17,7 @@ import {
     ArrowDownAZ,
     ArrowUpAZ,
     ChevronRight,
+    ClipboardCopy,
     Download,
     Eye,
     EyeOff,
@@ -139,36 +140,54 @@ export function FilesView({
     const [dragUpload, setDragUpload] = useState(false);
     const dragPath = useRef<string | null>(null);
     const router = useRouter();
-    const clickTimer = useRef<number | null>(null);
 
     function openViewer(entry: DriveEntry) {
         setViewerTarget({ connectionId, path: entry.path, name: entry.name });
     }
 
-    /** Single click opens (folder navigates, file previews or downloads); a double
-     * click within the delay cancels it and renames instead. Modifier clicks select. */
-    function handleNameClick(event: MouseEvent, index: number, entry: DriveEntry) {
-        if (event.shiftKey || event.ctrlKey || event.metaKey) {
-            handleSelectClick(event, index, entry);
-            return;
-        }
-        event.preventDefault();
-        if (clickTimer.current) window.clearTimeout(clickTimer.current);
-        clickTimer.current = window.setTimeout(() => {
-            clickTimer.current = null;
-            if (entry.kind === "dir") router.push(href(connectionId, entry.path));
-            else if (isViewable(entry.name)) openViewer(entry);
-            else triggerDownload(connectionId, entry);
-        }, 220);
+    /** Open an item: folders navigate, files preview (or download when no viewer). */
+    function openEntry(entry: DriveEntry) {
+        if (entry.kind === "dir") router.push(href(connectionId, entry.path));
+        else if (isViewable(entry.name)) openViewer(entry);
+        else triggerDownload(connectionId, entry);
     }
 
-    function handleNameDoubleClick(event: MouseEvent, entry: DriveEntry) {
-        event.preventDefault();
-        if (clickTimer.current) {
-            window.clearTimeout(clickTimer.current);
-            clickTimer.current = null;
+    /** Windows-style row click: plain selects only this, ctrl toggles, shift extends. */
+    function rowClick(event: MouseEvent, index: number, entry: DriveEntry) {
+        if (renaming === entry.path) return;
+        if (event.shiftKey) {
+            selectRange(index);
+            return;
         }
+        if (event.ctrlKey || event.metaKey) {
+            toggleOne(entry.path);
+            lastIndex.current = index;
+            return;
+        }
+        setSelected(new Set([entry.path]));
+        lastIndex.current = index;
+    }
+
+    /** Double-clicking the name (specifically) renames; elsewhere on the row opens. */
+    function nameDoubleClick(event: MouseEvent, entry: DriveEntry) {
+        event.preventDefault();
+        event.stopPropagation();
         startRename(entry);
+    }
+
+    /** Keyboard: F2 renames, Enter opens, Delete removes the current selection. */
+    function onListKeyDown(event: KeyboardEvent) {
+        if (renaming) return;
+        if (event.key === "F2" && selectedEntries.length === 1 && selectedEntries[0]) {
+            event.preventDefault();
+            startRename(selectedEntries[0]);
+        } else if (event.key === "Enter" && selectedEntries.length === 1 && selectedEntries[0]) {
+            event.preventDefault();
+            openEntry(selectedEntries[0]);
+        } else if (event.key === "Delete" && selectedEntries.length > 0) {
+            event.preventDefault();
+            onDelete(selectedEntries);
+        }
     }
 
     /** External file drag over the listing highlights it as an upload drop zone. */
@@ -521,8 +540,10 @@ export function FilesView({
             ) : null}
 
             <div
+                tabIndex={0}
+                onKeyDown={onListKeyDown}
                 className={cn(
-                    "relative rounded-lg",
+                    "relative rounded-lg focus:outline-none",
                     dragUpload && "ring-2 ring-primary ring-offset-2 ring-offset-background"
                 )}
                 onDragOver={onUploadDragOver}
@@ -571,6 +592,10 @@ export function FilesView({
                                         <ContextMenu key={entry.path}>
                                             <ContextMenuTrigger asChild>
                                                 <tr
+                                                    onClick={(event) => rowClick(event, index, entry)}
+                                                    onDoubleClick={() => {
+                                                        if (!isRenaming) openEntry(entry);
+                                                    }}
                                                     draggable={!isRenaming}
                                                     onDragStart={(event) => {
                                                         dragPath.current = entry.path;
@@ -606,7 +631,10 @@ export function FilesView({
                                                     )}
                                                 >
                                                     <td className="px-3 py-2">
-                                                        <label className="flex cursor-pointer items-center">
+                                                        <label
+                                                            className="flex cursor-pointer items-center"
+                                                            onClick={(e) => e.stopPropagation()}
+                                                        >
                                                             <Checkbox
                                                                 checked={isSelected}
                                                                 onClick={(e) => handleSelectClick(e, index, entry)}
@@ -628,8 +656,8 @@ export function FilesView({
                                                         ) : entry.kind === "dir" ? (
                                                             <Link
                                                                 href={href(connectionId, entry.path)}
-                                                                onClick={(e) => handleNameClick(e, index, entry)}
-                                                                onDoubleClick={(e) => handleNameDoubleClick(e, entry)}
+                                                                onClick={(e) => e.preventDefault()}
+                                                                onDoubleClick={(e) => nameDoubleClick(e, entry)}
                                                                 className="flex items-center gap-2 hover:text-primary"
                                                             >
                                                                 <EntryIcon entry={entry} />
@@ -638,8 +666,8 @@ export function FilesView({
                                                         ) : (
                                                             <a
                                                                 href={downloadUrl(connectionId, entry.path)}
-                                                                onClick={(e) => handleNameClick(e, index, entry)}
-                                                                onDoubleClick={(e) => handleNameDoubleClick(e, entry)}
+                                                                onClick={(e) => e.preventDefault()}
+                                                                onDoubleClick={(e) => nameDoubleClick(e, entry)}
                                                                 className="flex items-center gap-2 hover:text-primary"
                                                             >
                                                                 <EntryIcon entry={entry} />
@@ -701,6 +729,12 @@ export function FilesView({
                                                 <ContextMenuItem onSelect={() => startRename(entry)}>
                                                     <Pencil className="size-4" />
                                                     Rename
+                                                </ContextMenuItem>
+                                                <ContextMenuItem
+                                                    onSelect={() => void navigator.clipboard.writeText(entry.path)}
+                                                >
+                                                    <ClipboardCopy className="size-4" />
+                                                    Copy path
                                                 </ContextMenuItem>
                                                 <ContextMenuItem onSelect={() => onShare(entry)}>
                                                     <Share2 className="size-4" />
