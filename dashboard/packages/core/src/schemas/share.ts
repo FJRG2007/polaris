@@ -37,6 +37,10 @@ export const createShareSchema = z
         allowPreview: z.boolean().default(true),
         /** IP/CIDR allowlist. Empty means anyone with the link may access it. */
         allowedCidrs: z.array(cidrOrIp).default([]),
+        /** ISO-3166 alpha-2 country allowlist. Empty means no country restriction. */
+        allowedCountries: z.array(z.string().trim().toUpperCase().regex(/^[A-Z]{2}$/)).default([]),
+        /** Continent-code allowlist (AF/AS/EU/NA/SA/OC/AN). Empty means no restriction. */
+        allowedContinents: z.array(z.string().trim().toUpperCase().regex(/^[A-Z]{2}$/)).default([]),
         /** For invite shares: the users granted access. */
         inviteUserIds: z.array(z.string().min(1)).default([])
     })

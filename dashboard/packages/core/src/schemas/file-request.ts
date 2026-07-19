@@ -43,6 +43,10 @@ export const createFileRequestSchema = z.object({
     allowedMimeTypes: z.array(z.string().trim().toLowerCase()).default([]),
     /** IP/CIDR allowlist. Empty means no IP restriction. */
     allowedCidrs: z.array(cidrOrIp).default([]),
+    /** ISO-3166 alpha-2 country allowlist. Empty means no country restriction. */
+    allowedCountries: z.array(z.string().trim().toUpperCase().regex(/^[A-Z]{2}$/)).default([]),
+    /** Continent-code allowlist (AF/AS/EU/NA/SA/OC/AN). Empty means no restriction. */
+    allowedContinents: z.array(z.string().trim().toUpperCase().regex(/^[A-Z]{2}$/)).default([]),
     /** ISO timestamp after which the request stops accepting uploads. */
     expiresAt: z.coerce.date().optional()
 });

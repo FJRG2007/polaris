@@ -9,6 +9,7 @@
 // re-exported here so this barrel stays client-safe. Import it from
 // "@polaris/core/tokens" in server-only code.
 export * from "./cidr.js";
+export * from "./geo.js";
 export * from "./paths.js";
 export * from "./format.js";
 export * from "./permissions.js";

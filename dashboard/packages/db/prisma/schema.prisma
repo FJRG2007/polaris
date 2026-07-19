@@ -297,6 +297,10 @@ model DriveItemMeta {
     path         String
     hidden       Boolean  @default(false)
     favorite     Boolean  @default(false)
+    // The Polaris user who uploaded/created this item, when known (drop-point
+    // uploads, dashboard uploads, new files/folders, copies). Null for items that
+    // predate Polaris or were created out of band. Follows the item on move/rename.
+    creatorId    String?
     icon         String?
     iconColor    String?
     note         String?
@@ -394,6 +398,10 @@ model Share {
     allowPreview  Boolean   @default(true)
     // JSON string array of IP/CIDR rules; empty means anyone with the link.
     allowedCidrs  String    @default("[]")
+    // JSON string arrays of ISO country codes / continent codes; empty means no
+    // geo restriction. Enforced server-side per access after resolving the IP.
+    allowedCountries  String @default("[]")
+    allowedContinents String @default("[]")
     createdAt     DateTime  @default(now())
     revokedAt     DateTime?
 
@@ -458,6 +466,10 @@ model FileRequest {
     allowedExtensions       String    @default("[]")
     allowedMimeTypes        String    @default("[]")
     allowedCidrs            String    @default("[]")
+    // JSON string arrays of ISO country codes / continent codes; empty means no
+    // geo restriction. Enforced server-side per upload after resolving the IP.
+    allowedCountries        String    @default("[]")
+    allowedContinents       String    @default("[]")
     expiresAt               DateTime?
     createdAt               DateTime  @default(now())
     revokedAt               DateTime?
@@ -553,6 +565,18 @@ model Setting {
     userId String?
 
     @@index([scope])
+}
+
+// Cache of resolved IP geolocation, so a country/continent allowlist does not hit
+// an external provider on every access and a location is remembered for reuse.
+// Keyed by IP; refreshed lazily when a row ages out.
+model GeoIpCache {
+    ip          String   @id
+    countryCode String?
+    country     String?
+    continent   String?
+    source      String?
+    updatedAt   DateTime @updatedAt
 }
 
 // ---------------------------------------------------------------------------
