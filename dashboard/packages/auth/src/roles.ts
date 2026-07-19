@@ -8,12 +8,12 @@
 
 import {
     DEFAULT_ROLES,
-    hasPermission,
     mergeRolePermissions,
     type GrantedPermission,
     type Permission
 } from "@polaris/core";
 import { prisma } from "@polaris/db";
+import { can } from "./authz.js";
 
 /** Insert the built-in roles if they are missing. Idempotent. */
 export async function seedDefaultRoles(): Promise<void> {
@@ -36,11 +36,14 @@ export async function getUserPermissions(userId: string): Promise<Set<GrantedPer
     return mergeRolePermissions(roleGrants);
 }
 
-/** True if the user (or an admin) holds the required permission. */
+/**
+ * True if the user (or an admin) holds the required permission. Delegates to the
+ * authorization engine so grants from directly-held roles, group- and
+ * role-attached policies, and direct policy attachments are all considered, with
+ * an explicit deny in any policy overriding an allow.
+ */
 export async function userHasPermission(userId: string, required: Permission): Promise<boolean> {
-    const admin = await prisma.user.findUnique({ where: { id: userId }, select: { isAdmin: true } });
-    if (admin?.isAdmin) return true;
-    return hasPermission(await getUserPermissions(userId), required);
+    return can(userId, required);
 }
 
 /**

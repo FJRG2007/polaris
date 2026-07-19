@@ -13,7 +13,7 @@
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Folder, HardDrive, Info, Loader2, Trash2 } from "lucide-react";
+import { Folder, HardDrive, Info, Loader2, ShieldCheck, Trash2 } from "lucide-react";
 import {
     Badge,
     Button,
@@ -42,6 +42,7 @@ import {
     setItemNoteAction,
     setUnasShareAction
 } from "./actions";
+import { AccessDialog, UnlockPanel, type AccessTarget } from "./access-dialog";
 import { ConnectionDialog } from "./connection-dialog";
 import { FilesView } from "./files-view";
 import { RequestDialog, type RequestTarget } from "./request-dialog";
@@ -73,6 +74,8 @@ export function DriveExplorer({
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [needsSmbShare, setNeedsSmbShare] = useState(false);
+    const [locked, setLocked] = useState<{ lockId: string; lockPath: string } | null>(null);
+    const [accessTarget, setAccessTarget] = useState<AccessTarget | null>(null);
     const [newFolderOpen, setNewFolderOpen] = useState(false);
     const [newFolderName, setNewFolderName] = useState("");
     const [newFileOpen, setNewFileOpen] = useState(false);
@@ -109,6 +112,7 @@ export function DriveExplorer({
                 return;
             }
             setNeedsSmbShare(false);
+            setLocked(null);
             setLoading(true);
             try {
                 const query = new URLSearchParams({ c: connectionId });
@@ -119,6 +123,9 @@ export function DriveExplorer({
                 if (body.needsSmbShare) {
                     setEntries([]);
                     setNeedsSmbShare(true);
+                } else if (body.locked) {
+                    setEntries([]);
+                    setLocked({ lockId: body.lockId, lockPath: body.lockPath });
                 } else if (!res.ok) {
                     setEntries([]);
                     setError(body.error ?? "Unable to list this location");
@@ -304,9 +311,27 @@ export function DriveExplorer({
             </aside>
 
             <section className="min-w-0">
-                {selectedConnection?.kind === "unifi-unas" ? (
-                    <div className="mb-3 flex items-center justify-end">
-                        <UnifiConsoleButton webUrl={selectedConnection.webUrl} />
+                {connectionId && (selectedConnection?.kind === "unifi-unas" || selectedConnection?.canManageAccess) ? (
+                    <div className="mb-3 flex items-center justify-end gap-2">
+                        {selectedConnection?.canManageAccess ? (
+                            <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() =>
+                                    setAccessTarget({
+                                        connectionId,
+                                        path,
+                                        name: segments[segments.length - 1] ?? selectedConnection?.name ?? "This folder"
+                                    })
+                                }
+                            >
+                                <ShieldCheck className="size-4" />
+                                Access
+                            </Button>
+                        ) : null}
+                        {selectedConnection?.kind === "unifi-unas" ? (
+                            <UnifiConsoleButton webUrl={selectedConnection.webUrl} />
+                        ) : null}
                     </div>
                 ) : null}
 
@@ -316,6 +341,13 @@ export function DriveExplorer({
                     </div>
                 ) : needsSmbShare ? (
                     <UnasSmbSetup connectionId={connectionId} onSaved={() => void load()} />
+                ) : locked ? (
+                    <UnlockPanel
+                        connectionId={connectionId}
+                        lockId={locked.lockId}
+                        lockPath={locked.lockPath}
+                        onUnlocked={() => void load()}
+                    />
                 ) : (
                     <FilesView
                         connectionId={connectionId}
@@ -349,6 +381,12 @@ export function DriveExplorer({
                         onSetNote={onSetNote}
                         onMove={onMove}
                         onCopy={onCopy}
+                        onManageAccess={
+                            selectedConnection?.canManageAccess
+                                ? (entry) =>
+                                      setAccessTarget({ connectionId, path: entry.path, name: entry.name })
+                                : undefined
+                        }
                     />
                 )}
             </section>
@@ -367,6 +405,11 @@ export function DriveExplorer({
 
             <ShareDialog target={shareTarget} onOpenChange={(open) => !open && setShareTarget(null)} />
             <RequestDialog target={requestTarget} onOpenChange={(open) => !open && setRequestTarget(null)} />
+            <AccessDialog
+                target={accessTarget}
+                onOpenChange={(open) => !open && setAccessTarget(null)}
+                onChanged={() => void load()}
+            />
 
             <Dialog open={newFolderOpen} onOpenChange={setNewFolderOpen}>
                 <DialogContent>

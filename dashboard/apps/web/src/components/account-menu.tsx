@@ -1,6 +1,6 @@
 "use client";
 
-import { Activity, Link2, LogOut, Settings, Users } from "lucide-react";
+import { Activity, Link2, LogOut, Settings, ShieldCheck, Users, UsersRound } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
     DropdownMenu,
@@ -45,6 +45,18 @@ export function AccountMenu({ name, email, isAdmin }: { name: string; email: str
                             <a href="/admin/users">
                                 <Users className="size-4" />
                                 Users
+                            </a>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem asChild>
+                            <a href="/admin/groups">
+                                <UsersRound className="size-4" />
+                                Groups
+                            </a>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem asChild>
+                            <a href="/admin/policies">
+                                <ShieldCheck className="size-4" />
+                                Policies
                             </a>
                         </DropdownMenuItem>
                         <DropdownMenuItem asChild>

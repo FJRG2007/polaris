@@ -7,7 +7,7 @@
 
 import { userHasPermission } from "@polaris/auth";
 import { requireUser } from "@/lib/session";
-import { getDriver } from "@/lib/storage-service";
+import { requireDriveDriver, DriveAccessError, DriveLockedError } from "@/lib/drive-authz";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,7 +21,14 @@ export async function GET(request: Request): Promise<Response> {
     const connectionId = new URL(request.url).searchParams.get("c");
     if (!connectionId) return Response.json({ error: "Missing connection" }, { status: 400 });
 
-    const driver = await getDriver(connectionId, user.id);
+    let driver;
+    try {
+        driver = await requireDriveDriver(user.id, connectionId, "", "read", { skipLock: true });
+    } catch (caught) {
+        if (caught instanceof DriveLockedError) return Response.json({ error: "Locked" }, { status: 423 });
+        if (caught instanceof DriveAccessError) return Response.json({ error: "Forbidden" }, { status: 403 });
+        throw caught;
+    }
     try {
         const usage = await driver.usage();
         return Response.json({

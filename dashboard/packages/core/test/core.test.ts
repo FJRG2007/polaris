@@ -4,6 +4,12 @@ import { normalizeRelPath, UnsafePathError, extName, joinUnderRoot } from "../sr
 import { generateToken, hashToken, tokenMatchesHash } from "../src/tokens.js";
 import { hasPermission, mergeRolePermissions, DEFAULT_ROLES } from "../src/permissions.js";
 import { checkUploadCandidate } from "../src/schemas/file-request.js";
+import {
+    evaluateStatements,
+    matchesGlob,
+    driveResourcePatterns,
+    type PolicyStatement
+} from "../src/authz.js";
 
 describe("cidr", () => {
     it("matches addresses inside a v4 range and rejects those outside", () => {
@@ -62,6 +68,35 @@ describe("permissions", () => {
         expect(hasPermission(admin, "users.manage")).toBe(true);
         expect(hasPermission(viewer, "users.manage")).toBe(false);
         expect(hasPermission(viewer, "drive.read")).toBe(true);
+    });
+});
+
+describe("authz engine", () => {
+    it("globs across resource separators and anchors literals", () => {
+        expect(matchesGlob("*", "anything")).toBe(true);
+        expect(matchesGlob("drive:cxx:*", "drive:cxx:reports/q1.pdf")).toBe(true);
+        expect(matchesGlob("drive:cxx:*", "drive:cyy:reports/q1.pdf")).toBe(false);
+        expect(matchesGlob("drive.read", "drive.write")).toBe(false);
+    });
+
+    it("denies by default, allows on match, and lets an explicit deny win", () => {
+        const allowRead: PolicyStatement = { effect: "allow", actions: ["drive.read"], resources: ["drive:cxx:*"] };
+        const denyOne: PolicyStatement = {
+            effect: "deny",
+            actions: ["drive.read"],
+            resources: ["drive:cxx:secret/*"]
+        };
+        expect(evaluateStatements([], "drive.read", "drive:cxx:a")).toBe("implicit-deny");
+        expect(evaluateStatements([allowRead], "drive.read", "drive:cxx:a")).toBe("allow");
+        expect(evaluateStatements([allowRead], "drive.write", "drive:cxx:a")).toBe("implicit-deny");
+        // Deny overrides the broad allow regardless of statement order.
+        expect(evaluateStatements([allowRead, denyOne], "drive.read", "drive:cxx:secret/x")).toBe("deny");
+        expect(evaluateStatements([denyOne, allowRead], "drive.read", "drive:cxx:secret/x")).toBe("deny");
+    });
+
+    it("builds subtree resource patterns covering the item and its descendants", () => {
+        expect(driveResourcePatterns("cxx", "")).toEqual(["drive:cxx:*"]);
+        expect(driveResourcePatterns("cxx", "docs")).toEqual(["drive:cxx:docs", "drive:cxx:docs/*"]);
     });
 });
 

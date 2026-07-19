@@ -13,3 +13,27 @@ export {
     assignRole
 } from "./roles.js";
 export { provisionUser, hasAnyUser, setUserAdmin, type ProvisionInput } from "./provision.js";
+export { can, resolveGlobalStatements } from "./authz.js";
+export {
+    createGroup,
+    deleteGroup,
+    listGroups,
+    getGroupWithMembers,
+    addGroupMember,
+    removeGroupMember,
+    getUserGroupIds,
+    type GroupSummary,
+    type GroupMemberInfo
+} from "./groups.js";
+export {
+    createPolicy,
+    updatePolicy,
+    deletePolicy,
+    listPolicies,
+    getPolicy,
+    attachPolicy,
+    detachPolicy,
+    resolvePrincipalPolicyStatements,
+    type PrincipalType,
+    type PolicySummary
+} from "./policies.js";

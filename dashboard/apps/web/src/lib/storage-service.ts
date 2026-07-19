@@ -22,6 +22,7 @@ import {
 } from "@polaris/storage";
 import { fetchUnasMetrics, type UnasMetrics } from "@/lib/unifi-unas";
 import { listSmbShares } from "@/lib/smb-shares";
+import { grantedConnectionIds } from "@/lib/drive-acl-service";
 
 /** Base path under which the host daemon mounts SMB/NFS shares. */
 const HOSTD_MOUNT_ROOT = "/mnt/polaris";
@@ -151,13 +152,48 @@ export async function getUnasMetrics(connectionId: string, ownerId: string): Pro
     });
 }
 
+/** The non-secret columns of a connection the Drive UI needs. */
+const CONNECTION_SUMMARY_SELECT = {
+    id: true,
+    name: true,
+    kind: true,
+    status: true,
+    requiresHostd: true,
+    config: true,
+    createdAt: true
+} as const;
+
 /** All connections owned by a user, without secret material. */
 export async function listConnections(ownerId: string) {
     return prisma.storageConnection.findMany({
         where: { ownerId },
-        select: { id: true, name: true, kind: true, status: true, requiresHostd: true, config: true, createdAt: true },
+        select: CONNECTION_SUMMARY_SELECT,
         orderBy: { createdAt: "asc" }
     });
+}
+
+/**
+ * Connections a user may browse: the ones they own plus any another user has
+ * shared with them through an allow ACL (on the whole connection or a subtree).
+ * Shared connections are flagged so the UI can distinguish them; the actual
+ * per-path enforcement still happens in the Drive routes and actions.
+ */
+export async function listAccessibleConnections(userId: string) {
+    const [owned, grantedIds] = await Promise.all([listConnections(userId), grantedConnectionIds(userId)]);
+    const ownedIds = new Set(owned.map((row) => row.id));
+    const sharedIds = grantedIds.filter((id) => !ownedIds.has(id));
+    const shared =
+        sharedIds.length === 0
+            ? []
+            : await prisma.storageConnection.findMany({
+                  where: { id: { in: sharedIds } },
+                  select: CONNECTION_SUMMARY_SELECT,
+                  orderBy: { createdAt: "asc" }
+              });
+    return [
+        ...owned.map((row) => ({ ...row, shared: false })),
+        ...shared.map((row) => ({ ...row, shared: true }))
+    ];
 }
 
 /**

@@ -8,7 +8,7 @@
 import { normalizeRelPath } from "@polaris/core";
 import { userHasPermission } from "@polaris/auth";
 import { requireUser } from "@/lib/session";
-import { getDriver } from "@/lib/storage-service";
+import { requireDriveDriver, DriveAccessError, DriveLockedError } from "@/lib/drive-authz";
 import { recordAudit } from "@/lib/audit-service";
 
 export const runtime = "nodejs";
@@ -36,7 +36,15 @@ export async function PUT(request: Request): Promise<Response> {
     }
 
     const offset = offsetParam ? Number(offsetParam) : undefined;
-    const driver = await getDriver(connectionId, user.id);
+    let driver;
+    try {
+        // Authorize against the destination folder (the parent), where the write lands.
+        driver = await requireDriveDriver(user.id, connectionId, rawPath, "write");
+    } catch (caught) {
+        if (caught instanceof DriveLockedError) return new Response("Locked", { status: 423 });
+        if (caught instanceof DriveAccessError) return new Response("Forbidden", { status: 403 });
+        throw caught;
+    }
     try {
         // A folder upload sends nested names (a/b/file.txt); make sure the parent
         // directories exist before writing. mkdir on an existing dir is ignored.

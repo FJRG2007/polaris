@@ -3,14 +3,19 @@
  * off the server-rendered page means the Drive shell paints instantly and the
  * (sometimes slow, network-bound) listing streams in behind a skeleton instead
  * of blocking the whole navigation. Auth is re-checked here; the client is never
- * trusted. Node runtime because Prisma and the drivers need it.
+ * trusted. Access is authorized per path (ownership or ACL) and the access gate
+ * is enforced: a locked folder returns a `locked` marker so the UI can prompt for
+ * the password instead of leaking a listing. Node runtime because Prisma and the
+ * drivers need it.
  */
 
 import { normalizeRelPath } from "@polaris/core";
 import { userHasPermission } from "@polaris/auth";
 import { requireUser } from "@/lib/session";
-import { getDriver, SmbShareRequiredError } from "@/lib/storage-service";
+import { getDriverForConnection, SmbShareRequiredError } from "@/lib/storage-service";
+import { authorizeDrive, DriveAccessError, DriveLockedError } from "@/lib/drive-authz";
 import { getMetaMap } from "@/lib/drive-meta-service";
+import { listLocks } from "@/lib/access-lock-service";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -32,9 +37,20 @@ export async function GET(request: Request): Promise<Response> {
         return Response.json({ error: "Invalid path" }, { status: 400 });
     }
 
+    try {
+        await authorizeDrive(user.id, connectionId, path, "read");
+    } catch (caught) {
+        // A locked ancestor: tell the client which lock to unlock rather than 403.
+        if (caught instanceof DriveLockedError) {
+            return Response.json({ locked: true, lockId: caught.lockId, lockPath: caught.lockPath });
+        }
+        if (caught instanceof DriveAccessError) return Response.json({ error: "Forbidden" }, { status: 403 });
+        throw caught;
+    }
+
     let driver;
     try {
-        driver = await getDriver(connectionId, user.id);
+        driver = await getDriverForConnection(connectionId);
     } catch (caught) {
         // A UNAS with no SMB share yet: tell the client to ask for the share name
         // rather than surfacing a generic failure (credentials are reused).
@@ -50,10 +66,14 @@ export async function GET(request: Request): Promise<Response> {
         // Hide the Polaris trash folder from normal browsing; it lives at the root
         // of each connection and is managed through the Trash page instead.
         const visibleEntries = listing.entries.filter((entry) => entry.path !== ".polaris-trash");
-        const meta = await getMetaMap(
-            connectionId,
-            visibleEntries.map((entry) => entry.path)
-        );
+        const [meta, locks] = await Promise.all([
+            getMetaMap(
+                connectionId,
+                visibleEntries.map((entry) => entry.path)
+            ),
+            listLocks(connectionId)
+        ]);
+        const lockedPaths = new Set(locks.map((lock) => lock.path));
         const entries = visibleEntries.map((entry) => {
             const item = meta.get(entry.path);
             return {
@@ -66,7 +86,9 @@ export async function GET(request: Request): Promise<Response> {
                 hidden: item?.hidden ?? false,
                 icon: item?.icon ?? null,
                 iconColor: item?.iconColor ?? null,
-                note: item?.note ?? null
+                note: item?.note ?? null,
+                // A folder that is itself an access-gate root, for a lock badge.
+                locked: lockedPaths.has(entry.path)
             };
         });
         return Response.json({ entries });

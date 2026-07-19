@@ -12,6 +12,7 @@ export * from "./cidr.js";
 export * from "./paths.js";
 export * from "./format.js";
 export * from "./permissions.js";
+export * from "./authz.js";
 export * from "./schemas/storage.js";
 export * from "./schemas/share.js";
 export * from "./schemas/file-request.js";

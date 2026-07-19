@@ -33,11 +33,13 @@ import {
     FolderUp,
     Inbox,
     Info,
+    Lock,
     Palette,
     Pencil,
     Scissors,
     Search,
     Share2,
+    ShieldCheck,
     SlidersHorizontal,
     StickyNote,
     Trash2,
@@ -114,7 +116,8 @@ export function FilesView({
     onSetIcon,
     onSetNote,
     onMove,
-    onCopy
+    onCopy,
+    onManageAccess
 }: {
     connectionId: string;
     path: string;
@@ -138,6 +141,8 @@ export function FilesView({
     onSetNote: (entry: DriveEntry, note: string | null) => void;
     onMove: (entry: DriveEntry, destFolderPath: string) => void;
     onCopy: (entry: DriveEntry, destFolderPath: string) => void;
+    /** Manage per-path access (ACL grants and the password lock). Owner/admin only. */
+    onManageAccess?: (entry: DriveEntry) => void;
 }) {
     const [query, setQuery] = useState("");
     const [sortKey, setSortKey] = useState<SortKey>("name");
@@ -811,6 +816,12 @@ export function FilesView({
                                                             >
                                                                 <EntryIcon entry={entry} />
                                                                 {entry.name}
+                                                                {entry.locked ? (
+                                                                    <Lock
+                                                                        className="size-3 shrink-0 text-muted-foreground"
+                                                                        aria-label="Access-gated"
+                                                                    />
+                                                                ) : null}
                                                                 {entry.note ? (
                                                                     <StickyNote
                                                                         className="size-3 shrink-0 text-amber-500"
@@ -981,6 +992,12 @@ export function FilesView({
                                                     <Info className="size-4" />
                                                     Details
                                                 </ContextMenuItem>
+                                                {onManageAccess ? (
+                                                    <ContextMenuItem onSelect={() => onManageAccess(entry)}>
+                                                        <ShieldCheck className="size-4" />
+                                                        Permissions &amp; lock
+                                                    </ContextMenuItem>
+                                                ) : null}
                                                 <ContextMenuSeparator />
                                                 <ContextMenuItem variant="danger" onSelect={() => onDelete([entry])}>
                                                     <Trash2 className="size-4" />

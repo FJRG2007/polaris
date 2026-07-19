@@ -43,6 +43,7 @@ model User {
     sessions     Session[]
     accounts     Account[]
     roles        UserRole[]
+    groups       GroupMember[]
     invitesSent  Invite[]                @relation("InviteInviter")
     connections       StorageConnection[]
     dockerConnections DockerConnection[]
@@ -136,6 +137,99 @@ model Invite {
     @@index([email])
 }
 
+// A named bundle of users. Policies attach to a group so a grant applies to
+// everyone in it; group membership is the cheapest way to manage access at scale.
+model Group {
+    id          String        @id @default(cuid())
+    name        String        @unique
+    description String?
+    isSystem    Boolean       @default(false)
+    createdAt   DateTime      @default(now())
+    members     GroupMember[]
+}
+
+model GroupMember {
+    groupId String
+    userId  String
+    group   Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+    user    User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@id([groupId, userId])
+    @@index([userId])
+}
+
+// A reusable authorization policy: a JSON document of allow/deny statements over
+// (action, resource) patterns, evaluated by @polaris/core's engine. Attaching a
+// policy to a user, group, or role folds its statements into that principal's
+// effective permissions. Deny-by-default; an explicit deny overrides any allow.
+model Policy {
+    id          String             @id @default(cuid())
+    name        String             @unique
+    description String?
+    // Stringified PolicyDocument JSON (SQLite-portable); validated on read/write.
+    document    String
+    isSystem    Boolean            @default(false)
+    createdAt   DateTime           @default(now())
+    updatedAt   DateTime           @updatedAt
+    attachments PolicyAttachment[]
+}
+
+// Binds a policy to a principal. principalType is "user" | "group" | "role" and
+// principalId is that principal's id; kept generic (no FK) so one table covers
+// all three without three near-identical join tables.
+model PolicyAttachment {
+    id            String @id @default(cuid())
+    policyId      String
+    principalType String
+    principalId   String
+
+    policy Policy @relation(fields: [policyId], references: [id], onDelete: Cascade)
+
+    @@unique([policyId, principalType, principalId])
+    @@index([principalType, principalId])
+}
+
+// A per-path Drive access-control entry: grants (or denies) a principal a set of
+// Drive verbs on a connection subtree. Applies to the path and everything under
+// it. This is what lets a connection owner share specific folders with other
+// users/groups without handing over the whole connection.
+model DriveAcl {
+    id            String   @id @default(cuid())
+    connectionId  String
+    // "" means the whole connection; otherwise the subtree root (normalized).
+    path          String   @default("")
+    principalType String
+    principalId   String
+    // JSON array of Drive verbs: read, write, rename, delete, copy, download.
+    actions       String
+    effect        String   @default("allow")
+    createdById   String
+    createdAt     DateTime @default(now())
+
+    connection StorageConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+
+    @@index([connectionId])
+    @@index([principalType, principalId])
+}
+
+// A password gate ("Polaris access gate") on a Drive path. Browsing, opening, or
+// downloading anything at or under a locked path requires unlocking it with the
+// password first; the unlock is remembered in a signed, per-lock session cookie.
+// The password is stored with the same slow, salted KDF as share/link passwords.
+model AccessLock {
+    id           String   @id @default(cuid())
+    connectionId String
+    path         String
+    passwordHash String
+    createdById  String
+    createdAt    DateTime @default(now())
+
+    connection StorageConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+
+    @@unique([connectionId, path])
+    @@index([connectionId])
+}
+
 // ---------------------------------------------------------------------------
 // Storage
 // ---------------------------------------------------------------------------
@@ -164,6 +258,8 @@ model StorageConnection {
     uploads      UploadSession[]
     itemMeta     DriveItemMeta[]
     trashItems   TrashItem[]
+    acls         DriveAcl[]
+    locks        AccessLock[]
 
     @@index([ownerId])
 }

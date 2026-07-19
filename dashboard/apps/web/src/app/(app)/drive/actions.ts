@@ -10,7 +10,8 @@
 
 import { revalidatePath } from "next/cache";
 import { baseName, createConnectionSchema, normalizeRelPath } from "@polaris/core";
-import { requirePermission } from "@/lib/session";
+import { requirePermission, requireUser } from "@/lib/session";
+import { authorizeDrive, requireDriveDriver } from "@/lib/drive-authz";
 import {
     createConnection,
     deleteConnection,
@@ -137,9 +138,9 @@ export async function deleteConnectionAction(connectionId: string): Promise<void
 }
 
 export async function mkdirAction(connectionId: string, path: string, name: string): Promise<void> {
-    const user = await requirePermission("drive.write");
+    const user = await requireUser();
     const target = normalizeRelPath(path ? `${path}/${name}` : name);
-    const driver = await getDriver(connectionId, user.id);
+    const driver = await requireDriveDriver(user.id, connectionId, path, "write");
     try {
         await driver.mkdir(target);
     } finally {
@@ -151,11 +152,11 @@ export async function mkdirAction(connectionId: string, path: string, name: stri
 
 /** Create an empty file (any name/extension) in the given folder. */
 export async function createFileAction(connectionId: string, path: string, name: string): Promise<void> {
-    const user = await requirePermission("drive.write");
+    const user = await requireUser();
     const clean = name.trim();
     if (!clean) throw new Error("Enter a file name");
     const target = normalizeRelPath(path ? `${path}/${clean}` : clean);
-    const driver = await getDriver(connectionId, user.id);
+    const driver = await requireDriveDriver(user.id, connectionId, path, "write");
     try {
         const empty = new ReadableStream<Uint8Array>({
             start(controller) {
@@ -171,8 +172,8 @@ export async function createFileAction(connectionId: string, path: string, name:
 }
 
 export async function deleteEntryAction(connectionId: string, path: string): Promise<void> {
-    const user = await requirePermission("drive.delete");
-    const driver = await getDriver(connectionId, user.id);
+    const user = await requireUser();
+    const driver = await requireDriveDriver(user.id, connectionId, path, "delete");
     try {
         await driver.delete(normalizeRelPath(path), { recursive: true });
     } finally {
@@ -184,7 +185,8 @@ export async function deleteEntryAction(connectionId: string, path: string): Pro
 
 /** Move an item to the recycle bin (the default "delete" from the browser). */
 export async function moveToTrashAction(connectionId: string, path: string): Promise<void> {
-    const user = await requirePermission("drive.delete");
+    const user = await requireUser();
+    await authorizeDrive(user.id, connectionId, path, "delete");
     await moveToTrash(user.id, connectionId, path);
     await recordAudit({ actorId: user.id, action: "drive.trash", targetType: "connection", targetId: connectionId, metadata: { path } });
     revalidatePath("/drive");
@@ -214,10 +216,10 @@ export async function emptyTrashAction(): Promise<void> {
 }
 
 export async function renameAction(connectionId: string, from: string, to: string): Promise<void> {
-    const user = await requirePermission("drive.write");
+    const user = await requireUser();
     const normalizedFrom = normalizeRelPath(from);
     const normalizedTo = normalizeRelPath(to);
-    const driver = await getDriver(connectionId, user.id);
+    const driver = await requireDriveDriver(user.id, connectionId, from, "rename");
     try {
         await driver.move(normalizedFrom, normalizedTo);
     } finally {
@@ -308,10 +310,13 @@ async function copyRecursive(driver: Driver, from: string, to: string): Promise<
  * Collisions get a " copy" suffix so pasting into the source folder is safe.
  */
 export async function copyAction(connectionId: string, from: string, destFolder: string): Promise<void> {
-    const user = await requirePermission("drive.write");
+    const user = await requireUser();
     const source = normalizeRelPath(from);
     const base = baseName(source);
-    const driver = await getDriver(connectionId, user.id);
+    // Copy reads the source and writes into the destination folder; both ends must
+    // be authorized.
+    await authorizeDrive(user.id, connectionId, destFolder, "write");
+    const driver = await requireDriveDriver(user.id, connectionId, from, "copy");
     try {
         const destination = await freeName(
             driver,

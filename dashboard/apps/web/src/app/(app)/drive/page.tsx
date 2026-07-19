@@ -1,7 +1,7 @@
 import type { StorageProviderKind } from "@polaris/core";
 import { PageHeader } from "@polaris/ui";
 import { requireUser } from "@/lib/session";
-import { connectionWebUrl, listConnections } from "@/lib/storage-service";
+import { connectionWebUrl, listAccessibleConnections } from "@/lib/storage-service";
 import { DriveExplorer } from "./drive-explorer";
 import type { ConnectionSummary } from "./types";
 
@@ -22,12 +22,16 @@ export default async function DrivePage({
     // Only the fast, local query runs on the server so the page paints instantly.
     // The actual listing / device metrics load client-side (skeletons + cache),
     // which is what removes the multi-second delay a slow NAS used to add here.
-    const connections: ConnectionSummary[] = (await listConnections(user.id)).map((row) => ({
+    const connections: ConnectionSummary[] = (await listAccessibleConnections(user.id)).map((row) => ({
         id: row.id,
         name: row.name,
         kind: row.kind as StorageProviderKind,
         requiresHostd: row.requiresHostd,
-        webUrl: connectionWebUrl(row.kind, row.config)
+        webUrl: connectionWebUrl(row.kind, row.config),
+        shared: row.shared,
+        // Only the owner (or an admin) manages a connection's ACLs and locks; a
+        // shared connection is browse-only from the grantee's side.
+        canManageAccess: !row.shared || user.isAdmin
     }));
 
     const connectionId = pick(params.c) ?? connections[0]?.id ?? null;
