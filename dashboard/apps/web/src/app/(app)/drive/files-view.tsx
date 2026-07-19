@@ -30,6 +30,7 @@ import {
     Folder,
     FolderInput,
     FolderPlus,
+    FolderTree,
     FolderUp,
     Inbox,
     Info,
@@ -145,6 +146,11 @@ export function FilesView({
     onManageAccess?: (entry: DriveEntry) => void;
 }) {
     const [query, setQuery] = useState("");
+    // Search scope: the current folder only, or a recursive walk from here.
+    const [searchScope, setSearchScope] = useState<"current" | "recursive">("current");
+    const [remoteEntries, setRemoteEntries] = useState<DriveEntry[] | null>(null);
+    const [searching, setSearching] = useState(false);
+    const [searchTruncated, setSearchTruncated] = useState(false);
     const [sortKey, setSortKey] = useState<SortKey>("name");
     const [sortDir, setSortDir] = useState<SortDir>("asc");
     const [filtersOpen, setFiltersOpen] = useState(false);
@@ -313,6 +319,44 @@ export function FilesView({
         lastIndex.current = null;
     }, [connectionId, path]);
 
+    // Recursive search: when the scope is "recursive" and there is a query, walk
+    // the subtree server-side (debounced) instead of filtering the local listing.
+    useEffect(() => {
+        if (searchScope !== "recursive" || !query.trim()) {
+            setRemoteEntries(null);
+            setSearchTruncated(false);
+            setSearching(false);
+            return;
+        }
+        const controller = new AbortController();
+        setSearching(true);
+        const timer = setTimeout(() => {
+            const params = new URLSearchParams({ c: connectionId, q: query });
+            if (path) params.set("p", path);
+            fetch(`/api/drive/search?${params.toString()}`, { signal: controller.signal })
+                .then((res) => res.json())
+                .then((body) => {
+                    if (controller.signal.aborted) return;
+                    setRemoteEntries(Array.isArray(body.entries) ? (body.entries as DriveEntry[]) : []);
+                    setSearchTruncated(Boolean(body.truncated));
+                })
+                .catch(() => {
+                    if (!controller.signal.aborted) setRemoteEntries([]);
+                })
+                .finally(() => {
+                    if (!controller.signal.aborted) setSearching(false);
+                });
+        }, 350);
+        return () => {
+            controller.abort();
+            clearTimeout(timer);
+        };
+    }, [searchScope, query, connectionId, path]);
+
+    // The rows the pipeline operates on: recursive results when searching a
+    // subtree, otherwise the current folder's listing.
+    const source = searchScope === "recursive" && remoteEntries !== null ? remoteEntries : entries;
+
     const hasFilters =
         categories.size > 0 || extFilter.trim() !== "" || minMb !== "" || maxMb !== "" || dateFrom !== "" || dateTo !== "";
 
@@ -323,7 +367,7 @@ export function FilesView({
         const to = dateTo ? new Date(dateTo).getTime() + 24 * 60 * 60 * 1000 : null;
         const ext = extFilter.trim().replace(/^\./, "").toLowerCase();
 
-        let rows = entries.filter((entry) => {
+        let rows = source.filter((entry) => {
             if (!showHidden && entry.hidden) return false;
             const isDir = entry.kind === "dir";
             const entryExt = isDir ? "" : extensionOf(entry.name);
@@ -366,7 +410,7 @@ export function FilesView({
             }
             return a.name.localeCompare(b.name) * direction;
         });
-    }, [entries, categories, extFilter, minMb, maxMb, dateFrom, dateTo, query, sortKey, sortDir, showHidden]);
+    }, [source, categories, extFilter, minMb, maxMb, dateFrom, dateTo, query, sortKey, sortDir, showHidden]);
 
     const selectedEntries = visible.filter((entry) => selected.has(entry.path));
     const allSelected = visible.length > 0 && selectedEntries.length === visible.length;
@@ -382,6 +426,75 @@ export function FilesView({
         estimateSize: () => 40,
         overscan: 12
     });
+
+    // Marquee (rubber-band) selection. Rows are a fixed 40px tall, so the dragged
+    // rectangle maps to a contiguous index range by simple arithmetic - which also
+    // makes it work with virtualization (rows outside the viewport are not in the
+    // DOM but their indices still fall inside the band). The base selection is
+    // captured on mouse-down so Ctrl-drag adds to the existing selection.
+    const ROW_HEIGHT = 40;
+    const marqueeStart = useRef<number | null>(null);
+    const marqueeBase = useRef<Set<string>>(new Set());
+    const visibleRef = useRef(visible);
+    visibleRef.current = visible;
+    const [marqueeRect, setMarqueeRect] = useState<{ top: number; height: number } | null>(null);
+    const [marqueeActive, setMarqueeActive] = useState(false);
+
+    /** Y within the scroll content (accounts for how far the list is scrolled). */
+    function contentY(clientY: number): number {
+        const el = scrollRef.current;
+        if (!el) return 0;
+        return clientY - el.getBoundingClientRect().top + el.scrollTop;
+    }
+
+    /** Begin a marquee when the press lands on empty space, not on a row. */
+    function onMarqueeDown(event: MouseEvent) {
+        if (event.button !== 0) return;
+        const el = scrollRef.current;
+        if (!el) return;
+        // Ignore presses on the scrollbar gutter and on any row (rows handle their
+        // own click/drag).
+        if (event.nativeEvent.offsetX >= el.clientWidth) return;
+        if ((event.target as HTMLElement).closest("[data-drive-row]")) return;
+        const y = contentY(event.clientY);
+        marqueeStart.current = y;
+        marqueeBase.current = event.ctrlKey || event.metaKey ? new Set(selected) : new Set();
+        if (!(event.ctrlKey || event.metaKey)) setSelected(new Set());
+        setMarqueeRect({ top: y, height: 0 });
+        setMarqueeActive(true);
+        event.preventDefault();
+    }
+
+    useEffect(() => {
+        if (!marqueeActive) return;
+        function move(event: globalThis.MouseEvent) {
+            if (marqueeStart.current === null) return;
+            const y = contentY(event.clientY);
+            const top = Math.min(marqueeStart.current, y);
+            const bottom = Math.max(marqueeStart.current, y);
+            setMarqueeRect({ top, height: bottom - top });
+            const rows = visibleRef.current;
+            const lo = Math.max(0, Math.floor(top / ROW_HEIGHT));
+            const hi = Math.min(rows.length - 1, Math.floor(bottom / ROW_HEIGHT));
+            const next = new Set(marqueeBase.current);
+            for (let index = lo; index <= hi; index++) {
+                const entry = rows[index];
+                if (entry) next.add(entry.path);
+            }
+            setSelected(next);
+        }
+        function up() {
+            marqueeStart.current = null;
+            setMarqueeActive(false);
+            setMarqueeRect(null);
+        }
+        window.addEventListener("mousemove", move);
+        window.addEventListener("mouseup", up);
+        return () => {
+            window.removeEventListener("mousemove", move);
+            window.removeEventListener("mouseup", up);
+        };
+    }, [marqueeActive]);
 
     function toggleCategory(id: FileCategory) {
         setCategories((prev) => {
@@ -542,8 +655,28 @@ export function FilesView({
                         onChange={(event) => setQuery(event.target.value)}
                         placeholder="Search - try *.pdf, ext:pptx,pdf, /regex/"
                         title="Wildcards (*, ?), ext:pptx,pdf for extensions, /pattern/ for regex, or plain text for a fuzzy match"
-                        className={cn("pl-8", searchError && "border-danger")}
+                        className={cn("pl-8 pr-9", searchError && "border-danger")}
                     />
+                    <button
+                        type="button"
+                        onClick={() => setSearchScope((prev) => (prev === "current" ? "recursive" : "current"))}
+                        aria-label="Toggle search scope"
+                        title={
+                            searchScope === "recursive"
+                                ? "Searching this folder and all subfolders. Click to search only this folder."
+                                : "Searching only this folder. Click to search all subfolders too."
+                        }
+                        className={cn(
+                            "absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-1 transition-colors hover:bg-muted",
+                            searchScope === "recursive" ? "text-primary" : "text-muted-foreground"
+                        )}
+                    >
+                        {searchScope === "recursive" ? (
+                            <FolderTree className="size-4" />
+                        ) : (
+                            <Folder className="size-4" />
+                        )}
+                    </button>
                 </div>
                 <div className="flex items-center gap-1 rounded-md border border-border p-0.5">
                     {(["name", "created", "modified", "size"] as const).map((key) => (
@@ -587,6 +720,16 @@ export function FilesView({
                     Hidden
                 </Button>
             </div>
+
+            {searchScope === "recursive" && query.trim() ? (
+                <p className="mb-3 -mt-1 text-xs text-muted-foreground">
+                    {searching
+                        ? "Searching this folder and all subfolders..."
+                        : `${visible.length} result${visible.length === 1 ? "" : "s"} across subfolders${
+                              searchTruncated ? " (first matches only - narrow your search)" : ""
+                          }`}
+                </p>
+            ) : null}
 
             {filtersOpen ? (
                 <div className="mb-3 flex flex-col gap-3 rounded-lg border border-border bg-surface/40 p-3">
@@ -715,12 +858,16 @@ export function FilesView({
                     </div>
                     {visible.length === 0 ? (
                         <p className="px-3 py-8 text-center text-sm text-muted-foreground">
-                            {entries.length === 0
-                                ? "This folder is empty."
-                                : "Nothing matches your search or filters."}
+                            {searchScope === "recursive" && query.trim()
+                                ? searching
+                                    ? "Searching..."
+                                    : "No matches in this folder or its subfolders."
+                                : source.length === 0
+                                  ? "This folder is empty."
+                                  : "Nothing matches your search or filters."}
                         </p>
                     ) : (
-                        <div ref={scrollRef} className="max-h-[65vh] overflow-auto">
+                        <div ref={scrollRef} className="max-h-[65vh] overflow-auto" onMouseDown={onMarqueeDown}>
                             <div
                                 style={{
                                     height: `${rowVirtualizer.getTotalSize()}px`,
@@ -728,6 +875,12 @@ export function FilesView({
                                     width: "100%"
                                 }}
                             >
+                                {marqueeRect ? (
+                                    <div
+                                        className="pointer-events-none absolute left-0 right-0 z-10 rounded-sm border border-primary/60 bg-primary/10"
+                                        style={{ top: `${marqueeRect.top}px`, height: `${marqueeRect.height}px` }}
+                                    />
+                                ) : null}
                                 {rowVirtualizer.getVirtualItems().map((virtualRow) => {
                                     const index = virtualRow.index;
                                     const entry = visible[index];
@@ -738,6 +891,7 @@ export function FilesView({
                                         <ContextMenu key={entry.path}>
                                             <ContextMenuTrigger asChild>
                                                 <div
+                                                    data-drive-row
                                                     style={{
                                                         position: "absolute",
                                                         top: 0,
@@ -816,6 +970,11 @@ export function FilesView({
                                                             >
                                                                 <EntryIcon entry={entry} />
                                                                 {entry.name}
+                                                                {searchScope === "recursive" && entry.path.includes("/") ? (
+                                                                    <span className="shrink truncate text-xs text-muted-foreground">
+                                                                        in /{parentOf(entry.path)}
+                                                                    </span>
+                                                                ) : null}
                                                                 {entry.locked ? (
                                                                     <Lock
                                                                         className="size-3 shrink-0 text-muted-foreground"
@@ -838,6 +997,11 @@ export function FilesView({
                                                             >
                                                                 <EntryIcon entry={entry} />
                                                                 {entry.name}
+                                                                {searchScope === "recursive" && entry.path.includes("/") ? (
+                                                                    <span className="shrink truncate text-xs text-muted-foreground">
+                                                                        in /{parentOf(entry.path)}
+                                                                    </span>
+                                                                ) : null}
                                                                 {entry.note ? (
                                                                     <StickyNote
                                                                         className="size-3 shrink-0 text-amber-500"

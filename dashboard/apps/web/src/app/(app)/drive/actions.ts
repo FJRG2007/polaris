@@ -9,7 +9,13 @@
  */
 
 import { revalidatePath } from "next/cache";
-import { baseName, createConnectionSchema, normalizeRelPath } from "@polaris/core";
+import {
+    baseName,
+    createConnectionSchema,
+    normalizeRelPath,
+    storageConfigSchema,
+    storageCredentialsSchema
+} from "@polaris/core";
 import { requirePermission, requireUser } from "@/lib/session";
 import { authorizeDrive, requireDriveDriver } from "@/lib/drive-authz";
 import {
@@ -17,7 +23,8 @@ import {
     deleteConnection,
     discoverUnasShares,
     getDriver,
-    setUnasSmbShare
+    setUnasSmbShare,
+    updateConnection
 } from "@/lib/storage-service";
 import { detectHost, type NasDetection } from "@/lib/nas-detect";
 import { fetchUnasMetrics } from "@/lib/unifi-unas";
@@ -100,6 +107,50 @@ export async function createConnectionAction(input: unknown): Promise<{ error?: 
         targetType: "connection",
         targetId: created.id,
         metadata: { name: parsed.data.name, kind: parsed.data.config.kind }
+    });
+    revalidatePath("/drive");
+    return {};
+}
+
+/**
+ * Update an existing connection. The name and non-secret config are always
+ * applied; credentials are only changed when new secret material is provided
+ * (an empty credentials payload keeps the stored password/key), so editing a
+ * host or port never forces re-entering secrets.
+ */
+export async function updateConnectionAction(
+    connectionId: string,
+    input: { name?: unknown; config?: unknown; credentials?: unknown }
+): Promise<{ error?: string }> {
+    const user = await requirePermission("connections.manage");
+    const name = typeof input.name === "string" ? input.name.trim() : "";
+    if (!name) return { error: "Enter a connection name" };
+
+    const config = storageConfigSchema.safeParse(input.config);
+    if (!config.success) return { error: config.error.issues[0]?.message ?? "Invalid connection settings" };
+
+    // Only validate/replace credentials when the form actually supplied some; a
+    // payload of just { kind } means "keep the existing secret".
+    const rawCreds = input.credentials as Record<string, unknown> | undefined;
+    const hasSecret = rawCreds ? Object.keys(rawCreds).some((key) => key !== "kind") : false;
+    let credentials;
+    if (hasSecret) {
+        const parsed = storageCredentialsSchema.safeParse(rawCreds);
+        if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid credentials" };
+        credentials = parsed.data;
+    }
+
+    try {
+        await updateConnection(user.id, connectionId, { name, config: config.data, credentials });
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not update the connection" };
+    }
+    await recordAudit({
+        actorId: user.id,
+        action: "connection.update",
+        targetType: "connection",
+        targetId: connectionId,
+        metadata: { name, kind: config.data.kind }
     });
     revalidatePath("/drive");
     return {};

@@ -11,6 +11,16 @@ function pick(value: string | string[] | undefined): string | undefined {
     return Array.isArray(value) ? value[0] : value;
 }
 
+/** Parse a stored config JSON string into a plain object (empty on any error). */
+function parseConfig(raw: string): Record<string, unknown> {
+    try {
+        const parsed = JSON.parse(raw);
+        return parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>) : {};
+    } catch {
+        return {};
+    }
+}
+
 export default async function DrivePage({
     searchParams
 }: {
@@ -31,7 +41,9 @@ export default async function DrivePage({
         shared: row.shared,
         // Only the owner (or an admin) manages a connection's ACLs and locks; a
         // shared connection is browse-only from the grantee's side.
-        canManageAccess: !row.shared || user.isAdmin
+        canManageAccess: !row.shared || user.isAdmin,
+        // Non-secret config for the edit form; parsed defensively.
+        config: parseConfig(row.config)
     }));
 
     const connectionId = pick(params.c) ?? connections[0]?.id ?? null;

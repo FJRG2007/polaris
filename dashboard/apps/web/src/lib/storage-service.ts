@@ -241,6 +241,37 @@ export async function createConnection(
     });
 }
 
+/**
+ * Update an existing connection's name and non-secret config, and optionally its
+ * credentials. Scoped to the owner. Credentials are only re-encrypted when new
+ * secret material is supplied; a blank credentials payload keeps the stored one,
+ * so editing a host or port never forces the user to re-enter a password. The
+ * provider kind cannot change - that would be a different connection entirely.
+ */
+export async function updateConnection(
+    ownerId: string,
+    connectionId: string,
+    input: { name: string; config: StorageConfig; credentials?: StorageCredentials }
+) {
+    const row = await loadConnection(connectionId, ownerId);
+    if (row.kind !== input.config.kind) throw new Error("Cannot change the connection type");
+    const env = loadEnv();
+    const hasSecret = input.credentials
+        ? Object.keys(input.credentials).some((key) => key !== "kind")
+        : false;
+    const blob = hasSecret ? encryptCredentials(input.credentials as StorageCredentials, env.POLARIS_MASTER_KEY) : null;
+    await prisma.storageConnection.update({
+        where: { id: connectionId },
+        data: {
+            name: input.name,
+            config: JSON.stringify(input.config),
+            ...(blob
+                ? { encryptedCredential: blob.ciphertext, credentialNonce: blob.nonce, credentialKeyId: blob.keyId }
+                : {})
+        }
+    });
+}
+
 /** Delete a connection owned by the user. */
 export async function deleteConnection(ownerId: string, connectionId: string) {
     await prisma.storageConnection.deleteMany({ where: { id: connectionId, ownerId } });

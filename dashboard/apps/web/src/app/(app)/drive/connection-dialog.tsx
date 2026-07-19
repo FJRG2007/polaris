@@ -25,7 +25,14 @@ import {
     DialogTrigger,
     Input
 } from "@polaris/ui";
-import { createConnectionAction, detectNasAction, testUnasConnectionAction, type UnasTestResult } from "./actions";
+import {
+    createConnectionAction,
+    detectNasAction,
+    testUnasConnectionAction,
+    updateConnectionAction,
+    type UnasTestResult
+} from "./actions";
+import type { ConnectionSummary } from "./types";
 
 interface FieldDef {
     name: string;
@@ -161,6 +168,132 @@ const FIELDS: Record<StorageProviderKind, FieldDef[]> = {
         { name: "smbShare", label: "SMB share (optional, for file browsing)", group: "config" }
     ]
 };
+
+/**
+ * Edit an existing connection. Reuses the per-kind field map, prefilling the
+ * non-secret config from the stored connection. Credential fields start empty
+ * with a "leave blank to keep current" hint - the server only replaces the stored
+ * secret when new material is entered, so editing a host never re-prompts for a
+ * password. The provider kind is fixed (changing it would be a new connection).
+ */
+export function EditConnectionDialog({
+    connection,
+    open,
+    onOpenChange
+}: {
+    connection: ConnectionSummary | null;
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+}) {
+    const router = useRouter();
+    const [error, setError] = useState<string | null>(null);
+    const [pending, setPending] = useState(false);
+
+    if (!connection) return null;
+    const kind = connection.kind;
+    const config = connection.config ?? {};
+
+    async function onSubmit(event: FormEvent<HTMLFormElement>) {
+        event.preventDefault();
+        setPending(true);
+        setError(null);
+        const form = new FormData(event.currentTarget);
+        const nextConfig: Record<string, unknown> = { kind };
+        const credentials: Record<string, unknown> = { kind };
+        for (const field of FIELDS[kind]) {
+            const raw = form.get(field.name);
+            const target = field.group === "config" ? nextConfig : credentials;
+            if (field.type === "checkbox") {
+                target[field.name] = raw === "on";
+            } else if (field.type === "number") {
+                if (raw) target[field.name] = Number(raw);
+            } else if (raw) {
+                target[field.name] = String(raw);
+            }
+        }
+        const result = await updateConnectionAction(connection!.id, {
+            name: String(form.get("name") ?? ""),
+            config: nextConfig,
+            credentials
+        });
+        setPending(false);
+        if (result.error) {
+            setError(result.error);
+            return;
+        }
+        onOpenChange(false);
+        router.refresh();
+    }
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Edit {LABELS[kind]}</DialogTitle>
+                    <DialogDescription>
+                        Change the name, host, and settings. Leave a password or key blank to keep the current one.
+                    </DialogDescription>
+                </DialogHeader>
+                <form key={connection.id} onSubmit={onSubmit} className="flex flex-col gap-3">
+                    <label className="flex flex-col gap-1 text-sm">
+                        Name
+                        <Input name="name" required defaultValue={connection.name} />
+                    </label>
+                    {FIELDS[kind].map((field) => {
+                        const current = config[field.name];
+                        return (
+                            <label key={field.name} className="flex flex-col gap-1 text-sm">
+                                {field.type === "checkbox" ? (
+                                    <span className="flex items-center gap-2">
+                                        <input
+                                            type="checkbox"
+                                            name={field.name}
+                                            defaultChecked={Boolean(current)}
+                                            className="size-4"
+                                        />
+                                        {field.label}
+                                    </span>
+                                ) : field.type === "keyfile" ? (
+                                    <KeyFileField name={field.name} label={field.label} />
+                                ) : (
+                                    <>
+                                        {field.label}
+                                        <Input
+                                            name={field.name}
+                                            type={field.type ?? "text"}
+                                            required={field.required && field.group === "config"}
+                                            placeholder={
+                                                field.group === "credentials"
+                                                    ? "Leave blank to keep current"
+                                                    : field.placeholder
+                                            }
+                                            defaultValue={
+                                                field.group === "config" && current !== undefined && current !== null
+                                                    ? String(current)
+                                                    : undefined
+                                            }
+                                        />
+                                    </>
+                                )}
+                            </label>
+                        );
+                    })}
+                    {error ? <p className="text-sm text-danger">{error}</p> : null}
+                    <div className="mt-2 flex justify-end gap-2">
+                        <DialogClose asChild>
+                            <Button type="button" variant="ghost">
+                                Cancel
+                            </Button>
+                        </DialogClose>
+                        <Button type="submit" disabled={pending}>
+                            {pending ? "Saving..." : "Save changes"}
+                        </Button>
+                    </div>
+                </form>
+            </DialogContent>
+        </Dialog>
+    );
+}
 
 export function ConnectionDialog() {
     const router = useRouter();

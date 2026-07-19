@@ -13,6 +13,8 @@ export interface ConnectionSummary {
     shared?: boolean;
     /** True when the viewer owns the connection and may manage its access settings. */
     canManageAccess?: boolean;
+    /** Non-secret connection config (host, port, share, ...) for the edit form. */
+    config?: Record<string, unknown>;
 }
 
 export interface DriveEntry {

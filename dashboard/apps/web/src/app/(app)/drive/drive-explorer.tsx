@@ -13,7 +13,7 @@
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Folder, HardDrive, Info, Loader2, ShieldCheck, Trash2 } from "lucide-react";
+import { Folder, HardDrive, Info, Loader2, Pencil, ShieldCheck, Trash2 } from "lucide-react";
 import {
     Badge,
     Button,
@@ -43,7 +43,7 @@ import {
     setUnasShareAction
 } from "./actions";
 import { AccessDialog, UnlockPanel, type AccessTarget } from "./access-dialog";
-import { ConnectionDialog } from "./connection-dialog";
+import { ConnectionDialog, EditConnectionDialog } from "./connection-dialog";
 import { FilesView } from "./files-view";
 import { RequestDialog, type RequestTarget } from "./request-dialog";
 import { ShareDialog, type ShareTarget } from "./share-dialog";
@@ -82,6 +82,7 @@ export function DriveExplorer({
     const [newFileName, setNewFileName] = useState("Untitled.txt");
     const [deleteTargets, setDeleteTargets] = useState<DriveEntry[] | null>(null);
     const [deleteConn, setDeleteConn] = useState<ConnectionSummary | null>(null);
+    const [editConn, setEditConn] = useState<ConnectionSummary | null>(null);
     const [shareTarget, setShareTarget] = useState<ShareTarget | null>(null);
     const [requestTarget, setRequestTarget] = useState<RequestTarget | null>(null);
     const [ops, setOps] = useState<{ id: string; label: string }[]>([]);
@@ -294,16 +295,29 @@ export function DriveExplorer({
                                 >
                                     <HardDrive className="size-4 text-muted-foreground" />
                                     <span className="flex-1 truncate">{connection.name}</span>
+                                    {connection.shared ? <Badge variant="neutral">shared</Badge> : null}
                                     {connection.requiresHostd ? <Badge variant="neutral">host</Badge> : null}
                                 </Link>
-                                <button
-                                    type="button"
-                                    onClick={() => setDeleteConn(connection)}
-                                    className="rounded-md p-1 text-muted-foreground opacity-0 transition-opacity hover:text-danger group-hover:opacity-100"
-                                    aria-label={`Remove ${connection.name}`}
-                                >
-                                    <Trash2 className="size-4" />
-                                </button>
+                                {connection.canManageAccess ? (
+                                    <button
+                                        type="button"
+                                        onClick={() => setEditConn(connection)}
+                                        className="rounded-md p-1 text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100"
+                                        aria-label={`Edit ${connection.name}`}
+                                    >
+                                        <Pencil className="size-4" />
+                                    </button>
+                                ) : null}
+                                {connection.canManageAccess ? (
+                                    <button
+                                        type="button"
+                                        onClick={() => setDeleteConn(connection)}
+                                        className="rounded-md p-1 text-muted-foreground opacity-0 transition-opacity hover:text-danger group-hover:opacity-100"
+                                        aria-label={`Remove ${connection.name}`}
+                                    >
+                                        <Trash2 className="size-4" />
+                                    </button>
+                                ) : null}
                             </div>
                         ))
                     )}
@@ -409,6 +423,11 @@ export function DriveExplorer({
                 target={accessTarget}
                 onOpenChange={(open) => !open && setAccessTarget(null)}
                 onChanged={() => void load()}
+            />
+            <EditConnectionDialog
+                connection={editConn}
+                open={editConn !== null}
+                onOpenChange={(open) => !open && setEditConn(null)}
             />
 
             <Dialog open={newFolderOpen} onOpenChange={setNewFolderOpen}>
