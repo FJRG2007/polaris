@@ -11,18 +11,41 @@
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { loadEnv } from "@polaris/config";
-import { createShareSchema } from "@polaris/core";
+import { createShareSchema, isCidr, isIpAddress } from "@polaris/core";
 import { requirePermission } from "@/lib/session";
 import {
     createShare,
+    listShareAccessLogs,
     resolveShareByToken,
+    revealShareLink,
     revokeShare,
     shareUnlockCookie,
     shareUsability,
     signShareUnlock,
+    updateShare,
     verifySharePassword
 } from "@/lib/share-service";
 import { recordAudit } from "@/lib/audit-service";
+
+/** Interface a share owner uses to edit an existing link's guardrails. */
+export interface UpdateShareInput {
+    password?: string | null;
+    maxDownloads?: number | null;
+    expiresAt?: string | null;
+    allowDownload?: boolean;
+    allowPreview?: boolean;
+    allowUpload?: boolean;
+    allowedCidrs?: string[];
+}
+
+/** One access-log row as shown to the share owner. */
+export interface ShareLogRow {
+    id: string;
+    at: string;
+    ip: string | null;
+    action: string;
+    reason: string | null;
+}
 
 /** Create a share and return the absolute link to hand out (once). */
 export async function createShareAction(
@@ -47,6 +70,51 @@ export async function createShareAction(
     });
     revalidatePath("/shared");
     return { url: `${loadEnv().POLARIS_APP_URL}/s/${token}` };
+}
+
+/** Reveal a share's link again (owner-only; decrypts the stored token). */
+export async function revealShareLinkAction(shareId: string): Promise<{ url?: string; error?: string }> {
+    const user = await requirePermission("shares.create");
+    const url = await revealShareLink(user.id, shareId);
+    if (!url) {
+        return { error: "This link cannot be revealed - it predates link recovery. Create a new share instead." };
+    }
+    return { url };
+}
+
+/** Edit an existing share's guardrails (owner-scoped). */
+export async function updateShareAction(shareId: string, input: UpdateShareInput): Promise<{ error?: string }> {
+    const user = await requirePermission("shares.create");
+    const cidrs = (input.allowedCidrs ?? []).map((value) => value.trim()).filter(Boolean);
+    const invalid = cidrs.find((value) => !isCidr(value) && !isIpAddress(value));
+    if (invalid) return { error: `Invalid IP or range: ${invalid}` };
+    await updateShare(user.id, shareId, {
+        password: input.password === undefined ? undefined : input.password || null,
+        maxDownloads: input.maxDownloads === undefined ? undefined : input.maxDownloads || null,
+        expiresAt: input.expiresAt === undefined ? undefined : input.expiresAt ? new Date(input.expiresAt) : null,
+        allowDownload: input.allowDownload,
+        allowPreview: input.allowPreview,
+        allowUpload: input.allowUpload,
+        allowedCidrs: input.allowedCidrs === undefined ? undefined : cidrs
+    });
+    await recordAudit({ actorId: user.id, action: "share.update", targetType: "share", targetId: shareId });
+    revalidatePath("/shared");
+    return {};
+}
+
+/** Fetch the access log for a share the caller owns. */
+export async function getShareLogsAction(shareId: string): Promise<{ logs: ShareLogRow[] }> {
+    const user = await requirePermission("shares.create");
+    const logs = await listShareAccessLogs(user.id, shareId);
+    return {
+        logs: logs.map((row) => ({
+            id: row.id,
+            at: row.at.toISOString(),
+            ip: row.ip,
+            action: row.action,
+            reason: row.reason
+        }))
+    };
 }
 
 /** Revoke a share the caller owns. Owner-scoped, so it cannot touch others'. */

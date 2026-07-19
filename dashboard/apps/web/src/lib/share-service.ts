@@ -12,6 +12,8 @@ import type { CreateShareInput } from "@polaris/core";
 import { ipAllowed, normalizeRelPath } from "@polaris/core";
 import { generateToken, hashToken } from "@polaris/core/tokens";
 import { hashLinkPassword, verifyLinkPassword } from "@polaris/core/link-password";
+import { loadEnv } from "@polaris/config";
+import { decryptSecret, encryptSecret } from "@polaris/storage";
 import { prisma } from "@polaris/db";
 
 /** A share as needed by the public access path. */
@@ -30,6 +32,7 @@ export async function createShare(
     const token = generateToken();
     const path = normalizeRelPath(input.path);
     const passwordHash = input.password ? await hashLinkPassword(input.password) : null;
+    const tokenBlob = encryptSecret(token, loadEnv().POLARIS_MASTER_KEY);
     const share = await prisma.share.create({
         data: {
             connectionId: input.connectionId,
@@ -37,6 +40,9 @@ export async function createShare(
             ownerId,
             kind: input.kind,
             tokenHash: hashToken(token),
+            encryptedToken: tokenBlob.ciphertext,
+            tokenNonce: tokenBlob.nonce,
+            tokenKeyId: tokenBlob.keyId,
             passwordHash,
             maxDownloads: input.maxDownloads ?? null,
             expiresAt: input.expiresAt ?? null,
@@ -64,13 +70,74 @@ export async function listSharesForOwner(ownerId: string) {
             path: true,
             kind: true,
             allowUpload: true,
+            allowDownload: true,
+            allowPreview: true,
+            allowedCidrs: true,
             maxDownloads: true,
             downloadCount: true,
             expiresAt: true,
             revokedAt: true,
             createdAt: true,
+            encryptedToken: true,
             connection: { select: { name: true } }
         }
+    });
+}
+
+/** Decrypt and return the raw link for a share the caller owns, or null. */
+export async function revealShareLink(ownerId: string, shareId: string): Promise<string | null> {
+    const share = await prisma.share.findFirst({
+        where: { id: shareId, ownerId },
+        select: { encryptedToken: true, tokenNonce: true, tokenKeyId: true }
+    });
+    if (!share?.encryptedToken || !share.tokenNonce) return null;
+    const token = decryptSecret(
+        {
+            ciphertext: Buffer.from(share.encryptedToken),
+            nonce: Buffer.from(share.tokenNonce),
+            keyId: share.tokenKeyId ?? ""
+        },
+        loadEnv().POLARIS_MASTER_KEY
+    );
+    return `${loadEnv().POLARIS_APP_URL}/s/${token}`;
+}
+
+/** Update a share's guardrails. Owner-scoped; only the given fields change. */
+export async function updateShare(
+    ownerId: string,
+    shareId: string,
+    input: {
+        password?: string | null;
+        maxDownloads?: number | null;
+        expiresAt?: Date | null;
+        allowDownload?: boolean;
+        allowPreview?: boolean;
+        allowUpload?: boolean;
+        allowedCidrs?: string[];
+    }
+): Promise<void> {
+    const data: Record<string, unknown> = {};
+    if (input.password !== undefined) {
+        data.passwordHash = input.password ? await hashLinkPassword(input.password) : null;
+    }
+    if (input.maxDownloads !== undefined) data.maxDownloads = input.maxDownloads;
+    if (input.expiresAt !== undefined) data.expiresAt = input.expiresAt;
+    if (input.allowDownload !== undefined) data.allowDownload = input.allowDownload;
+    if (input.allowPreview !== undefined) data.allowPreview = input.allowPreview;
+    if (input.allowUpload !== undefined) data.allowUpload = input.allowUpload;
+    if (input.allowedCidrs !== undefined) data.allowedCidrs = JSON.stringify(input.allowedCidrs);
+    await prisma.share.updateMany({ where: { id: shareId, ownerId }, data });
+}
+
+/** Access-log entries for a share the caller owns, newest first (owner-visible). */
+export async function listShareAccessLogs(ownerId: string, shareId: string) {
+    const owns = await prisma.share.count({ where: { id: shareId, ownerId } });
+    if (owns === 0) return [];
+    return prisma.shareAccessLog.findMany({
+        where: { shareId },
+        orderBy: { at: "desc" },
+        take: 500,
+        select: { id: true, at: true, ip: true, action: true, reason: true }
     });
 }
 
@@ -168,6 +235,7 @@ export async function logShareAccess(entry: {
     shareId: string;
     action: string;
     reason?: string;
+    ip?: string;
     ipHash?: string;
     userAgentHash?: string;
 }): Promise<void> {
@@ -177,6 +245,7 @@ export async function logShareAccess(entry: {
                 shareId: entry.shareId,
                 action: entry.action,
                 reason: entry.reason,
+                ip: entry.ip,
                 ipHash: entry.ipHash,
                 userAgentHash: entry.userAgentHash
             }

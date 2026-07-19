@@ -40,7 +40,7 @@ export async function GET(
     const ipHash = hashForLog(ip);
     const userAgentHash = hashForLog(await clientUserAgent());
     const deny = (status: number, reason: string) => {
-        void logShareAccess({ shareId: share.id, action: "download", reason, ipHash, userAgentHash });
+        void logShareAccess({ shareId: share.id, action: "download", reason, ip, ipHash, userAgentHash });
         return new Response(reason, { status });
     };
 
@@ -76,7 +76,7 @@ export async function GET(
         // concurrent request this returns false and we serve nothing.
         if (!(await registerDownload(share.id))) return deny(410, "exhausted");
 
-        await logShareAccess({ shareId: share.id, action: "download", ipHash, userAgentHash });
+        await logShareAccess({ shareId: share.id, action: "download", ip, ipHash, userAgentHash });
 
         const headerStore = await headers();
         const responseHeaders = new Headers({

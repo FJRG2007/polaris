@@ -256,6 +256,11 @@ model Share {
     kind          String    @default("public")
     // SHA-256 of the share token; lookups are by hash so a DB dump yields no links.
     tokenHash     String    @unique
+    // The token, envelope-encrypted under the master key, so the owner can reveal
+    // the link again after creation. A DB dump alone still yields no working links.
+    encryptedToken Bytes?
+    tokenNonce     Bytes?
+    tokenKeyId     String?
     // argon2 hash of the optional link password.
     passwordHash  String?
     maxDownloads  Int?
@@ -299,6 +304,8 @@ model ShareAccessLog {
     at            DateTime @default(now())
     // Client IP is stored hashed for privacy while still supporting abuse review.
     ipHash        String?
+    // Raw client IP, shown to the share owner in the access log (their own link).
+    ip            String?
     userAgentHash String?
     action        String
     reason        String?

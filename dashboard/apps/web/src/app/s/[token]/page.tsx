@@ -15,6 +15,7 @@ import { Badge, Card, CardBody, CardHeader, CardTitle, PolarisMark } from "@pola
 import { ChevronRight, Download, Eye, File, Folder, FolderOpen } from "lucide-react";
 import { getDriverForConnection } from "@/lib/storage-service";
 import {
+    logShareAccess,
     resolveShareByToken,
     resolveWithinShare,
     shareIpAllowed,
@@ -22,7 +23,7 @@ import {
     shareUsability,
     verifyShareUnlock
 } from "@/lib/share-service";
-import { clientIp } from "@/lib/request-context";
+import { clientIp, clientUserAgent, hashForLog } from "@/lib/request-context";
 import { SharePasswordForm } from "./share-password-form";
 
 export const runtime = "nodejs";
@@ -79,7 +80,8 @@ export default async function SharePage({
         return <Unavailable message={message} />;
     }
 
-    if (!shareIpAllowed(share.allowedCidrs, await clientIp())) {
+    const ip = await clientIp();
+    if (!shareIpAllowed(share.allowedCidrs, ip)) {
         return <Unavailable message="This link is not available from your network." />;
     }
 
@@ -89,6 +91,15 @@ export default async function SharePage({
             return <SharePasswordForm token={token} />;
         }
     }
+
+    // Record a view (the visitor passed every gate). Best-effort; never blocks.
+    void logShareAccess({
+        shareId: share.id,
+        action: "view",
+        ip,
+        ipHash: hashForLog(ip),
+        userAgentHash: hashForLog(await clientUserAgent())
+    });
 
     const root = normalizeRelPath(share.path);
     const current = resolveWithinShare(share.path, p ?? null) ?? root;
