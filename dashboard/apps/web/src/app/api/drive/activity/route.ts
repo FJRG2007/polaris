@@ -75,6 +75,7 @@ export async function GET(request: Request): Promise<Response> {
     const items = matched.map((row) => ({
         id: row.id,
         action: row.action,
+        actorId: row.actorId ?? null,
         actor: row.actorId ? (names.get(row.actorId) ?? null) : null,
         at: row.at.toISOString()
     }));

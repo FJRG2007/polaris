@@ -84,6 +84,7 @@ import { FileViewer, isViewable, type ViewerTarget } from "./file-viewer";
 import { ITEM_ICONS, ITEM_ICON_COLORS, iconColorClass, iconComponent } from "./item-icons";
 import { matchesStructured, parseSearch } from "./search-query";
 import { RelativeTime } from "@/components/relative-time";
+import { UserProfileDialog } from "@/components/user-profile-dialog";
 import type { DriveEntry } from "./types";
 
 type SortKey = "name" | "created" | "modified" | "size";
@@ -92,6 +93,7 @@ type SortDir = "asc" | "desc";
 interface ActivityItem {
     id: string;
     action: string;
+    actorId: string | null;
     actor: string | null;
     at: string;
 }
@@ -263,6 +265,8 @@ export function FilesView({
     const [dropFolder, setDropFolder] = useState<string | null>(null);
     // Folder picked for upload, awaiting an in-app confirmation (not the browser's).
     const [pendingFolder, setPendingFolder] = useState<{ name: string; items: UploadItem[] } | null>(null);
+    // Actor whose profile is open from the activity feed.
+    const [profileUserId, setProfileUserId] = useState<string | null>(null);
     const [iconTarget, setIconTarget] = useState<DriveEntry | null>(null);
     const [detailsTarget, setDetailsTarget] = useState<DriveEntry | null>(null);
     const [noteTarget, setNoteTarget] = useState<DriveEntry | null>(null);
@@ -1765,7 +1769,20 @@ export function FilesView({
                                             <div className="flex min-w-0 flex-col">
                                                 <span>
                                                     {activityLabel(item.action)}
-                                                    {item.actor ? ` by ${item.actor}` : ""}
+                                                    {item.actor ? " by " : ""}
+                                                    {item.actor ? (
+                                                        item.actorId ? (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setProfileUserId(item.actorId)}
+                                                                className="font-medium text-primary hover:underline"
+                                                            >
+                                                                {item.actor}
+                                                            </button>
+                                                        ) : (
+                                                            <span className="font-medium">{item.actor}</span>
+                                                        )
+                                                    ) : null}
                                                 </span>
                                                 <span className="text-muted-foreground/70">
                                                     <RelativeTime iso={item.at} />
@@ -1811,6 +1828,8 @@ export function FilesView({
                     })
                 }
             />
+
+            <UserProfileDialog userId={profileUserId} onOpenChange={(open) => !open && setProfileUserId(null)} />
 
             <Dialog open={pendingFolder !== null} onOpenChange={(open) => !open && setPendingFolder(null)}>
                 <DialogContent>

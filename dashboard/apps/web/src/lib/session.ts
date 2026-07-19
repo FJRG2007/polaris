@@ -8,6 +8,7 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { userHasPermission } from "@polaris/auth";
+import { prisma } from "@polaris/db";
 import type { Permission } from "@polaris/core";
 import { auth } from "@/lib/auth";
 
@@ -34,11 +35,14 @@ export async function getSession() {
     }
 }
 
-/** Resolve the current user or redirect to sign-in. */
+/** Resolve the current user or redirect to sign-in. A banned account is treated
+ *  as signed out, so a ban takes effect on the banned user's next request. */
 export async function requireUser(): Promise<SessionUser> {
     const session = await getSession();
     if (!session?.user) redirect("/oauth/login");
     const user = session.user as { id: string; email: string; name: string; image?: string | null };
+    const record = await prisma.user.findUnique({ where: { id: user.id }, select: { bannedAt: true } });
+    if (record?.bannedAt) redirect("/oauth/login?banned=1");
     const isAdmin = (session.user as { isAdmin?: boolean }).isAdmin === true;
     return { id: user.id, email: user.email, name: user.name, image: user.image, isAdmin };
 }
