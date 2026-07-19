@@ -19,10 +19,13 @@ import {
     ChevronRight,
     Download,
     Eye,
+    EyeOff,
     File,
     Folder,
     FolderPlus,
     Inbox,
+    Info,
+    Palette,
     Pencil,
     Search,
     Share2,
@@ -42,12 +45,18 @@ import {
     ContextMenuLabel,
     ContextMenuSeparator,
     ContextMenuTrigger,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
     Input,
     Skeleton,
     cn
 } from "@polaris/ui";
 import { FILE_CATEGORIES, categoryOfExtension, extensionOf, type FileCategory } from "./file-categories";
 import { FileViewer, isViewable, type ViewerTarget } from "./file-viewer";
+import { ITEM_ICONS, ITEM_ICON_COLORS, iconColorClass, iconComponent } from "./item-icons";
 import type { DriveEntry } from "./types";
 
 type SortKey = "name" | "size" | "modified";
@@ -83,7 +92,10 @@ export function FilesView({
     onDelete,
     onRename,
     onShare,
-    onRequestFiles
+    onRequestFiles,
+    onToggleHidden,
+    onSetIcon,
+    onMove
 }: {
     connectionId: string;
     path: string;
@@ -101,6 +113,9 @@ export function FilesView({
     onRename: (entry: DriveEntry, nextName: string) => void;
     onShare: (entry: DriveEntry) => void;
     onRequestFiles: (path: string, name: string) => void;
+    onToggleHidden: (entry: DriveEntry) => void;
+    onSetIcon: (entry: DriveEntry, icon: string | null, color: string | null) => void;
+    onMove: (entry: DriveEntry, destFolderPath: string) => void;
 }) {
     const [query, setQuery] = useState("");
     const [sortKey, setSortKey] = useState<SortKey>("name");
@@ -118,6 +133,11 @@ export function FilesView({
     const [renaming, setRenaming] = useState<string | null>(null);
     const [renameValue, setRenameValue] = useState("");
     const [viewerTarget, setViewerTarget] = useState<ViewerTarget | null>(null);
+    const [showHidden, setShowHidden] = useState(false);
+    const [iconTarget, setIconTarget] = useState<DriveEntry | null>(null);
+    const [detailsTarget, setDetailsTarget] = useState<DriveEntry | null>(null);
+    const [dragUpload, setDragUpload] = useState(false);
+    const dragPath = useRef<string | null>(null);
     const router = useRouter();
     const clickTimer = useRef<number | null>(null);
 
@@ -151,6 +171,31 @@ export function FilesView({
         startRename(entry);
     }
 
+    /** External file drag over the listing highlights it as an upload drop zone. */
+    function onUploadDragOver(event: React.DragEvent) {
+        if (!event.dataTransfer.types.includes("Files")) return;
+        event.preventDefault();
+        setDragUpload(true);
+    }
+
+    function onUploadDrop(event: React.DragEvent) {
+        if (!event.dataTransfer.types.includes("Files")) return;
+        event.preventDefault();
+        setDragUpload(false);
+        onUpload(event.dataTransfer.files);
+    }
+
+    /** Drop a dragged row onto a folder to move it there (never into itself). */
+    function onFolderDrop(event: React.DragEvent, folder: DriveEntry) {
+        const source = dragPath.current ?? event.dataTransfer.getData("application/x-polaris-path");
+        dragPath.current = null;
+        if (!source || source === folder.path || folder.path.startsWith(`${source}/`)) return;
+        event.preventDefault();
+        event.stopPropagation();
+        const dragged = entries.find((entry) => entry.path === source);
+        if (dragged) onMove(dragged, folder.path);
+    }
+
     // Selection and rename are tied to a specific listing; drop them whenever the
     // location changes so a stale selection never leaks across folders.
     useEffect(() => {
@@ -170,6 +215,7 @@ export function FilesView({
         const ext = extFilter.trim().replace(/^\./, "").toLowerCase();
 
         let rows = entries.filter((entry) => {
+            if (!showHidden && entry.hidden) return false;
             const isDir = entry.kind === "dir";
             const entryExt = isDir ? "" : extensionOf(entry.name);
             if (categories.size > 0) {
@@ -207,7 +253,7 @@ export function FilesView({
             }
             return a.name.localeCompare(b.name) * direction;
         });
-    }, [entries, categories, extFilter, minMb, maxMb, dateFrom, dateTo, query, sortKey, sortDir]);
+    }, [entries, categories, extFilter, minMb, maxMb, dateFrom, dateTo, query, sortKey, sortDir, showHidden]);
 
     const selectedEntries = visible.filter((entry) => selected.has(entry.path));
     const allSelected = visible.length > 0 && selectedEntries.length === visible.length;
@@ -375,6 +421,15 @@ export function FilesView({
                     Filters
                     {hasFilters ? <Badge variant="neutral">{categories.size + (extFilter ? 1 : 0)}</Badge> : null}
                 </Button>
+                <Button
+                    size="sm"
+                    variant={showHidden ? "secondary" : "ghost"}
+                    onClick={() => setShowHidden((prev) => !prev)}
+                    aria-label={showHidden ? "Hide hidden items" : "Show hidden items"}
+                >
+                    {showHidden ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                    Hidden
+                </Button>
             </div>
 
             {filtersOpen ? (
@@ -465,6 +520,15 @@ export function FilesView({
                 </div>
             ) : null}
 
+            <div
+                className={cn(
+                    "relative rounded-lg",
+                    dragUpload && "ring-2 ring-primary ring-offset-2 ring-offset-background"
+                )}
+                onDragOver={onUploadDragOver}
+                onDragLeave={() => setDragUpload(false)}
+                onDrop={onUploadDrop}
+            >
             {loading ? (
                 <ListingSkeleton />
             ) : error ? (
@@ -507,9 +571,38 @@ export function FilesView({
                                         <ContextMenu key={entry.path}>
                                             <ContextMenuTrigger asChild>
                                                 <tr
+                                                    draggable={!isRenaming}
+                                                    onDragStart={(event) => {
+                                                        dragPath.current = entry.path;
+                                                        event.dataTransfer.setData(
+                                                            "application/x-polaris-path",
+                                                            entry.path
+                                                        );
+                                                        event.dataTransfer.effectAllowed = "move";
+                                                    }}
+                                                    onDragEnd={() => {
+                                                        dragPath.current = null;
+                                                    }}
+                                                    onDragOver={
+                                                        entry.kind === "dir"
+                                                            ? (event) => {
+                                                                  if (
+                                                                      dragPath.current &&
+                                                                      dragPath.current !== entry.path
+                                                                  )
+                                                                      event.preventDefault();
+                                                              }
+                                                            : undefined
+                                                    }
+                                                    onDrop={
+                                                        entry.kind === "dir"
+                                                            ? (event) => onFolderDrop(event, entry)
+                                                            : undefined
+                                                    }
                                                     className={cn(
                                                         "transition-colors",
-                                                        isSelected ? "bg-primary/5" : "hover:bg-card-hover"
+                                                        isSelected ? "bg-primary/5" : "hover:bg-card-hover",
+                                                        entry.hidden && "opacity-50"
                                                     )}
                                                 >
                                                     <td className="px-3 py-2">
@@ -539,7 +632,7 @@ export function FilesView({
                                                                 onDoubleClick={(e) => handleNameDoubleClick(e, entry)}
                                                                 className="flex items-center gap-2 hover:text-primary"
                                                             >
-                                                                <Folder className="size-4 text-primary" />
+                                                                <EntryIcon entry={entry} />
                                                                 {entry.name}
                                                             </Link>
                                                         ) : (
@@ -549,7 +642,7 @@ export function FilesView({
                                                                 onDoubleClick={(e) => handleNameDoubleClick(e, entry)}
                                                                 className="flex items-center gap-2 hover:text-primary"
                                                             >
-                                                                <File className="size-4 text-muted-foreground" />
+                                                                <EntryIcon entry={entry} />
                                                                 {entry.name}
                                                             </a>
                                                         )}
@@ -614,6 +707,23 @@ export function FilesView({
                                                     Share
                                                 </ContextMenuItem>
                                                 <ContextMenuSeparator />
+                                                <ContextMenuItem onSelect={() => setIconTarget(entry)}>
+                                                    <Palette className="size-4" />
+                                                    Change icon
+                                                </ContextMenuItem>
+                                                <ContextMenuItem onSelect={() => onToggleHidden(entry)}>
+                                                    {entry.hidden ? (
+                                                        <Eye className="size-4" />
+                                                    ) : (
+                                                        <EyeOff className="size-4" />
+                                                    )}
+                                                    {entry.hidden ? "Unhide" : "Hide"}
+                                                </ContextMenuItem>
+                                                <ContextMenuItem onSelect={() => setDetailsTarget(entry)}>
+                                                    <Info className="size-4" />
+                                                    Details
+                                                </ContextMenuItem>
+                                                <ContextMenuSeparator />
                                                 <ContextMenuItem variant="danger" onSelect={() => onDelete([entry])}>
                                                     <Trash2 className="size-4" />
                                                     Delete
@@ -627,9 +737,126 @@ export function FilesView({
                     </table>
                 </div>
             )}
+                {dragUpload ? (
+                    <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-lg bg-primary/5 text-sm font-medium text-primary">
+                        Drop files to upload here
+                    </div>
+                ) : null}
+            </div>
 
             <FileViewer target={viewerTarget} onOpenChange={(open) => !open && setViewerTarget(null)} />
+
+            <Dialog open={iconTarget !== null} onOpenChange={(open) => !open && setIconTarget(null)}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Change icon</DialogTitle>
+                        <DialogDescription className="truncate">{iconTarget?.name}</DialogDescription>
+                    </DialogHeader>
+                    <div className="flex flex-col gap-4">
+                        <div className="grid grid-cols-7 gap-1.5">
+                            {Object.entries(ITEM_ICONS).map(([name, Icon]) => (
+                                <button
+                                    key={name}
+                                    type="button"
+                                    onClick={() => {
+                                        if (!iconTarget) return;
+                                        onSetIcon(iconTarget, name, iconTarget.iconColor ?? "primary");
+                                        setIconTarget({ ...iconTarget, icon: name });
+                                    }}
+                                    className={cn(
+                                        "flex items-center justify-center rounded-md border p-2 transition-colors hover:bg-muted",
+                                        iconTarget?.icon === name ? "border-primary" : "border-border"
+                                    )}
+                                >
+                                    <Icon className={cn("size-5", iconColorClass(iconTarget?.iconColor))} />
+                                </button>
+                            ))}
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                            {ITEM_ICON_COLORS.map((color) => (
+                                <button
+                                    key={color.id}
+                                    type="button"
+                                    aria-label={color.id}
+                                    onClick={() => {
+                                        if (!iconTarget) return;
+                                        onSetIcon(iconTarget, iconTarget.icon ?? "folder", color.id);
+                                        setIconTarget({ ...iconTarget, icon: iconTarget.icon ?? "folder", iconColor: color.id });
+                                    }}
+                                    className={cn(
+                                        "size-6 rounded-full ring-offset-2 ring-offset-background transition",
+                                        iconTarget?.iconColor === color.id ? "ring-2 ring-primary" : ""
+                                    )}
+                                >
+                                    <span className={cn("block size-full rounded-full", color.swatch)} />
+                                </button>
+                            ))}
+                        </div>
+                        <div className="flex justify-between">
+                            <Button
+                                type="button"
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => {
+                                    if (iconTarget) onSetIcon(iconTarget, null, null);
+                                    setIconTarget(null);
+                                }}
+                            >
+                                Reset to default
+                            </Button>
+                            <Button type="button" size="sm" onClick={() => setIconTarget(null)}>
+                                Done
+                            </Button>
+                        </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={detailsTarget !== null} onOpenChange={(open) => !open && setDetailsTarget(null)}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Details</DialogTitle>
+                    </DialogHeader>
+                    {detailsTarget ? (
+                        <dl className="grid grid-cols-[7rem_1fr] gap-y-2 text-sm">
+                            <dt className="text-muted-foreground">Name</dt>
+                            <dd className="truncate">{detailsTarget.name}</dd>
+                            <dt className="text-muted-foreground">Type</dt>
+                            <dd>
+                                {detailsTarget.kind === "dir"
+                                    ? "Folder"
+                                    : extensionOf(detailsTarget.name)
+                                      ? `${extensionOf(detailsTarget.name).toUpperCase()} file`
+                                      : "File"}
+                            </dd>
+                            <dt className="text-muted-foreground">Location</dt>
+                            <dd className="truncate">
+                                /{detailsTarget.path.split("/").slice(0, -1).join("/")}
+                            </dd>
+                            <dt className="text-muted-foreground">Size</dt>
+                            <dd>
+                                {detailsTarget.kind === "dir"
+                                    ? "-"
+                                    : `${formatBytes(BigInt(detailsTarget.size))} (${Number(detailsTarget.size).toLocaleString()} bytes)`}
+                            </dd>
+                            <dt className="text-muted-foreground">Modified</dt>
+                            <dd>{new Date(detailsTarget.modifiedAt).toLocaleString()}</dd>
+                        </dl>
+                    ) : null}
+                </DialogContent>
+            </Dialog>
         </>
+    );
+}
+
+/** The icon for an entry - a user-set custom icon/color, or the default by kind. */
+function EntryIcon({ entry }: { entry: DriveEntry }) {
+    const Custom = iconComponent(entry.icon);
+    if (Custom) return <Custom className={cn("size-4", iconColorClass(entry.iconColor))} />;
+    return entry.kind === "dir" ? (
+        <Folder className="size-4 text-primary" />
+    ) : (
+        <File className="size-4 text-muted-foreground" />
     );
 }
 

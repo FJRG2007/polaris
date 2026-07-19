@@ -20,6 +20,7 @@ import {
 } from "@/lib/storage-service";
 import { detectHost, type NasDetection } from "@/lib/nas-detect";
 import { fetchUnasMetrics } from "@/lib/unifi-unas";
+import { moveItemMeta, setItemHidden, setItemIcon } from "@/lib/drive-meta-service";
 import { recordAudit } from "@/lib/audit-service";
 
 /** Result of a UNAS connection dry-run: what the console reported, or why not. */
@@ -161,12 +162,35 @@ export async function deleteEntryAction(connectionId: string, path: string): Pro
 
 export async function renameAction(connectionId: string, from: string, to: string): Promise<void> {
     const user = await requirePermission("drive.write");
+    const normalizedFrom = normalizeRelPath(from);
+    const normalizedTo = normalizeRelPath(to);
     const driver = await getDriver(connectionId, user.id);
     try {
-        await driver.move(normalizeRelPath(from), normalizeRelPath(to));
+        await driver.move(normalizedFrom, normalizedTo);
     } finally {
         await driver.dispose();
     }
+    // Keep any custom icon / hidden flag attached to the item after it moves.
+    await moveItemMeta(connectionId, normalizedFrom, normalizedTo);
     await recordAudit({ actorId: user.id, action: "drive.move", targetType: "connection", targetId: connectionId, metadata: { from, to } });
+    revalidatePath("/drive");
+}
+
+/** Hide or unhide an item in the browser (presentation only; the file is untouched). */
+export async function setItemHiddenAction(connectionId: string, path: string, hidden: boolean): Promise<void> {
+    const user = await requirePermission("drive.write");
+    await setItemHidden(user.id, connectionId, normalizeRelPath(path), hidden);
+    revalidatePath("/drive");
+}
+
+/** Set or clear an item's custom icon and color. */
+export async function setItemIconAction(
+    connectionId: string,
+    path: string,
+    icon: string | null,
+    iconColor: string | null
+): Promise<void> {
+    const user = await requirePermission("drive.write");
+    await setItemIcon(user.id, connectionId, normalizeRelPath(path), icon, iconColor);
     revalidatePath("/drive");
 }

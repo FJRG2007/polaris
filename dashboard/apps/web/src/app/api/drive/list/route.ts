@@ -10,6 +10,7 @@ import { normalizeRelPath } from "@polaris/core";
 import { userHasPermission } from "@polaris/auth";
 import { requireUser } from "@/lib/session";
 import { getDriver, SmbShareRequiredError } from "@/lib/storage-service";
+import { getMetaMap } from "@/lib/drive-meta-service";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -46,13 +47,23 @@ export async function GET(request: Request): Promise<Response> {
 
     try {
         const listing = await driver.list(path);
-        const entries = listing.entries.map((entry) => ({
-            name: entry.name,
-            path: entry.path,
-            kind: entry.kind,
-            size: entry.size.toString(),
-            modifiedAt: entry.modifiedAt.toISOString()
-        }));
+        const meta = await getMetaMap(
+            connectionId,
+            listing.entries.map((entry) => entry.path)
+        );
+        const entries = listing.entries.map((entry) => {
+            const item = meta.get(entry.path);
+            return {
+                name: entry.name,
+                path: entry.path,
+                kind: entry.kind,
+                size: entry.size.toString(),
+                modifiedAt: entry.modifiedAt.toISOString(),
+                hidden: item?.hidden ?? false,
+                icon: item?.icon ?? null,
+                iconColor: item?.iconColor ?? null
+            };
+        });
         return Response.json({ entries });
     } catch (caught) {
         const message = caught instanceof Error ? caught.message : "Unable to list this location";

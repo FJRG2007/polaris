@@ -35,6 +35,8 @@ import {
     discoverUnasSharesAction,
     mkdirAction,
     renameAction,
+    setItemHiddenAction,
+    setItemIconAction,
     setUnasShareAction
 } from "./actions";
 import { ConnectionDialog } from "./connection-dialog";
@@ -161,6 +163,37 @@ export function DriveExplorer({
         });
     }
 
+    function onToggleHidden(entry: DriveEntry) {
+        if (!connectionId) return;
+        const next = !entry.hidden;
+        setEntries((prev) => prev.map((row) => (row.path === entry.path ? { ...row, hidden: next } : row)));
+        startTransition(async () => {
+            await setItemHiddenAction(connectionId, entry.path, next);
+            void load();
+        });
+    }
+
+    function onSetIcon(entry: DriveEntry, icon: string | null, color: string | null) {
+        if (!connectionId) return;
+        setEntries((prev) =>
+            prev.map((row) => (row.path === entry.path ? { ...row, icon, iconColor: color } : row))
+        );
+        startTransition(async () => {
+            await setItemIconAction(connectionId, entry.path, icon, color);
+            void load();
+        });
+    }
+
+    function onMove(entry: DriveEntry, destFolderPath: string) {
+        if (!connectionId) return;
+        const to = destFolderPath ? `${destFolderPath}/${entry.name}` : entry.name;
+        setEntries((prev) => prev.filter((row) => row.path !== entry.path));
+        startTransition(async () => {
+            await renameAction(connectionId, entry.path, to);
+            void load();
+        });
+    }
+
     function confirmDelete() {
         if (!connectionId || !deleteTargets) return;
         const targets = deleteTargets;
@@ -264,6 +297,9 @@ export function DriveExplorer({
                         onRequestFiles={(target, name) =>
                             setRequestTarget({ connectionId, path: target, name })
                         }
+                        onToggleHidden={onToggleHidden}
+                        onSetIcon={onSetIcon}
+                        onMove={onMove}
                     />
                 )}
             </section>

@@ -18,4 +18,8 @@ export interface DriveEntry {
     /** Byte size serialized as a string to cross the server/client boundary. */
     size: string;
     modifiedAt: string;
+    /** User-set presentation metadata (merged from DriveItemMeta), when present. */
+    hidden?: boolean;
+    icon?: string | null;
+    iconColor?: string | null;
 }

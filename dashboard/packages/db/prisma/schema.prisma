@@ -162,7 +162,28 @@ model StorageConnection {
     shares       Share[]
     fileRequests FileRequest[]
     uploads      UploadSession[]
+    itemMeta     DriveItemMeta[]
 
+    @@index([ownerId])
+}
+
+// Per-path presentation metadata for a browsed item (not a mirror of the tree):
+// custom icon, hidden flag. Keyed by (connection, path); rows exist only for
+// items the user has customized. Cascades away with its connection.
+model DriveItemMeta {
+    id           String   @id @default(cuid())
+    ownerId      String
+    connectionId String
+    path         String
+    hidden       Boolean  @default(false)
+    icon         String?
+    iconColor    String?
+    createdAt    DateTime @default(now())
+    updatedAt    DateTime @updatedAt
+
+    connection StorageConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+
+    @@unique([connectionId, path])
     @@index([ownerId])
 }
 
