@@ -11,12 +11,14 @@
 
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import Fuse from "fuse.js";
 import {
     ArrowDownAZ,
     ArrowUpAZ,
     ChevronRight,
     Download,
+    Eye,
     File,
     Folder,
     FolderPlus,
@@ -45,6 +47,7 @@ import {
     cn
 } from "@polaris/ui";
 import { FILE_CATEGORIES, categoryOfExtension, extensionOf, type FileCategory } from "./file-categories";
+import { FileViewer, isViewable, type ViewerTarget } from "./file-viewer";
 import type { DriveEntry } from "./types";
 
 type SortKey = "name" | "size" | "modified";
@@ -114,6 +117,39 @@ export function FilesView({
     const lastIndex = useRef<number | null>(null);
     const [renaming, setRenaming] = useState<string | null>(null);
     const [renameValue, setRenameValue] = useState("");
+    const [viewerTarget, setViewerTarget] = useState<ViewerTarget | null>(null);
+    const router = useRouter();
+    const clickTimer = useRef<number | null>(null);
+
+    function openViewer(entry: DriveEntry) {
+        setViewerTarget({ connectionId, path: entry.path, name: entry.name });
+    }
+
+    /** Single click opens (folder navigates, file previews or downloads); a double
+     * click within the delay cancels it and renames instead. Modifier clicks select. */
+    function handleNameClick(event: MouseEvent, index: number, entry: DriveEntry) {
+        if (event.shiftKey || event.ctrlKey || event.metaKey) {
+            handleSelectClick(event, index, entry);
+            return;
+        }
+        event.preventDefault();
+        if (clickTimer.current) window.clearTimeout(clickTimer.current);
+        clickTimer.current = window.setTimeout(() => {
+            clickTimer.current = null;
+            if (entry.kind === "dir") router.push(href(connectionId, entry.path));
+            else if (isViewable(entry.name)) openViewer(entry);
+            else triggerDownload(connectionId, entry);
+        }, 220);
+    }
+
+    function handleNameDoubleClick(event: MouseEvent, entry: DriveEntry) {
+        event.preventDefault();
+        if (clickTimer.current) {
+            window.clearTimeout(clickTimer.current);
+            clickTimer.current = null;
+        }
+        startRename(entry);
+    }
 
     // Selection and rename are tied to a specific listing; drop them whenever the
     // location changes so a stale selection never leaks across folders.
@@ -434,9 +470,9 @@ export function FilesView({
             ) : error ? (
                 <div className="rounded-md border border-danger/40 bg-danger/10 p-3 text-sm text-danger">{error}</div>
             ) : (
-                <div className="overflow-hidden rounded-lg border border-border">
+                <div className="overflow-x-auto">
                     <table className="w-full text-sm">
-                        <thead className="bg-surface/60 text-left text-xs text-muted-foreground">
+                        <thead className="text-left text-xs text-muted-foreground">
                             <tr>
                                 <th className="w-9 px-3 py-2">
                                     <label className="flex cursor-pointer items-center">
@@ -472,7 +508,7 @@ export function FilesView({
                                             <ContextMenuTrigger asChild>
                                                 <tr
                                                     className={cn(
-                                                        "border-t border-border transition-colors",
+                                                        "transition-colors",
                                                         isSelected ? "bg-primary/5" : "hover:bg-card-hover"
                                                     )}
                                                 >
@@ -499,14 +535,8 @@ export function FilesView({
                                                         ) : entry.kind === "dir" ? (
                                                             <Link
                                                                 href={href(connectionId, entry.path)}
-                                                                onClick={(e) => {
-                                                                    if (e.shiftKey || e.ctrlKey || e.metaKey)
-                                                                        handleSelectClick(e, index, entry);
-                                                                }}
-                                                                onDoubleClick={(e) => {
-                                                                    e.preventDefault();
-                                                                    startRename(entry);
-                                                                }}
+                                                                onClick={(e) => handleNameClick(e, index, entry)}
+                                                                onDoubleClick={(e) => handleNameDoubleClick(e, entry)}
                                                                 className="flex items-center gap-2 hover:text-primary"
                                                             >
                                                                 <Folder className="size-4 text-primary" />
@@ -515,14 +545,8 @@ export function FilesView({
                                                         ) : (
                                                             <a
                                                                 href={downloadUrl(connectionId, entry.path)}
-                                                                onClick={(e) => {
-                                                                    if (e.shiftKey || e.ctrlKey || e.metaKey)
-                                                                        handleSelectClick(e, index, entry);
-                                                                }}
-                                                                onDoubleClick={(e) => {
-                                                                    e.preventDefault();
-                                                                    startRename(entry);
-                                                                }}
+                                                                onClick={(e) => handleNameClick(e, index, entry)}
+                                                                onDoubleClick={(e) => handleNameDoubleClick(e, entry)}
                                                                 className="flex items-center gap-2 hover:text-primary"
                                                             >
                                                                 <File className="size-4 text-muted-foreground" />
@@ -566,10 +590,20 @@ export function FilesView({
                                                         </ContextMenuItem>
                                                     </>
                                                 ) : (
-                                                    <ContextMenuItem onSelect={() => triggerDownload(connectionId, entry)}>
-                                                        <Download className="size-4" />
-                                                        Download
-                                                    </ContextMenuItem>
+                                                    <>
+                                                        {isViewable(entry.name) ? (
+                                                            <ContextMenuItem onSelect={() => openViewer(entry)}>
+                                                                <Eye className="size-4" />
+                                                                Open
+                                                            </ContextMenuItem>
+                                                        ) : null}
+                                                        <ContextMenuItem
+                                                            onSelect={() => triggerDownload(connectionId, entry)}
+                                                        >
+                                                            <Download className="size-4" />
+                                                            Download
+                                                        </ContextMenuItem>
+                                                    </>
                                                 )}
                                                 <ContextMenuItem onSelect={() => startRename(entry)}>
                                                     <Pencil className="size-4" />
@@ -593,6 +627,8 @@ export function FilesView({
                     </table>
                 </div>
             )}
+
+            <FileViewer target={viewerTarget} onOpenChange={(open) => !open && setViewerTarget(null)} />
         </>
     );
 }
@@ -600,16 +636,14 @@ export function FilesView({
 /** Placeholder while a directory listing loads. */
 function ListingSkeleton() {
     return (
-        <div className="overflow-hidden rounded-lg border border-border">
-            <div className="flex flex-col divide-y divide-border">
-                {Array.from({ length: 6 }).map((_, index) => (
-                    <div key={index} className="flex items-center gap-3 px-3 py-2.5">
-                        <Skeleton className="size-4 rounded" />
-                        <Skeleton className="h-4 flex-1 max-w-[40%]" />
-                        <Skeleton className="ml-auto h-4 w-16" />
-                    </div>
-                ))}
-            </div>
+        <div className="flex flex-col">
+            {Array.from({ length: 6 }).map((_, index) => (
+                <div key={index} className="flex items-center gap-3 px-3 py-2.5">
+                    <Skeleton className="size-4 rounded" />
+                    <Skeleton className="h-4 flex-1 max-w-[40%]" />
+                    <Skeleton className="ml-auto h-4 w-16" />
+                </div>
+            ))}
         </div>
     );
 }

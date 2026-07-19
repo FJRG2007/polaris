@@ -45,10 +45,13 @@ export async function GET(request: Request): Promise<Response> {
         metadata: { path, size: stat.size.toString() }
     });
 
+    // An inline request feeds an in-dashboard viewer (image/pdf/media); the default
+    // is an attachment download. Both stream the same bytes and honor Range.
+    const inline = url.searchParams.get("disposition") === "inline";
     const headers = new Headers({
         "content-type": stat.mime ?? "application/octet-stream",
         "accept-ranges": "bytes",
-        "content-disposition": `attachment; filename*=UTF-8''${encodeURIComponent(baseName(path))}`
+        "content-disposition": `${inline ? "inline" : "attachment"}; filename*=UTF-8''${encodeURIComponent(baseName(path))}`
     });
 
     const rangeHeader = request.headers.get("range");
