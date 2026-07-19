@@ -21,6 +21,7 @@ import {
 import { detectHost, type NasDetection } from "@/lib/nas-detect";
 import { fetchUnasMetrics } from "@/lib/unifi-unas";
 import { moveItemMeta, setItemHidden, setItemIcon, setItemNote } from "@/lib/drive-meta-service";
+import { deleteTrashForever, emptyTrash, moveToTrash, restoreTrash } from "@/lib/trash-service";
 import { recordAudit } from "@/lib/audit-service";
 
 /** Result of a UNAS connection dry-run: what the console reported, or why not. */
@@ -179,6 +180,37 @@ export async function deleteEntryAction(connectionId: string, path: string): Pro
     }
     await recordAudit({ actorId: user.id, action: "drive.delete", targetType: "connection", targetId: connectionId, metadata: { path } });
     revalidatePath("/drive");
+}
+
+/** Move an item to the recycle bin (the default "delete" from the browser). */
+export async function moveToTrashAction(connectionId: string, path: string): Promise<void> {
+    const user = await requirePermission("drive.delete");
+    await moveToTrash(user.id, connectionId, path);
+    await recordAudit({ actorId: user.id, action: "drive.trash", targetType: "connection", targetId: connectionId, metadata: { path } });
+    revalidatePath("/drive");
+    revalidatePath("/trash");
+}
+
+/** Restore a trashed item to its original location. */
+export async function restoreTrashAction(id: string): Promise<void> {
+    const user = await requirePermission("drive.write");
+    await restoreTrash(user.id, id);
+    revalidatePath("/drive");
+    revalidatePath("/trash");
+}
+
+/** Permanently delete a single trashed item. */
+export async function deleteTrashForeverAction(id: string): Promise<void> {
+    const user = await requirePermission("drive.delete");
+    await deleteTrashForever(user.id, id);
+    revalidatePath("/trash");
+}
+
+/** Permanently empty the recycle bin. */
+export async function emptyTrashAction(): Promise<void> {
+    const user = await requirePermission("drive.delete");
+    await emptyTrash(user.id);
+    revalidatePath("/trash");
 }
 
 export async function renameAction(connectionId: string, from: string, to: string): Promise<void> {

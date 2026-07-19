@@ -47,11 +47,14 @@ export async function GET(request: Request): Promise<Response> {
 
     try {
         const listing = await driver.list(path);
+        // Hide the Polaris trash folder from normal browsing; it lives at the root
+        // of each connection and is managed through the Trash page instead.
+        const visibleEntries = listing.entries.filter((entry) => entry.path !== ".polaris-trash");
         const meta = await getMetaMap(
             connectionId,
-            listing.entries.map((entry) => entry.path)
+            visibleEntries.map((entry) => entry.path)
         );
-        const entries = listing.entries.map((entry) => {
+        const entries = visibleEntries.map((entry) => {
             const item = meta.get(entry.path);
             return {
                 name: entry.name,

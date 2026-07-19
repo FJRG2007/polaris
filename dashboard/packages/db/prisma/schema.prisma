@@ -163,8 +163,31 @@ model StorageConnection {
     fileRequests FileRequest[]
     uploads      UploadSession[]
     itemMeta     DriveItemMeta[]
+    trashItems   TrashItem[]
 
     @@index([ownerId])
+}
+
+// A Polaris-managed recycle bin entry. "Move to Trash" relocates the item into a
+// hidden trash folder on the same connection and records where it came from, so
+// it can be listed, restored to its original path, or permanently deleted. Works
+// for any backend; UniFi UNAS keeps its own trash, which can be reused later.
+model TrashItem {
+    id           String   @id @default(cuid())
+    ownerId      String
+    connectionId String
+    name         String
+    // Where it lived before deletion, and where it now sits in the trash folder.
+    originalPath String
+    trashPath    String
+    kind         String
+    size         BigInt   @default(0)
+    deletedAt    DateTime @default(now())
+
+    connection StorageConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+
+    @@index([ownerId])
+    @@index([connectionId])
 }
 
 // Per-path presentation metadata for a browsed item (not a mirror of the tree):

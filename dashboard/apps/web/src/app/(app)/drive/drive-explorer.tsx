@@ -33,9 +33,9 @@ import {
     copyAction,
     createFileAction,
     deleteConnectionAction,
-    deleteEntryAction,
     discoverUnasSharesAction,
     mkdirAction,
+    moveToTrashAction,
     renameAction,
     setItemHiddenAction,
     setItemIconAction,
@@ -244,10 +244,12 @@ export function DriveExplorer({
         const paths = new Set(targets.map((entry) => entry.path));
         setEntries((prev) => prev.filter((entry) => !paths.has(entry.path)));
         const label =
-            targets.length === 1 ? `Deleting ${targets[0]?.name}` : `Deleting ${targets.length} items`;
+            targets.length === 1
+                ? `Moving ${targets[0]?.name} to Trash`
+                : `Moving ${targets.length} items to Trash`;
         runOp(label, async () => {
             for (const entry of targets) {
-                await deleteEntryAction(connectionId, entry.path);
+                await moveToTrashAction(connectionId, entry.path);
             }
         });
     }
@@ -426,12 +428,13 @@ export function DriveExplorer({
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>
-                            Delete {deleteTargets && deleteTargets.length > 1 ? `${deleteTargets.length} items` : "item"}
+                            Move {deleteTargets && deleteTargets.length > 1 ? `${deleteTargets.length} items` : "item"}{" "}
+                            to Trash
                         </DialogTitle>
                         <DialogDescription className="truncate">
                             {deleteTargets && deleteTargets.length === 1
-                                ? `${deleteTargets[0]?.name} will be permanently deleted${deleteTargets[0]?.kind === "dir" ? ", along with everything inside it" : ""}.`
-                                : "The selected items will be permanently deleted, along with everything inside any folders."}
+                                ? `${deleteTargets[0]?.name} will be moved to the recycle bin. You can restore it from Trash.`
+                                : "The selected items will be moved to the recycle bin. You can restore them from Trash."}
                         </DialogDescription>
                     </DialogHeader>
                     <div className="flex justify-end gap-2">
@@ -439,7 +442,7 @@ export function DriveExplorer({
                             Cancel
                         </Button>
                         <Button type="button" variant="danger" onClick={confirmDelete}>
-                            Delete
+                            Move to Trash
                         </Button>
                     </div>
                 </DialogContent>
