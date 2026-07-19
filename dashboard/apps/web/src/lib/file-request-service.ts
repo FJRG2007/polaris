@@ -71,6 +71,17 @@ export async function listFileRequestsForOwner(ownerId: string) {
     });
 }
 
+/** Per-request count of submissions flagged malicious by a scanner, as a map. */
+export async function flaggedCounts(requestIds: string[]): Promise<Map<string, number>> {
+    if (requestIds.length === 0) return new Map();
+    const rows = await prisma.fileRequestSubmission.groupBy({
+        by: ["requestId"],
+        where: { requestId: { in: requestIds }, scanStatus: "malicious" },
+        _count: { _all: true }
+    });
+    return new Map(rows.map((row) => [row.requestId, row._count._all]));
+}
+
 /** Revoke a file request owned by the user. Idempotent; scoped so IDOR is impossible. */
 export async function revokeFileRequest(ownerId: string, requestId: string): Promise<void> {
     await prisma.fileRequest.updateMany({
@@ -85,6 +96,7 @@ export async function resolveFileRequestByToken(token: string) {
         where: { tokenHash: hashToken(token) },
         select: {
             id: true,
+            ownerId: true,
             title: true,
             instructions: true,
             destinationConnectionId: true,
@@ -173,7 +185,7 @@ export async function countSubmissions(requestId: string): Promise<number> {
     return prisma.fileRequestSubmission.count({ where: { requestId } });
 }
 
-/** Record a stored submission against a request. */
+/** Record a stored submission against a request; returns the new submission id. */
 export async function recordSubmission(entry: {
     requestId: string;
     submittedByUserId?: string | null;
@@ -181,8 +193,8 @@ export async function recordSubmission(entry: {
     fileName: string;
     size: bigint;
     storedPath: string;
-}): Promise<void> {
-    await prisma.fileRequestSubmission.create({
+}): Promise<string> {
+    const created = await prisma.fileRequestSubmission.create({
         data: {
             requestId: entry.requestId,
             submittedByUserId: entry.submittedByUserId ?? null,
@@ -191,6 +203,8 @@ export async function recordSubmission(entry: {
             size: entry.size,
             storedPath: entry.storedPath,
             status: "stored"
-        }
+        },
+        select: { id: true }
     });
+    return created.id;
 }

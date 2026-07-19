@@ -4,6 +4,7 @@ import { AppShell, CapabilityProvider, EditionBadge } from "@polaris/ui";
 import { AccountMenu } from "@/components/account-menu";
 import { AppNav } from "@/components/app-nav";
 import { AppSidebar } from "@/components/app-sidebar";
+import { NotificationBell } from "@/components/notification-bell";
 import { UpdateIndicator } from "@/components/update-indicator";
 import { requireUser } from "@/lib/session";
 
@@ -25,6 +26,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
                     <>
                         {user.isAdmin ? <UpdateIndicator /> : null}
                         <EditionBadge />
+                        <NotificationBell />
                         <AccountMenu name={user.name} email={user.email} isAdmin={user.isAdmin} />
                     </>
                 }

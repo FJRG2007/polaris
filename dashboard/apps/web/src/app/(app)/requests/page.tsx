@@ -6,7 +6,7 @@
  */
 
 import { requireUser } from "@/lib/session";
-import { listFileRequestsForOwner } from "@/lib/file-request-service";
+import { flaggedCounts, listFileRequestsForOwner } from "@/lib/file-request-service";
 import { listConnections } from "@/lib/storage-service";
 import { NewDropPointButton } from "./new-drop-point-button";
 import { RequestsView, type RequestRow } from "./requests-view";
@@ -19,6 +19,7 @@ export default async function RequestsPage() {
         listFileRequestsForOwner(user.id),
         listConnections(user.id)
     ]);
+    const flagged = await flaggedCounts(requests.map((request) => request.id));
     const rows: RequestRow[] = requests.map((request) => ({
         id: request.id,
         title: request.title,
@@ -27,6 +28,7 @@ export default async function RequestsPage() {
         requireLogin: request.requireLogin,
         maxFiles: request.maxFiles,
         submissionCount: request._count.submissions,
+        flaggedCount: flagged.get(request.id) ?? 0,
         expiresAt: request.expiresAt ? request.expiresAt.toISOString() : null,
         revokedAt: request.revokedAt ? request.revokedAt.toISOString() : null,
         createdAt: request.createdAt.toISOString()

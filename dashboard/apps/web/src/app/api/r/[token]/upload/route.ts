@@ -27,6 +27,7 @@ import {
     verifyFileRequestUnlock
 } from "@/lib/file-request-service";
 import { clientIp, hashForLog } from "@/lib/request-context";
+import { scanDropPointSubmission } from "@/lib/integrations/drop-point-scan";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -118,13 +119,24 @@ export async function PUT(
     const driver = await getDriverForConnection(fileRequest.destinationConnectionId);
     try {
         const stat = await driver.writeStream(destination, limitSize(request.body, maxSizeBytes), {});
-        await recordSubmission({
+        const submissionId = await recordSubmission({
             requestId: fileRequest.id,
             submittedByUserId: userId,
             ipHash: hashForLog(ip),
             fileName: safeName,
             size: stat.size,
             storedPath: destination
+        });
+        // Hand the stored file to any enabled scanner (VirusTotal) without blocking
+        // the uploader; the scan updates the submission and notifies the owner if it
+        // flags something. Detached: a scan failure never fails the upload.
+        void scanDropPointSubmission({
+            submissionId,
+            ownerId: fileRequest.ownerId,
+            connectionId: fileRequest.destinationConnectionId,
+            storedPath: destination,
+            fileName: safeName,
+            size: Number(stat.size)
         });
         return Response.json({ ok: true, name: safeName, size: stat.size.toString() });
     } catch (error) {

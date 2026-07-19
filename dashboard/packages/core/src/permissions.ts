@@ -18,6 +18,7 @@ export const PERMISSIONS = [
     "requests.manage",
     "users.manage",
     "settings.manage",
+    "integrations.manage",
     "system.manage"
 ] as const;
 

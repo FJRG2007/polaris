@@ -7,7 +7,7 @@
  */
 
 import { useState, useTransition } from "react";
-import { Ban, Inbox, Lock } from "lucide-react";
+import { Ban, Inbox, Lock, ShieldAlert } from "lucide-react";
 import { Badge, Button, Card, CardBody } from "@polaris/ui";
 import { revokeFileRequestAction } from "../drive/request-actions";
 
@@ -19,6 +19,8 @@ export interface RequestRow {
     requireLogin: boolean;
     maxFiles: number | null;
     submissionCount: number;
+    /** Uploads to this drop point flagged as malware by a scanner. */
+    flaggedCount: number;
     expiresAt: string | null;
     revokedAt: string | null;
     createdAt: string;
@@ -90,6 +92,12 @@ export function RequestsView({ requests }: { requests: RequestRow[] }) {
                                 </div>
                             </div>
                             <div className="flex items-center gap-2">
+                                {request.flaggedCount > 0 ? (
+                                    <Badge variant="danger" className="gap-1" title="Uploads flagged as malware">
+                                        <ShieldAlert className="size-3" />
+                                        {request.flaggedCount} flagged
+                                    </Badge>
+                                ) : null}
                                 <Badge variant={state.variant}>{state.label}</Badge>
                                 {!request.revokedAt ? (
                                     <Button

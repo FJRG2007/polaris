@@ -1,6 +1,6 @@
 "use client";
 
-import { Activity, Link2, LogOut, Settings, ShieldCheck, Users, UsersRound } from "lucide-react";
+import { Activity, Blocks, Link2, LogOut, Settings, ShieldCheck, Users, UsersRound } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
     DropdownMenu,
@@ -63,6 +63,12 @@ export function AccountMenu({ name, email, isAdmin }: { name: string; email: str
                             <a href="/admin/activity">
                                 <Activity className="size-4" />
                                 Activity
+                            </a>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem asChild>
+                            <a href="/integrations">
+                                <Blocks className="size-4" />
+                                Integrations
                             </a>
                         </DropdownMenuItem>
                         <DropdownMenuItem asChild>
