@@ -30,6 +30,7 @@ import { detectHost, type NasDetection } from "@/lib/nas-detect";
 import { fetchUnasMetrics } from "@/lib/unifi-unas";
 import { moveItemMeta, recordItemCreator, setItemFavorite, setItemHidden, setItemIcon, setItemNote } from "@/lib/drive-meta-service";
 import { deleteTrashForever, emptyTrash, moveToTrash, restoreTrash } from "@/lib/trash-service";
+import { createScheduledDeletion } from "@/lib/scheduled-deletion-service";
 import { recordAudit } from "@/lib/audit-service";
 
 /** Result of a UNAS connection dry-run: what the console reported, or why not. */
@@ -236,6 +237,39 @@ export async function deleteEntryAction(connectionId: string, path: string): Pro
     revalidatePath("/drive");
 }
 
+/**
+ * Schedule an item's deletion for a future time. Owner/ACL-authorized like a real
+ * delete; the sweep (lazy on browse, or the cron) carries it out later. `permanent`
+ * chooses a real delete over the recycle bin.
+ */
+export async function scheduleDeleteAction(
+    connectionId: string,
+    path: string,
+    deleteAt: string,
+    permanent: boolean
+): Promise<{ error?: string }> {
+    const user = await requireUser();
+    try {
+        await authorizeDrive(user.id, connectionId, path, "delete");
+    } catch (caught) {
+        return { error: driveErrorMessage(caught, "You cannot delete this item.") };
+    }
+    const when = new Date(deleteAt);
+    if (Number.isNaN(when.getTime())) return { error: "Pick a valid date and time." };
+    if (when.getTime() <= Date.now()) return { error: "Pick a time in the future." };
+
+    await createScheduledDeletion({ ownerId: user.id, connectionId, path: normalizeRelPath(path), permanent, deleteAt: when });
+    await recordAudit({
+        actorId: user.id,
+        action: "drive.schedule_delete",
+        targetType: "connection",
+        targetId: connectionId,
+        metadata: { path, deleteAt: when.toISOString(), permanent }
+    });
+    revalidatePath("/drive");
+    return {};
+}
+
 /** Move an item to the recycle bin (the default "delete" from the browser). */
 export async function moveToTrashAction(connectionId: string, path: string): Promise<void> {
     const user = await requireUser();
@@ -291,6 +325,21 @@ export async function renameAction(connectionId: string, from: string, to: strin
         return { error: driveErrorMessage(caught, "You cannot move or rename this item.") };
     }
     try {
+        // Moving an item onto its own path is a no-op, not an error.
+        if (normalizedFrom === normalizedTo) return {};
+        // Refuse to move onto an existing item: a native rename would either fail
+        // with an opaque driver error or clobber the target. Reporting the clash
+        // is why a folder can look "stuck" - the destination name is already taken.
+        let destinationTaken = false;
+        try {
+            await driver.stat(normalizedTo);
+            destinationTaken = true;
+        } catch {
+            destinationTaken = false;
+        }
+        if (destinationTaken) {
+            return { error: `An item named "${baseName(normalizedTo)}" already exists in that folder.` };
+        }
         await driver.move(normalizedFrom, normalizedTo);
     } catch (caught) {
         return { error: driveErrorMessage(caught, "Could not move the item.") };

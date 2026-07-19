@@ -1,17 +1,19 @@
 "use client";
 
 /**
- * Manage-drop-points view. Lists the current user's file requests with their
- * limits and submission counts, and lets them revoke one. Mirrors the shared-
- * links view; the link is not shown here because only its hash is stored.
+ * Drop-points list. Each row links to the drop point's detail page (collected
+ * files, config, activity). Quick actions to close an open drop point or reopen a
+ * closed one live inline; they sit outside the row link so a click on them does
+ * not navigate. The link is not shown here - only its hash is stored.
  */
 
 import { useState, useTransition } from "react";
-import { Ban, Inbox, Lock } from "lucide-react";
+import Link from "next/link";
+import { Ban, Inbox, Lock, RotateCcw } from "lucide-react";
 import { Badge, Button, Card, CardBody } from "@polaris/ui";
-import { revokeFileRequestAction } from "../drive/request-actions";
+import { reopenFileRequestAction, revokeFileRequestAction } from "../request-actions";
 
-export interface RequestRow {
+export interface DropPointRow {
     id: string;
     title: string;
     destinationPath: string;
@@ -24,7 +26,7 @@ export interface RequestRow {
     createdAt: string;
 }
 
-function status(request: RequestRow): { label: string; variant: "success" | "neutral" | "warning" } {
+function status(request: DropPointRow): { label: string; variant: "success" | "neutral" | "warning" } {
     if (request.revokedAt) return { label: "Closed", variant: "neutral" };
     if (request.expiresAt && new Date(request.expiresAt).getTime() <= Date.now()) {
         return { label: "Expired", variant: "warning" };
@@ -35,7 +37,7 @@ function status(request: RequestRow): { label: string; variant: "success" | "neu
     return { label: "Open", variant: "success" };
 }
 
-export function RequestsView({ requests }: { requests: RequestRow[] }) {
+export function DropPointsView({ requests }: { requests: DropPointRow[] }) {
     const [rows, setRows] = useState(requests);
     const [pending, startTransition] = useTransition();
     const [busy, setBusy] = useState<string | null>(null);
@@ -48,6 +50,15 @@ export function RequestsView({ requests }: { requests: RequestRow[] }) {
             setRows((prev) =>
                 prev.map((row) => (row.id === id ? { ...row, revokedAt: new Date().toISOString() } : row))
             );
+            setBusy(null);
+        });
+    }
+
+    function onReopen(id: string) {
+        setBusy(id);
+        startTransition(async () => {
+            await reopenFileRequestAction(id);
+            setRows((prev) => prev.map((row) => (row.id === id ? { ...row, revokedAt: null } : row)));
             setBusy(null);
         });
     }
@@ -69,7 +80,10 @@ export function RequestsView({ requests }: { requests: RequestRow[] }) {
                 return (
                     <Card key={request.id}>
                         <CardBody className="flex flex-wrap items-center justify-between gap-3">
-                            <div className="flex min-w-0 items-center gap-3">
+                            <Link
+                                href={`/drive/drop-points/${request.id}`}
+                                className="flex min-w-0 flex-1 items-center gap-3 rounded-md transition-colors hover:opacity-80"
+                            >
                                 <Inbox className="size-4 shrink-0 text-primary" />
                                 <div className="min-w-0">
                                     <p className="flex items-center gap-1.5 truncate text-sm font-medium">
@@ -88,10 +102,20 @@ export function RequestsView({ requests }: { requests: RequestRow[] }) {
                                             : ""}
                                     </p>
                                 </div>
-                            </div>
+                            </Link>
                             <div className="flex items-center gap-2">
                                 <Badge variant={state.variant}>{state.label}</Badge>
-                                {!request.revokedAt ? (
+                                {request.revokedAt ? (
+                                    <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        onClick={() => onReopen(request.id)}
+                                        disabled={pending && busy === request.id}
+                                    >
+                                        <RotateCcw className="size-4" />
+                                        Reopen
+                                    </Button>
+                                ) : (
                                     <Button
                                         size="sm"
                                         variant="ghost"
@@ -101,7 +125,7 @@ export function RequestsView({ requests }: { requests: RequestRow[] }) {
                                         <Ban className="size-4" />
                                         Close
                                     </Button>
-                                ) : null}
+                                )}
                             </div>
                         </CardBody>
                     </Card>

@@ -10,7 +10,7 @@
  * and (being a UniFi device) it also offers a shortcut to its own console.
  */
 
-import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Folder, HardDrive, Info, Loader2, Pencil, ShieldCheck, Trash2, X } from "lucide-react";
@@ -33,10 +33,12 @@ import {
     copyAction,
     createFileAction,
     deleteConnectionAction,
+    deleteEntryAction,
     discoverUnasSharesAction,
     mkdirAction,
     moveToTrashAction,
     renameAction,
+    scheduleDeleteAction,
     setItemFavoriteAction,
     setItemHiddenAction,
     setItemIconAction,
@@ -82,6 +84,8 @@ export function DriveExplorer({
     const [newFileOpen, setNewFileOpen] = useState(false);
     const [newFileName, setNewFileName] = useState("Untitled.txt");
     const [deleteTargets, setDeleteTargets] = useState<DriveEntry[] | null>(null);
+    const [permanentTargets, setPermanentTargets] = useState<DriveEntry[] | null>(null);
+    const [scheduleTargets, setScheduleTargets] = useState<DriveEntry[] | null>(null);
     const [deleteConn, setDeleteConn] = useState<ConnectionSummary | null>(null);
     const [editConn, setEditConn] = useState<ConnectionSummary | null>(null);
     const [shareTarget, setShareTarget] = useState<ShareTarget | null>(null);
@@ -254,6 +258,9 @@ export function DriveExplorer({
     function onMove(entry: DriveEntry, destFolderPath: string) {
         if (!connectionId) return;
         const to = destFolderPath ? `${destFolderPath}/${entry.name}` : entry.name;
+        // Already in that folder: nothing to do (dropping onto the current folder
+        // or its own parent would otherwise flash the row out and back).
+        if (to === entry.path) return;
         setEntries((prev) => prev.filter((row) => row.path !== entry.path));
         runOp(`Moving ${entry.name}`, () => renameAction(connectionId, entry.path, to));
     }
@@ -276,6 +283,23 @@ export function DriveExplorer({
         runOp(label, async () => {
             for (const entry of targets) {
                 await moveToTrashAction(connectionId, entry.path);
+            }
+        });
+    }
+
+    function confirmDeletePermanent() {
+        if (!connectionId || !permanentTargets) return;
+        const targets = permanentTargets;
+        setPermanentTargets(null);
+        const paths = new Set(targets.map((entry) => entry.path));
+        setEntries((prev) => prev.filter((entry) => !paths.has(entry.path)));
+        const label =
+            targets.length === 1
+                ? `Deleting ${targets[0]?.name} permanently`
+                : `Deleting ${targets.length} items permanently`;
+        runOp(label, async () => {
+            for (const entry of targets) {
+                await deleteEntryAction(connectionId, entry.path);
             }
         });
     }
@@ -372,6 +396,8 @@ export function DriveExplorer({
                         onNewFile={() => setNewFileOpen(true)}
                         onUpload={onUpload}
                         onDelete={(items) => setDeleteTargets(items)}
+                        onDeletePermanent={(items) => setPermanentTargets(items)}
+                        onScheduleDelete={(items) => setScheduleTargets(items)}
                         onRename={onRename}
                         onShare={(entry) =>
                             setShareTarget({
@@ -548,6 +574,46 @@ export function DriveExplorer({
                 </DialogContent>
             </Dialog>
 
+            <Dialog open={permanentTargets !== null} onOpenChange={(open) => !open && setPermanentTargets(null)}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>
+                            Delete{" "}
+                            {permanentTargets && permanentTargets.length > 1
+                                ? `${permanentTargets.length} items`
+                                : "item"}{" "}
+                            permanently
+                        </DialogTitle>
+                        <DialogDescription className="truncate">
+                            {permanentTargets && permanentTargets.length === 1
+                                ? `${permanentTargets[0]?.name} will be deleted for good. This cannot be undone.`
+                                : "The selected items will be deleted for good. This cannot be undone."}
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="flex justify-end gap-2">
+                        <Button type="button" variant="ghost" onClick={() => setPermanentTargets(null)}>
+                            Cancel
+                        </Button>
+                        <Button type="button" variant="danger" onClick={confirmDeletePermanent}>
+                            Delete permanently
+                        </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
+            {connectionId ? (
+                <ScheduleDeleteDialog
+                    connectionId={connectionId}
+                    targets={scheduleTargets}
+                    onOpenChange={(open) => !open && setScheduleTargets(null)}
+                    onScheduled={() => {
+                        setScheduleTargets(null);
+                        void load();
+                    }}
+                    onError={(message) => setOpError(message)}
+                />
+            ) : null}
+
             <Dialog open={deleteConn !== null} onOpenChange={(open) => !open && setDeleteConn(null)}>
                 <DialogContent>
                     <DialogHeader>
@@ -568,6 +634,115 @@ export function DriveExplorer({
                 </DialogContent>
             </Dialog>
         </div>
+    );
+}
+
+/**
+ * Schedule-deletion dialog. Picks a future date/time and whether the deletion goes
+ * to the recycle bin or is permanent, then registers a scheduled deletion per
+ * target. The sweep (lazy on browse, or the cron) carries it out later.
+ */
+function ScheduleDeleteDialog({
+    connectionId,
+    targets,
+    onOpenChange,
+    onScheduled,
+    onError
+}: {
+    connectionId: string;
+    targets: DriveEntry[] | null;
+    onOpenChange: (open: boolean) => void;
+    onScheduled: () => void;
+    onError: (message: string) => void;
+}) {
+    const [when, setWhen] = useState("");
+    const [permanent, setPermanent] = useState(false);
+    const [pending, setPending] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (targets) {
+            setWhen("");
+            setPermanent(false);
+            setError(null);
+        }
+    }, [targets]);
+
+    async function onSubmit(event: FormEvent) {
+        event.preventDefault();
+        if (!targets || targets.length === 0) return;
+        if (!when) {
+            setError("Pick a date and time.");
+            return;
+        }
+        setPending(true);
+        setError(null);
+        const iso = new Date(when).toISOString();
+        let failure: string | null = null;
+        for (const entry of targets) {
+            const result = await scheduleDeleteAction(connectionId, entry.path, iso, permanent);
+            if (result.error) {
+                failure = result.error;
+                break;
+            }
+        }
+        setPending(false);
+        if (failure) {
+            setError(failure);
+            onError(failure);
+            return;
+        }
+        onScheduled();
+    }
+
+    const count = targets?.length ?? 0;
+
+    return (
+        <Dialog open={targets !== null} onOpenChange={onOpenChange}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Schedule deletion</DialogTitle>
+                    <DialogDescription className="truncate">
+                        {count === 1 ? targets?.[0]?.name : `${count} items`} will be deleted at the time you choose.
+                    </DialogDescription>
+                </DialogHeader>
+                <form onSubmit={onSubmit} className="flex flex-col gap-3">
+                    <label className="flex flex-col gap-1 text-sm">
+                        Delete on
+                        <Input
+                            type="datetime-local"
+                            value={when}
+                            onChange={(event) => setWhen(event.target.value)}
+                            required
+                        />
+                    </label>
+                    <label className="flex items-center gap-2 text-sm">
+                        <input
+                            type="checkbox"
+                            checked={permanent}
+                            onChange={(event) => setPermanent(event.target.checked)}
+                            className="size-4"
+                        />
+                        Delete permanently (skip the recycle bin)
+                    </label>
+                    <p className="text-xs text-muted-foreground">
+                        Runs the next time this connection is browsed after that moment, or exactly on time if the
+                        deletion cron is configured.
+                    </p>
+                    {error ? <p className="text-sm text-danger">{error}</p> : null}
+                    <div className="flex justify-end gap-2">
+                        <DialogClose asChild>
+                            <Button type="button" variant="ghost">
+                                Cancel
+                            </Button>
+                        </DialogClose>
+                        <Button type="submit" variant={permanent ? "danger" : undefined} disabled={pending}>
+                            {pending ? "Scheduling..." : "Schedule"}
+                        </Button>
+                    </div>
+                </form>
+            </DialogContent>
+        </Dialog>
     );
 }
 

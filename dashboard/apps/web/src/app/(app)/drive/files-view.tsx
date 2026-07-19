@@ -17,6 +17,7 @@ import Fuse from "fuse.js";
 import {
     ArrowDownAZ,
     ArrowUpAZ,
+    CalendarClock,
     ChevronRight,
     ClipboardCopy,
     ClipboardPaste,
@@ -34,6 +35,8 @@ import {
     FolderUp,
     Inbox,
     Info,
+    LayoutGrid,
+    List,
     Lock,
     Palette,
     Pencil,
@@ -58,6 +61,9 @@ import {
     ContextMenuItem,
     ContextMenuLabel,
     ContextMenuSeparator,
+    ContextMenuSub,
+    ContextMenuSubContent,
+    ContextMenuSubTrigger,
     ContextMenuTrigger,
     Dialog,
     DialogContent,
@@ -169,6 +175,8 @@ export function FilesView({
     onMove,
     onCopy,
     onManageAccess,
+    onDeletePermanent,
+    onScheduleDelete,
     headerActions
 }: {
     connectionId: string;
@@ -196,6 +204,10 @@ export function FilesView({
     onCopy: (entry: DriveEntry, destFolderPath: string) => void;
     /** Manage per-path access (ACL grants and the password lock). Owner/admin only. */
     onManageAccess?: (entry: DriveEntry) => void;
+    /** Delete items for good, bypassing the recycle bin. */
+    onDeletePermanent: (entries: DriveEntry[]) => void;
+    /** Schedule items to be deleted at a future time. */
+    onScheduleDelete: (entries: DriveEntry[]) => void;
     /** Connection-level actions (Access, Open console) rendered in the toolbar, left of the panel. */
     headerActions?: ReactNode;
 }) {
@@ -218,11 +230,20 @@ export function FilesView({
     const [dateTo, setDateTo] = useState("");
 
     const [selected, setSelected] = useState<Set<string>>(new Set());
+    // Anchor for shift-range selection; keyboard cursor is tracked separately so a
+    // shift+arrow can extend from a fixed anchor while the cursor keeps moving.
     const lastIndex = useRef<number | null>(null);
+    const cursorRef = useRef<number | null>(null);
+    const gridRef = useRef<HTMLDivElement>(null);
     const [renaming, setRenaming] = useState<string | null>(null);
     const [renameValue, setRenameValue] = useState("");
     const [viewerTarget, setViewerTarget] = useState<ViewerTarget | null>(null);
     const [showHidden, setShowHidden] = useState(false);
+    const [viewMode, setViewMode] = useState<"list" | "grid">("list");
+    // Breadcrumb segment currently under a drag, highlighted as a move target.
+    const [dropSegment, setDropSegment] = useState<string | null>(null);
+    // Folder picked for upload, awaiting an in-app confirmation (not the browser's).
+    const [pendingFolder, setPendingFolder] = useState<{ name: string; items: UploadItem[] } | null>(null);
     const [iconTarget, setIconTarget] = useState<DriveEntry | null>(null);
     const [detailsTarget, setDetailsTarget] = useState<DriveEntry | null>(null);
     const [noteTarget, setNoteTarget] = useState<DriveEntry | null>(null);
@@ -296,6 +317,7 @@ export function FilesView({
     /** Windows-style row click: plain selects only this, ctrl toggles, shift extends. */
     function rowClick(event: MouseEvent, index: number, entry: DriveEntry) {
         if (renaming === entry.path) return;
+        cursorRef.current = index;
         if (event.shiftKey) {
             selectRange(index);
             return;
@@ -339,6 +361,27 @@ export function FilesView({
         } else if (event.key === "Delete" && selectedEntries.length > 0) {
             event.preventDefault();
             onDelete(selectedEntries);
+        } else if (event.key === "ArrowDown") {
+            event.preventDefault();
+            moveCursor(viewMode === "grid" ? gridColumns() : 1, event.shiftKey);
+        } else if (event.key === "ArrowUp") {
+            event.preventDefault();
+            moveCursor(viewMode === "grid" ? -gridColumns() : -1, event.shiftKey);
+        } else if (viewMode === "grid" && event.key === "ArrowRight") {
+            event.preventDefault();
+            moveCursor(1, event.shiftKey);
+        } else if (viewMode === "grid" && event.key === "ArrowLeft") {
+            event.preventDefault();
+            moveCursor(-1, event.shiftKey);
+        } else if (event.key === "Home") {
+            event.preventDefault();
+            moveCursor(-visible.length, event.shiftKey);
+        } else if (event.key === "End") {
+            event.preventDefault();
+            moveCursor(visible.length, event.shiftKey);
+        } else if (mod && key === "a") {
+            event.preventDefault();
+            setSelected(new Set(visible.map((entry) => entry.path)));
         }
     }
 
@@ -358,6 +401,28 @@ export function FilesView({
         void gatherDropItems(transfer).then((items) => onUpload(items));
     }
 
+    /**
+     * Pick a folder to upload. Prefers the File System Access API, which lets us
+     * enumerate the folder and confirm in our own dialog; only where it is missing
+     * do we fall back to the <input webkitdirectory> that shows the browser prompt.
+     */
+    async function pickFolder() {
+        const picker = (window as unknown as { showDirectoryPicker?: () => Promise<FsDirectoryHandle> })
+            .showDirectoryPicker;
+        if (!picker) {
+            folderInput.current?.click();
+            return;
+        }
+        let dir: FsDirectoryHandle;
+        try {
+            dir = await picker();
+        } catch {
+            return; // The user dismissed the OS picker.
+        }
+        const items = await readDirectoryHandle(dir, `${dir.name}/`);
+        if (items.length > 0) setPendingFolder({ name: dir.name, items });
+    }
+
     /** Drop a dragged row onto a folder to move it there (never into itself). */
     function onFolderDrop(event: React.DragEvent, folder: DriveEntry) {
         const source = dragPath.current ?? event.dataTransfer.getData("application/x-polaris-path");
@@ -375,6 +440,7 @@ export function FilesView({
         setSelected(new Set());
         setRenaming(null);
         lastIndex.current = null;
+        cursorRef.current = null;
     }, [connectionId, path]);
 
     // The clipboard holds paths from one connection; copy/move actions run against
@@ -487,6 +553,219 @@ export function FilesView({
     const selectedEntries = visible.filter((entry) => selected.has(entry.path));
     const allSelected = visible.length > 0 && selectedEntries.length === visible.length;
     const searchError = useMemo(() => parseSearch(query).error, [query]);
+
+    // Items marked for a cut are shown dimmed until pasted, the way a file
+    // manager greys a cut selection so it is obvious what will move.
+    const cutPaths = useMemo(
+        () => (clipboard?.mode === "cut" ? new Set(clipboard.entries.map((entry) => entry.path)) : null),
+        [clipboard]
+    );
+
+    /**
+     * Move whatever is being dragged into `targetPath` (a breadcrumb folder). If the
+     * dragged item is part of the selection, the whole selection moves; items already
+     * in the target, or a folder dropped onto itself or a descendant, are skipped.
+     */
+    function moveDraggedTo(targetPath: string) {
+        const source = dragPath.current;
+        dragPath.current = null;
+        setDropSegment(null);
+        if (source === null) return;
+        const group = selected.has(source) ? selectedEntries : visible.filter((entry) => entry.path === source);
+        for (const item of group) {
+            if (parentOf(item.path) === targetPath) continue;
+            if (item.path === targetPath || targetPath.startsWith(`${item.path}/`)) continue;
+            onMove(item, targetPath);
+        }
+    }
+
+    /** Drag-and-drop handlers that turn a breadcrumb segment into a move target. */
+    function segmentDropProps(targetPath: string) {
+        return {
+            onDragOver: (event: React.DragEvent) => {
+                if (dragPath.current === null) return;
+                event.preventDefault();
+                setDropSegment(targetPath);
+            },
+            onDragLeave: () => setDropSegment((prev) => (prev === targetPath ? null : prev)),
+            onDrop: (event: React.DragEvent) => {
+                event.preventDefault();
+                moveDraggedTo(targetPath);
+            }
+        };
+    }
+
+    /** Drag handlers shared by list rows and grid cells: drag to move, drop onto a folder. */
+    function entryDragProps(entry: DriveEntry, isRenaming: boolean) {
+        return {
+            draggable: !isRenaming,
+            onDragStart: (event: React.DragEvent) => {
+                dragPath.current = entry.path;
+                event.dataTransfer.setData("application/x-polaris-path", entry.path);
+                event.dataTransfer.effectAllowed = "move";
+            },
+            onDragEnd: () => {
+                dragPath.current = null;
+            },
+            onDragOver:
+                entry.kind === "dir"
+                    ? (event: React.DragEvent) => {
+                          if (dragPath.current && dragPath.current !== entry.path) event.preventDefault();
+                      }
+                    : undefined,
+            onDrop: entry.kind === "dir" ? (event: React.DragEvent) => onFolderDrop(event, entry) : undefined
+        };
+    }
+
+    /** The right-click menu for a single entry, shared by the list and grid views. */
+    function entryMenu(entry: DriveEntry) {
+        return (
+            <ContextMenuContent>
+                <ContextMenuLabel>{entry.name}</ContextMenuLabel>
+                {entry.kind === "dir" ? (
+                    <>
+                        <ContextMenuItem asChild>
+                            <Link href={href(connectionId, entry.path)}>
+                                <Folder className="size-4" />
+                                Open
+                            </Link>
+                        </ContextMenuItem>
+                        <ContextMenuItem onSelect={() => downloadSelection(connectionId, [entry])}>
+                            <Download className="size-4" />
+                            Download as ZIP
+                        </ContextMenuItem>
+                        <ContextMenuItem onSelect={() => onRequestFiles(entry.path, entry.name)}>
+                            <Inbox className="size-4" />
+                            Request files here
+                        </ContextMenuItem>
+                        {clipboard ? (
+                            <ContextMenuItem
+                                onSelect={() => {
+                                    for (const item of clipboard.entries) {
+                                        if (clipboard.mode === "cut") onMove(item, entry.path);
+                                        else onCopy(item, entry.path);
+                                    }
+                                    if (clipboard.mode === "cut") setClipboard(null);
+                                }}
+                            >
+                                <ClipboardPaste className="size-4" />
+                                Paste here
+                            </ContextMenuItem>
+                        ) : null}
+                    </>
+                ) : (
+                    <>
+                        {isViewable(entry.name) ? (
+                            <ContextMenuItem onSelect={() => openViewer(entry)}>
+                                <Eye className="size-4" />
+                                Open
+                            </ContextMenuItem>
+                        ) : null}
+                        <ContextMenuItem onSelect={() => triggerDownload(connectionId, entry)}>
+                            <Download className="size-4" />
+                            Download
+                        </ContextMenuItem>
+                    </>
+                )}
+                <ContextMenuItem onSelect={() => startRename(entry)}>
+                    <Pencil className="size-4" />
+                    Rename
+                    <span className="ml-auto pl-6 text-xs text-muted-foreground">F2</span>
+                </ContextMenuItem>
+                <ContextMenuItem
+                    onSelect={() =>
+                        setClipboard({ entries: selected.has(entry.path) ? selectedEntries : [entry], mode: "copy" })
+                    }
+                >
+                    <Copy className="size-4" />
+                    Copy
+                    <span className="ml-auto pl-6 text-xs text-muted-foreground">Ctrl+C</span>
+                </ContextMenuItem>
+                <ContextMenuItem
+                    onSelect={() =>
+                        setClipboard({ entries: selected.has(entry.path) ? selectedEntries : [entry], mode: "cut" })
+                    }
+                >
+                    <Scissors className="size-4" />
+                    Cut
+                    <span className="ml-auto pl-6 text-xs text-muted-foreground">Ctrl+X</span>
+                </ContextMenuItem>
+                <ContextMenuItem onSelect={() => duplicate(entry)}>
+                    <Files className="size-4" />
+                    Duplicate
+                </ContextMenuItem>
+                <ContextMenuItem onSelect={() => openMove(selected.has(entry.path) ? selectedEntries : [entry])}>
+                    <FolderInput className="size-4" />
+                    Move to...
+                </ContextMenuItem>
+                <ContextMenuItem onSelect={() => void navigator.clipboard.writeText(entry.path)}>
+                    <ClipboardCopy className="size-4" />
+                    Copy path
+                </ContextMenuItem>
+                <ContextMenuItem onSelect={() => onShare(entry)}>
+                    <Share2 className="size-4" />
+                    Share
+                </ContextMenuItem>
+                <ContextMenuSeparator />
+                <ContextMenuItem onSelect={() => onSetFavorite(entry, !entry.favorite)}>
+                    <Star className={cn("size-4", entry.favorite && "fill-amber-400 text-amber-400")} />
+                    {entry.favorite ? "Remove from favorites" : "Add to favorites"}
+                </ContextMenuItem>
+                <ContextMenuItem onSelect={() => setIconTarget(entry)}>
+                    <Palette className="size-4" />
+                    Change icon
+                </ContextMenuItem>
+                <ContextMenuItem onSelect={() => onToggleHidden(entry)}>
+                    {entry.hidden ? <Eye className="size-4" /> : <EyeOff className="size-4" />}
+                    {entry.hidden ? "Unhide" : "Hide"}
+                </ContextMenuItem>
+                <ContextMenuItem onSelect={() => openNote(entry)}>
+                    <StickyNote className="size-4" />
+                    {entry.note ? "Edit note" : "Add note"}
+                </ContextMenuItem>
+                <ContextMenuItem onSelect={() => setDetailsTarget(entry)}>
+                    <Info className="size-4" />
+                    Details
+                </ContextMenuItem>
+                {onManageAccess ? (
+                    <ContextMenuItem onSelect={() => onManageAccess(entry)}>
+                        <ShieldCheck className="size-4" />
+                        Permissions &amp; lock
+                    </ContextMenuItem>
+                ) : null}
+                <ContextMenuSeparator />
+                <ContextMenuSub>
+                    <ContextMenuSubTrigger className="text-danger data-[state=open]:bg-danger/10 focus:bg-danger/10">
+                        <Trash2 className="size-4" />
+                        Delete
+                    </ContextMenuSubTrigger>
+                    <ContextMenuSubContent>
+                        <ContextMenuItem
+                            onSelect={() => onDelete(selected.has(entry.path) ? selectedEntries : [entry])}
+                        >
+                            <Trash2 className="size-4" />
+                            Move to Trash
+                            <span className="ml-auto pl-6 text-xs text-muted-foreground">Del</span>
+                        </ContextMenuItem>
+                        <ContextMenuItem
+                            variant="danger"
+                            onSelect={() => onDeletePermanent(selected.has(entry.path) ? selectedEntries : [entry])}
+                        >
+                            <Trash2 className="size-4" />
+                            Delete permanently
+                        </ContextMenuItem>
+                        <ContextMenuSeparator />
+                        <ContextMenuItem
+                            onSelect={() => onScheduleDelete(selected.has(entry.path) ? selectedEntries : [entry])}
+                        >
+                            <CalendarClock className="size-4" />
+                            Delete later...
+                        </ContextMenuItem>
+                    </ContextMenuSubContent>
+                </ContextMenuSub>
+            </ContextMenuContent>
+        );
+    }
 
     // Load the activity feed for a single selected item (downloads, renames, ...).
     const singleSelectedPath = selectedEntries.length === 1 ? (selectedEntries[0]?.path ?? null) : null;
@@ -623,6 +902,62 @@ export function FilesView({
         });
     }
 
+    /** Select exactly the contiguous range between two indices (keyboard shift-extend). */
+    function setRangeSelection(a: number, b: number) {
+        const [lo, hi] = a < b ? [a, b] : [b, a];
+        const next = new Set<string>();
+        for (let i = lo; i <= hi; i++) {
+            const entry = visible[i];
+            if (entry) next.add(entry.path);
+        }
+        setSelected(next);
+    }
+
+    /** Columns currently shown in grid view, measured from the first row's layout. */
+    function gridColumns(): number {
+        const grid = gridRef.current;
+        if (!grid || grid.children.length === 0) return 1;
+        const top = (grid.children[0] as HTMLElement).offsetTop;
+        let cols = 0;
+        for (const child of Array.from(grid.children)) {
+            if ((child as HTMLElement).offsetTop === top) cols++;
+            else break;
+        }
+        return Math.max(1, cols);
+    }
+
+    /** Bring the keyboard cursor into view in whichever layout is active. */
+    function scrollCursorIntoView(index: number) {
+        if (viewMode === "grid") {
+            (gridRef.current?.children[index] as HTMLElement | undefined)?.scrollIntoView({ block: "nearest" });
+        } else {
+            rowVirtualizer.scrollToIndex(index, { align: "auto" });
+        }
+    }
+
+    /**
+     * Move the keyboard cursor by `delta` positions (a row in list view, a row or
+     * column in grid view). Plain move selects just that item; holding shift extends
+     * the selection from the anchor, mirroring a file manager's arrow-key behavior.
+     */
+    function moveCursor(delta: number, extend: boolean) {
+        if (visible.length === 0) return;
+        const start =
+            cursorRef.current ??
+            lastIndex.current ??
+            (selectedEntries[0] ? visible.indexOf(selectedEntries[0]) : -1);
+        const next = start < 0 ? (delta > 0 ? 0 : visible.length - 1) : Math.max(0, Math.min(visible.length - 1, start + delta));
+        cursorRef.current = next;
+        if (extend) {
+            setRangeSelection(lastIndex.current ?? next, next);
+        } else {
+            const entry = visible[next];
+            if (entry) setSelected(new Set([entry.path]));
+            lastIndex.current = next;
+        }
+        scrollCursorIntoView(next);
+    }
+
     /** Ctrl/Cmd toggles, Shift extends a range - shared by the checkbox and name. */
     function handleSelectClick(event: MouseEvent, index: number, entry: DriveEntry) {
         if (event.shiftKey) {
@@ -671,7 +1006,14 @@ export function FilesView({
             >
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                 <div className="flex min-w-0 items-center gap-1 text-sm text-muted-foreground">
-                    <Link href={href(connectionId, "")} className="hover:text-foreground">
+                    <Link
+                        href={href(connectionId, "")}
+                        {...segmentDropProps("")}
+                        className={cn(
+                            "rounded px-1 py-0.5 hover:text-foreground",
+                            dropSegment === "" && "bg-primary/15 text-primary ring-1 ring-primary/40"
+                        )}
+                    >
                         Home
                     </Link>
                     {segments.map((segment, index) => {
@@ -679,7 +1021,14 @@ export function FilesView({
                         return (
                             <span key={target} className="flex items-center gap-1">
                                 <ChevronRight className="size-3" />
-                                <Link href={href(connectionId, target)} className="truncate hover:text-foreground">
+                                <Link
+                                    href={href(connectionId, target)}
+                                    {...segmentDropProps(target)}
+                                    className={cn(
+                                        "truncate rounded px-1 py-0.5 hover:text-foreground",
+                                        dropSegment === target && "bg-primary/15 text-primary ring-1 ring-primary/40"
+                                    )}
+                                >
                                     {segment}
                                 </Link>
                             </span>
@@ -719,7 +1068,7 @@ export function FilesView({
                                 <Upload className="size-4" />
                                 Files
                             </DropdownMenuItem>
-                            <DropdownMenuItem onSelect={() => folderInput.current?.click()}>
+                            <DropdownMenuItem onSelect={() => void pickFolder()}>
                                 <FolderUp className="size-4" />
                                 Folder
                             </DropdownMenuItem>
@@ -802,6 +1151,32 @@ export function FilesView({
                         aria-label={`Sort ${sortDir === "asc" ? "descending" : "ascending"}`}
                     >
                         {sortDir === "asc" ? <ArrowDownAZ className="size-4" /> : <ArrowUpAZ className="size-4" />}
+                    </button>
+                </div>
+                <div className="flex items-center gap-1 rounded-md border border-border p-0.5">
+                    <button
+                        type="button"
+                        onClick={() => setViewMode("list")}
+                        aria-label="List view"
+                        title="List view"
+                        className={cn(
+                            "rounded p-1 transition-colors hover:bg-muted",
+                            viewMode === "list" ? "bg-muted text-foreground" : "text-muted-foreground"
+                        )}
+                    >
+                        <List className="size-4" />
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setViewMode("grid")}
+                        aria-label="Grid view"
+                        title="Grid view"
+                        className={cn(
+                            "rounded p-1 transition-colors hover:bg-muted",
+                            viewMode === "grid" ? "bg-muted text-foreground" : "text-muted-foreground"
+                        )}
+                    >
+                        <LayoutGrid className="size-4" />
                     </button>
                 </div>
                 <Button
@@ -948,23 +1323,25 @@ export function FilesView({
                 <div className="rounded-md border border-danger/40 bg-danger/10 p-3 text-sm text-danger">{error}</div>
             ) : (
                 <div>
-                    <div className="flex h-9 items-center border-b border-border text-left text-xs font-medium text-muted-foreground">
-                        <div className="flex w-9 shrink-0 items-center justify-center">
-                            <label className="flex cursor-pointer items-center">
-                                <Checkbox
-                                    checked={allSelected}
-                                    indeterminate={!allSelected && selectedEntries.length > 0}
-                                    onChange={toggleAll}
-                                    aria-label="Select all"
-                                />
-                            </label>
+                    {viewMode === "list" ? (
+                        <div className="flex h-9 items-center border-b border-border text-left text-xs font-medium text-muted-foreground">
+                            <div className="flex w-9 shrink-0 items-center justify-center">
+                                <label className="flex cursor-pointer items-center">
+                                    <Checkbox
+                                        checked={allSelected}
+                                        indeterminate={!allSelected && selectedEntries.length > 0}
+                                        onChange={toggleAll}
+                                        aria-label="Select all"
+                                    />
+                                </label>
+                            </div>
+                            <div className="min-w-0 flex-1 px-1">Name</div>
+                            <div className="hidden w-44 shrink-0 px-2 lg:block">Created on</div>
+                            <div className="hidden w-44 shrink-0 px-2 sm:block">Last Modified</div>
+                            <div className="w-24 shrink-0 px-2">Size</div>
+                            <div className="w-12 shrink-0 px-2" />
                         </div>
-                        <div className="min-w-0 flex-1 px-1">Name</div>
-                        <div className="hidden w-44 shrink-0 px-2 lg:block">Created on</div>
-                        <div className="hidden w-44 shrink-0 px-2 sm:block">Last Modified</div>
-                        <div className="w-24 shrink-0 px-2">Size</div>
-                        <div className="w-12 shrink-0 px-2" />
-                    </div>
+                    ) : null}
                     {visible.length === 0 ? (
                         <p className="px-3 py-8 text-center text-sm text-muted-foreground">
                             {searchScope === "recursive" && query.trim()
@@ -975,6 +1352,76 @@ export function FilesView({
                                   ? "This folder is empty."
                                   : "Nothing matches your search or filters."}
                         </p>
+                    ) : viewMode === "grid" ? (
+                        <div className="max-h-[65vh] overflow-auto p-1">
+                            <div
+                                ref={gridRef}
+                                className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6"
+                            >
+                                {visible.map((entry, index) => {
+                                    const isSelected = selected.has(entry.path);
+                                    const isRenaming = renaming === entry.path;
+                                    return (
+                                        <ContextMenu key={entry.path}>
+                                            <ContextMenuTrigger asChild>
+                                                <div
+                                                    data-drive-row
+                                                    onClick={(event) => rowClick(event, index, entry)}
+                                                    onDoubleClick={() => {
+                                                        if (!isRenaming) openEntry(entry);
+                                                    }}
+                                                    {...entryDragProps(entry, isRenaming)}
+                                                    className={cn(
+                                                        "group relative flex flex-col items-center gap-1.5 rounded-lg border p-3 text-center transition-colors",
+                                                        isSelected
+                                                            ? "border-primary/40 bg-primary/5"
+                                                            : "border-transparent hover:bg-card-hover",
+                                                        entry.hidden && "opacity-50",
+                                                        cutPaths?.has(entry.path) && "opacity-40"
+                                                    )}
+                                                >
+                                                    <EntryIcon entry={entry} className="size-10" />
+                                                    {isRenaming ? (
+                                                        <Input
+                                                            autoFocus
+                                                            value={renameValue}
+                                                            onChange={(e) => setRenameValue(e.target.value)}
+                                                            onKeyDown={(e) => onRenameKey(e, entry)}
+                                                            onBlur={() => submitRename(entry)}
+                                                            onClick={(e) => e.stopPropagation()}
+                                                            className="h-7 w-full py-1 text-center text-xs"
+                                                        />
+                                                    ) : (
+                                                        <span
+                                                            className="w-full truncate text-xs"
+                                                            title={entry.name}
+                                                            onDoubleClick={(e) => nameDoubleClick(e, entry)}
+                                                        >
+                                                            {entry.name}
+                                                        </span>
+                                                    )}
+                                                    <span className="text-[11px] text-muted-foreground">
+                                                        {entry.kind === "dir" ? "Folder" : formatBytes(BigInt(entry.size))}
+                                                    </span>
+                                                    <div className="flex items-center gap-1">
+                                                        {entry.favorite ? (
+                                                            <Star className="size-3 fill-amber-400 text-amber-400" />
+                                                        ) : null}
+                                                        {entry.locked ? (
+                                                            <Lock className="size-3 text-muted-foreground" />
+                                                        ) : null}
+                                                        {entry.note ? (
+                                                            <StickyNote className="size-3 text-amber-500" />
+                                                        ) : null}
+                                                    </div>
+                                                </div>
+                                            </ContextMenuTrigger>
+                                            {entryMenu(entry)}
+                                        </ContextMenu>
+                                    );
+                                })}
+                            </div>
+                        </div>
                     ) : (
                         <div ref={scrollRef} className="max-h-[65vh] overflow-auto" onMouseDown={onMarqueeDown}>
                             <div
@@ -1044,7 +1491,8 @@ export function FilesView({
                                                     className={cn(
                                                         "flex h-10 items-center text-sm transition-colors",
                                                         isSelected ? "bg-primary/5" : "hover:bg-card-hover",
-                                                        entry.hidden && "opacity-50"
+                                                        entry.hidden && "opacity-50",
+                                                        cutPaths?.has(entry.path) && "opacity-40"
                                                     )}
                                                 >
                                                     <div className="flex w-9 shrink-0 items-center justify-center">
@@ -1155,160 +1603,7 @@ export function FilesView({
                                                     </div>
                                                 </div>
                                             </ContextMenuTrigger>
-                                            <ContextMenuContent>
-                                                <ContextMenuLabel>{entry.name}</ContextMenuLabel>
-                                                {entry.kind === "dir" ? (
-                                                    <>
-                                                        <ContextMenuItem asChild>
-                                                            <Link href={href(connectionId, entry.path)}>
-                                                                <Folder className="size-4" />
-                                                                Open
-                                                            </Link>
-                                                        </ContextMenuItem>
-                                                        <ContextMenuItem
-                                                            onSelect={() => downloadSelection(connectionId, [entry])}
-                                                        >
-                                                            <Download className="size-4" />
-                                                            Download as ZIP
-                                                        </ContextMenuItem>
-                                                        <ContextMenuItem
-                                                            onSelect={() => onRequestFiles(entry.path, entry.name)}
-                                                        >
-                                                            <Inbox className="size-4" />
-                                                            Request files here
-                                                        </ContextMenuItem>
-                                                        {clipboard ? (
-                                                            <ContextMenuItem
-                                                                onSelect={() => {
-                                                                    for (const item of clipboard.entries) {
-                                                                        if (clipboard.mode === "cut")
-                                                                            onMove(item, entry.path);
-                                                                        else onCopy(item, entry.path);
-                                                                    }
-                                                                    if (clipboard.mode === "cut") setClipboard(null);
-                                                                }}
-                                                            >
-                                                                <ClipboardPaste className="size-4" />
-                                                                Paste here
-                                                            </ContextMenuItem>
-                                                        ) : null}
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        {isViewable(entry.name) ? (
-                                                            <ContextMenuItem onSelect={() => openViewer(entry)}>
-                                                                <Eye className="size-4" />
-                                                                Open
-                                                            </ContextMenuItem>
-                                                        ) : null}
-                                                        <ContextMenuItem
-                                                            onSelect={() => triggerDownload(connectionId, entry)}
-                                                        >
-                                                            <Download className="size-4" />
-                                                            Download
-                                                        </ContextMenuItem>
-                                                    </>
-                                                )}
-                                                <ContextMenuItem onSelect={() => startRename(entry)}>
-                                                    <Pencil className="size-4" />
-                                                    Rename
-                                                    <span className="ml-auto pl-6 text-xs text-muted-foreground">F2</span>
-                                                </ContextMenuItem>
-                                                <ContextMenuItem
-                                                    onSelect={() =>
-                                                        setClipboard({
-                                                            entries: selected.has(entry.path) ? selectedEntries : [entry],
-                                                            mode: "copy"
-                                                        })
-                                                    }
-                                                >
-                                                    <Copy className="size-4" />
-                                                    Copy
-                                                    <span className="ml-auto pl-6 text-xs text-muted-foreground">
-                                                        Ctrl+C
-                                                    </span>
-                                                </ContextMenuItem>
-                                                <ContextMenuItem
-                                                    onSelect={() =>
-                                                        setClipboard({
-                                                            entries: selected.has(entry.path) ? selectedEntries : [entry],
-                                                            mode: "cut"
-                                                        })
-                                                    }
-                                                >
-                                                    <Scissors className="size-4" />
-                                                    Cut
-                                                    <span className="ml-auto pl-6 text-xs text-muted-foreground">
-                                                        Ctrl+X
-                                                    </span>
-                                                </ContextMenuItem>
-                                                <ContextMenuItem onSelect={() => duplicate(entry)}>
-                                                    <Files className="size-4" />
-                                                    Duplicate
-                                                </ContextMenuItem>
-                                                <ContextMenuItem
-                                                    onSelect={() =>
-                                                        openMove(selected.has(entry.path) ? selectedEntries : [entry])
-                                                    }
-                                                >
-                                                    <FolderInput className="size-4" />
-                                                    Move to...
-                                                </ContextMenuItem>
-                                                <ContextMenuItem
-                                                    onSelect={() => void navigator.clipboard.writeText(entry.path)}
-                                                >
-                                                    <ClipboardCopy className="size-4" />
-                                                    Copy path
-                                                </ContextMenuItem>
-                                                <ContextMenuItem onSelect={() => onShare(entry)}>
-                                                    <Share2 className="size-4" />
-                                                    Share
-                                                </ContextMenuItem>
-                                                <ContextMenuSeparator />
-                                                <ContextMenuItem
-                                                    onSelect={() => onSetFavorite(entry, !entry.favorite)}
-                                                >
-                                                    <Star
-                                                        className={cn(
-                                                            "size-4",
-                                                            entry.favorite && "fill-amber-400 text-amber-400"
-                                                        )}
-                                                    />
-                                                    {entry.favorite ? "Remove from favorites" : "Add to favorites"}
-                                                </ContextMenuItem>
-                                                <ContextMenuItem onSelect={() => setIconTarget(entry)}>
-                                                    <Palette className="size-4" />
-                                                    Change icon
-                                                </ContextMenuItem>
-                                                <ContextMenuItem onSelect={() => onToggleHidden(entry)}>
-                                                    {entry.hidden ? (
-                                                        <Eye className="size-4" />
-                                                    ) : (
-                                                        <EyeOff className="size-4" />
-                                                    )}
-                                                    {entry.hidden ? "Unhide" : "Hide"}
-                                                </ContextMenuItem>
-                                                <ContextMenuItem onSelect={() => openNote(entry)}>
-                                                    <StickyNote className="size-4" />
-                                                    {entry.note ? "Edit note" : "Add note"}
-                                                </ContextMenuItem>
-                                                <ContextMenuItem onSelect={() => setDetailsTarget(entry)}>
-                                                    <Info className="size-4" />
-                                                    Details
-                                                </ContextMenuItem>
-                                                {onManageAccess ? (
-                                                    <ContextMenuItem onSelect={() => onManageAccess(entry)}>
-                                                        <ShieldCheck className="size-4" />
-                                                        Permissions &amp; lock
-                                                    </ContextMenuItem>
-                                                ) : null}
-                                                <ContextMenuSeparator />
-                                                <ContextMenuItem variant="danger" onSelect={() => onDelete([entry])}>
-                                                    <Trash2 className="size-4" />
-                                                    Delete
-                                                    <span className="ml-auto pl-6 text-xs text-muted-foreground">Del</span>
-                                                </ContextMenuItem>
-                                            </ContextMenuContent>
+                                            {entryMenu(entry)}
                                         </ContextMenu>
                                     );
                                 })}
@@ -1338,7 +1633,7 @@ export function FilesView({
                     <Upload className="size-4" />
                     Upload files
                 </ContextMenuItem>
-                <ContextMenuItem onSelect={() => folderInput.current?.click()}>
+                <ContextMenuItem onSelect={() => void pickFolder()}>
                     <FolderUp className="size-4" />
                     Upload folder
                 </ContextMenuItem>
@@ -1494,6 +1789,38 @@ export function FilesView({
                     })
                 }
             />
+
+            <Dialog open={pendingFolder !== null} onOpenChange={(open) => !open && setPendingFolder(null)}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Upload folder</DialogTitle>
+                        <DialogDescription className="truncate">
+                            {pendingFolder
+                                ? `Upload ${pendingFolder.items.length} file${
+                                      pendingFolder.items.length === 1 ? "" : "s"
+                                  } (${formatBytes(
+                                      pendingFolder.items.reduce((sum, item) => sum + BigInt(item.file.size), 0n)
+                                  )}) from "${pendingFolder.name}"?`
+                                : ""}
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="flex justify-end gap-2">
+                        <Button type="button" variant="ghost" onClick={() => setPendingFolder(null)}>
+                            Cancel
+                        </Button>
+                        <Button
+                            type="button"
+                            onClick={() => {
+                                if (pendingFolder) onUpload(pendingFolder.items);
+                                setPendingFolder(null);
+                            }}
+                        >
+                            <Upload className="size-4" />
+                            Upload
+                        </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
 
             <Dialog open={iconTarget !== null} onOpenChange={(open) => !open && setIconTarget(null)}>
                 <DialogContent>
@@ -1740,6 +2067,34 @@ async function gatherDropItems(dataTransfer: DataTransfer): Promise<UploadItem[]
         }
     };
     for (const root of roots) await walk(root, "");
+    return out;
+}
+
+/** Minimal File System Access API shapes (avoids depending on lib.dom having them). */
+interface FsFileHandle {
+    kind: "file";
+    name: string;
+    getFile(): Promise<File>;
+}
+interface FsDirectoryHandle {
+    kind: "directory";
+    name: string;
+    values(): AsyncIterable<FsFileHandle | FsDirectoryHandle>;
+}
+
+/**
+ * Read every file under a File System Access directory handle, with folder-relative
+ * paths ("folder/sub/file.txt"). Used for the folder upload so we can confirm in an
+ * in-app dialog instead of the browser's own "Upload N files?" prompt (which the
+ * legacy <input webkitdirectory> path forces and cannot be styled away).
+ */
+async function readDirectoryHandle(dir: FsDirectoryHandle, prefix: string): Promise<UploadItem[]> {
+    const out: UploadItem[] = [];
+    for await (const handle of dir.values()) {
+        const rel = `${prefix}${handle.name}`;
+        if (handle.kind === "file") out.push({ file: await handle.getFile(), relPath: rel });
+        else out.push(...(await readDirectoryHandle(handle, `${rel}/`)));
+    }
     return out;
 }
 

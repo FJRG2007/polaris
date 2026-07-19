@@ -9,7 +9,7 @@
 import { useState } from "react";
 import { Inbox } from "lucide-react";
 import { Button } from "@polaris/ui";
-import { RequestDialog, type RequestTarget } from "../drive/request-dialog";
+import { RequestDialog, type RequestTarget } from "../request-dialog";
 
 export function NewDropPointButton({ connections }: { connections: { id: string; name: string }[] }) {
     const [target, setTarget] = useState<RequestTarget | null>(null);

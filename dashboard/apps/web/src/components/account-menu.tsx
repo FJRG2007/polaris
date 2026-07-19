@@ -40,7 +40,7 @@ export function AccountMenu({ name, email, isAdmin }: { name: string; email: str
                     </a>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
-                    <a href="/shared">
+                    <a href="/drive/shared-links">
                         <Link2 className="size-4" />
                         Shared links
                     </a>

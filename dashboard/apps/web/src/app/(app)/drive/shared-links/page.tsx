@@ -1,11 +1,13 @@
 /**
- * "Shared" page: the current user's outgoing share links. Server component that
- * loads the owner's shares and hands them to the client view for revocation.
+ * "Shared links" page (/drive/shared-links): the current user's outgoing share
+ * links. Server component that loads the owner's shares and hands them to the
+ * client view for revealing the link, editing limits, inspecting access logs,
+ * opening the shared file in Drive, and revoking.
  */
 
 import { requireUser } from "@/lib/session";
 import { listSharesForOwner } from "@/lib/share-service";
-import { SharedView, type ShareRow } from "./shared-view";
+import { SharedView, type ShareRow } from "./shared-links-view";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +26,7 @@ export default async function SharedPage() {
             id: share.id,
             path: share.path,
             kind: share.kind,
+            connectionId: share.connectionId,
             connectionName: share.connection.name,
             allowUpload: share.allowUpload,
             allowDownload: share.allowDownload,

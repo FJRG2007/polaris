@@ -14,9 +14,9 @@
 
 import "plyr/dist/plyr.css";
 import { useEffect, useRef, useState, type CSSProperties } from "react";
-import { Download, FileQuestion, Loader2, Share2 } from "lucide-react";
+import { Download, FileQuestion, Loader2, Pencil, Share2 } from "lucide-react";
 import { formatBytes } from "@polaris/core";
-import { Button, Dialog, DialogContent, DialogHeader, DialogTitle } from "@polaris/ui";
+import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, cn } from "@polaris/ui";
 import { extensionOf } from "./file-categories";
 
 export interface ViewerTarget {
@@ -28,14 +28,15 @@ export interface ViewerTarget {
     modifiedAt?: string;
 }
 
-type ViewerKind = "image" | "video" | "audio" | "pdf" | "sheet" | "doc" | "text" | "none";
+type ViewerKind = "image" | "video" | "audio" | "pdf" | "sheet" | "doc" | "markdown" | "text" | "none";
 
 const IMAGE = new Set(["jpg", "jpeg", "png", "gif", "webp", "svg", "bmp", "avif", "ico"]);
 const VIDEO = new Set(["mp4", "webm", "mov", "m4v", "ogv"]);
 const AUDIO = new Set(["mp3", "wav", "flac", "aac", "ogg", "oga", "m4a", "opus"]);
 const SHEET = new Set(["xlsx", "xls", "csv", "ods", "tsv"]);
 const DOC = new Set(["docx"]);
-const TEXT = new Set(["txt", "md", "markdown", "log", "json", "xml", "yaml", "yml", "ini", "conf", "csv"]);
+const MARKDOWN = new Set(["md", "markdown", "mdown", "mkd"]);
+const TEXT = new Set(["txt", "log", "json", "xml", "yaml", "yml", "ini", "conf", "csv"]);
 
 /** Which viewer, if any, can render a file by its extension. */
 export function viewerKind(name: string): ViewerKind {
@@ -46,6 +47,7 @@ export function viewerKind(name: string): ViewerKind {
     if (ext === "pdf") return "pdf";
     if (SHEET.has(ext)) return "sheet";
     if (DOC.has(ext)) return "doc";
+    if (MARKDOWN.has(ext)) return "markdown";
     if (TEXT.has(ext)) return "text";
     return "none";
 }
@@ -116,6 +118,8 @@ export function FileViewer({
                                 <SheetView src={inlineSrc} />
                             ) : kind === "doc" ? (
                                 <DocView src={inlineSrc} />
+                            ) : kind === "markdown" && target ? (
+                                <MarkdownView src={inlineSrc} target={target} />
                             ) : kind === "text" ? (
                                 <TextView src={inlineSrc} />
                             ) : (
@@ -367,4 +371,205 @@ function TextView({ src }: { src: string }) {
     if (error) return <p className="p-8 text-center text-sm text-danger">This file could not be read.</p>;
     if (text === null) return <Loading />;
     return <pre className="overflow-auto p-4 text-xs leading-relaxed">{text}</pre>;
+}
+
+// Register the link-hardening hook once (module-scoped): every anchor opens in a
+// new tab and cannot reach back into the opener.
+let purifyHooked = false;
+
+/**
+ * Render Markdown to sanitized HTML. Parsing (marked) and sanitizing (DOMPurify)
+ * are dynamically imported so they never touch the main bundle. The sanitizer is
+ * deliberately strict: style/link/iframe/script/form/object and inline `style`
+ * attributes are stripped, so a document can never inject CSS, exfiltrate, or run
+ * script - only formatting, links, and images survive. All same-origin.
+ */
+async function renderMarkdown(markdown: string): Promise<string> {
+    const [{ marked }, purifyModule] = await Promise.all([import("marked"), import("dompurify")]);
+    const DOMPurify = purifyModule.default;
+    if (!purifyHooked) {
+        DOMPurify.addHook("afterSanitizeAttributes", (node) => {
+            if (node.tagName === "A") {
+                node.setAttribute("target", "_blank");
+                node.setAttribute("rel", "noopener noreferrer nofollow");
+            }
+        });
+        purifyHooked = true;
+    }
+    const dirty = marked.parse(markdown, { async: false, gfm: true }) as string;
+    return DOMPurify.sanitize(dirty, {
+        FORBID_TAGS: [
+            "style",
+            "link",
+            "iframe",
+            "script",
+            "form",
+            "input",
+            "button",
+            "meta",
+            "base",
+            "object",
+            "embed"
+        ],
+        FORBID_ATTR: ["style", "srcset", "onerror", "onload"],
+        ADD_ATTR: ["target", "rel"]
+    });
+}
+
+/** Tailwind styling for rendered Markdown (no typography plugin needed). */
+const MARKDOWN_PROSE = cn(
+    "max-w-none space-y-3 p-6 text-sm leading-relaxed",
+    "[&_h1]:mt-2 [&_h1]:text-2xl [&_h1]:font-bold [&_h2]:mt-2 [&_h2]:text-xl [&_h2]:font-semibold",
+    "[&_h3]:text-lg [&_h3]:font-semibold [&_h4]:font-semibold",
+    "[&_p]:leading-relaxed [&_a]:text-primary [&_a]:underline",
+    "[&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6 [&_li]:my-0.5",
+    "[&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-xs",
+    "[&_pre]:overflow-auto [&_pre]:rounded-md [&_pre]:bg-muted [&_pre]:p-3 [&_pre_code]:bg-transparent [&_pre_code]:p-0",
+    "[&_blockquote]:border-l-2 [&_blockquote]:border-border [&_blockquote]:pl-3 [&_blockquote]:text-muted-foreground",
+    "[&_hr]:my-4 [&_hr]:border-border [&_img]:max-w-full [&_img]:rounded",
+    "[&_table]:w-full [&_table]:text-left [&_th]:border-b [&_th]:border-border [&_th]:p-2 [&_td]:border-b [&_td]:border-border [&_td]:p-2"
+);
+
+/**
+ * Markdown viewer: sanitized rendered ("pretty") or raw source, and inline editing
+ * that saves the file back through the upload route (guarded by write access).
+ */
+function MarkdownView({ src, target }: { src: string; target: ViewerTarget }) {
+    const [text, setText] = useState<string | null>(null);
+    const [error, setError] = useState(false);
+    const [mode, setMode] = useState<"pretty" | "raw">("pretty");
+    const [html, setHtml] = useState("");
+    const [editing, setEditing] = useState(false);
+    const [draft, setDraft] = useState("");
+    const [saving, setSaving] = useState(false);
+    const [saveError, setSaveError] = useState<string | null>(null);
+
+    useEffect(() => {
+        let alive = true;
+        setText(null);
+        setError(false);
+        setEditing(false);
+        fetch(src)
+            .then((response) => response.text())
+            .then((body) => alive && setText(body.slice(0, 500_000)))
+            .catch(() => alive && setError(true));
+        return () => {
+            alive = false;
+        };
+    }, [src]);
+
+    useEffect(() => {
+        if (text === null || editing || mode !== "pretty") return;
+        let alive = true;
+        void renderMarkdown(text).then((rendered) => {
+            if (alive) setHtml(rendered);
+        });
+        return () => {
+            alive = false;
+        };
+    }, [text, editing, mode]);
+
+    async function save() {
+        setSaving(true);
+        setSaveError(null);
+        const parent = target.path.split("/").slice(0, -1).join("/");
+        const query = new URLSearchParams({ c: target.connectionId, name: target.name });
+        if (parent) query.set("p", parent);
+        try {
+            const response = await fetch(`/api/drive/upload?${query.toString()}`, { method: "PUT", body: draft });
+            if (!response.ok) {
+                setSaveError("Could not save - you may not have write access here.");
+                setSaving(false);
+                return;
+            }
+            setText(draft);
+            setEditing(false);
+        } catch {
+            setSaveError("Could not save this file.");
+        }
+        setSaving(false);
+    }
+
+    if (error) return <p className="p-8 text-center text-sm text-danger">This file could not be read.</p>;
+    if (text === null) return <Loading />;
+
+    return (
+        <div className="flex max-h-[80vh] flex-col">
+            <div className="flex items-center gap-2 border-b border-border px-3 py-2">
+                {editing ? (
+                    <>
+                        <span className="text-xs font-medium text-muted-foreground">Editing</span>
+                        <div className="ml-auto flex items-center gap-2">
+                            {saveError ? <span className="text-xs text-danger">{saveError}</span> : null}
+                            <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => {
+                                    setEditing(false);
+                                    setSaveError(null);
+                                }}
+                                disabled={saving}
+                            >
+                                Cancel
+                            </Button>
+                            <Button size="sm" onClick={save} disabled={saving}>
+                                {saving ? "Saving..." : "Save"}
+                            </Button>
+                        </div>
+                    </>
+                ) : (
+                    <>
+                        <div className="flex items-center gap-1 rounded-md border border-border p-0.5">
+                            <button
+                                type="button"
+                                onClick={() => setMode("pretty")}
+                                className={cn(
+                                    "rounded px-2 py-1 text-xs transition-colors hover:bg-muted",
+                                    mode === "pretty" ? "bg-muted font-medium" : "text-muted-foreground"
+                                )}
+                            >
+                                Pretty
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setMode("raw")}
+                                className={cn(
+                                    "rounded px-2 py-1 text-xs transition-colors hover:bg-muted",
+                                    mode === "raw" ? "bg-muted font-medium" : "text-muted-foreground"
+                                )}
+                            >
+                                Raw
+                            </button>
+                        </div>
+                        <Button
+                            size="sm"
+                            variant="ghost"
+                            className="ml-auto"
+                            onClick={() => {
+                                setDraft(text);
+                                setEditing(true);
+                            }}
+                        >
+                            <Pencil className="size-4" />
+                            Edit
+                        </Button>
+                    </>
+                )}
+            </div>
+            <div className="min-h-0 flex-1 overflow-auto">
+                {editing ? (
+                    <textarea
+                        value={draft}
+                        onChange={(event) => setDraft(event.target.value)}
+                        spellCheck={false}
+                        className="h-full min-h-[50vh] w-full resize-none border-0 bg-transparent p-4 font-mono text-xs leading-relaxed outline-none"
+                    />
+                ) : mode === "raw" ? (
+                    <pre className="overflow-auto p-4 text-xs leading-relaxed">{text}</pre>
+                ) : (
+                    <div className={MARKDOWN_PROSE} dangerouslySetInnerHTML={{ __html: html }} />
+                )}
+            </div>
+        </div>
+    );
 }

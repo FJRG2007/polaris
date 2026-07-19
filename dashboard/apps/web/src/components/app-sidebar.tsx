@@ -10,7 +10,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Container, FolderOpen, Inbox, LayoutDashboard, Link2, Trash2, type LucideIcon } from "lucide-react";
+import { Clock, Container, FolderOpen, Inbox, LayoutDashboard, Link2, Trash2, type LucideIcon } from "lucide-react";
 import { cn } from "@polaris/ui";
 import { POLARIS_APPS } from "@/lib/apps";
 
@@ -25,8 +25,9 @@ const APP_SIDEBARS: Record<string, SidebarItem[]> = {
     drive: [
         { label: "Overview", href: "/overview", icon: LayoutDashboard },
         { label: "Files", href: "/drive", icon: FolderOpen },
-        { label: "Shared links", href: "/shared", icon: Link2 },
-        { label: "Drop points", href: "/requests", icon: Inbox },
+        { label: "Recent", href: "/drive/recent", icon: Clock },
+        { label: "Shared links", href: "/drive/shared-links", icon: Link2 },
+        { label: "Drop points", href: "/drive/drop-points", icon: Inbox },
         { label: "Trash", href: "/trash", icon: Trash2 }
     ],
     containers: [{ label: "Containers", href: "/apps/containers", icon: Container }]
@@ -46,7 +47,12 @@ export function AppSidebar() {
                 {app?.label}
             </p>
             {items.map((item) => {
-                const active = pathname === item.href;
+                // Files ("/drive") matches only itself; the nested drive apps
+                // (shared links, drop points) stay highlighted on their subtrees.
+                const active =
+                    item.href === "/drive"
+                        ? pathname === "/drive"
+                        : pathname === item.href || pathname.startsWith(`${item.href}/`);
                 const Icon = item.icon;
                 return (
                     <Link

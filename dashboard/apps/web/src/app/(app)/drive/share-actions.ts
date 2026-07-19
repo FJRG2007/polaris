@@ -74,7 +74,7 @@ export async function createShareAction(
             allowUpload: parsed.data.allowUpload
         }
     });
-    revalidatePath("/shared");
+    revalidatePath("/drive/shared-links");
     return { url: `${loadEnv().POLARIS_APP_URL}/s/${token}` };
 }
 
@@ -104,7 +104,7 @@ export async function updateShareAction(shareId: string, input: UpdateShareInput
         allowedCidrs: input.allowedCidrs === undefined ? undefined : cidrs
     });
     await recordAudit({ actorId: user.id, action: "share.update", targetType: "share", targetId: shareId });
-    revalidatePath("/shared");
+    revalidatePath("/drive/shared-links");
     return {};
 }
 
@@ -128,7 +128,7 @@ export async function revokeShareAction(shareId: string): Promise<void> {
     const user = await requirePermission("shares.create");
     await revokeShare(user.id, shareId);
     await recordAudit({ actorId: user.id, action: "share.revoke", targetType: "share", targetId: shareId });
-    revalidatePath("/shared");
+    revalidatePath("/drive/shared-links");
 }
 
 /**

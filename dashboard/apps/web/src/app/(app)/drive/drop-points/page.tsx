@@ -1,25 +1,26 @@
 /**
- * "Requests" page: the current user's drop points (file requests). Server
- * component that loads the owner's requests and hands them to the client view for
- * revocation. The link itself is not shown - only its hash is stored, so the URL
- * exists solely at creation time; revoking is the control offered afterwards.
+ * "Drop points" page (/drive/drop-points): the current user's drop points (file
+ * requests). Server component that loads the owner's drop points and hands them
+ * to the client list. Each row links to its detail page, where the owner can see
+ * collected files, edit the config, view activity, reopen, or clone it. The link
+ * itself is only shown once at creation, so it is never listed here.
  */
 
 import { requireUser } from "@/lib/session";
 import { listFileRequestsForOwner } from "@/lib/file-request-service";
 import { listConnections } from "@/lib/storage-service";
 import { NewDropPointButton } from "./new-drop-point-button";
-import { RequestsView, type RequestRow } from "./requests-view";
+import { DropPointsView, type DropPointRow } from "./drop-points-view";
 
 export const dynamic = "force-dynamic";
 
-export default async function RequestsPage() {
+export default async function DropPointsPage() {
     const user = await requireUser();
     const [requests, connections] = await Promise.all([
         listFileRequestsForOwner(user.id),
         listConnections(user.id)
     ]);
-    const rows: RequestRow[] = requests.map((request) => ({
+    const rows: DropPointRow[] = requests.map((request) => ({
         id: request.id,
         title: request.title,
         destinationPath: request.destinationPath,
@@ -43,7 +44,7 @@ export default async function RequestsPage() {
                 </div>
                 <NewDropPointButton connections={connections.map((row) => ({ id: row.id, name: row.name }))} />
             </div>
-            <RequestsView requests={rows} />
+            <DropPointsView requests={rows} />
         </div>
     );
 }

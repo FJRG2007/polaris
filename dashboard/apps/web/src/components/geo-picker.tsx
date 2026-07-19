@@ -7,7 +7,7 @@
  * name table ships. Controlled: the parent owns the selected code arrays.
  */
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { X } from "lucide-react";
 import { CONTINENTS, COUNTRY_CODES } from "@polaris/core";
 import { cn } from "@polaris/ui";
@@ -49,15 +49,30 @@ export function GeoPicker({
         [nameOf]
     );
 
+    const [query, setQuery] = useState("");
+    const [open, setOpen] = useState(false);
+
+    // Suggestions live under the input inside the picker (an in-flow dropdown), not
+    // the browser's native <datalist> popup, which a dialog would float off to the
+    // side. Show up to eight matches for the current query, excluding chosen ones.
+    const suggestions = useMemo(() => {
+        const needle = query.trim().toLowerCase();
+        if (!needle) return [];
+        return options
+            .filter((option) => !countries.includes(option.code) && option.name.toLowerCase().includes(needle))
+            .slice(0, 8);
+    }, [options, countries, query]);
+
     function toggleContinent(code: string) {
         onContinents(continents.includes(code) ? continents.filter((c) => c !== code) : [...continents, code]);
     }
 
     function addCountry(value: string) {
-        // Accept a name from the datalist or a raw 2-letter code.
+        // Accept a display name or a raw 2-letter code.
         const byName = options.find((option) => option.name.toLowerCase() === value.trim().toLowerCase());
         const code = (byName?.code ?? value.trim().toUpperCase()).toUpperCase();
         if (COUNTRY_CODES.includes(code) && !countries.includes(code)) onCountries([...countries, code]);
+        setQuery("");
     }
 
     return (
@@ -85,32 +100,47 @@ export function GeoPicker({
 
             <div className="flex flex-col gap-1">
                 <span className="text-xs text-muted-foreground">Countries</span>
-                <input
-                    list="geo-country-list"
-                    placeholder="Type a country to add"
-                    autoComplete="off"
-                    className="h-9 rounded-md border border-input bg-surface px-3 text-sm"
-                    onKeyDown={(event) => {
-                        if (event.key === "Enter") {
-                            event.preventDefault();
-                            addCountry(event.currentTarget.value);
-                            event.currentTarget.value = "";
-                        }
-                    }}
-                    onChange={(event) => {
-                        // Selecting from the datalist fires change with the full value.
-                        const match = options.find((option) => option.name === event.target.value);
-                        if (match) {
-                            addCountry(match.name);
-                            event.target.value = "";
-                        }
-                    }}
-                />
-                <datalist id="geo-country-list">
-                    {options.map((option) => (
-                        <option key={option.code} value={option.name} />
-                    ))}
-                </datalist>
+                <div className="relative">
+                    <input
+                        value={query}
+                        placeholder="Type a country to add"
+                        autoComplete="off"
+                        className="h-9 w-full rounded-md border border-input bg-surface px-3 text-sm"
+                        onChange={(event) => {
+                            setQuery(event.target.value);
+                            setOpen(true);
+                        }}
+                        onFocus={() => setOpen(true)}
+                        onBlur={() => window.setTimeout(() => setOpen(false), 120)}
+                        onKeyDown={(event) => {
+                            if (event.key === "Enter") {
+                                event.preventDefault();
+                                addCountry(suggestions[0]?.name ?? event.currentTarget.value);
+                            } else if (event.key === "Escape") {
+                                setOpen(false);
+                            }
+                        }}
+                    />
+                    {open && suggestions.length > 0 ? (
+                        <ul className="absolute left-0 right-0 top-full z-20 mt-1 max-h-56 overflow-auto rounded-md border border-border bg-surface py-1 shadow-lg">
+                            {suggestions.map((option) => (
+                                <li key={option.code}>
+                                    <button
+                                        type="button"
+                                        // Fire before the input's blur so the click is not lost.
+                                        onMouseDown={(event) => {
+                                            event.preventDefault();
+                                            addCountry(option.name);
+                                        }}
+                                        className="flex w-full items-center px-3 py-1.5 text-left text-sm hover:bg-muted"
+                                    >
+                                        {option.name}
+                                    </button>
+                                </li>
+                            ))}
+                        </ul>
+                    ) : null}
+                </div>
                 {countries.length > 0 ? (
                     <div className="flex flex-wrap gap-1.5">
                         {countries.map((code) => (

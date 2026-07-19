@@ -9,7 +9,8 @@
  */
 
 import { useEffect, useState, useTransition } from "react";
-import { Ban, Check, Copy, FileText, FolderClosed, Link2, Pencil, ScrollText } from "lucide-react";
+import Link from "next/link";
+import { Ban, Check, Copy, FileText, FolderClosed, FolderOpen, Link2, Pencil, ScrollText } from "lucide-react";
 import {
     Badge,
     Button,
@@ -28,12 +29,13 @@ import {
     revokeShareAction,
     updateShareAction,
     type ShareLogRow
-} from "../drive/share-actions";
+} from "../share-actions";
 
 export interface ShareRow {
     id: string;
     path: string;
     kind: string;
+    connectionId: string;
     connectionName: string;
     allowUpload: boolean;
     allowDownload: boolean;
@@ -131,6 +133,16 @@ export function SharedView({ shares }: { shares: ShareRow[] }) {
                                     </div>
                                     <div className="flex items-center gap-1">
                                         <Badge variant={state.variant}>{state.label}</Badge>
+                                        <Button size="sm" variant="ghost" asChild>
+                                            <Link
+                                                href={`/drive?c=${share.connectionId}&p=${encodeURIComponent(
+                                                    isDir ? share.path : share.path.split("/").slice(0, -1).join("/")
+                                                )}`}
+                                            >
+                                                <FolderOpen className="size-4" />
+                                                Open
+                                            </Link>
+                                        </Button>
                                         {share.canReveal && !share.revokedAt ? (
                                             <Button
                                                 size="sm"

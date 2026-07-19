@@ -23,15 +23,31 @@ export interface RequestTarget {
     name: string;
 }
 
+/** Prefill for the create form, used when cloning an existing drop point's config. */
+export interface RequestInitial {
+    title?: string;
+    instructions?: string;
+    extensions?: string;
+    maxMb?: number;
+    maxFiles?: number;
+    requireLogin?: boolean;
+    allowedCidrs?: string;
+    geoCountries?: string[];
+    geoContinents?: string[];
+}
+
 export function RequestDialog({
     target,
     onOpenChange,
-    connections
+    connections,
+    initial
 }: {
     target: RequestTarget | null;
     onOpenChange: (open: boolean) => void;
     /** When the target has no connectionId, these let the user pick a destination. */
     connections?: { id: string; name: string }[];
+    /** Optional values to prefill the form with (clone). */
+    initial?: RequestInitial;
 }) {
     const [categories, setCategories] = useState<Set<FileCategory>>(new Set());
     const [pending, setPending] = useState(false);
@@ -55,8 +71,8 @@ export function RequestDialog({
             setCopied(false);
             setPickConnection(connections?.[0]?.id ?? "");
             setPickPath("");
-            setGeoCountries([]);
-            setGeoContinents([]);
+            setGeoCountries(initial?.geoCountries ?? []);
+            setGeoContinents(initial?.geoContinents ?? []);
         }
         onOpenChange(next);
     }
@@ -193,7 +209,13 @@ export function RequestDialog({
                         ) : null}
                         <label className="flex flex-col gap-1 text-sm">
                             Title
-                            <Input name="title" required placeholder="e.g. Send me your photos" autoComplete="off" />
+                            <Input
+                                name="title"
+                                required
+                                defaultValue={initial?.title}
+                                placeholder="e.g. Send me your photos"
+                                autoComplete="off"
+                            />
                             <span className="text-xs text-muted-foreground">
                                 Uploads collect in a folder named after this drop point, under &quot;Drop Points&quot;.
                             </span>
@@ -203,6 +225,7 @@ export function RequestDialog({
                             <textarea
                                 name="instructions"
                                 rows={2}
+                                defaultValue={initial?.instructions}
                                 placeholder="What should people upload?"
                                 className="rounded-md border border-input bg-surface px-3 py-2 text-sm"
                             />
@@ -233,17 +256,28 @@ export function RequestDialog({
                         </div>
                         <label className="flex flex-col gap-1 text-sm">
                             Also allow these extensions (optional)
-                            <Input name="extensions" placeholder="e.g. psd, ai, sketch" autoComplete="off" />
+                            <Input
+                                name="extensions"
+                                defaultValue={initial?.extensions}
+                                placeholder="e.g. psd, ai, sketch"
+                                autoComplete="off"
+                            />
                         </label>
 
                         <div className="grid grid-cols-3 gap-3">
                             <label className="flex flex-col gap-1 text-sm">
                                 Max size (MB)
-                                <Input name="maxMb" type="number" min="1" placeholder="1024" />
+                                <Input name="maxMb" type="number" min="1" defaultValue={initial?.maxMb} placeholder="1024" />
                             </label>
                             <label className="flex flex-col gap-1 text-sm">
                                 Max files
-                                <Input name="maxFiles" type="number" min="1" placeholder="No limit" />
+                                <Input
+                                    name="maxFiles"
+                                    type="number"
+                                    min="1"
+                                    defaultValue={initial?.maxFiles}
+                                    placeholder="No limit"
+                                />
                             </label>
                             <label className="flex flex-col gap-1 text-sm">
                                 Expires
@@ -253,7 +287,12 @@ export function RequestDialog({
 
                         <label className="flex flex-col gap-1 text-sm">
                             Restrict to IPs / ranges (optional)
-                            <Input name="allowedCidrs" placeholder="e.g. 203.0.113.4, 10.0.0.0/24" autoComplete="off" />
+                            <Input
+                                name="allowedCidrs"
+                                defaultValue={initial?.allowedCidrs}
+                                placeholder="e.g. 203.0.113.4, 10.0.0.0/24"
+                                autoComplete="off"
+                            />
                         </label>
                         <div className="flex flex-col gap-1 text-sm">
                             Restrict by location (optional)
@@ -269,7 +308,12 @@ export function RequestDialog({
                             <Input name="password" type="password" placeholder="No PIN" autoComplete="off" />
                         </label>
                         <label className="flex items-center gap-2 text-sm">
-                            <input type="checkbox" name="requireLogin" className="size-4" />
+                            <input
+                                type="checkbox"
+                                name="requireLogin"
+                                defaultChecked={initial?.requireLogin}
+                                className="size-4"
+                            />
                             Require uploaders to sign in
                         </label>
 
