@@ -371,7 +371,7 @@ function EditDropPointDialog({
                             name="instructions"
                             rows={2}
                             defaultValue={config.instructions ?? ""}
-                            className="rounded-md border border-input bg-surface px-3 py-2 text-sm"
+                            className="max-h-48 min-h-[2.5rem] resize-y rounded-md border border-input bg-surface px-3 py-2 text-sm"
                         />
                     </label>
                     <label className="flex flex-col gap-1 text-sm">

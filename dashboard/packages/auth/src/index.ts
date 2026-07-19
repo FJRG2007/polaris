@@ -13,6 +13,7 @@ export {
     assignRole
 } from "./roles.js";
 export { provisionUser, hasAnyUser, setUserAdmin, type ProvisionInput } from "./provision.js";
+export { updateUserProfile, changeUserEmail, changeUserPassword } from "./account.js";
 export { can, resolveGlobalStatements } from "./authz.js";
 export {
     createGroup,

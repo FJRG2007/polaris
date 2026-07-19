@@ -1,6 +1,6 @@
 "use client";
 
-import { Activity, Bell, Blocks, Link2, LogOut, Settings, ShieldCheck, Users, UsersRound } from "lucide-react";
+import { Activity, Bell, Blocks, Link2, LogOut, Settings, ShieldCheck, UserCog, Users, UsersRound } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
     DropdownMenu,
@@ -33,6 +33,12 @@ export function AccountMenu({ name, email, isAdmin }: { name: string; email: str
                     <span className="block truncate">{email}</span>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                    <a href="/account">
+                        <UserCog className="size-4" />
+                        My account
+                    </a>
+                </DropdownMenuItem>
                 <DropdownMenuItem asChild>
                     <a href="/notifications">
                         <Bell className="size-4" />

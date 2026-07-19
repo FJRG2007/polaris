@@ -242,6 +242,8 @@ export function FilesView({
     const [viewMode, setViewMode] = useState<"list" | "grid">("list");
     // Breadcrumb segment currently under a drag, highlighted as a move target.
     const [dropSegment, setDropSegment] = useState<string | null>(null);
+    // Folder row/cell currently under a drag, highlighted as the drop target.
+    const [dropFolder, setDropFolder] = useState<string | null>(null);
     // Folder picked for upload, awaiting an in-app confirmation (not the browser's).
     const [pendingFolder, setPendingFolder] = useState<{ name: string; items: UploadItem[] } | null>(null);
     const [iconTarget, setIconTarget] = useState<DriveEntry | null>(null);
@@ -427,6 +429,7 @@ export function FilesView({
     function onFolderDrop(event: React.DragEvent, folder: DriveEntry) {
         const source = dragPath.current ?? event.dataTransfer.getData("application/x-polaris-path");
         dragPath.current = null;
+        setDropFolder(null);
         if (!source || source === folder.path || folder.path.startsWith(`${source}/`)) return;
         event.preventDefault();
         event.stopPropagation();
@@ -597,6 +600,13 @@ export function FilesView({
 
     /** Drag handlers shared by list rows and grid cells: drag to move, drop onto a folder. */
     function entryDragProps(entry: DriveEntry, isRenaming: boolean) {
+        // A folder is a valid drop target for the current drag unless it is the
+        // dragged item itself or one of its descendants (which would be a cycle).
+        const droppableFor = (source: string | null): boolean =>
+            entry.kind === "dir" &&
+            source !== null &&
+            source !== entry.path &&
+            !entry.path.startsWith(`${source}/`);
         return {
             draggable: !isRenaming,
             onDragStart: (event: React.DragEvent) => {
@@ -606,12 +616,19 @@ export function FilesView({
             },
             onDragEnd: () => {
                 dragPath.current = null;
+                setDropFolder(null);
             },
             onDragOver:
                 entry.kind === "dir"
                     ? (event: React.DragEvent) => {
-                          if (dragPath.current && dragPath.current !== entry.path) event.preventDefault();
+                          if (!droppableFor(dragPath.current)) return;
+                          event.preventDefault();
+                          setDropFolder(entry.path);
                       }
+                    : undefined,
+            onDragLeave:
+                entry.kind === "dir"
+                    ? () => setDropFolder((prev) => (prev === entry.path ? null : prev))
                     : undefined,
             onDrop: entry.kind === "dir" ? (event: React.DragEvent) => onFolderDrop(event, entry) : undefined
         };
@@ -1377,7 +1394,8 @@ export function FilesView({
                                                             ? "border-primary/40 bg-primary/5"
                                                             : "border-transparent hover:bg-card-hover",
                                                         entry.hidden && "opacity-50",
-                                                        cutPaths?.has(entry.path) && "opacity-40"
+                                                        cutPaths?.has(entry.path) && "opacity-40",
+                                                        dropFolder === entry.path && "border-primary bg-primary/10 ring-2 ring-primary"
                                                     )}
                                                 >
                                                     <EntryIcon entry={entry} className="size-10" />
@@ -1460,39 +1478,14 @@ export function FilesView({
                                                     onDoubleClick={() => {
                                                         if (!isRenaming) openEntry(entry);
                                                     }}
-                                                    draggable={!isRenaming}
-                                                    onDragStart={(event) => {
-                                                        dragPath.current = entry.path;
-                                                        event.dataTransfer.setData(
-                                                            "application/x-polaris-path",
-                                                            entry.path
-                                                        );
-                                                        event.dataTransfer.effectAllowed = "move";
-                                                    }}
-                                                    onDragEnd={() => {
-                                                        dragPath.current = null;
-                                                    }}
-                                                    onDragOver={
-                                                        entry.kind === "dir"
-                                                            ? (event) => {
-                                                                  if (
-                                                                      dragPath.current &&
-                                                                      dragPath.current !== entry.path
-                                                                  )
-                                                                      event.preventDefault();
-                                                              }
-                                                            : undefined
-                                                    }
-                                                    onDrop={
-                                                        entry.kind === "dir"
-                                                            ? (event) => onFolderDrop(event, entry)
-                                                            : undefined
-                                                    }
+                                                    {...entryDragProps(entry, isRenaming)}
                                                     className={cn(
                                                         "flex h-10 items-center text-sm transition-colors",
                                                         isSelected ? "bg-primary/5" : "hover:bg-card-hover",
                                                         entry.hidden && "opacity-50",
-                                                        cutPaths?.has(entry.path) && "opacity-40"
+                                                        cutPaths?.has(entry.path) && "opacity-40",
+                                                        dropFolder === entry.path &&
+                                                            "bg-primary/10 ring-2 ring-inset ring-primary"
                                                     )}
                                                 >
                                                     <div className="flex w-9 shrink-0 items-center justify-center">

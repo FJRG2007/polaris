@@ -9,7 +9,8 @@
  */
 
 import { useEffect, useState } from "react";
-import { Loader2, Lock, Trash2, Unlock } from "lucide-react";
+import Link from "next/link";
+import { ArrowUpRight, Loader2, Lock, ShieldCheck, Trash2, Unlock, User, Users } from "lucide-react";
 import { DRIVE_ACTIONS, type DriveAction } from "@polaris/core";
 import {
     Badge,
@@ -36,6 +37,32 @@ export interface AccessTarget {
     connectionId: string;
     path: string;
     name: string;
+}
+
+/** Human labels for the raw Drive verbs, so a grant reads plainly. */
+const ACTION_LABELS: Record<DriveAction, string> = {
+    read: "View",
+    download: "Download",
+    write: "Edit",
+    rename: "Rename",
+    copy: "Copy",
+    delete: "Delete"
+};
+
+/** One-click access levels; "Custom" just leaves the checkboxes as-is. */
+const PRESETS: { id: string; label: string; actions: DriveAction[] }[] = [
+    { id: "viewer", label: "Viewer", actions: ["read", "download"] },
+    { id: "editor", label: "Editor", actions: ["read", "download", "write", "rename", "copy", "delete"] }
+];
+
+/** Whether a chosen action set exactly matches a preset. */
+function presetMatch(actions: Set<DriveAction>): string {
+    for (const preset of PRESETS) {
+        if (preset.actions.length === actions.size && preset.actions.every((action) => actions.has(action))) {
+            return preset.id;
+        }
+    }
+    return "custom";
 }
 
 export function AccessDialog({
@@ -150,31 +177,54 @@ export function AccessDialog({
                 ) : (
                     <div className="flex flex-col gap-5">
                         <section className="flex flex-col gap-2">
-                            <h3 className="text-sm font-medium">Who can access this</h3>
-                            {grants.length === 0 ? (
+                            <div>
+                                <h3 className="text-sm font-medium">Who can access this</h3>
                                 <p className="text-xs text-muted-foreground">
-                                    No grants on this item yet. The owner and admins always have access.
+                                    The owner and admins always have full access. Add people or groups below to give
+                                    them specific actions; a <span className="text-danger">Deny</span> always wins over
+                                    an allow.
+                                </p>
+                            </div>
+                            {grants.length === 0 ? (
+                                <p className="rounded-md border border-dashed border-border px-3 py-4 text-center text-xs text-muted-foreground">
+                                    No one else has been granted access yet.
                                 </p>
                             ) : (
                                 <ul className="flex flex-col gap-1.5">
                                     {grants.map((grant) => (
                                         <li
                                             key={grant.id}
-                                            className="flex items-center justify-between gap-2 rounded-md border border-border px-2 py-1.5 text-sm"
+                                            className="flex items-start justify-between gap-2 rounded-md border border-border px-2.5 py-2 text-sm"
                                         >
-                                            <span className="min-w-0">
-                                                <span className="flex items-center gap-1.5">
-                                                    <span className="truncate">
-                                                        {principalLabel(grant.principalType, grant.principalId)}
+                                            <div className="flex min-w-0 items-start gap-2">
+                                                {grant.principalType === "group" ? (
+                                                    <Users className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                                                ) : (
+                                                    <User className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                                                )}
+                                                <div className="min-w-0">
+                                                    <span className="flex items-center gap-1.5">
+                                                        <span className="truncate font-medium">
+                                                            {principalLabel(grant.principalType, grant.principalId)}
+                                                        </span>
+                                                        <Badge
+                                                            variant={grant.effect === "deny" ? "danger" : "success"}
+                                                        >
+                                                            {grant.effect === "deny" ? "Denied" : "Allowed"}
+                                                        </Badge>
                                                     </span>
-                                                    <Badge variant={grant.effect === "deny" ? "danger" : "neutral"}>
-                                                        {grant.effect}
-                                                    </Badge>
-                                                </span>
-                                                <span className="block truncate text-xs text-muted-foreground">
-                                                    {grant.actions.join(", ")}
-                                                </span>
-                                            </span>
+                                                    <span className="mt-1 flex flex-wrap gap-1">
+                                                        {grant.actions.map((action) => (
+                                                            <span
+                                                                key={action}
+                                                                className="rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground"
+                                                            >
+                                                                {ACTION_LABELS[action] ?? action}
+                                                            </span>
+                                                        ))}
+                                                    </span>
+                                                </div>
+                                            </div>
                                             <Button
                                                 size="icon"
                                                 variant="ghost"
@@ -206,15 +256,45 @@ export function AccessDialog({
                                         </option>
                                     ))}
                                 </select>
+                                <div className="flex items-center gap-1.5">
+                                    <span className="text-xs text-muted-foreground">Level</span>
+                                    <div className="flex items-center gap-1 rounded-md border border-border p-0.5">
+                                        {PRESETS.map((preset) => (
+                                            <button
+                                                key={preset.id}
+                                                type="button"
+                                                onClick={() => setActions(new Set(preset.actions))}
+                                                className={
+                                                    "rounded px-2 py-1 text-xs transition-colors hover:bg-muted " +
+                                                    (presetMatch(actions) === preset.id
+                                                        ? "bg-muted font-medium"
+                                                        : "text-muted-foreground")
+                                                }
+                                            >
+                                                {preset.label}
+                                            </button>
+                                        ))}
+                                        <span
+                                            className={
+                                                "rounded px-2 py-1 text-xs " +
+                                                (presetMatch(actions) === "custom"
+                                                    ? "bg-muted font-medium"
+                                                    : "text-muted-foreground")
+                                            }
+                                        >
+                                            Custom
+                                        </span>
+                                    </div>
+                                </div>
                                 <div className="flex flex-wrap gap-2">
                                     {DRIVE_ACTIONS.map((action) => (
-                                        <label key={action} className="flex items-center gap-1.5 text-xs capitalize">
+                                        <label key={action} className="flex items-center gap-1.5 text-xs">
                                             <Checkbox
                                                 checked={actions.has(action)}
                                                 onChange={() => toggleAction(action)}
-                                                aria-label={action}
+                                                aria-label={ACTION_LABELS[action] ?? action}
                                             />
-                                            {action}
+                                            {ACTION_LABELS[action] ?? action}
                                         </label>
                                     ))}
                                 </div>
@@ -232,6 +312,15 @@ export function AccessDialog({
                                     </Button>
                                 </div>
                             </div>
+
+                            <Link
+                                href="/admin/policies"
+                                className="flex items-center gap-1.5 text-xs text-primary hover:underline"
+                            >
+                                <ShieldCheck className="size-3.5" />
+                                Manage roles, groups and org-wide policies in the IAM dashboard
+                                <ArrowUpRight className="size-3.5" />
+                            </Link>
                         </section>
 
                         <section className="flex flex-col gap-2 border-t border-border pt-4">

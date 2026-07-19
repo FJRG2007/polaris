@@ -13,6 +13,7 @@ import { useState, type FormEvent } from "react";
 import { Check, Copy, Inbox } from "lucide-react";
 import { Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Input, cn } from "@polaris/ui";
 import { GeoPicker } from "@/components/geo-picker";
+import { ExpirySelect } from "@/components/expiry-select";
 import { FILE_CATEGORIES, categoryDef, type FileCategory } from "./file-categories";
 import { createFileRequestAction } from "./request-actions";
 
@@ -58,6 +59,7 @@ export function RequestDialog({
     const [pickPath, setPickPath] = useState("");
     const [geoCountries, setGeoCountries] = useState<string[]>([]);
     const [geoContinents, setGeoContinents] = useState<string[]>([]);
+    const [expiry, setExpiry] = useState("");
 
     // Picker mode: opened from the Drop points page with no fixed folder, so the
     // user chooses which connection and folder to collect into.
@@ -73,6 +75,7 @@ export function RequestDialog({
             setPickPath("");
             setGeoCountries(initial?.geoCountries ?? []);
             setGeoContinents(initial?.geoContinents ?? []);
+            setExpiry("");
         }
         onOpenChange(next);
     }
@@ -109,7 +112,6 @@ export function RequestDialog({
             .filter(Boolean);
         const maxFiles = form.get("maxFiles");
         const maxMb = Number(form.get("maxMb") ?? 0);
-        const expiresAt = form.get("expiresAt");
 
         const destinationConnectionId = needsPicker ? pickConnection : target.connectionId;
         const destinationPath = needsPicker ? pickPath.trim().replace(/^\/+|\/+$/g, "") : target.path;
@@ -133,7 +135,7 @@ export function RequestDialog({
             allowedCidrs,
             allowedCountries: geoCountries,
             allowedContinents: geoContinents,
-            expiresAt: expiresAt ? String(expiresAt) : undefined
+            expiresAt: expiry || undefined
         });
         setPending(false);
         if (result.error) {
@@ -227,7 +229,7 @@ export function RequestDialog({
                                 rows={2}
                                 defaultValue={initial?.instructions}
                                 placeholder="What should people upload?"
-                                className="rounded-md border border-input bg-surface px-3 py-2 text-sm"
+                                className="max-h-48 min-h-[2.5rem] resize-y rounded-md border border-input bg-surface px-3 py-2 text-sm"
                             />
                         </label>
 
@@ -264,7 +266,7 @@ export function RequestDialog({
                             />
                         </label>
 
-                        <div className="grid grid-cols-3 gap-3">
+                        <div className="grid grid-cols-2 gap-3">
                             <label className="flex flex-col gap-1 text-sm">
                                 Max size (MB)
                                 <Input name="maxMb" type="number" min="1" defaultValue={initial?.maxMb} placeholder="1024" />
@@ -279,10 +281,10 @@ export function RequestDialog({
                                     placeholder="No limit"
                                 />
                             </label>
-                            <label className="flex flex-col gap-1 text-sm">
-                                Expires
-                                <Input name="expiresAt" type="date" />
-                            </label>
+                        </div>
+                        <div className="flex flex-col gap-1 text-sm">
+                            Expires
+                            <ExpirySelect onChange={setExpiry} />
                         </div>
 
                         <label className="flex flex-col gap-1 text-sm">
