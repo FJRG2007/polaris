@@ -158,7 +158,13 @@ export function FilesView({
     }
 
     function openViewer(entry: DriveEntry) {
-        setViewerTarget({ connectionId, path: entry.path, name: entry.name });
+        setViewerTarget({
+            connectionId,
+            path: entry.path,
+            name: entry.name,
+            size: entry.size,
+            modifiedAt: entry.modifiedAt
+        });
     }
 
     /** Open an item: folders navigate, files preview (or download when no viewer). */
@@ -899,7 +905,19 @@ export function FilesView({
             ) : null}
             </div>
 
-            <FileViewer target={viewerTarget} onOpenChange={(open) => !open && setViewerTarget(null)} />
+            <FileViewer
+                target={viewerTarget}
+                onOpenChange={(open) => !open && setViewerTarget(null)}
+                onShare={(t) =>
+                    onShare({
+                        name: t.name,
+                        path: t.path,
+                        kind: "file",
+                        size: t.size ?? "0",
+                        modifiedAt: t.modifiedAt ?? new Date().toISOString()
+                    })
+                }
+            />
 
             <Dialog open={iconTarget !== null} onOpenChange={(open) => !open && setIconTarget(null)}>
                 <DialogContent>

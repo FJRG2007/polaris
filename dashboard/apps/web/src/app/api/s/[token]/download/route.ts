@@ -11,6 +11,7 @@ import { cookies, headers } from "next/headers";
 import { loadEnv } from "@polaris/config";
 import { baseName } from "@polaris/core";
 import { getDriverForConnection } from "@/lib/storage-service";
+import { mimeForName } from "@/lib/mime";
 import {
     logShareAccess,
     registerDownload,
@@ -80,7 +81,7 @@ export async function GET(
 
         const headerStore = await headers();
         const responseHeaders = new Headers({
-            "content-type": stat.mime ?? "application/octet-stream",
+            "content-type": stat.mime ?? mimeForName(baseName(target)) ?? "application/octet-stream",
             "accept-ranges": "bytes",
             "content-disposition": `${inline ? "inline" : "attachment"}; filename*=UTF-8''${encodeURIComponent(baseName(target))}`
         });

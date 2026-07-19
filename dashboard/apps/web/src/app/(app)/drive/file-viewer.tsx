@@ -2,18 +2,20 @@
 
 /**
  * In-dashboard file viewer. Opens a file in a modal and renders it inline by type
- * - images natively, audio/video through a Polaris-themed Plyr, PDFs via pdf.js,
- * and spreadsheets/CSV via SheetJS. Anything else offers a download. The heavy
- * viewer libraries are dynamically imported inside effects so they never run
- * during SSR and only load when a file of that type is actually opened. Bytes are
- * streamed from the drive route with an inline disposition (Range-enabled, so
- * media scrubbing and large PDFs work) and stay same-origin, so no external
- * assets are ever fetched.
+ * - images natively, audio/video through a Polaris-themed Plyr, PDFs in the
+ * browser's native viewer (an inline iframe: crisp, selectable text, zoom), and
+ * spreadsheets/CSV via SheetJS. Anything else offers a download. The heavy viewer
+ * libraries are dynamically imported inside effects so they never run during SSR
+ * and only load when a file of that type is actually opened. Bytes are streamed
+ * from the drive route with an inline disposition (Range-enabled, so media
+ * scrubbing works) and stay same-origin, so no external assets are ever fetched.
+ * A properties sidebar and Share/Download actions sit alongside the preview.
  */
 
 import "plyr/dist/plyr.css";
 import { useEffect, useRef, useState, type CSSProperties } from "react";
-import { Download, FileQuestion, Loader2 } from "lucide-react";
+import { Download, FileQuestion, Loader2, Share2 } from "lucide-react";
+import { formatBytes } from "@polaris/core";
 import { Button, Dialog, DialogContent, DialogHeader, DialogTitle } from "@polaris/ui";
 import { extensionOf } from "./file-categories";
 
@@ -21,6 +23,9 @@ export interface ViewerTarget {
     connectionId: string;
     path: string;
     name: string;
+    /** Byte size (serialized) and modified time, for the properties sidebar. */
+    size?: string;
+    modifiedAt?: string;
 }
 
 type ViewerKind = "image" | "video" | "audio" | "pdf" | "sheet" | "text" | "none";
@@ -56,46 +61,90 @@ function byteUrl(target: ViewerTarget, inline: boolean): string {
 
 export function FileViewer({
     target,
-    onOpenChange
+    onOpenChange,
+    onShare
 }: {
     target: ViewerTarget | null;
     onOpenChange: (open: boolean) => void;
+    onShare?: (target: ViewerTarget) => void;
 }) {
     const kind = target ? viewerKind(target.name) : "none";
     const inlineSrc = target ? byteUrl(target, true) : "";
+    const extension = target ? extensionOf(target.name) : "";
 
     return (
         <Dialog open={target !== null} onOpenChange={onOpenChange}>
-            <DialogContent className="flex max-h-[90vh] w-full max-w-5xl flex-col gap-0 overflow-hidden p-0">
+            <DialogContent className="flex max-h-[90vh] w-full max-w-6xl flex-col gap-0 overflow-hidden p-0">
                 <DialogHeader className="flex flex-row items-center justify-between gap-3 px-4 py-3">
                     <DialogTitle className="min-w-0 truncate text-sm">{target?.name}</DialogTitle>
                     {target ? (
-                        <Button asChild size="sm" variant="secondary" className="mr-8 shrink-0">
-                            <a href={byteUrl(target, false)} download={target.name}>
-                                <Download className="size-4" />
-                                Download
-                            </a>
-                        </Button>
+                        <div className="mr-8 flex shrink-0 items-center gap-2">
+                            {onShare ? (
+                                <Button size="sm" variant="ghost" onClick={() => onShare(target)}>
+                                    <Share2 className="size-4" />
+                                    Share
+                                </Button>
+                            ) : null}
+                            <Button asChild size="sm" variant="secondary">
+                                <a href={byteUrl(target, false)} download={target.name}>
+                                    <Download className="size-4" />
+                                    Download
+                                </a>
+                            </Button>
+                        </div>
                     ) : null}
                 </DialogHeader>
-                <div className="min-h-0 flex-1 overflow-auto bg-surface/40">
+                <div className="flex min-h-0 flex-1">
+                    <div className="min-h-0 min-w-0 flex-1 overflow-auto bg-surface/40">
+                        {target ? (
+                            kind === "image" ? (
+                                <div className="flex items-center justify-center p-4">
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img
+                                        src={inlineSrc}
+                                        alt={target.name}
+                                        className="max-h-[80vh] max-w-full object-contain"
+                                    />
+                                </div>
+                            ) : kind === "video" || kind === "audio" ? (
+                                <MediaView src={inlineSrc} kind={kind} />
+                            ) : kind === "pdf" ? (
+                                <PdfView src={inlineSrc} />
+                            ) : kind === "sheet" ? (
+                                <SheetView src={inlineSrc} />
+                            ) : kind === "text" ? (
+                                <TextView src={inlineSrc} />
+                            ) : (
+                                <Unsupported />
+                            )
+                        ) : null}
+                    </div>
                     {target ? (
-                        kind === "image" ? (
-                            <div className="flex items-center justify-center p-4">
-                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img src={inlineSrc} alt={target.name} className="max-h-[75vh] max-w-full object-contain" />
+                        <aside className="hidden w-56 shrink-0 flex-col gap-2 border-l border-border p-4 text-sm md:flex">
+                            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                                Properties
+                            </p>
+                            <div className="flex justify-between gap-2">
+                                <span className="text-muted-foreground">Type</span>
+                                <span>{extension ? `${extension.toUpperCase()} file` : "File"}</span>
                             </div>
-                        ) : kind === "video" || kind === "audio" ? (
-                            <MediaView src={inlineSrc} kind={kind} />
-                        ) : kind === "pdf" ? (
-                            <PdfView src={inlineSrc} />
-                        ) : kind === "sheet" ? (
-                            <SheetView src={inlineSrc} />
-                        ) : kind === "text" ? (
-                            <TextView src={inlineSrc} />
-                        ) : (
-                            <Unsupported />
-                        )
+                            {target.size !== undefined ? (
+                                <div className="flex justify-between gap-2">
+                                    <span className="text-muted-foreground">Size</span>
+                                    <span>{formatBytes(BigInt(target.size))}</span>
+                                </div>
+                            ) : null}
+                            {target.modifiedAt ? (
+                                <div className="flex flex-col gap-0.5">
+                                    <span className="text-muted-foreground">Modified</span>
+                                    <span>{new Date(target.modifiedAt).toLocaleString()}</span>
+                                </div>
+                            ) : null}
+                            <div className="flex flex-col gap-0.5">
+                                <span className="text-muted-foreground">Location</span>
+                                <span className="break-all">/{target.path.split("/").slice(0, -1).join("/")}</span>
+                            </div>
+                        </aside>
                     ) : null}
                 </div>
             </DialogContent>
@@ -169,59 +218,14 @@ function MediaView({ src, kind }: { src: string; kind: "video" | "audio" }) {
     );
 }
 
-/** Render every page of a PDF to a canvas, top to bottom. */
+/**
+ * Show a PDF in the browser's native viewer via an inline iframe. This renders
+ * crisply and keeps selectable, copyable text, zoom, and print - which a
+ * hand-rolled canvas render does not - with no library weight. The bytes are
+ * served same-origin with an inline disposition.
+ */
 function PdfView({ src }: { src: string }) {
-    const containerRef = useRef<HTMLDivElement>(null);
-    const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
-
-    useEffect(() => {
-        let active = true;
-        const container = containerRef.current;
-        if (container) container.innerHTML = "";
-        setStatus("loading");
-
-        void (async () => {
-            try {
-                const pdfjs = await import("pdfjs-dist");
-                pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-                    "pdfjs-dist/build/pdf.worker.min.mjs",
-                    import.meta.url
-                ).toString();
-                const doc = await pdfjs.getDocument({ url: src, withCredentials: true }).promise;
-                if (!active) return;
-                for (let pageNumber = 1; pageNumber <= doc.numPages; pageNumber++) {
-                    const page = await doc.getPage(pageNumber);
-                    if (!active || !containerRef.current) return;
-                    const viewport = page.getViewport({ scale: 1.4 });
-                    const canvas = document.createElement("canvas");
-                    canvas.width = viewport.width;
-                    canvas.height = viewport.height;
-                    canvas.className = "mx-auto mb-4 max-w-full rounded shadow";
-                    const context = canvas.getContext("2d");
-                    if (!context) continue;
-                    containerRef.current.appendChild(canvas);
-                    await page.render({ canvasContext: context, viewport }).promise;
-                }
-                if (active) setStatus("ready");
-            } catch {
-                if (active) setStatus("error");
-            }
-        })();
-
-        return () => {
-            active = false;
-        };
-    }, [src]);
-
-    return (
-        <div className="p-4">
-            {status === "loading" ? <Loading /> : null}
-            {status === "error" ? (
-                <p className="p-8 text-center text-sm text-danger">This PDF could not be rendered.</p>
-            ) : null}
-            <div ref={containerRef} />
-        </div>
-    );
+    return <iframe title="PDF preview" src={src} className="h-[80vh] w-full border-0" />;
 }
 
 /** Parse a spreadsheet with SheetJS and render each sheet as an HTML table. */

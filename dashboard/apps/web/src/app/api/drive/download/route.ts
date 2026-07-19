@@ -8,6 +8,7 @@ import { baseName, normalizeRelPath } from "@polaris/core";
 import { userHasPermission } from "@polaris/auth";
 import { requireUser } from "@/lib/session";
 import { getDriver } from "@/lib/storage-service";
+import { mimeForName } from "@/lib/mime";
 import { recordAudit } from "@/lib/audit-service";
 
 export const runtime = "nodejs";
@@ -49,7 +50,7 @@ export async function GET(request: Request): Promise<Response> {
     // is an attachment download. Both stream the same bytes and honor Range.
     const inline = url.searchParams.get("disposition") === "inline";
     const headers = new Headers({
-        "content-type": stat.mime ?? "application/octet-stream",
+        "content-type": stat.mime ?? mimeForName(baseName(path)) ?? "application/octet-stream",
         "accept-ranges": "bytes",
         "content-disposition": `${inline ? "inline" : "attachment"}; filename*=UTF-8''${encodeURIComponent(baseName(path))}`
     });
