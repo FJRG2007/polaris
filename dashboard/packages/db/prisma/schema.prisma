@@ -61,6 +61,9 @@ model User {
     submissions       FileRequestSubmission[]
     uploads           UploadSession[]
     notifications     Notification[]
+    deployTargets     DeployTarget[]
+    projects          Project[]
+    deployTickets     DeployTicket[]
 }
 
 model Session {
@@ -388,7 +391,8 @@ model Host {
     createdAt           DateTime @default(now())
     updatedAt           DateTime @updatedAt
 
-    owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+    owner         User           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+    deployTargets DeployTarget[]
 
     @@index([ownerId])
 }
@@ -712,4 +716,238 @@ model FileScan {
 
     @@index([submissionId])
     @@index([sha256])
+}
+
+// ---------------------------------------------------------------------------
+// Deploy (Railway-style app/database orchestration)
+// ---------------------------------------------------------------------------
+
+// The "where it runs" abstraction: the local host (via polaris-hostd) or a
+// remote SSH Host (EC2/VPS). Holds the per-server runtime engine and the shared
+// proxy network deployed services join. A local target has a null hostId.
+model DeployTarget {
+    id              String   @id @default(uuid(7)) @db.Uuid
+    ownerId         String   @db.Uuid
+    name            String
+    // local | host
+    kind            String   @default("local")
+    // Null for the local hostd target; otherwise the SSH Host it runs on.
+    hostId          String?  @db.Uuid
+    // compose | swarm
+    runtime         String   @default("compose")
+    // Shared user-defined network deployed services join for name-based DNS.
+    proxyNetwork    String   @default("polaris-proxy")
+    // Hash of the last applied runtime/proxy config, for idempotency and drift.
+    lastAppliedHash String?
+    status          String   @default("active")
+    createdAt       DateTime @default(now())
+    updatedAt       DateTime @updatedAt
+
+    owner        User              @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+    host         Host?             @relation(fields: [hostId], references: [id], onDelete: Cascade)
+    applications Application[]
+    databases    ManagedDatabase[]
+    deployments  Deployment[]
+    volumes      Volume[]
+
+    @@unique([ownerId, name])
+    @@index([ownerId])
+    @@index([hostId])
+}
+
+model Project {
+    id          String   @id @default(uuid(7)) @db.Uuid
+    ownerId     String   @db.Uuid
+    name        String
+    slug        String
+    description String?
+    createdAt   DateTime @default(now())
+    updatedAt   DateTime @updatedAt
+
+    owner        User          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+    environments Environment[]
+
+    @@unique([ownerId, slug])
+    @@index([ownerId])
+}
+
+model Environment {
+    id        String   @id @default(uuid(7)) @db.Uuid
+    projectId String   @db.Uuid
+    name      String
+    slug      String
+    isDefault Boolean  @default(false)
+    createdAt DateTime @default(now())
+
+    project      Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+    applications Application[]
+    databases    ManagedDatabase[]
+
+    @@unique([projectId, slug])
+    @@index([projectId])
+}
+
+model Application {
+    id                  String    @id @default(uuid(7)) @db.Uuid
+    environmentId       String    @db.Uuid
+    targetId            String    @db.Uuid
+    name                String
+    slug                String
+    // image | git | dockerfile | nixpacks | buildpacks | static | compose
+    sourceType          String
+    // JSON: repoUrl, branch, imageRef, dockerfilePath, composeYaml, ...
+    sourceConfig        String    @default("{}")
+    // JSON: build args, target stage, env-file refs, ...
+    buildConfig         String    @default("{}")
+    // JSON: healthcheck path/interval/retries (null = none).
+    healthcheck         String?
+    // running | stopped
+    desiredState        String    @default("running")
+    replicas            Int       @default(1)
+    // Soft pointer to the latest Deployment (no FK, to avoid a relation cycle).
+    currentDeploymentId String?   @db.Uuid
+    createdAt           DateTime  @default(now())
+    updatedAt           DateTime  @updatedAt
+
+    environment Environment  @relation(fields: [environmentId], references: [id], onDelete: Cascade)
+    target      DeployTarget @relation(fields: [targetId], references: [id], onDelete: Cascade)
+    domains     Domain[]
+    volumes     Volume[]
+
+    @@unique([environmentId, slug])
+    @@index([targetId])
+}
+
+model ManagedDatabase {
+    id                  String   @id @default(uuid(7)) @db.Uuid
+    environmentId       String   @db.Uuid
+    targetId            String   @db.Uuid
+    name                String
+    slug                String
+    // postgres | mysql | mariadb | mongo | redis
+    engine              String
+    image               String
+    version             String
+    volumeName          String
+    // Container name = DNS hostname on the proxy network.
+    containerName       String
+    // Optional published TCP port for external access via a per-db forwarder.
+    exposePort          Int?
+    // Envelope-encrypted generated credentials (JSON: user/password/database).
+    encryptedCredential Bytes?
+    credentialNonce     Bytes?
+    credentialKeyId     String?
+    status              String   @default("provisioning")
+    createdAt           DateTime @default(now())
+    updatedAt           DateTime @updatedAt
+
+    environment Environment  @relation(fields: [environmentId], references: [id], onDelete: Cascade)
+    target      DeployTarget @relation(fields: [targetId], references: [id], onDelete: Cascade)
+
+    @@unique([environmentId, slug])
+    @@index([targetId])
+}
+
+// One deploy run: a status row plus a pointer to its streamed log file. The log
+// itself lives on disk (tailed live), not in the database.
+model Deployment {
+    id             String    @id @default(uuid(7)) @db.Uuid
+    targetId       String    @db.Uuid
+    // application | database | stack
+    deployableType String
+    deployableId   String    @db.Uuid
+    // queued | building | deploying | running | failed | cancelled | rolled_back
+    status         String    @default("queued")
+    imageTag       String?
+    commitSha      String?
+    // Relative path (under the deploy dir) of the streamed build/deploy log file.
+    logPath        String?
+    triggeredById  String?   @db.Uuid
+    startedAt      DateTime?
+    finishedAt     DateTime?
+    error          String?
+    createdAt      DateTime  @default(now())
+
+    target DeployTarget @relation(fields: [targetId], references: [id], onDelete: Cascade)
+
+    @@index([deployableType, deployableId])
+    @@index([targetId])
+}
+
+model Domain {
+    id            String   @id @default(uuid(7)) @db.Uuid
+    applicationId String   @db.Uuid
+    hostname      String   @unique
+    // auto (free sslip.io/traefik.me) | custom | duckdns
+    kind          String   @default("auto")
+    targetPort    Int
+    https         Boolean  @default(true)
+    // le | internal | none
+    certResolver  String   @default("le")
+    pathPrefix    String?
+    createdAt     DateTime @default(now())
+
+    application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+    @@index([applicationId])
+}
+
+// Environment variable or secret, scoped to an application or an environment.
+// Polymorphic (no FK) like PolicyAttachment; secrets use the envelope columns.
+model EnvVar {
+    id             String   @id @default(uuid(7)) @db.Uuid
+    // application | environment
+    scopeType      String
+    scopeId        String   @db.Uuid
+    key            String
+    isSecret       Boolean  @default(false)
+    // Plaintext when not a secret; null when isSecret (see envelope columns).
+    value          String?
+    encryptedValue Bytes?
+    valueNonce     Bytes?
+    valueKeyId     String?
+    createdAt      DateTime @default(now())
+    updatedAt      DateTime @updatedAt
+
+    @@unique([scopeType, scopeId, key])
+    @@index([scopeType, scopeId])
+}
+
+model Volume {
+    id            String   @id @default(uuid(7)) @db.Uuid
+    targetId      String   @db.Uuid
+    applicationId String?  @db.Uuid
+    name          String
+    mountPath     String
+    // volume | bind
+    kind          String   @default("volume")
+    // Named-volume name or host bind source path.
+    source        String?
+    createdAt     DateTime @default(now())
+
+    target      DeployTarget @relation(fields: [targetId], references: [id], onDelete: Cascade)
+    application Application? @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+    @@index([applicationId])
+    @@index([targetId])
+}
+
+// One-shot bearer ticket for a terminal/logs WebSocket. The client presents the
+// raw token (hashed here) over Sec-WebSocket-Protocol; the sidecar burns it once.
+model DeployTicket {
+    id           String    @id @default(uuid(7)) @db.Uuid
+    tokenHash    String    @unique
+    userId       String    @db.Uuid
+    targetId     String    @db.Uuid
+    // Container id/name (or a host marker) the ticket authorizes.
+    containerRef String
+    // terminal | logs
+    mode         String    @default("terminal")
+    expiresAt    DateTime
+    usedAt       DateTime?
+    createdAt    DateTime  @default(now())
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@index([userId])
 }

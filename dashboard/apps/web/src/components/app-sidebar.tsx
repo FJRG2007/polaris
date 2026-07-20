@@ -21,6 +21,8 @@ import {
     Inbox,
     LayoutDashboard,
     Link2,
+    Rocket,
+    Server,
     Settings,
     ShieldCheck,
     Trash2,
@@ -47,7 +49,11 @@ const APP_SIDEBARS: Record<string, SidebarItem[]> = {
         { label: "Drop points", href: "/drive/drop-points", icon: Inbox },
         { label: "Trash", href: "/trash", icon: Trash2 }
     ],
-    containers: [{ label: "Containers", href: "/apps/containers", icon: Container }],
+    deploy: [
+        { label: "Overview", href: "/apps/deploy", icon: Rocket },
+        { label: "Servers", href: "/apps/servers", icon: Server },
+        { label: "Containers", href: "/apps/containers", icon: Container }
+    ],
     backups: [{ label: "Databases", href: "/apps/backups", icon: Database }],
     admin: [
         { label: "Overview", href: "/admin", icon: LayoutDashboard },

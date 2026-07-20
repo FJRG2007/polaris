@@ -7,11 +7,10 @@
 
 import {
     Boxes,
-    Container,
     DatabaseBackup,
     HardDrive,
     Home,
-    Server,
+    Rocket,
     SlidersHorizontal,
     type LucideIcon
 } from "lucide-react";
@@ -33,10 +32,18 @@ export interface AppEntry {
 
 export const POLARIS_APPS: AppEntry[] = [
     { id: "drive", label: "Drive", description: "Files across every NAS", icon: HardDrive, href: "/drive" },
-    { id: "containers", label: "Containers", description: "Docker & Compose", icon: Container, href: "/apps/containers" },
+    {
+        id: "deploy",
+        label: "Deploy",
+        description: "Apps, databases & servers",
+        icon: Rocket,
+        href: "/apps/deploy",
+        // Absorbs the former Containers and Servers apps, so their routes still
+        // resolve to Deploy in the switcher and sidebar during the transition.
+        match: ["/apps/containers", "/apps/servers"]
+    },
     { id: "backups", label: "Backups", description: "Databases, Polaris & NAS", icon: DatabaseBackup, href: "/apps/backups" },
     { id: "kubernetes", label: "Kubernetes", description: "Clusters & workloads", icon: Boxes, href: "/apps/kubernetes", locked: true },
-    { id: "servers", label: "Servers", description: "SSH hosts for Containers & Drive", icon: Server, href: "/apps/servers" },
     {
         id: "admin",
         label: "Management",

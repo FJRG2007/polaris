@@ -16,6 +16,8 @@ export const PERMISSIONS = [
     "shares.manage",
     "requests.create",
     "requests.manage",
+    "deploy.read",
+    "deploy.manage",
     "users.manage",
     "settings.manage",
     "system.manage"
@@ -37,9 +39,11 @@ export const DEFAULT_ROLES: Record<string, readonly GrantedPermission[]> = {
         "drive.delete",
         "connections.manage",
         "shares.create",
-        "requests.create"
+        "requests.create",
+        "deploy.read",
+        "deploy.manage"
     ],
-    viewer: ["drive.read"]
+    viewer: ["drive.read", "deploy.read"]
 };
 
 /**
