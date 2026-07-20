@@ -65,14 +65,36 @@ gen_secret() {
     esac
 }
 
-# Return a durable secret for KEY: reuse the remembered value if present,
-# otherwise generate one of KIND and remember it. This is what makes a
-# regenerated .env recover the SAME master key instead of a fresh one.
+# Recover a secret from the currently-running Polaris deployment (its web
+# container's environment). Docker volumes are global to the `polaris` compose
+# project, so the live master key is identical no matter which directory or user
+# runs the installer - reusing it is what stops a fresh .env from orphaning the
+# database's encrypted credentials. Empty if Docker is absent or nothing runs.
+docker_recover_env() {
+    command -v docker >/dev/null 2>&1 || return 0
+    cid=$(docker ps -q \
+        --filter "label=com.docker.compose.project=polaris" \
+        --filter "label=com.docker.compose.service=web" 2>/dev/null | head -n1)
+    [ -n "$cid" ] || return 0
+    docker inspect "$cid" --format '{{range .Config.Env}}{{println .}}{{end}}' 2>/dev/null \
+        | sed -n "s/^$1=//p" | head -n1
+}
+
+# Return a durable secret for KEY: reuse the remembered value, else adopt the
+# value from a Polaris deployment already running on this host, else generate one
+# of KIND. Each source is remembered. This is what makes a regenerated .env - or a
+# fresh checkout in another directory - recover the SAME master key.
 durable_secret() {
     key="$1"
     existing=$(recall_secret "$key")
     if [ -n "$existing" ]; then
         printf '%s' "$existing"
+        return 0
+    fi
+    recovered=$(docker_recover_env "$key")
+    if [ -n "$recovered" ]; then
+        remember_secret "$key" "$recovered"
+        printf '%s' "$recovered"
         return 0
     fi
     value=$(gen_secret "$2")
@@ -92,6 +114,21 @@ seed_store_from_env() {
         case "$cur" in "" | REPLACE_ME_*) continue ;; esac
         remember_secret "$key" "$cur"
     done
+}
+
+# The host directory of a Polaris deployment already running here (its compose
+# working dir, i.e. the `docker/` folder). Used so a bare `curl | sh` updates that
+# deployment in place instead of cloning a divergent checkout into $HOME/polaris -
+# which, sharing the global Docker volumes, would run a fresh master key against
+# the existing database and orphan its encrypted credentials. Empty if none runs.
+existing_deployment_dir() {
+    command -v docker >/dev/null 2>&1 || return 0
+    cid=$(docker ps -q \
+        --filter "label=com.docker.compose.project=polaris" \
+        --filter "label=com.docker.compose.service=web" 2>/dev/null | head -n1)
+    [ -n "$cid" ] || return 0
+    docker inspect "$cid" \
+        --format '{{index .Config.Labels "com.docker.compose.project.working_dir"}}' 2>/dev/null
 }
 
 need() {
@@ -390,6 +427,14 @@ main() {
     elif [ -f "docker-compose.yml" ] && [ -f ".env.example" ]; then
         workdir="."
     else
+        # Prefer a deployment already running on this host: update IT in place so a
+        # bare `curl | sh` (run from any directory or user) never spins up a second,
+        # divergent checkout with a fresh master key against the shared volumes.
+        running_dir=$(existing_deployment_dir)
+        if [ -n "$running_dir" ] && [ -f "$running_dir/docker-compose.yml" ]; then
+            INSTALL_DIR=$(cd "$running_dir/../.." && pwd)
+            log "found the running Polaris deployment at $INSTALL_DIR; updating it in place"
+        fi
         need git "install git so the installer can fetch the Polaris repository"
         if [ -d "$INSTALL_DIR/.git" ]; then
             log "updating existing checkout in $INSTALL_DIR"
