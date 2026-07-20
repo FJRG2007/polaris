@@ -34,10 +34,18 @@ export class SwarmRuntime implements RuntimeDriver {
             if (!plan.build.imageRef) return { ok: false, error: "an image source needs an image reference" };
             imageTag = plan.build.imageRef;
             await ctx.ports.pull(imageTag, sink);
-        } else if (plan.build.method === "dockerfile" && ctx.buildContext) {
+        } else if ((plan.build.method === "dockerfile" || plan.build.method === "nixpacks") && ctx.buildContext) {
             imageTag = toImageTag(plan.build.name, plan.build.commitSha);
             const contextTar = await ctx.buildContext();
-            await ctx.ports.build({ tag: imageTag, dockerfile: plan.build.dockerfilePath, contextTar }, sink);
+            await ctx.ports.build(
+                {
+                    tag: imageTag,
+                    dockerfile: plan.build.dockerfilePath,
+                    contextTar,
+                    builder: plan.build.method === "nixpacks" ? "nixpacks" : "docker"
+                },
+                sink
+            );
         } else {
             return { ok: false, error: `build method "${plan.build.method}" is not yet supported on the swarm runtime` };
         }

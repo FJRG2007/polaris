@@ -587,6 +587,23 @@ pub fn pull(image: &str) -> io::Result<Box<dyn Read + Send>> {
     stream_command(cmd)
 }
 
+/// Build an image from a source directory with Nixpacks, which auto-detects the
+/// framework (no Dockerfile required). The context directory is removed once the
+/// build finishes. Path/tag are positional args so nothing is shell-interpolated.
+pub fn build_nixpacks(
+    tag: &str,
+    context_dir: &std::path::Path,
+) -> io::Result<Box<dyn Read + Send>> {
+    let mut cmd = Command::new("sh");
+    cmd.arg("-c")
+        .arg("nixpacks build \"$1\" --name \"$2\" 2>&1; code=$?; rm -rf \"$1\"; exit $code")
+        .arg("sh")
+        .arg(context_dir)
+        .arg(tag)
+        .stdin(Stdio::null());
+    stream_command(cmd)
+}
+
 /// `docker login` to a registry, reading the password from stdin so it never
 /// appears in the process arguments or logs. An empty registry logs in to Docker
 /// Hub. Returns whether the login succeeded.

@@ -435,6 +435,10 @@ fn deploy_build<R: Read>(state: &AppState, req: &Request, body: &mut R) -> Respo
     {
         return Response::bad_request("invalid X-Polaris-Dockerfile");
     }
+    let builder = req.header("x-polaris-builder").unwrap_or("docker");
+    if builder != "docker" && builder != "nixpacks" {
+        return Response::bad_request("invalid X-Polaris-Builder");
+    }
 
     // Stream the tar context to a private file under the deploy root, bounded.
     let build_dir = state.config.deploy_root.join("_build");
@@ -453,6 +457,37 @@ fn deploy_build<R: Read>(state: &AppState, req: &Request, body: &mut R) -> Respo
         return Response::server_error();
     }
     drop(file);
+
+    // Nixpacks needs the context as a directory: unpack the tar, then build (the
+    // build script removes the directory when it finishes).
+    if builder == "nixpacks" {
+        let extract_dir = build_dir.join(format!("nixpacks-{}", std::process::id()));
+        if std::fs::create_dir_all(&extract_dir).is_err() {
+            let _ = std::fs::remove_file(&tar_path);
+            return Response::server_error();
+        }
+        let unpacked = std::process::Command::new("tar")
+            .arg("-xf")
+            .arg(&tar_path)
+            .arg("-C")
+            .arg(&extract_dir)
+            .status()
+            .map(|s| s.success())
+            .unwrap_or(false);
+        let _ = std::fs::remove_file(&tar_path);
+        if !unpacked {
+            let _ = std::fs::remove_dir_all(&extract_dir);
+            return Response::text(502, "Bad Gateway", "could not unpack the build context");
+        }
+        return match deploy::build_nixpacks(tag, &extract_dir) {
+            Ok(reader) => stream_response(reader),
+            Err(_) => {
+                let _ = std::fs::remove_dir_all(&extract_dir);
+                Response::text(502, "Bad Gateway", "could not start the build")
+            }
+        };
+    }
+
     let reopened = match std::fs::File::open(&tar_path) {
         Ok(f) => f,
         Err(_) => return Response::server_error(),

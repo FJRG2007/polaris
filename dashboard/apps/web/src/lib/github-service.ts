@@ -328,6 +328,107 @@ export async function listGithubRepos(): Promise<GithubRepo[]> {
     }));
 }
 
+/** An API token for REST calls scoped to `owner` (installation token for the App
+ *  method, the PAT otherwise), or null when not connected / for a public call. */
+async function apiToken(owner?: string): Promise<string | null> {
+    const state = await getIntegrationState(PROVIDER);
+    if (!state?.hasSecret) return null;
+    if (state.config.method === "app") {
+        const secrets = await getAppSecrets();
+        if (!secrets) return null;
+        const installs = Array.isArray(state.config.installations) ? (state.config.installations as Installation[]) : [];
+        const inst = (owner && installs.find((row) => row.login.toLowerCase() === owner.toLowerCase())) || installs[0];
+        if (!inst) return null;
+        return installationToken(inst.id, secrets.appId, secrets.pem);
+    }
+    return getPatToken();
+}
+
+export interface RepoInspection {
+    /** Path to a Dockerfile in the repo, or null if none was found. */
+    dockerfile: string | null;
+    /** Detected stack/framework (informational), or null. */
+    framework: string | null;
+    /** The build strategy to default to. */
+    builder: "dockerfile" | "nixpacks";
+}
+
+/** Framework hints keyed by a package.json dependency name. */
+const JS_FRAMEWORKS: Array<[string, string]> = [
+    ["next", "Next.js"],
+    ["nuxt", "Nuxt"],
+    ["@remix-run/react", "Remix"],
+    ["astro", "Astro"],
+    ["@angular/core", "Angular"],
+    ["@sveltejs/kit", "SvelteKit"],
+    ["vue", "Vue"],
+    ["react", "React"],
+    ["vite", "Vite"],
+    ["express", "Express"],
+    ["fastify", "Fastify"]
+];
+
+/**
+ * Inspect a repo to auto-configure a deploy: find a Dockerfile and detect the
+ * framework (like Vercel/Railway) so the build needs no Dockerfile. Best-effort -
+ * returns nulls on any API hiccup and defaults to a nixpacks (auto) build.
+ */
+export async function inspectGithubRepo(owner: string, repo: string, branch: string): Promise<RepoInspection> {
+    const token = await apiToken(owner);
+    const headers: HeadersInit = token
+        ? apiHeaders(token)
+        : { Accept: "application/vnd.github+json", "User-Agent": "polaris", "X-GitHub-Api-Version": "2022-11-28" };
+
+    let paths: string[] = [];
+    try {
+        const res = await fetch(
+            `${API}/repos/${owner}/${repo}/git/trees/${encodeURIComponent(branch)}?recursive=1`,
+            { headers, cache: "no-store" }
+        );
+        if (res.ok) {
+            const body = (await res.json()) as { tree?: Array<{ path?: string; type?: string }> };
+            paths = (body.tree ?? []).filter((entry) => entry.type === "blob").map((entry) => entry.path ?? "");
+        }
+    } catch {
+        // fall through with no paths
+    }
+
+    const dockerfile = paths.find((p) => p === "Dockerfile") ?? paths.find((p) => p.endsWith("/Dockerfile")) ?? null;
+    const has = (name: string) => paths.some((p) => p === name || p.endsWith(`/${name}`));
+
+    let framework: string | null = null;
+    if (paths.includes("package.json")) {
+        framework = "Node.js";
+        try {
+            const res = await fetch(
+                `${API}/repos/${owner}/${repo}/contents/package.json?ref=${encodeURIComponent(branch)}`,
+                { headers, cache: "no-store" }
+            );
+            if (res.ok) {
+                const body = (await res.json()) as { content?: string };
+                const json = body.content
+                    ? (JSON.parse(Buffer.from(body.content, "base64").toString("utf8")) as {
+                          dependencies?: Record<string, string>;
+                          devDependencies?: Record<string, string>;
+                      })
+                    : {};
+                const deps = { ...json.dependencies, ...json.devDependencies };
+                const match = JS_FRAMEWORKS.find(([dep]) => dep in deps);
+                if (match) framework = match[1];
+            }
+        } catch {
+            // keep the generic Node.js label
+        }
+    } else if (has("requirements.txt") || has("pyproject.toml") || has("Pipfile")) framework = "Python";
+    else if (has("go.mod")) framework = "Go";
+    else if (has("Cargo.toml")) framework = "Rust";
+    else if (has("Gemfile")) framework = "Ruby";
+    else if (has("composer.json")) framework = "PHP";
+    else if (has("pom.xml") || has("build.gradle")) framework = "Java";
+
+    return { dockerfile, framework, builder: dockerfile ? "dockerfile" : "nixpacks" };
+}
+
 /**
  * A git basic-auth header value that authenticates a clone with the stored
  * credentials, or null if GitHub is not connected. Used as `http.extraHeader` so

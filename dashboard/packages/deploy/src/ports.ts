@@ -22,6 +22,9 @@ export interface BuildRequest {
     /** A tar stream of the build context. */
     readonly contextTar: NodeJS.ReadableStream;
     readonly buildArgs?: Readonly<Record<string, string>>;
+    /** Build strategy: "docker" uses the Dockerfile, "nixpacks" auto-detects the
+     *  framework and builds without one. Defaults to "docker". */
+    readonly builder?: "docker" | "nixpacks";
 }
 
 export interface ExecSpec {

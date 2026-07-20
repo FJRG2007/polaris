@@ -22,7 +22,13 @@ import {
     saveEnvironmentLayout
 } from "@/lib/deploy-service";
 import { createDatabase, deployDatabase, type DbEngine } from "@/lib/database-service";
-import { getGithubStatus, listGithubRepos, type GithubRepo } from "@/lib/github-service";
+import {
+    getGithubStatus,
+    inspectGithubRepo,
+    listGithubRepos,
+    type GithubRepo,
+    type RepoInspection
+} from "@/lib/github-service";
 import {
     deleteRegistryCredential,
     listRegistryCredentials,
@@ -104,17 +110,19 @@ export async function createApplicationAction(input: {
     const user = await requirePermission("deploy.manage");
     const name = input.name?.trim();
     if (!name) return { error: "An application name is required" };
-    const isGit = input.sourceType === "dockerfile" || input.sourceType === "git";
+    const isNixpacks = input.sourceType === "nixpacks";
+    const isGit = input.sourceType === "dockerfile" || input.sourceType === "git" || isNixpacks;
     let sourceType = "image";
     let sourceConfig: Record<string, unknown>;
     if (isGit) {
         const repoUrl = input.repoUrl?.trim();
         if (!repoUrl) return { error: "A git repository URL is required" };
-        sourceType = "dockerfile";
+        // "nixpacks" auto-builds from source (no Dockerfile); "dockerfile" uses one.
+        sourceType = isNixpacks ? "nixpacks" : "dockerfile";
         sourceConfig = {
             repoUrl,
             branch: input.branch?.trim() || undefined,
-            dockerfilePath: input.dockerfilePath?.trim() || "Dockerfile",
+            dockerfilePath: isNixpacks ? undefined : input.dockerfilePath?.trim() || "Dockerfile",
             // Mark GitHub-sourced repos so the build authenticates its clone with the
             // connected token (private repos), transparently for public ones too.
             provider: input.provider === "github" ? "github" : undefined
@@ -247,6 +255,21 @@ export async function deleteRegistryCredentialAction(id: string): Promise<{ erro
     await deleteRegistryCredential(id, user.id);
     await recordAudit({ actorId: user.id, action: "deploy.registry.delete", targetType: "registry", targetId: id });
     return {};
+}
+
+/** Inspect a repo to auto-configure a deploy (find a Dockerfile, detect the
+ *  framework). Gated on deploy.manage. */
+export async function inspectRepoAction(input: {
+    owner: string;
+    repo: string;
+    branch: string;
+}): Promise<RepoInspection> {
+    await requirePermission("deploy.manage");
+    try {
+        return await inspectGithubRepo(input.owner, input.repo, input.branch);
+    } catch {
+        return { dockerfile: null, framework: null, builder: "nixpacks" };
+    }
 }
 
 /** The connected GitHub account (if any) and the repositories it can deploy, for the

@@ -36,17 +36,22 @@ export class ComposeRuntime implements RuntimeDriver {
             if (!plan.build.imageRef) return { ok: false, error: "an image source needs an image reference" };
             imageTag = plan.build.imageRef;
             await ctx.ports.pull(imageTag, sink);
-        } else if (plan.build.method === "dockerfile" && ctx.buildContext) {
-            // Build from a Dockerfile in the cloned repo, then run the built image.
+        } else if ((plan.build.method === "dockerfile" || plan.build.method === "nixpacks") && ctx.buildContext) {
+            // Build from the cloned repo: a Dockerfile, or Nixpacks auto-detecting the
+            // framework (no Dockerfile needed). Then run the built image.
             imageTag = toImageTag(plan.build.name, plan.build.commitSha);
             const contextTar = await ctx.buildContext();
             await ctx.ports.build(
-                { tag: imageTag, dockerfile: plan.build.dockerfilePath, contextTar },
+                {
+                    tag: imageTag,
+                    dockerfile: plan.build.dockerfilePath,
+                    contextTar,
+                    builder: plan.build.method === "nixpacks" ? "nixpacks" : "docker"
+                },
                 sink
             );
         } else {
-            // nixpacks/buildpacks/static need a builder toolchain on the target; not
-            // yet wired. Fail clearly rather than silently.
+            // buildpacks/static need a builder toolchain on the target; not yet wired.
             return { ok: false, error: `build method "${plan.build.method}" is not yet supported on the compose runtime` };
         }
 

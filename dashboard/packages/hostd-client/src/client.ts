@@ -172,11 +172,17 @@ export class HostdClient {
      * dockerfile ride in headers because the daemon strips query strings; the
      * body is the raw tar (its length is known, so no chunked framing).
      */
-    public async deployBuild(tag: string, dockerfile: string, contextTar: Buffer): Promise<IncomingMessage> {
+    public async deployBuild(
+        tag: string,
+        dockerfile: string,
+        contextTar: Buffer,
+        builder: "docker" | "nixpacks" = "docker"
+    ): Promise<IncomingMessage> {
         return this.callStream("POST", "/v1/deploy/build", contextTar, {
             "content-type": "application/x-tar",
             "x-polaris-tag": tag,
-            "x-polaris-dockerfile": dockerfile
+            "x-polaris-dockerfile": dockerfile,
+            "x-polaris-builder": builder
         });
     }
 

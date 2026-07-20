@@ -34,7 +34,12 @@ export class HostdPorts implements RuntimePorts {
 
     public async build(request: BuildRequest, onOutput?: OutputSink): Promise<string> {
         const tar = await bufferStream(request.contextTar);
-        const res = await this.client.deployBuild(request.tag, request.dockerfile ?? "Dockerfile", tar);
+        const res = await this.client.deployBuild(
+            request.tag,
+            request.dockerfile ?? "Dockerfile",
+            tar,
+            request.builder ?? "docker"
+        );
         await drain(res, onOutput);
         return request.tag;
     }

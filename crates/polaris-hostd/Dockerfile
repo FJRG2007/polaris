@@ -26,7 +26,21 @@ RUN cargo build --release -p polaris-hostd
 # ---------------------------------------------------------------------------
 FROM alpine:3
 
-RUN apk add --no-cache docker-cli
+# docker-cli drives builds/pulls; tar unpacks the build context for Nixpacks.
+# Nixpacks (best-effort, arch-aware) auto-builds repos that ship no Dockerfile; if
+# the download fails the image still builds and Dockerfile-based deploys keep working.
+ARG TARGETARCH
+ARG NIXPACKS_VERSION=1.29.0
+RUN apk add --no-cache docker-cli tar ca-certificates \
+    && case "$TARGETARCH" in \
+        arm64) NARCH=aarch64 ;; \
+        *) NARCH=x86_64 ;; \
+    esac \
+    && ( wget -qO /tmp/nixpacks.tar.gz \
+            "https://github.com/railwayapp/nixpacks/releases/download/v${NIXPACKS_VERSION}/nixpacks-v${NIXPACKS_VERSION}-${NARCH}-unknown-linux-musl.tar.gz" \
+        && tar -xzf /tmp/nixpacks.tar.gz -C /usr/local/bin nixpacks \
+        && rm -f /tmp/nixpacks.tar.gz ) \
+    || echo "nixpacks unavailable for ${TARGETARCH}; Dockerfile builds still work"
 
 COPY --from=builder /build/target/release/polaris-hostd /usr/local/bin/polaris-hostd
 

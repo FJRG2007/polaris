@@ -8,9 +8,10 @@
  * says plainly when it needs the full edition rather than failing silently.
  */
 
-import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 import {
     ArrowLeft,
+    Check,
     ChevronRight,
     Database,
     FolderOpen,
@@ -18,7 +19,9 @@ import {
     Loader2,
     Lock,
     Plus,
+    RefreshCw,
     Rocket,
+    Search,
     TerminalSquare
 } from "lucide-react";
 import {
@@ -43,7 +46,8 @@ import {
     createDatabaseAction,
     deployApplicationAction,
     deployDatabaseAction,
-    githubReposAction
+    githubReposAction,
+    inspectRepoAction
 } from "./actions";
 
 const DB_ENGINES = ["postgres", "mysql", "mariadb", "mongo", "redis"] as const;
@@ -412,43 +416,79 @@ interface RepoOption {
     private: boolean;
 }
 
+// Session cache of the connected account's repos so reopening the dialog is
+// instant; the Refresh button re-fetches from GitHub.
+let repoCache: RepoOption[] | null = null;
+let repoCacheConnected = false;
+
+type Builder = "dockerfile" | "nixpacks";
+
+const BUILDER_OPTIONS: SelectOption[] = [
+    { value: "dockerfile", label: "Dockerfile" },
+    { value: "nixpacks", label: "Auto-detect (Nixpacks)" }
+];
+
 function NewGithubForm({ environmentId, onDone }: { environmentId: string; onDone: () => void }) {
-    const [loading, setLoading] = useState(true);
-    const [connected, setConnected] = useState(false);
-    const [repos, setRepos] = useState<RepoOption[]>([]);
-    const [name, setName] = useState("");
+    const [loading, setLoading] = useState(repoCache === null);
+    const [connected, setConnected] = useState(repoCacheConnected);
+    const [repos, setRepos] = useState<RepoOption[]>(repoCache ?? []);
+    const [search, setSearch] = useState("");
     const [repoFullName, setRepoFullName] = useState("");
     const [manualUrl, setManualUrl] = useState("");
+    const [name, setName] = useState("");
     const [branch, setBranch] = useState("");
-    const [dockerfilePath, setDockerfilePath] = useState("");
+    const [builder, setBuilder] = useState<Builder>("dockerfile");
+    const [dockerfilePath, setDockerfilePath] = useState("Dockerfile");
+    const [framework, setFramework] = useState<string | null>(null);
+    const [inspecting, setInspecting] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
 
-    useEffect(() => {
-        let active = true;
+    const load = useCallback((force: boolean) => {
+        if (!force && repoCache !== null) {
+            setRepos(repoCache);
+            setConnected(repoCacheConnected);
+            setLoading(false);
+            return;
+        }
+        setLoading(true);
         void githubReposAction()
             .then((result) => {
-                if (!active) return;
-                setConnected(result.connected);
+                repoCache = result.repos;
+                repoCacheConnected = result.connected;
                 setRepos(result.repos);
+                setConnected(result.connected);
             })
             .catch(() => undefined)
-            .finally(() => active && setLoading(false));
-        return () => {
-            active = false;
-        };
+            .finally(() => setLoading(false));
     }, []);
 
-    const usePicker = connected && repos.length > 0;
-    const canSubmit = name.trim() && (usePicker ? repoFullName : manualUrl.trim());
+    useEffect(() => {
+        load(false);
+    }, [load]);
 
-    function onPickRepo(value: string) {
-        setRepoFullName(value);
-        const repo = repos.find((item) => item.fullName === value);
-        if (repo) {
-            setBranch(repo.defaultBranch);
-            if (!name.trim()) setName(repo.fullName.split("/")[1] ?? "");
-        }
+    const usePicker = connected && repos.length > 0;
+    const filtered = search.trim()
+        ? repos.filter((repo) => repo.fullName.toLowerCase().includes(search.trim().toLowerCase()))
+        : repos;
+    const selected = Boolean(usePicker ? repoFullName : manualUrl.trim());
+    const canSubmit = Boolean(name.trim()) && selected;
+
+    function onPickRepo(repo: RepoOption) {
+        setRepoFullName(repo.fullName);
+        setName(repo.fullName.split("/")[1] ?? "");
+        setBranch(repo.defaultBranch);
+        setFramework(null);
+        setInspecting(true);
+        const [owner, repoName] = repo.fullName.split("/");
+        void inspectRepoAction({ owner: owner ?? "", repo: repoName ?? "", branch: repo.defaultBranch })
+            .then((inspection) => {
+                setBuilder(inspection.builder);
+                setDockerfilePath(inspection.dockerfile ?? "Dockerfile");
+                setFramework(inspection.framework);
+            })
+            .catch(() => undefined)
+            .finally(() => setInspecting(false));
     }
 
     function submit() {
@@ -458,10 +498,10 @@ function NewGithubForm({ environmentId, onDone }: { environmentId: string; onDon
             const result = await createApplicationAction({
                 environmentId,
                 name,
-                sourceType: "dockerfile",
+                sourceType: builder,
                 repoUrl,
                 branch: branch.trim() || undefined,
-                dockerfilePath: dockerfilePath.trim() || undefined,
+                dockerfilePath: builder === "dockerfile" ? dockerfilePath.trim() || undefined : undefined,
                 provider: connected ? "github" : undefined
             });
             if (result.error) setError(result.error);
@@ -469,61 +509,119 @@ function NewGithubForm({ environmentId, onDone }: { environmentId: string; onDon
         });
     }
 
-    if (loading) {
-        return (
-            <div className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
-                <Loader2 className="size-4 animate-spin" /> Loading repositories...
-            </div>
-        );
-    }
-
     return (
         <div className="flex flex-col gap-3">
-            {!connected && (
+            {!connected && !loading && (
                 <p className="rounded-md border border-border/60 bg-surface/40 px-3 py-2 text-xs text-muted-foreground">
-                    Deploying a public repository. <a href="/integrations" className="text-primary hover:underline">Connect GitHub</a> for private repositories and a repository picker.
+                    Deploying a public repository.{" "}
+                    <a href="/integrations" className="text-primary hover:underline">
+                        Connect GitHub
+                    </a>{" "}
+                    for private repositories and a searchable picker.
                 </p>
             )}
 
-            {usePicker ? (
-                <Field label="Repository">
-                    <Select
-                        value={repoFullName}
-                        onValueChange={onPickRepo}
-                        placeholder="Select a repository"
-                        options={repos.map((repo) => ({
-                            value: repo.fullName,
-                            label: repo.fullName,
-                            icon: repo.private ? <Lock className="size-4 text-muted-foreground" /> : undefined
-                        }))}
-                    />
-                </Field>
+            {connected ? (
+                <div className="flex flex-col gap-2">
+                    <div className="flex items-center gap-2">
+                        <div className="relative flex-1">
+                            <Search className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                            <Input
+                                value={search}
+                                onChange={(event) => setSearch(event.target.value)}
+                                placeholder="Search repositories"
+                                className="pl-8"
+                            />
+                        </div>
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            title="Refresh repositories"
+                            disabled={loading}
+                            onClick={() => load(true)}
+                        >
+                            <RefreshCw className={`size-4 ${loading ? "animate-spin" : ""}`} />
+                        </Button>
+                    </div>
+                    <div className="max-h-56 overflow-auto rounded-md border border-border/60">
+                        {loading ? (
+                            <div className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
+                                <Loader2 className="size-4 animate-spin" /> Loading repositories...
+                            </div>
+                        ) : filtered.length === 0 ? (
+                            <p className="py-8 text-center text-sm text-muted-foreground">No repositories match.</p>
+                        ) : (
+                            filtered.map((repo) => (
+                                <button
+                                    key={repo.fullName}
+                                    type="button"
+                                    onClick={() => onPickRepo(repo)}
+                                    className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-muted ${
+                                        repoFullName === repo.fullName ? "bg-muted" : ""
+                                    }`}
+                                >
+                                    <GitHubMark className="size-4 shrink-0 text-muted-foreground" />
+                                    <span className="truncate">{repo.fullName}</span>
+                                    {repoFullName === repo.fullName && <Check className="size-4 shrink-0 text-primary" />}
+                                    <span className="ml-auto flex items-center gap-2 pl-2 text-xs text-muted-foreground">
+                                        {repo.private && <Lock className="size-3.5" />}
+                                        {repo.defaultBranch}
+                                    </span>
+                                </button>
+                            ))
+                        )}
+                    </div>
+                </div>
             ) : (
-                <Field label="Repository URL" hint="Public http(s) repository.">
-                    <Input
-                        value={manualUrl}
-                        onChange={(event) => setManualUrl(event.target.value)}
-                        placeholder="https://github.com/user/repo"
-                    />
-                </Field>
+                !loading && (
+                    <Field label="Repository URL" hint="Public http(s) repository.">
+                        <Input
+                            value={manualUrl}
+                            onChange={(event) => setManualUrl(event.target.value)}
+                            placeholder="https://github.com/user/repo"
+                        />
+                    </Field>
+                )
             )}
 
-            <Field label="Name">
-                <Input value={name} onChange={(event) => setName(event.target.value)} placeholder="my-app" />
-            </Field>
-
-            <div className="grid grid-cols-2 gap-3">
-                <Field label="Branch">
-                    <Input value={branch} onChange={(event) => setBranch(event.target.value)} placeholder="main" />
-                </Field>
-                <Field label="Dockerfile">
-                    <Input
-                        value={dockerfilePath}
-                        onChange={(event) => setDockerfilePath(event.target.value)}
-                        placeholder="Dockerfile"
-                    />
-                </Field>
-            </div>
+            {selected && (
+                <>
+                    <div className="grid grid-cols-2 gap-3">
+                        <Field label="Name">
+                            <Input value={name} onChange={(event) => setName(event.target.value)} placeholder="my-app" />
+                        </Field>
+                        <Field label="Branch">
+                            <Input value={branch} onChange={(event) => setBranch(event.target.value)} placeholder="main" />
+                        </Field>
+                    </div>
+                    <Field
+                        label="Builder"
+                        hint={
+                            inspecting
+                                ? "Detecting the stack..."
+                                : framework
+                                  ? `Detected ${framework}.`
+                                  : "No Dockerfile found - Nixpacks auto-builds from the source."
+                        }
+                    >
+                        <Select
+                            value={builder}
+                            onValueChange={(value) => setBuilder(value as Builder)}
+                            options={BUILDER_OPTIONS}
+                        />
+                    </Field>
+                    {builder === "dockerfile" && (
+                        <Field label="Dockerfile path">
+                            <Input
+                                value={dockerfilePath}
+                                onChange={(event) => setDockerfilePath(event.target.value)}
+                                placeholder="Dockerfile"
+                            />
+                        </Field>
+                    )}
+                </>
+            )}
 
             {error && <p className="text-sm text-danger">{error}</p>}
             <div className="flex justify-end">
