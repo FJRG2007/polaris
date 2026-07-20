@@ -1,6 +1,6 @@
 "use client";
 
-import { Activity, Bell, Blocks, Globe, Link2, LogOut, Settings, ShieldCheck, UserCog, Users, UsersRound } from "lucide-react";
+import { Bell, Link2, LogOut, UserCog } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
     DropdownMenu,
@@ -12,7 +12,12 @@ import {
 } from "@polaris/ui";
 import { signOut } from "@/lib/auth-client";
 
-export function AccountMenu({ name, email, isAdmin }: { name: string; email: string; isAdmin: boolean }) {
+/**
+ * The personal account dropdown. Only per-user items live here; administration
+ * (users, policies, domains, integrations, updates, ...) moved to the dedicated
+ * Management app in the switcher, so this menu stays about "you", not the system.
+ */
+export function AccountMenu({ name, email }: { name: string; email: string }) {
     const router = useRouter();
     const initial = name.trim().charAt(0).toUpperCase() || "?";
 
@@ -51,52 +56,6 @@ export function AccountMenu({ name, email, isAdmin }: { name: string; email: str
                         Shared links
                     </a>
                 </DropdownMenuItem>
-                {isAdmin ? (
-                    <>
-                        <DropdownMenuItem asChild>
-                            <a href="/integrations">
-                                <Blocks className="size-4" />
-                                Integrations
-                            </a>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem asChild>
-                            <a href="/admin/users">
-                                <Users className="size-4" />
-                                Users
-                            </a>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem asChild>
-                            <a href="/admin/groups">
-                                <UsersRound className="size-4" />
-                                Groups
-                            </a>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem asChild>
-                            <a href="/admin/policies">
-                                <ShieldCheck className="size-4" />
-                                Policies
-                            </a>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem asChild>
-                            <a href="/admin/activity">
-                                <Activity className="size-4" />
-                                Activity
-                            </a>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem asChild>
-                            <a href="/admin/domains">
-                                <Globe className="size-4" />
-                                Domains
-                            </a>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem asChild>
-                            <a href="/settings">
-                                <Settings className="size-4" />
-                                Settings
-                            </a>
-                        </DropdownMenuItem>
-                    </>
-                ) : null}
                 <DropdownMenuItem onSelect={onSignOut}>
                     <LogOut className="size-4" />
                     Sign out
