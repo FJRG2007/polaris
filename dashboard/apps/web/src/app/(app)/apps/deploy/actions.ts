@@ -19,7 +19,8 @@ import {
     deleteProject,
     deployApplication,
     removeApplicationDomain,
-    saveEnvironmentLayout
+    saveEnvironmentLayout,
+    updateAutoDeploy
 } from "@/lib/deploy-service";
 import { createDatabase, deployDatabase, type DbEngine } from "@/lib/database-service";
 import {
@@ -146,6 +147,26 @@ export async function createApplicationAction(input: {
         return {};
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Could not create the application" };
+    }
+}
+
+export async function setAutoDeployAction(input: {
+    applicationId: string;
+    autoDeploy: boolean;
+    deployBranch?: string;
+    commitFilter?: string;
+}): Promise<{ error?: string }> {
+    const user = await requirePermission("deploy.manage");
+    try {
+        await updateAutoDeploy(input.applicationId, user.id, {
+            autoDeploy: input.autoDeploy,
+            deployBranch: input.deployBranch,
+            commitFilter: input.commitFilter
+        });
+        revalidatePath(DEPLOY_PATH);
+        return {};
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not save auto-deploy settings" };
     }
 }
 

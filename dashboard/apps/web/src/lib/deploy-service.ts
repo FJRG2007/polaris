@@ -313,6 +313,93 @@ export async function deployApplication(applicationId: string, ownerId: string, 
     return deployment.id;
 }
 
+/** Update an application's auto-deploy settings (owner-checked). */
+export async function updateAutoDeploy(
+    applicationId: string,
+    ownerId: string,
+    settings: { autoDeploy: boolean; deployBranch?: string | null; commitFilter?: string | null }
+): Promise<void> {
+    const app = await prisma.application.findFirst({
+        where: { id: applicationId, environment: { project: { ownerId } } }
+    });
+    if (!app) throw new Error("Application not found");
+    await prisma.application.update({
+        where: { id: applicationId },
+        data: {
+            autoDeploy: settings.autoDeploy,
+            deployBranch: settings.deployBranch?.trim() || null,
+            commitFilter: settings.commitFilter?.trim() || null
+        }
+    });
+}
+
+/** "refs/heads/main" -> "main". */
+export function branchFromRef(ref: string): string {
+    return ref.startsWith("refs/heads/") ? ref.slice("refs/heads/".length) : ref;
+}
+
+/** Whether a commit message satisfies an auto-deploy filter. Empty = any commit;
+ *  "regex:<pattern>" is matched as a regex, otherwise a case-insensitive substring
+ *  (e.g. "build:" fires only on commits mentioning build: anywhere). */
+export function commitPassesFilter(message: string, filter: string | null | undefined): boolean {
+    const trimmed = filter?.trim();
+    if (!trimmed) return true;
+    if (trimmed.startsWith("regex:")) {
+        try {
+            return new RegExp(trimmed.slice("regex:".length)).test(message);
+        } catch {
+            return false;
+        }
+    }
+    return message.toLowerCase().includes(trimmed.toLowerCase());
+}
+
+/**
+ * Trigger auto-deploys for a git push: find applications tracking this repo with
+ * auto-deploy enabled whose branch and commit-message filters pass, and deploy
+ * each. Returns the number of deployments started. Not owner-scoped - a webhook
+ * fans out to every matching app on the instance.
+ */
+export async function triggerAutoDeploysForPush(input: {
+    repoFullName: string;
+    branch: string;
+    commitMessage: string;
+    commitSha: string;
+}): Promise<number> {
+    const apps = await prisma.application.findMany({
+        where: { autoDeploy: true, sourceType: { in: ["dockerfile", "nixpacks"] } },
+        include: { environment: { include: { project: true } } }
+    });
+    const wanted = input.repoFullName.toLowerCase();
+    let started = 0;
+    for (const app of apps) {
+        let source: Record<string, unknown>;
+        try {
+            source = JSON.parse(app.sourceConfig);
+        } catch {
+            continue;
+        }
+        const repoUrl = typeof source.repoUrl === "string" ? source.repoUrl.toLowerCase() : "";
+        const matchesRepo =
+            repoUrl.includes(`github.com/${wanted}`) ||
+            repoUrl.endsWith(`/${wanted}`) ||
+            repoUrl.endsWith(`/${wanted}.git`);
+        if (!matchesRepo) continue;
+        const configuredBranch = (app.deployBranch?.trim() || (typeof source.branch === "string" ? source.branch : "")).trim();
+        if (configuredBranch && configuredBranch !== input.branch) continue;
+        if (!commitPassesFilter(input.commitMessage, app.commitFilter)) continue;
+        const ownerId = app.environment.project.ownerId;
+        try {
+            await deployApplication(app.id, ownerId, ownerId);
+            await prisma.application.update({ where: { id: app.id }, data: { lastDeployedSha: input.commitSha } });
+            started += 1;
+        } catch {
+            // Skip this app; the others still deploy.
+        }
+    }
+    return started;
+}
+
 function runDeployment(
     deploymentId: string,
     plan: AppDeployPlan,

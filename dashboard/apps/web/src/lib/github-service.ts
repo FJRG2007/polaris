@@ -12,7 +12,7 @@
  *    This is the path the future build/webhook system builds on.
  */
 
-import { createSign } from "node:crypto";
+import { createHmac, createSign, timingSafeEqual } from "node:crypto";
 import { getIntegrationSecret, getIntegrationState, upsertIntegration } from "./integration-service";
 
 const PROVIDER = "github";
@@ -147,13 +147,15 @@ export function buildAppManifest(baseUrl: string, name: string): Record<string, 
         url: baseUrl,
         // Webhooks are inactive until the build system needs them; the URL is set so
         // enabling them later needs no app edit.
-        hook_attributes: { url: `${baseUrl}/api/integrations/github/webhook`, active: false },
+        // Push events drive auto-deploy. GitHub must be able to reach this URL, so
+        // it only fires for instances with a public domain (LAN installs use polling).
+        hook_attributes: { url: `${baseUrl}/api/deploy/github/webhook`, active: true },
+        default_events: ["push"],
         redirect_url: `${baseUrl}/api/integrations/github/callback`,
         setup_url: `${baseUrl}/api/integrations/github/callback`,
         setup_on_update: true,
         public: false,
-        default_permissions: { contents: "read", metadata: "read" },
-        default_events: []
+        default_permissions: { contents: "read", metadata: "read" }
     };
 }
 
@@ -454,4 +456,18 @@ export async function githubCloneAuthHeader(owner?: string): Promise<string | nu
     }
     if (!token) return null;
     return `Authorization: Basic ${Buffer.from(`x-access-token:${token}`).toString("base64")}`;
+}
+
+/** The GitHub App's webhook secret (app method only), used to verify push events. */
+export async function getGithubWebhookSecret(): Promise<string | null> {
+    const secrets = await getAppSecrets();
+    return secrets?.webhookSecret ?? null;
+}
+
+/** Constant-time verification of a GitHub webhook signature ("sha256=<hex>"). */
+export function verifyWebhookSignature(secret: string, payload: string, signature: string): boolean {
+    const expected = `sha256=${createHmac("sha256", secret).update(payload).digest("hex")}`;
+    const a = Buffer.from(signature);
+    const b = Buffer.from(expected);
+    return a.length === b.length && timingSafeEqual(a, b);
 }

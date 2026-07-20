@@ -827,6 +827,15 @@ model Application {
     replicas            Int       @default(1)
     // Soft pointer to the latest Deployment (no FK, to avoid a relation cycle).
     currentDeploymentId String?   @db.Uuid
+    // Auto-deploy on git push (Vercel-style): redeploy when a matching commit lands.
+    autoDeploy          Boolean   @default(false)
+    // Branch that triggers auto-deploy (falls back to the source branch).
+    deployBranch        String?
+    // Only auto-deploy when the head commit message matches this (substring, or
+    // "regex:<pattern>"); empty = any commit. e.g. "build:".
+    commitFilter        String?
+    // Last git SHA deployed, for the polling fallback and change detection.
+    lastDeployedSha     String?
     createdAt           DateTime  @default(now())
     updatedAt           DateTime  @updatedAt
 

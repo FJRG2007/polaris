@@ -34,6 +34,9 @@ export default async function DeployProjectPage({ params }: { params: Promise<{ 
                 currentDeploymentId: app.currentDeploymentId,
                 targetId: app.targetId,
                 containerRef: serviceName(project.slug, app.slug, app.id),
+                autoDeploy: app.autoDeploy,
+                deployBranch: app.deployBranch,
+                commitFilter: app.commitFilter,
                 domains: app.domains.map((domain) => ({ id: domain.id, hostname: domain.hostname, kind: domain.kind }))
             })),
             databases: environment.databases.map((database) => ({

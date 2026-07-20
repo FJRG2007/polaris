@@ -15,6 +15,7 @@ import {
     ChevronRight,
     Database,
     FolderOpen,
+    GitBranch,
     Globe,
     Loader2,
     Lock,
@@ -35,6 +36,7 @@ import {
     DialogTitle,
     Input,
     Select,
+    Switch,
     type SelectOption
 } from "@polaris/ui";
 import { DockerMark, GitHubMark } from "@/components/brand-icons";
@@ -47,7 +49,8 @@ import {
     deployApplicationAction,
     deployDatabaseAction,
     githubReposAction,
-    inspectRepoAction
+    inspectRepoAction,
+    setAutoDeployAction
 } from "./actions";
 
 const DB_ENGINES = ["postgres", "mysql", "mariadb", "mongo", "redis"] as const;
@@ -76,6 +79,9 @@ export interface ProjectSummary {
             currentDeploymentId: string | null;
             targetId: string;
             containerRef: string;
+            autoDeploy: boolean;
+            deployBranch: string | null;
+            commitFilter: string | null;
             domains: { id: string; hostname: string; kind: string }[];
         }[];
         databases: { id: string; name: string; engine: string; status: string }[];
@@ -138,8 +144,10 @@ function AppCard({ app, canManage, onChanged }: { app: ProjectApp; canManage: bo
     const [showTerminal, setShowTerminal] = useState(false);
     const [showFiles, setShowFiles] = useState(false);
     const [showDomain, setShowDomain] = useState(false);
+    const [showAutoDeploy, setShowAutoDeploy] = useState(false);
     const [logsFor, setLogsFor] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const isGit = app.sourceType === "dockerfile" || app.sourceType === "nixpacks";
 
     function onDeploy() {
         setError(null);
@@ -166,6 +174,7 @@ function AppCard({ app, canManage, onChanged }: { app: ProjectApp; canManage: bo
 
             <div className="flex flex-wrap items-center gap-2">
                 <Badge>{app.sourceType === "dockerfile" ? "git" : app.sourceType}</Badge>
+                {app.autoDeploy && <Badge>auto-deploy</Badge>}
                 <MetricsBadge applicationId={app.id} />
             </div>
 
@@ -192,6 +201,11 @@ function AppCard({ app, canManage, onChanged }: { app: ProjectApp; canManage: bo
                     <Button size="sm" variant="secondary" onClick={onDeploy} disabled={busy} className="mr-auto">
                         {busy ? <Loader2 className="size-4 animate-spin" /> : <Rocket className="size-4" />} Deploy
                     </Button>
+                    {isGit && (
+                        <Button variant="ghost" size="icon" onClick={() => setShowAutoDeploy(true)} title="Auto-deploy">
+                            <GitBranch className="size-4" />
+                        </Button>
+                    )}
                     <Button variant="ghost" size="icon" onClick={() => setShowFiles(true)} title="Files">
                         <FolderOpen className="size-4" />
                     </Button>
@@ -225,6 +239,10 @@ function AppCard({ app, canManage, onChanged }: { app: ProjectApp; canManage: bo
             </Dialog>
 
             <DomainDialog app={app} open={showDomain} onOpenChange={setShowDomain} onChanged={onChanged} />
+
+            {isGit && (
+                <AutoDeployDialog app={app} open={showAutoDeploy} onOpenChange={setShowAutoDeploy} onChanged={onChanged} />
+            )}
 
             <Dialog open={logsFor !== null} onOpenChange={(open) => !open && setLogsFor(null)}>
                 <DialogContent className="max-w-3xl">
@@ -667,6 +685,81 @@ function NewDatabaseForm({ environmentId, onDone }: { environmentId: string; onD
                 </Button>
             </div>
         </div>
+    );
+}
+
+function AutoDeployDialog({
+    app,
+    open,
+    onOpenChange,
+    onChanged
+}: {
+    app: ProjectApp;
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    onChanged: () => void;
+}) {
+    const [enabled, setEnabled] = useState(app.autoDeploy);
+    const [branch, setBranch] = useState(app.deployBranch ?? "");
+    const [filter, setFilter] = useState(app.commitFilter ?? "");
+    const [error, setError] = useState<string | null>(null);
+    const [pending, startTransition] = useTransition();
+
+    function submit() {
+        setError(null);
+        startTransition(async () => {
+            const result = await setAutoDeployAction({
+                applicationId: app.id,
+                autoDeploy: enabled,
+                deployBranch: branch.trim() || undefined,
+                commitFilter: filter.trim() || undefined
+            });
+            if (result.error) setError(result.error);
+            else {
+                onOpenChange(false);
+                onChanged();
+            }
+        });
+    }
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="max-w-md">
+                <DialogHeader>
+                    <DialogTitle>Auto-deploy - {app.name}</DialogTitle>
+                </DialogHeader>
+                <div className="flex flex-col gap-4">
+                    <div className="flex items-start justify-between gap-3 rounded-md border border-border p-3 text-sm">
+                        <span>
+                            <span className="font-medium">Deploy on push</span>
+                            <span className="block text-xs text-muted-foreground">
+                                Rebuild and deploy automatically when a matching commit is pushed. Needs GitHub App
+                                webhooks reaching this instance (public domain).
+                            </span>
+                        </span>
+                        <Switch checked={enabled} onChange={setEnabled} aria-label="Deploy on push" />
+                    </div>
+                    <Field label="Branch" hint="Only this branch triggers a deploy. Blank uses the app's branch.">
+                        <Input value={branch} onChange={(event) => setBranch(event.target.value)} placeholder="main" />
+                    </Field>
+                    <Field
+                        label="Commit filter"
+                        hint='Deploy only when the commit message contains this (e.g. "build:"), or "regex:<pattern>". Blank = any commit.'
+                    >
+                        <Input value={filter} onChange={(event) => setFilter(event.target.value)} placeholder="build:" />
+                    </Field>
+                    {error && <p className="text-sm text-danger">{error}</p>}
+                    <div className="flex justify-end gap-2">
+                        <Button variant="ghost" onClick={() => onOpenChange(false)}>
+                            Cancel
+                        </Button>
+                        <Button onClick={submit} disabled={pending}>
+                            {pending && <Loader2 className="size-4 animate-spin" />} Save
+                        </Button>
+                    </div>
+                </div>
+            </DialogContent>
+        </Dialog>
     );
 }
 
