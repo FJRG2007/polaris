@@ -51,8 +51,16 @@ import {
 const DB_ENGINES = ["postgres", "mysql", "mariadb", "mongo", "redis"] as const;
 
 const SOURCE_OPTIONS: SelectOption[] = [
-    { value: "image", label: "Docker image", icon: <Container className="size-4 text-muted-foreground" /> },
-    { value: "dockerfile", label: "Git + Dockerfile", icon: <GitBranch className="size-4 text-muted-foreground" /> }
+    {
+        value: "image",
+        label: "Docker image",
+        icon: <Container className="size-4 text-muted-foreground" />
+    },
+    {
+        value: "dockerfile",
+        label: "Git + Dockerfile",
+        icon: <GitBranch className="size-4 text-muted-foreground" />
+    }
 ];
 
 const ENGINE_OPTIONS: SelectOption[] = DB_ENGINES.map((engine) => ({
@@ -100,9 +108,12 @@ export function DeployView({
             {!localReady && canManage && (
                 <Card className="border-warning/30 bg-warning/5">
                     <CardBody className="text-sm text-muted-foreground">
-                        The local host is not ready to build and deploy. This needs the full edition with a running{" "}
-                        <code className="rounded bg-muted px-1 py-0.5 text-xs text-foreground">polaris-hostd</code>.
-                        Remote servers added in the Servers view work regardless.
+                        The local host is not ready to build and deploy. This needs the full edition
+                        with a running{" "}
+                        <code className="rounded bg-muted px-1 py-0.5 text-xs text-foreground">
+                            polaris-hostd
+                        </code>
+                        . Remote servers added in the Servers view work regardless.
                     </CardBody>
                 </Card>
             )}
@@ -126,7 +137,12 @@ export function DeployView({
                 />
             ) : (
                 projects.map((project) => (
-                    <ProjectCard key={project.id} project={project} canManage={canManage} onChanged={refresh} />
+                    <ProjectCard
+                        key={project.id}
+                        project={project}
+                        canManage={canManage}
+                        onChanged={refresh}
+                    />
                 ))
             )}
         </div>
@@ -212,7 +228,9 @@ function ProjectCard({
                 {canManage &&
                     (confirmDelete ? (
                         <div className="flex items-center gap-2">
-                            <span className="text-xs text-muted-foreground">Delete project and everything in it?</span>
+                            <span className="text-xs text-muted-foreground">
+                                Delete project and everything in it?
+                            </span>
                             <Button
                                 variant="danger"
                                 size="sm"
@@ -227,12 +245,21 @@ function ProjectCard({
                             >
                                 {pending && <Loader2 className="size-4 animate-spin" />} Confirm
                             </Button>
-                            <Button variant="ghost" size="sm" onClick={() => setConfirmDelete(false)}>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setConfirmDelete(false)}
+                            >
                                 Cancel
                             </Button>
                         </div>
                     ) : (
-                        <Button variant="ghost" size="icon" onClick={() => setConfirmDelete(true)} title="Delete project">
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setConfirmDelete(true)}
+                            title="Delete project"
+                        >
                             <Trash2 className="size-4" />
                         </Button>
                     ))}
@@ -268,7 +295,9 @@ function EnvironmentSection({
                 <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                     {environment.name}
                 </span>
-                {canManage && <NewServiceButton environmentId={environment.id} onChanged={onChanged} />}
+                {canManage && (
+                    <NewServiceButton environmentId={environment.id} onChanged={onChanged} />
+                )}
             </div>
 
             {isEmpty ? (
@@ -278,10 +307,20 @@ function EnvironmentSection({
             ) : (
                 <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                     {environment.applications.map((app) => (
-                        <AppCard key={app.id} app={app} canManage={canManage} onChanged={onChanged} />
+                        <AppCard
+                            key={app.id}
+                            app={app}
+                            canManage={canManage}
+                            onChanged={onChanged}
+                        />
                     ))}
                     {environment.databases.map((database) => (
-                        <DatabaseCard key={database.id} database={database} canManage={canManage} onChanged={onChanged} />
+                        <DatabaseCard
+                            key={database.id}
+                            database={database}
+                            canManage={canManage}
+                            onChanged={onChanged}
+                        />
                     ))}
                 </div>
             )}
@@ -289,7 +328,15 @@ function EnvironmentSection({
     );
 }
 
-function AppCard({ app, canManage, onChanged }: { app: ProjectApp; canManage: boolean; onChanged: () => void }) {
+function AppCard({
+    app,
+    canManage,
+    onChanged
+}: {
+    app: ProjectApp;
+    canManage: boolean;
+    onChanged: () => void;
+}) {
     const [busy, startTransition] = useTransition();
     const [showTerminal, setShowTerminal] = useState(false);
     const [showFiles, setShowFiles] = useState(false);
@@ -345,16 +392,42 @@ function AppCard({ app, canManage, onChanged }: { app: ProjectApp; canManage: bo
 
             {canManage && (
                 <div className="mt-auto flex items-center gap-1 border-t border-border/60 pt-3">
-                    <Button size="sm" variant="secondary" onClick={onDeploy} disabled={busy} className="mr-auto">
-                        {busy ? <Loader2 className="size-4 animate-spin" /> : <Rocket className="size-4" />} Deploy
+                    <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={onDeploy}
+                        disabled={busy}
+                        className="mr-auto"
+                    >
+                        {busy ? (
+                            <Loader2 className="size-4 animate-spin" />
+                        ) : (
+                            <Rocket className="size-4" />
+                        )}{" "}
+                        Deploy
                     </Button>
-                    <Button variant="ghost" size="icon" onClick={() => setShowFiles(true)} title="Files">
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setShowFiles(true)}
+                        title="Files"
+                    >
                         <FolderOpen className="size-4" />
                     </Button>
-                    <Button variant="ghost" size="icon" onClick={() => setShowTerminal(true)} title="Terminal">
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setShowTerminal(true)}
+                        title="Terminal"
+                    >
                         <TerminalSquare className="size-4" />
                     </Button>
-                    <Button variant="ghost" size="icon" onClick={() => setShowDomain(true)} title="Domains">
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setShowDomain(true)}
+                        title="Domains"
+                    >
                         <Globe className="size-4" />
                     </Button>
                 </div>
@@ -366,7 +439,11 @@ function AppCard({ app, canManage, onChanged }: { app: ProjectApp; canManage: bo
                         <DialogTitle>Terminal - {app.name}</DialogTitle>
                     </DialogHeader>
                     {showTerminal && (
-                        <TerminalPanel targetId={app.targetId} containerRef={app.containerRef} label={app.containerRef} />
+                        <TerminalPanel
+                            targetId={app.targetId}
+                            containerRef={app.containerRef}
+                            label={app.containerRef}
+                        />
                     )}
                 </DialogContent>
             </Dialog>
@@ -380,7 +457,12 @@ function AppCard({ app, canManage, onChanged }: { app: ProjectApp; canManage: bo
                 </DialogContent>
             </Dialog>
 
-            <DomainDialog app={app} open={showDomain} onOpenChange={setShowDomain} onChanged={onChanged} />
+            <DomainDialog
+                app={app}
+                open={showDomain}
+                onOpenChange={setShowDomain}
+                onChanged={onChanged}
+            />
 
             <Dialog open={logsFor !== null} onOpenChange={(open) => !open && setLogsFor(null)}>
                 <DialogContent className="max-w-3xl">
@@ -432,7 +514,12 @@ function DatabaseCard({
                             })
                         }
                     >
-                        {pending ? <Loader2 className="size-4 animate-spin" /> : <Rocket className="size-4" />} Provision
+                        {pending ? (
+                            <Loader2 className="size-4 animate-spin" />
+                        ) : (
+                            <Rocket className="size-4" />
+                        )}{" "}
+                        Provision
                     </Button>
                 </div>
             )}
@@ -440,7 +527,13 @@ function DatabaseCard({
     );
 }
 
-function NewServiceButton({ environmentId, onChanged }: { environmentId: string; onChanged: () => void }) {
+function NewServiceButton({
+    environmentId,
+    onChanged
+}: {
+    environmentId: string;
+    onChanged: () => void;
+}) {
     const [open, setOpen] = useState(false);
     const [kind, setKind] = useState<"app" | "database">("app");
 
@@ -459,7 +552,10 @@ function NewServiceButton({ environmentId, onChanged }: { environmentId: string;
                             <SegmentButton active={kind === "app"} onClick={() => setKind("app")}>
                                 <Rocket className="size-4" /> Application
                             </SegmentButton>
-                            <SegmentButton active={kind === "database"} onClick={() => setKind("database")}>
+                            <SegmentButton
+                                active={kind === "database"}
+                                onClick={() => setKind("database")}
+                            >
                                 <Database className="size-4" /> Database
                             </SegmentButton>
                         </div>
@@ -515,7 +611,12 @@ function NewAppForm({ environmentId, onDone }: { environmentId: string; onDone: 
     return (
         <div className="flex flex-col gap-3">
             <Field label="Name">
-                <Input value={name} onChange={(event) => setName(event.target.value)} placeholder="my-app" autoFocus />
+                <Input
+                    value={name}
+                    onChange={(event) => setName(event.target.value)}
+                    placeholder="my-app"
+                    autoFocus
+                />
             </Field>
             <Field label="Source">
                 <Select
@@ -569,7 +670,12 @@ function NewDatabaseForm({ environmentId, onDone }: { environmentId: string; onD
     return (
         <div className="flex flex-col gap-3">
             <Field label="Name">
-                <Input value={name} onChange={(event) => setName(event.target.value)} placeholder="my-db" autoFocus />
+                <Input
+                    value={name}
+                    onChange={(event) => setName(event.target.value)}
+                    placeholder="my-db"
+                    autoFocus
+                />
             </Field>
             <Field label="Engine">
                 <Select
@@ -651,7 +757,12 @@ function DomainDialog({
                         />
                     </Field>
                     <Field label="Target port">
-                        <Input value={port} onChange={(event) => setPort(event.target.value)} placeholder="80" className="w-28" />
+                        <Input
+                            value={port}
+                            onChange={(event) => setPort(event.target.value)}
+                            placeholder="80"
+                            className="w-28"
+                        />
                     </Field>
                     {error && <p className="text-sm text-danger">{error}</p>}
                     <div className="flex justify-end">
@@ -675,13 +786,23 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
     );
 }
 
-function SegmentButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {
+function SegmentButton({
+    active,
+    onClick,
+    children
+}: {
+    active: boolean;
+    onClick: () => void;
+    children: ReactNode;
+}) {
     return (
         <button
             type="button"
             onClick={onClick}
             className={`flex items-center justify-center gap-2 rounded px-3 py-1.5 text-sm font-medium transition-colors ${
-                active ? "bg-surface text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                active
+                    ? "bg-surface text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
             }`}
         >
             {children}
@@ -689,7 +810,13 @@ function SegmentButton({ active, onClick, children }: { active: boolean; onClick
     );
 }
 
-function StatusPill({ tone, label }: { tone: "success" | "warning" | "danger" | "idle"; label: string }) {
+function StatusPill({
+    tone,
+    label
+}: {
+    tone: "success" | "warning" | "danger" | "idle";
+    label: string;
+}) {
     const dot = {
         success: "bg-success",
         warning: "bg-warning",
@@ -708,15 +835,26 @@ function dbTone(status: string): "success" | "warning" | "danger" | "idle" {
     const value = status.toLowerCase();
     if (["running", "active", "healthy", "ready"].includes(value)) return "success";
     if (["failed", "error", "stopped"].includes(value)) return "danger";
-    if (["queued", "provisioning", "deploying", "pending", "building"].includes(value)) return "warning";
+    if (["queued", "provisioning", "deploying", "pending", "building"].includes(value))
+        return "warning";
     return "idle";
 }
 
-function EmptyState({ icon, title, description }: { icon: ReactNode; title: string; description: string }) {
+function EmptyState({
+    icon,
+    title,
+    description
+}: {
+    icon: ReactNode;
+    title: string;
+    description: string;
+}) {
     return (
         <Card>
             <CardBody className="flex flex-col items-center gap-2 py-12 text-center">
-                <div className="flex size-12 items-center justify-center rounded-full bg-muted">{icon}</div>
+                <div className="flex size-12 items-center justify-center rounded-full bg-muted">
+                    {icon}
+                </div>
                 <h3 className="text-sm font-medium">{title}</h3>
                 <p className="max-w-sm text-sm text-muted-foreground">{description}</p>
             </CardBody>
@@ -734,7 +872,9 @@ function DeploymentLogs({ deploymentId, onDone }: { deploymentId: string; onDone
         let timer: ReturnType<typeof setTimeout>;
 
         async function poll(): Promise<void> {
-            const res = await fetch(`/api/deploy/deployments/${deploymentId}/log`, { cache: "no-store" });
+            const res = await fetch(`/api/deploy/deployments/${deploymentId}/log`, {
+                cache: "no-store"
+            });
             if (!active) return;
             if (res.ok) {
                 const data = (await res.json()) as { status: string; log: string };
@@ -779,13 +919,23 @@ function MetricsBadge({ applicationId }: { applicationId: string }) {
         let active = true;
         void fetch(`/api/deploy/apps/${applicationId}/metrics`, { cache: "no-store" })
             .then((res) => (res.ok ? res.json() : null))
-            .then((data: { state?: string; cpuPercent?: number | null; memPercent?: number | null } | null) => {
-                if (!active || !data?.state) return;
-                const parts = [data.state];
-                if (typeof data.cpuPercent === "number") parts.push(`${data.cpuPercent.toFixed(0)}% cpu`);
-                if (typeof data.memPercent === "number") parts.push(`${data.memPercent.toFixed(0)}% mem`);
-                setText(parts.join(" · "));
-            })
+            .then(
+                (
+                    data: {
+                        state?: string;
+                        cpuPercent?: number | null;
+                        memPercent?: number | null;
+                    } | null
+                ) => {
+                    if (!active || !data?.state) return;
+                    const parts = [data.state];
+                    if (typeof data.cpuPercent === "number")
+                        parts.push(`${data.cpuPercent.toFixed(0)}% cpu`);
+                    if (typeof data.memPercent === "number")
+                        parts.push(`${data.memPercent.toFixed(0)}% mem`);
+                    setText(parts.join(" · "));
+                }
+            )
             .catch(() => undefined);
         return () => {
             active = false;

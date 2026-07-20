@@ -67,7 +67,11 @@ export function GroupsAdmin({ groups, users }: { groups: GroupRow[]; users: User
                 </CardHeader>
                 <CardBody>
                     <form onSubmit={onCreate} className="flex flex-col gap-3">
-                        <Input placeholder="Group name" value={name} onChange={(event) => setName(event.target.value)} />
+                        <Input
+                            placeholder="Group name"
+                            value={name}
+                            onChange={(event) => setName(event.target.value)}
+                        />
                         <Input
                             placeholder="Description (optional)"
                             value={description}
@@ -84,11 +88,19 @@ export function GroupsAdmin({ groups, users }: { groups: GroupRow[]; users: User
             <div className="flex flex-col gap-3 lg:col-span-2">
                 {groups.length === 0 ? (
                     <Card>
-                        <CardBody className="p-8 text-center text-sm text-muted-foreground">No groups yet.</CardBody>
+                        <CardBody className="p-8 text-center text-sm text-muted-foreground">
+                            No groups yet.
+                        </CardBody>
                     </Card>
                 ) : (
                     groups.map((group) => (
-                        <GroupCard key={group.id} group={group} users={users} onMutate={mutate} disabled={pending} />
+                        <GroupCard
+                            key={group.id}
+                            group={group}
+                            users={users}
+                            onMutate={mutate}
+                            disabled={pending}
+                        />
                     ))
                 )}
             </div>
@@ -121,7 +133,9 @@ function GroupCard({
                             {group.isSystem ? <Badge>system</Badge> : null}
                         </CardTitle>
                         {group.description ? (
-                            <p className="mt-1 text-xs text-muted-foreground">{group.description}</p>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                                {group.description}
+                            </p>
                         ) : null}
                     </div>
                     {!group.isSystem ? (
@@ -150,7 +164,11 @@ function GroupCard({
                                         type="button"
                                         aria-label={`Remove ${member.name}`}
                                         disabled={disabled}
-                                        onClick={() => onMutate(() => removeGroupMemberAction(group.id, member.id))}
+                                        onClick={() =>
+                                            onMutate(() =>
+                                                removeGroupMemberAction(group.id, member.id)
+                                            )
+                                        }
                                         className="text-muted-foreground hover:text-foreground"
                                     >
                                         <X className="size-3" />

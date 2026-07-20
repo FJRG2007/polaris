@@ -107,7 +107,10 @@ export function HostDialog() {
                         <Select
                             value={authMethod}
                             onValueChange={(value) => setAuthMethod(value as SshAuthMethod)}
-                            options={SSH_AUTH_METHODS.map((value) => ({ value, label: AUTH_LABELS[value] }))}
+                            options={SSH_AUTH_METHODS.map((value) => ({
+                                value,
+                                label: AUTH_LABELS[value]
+                            }))}
                         />
                     </label>
 

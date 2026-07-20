@@ -11,7 +11,17 @@
 
 import { useState, type FormEvent } from "react";
 import { Check, Copy, Inbox } from "lucide-react";
-import { Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Input, Select, cn } from "@polaris/ui";
+import {
+    Button,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    Input,
+    Select,
+    cn
+} from "@polaris/ui";
 import { GeoPicker } from "@/components/geo-picker";
 import { ExpirySelect } from "@/components/expiry-select";
 import { FILE_CATEGORIES, categoryDef, type FileCategory } from "./file-categories";
@@ -63,7 +73,8 @@ export function RequestDialog({
 
     // Picker mode: opened from the Drop points page with no fixed folder, so the
     // user chooses which connection and folder to collect into.
-    const needsPicker = target !== null && target.connectionId === "" && (connections?.length ?? 0) > 0;
+    const needsPicker =
+        target !== null && target.connectionId === "" && (connections?.length ?? 0) > 0;
 
     function handleOpenChange(next: boolean) {
         if (next) {
@@ -114,7 +125,9 @@ export function RequestDialog({
         const maxMb = Number(form.get("maxMb") ?? 0);
 
         const destinationConnectionId = needsPicker ? pickConnection : target.connectionId;
-        const destinationPath = needsPicker ? pickPath.trim().replace(/^\/+|\/+$/g, "") : target.path;
+        const destinationPath = needsPicker
+            ? pickPath.trim().replace(/^\/+|\/+$/g, "")
+            : target.path;
         if (!destinationConnectionId) {
             setPending(false);
             setError("Choose a connection to collect into");
@@ -171,7 +184,11 @@ export function RequestDialog({
                         <div className="flex items-center gap-2">
                             <Input readOnly value={url} className="font-mono text-xs" />
                             <Button type="button" size="icon" variant="secondary" onClick={onCopy}>
-                                {copied ? <Check className="size-4 text-success" /> : <Copy className="size-4" />}
+                                {copied ? (
+                                    <Check className="size-4 text-success" />
+                                ) : (
+                                    <Copy className="size-4" />
+                                )}
                             </Button>
                         </div>
                         <div className="flex justify-end">
@@ -216,7 +233,8 @@ export function RequestDialog({
                                 autoComplete="off"
                             />
                             <span className="text-xs text-muted-foreground">
-                                Uploads collect in a folder named after this drop point, under &quot;Drop Points&quot;.
+                                Uploads collect in a folder named after this drop point, under
+                                &quot;Drop Points&quot;.
                             </span>
                         </label>
                         <label className="flex flex-col gap-1 text-sm">
@@ -266,7 +284,13 @@ export function RequestDialog({
                         <div className="grid grid-cols-2 gap-3">
                             <label className="flex flex-col gap-1 text-sm">
                                 Max size (MB)
-                                <Input name="maxMb" type="number" min="1" defaultValue={initial?.maxMb} placeholder="1024" />
+                                <Input
+                                    name="maxMb"
+                                    type="number"
+                                    min="1"
+                                    defaultValue={initial?.maxMb}
+                                    placeholder="1024"
+                                />
                             </label>
                             <label className="flex flex-col gap-1 text-sm">
                                 Max files
@@ -304,7 +328,12 @@ export function RequestDialog({
                         </div>
                         <label className="flex flex-col gap-1 text-sm">
                             Access PIN (optional)
-                            <Input name="password" type="password" placeholder="No PIN" autoComplete="off" />
+                            <Input
+                                name="password"
+                                type="password"
+                                placeholder="No PIN"
+                                autoComplete="off"
+                            />
                         </label>
                         <label className="flex items-center gap-2 text-sm">
                             <input

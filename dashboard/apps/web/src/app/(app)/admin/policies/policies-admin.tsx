@@ -41,7 +41,11 @@ export interface PolicyRow {
 const TEMPLATE = JSON.stringify(
     {
         statements: [
-            { effect: "allow", actions: ["drive.read", "drive.download"], resources: ["drive:CONNECTION_ID:*"] }
+            {
+                effect: "allow",
+                actions: ["drive.read", "drive.download"],
+                resources: ["drive:CONNECTION_ID:*"]
+            }
         ]
     },
     null,
@@ -51,11 +55,15 @@ const TEMPLATE = JSON.stringify(
 /** One-line summary of a document's statements, tolerant of malformed JSON. */
 function summarize(document: string): string {
     try {
-        const parsed = JSON.parse(document) as { statements?: { effect?: string; actions?: string[] }[] };
+        const parsed = JSON.parse(document) as {
+            statements?: { effect?: string; actions?: string[] }[];
+        };
         const statements = parsed.statements ?? [];
         if (statements.length === 0) return "No statements";
         return statements
-            .map((statement) => `${statement.effect ?? "?"}: ${(statement.actions ?? []).join(", ")}`)
+            .map(
+                (statement) => `${statement.effect ?? "?"}: ${(statement.actions ?? []).join(", ")}`
+            )
             .join("  -  ");
     } catch {
         return "Invalid document";
@@ -106,7 +114,11 @@ export function PoliciesAdmin({
                 </CardHeader>
                 <CardBody className="flex flex-col gap-3">
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                        <Input placeholder="Policy name" value={name} onChange={(event) => setName(event.target.value)} />
+                        <Input
+                            placeholder="Policy name"
+                            value={name}
+                            onChange={(event) => setName(event.target.value)}
+                        />
                         <Input
                             placeholder="Description (optional)"
                             value={description}
@@ -120,8 +132,9 @@ export function PoliciesAdmin({
                         spellCheck={false}
                     />
                     <p className="text-xs text-muted-foreground">
-                        Actions are capability keys (e.g. <code>drive.read</code>) or Drive verbs; resources are{" "}
-                        <code>drive:CONNECTION_ID:PATH</code> or <code>*</code>. An explicit deny always wins.
+                        Actions are capability keys (e.g. <code>drive.read</code>) or Drive verbs;
+                        resources are <code>drive:CONNECTION_ID:PATH</code> or <code>*</code>. An
+                        explicit deny always wins.
                     </p>
                     {error ? <p className="text-sm text-danger">{error}</p> : null}
                     <div>
@@ -135,7 +148,9 @@ export function PoliciesAdmin({
 
             {policies.length === 0 ? (
                 <Card>
-                    <CardBody className="p-8 text-center text-sm text-muted-foreground">No policies yet.</CardBody>
+                    <CardBody className="p-8 text-center text-sm text-muted-foreground">
+                        No policies yet.
+                    </CardBody>
                 </Card>
             ) : (
                 policies.map((policy) => (
@@ -182,7 +197,12 @@ function PolicyCard({
     }
     function onMutateSave() {
         onMutate(async () => {
-            const result = await updatePolicyAction(policy.id, name.trim(), description.trim(), document);
+            const result = await updatePolicyAction(
+                policy.id,
+                name.trim(),
+                description.trim(),
+                document
+            );
             if (result.error) setError(result.error);
         });
     }
@@ -190,7 +210,9 @@ function PolicyCard({
     function onAttach() {
         if (!attach) return;
         const [type, id] = attach.split(":");
-        onMutate(() => attachPolicyAction(policy.id, type as PrincipalOption["type"], id as string));
+        onMutate(() =>
+            attachPolicyAction(policy.id, type as PrincipalOption["type"], id as string)
+        );
         setAttach("");
     }
 
@@ -203,11 +225,20 @@ function PolicyCard({
                             {policy.name}
                             {policy.isSystem ? <Badge>system</Badge> : null}
                         </CardTitle>
-                        <p className="mt-1 truncate text-xs text-muted-foreground">{summarize(policy.document)}</p>
+                        <p className="mt-1 truncate text-xs text-muted-foreground">
+                            {summarize(policy.document)}
+                        </p>
                     </div>
                     <div className="flex items-center gap-1">
-                        <Button size="icon" variant="ghost" aria-label="Toggle details" onClick={() => setOpen((value) => !value)}>
-                            <ChevronDown className={`size-4 transition-transform ${open ? "rotate-180" : ""}`} />
+                        <Button
+                            size="icon"
+                            variant="ghost"
+                            aria-label="Toggle details"
+                            onClick={() => setOpen((value) => !value)}
+                        >
+                            <ChevronDown
+                                className={`size-4 transition-transform ${open ? "rotate-180" : ""}`}
+                            />
                         </Button>
                         {!policy.isSystem ? (
                             <Button
@@ -241,7 +272,11 @@ function PolicyCard({
                                     disabled={disabled}
                                     onClick={() =>
                                         onMutate(() =>
-                                            detachPolicyAction(policy.id, attachment.principalType, attachment.principalId)
+                                            detachPolicyAction(
+                                                policy.id,
+                                                attachment.principalType,
+                                                attachment.principalId
+                                            )
                                         )
                                     }
                                     className="text-muted-foreground hover:text-foreground"
@@ -263,7 +298,12 @@ function PolicyCard({
                             label: principal.label
                         }))}
                     />
-                    <Button size="sm" variant="ghost" disabled={disabled || !attach} onClick={onAttach}>
+                    <Button
+                        size="sm"
+                        variant="ghost"
+                        disabled={disabled || !attach}
+                        onClick={onAttach}
+                    >
                         <Plus className="size-4" />
                         Attach
                     </Button>
@@ -274,7 +314,10 @@ function PolicyCard({
                         {!policy.isSystem ? (
                             <>
                                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                                    <Input value={name} onChange={(event) => setName(event.target.value)} />
+                                    <Input
+                                        value={name}
+                                        onChange={(event) => setName(event.target.value)}
+                                    />
                                     <Input
                                         placeholder="Description"
                                         value={description}

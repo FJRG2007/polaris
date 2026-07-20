@@ -54,7 +54,10 @@ export function DockerConnectionDialog({ sshEnabled }: { sshEnabled: boolean }) 
         let config: Record<string, unknown>;
         let credentials: Record<string, unknown>;
         if (transport === "socket") {
-            config = { transport: "socket", socketPath: str("socketPath") ?? "/var/run/docker.sock" };
+            config = {
+                transport: "socket",
+                socketPath: str("socketPath") ?? "/var/run/docker.sock"
+            };
             credentials = { transport: "socket" };
         } else if (transport === "ssh") {
             config = {
@@ -66,9 +69,18 @@ export function DockerConnectionDialog({ sshEnabled }: { sshEnabled: boolean }) 
             };
             credentials = useInstallKey
                 ? { transport: "ssh" }
-                : { transport: "ssh", privateKey: str("privateKey"), passphrase: str("passphrase") };
+                : {
+                      transport: "ssh",
+                      privateKey: str("privateKey"),
+                      passphrase: str("passphrase")
+                  };
         } else {
-            config = { transport: "tcp", host: str("host"), port: Number(str("port") ?? 2375), tls };
+            config = {
+                transport: "tcp",
+                host: str("host"),
+                port: Number(str("port") ?? 2375),
+                tls
+            };
             credentials = tls
                 ? { transport: "tcp", ca: str("ca"), cert: str("cert"), key: str("key") }
                 : { transport: "tcp" };
@@ -95,7 +107,9 @@ export function DockerConnectionDialog({ sshEnabled }: { sshEnabled: boolean }) 
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>Add a Docker host</DialogTitle>
-                    <DialogDescription>Monitor and manage containers on this host.</DialogDescription>
+                    <DialogDescription>
+                        Monitor and manage containers on this host.
+                    </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={onSubmit} className="flex flex-col gap-3">
                     <label className="flex flex-col gap-1 text-sm">
@@ -103,7 +117,10 @@ export function DockerConnectionDialog({ sshEnabled }: { sshEnabled: boolean }) 
                         <Select
                             value={transport}
                             onValueChange={(value) => setTransport(value as DockerTransport)}
-                            options={DOCKER_TRANSPORTS.map((value) => ({ value, label: TRANSPORT_LABELS[value] }))}
+                            options={DOCKER_TRANSPORTS.map((value) => ({
+                                value,
+                                label: TRANSPORT_LABELS[value]
+                            }))}
                         />
                     </label>
                     <label className="flex flex-col gap-1 text-sm">
@@ -148,7 +165,11 @@ export function DockerConnectionDialog({ sshEnabled }: { sshEnabled: boolean }) 
                                 <>
                                     <label className="flex flex-col gap-1 text-sm">
                                         Private key (PEM)
-                                        <textarea name="privateKey" rows={4} className="rounded-md border border-input bg-surface px-3 py-1 text-sm" />
+                                        <textarea
+                                            name="privateKey"
+                                            rows={4}
+                                            className="rounded-md border border-input bg-surface px-3 py-1 text-sm"
+                                        />
                                     </label>
                                     <label className="flex flex-col gap-1 text-sm">
                                         Key passphrase (optional)
@@ -172,22 +193,39 @@ export function DockerConnectionDialog({ sshEnabled }: { sshEnabled: boolean }) 
                                 </label>
                             </div>
                             <label className="flex items-center gap-2 text-sm">
-                                <input type="checkbox" className="size-4" checked={tls} onChange={(event) => setTls(event.target.checked)} />
+                                <input
+                                    type="checkbox"
+                                    className="size-4"
+                                    checked={tls}
+                                    onChange={(event) => setTls(event.target.checked)}
+                                />
                                 Use TLS
                             </label>
                             {tls ? (
                                 <>
                                     <label className="flex flex-col gap-1 text-sm">
                                         CA certificate
-                                        <textarea name="ca" rows={3} className="rounded-md border border-input bg-surface px-3 py-1 text-sm" />
+                                        <textarea
+                                            name="ca"
+                                            rows={3}
+                                            className="rounded-md border border-input bg-surface px-3 py-1 text-sm"
+                                        />
                                     </label>
                                     <label className="flex flex-col gap-1 text-sm">
                                         Client certificate
-                                        <textarea name="cert" rows={3} className="rounded-md border border-input bg-surface px-3 py-1 text-sm" />
+                                        <textarea
+                                            name="cert"
+                                            rows={3}
+                                            className="rounded-md border border-input bg-surface px-3 py-1 text-sm"
+                                        />
                                     </label>
                                     <label className="flex flex-col gap-1 text-sm">
                                         Client key
-                                        <textarea name="key" rows={3} className="rounded-md border border-input bg-surface px-3 py-1 text-sm" />
+                                        <textarea
+                                            name="key"
+                                            rows={3}
+                                            className="rounded-md border border-input bg-surface px-3 py-1 text-sm"
+                                        />
                                     </label>
                                 </>
                             ) : null}

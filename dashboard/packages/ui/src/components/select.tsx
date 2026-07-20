@@ -62,7 +62,9 @@ export const SelectContent = forwardRef<
             )}
             {...props}
         >
-            <RadixSelect.Viewport className="max-h-72 overflow-y-auto p-1">{children}</RadixSelect.Viewport>
+            <RadixSelect.Viewport className="max-h-72 overflow-y-auto p-1">
+                {children}
+            </RadixSelect.Viewport>
         </RadixSelect.Content>
     </RadixSelect.Portal>
 ));
@@ -72,7 +74,11 @@ export const SelectLabel = forwardRef<
     ElementRef<typeof RadixSelect.Label>,
     ComponentPropsWithoutRef<typeof RadixSelect.Label>
 >(({ className, ...props }, ref) => (
-    <RadixSelect.Label ref={ref} className={cn("px-2 py-1.5 text-xs font-medium text-muted-foreground", className)} {...props} />
+    <RadixSelect.Label
+        ref={ref}
+        className={cn("px-2 py-1.5 text-xs font-medium text-muted-foreground", className)}
+        {...props}
+    />
 ));
 SelectLabel.displayName = "SelectLabel";
 
@@ -100,7 +106,11 @@ export const SelectSeparator = forwardRef<
     ElementRef<typeof RadixSelect.Separator>,
     ComponentPropsWithoutRef<typeof RadixSelect.Separator>
 >(({ className, ...props }, ref) => (
-    <RadixSelect.Separator ref={ref} className={cn("-mx-1 my-1 h-px bg-border", className)} {...props} />
+    <RadixSelect.Separator
+        ref={ref}
+        className={cn("-mx-1 my-1 h-px bg-border", className)}
+        {...props}
+    />
 ));
 SelectSeparator.displayName = "SelectSeparator";
 
@@ -146,7 +156,12 @@ export function Select({
     const selected = options.find((option) => option.value === value);
 
     return (
-        <RadixSelect.Root value={value} onValueChange={onValueChange} disabled={disabled} name={name}>
+        <RadixSelect.Root
+            value={value}
+            onValueChange={onValueChange}
+            disabled={disabled}
+            name={name}
+        >
             <SelectTrigger id={id} aria-label={ariaLabel} className={className}>
                 <RadixSelect.Value placeholder={placeholder}>
                     {selected && (
