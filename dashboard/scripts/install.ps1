@@ -45,24 +45,90 @@ function Invoke-PolarisInstall {
     }
 
     # New-Secret: cryptographically random bytes, base64 or hex encoded.
+    # Uses RandomNumberGenerator.Create().GetBytes(): the static Fill() overload
+    # only exists on .NET Core, so under Windows PowerShell 5.1 (.NET Framework) it
+    # throws a non-terminating error and would silently leave the buffer all-zero -
+    # a predictable master key. The instance GetBytes() works on both runtimes.
     function New-Secret {
         param([int]$Bytes = 32, [switch]$Hex)
         $buffer = New-Object 'System.Byte[]' $Bytes
-        [System.Security.Cryptography.RandomNumberGenerator]::Fill($buffer)
+        $rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+        try { $rng.GetBytes($buffer) } finally { $rng.Dispose() }
         if ($Hex) {
             return -join ($buffer | ForEach-Object { $_.ToString("x2") })
         }
         return [System.Convert]::ToBase64String($buffer)
     }
 
-    # Turn a known secret placeholder into a fresh value, or pass it through.
+    # Durable store for generated secrets, kept outside .env so a deleted or
+    # regenerated .env reuses the same POLARIS_MASTER_KEY instead of minting a new
+    # one that would orphan already-encrypted credentials in the persistent
+    # database. Override the location with POLARIS_SECRETS_FILE.
+    if ($env:POLARIS_SECRETS_FILE) {
+        $script:SecretsStore = $env:POLARIS_SECRETS_FILE
+    }
+    else {
+        $script:SecretsStore = Join-Path $HOME ".polaris/secrets.env"
+    }
+
+    # Read a remembered secret's value for a key (empty string if none).
+    function Get-StoredSecret {
+        param([string]$Key)
+        if (-not (Test-Path $script:SecretsStore)) { return "" }
+        foreach ($line in (Get-Content $script:SecretsStore)) {
+            if ($line -match "^$([regex]::Escape($Key))=(.*)$") { return $Matches[1] }
+        }
+        return ""
+    }
+
+    # Persist Key=Value in the store, replacing any prior line for that key.
+    function Set-StoredSecret {
+        param([string]$Key, [string]$Value)
+        $dir = Split-Path -Parent $script:SecretsStore
+        if ($dir -and -not (Test-Path $dir)) { New-Item -ItemType Directory -Force -Path $dir | Out-Null }
+        $lines = @()
+        if (Test-Path $script:SecretsStore) {
+            $lines = @(Get-Content $script:SecretsStore | Where-Object { $_ -notmatch "^$([regex]::Escape($Key))=" })
+        }
+        $lines += "$Key=$Value"
+        [System.IO.File]::WriteAllText($script:SecretsStore, (($lines -join "`n") + "`n"))
+    }
+
+    # Reuse a remembered secret for Key, or generate one and remember it. This is
+    # what makes a regenerated .env recover the SAME master key.
+    function Get-DurableSecret {
+        param([string]$Key, [int]$Bytes, [switch]$Hex)
+        $existing = Get-StoredSecret $Key
+        if ($existing) { return $existing }
+        if ($Hex) { $value = New-Secret -Bytes $Bytes -Hex } else { $value = New-Secret -Bytes $Bytes }
+        Set-StoredSecret $Key $value
+        return $value
+    }
+
+    # First run of this hardened installer: capture the CURRENT durable secrets
+    # from an existing .env so a later .env loss recovers them. Never overwrites a
+    # value already in the store, and ignores unresolved REPLACE_ME placeholders.
+    function Import-EnvSecretsToStore {
+        foreach ($key in @("POLARIS_MASTER_KEY", "POLARIS_AUTH_SECRET", "POSTGRES_PASSWORD")) {
+            if (Get-StoredSecret $key) { continue }
+            $cur = ""
+            foreach ($line in (Get-Content ".env")) {
+                if ($line -match "^$([regex]::Escape($key))=(.*)$") { $cur = $Matches[1]; break }
+            }
+            if (-not $cur -or $cur -like "REPLACE_ME_*") { continue }
+            Set-StoredSecret $key $cur
+        }
+    }
+
+    # Turn a known secret placeholder into a value, or pass it through. Durable
+    # secrets are reused from the store; Key is the .env key being filled.
     function Get-Materialized {
-        param($Value)
+        param([string]$Key, $Value)
         switch ($Value) {
-            "REPLACE_ME_openssl_rand_base64_32" { return (New-Secret -Bytes 32) }
-            "REPLACE_ME_long_random_string" { return (New-Secret -Bytes 48) }
+            "REPLACE_ME_openssl_rand_base64_32" { return (Get-DurableSecret -Key $Key -Bytes 32) }
+            "REPLACE_ME_long_random_string" { return (Get-DurableSecret -Key $Key -Bytes 48) }
+            "REPLACE_ME_strong_password" { return (Get-DurableSecret -Key $Key -Bytes 24 -Hex) }
             "REPLACE_ME_setup_token" { return (New-Secret -Bytes 24 -Hex) }
-            "REPLACE_ME_strong_password" { return (New-Secret -Bytes 24 -Hex) }
             default { return $Value }
         }
     }
@@ -80,7 +146,7 @@ function Invoke-PolarisInstall {
             if ($line -notmatch "^([^=]+)=(.*)$") { continue }
             $key = $Matches[1]
             if (-not $present.ContainsKey($key)) {
-                $value = Get-Materialized $Matches[2]
+                $value = Get-Materialized $key $Matches[2]
                 Add-Content -Path ".env" -Value "$key=$value"
                 $added += $key
             }
@@ -131,9 +197,12 @@ function Invoke-PolarisInstall {
     try {
         if (-not (Test-Path ".env")) {
             Write-Log "generating .env with fresh secrets"
-            $masterKey = New-Secret -Bytes 32
-            $authSecret = New-Secret -Bytes 48
-            $pgPassword = New-Secret -Bytes 24 -Hex
+            # Durable across installs (reused from the secrets store), so a
+            # regenerated .env keeps decrypting existing data. The setup token is
+            # ephemeral (inert once an administrator exists).
+            $masterKey = Get-DurableSecret -Key "POLARIS_MASTER_KEY" -Bytes 32
+            $authSecret = Get-DurableSecret -Key "POLARIS_AUTH_SECRET" -Bytes 48
+            $pgPassword = Get-DurableSecret -Key "POSTGRES_PASSWORD" -Bytes 24 -Hex
             $setupToken = New-Secret -Bytes 24 -Hex
 
             $content = Get-Content ".env.example" -Raw
@@ -147,6 +216,9 @@ function Invoke-PolarisInstall {
         }
         else {
             Write-Log ".env present; reconciling any new settings"
+            # Capture this host's current durable secrets before touching
+            # anything, so its master key survives a future .env loss.
+            Import-EnvSecretsToStore
             Sync-Env
         }
 

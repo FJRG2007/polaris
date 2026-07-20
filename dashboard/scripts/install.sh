@@ -26,6 +26,74 @@ INSTALL_DIR="${POLARIS_INSTALL_DIR:-$HOME/polaris}"
 log() { printf 'polaris: %s\n' "$1"; }
 err() { printf 'polaris: %s\n' "$1" >&2; }
 
+# Durable store for generated deployment secrets. The database lives in a
+# persistent Docker volume, but POLARIS_MASTER_KEY (which envelope-encrypts stored
+# credentials) lived only in .env - so a deleted or regenerated .env would mint a
+# NEW key and orphan every already-encrypted credential in that surviving volume.
+# This store keeps those secrets outside .env so they are REUSED across installs:
+# only genuinely-new secrets are generated, existing ones are never changed.
+# Override the location with POLARIS_SECRETS_FILE.
+SECRETS_STORE="${POLARIS_SECRETS_FILE:-$HOME/.polaris/secrets.env}"
+
+# Echo a remembered secret's value for KEY (empty if the store has none).
+recall_secret() {
+    [ -f "$SECRETS_STORE" ] || return 0
+    sed -n "s/^$1=//p" "$SECRETS_STORE" | head -n1
+}
+
+# Persist KEY=VALUE in the store (created 0600), replacing any prior line for KEY.
+remember_secret() {
+    key="$1"
+    value="$2"
+    dir=$(dirname -- "$SECRETS_STORE")
+    [ -d "$dir" ] || mkdir -p "$dir"
+    [ -f "$SECRETS_STORE" ] || : > "$SECRETS_STORE"
+    chmod 600 "$SECRETS_STORE" 2>/dev/null || true
+    tmp=$(mktemp)
+    grep -v "^${key}=" "$SECRETS_STORE" 2>/dev/null > "$tmp" || true
+    printf '%s=%s\n' "$key" "$value" >> "$tmp"
+    cat "$tmp" > "$SECRETS_STORE"
+    rm -f "$tmp"
+}
+
+# Generate a random secret of the requested kind.
+gen_secret() {
+    case "$1" in
+        b64_32) openssl rand -base64 32 ;;
+        b64_48) openssl rand -base64 48 ;;
+        hex_24) openssl rand -hex 24 ;;
+    esac
+}
+
+# Return a durable secret for KEY: reuse the remembered value if present,
+# otherwise generate one of KIND and remember it. This is what makes a
+# regenerated .env recover the SAME master key instead of a fresh one.
+durable_secret() {
+    key="$1"
+    existing=$(recall_secret "$key")
+    if [ -n "$existing" ]; then
+        printf '%s' "$existing"
+        return 0
+    fi
+    value=$(gen_secret "$2")
+    remember_secret "$key" "$value"
+    printf '%s' "$value"
+}
+
+# Seed the durable store from an existing .env: the first run of this hardened
+# installer captures the CURRENT master key (and other durable secrets) so a
+# later .env loss recovers them instead of minting new ones. Never overwrites a
+# value already in the store.
+seed_store_from_env() {
+    target="$1"
+    for key in POLARIS_MASTER_KEY POLARIS_AUTH_SECRET POSTGRES_PASSWORD; do
+        [ -n "$(recall_secret "$key")" ] && continue
+        cur=$(sed -n "s/^${key}=//p" "$target" | head -n1)
+        case "$cur" in "" | REPLACE_ME_*) continue ;; esac
+        remember_secret "$key" "$cur"
+    done
+}
+
 need() {
     if ! command -v "$1" >/dev/null 2>&1; then
         err "required command not found: $1"
@@ -98,9 +166,12 @@ install_cli() {
 generate_env() {
     example="$1"
     target="$2"
-    master_key=$(openssl rand -base64 32)
-    auth_secret=$(openssl rand -base64 48)
-    pg_password=$(openssl rand -hex 24)
+    # Durable across installs, so a regenerated .env keeps decrypting existing
+    # data and keeps the DB password stable. The setup token is intentionally
+    # ephemeral (it is inert once an administrator exists).
+    master_key=$(durable_secret POLARIS_MASTER_KEY b64_32)
+    auth_secret=$(durable_secret POLARIS_AUTH_SECRET b64_48)
+    pg_password=$(durable_secret POSTGRES_PASSWORD hex_24)
     setup_token=$(openssl rand -hex 24)
 
     sed \
@@ -113,15 +184,19 @@ generate_env() {
     chmod 600 "$target"
 }
 
-# Substitute a known secret placeholder with a freshly generated value, or echo
-# the value unchanged. Keeps updates hands-off: new secrets appear automatically.
+# Substitute a known secret placeholder with a value, or echo it unchanged. Keeps
+# updates hands-off: new secrets appear automatically. Durable secrets (master
+# key, auth secret, DB password) are reused from the store if known, so a key
+# that was dropped from .env is restored rather than regenerated. KEY is the .env
+# key being filled; PLACEHOLDER is its example value.
 materialize() {
-    case "$1" in
-        REPLACE_ME_openssl_rand_base64_32) openssl rand -base64 32 ;;
-        REPLACE_ME_long_random_string) openssl rand -base64 48 ;;
+    key="$1"
+    case "$2" in
+        REPLACE_ME_openssl_rand_base64_32) durable_secret "$key" b64_32 ;;
+        REPLACE_ME_long_random_string) durable_secret "$key" b64_48 ;;
+        REPLACE_ME_strong_password) durable_secret "$key" hex_24 ;;
         REPLACE_ME_setup_token) openssl rand -hex 24 ;;
-        REPLACE_ME_strong_password) openssl rand -hex 24 ;;
-        *) printf '%s' "$1" ;;
+        *) printf '%s' "$2" ;;
     esac
 }
 
@@ -137,7 +212,7 @@ reconcile_env() {
         case "$line" in *=*) ;; *) continue ;; esac
         key=${line%%=*}
         if ! grep -q "^${key}=" "$target" 2>/dev/null; then
-            value=$(materialize "${line#*=}")
+            value=$(materialize "$key" "${line#*=}")
             printf '%s=%s\n' "$key" "$value" >> "$target"
             added="$added $key"
         fi
@@ -343,6 +418,9 @@ main() {
         err "review .env and set POLARIS_SITE_ADDRESS / POLARIS_APP_URL to your domain"
     else
         log ".env present; reconciling any new settings"
+        # Capture the current durable secrets before touching anything, so this
+        # host's existing master key survives a future .env loss.
+        seed_store_from_env ".env"
         reconcile_env ".env.example" ".env"
     fi
 
