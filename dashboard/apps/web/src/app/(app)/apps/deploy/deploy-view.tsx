@@ -18,6 +18,7 @@ import {
     FolderOpen,
     Globe,
     Loader2,
+    Lock,
     Plus,
     Rocket,
     TerminalSquare,
@@ -46,7 +47,8 @@ import {
     createProjectAction,
     deleteProjectAction,
     deployApplicationAction,
-    deployDatabaseAction
+    deployDatabaseAction,
+    githubReposAction
 } from "./actions";
 
 const DB_ENGINES = ["postgres", "mysql", "mariadb", "mongo", "redis"] as const;
@@ -492,8 +494,10 @@ function NewServiceButton({ environmentId, onChanged }: { environmentId: string;
                         <ServiceTypeList onPick={setView} />
                     ) : view === "database" ? (
                         <NewDatabaseForm environmentId={environmentId} onDone={done} />
+                    ) : view === "github" ? (
+                        <NewGithubForm environmentId={environmentId} onDone={done} />
                     ) : (
-                        <NewAppForm environmentId={environmentId} mode={view} onDone={done} />
+                        <NewImageForm environmentId={environmentId} onDone={done} />
                     )}
                 </DialogContent>
             </Dialog>
@@ -520,38 +524,16 @@ function ServiceTypeList({ onPick }: { onPick: (view: Exclude<ServiceView, "list
     );
 }
 
-function NewAppForm({
-    environmentId,
-    mode,
-    onDone
-}: {
-    environmentId: string;
-    mode: "github" | "docker";
-    onDone: () => void;
-}) {
-    const isGit = mode === "github";
+function NewImageForm({ environmentId, onDone }: { environmentId: string; onDone: () => void }) {
     const [name, setName] = useState("");
     const [image, setImage] = useState("");
-    const [repoUrl, setRepoUrl] = useState("");
-    const [branch, setBranch] = useState("");
-    const [dockerfilePath, setDockerfilePath] = useState("");
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
-
-    const canSubmit = name.trim() && (isGit ? repoUrl.trim() : image.trim());
 
     function submit() {
         setError(null);
         startTransition(async () => {
-            const result = await createApplicationAction({
-                environmentId,
-                name,
-                sourceType: isGit ? "dockerfile" : "image",
-                imageRef: image,
-                repoUrl,
-                branch: branch.trim() || undefined,
-                dockerfilePath: dockerfilePath.trim() || undefined
-            });
+            const result = await createApplicationAction({ environmentId, name, sourceType: "image", imageRef: image });
             if (result.error) setError(result.error);
             else onDone();
         });
@@ -562,41 +544,146 @@ function NewAppForm({
             <Field label="Name">
                 <Input value={name} onChange={(event) => setName(event.target.value)} placeholder="my-app" autoFocus />
             </Field>
-            {isGit ? (
-                <>
-                    <Field label="Repository URL" hint="Public http(s) repository.">
-                        <Input
-                            value={repoUrl}
-                            onChange={(event) => setRepoUrl(event.target.value)}
-                            placeholder="https://github.com/user/repo"
-                        />
-                    </Field>
-                    <div className="grid grid-cols-2 gap-3">
-                        <Field label="Branch">
-                            <Input value={branch} onChange={(event) => setBranch(event.target.value)} placeholder="main" />
-                        </Field>
-                        <Field label="Dockerfile">
-                            <Input
-                                value={dockerfilePath}
-                                onChange={(event) => setDockerfilePath(event.target.value)}
-                                placeholder="Dockerfile"
-                            />
-                        </Field>
-                    </div>
-                </>
+            <Field label="Image" hint="Docker Hub, GHCR, Quay, GitLab or MCR. e.g. ghcr.io/user/repo:latest">
+                <Input
+                    value={image}
+                    onChange={(event) => setImage(event.target.value)}
+                    placeholder="ghcr.io/user/repo:latest"
+                />
+            </Field>
+            {error && <p className="text-sm text-danger">{error}</p>}
+            <div className="flex justify-end">
+                <Button onClick={submit} disabled={pending || !name.trim() || !image.trim()}>
+                    {pending && <Loader2 className="size-4 animate-spin" />} Deploy image
+                </Button>
+            </div>
+        </div>
+    );
+}
+
+interface RepoOption {
+    fullName: string;
+    defaultBranch: string;
+    private: boolean;
+}
+
+function NewGithubForm({ environmentId, onDone }: { environmentId: string; onDone: () => void }) {
+    const [loading, setLoading] = useState(true);
+    const [connected, setConnected] = useState(false);
+    const [repos, setRepos] = useState<RepoOption[]>([]);
+    const [name, setName] = useState("");
+    const [repoFullName, setRepoFullName] = useState("");
+    const [manualUrl, setManualUrl] = useState("");
+    const [branch, setBranch] = useState("");
+    const [dockerfilePath, setDockerfilePath] = useState("");
+    const [error, setError] = useState<string | null>(null);
+    const [pending, startTransition] = useTransition();
+
+    useEffect(() => {
+        let active = true;
+        void githubReposAction()
+            .then((result) => {
+                if (!active) return;
+                setConnected(result.connected);
+                setRepos(result.repos);
+            })
+            .catch(() => undefined)
+            .finally(() => active && setLoading(false));
+        return () => {
+            active = false;
+        };
+    }, []);
+
+    const usePicker = connected && repos.length > 0;
+    const canSubmit = name.trim() && (usePicker ? repoFullName : manualUrl.trim());
+
+    function onPickRepo(value: string) {
+        setRepoFullName(value);
+        const repo = repos.find((item) => item.fullName === value);
+        if (repo) {
+            setBranch(repo.defaultBranch);
+            if (!name.trim()) setName(repo.fullName.split("/")[1] ?? "");
+        }
+    }
+
+    function submit() {
+        setError(null);
+        const repoUrl = usePicker ? `https://github.com/${repoFullName}` : manualUrl.trim();
+        startTransition(async () => {
+            const result = await createApplicationAction({
+                environmentId,
+                name,
+                sourceType: "dockerfile",
+                repoUrl,
+                branch: branch.trim() || undefined,
+                dockerfilePath: dockerfilePath.trim() || undefined,
+                provider: connected ? "github" : undefined
+            });
+            if (result.error) setError(result.error);
+            else onDone();
+        });
+    }
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
+                <Loader2 className="size-4 animate-spin" /> Loading repositories...
+            </div>
+        );
+    }
+
+    return (
+        <div className="flex flex-col gap-3">
+            {!connected && (
+                <p className="rounded-md border border-border/60 bg-surface/40 px-3 py-2 text-xs text-muted-foreground">
+                    Deploying a public repository. <a href="/integrations" className="text-primary hover:underline">Connect GitHub</a> for private repositories and a repository picker.
+                </p>
+            )}
+
+            {usePicker ? (
+                <Field label="Repository">
+                    <Select
+                        value={repoFullName}
+                        onValueChange={onPickRepo}
+                        placeholder="Select a repository"
+                        options={repos.map((repo) => ({
+                            value: repo.fullName,
+                            label: repo.fullName,
+                            icon: repo.private ? <Lock className="size-4 text-muted-foreground" /> : undefined
+                        }))}
+                    />
+                </Field>
             ) : (
-                <Field label="Image" hint="Docker Hub, GHCR, Quay, GitLab or MCR. e.g. ghcr.io/user/repo:latest">
+                <Field label="Repository URL" hint="Public http(s) repository.">
                     <Input
-                        value={image}
-                        onChange={(event) => setImage(event.target.value)}
-                        placeholder="ghcr.io/user/repo:latest"
+                        value={manualUrl}
+                        onChange={(event) => setManualUrl(event.target.value)}
+                        placeholder="https://github.com/user/repo"
                     />
                 </Field>
             )}
+
+            <Field label="Name">
+                <Input value={name} onChange={(event) => setName(event.target.value)} placeholder="my-app" />
+            </Field>
+
+            <div className="grid grid-cols-2 gap-3">
+                <Field label="Branch">
+                    <Input value={branch} onChange={(event) => setBranch(event.target.value)} placeholder="main" />
+                </Field>
+                <Field label="Dockerfile">
+                    <Input
+                        value={dockerfilePath}
+                        onChange={(event) => setDockerfilePath(event.target.value)}
+                        placeholder="Dockerfile"
+                    />
+                </Field>
+            </div>
+
             {error && <p className="text-sm text-danger">{error}</p>}
             <div className="flex justify-end">
                 <Button onClick={submit} disabled={pending || !canSubmit}>
-                    {pending && <Loader2 className="size-4 animate-spin" />} {isGit ? "Deploy repository" : "Deploy image"}
+                    {pending && <Loader2 className="size-4 animate-spin" />} Deploy repository
                 </Button>
             </div>
         </div>

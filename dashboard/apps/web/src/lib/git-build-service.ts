@@ -15,6 +15,12 @@ import type { Readable } from "node:stream";
 export interface GitSource {
     repoUrl: string;
     branch?: string;
+    /**
+     * Optional git `http.extraHeader` value (e.g. "Authorization: Basic ...") used to
+     * authenticate the clone of a private repository. Passed via `-c` so the credential
+     * never appears in the clone URL or the streamed deployment log.
+     */
+    authHeader?: string;
 }
 
 /** Whether a repo URL is a scheme we will clone (http/https/git, no ssh/file). */
@@ -29,11 +35,14 @@ export function isCloneableUrl(url: string): boolean {
  */
 export function gitBuildContext(source: GitSource, onOutput: (chunk: Buffer) => void): () => Promise<Readable> {
     if (!isCloneableUrl(source.repoUrl)) {
-        throw new Error("Only public http(s)/git repository URLs are supported");
+        throw new Error("Only http(s)/git repository URLs are supported");
     }
     return async () => {
         const dir = await mkdtemp(join(tmpdir(), "polaris-build-"));
-        const args = ["clone", "--depth", "1"];
+        // Repo-level config (`-c`) must precede the subcommand.
+        const args: string[] = [];
+        if (source.authHeader) args.push("-c", `http.extraHeader=${source.authHeader}`);
+        args.push("clone", "--depth", "1");
         if (source.branch) args.push("--branch", source.branch);
         args.push("--", source.repoUrl, dir);
         await runCommand("git", args, onOutput);

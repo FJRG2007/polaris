@@ -13,6 +13,7 @@ import { DYMO_IP_RULES, findIntegration, type ScanAction } from "@/lib/integrati
 import { getIntegrationState, upsertIntegration } from "@/lib/integration-service";
 import { verifyKey } from "@/lib/integrations/virustotal";
 import { verifyIp } from "@/lib/integrations/dymo";
+import { connectGithubPat, disconnectGithub, verifyGithubToken } from "@/lib/github-service";
 import { recordAudit } from "@/lib/audit-service";
 
 const SCAN_ACTIONS = new Set<ScanAction>(["block", "quarantine", "notify"]);
@@ -138,4 +139,38 @@ export async function testVirusTotalKeyAction(apiKey: string): Promise<{ ok: boo
     await requireAdmin();
     if (!apiKey.trim()) return { ok: false, error: "Enter an API key first" };
     return verifyKey(apiKey.trim());
+}
+
+/** Validate a GitHub token without saving it (the connect dialog's Test button). */
+export async function testGithubTokenAction(token: string): Promise<{ ok: boolean; login?: string; error?: string }> {
+    await requireAdmin();
+    if (!token.trim()) return { ok: false, error: "Enter a token first" };
+    try {
+        const { login } = await verifyGithubToken(token.trim());
+        return { ok: true, login };
+    } catch (caught) {
+        return { ok: false, error: caught instanceof Error ? caught.message : "The token was rejected" };
+    }
+}
+
+/** Connect GitHub with a Personal Access Token (validated before it is stored). */
+export async function connectGithubAction(token: string): Promise<{ error?: string; login?: string }> {
+    const user = await requireAdmin();
+    try {
+        const { login } = await connectGithubPat(token, user.id);
+        await recordAudit({ actorId: user.id, action: "integration.configure", targetType: "integration", targetId: "github", metadata: { login } });
+        revalidatePath("/integrations");
+        return { login };
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not connect GitHub" };
+    }
+}
+
+/** Disconnect GitHub and forget its token. */
+export async function disconnectGithubAction(): Promise<{ error?: string }> {
+    const user = await requireAdmin();
+    await disconnectGithub();
+    await recordAudit({ actorId: user.id, action: "integration.disable", targetType: "integration", targetId: "github" });
+    revalidatePath("/integrations");
+    return {};
 }

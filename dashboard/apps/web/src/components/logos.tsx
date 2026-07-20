@@ -5,6 +5,7 @@
  */
 
 import { Blocks } from "lucide-react";
+import { GitHubMark } from "./brand-icons";
 
 interface LogoProps {
     className?: string;
@@ -30,5 +31,6 @@ export function VirusTotalLogo({ className = "size-6", brand }: LogoProps) {
 /** The logo for a marketplace integration slug (a neutral fallback otherwise). */
 export function IntegrationLogo({ slug, className }: { slug: string; className?: string }) {
     if (slug === "virustotal") return <VirusTotalLogo className={className} brand />;
+    if (slug === "github") return <GitHubMark className={className} />;
     return <Blocks className={className} />;
 }

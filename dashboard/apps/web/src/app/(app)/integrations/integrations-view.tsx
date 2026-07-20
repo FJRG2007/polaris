@@ -25,7 +25,15 @@ import {
 } from "@polaris/ui";
 import { DYMO_IP_RULES, SCAN_ACTIONS, type ScanAction } from "@/lib/integrations/registry";
 import { IntegrationLogo } from "@/components/logos";
-import { saveDymoAction, saveVirusTotalAction, testDymoKeyAction, testVirusTotalKeyAction } from "./actions";
+import {
+    connectGithubAction,
+    disconnectGithubAction,
+    saveDymoAction,
+    saveVirusTotalAction,
+    testDymoKeyAction,
+    testGithubTokenAction,
+    testVirusTotalKeyAction
+} from "./actions";
 
 export interface IntegrationCard {
     slug: string;
@@ -45,6 +53,8 @@ export interface IntegrationCard {
     verifyAccessIp: boolean;
     /** Dymo: IP deny rules (FRAUD, PROXY, ...). */
     deny: string[];
+    /** GitHub: the connected account login, when connected. */
+    githubLogin?: string;
 }
 
 export function IntegrationsView({ cards }: { cards: IntegrationCard[] }) {
@@ -96,6 +106,8 @@ export function IntegrationsView({ cards }: { cards: IntegrationCard[] }) {
                 <VirusTotalDialog card={configuring} onClose={() => setConfiguring(null)} />
             ) : configuring?.slug === "dymo" ? (
                 <DymoDialog card={configuring} onClose={() => setConfiguring(null)} />
+            ) : configuring?.slug === "github" ? (
+                <GitHubDialog card={configuring} onClose={() => setConfiguring(null)} />
             ) : null}
         </>
     );
@@ -227,6 +239,112 @@ function DymoDialog({ card, onClose }: { card: IntegrationCard; onClose: () => v
                         </Button>
                         <Button type="button" onClick={onSave} disabled={saving}>
                             {saving ? <Loader2 className="size-4 animate-spin" /> : "Save"}
+                        </Button>
+                    </div>
+                </div>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+function GitHubDialog({ card, onClose }: { card: IntegrationCard; onClose: () => void }) {
+    const [token, setToken] = useState("");
+    const [error, setError] = useState<string | null>(null);
+    const [tested, setTested] = useState<string | null>(null);
+    const [testing, startTest] = useTransition();
+    const [saving, startSave] = useTransition();
+
+    function onTest() {
+        setError(null);
+        setTested(null);
+        startTest(async () => {
+            const result = await testGithubTokenAction(token);
+            if (result.ok) setTested(`Authenticated as ${result.login}.`);
+            else setError(result.error ?? "The token was rejected");
+        });
+    }
+
+    function onConnect() {
+        setError(null);
+        startSave(async () => {
+            const result = await connectGithubAction(token);
+            if (result.error) setError(result.error);
+            else onClose();
+        });
+    }
+
+    function onDisconnect() {
+        setError(null);
+        startSave(async () => {
+            const result = await disconnectGithubAction();
+            if (result.error) setError(result.error);
+            else onClose();
+        });
+    }
+
+    return (
+        <Dialog open onOpenChange={(open) => !open && onClose()}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2">
+                        <IntegrationLogo slug="github" className="size-5" />
+                        GitHub
+                    </DialogTitle>
+                    <DialogDescription>{card.description}</DialogDescription>
+                </DialogHeader>
+
+                <div className="flex flex-col gap-4">
+                    {card.githubLogin ? (
+                        <div className="flex items-center justify-between gap-3 rounded-md border border-border bg-surface/40 p-3 text-sm">
+                            <span className="flex items-center gap-2">
+                                <CheckCircle2 className="size-4 text-success" />
+                                Connected as <span className="font-medium">{card.githubLogin}</span>
+                            </span>
+                            <Button type="button" variant="danger" onClick={onDisconnect} disabled={saving}>
+                                {saving ? <Loader2 className="size-4 animate-spin" /> : "Disconnect"}
+                            </Button>
+                        </div>
+                    ) : null}
+
+                    <label className="flex flex-col gap-1 text-sm">
+                        <span className="font-medium">{card.githubLogin ? "Replace token" : card.apiKeyLabel}</span>
+                        <div className="flex gap-2">
+                            <Input
+                                type="password"
+                                autoComplete="off"
+                                value={token}
+                                onChange={(event) => setToken(event.target.value)}
+                                placeholder="ghp_... or github_pat_..."
+                            />
+                            <Button type="button" variant="ghost" onClick={onTest} disabled={testing || !token.trim()}>
+                                {testing ? <Loader2 className="size-4 animate-spin" /> : "Test"}
+                            </Button>
+                        </div>
+                        {card.apiKeyHelp ? <span className="text-xs text-muted-foreground">{card.apiKeyHelp}</span> : null}
+                        <a
+                            href={card.docsUrl}
+                            target="_blank"
+                            rel="noreferrer noopener"
+                            className="inline-flex w-fit items-center gap-1 text-xs text-primary hover:underline"
+                        >
+                            Create a token <ExternalLink className="size-3" />
+                        </a>
+                        {tested ? (
+                            <span className="flex items-center gap-1 text-xs text-success">
+                                <CheckCircle2 className="size-3" />
+                                {tested}
+                            </span>
+                        ) : null}
+                    </label>
+
+                    {error ? <p className="text-sm text-danger">{error}</p> : null}
+
+                    <div className="flex justify-end gap-2">
+                        <Button type="button" variant="ghost" onClick={onClose}>
+                            Cancel
+                        </Button>
+                        <Button type="button" onClick={onConnect} disabled={saving || !token.trim()}>
+                            {saving ? <Loader2 className="size-4 animate-spin" /> : card.githubLogin ? "Update" : "Connect"}
                         </Button>
                     </div>
                 </div>

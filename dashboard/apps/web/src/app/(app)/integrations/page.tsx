@@ -33,7 +33,8 @@ export default async function IntegrationsPage() {
             scanDropPoints: virustotal?.scanDropPoints ?? true,
             onDetection: virustotal?.onDetection ?? "block",
             verifyAccessIp: dymo?.verifyAccessIp ?? true,
-            deny: dymo?.deny ?? ["FRAUD"]
+            deny: dymo?.deny ?? ["FRAUD"],
+            githubLogin: entry.slug === "github" && typeof state?.config.login === "string" ? state.config.login : undefined
         };
     });
 

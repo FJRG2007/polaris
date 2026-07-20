@@ -16,6 +16,7 @@ import { decryptSecret } from "@polaris/storage";
 import { getDriver, getPorts, toTargetInfo, type TargetRow } from "./deploy/runtime";
 import { autoSubdomainUrl } from "./domain-service";
 import { gitBuildContext, type GitSource } from "./git-build-service";
+import { githubCloneAuthHeader } from "./github-service";
 
 /** Directory the web process writes deploy log files to (tailed by the UI). */
 function logDir(): string {
@@ -199,10 +200,16 @@ async function buildAppPlan(
         })),
         healthcheck
     };
-    const gitSource =
-        typeof source.repoUrl === "string" && source.repoUrl
-            ? { repoUrl: source.repoUrl, branch: typeof source.branch === "string" ? source.branch : undefined }
-            : undefined;
+    let gitSource: GitSource | undefined;
+    if (typeof source.repoUrl === "string" && source.repoUrl) {
+        gitSource = { repoUrl: source.repoUrl, branch: typeof source.branch === "string" ? source.branch : undefined };
+        // GitHub-sourced repos clone with the connected account's token so private
+        // repositories build; the header is null (public clone) when not connected.
+        if (source.provider === "github") {
+            const authHeader = await githubCloneAuthHeader();
+            if (authHeader) gitSource.authHeader = authHeader;
+        }
+    }
     return { plan, target: app.target, gitSource };
 }
 

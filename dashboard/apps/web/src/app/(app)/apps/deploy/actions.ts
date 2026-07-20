@@ -19,6 +19,7 @@ import {
     removeApplicationDomain
 } from "@/lib/deploy-service";
 import { createDatabase, deployDatabase, type DbEngine } from "@/lib/database-service";
+import { getGithubStatus, listGithubRepos, type GithubRepo } from "@/lib/github-service";
 
 const DB_ENGINES: DbEngine[] = ["postgres", "mysql", "mariadb", "mongo", "redis"];
 
@@ -53,6 +54,7 @@ export async function createApplicationAction(input: {
     repoUrl?: string;
     branch?: string;
     dockerfilePath?: string;
+    provider?: string;
 }): Promise<{ error?: string }> {
     const user = await requirePermission("deploy.manage");
     const name = input.name?.trim();
@@ -67,7 +69,10 @@ export async function createApplicationAction(input: {
         sourceConfig = {
             repoUrl,
             branch: input.branch?.trim() || undefined,
-            dockerfilePath: input.dockerfilePath?.trim() || "Dockerfile"
+            dockerfilePath: input.dockerfilePath?.trim() || "Dockerfile",
+            // Mark GitHub-sourced repos so the build authenticates its clone with the
+            // connected token (private repos), transparently for public ones too.
+            provider: input.provider === "github" ? "github" : undefined
         };
     } else {
         const imageRef = input.imageRef?.trim();
@@ -166,5 +171,19 @@ export async function deployDatabaseAction(databaseId: string): Promise<{ error?
         return { deploymentId };
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Could not provision the database" };
+    }
+}
+
+/** The connected GitHub account (if any) and the repositories it can deploy, for the
+ *  Deploy "GitHub Repository" picker. Gated on deploy.manage. */
+export async function githubReposAction(): Promise<{ connected: boolean; login: string | null; repos: GithubRepo[] }> {
+    await requirePermission("deploy.manage");
+    const status = await getGithubStatus();
+    if (!status.connected) return { connected: false, login: null, repos: [] };
+    try {
+        const repos = await listGithubRepos();
+        return { connected: true, login: status.login, repos };
+    } catch {
+        return { connected: true, login: status.login, repos: [] };
     }
 }

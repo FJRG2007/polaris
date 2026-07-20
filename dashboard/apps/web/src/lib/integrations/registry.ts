@@ -116,6 +116,19 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         requiresApiKey: true,
         apiKeyLabel: "API key",
         apiKeyHelp: "Get one at https://tpe.li/new-api-key."
+    },
+    {
+        slug: "github",
+        name: "GitHub",
+        category: "Automation",
+        summary: "Deploy from your repositories, including private ones.",
+        description:
+            "Connect a GitHub account so Deploy can list your repositories and build private ones. Today this uses a Personal Access Token; a one-click GitHub App is on the way.",
+        docsUrl: "https://github.com/settings/tokens",
+        requiresApiKey: true,
+        apiKeyLabel: "Personal Access Token",
+        apiKeyHelp:
+            "A fine-grained token with Contents: Read on the repositories you want to deploy (or a classic token with the 'repo' scope)."
     }
 ];
 
