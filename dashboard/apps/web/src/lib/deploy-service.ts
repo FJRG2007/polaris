@@ -206,7 +206,8 @@ async function buildAppPlan(
         // GitHub-sourced repos clone with the connected account's token so private
         // repositories build; the header is null (public clone) when not connected.
         if (source.provider === "github") {
-            const authHeader = await githubCloneAuthHeader();
+            const owner = gitSource.repoUrl.match(/github\.com[/:]([^/]+)\//i)?.[1];
+            const authHeader = await githubCloneAuthHeader(owner);
             if (authHeader) gitSource.authHeader = authHeader;
         }
     }

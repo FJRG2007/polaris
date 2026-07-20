@@ -13,7 +13,13 @@ import { DYMO_IP_RULES, findIntegration, type ScanAction } from "@/lib/integrati
 import { getIntegrationState, upsertIntegration } from "@/lib/integration-service";
 import { verifyKey } from "@/lib/integrations/virustotal";
 import { verifyIp } from "@/lib/integrations/dymo";
-import { connectGithubPat, disconnectGithub, verifyGithubToken } from "@/lib/github-service";
+import {
+    connectGithubApp,
+    connectGithubPat,
+    disconnectGithub,
+    refreshInstallations,
+    verifyGithubToken
+} from "@/lib/github-service";
 import { recordAudit } from "@/lib/audit-service";
 
 const SCAN_ACTIONS = new Set<ScanAction>(["block", "quarantine", "notify"]);
@@ -163,6 +169,35 @@ export async function connectGithubAction(token: string): Promise<{ error?: stri
         return { login };
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Could not connect GitHub" };
+    }
+}
+
+/** Connect an existing GitHub App by App ID + private key (validated before storing). */
+export async function connectGithubAppAction(input: {
+    appId: string;
+    pem: string;
+    appName?: string;
+}): Promise<{ error?: string; installations?: number }> {
+    const user = await requireAdmin();
+    try {
+        const { installations } = await connectGithubApp(input);
+        await recordAudit({ actorId: user.id, action: "integration.configure", targetType: "integration", targetId: "github", metadata: { method: "app" } });
+        revalidatePath("/integrations");
+        return { installations };
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not connect the GitHub App" };
+    }
+}
+
+/** Refresh the stored list of app installations (after installing on more accounts). */
+export async function refreshGithubInstallationsAction(): Promise<{ error?: string }> {
+    await requireAdmin();
+    try {
+        await refreshInstallations();
+        revalidatePath("/integrations");
+        return {};
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not refresh installations" };
     }
 }
 

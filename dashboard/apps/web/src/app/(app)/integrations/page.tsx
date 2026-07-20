@@ -6,6 +6,7 @@
 import { requireAdmin } from "@/lib/session";
 import { INTEGRATIONS, readDymoConfig, readVirusTotalConfig } from "@/lib/integrations/registry";
 import { listIntegrationStates } from "@/lib/integration-service";
+import { getGithubStatus } from "@/lib/github-service";
 import { IntegrationsView, type IntegrationCard } from "./integrations-view";
 
 export const dynamic = "force-dynamic";
@@ -13,6 +14,7 @@ export const dynamic = "force-dynamic";
 export default async function IntegrationsPage() {
     await requireAdmin();
     const states = await listIntegrationStates();
+    const github = await getGithubStatus();
 
     const cards: IntegrationCard[] = INTEGRATIONS.map((entry) => {
         const state = states.get(entry.slug);
@@ -34,7 +36,10 @@ export default async function IntegrationsPage() {
             onDetection: virustotal?.onDetection ?? "block",
             verifyAccessIp: dymo?.verifyAccessIp ?? true,
             deny: dymo?.deny ?? ["FRAUD"],
-            githubLogin: entry.slug === "github" && typeof state?.config.login === "string" ? state.config.login : undefined
+            githubMethod: entry.slug === "github" ? github.method : undefined,
+            githubLogin: entry.slug === "github" ? github.login ?? undefined : undefined,
+            githubInstallations: entry.slug === "github" ? github.installations : undefined,
+            githubHtmlUrl: entry.slug === "github" ? github.htmlUrl ?? undefined : undefined
         };
     });
 
