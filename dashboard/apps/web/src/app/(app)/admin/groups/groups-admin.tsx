@@ -9,7 +9,7 @@
 import { useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Trash2, UserPlus, X } from "lucide-react";
-import { Badge, Button, Card, CardBody, CardHeader, CardTitle, Input } from "@polaris/ui";
+import { Badge, Button, Card, CardBody, CardHeader, CardTitle, Input, Select } from "@polaris/ui";
 import {
     addGroupMemberAction,
     createGroupAction,
@@ -67,7 +67,11 @@ export function GroupsAdmin({ groups, users }: { groups: GroupRow[]; users: User
                 </CardHeader>
                 <CardBody>
                     <form onSubmit={onCreate} className="flex flex-col gap-3">
-                        <Input placeholder="Group name" value={name} onChange={(event) => setName(event.target.value)} />
+                        <Input
+                            placeholder="Group name"
+                            value={name}
+                            onChange={(event) => setName(event.target.value)}
+                        />
                         <Input
                             placeholder="Description (optional)"
                             value={description}
@@ -84,11 +88,19 @@ export function GroupsAdmin({ groups, users }: { groups: GroupRow[]; users: User
             <div className="flex flex-col gap-3 lg:col-span-2">
                 {groups.length === 0 ? (
                     <Card>
-                        <CardBody className="p-8 text-center text-sm text-muted-foreground">No groups yet.</CardBody>
+                        <CardBody className="p-8 text-center text-sm text-muted-foreground">
+                            No groups yet.
+                        </CardBody>
                     </Card>
                 ) : (
                     groups.map((group) => (
-                        <GroupCard key={group.id} group={group} users={users} onMutate={mutate} disabled={pending} />
+                        <GroupCard
+                            key={group.id}
+                            group={group}
+                            users={users}
+                            onMutate={mutate}
+                            disabled={pending}
+                        />
                     ))
                 )}
             </div>
@@ -121,7 +133,9 @@ function GroupCard({
                             {group.isSystem ? <Badge>system</Badge> : null}
                         </CardTitle>
                         {group.description ? (
-                            <p className="mt-1 text-xs text-muted-foreground">{group.description}</p>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                                {group.description}
+                            </p>
                         ) : null}
                     </div>
                     {!group.isSystem ? (
@@ -150,7 +164,11 @@ function GroupCard({
                                         type="button"
                                         aria-label={`Remove ${member.name}`}
                                         disabled={disabled}
-                                        onClick={() => onMutate(() => removeGroupMemberAction(group.id, member.id))}
+                                        onClick={() =>
+                                            onMutate(() =>
+                                                removeGroupMemberAction(group.id, member.id)
+                                            )
+                                        }
                                         className="text-muted-foreground hover:text-foreground"
                                     >
                                         <X className="size-3" />
@@ -162,18 +180,16 @@ function GroupCard({
                 )}
                 {candidates.length > 0 ? (
                     <div className="flex items-center gap-2">
-                        <select
-                            className="h-9 flex-1 rounded-md border border-input bg-surface px-3 text-sm"
+                        <Select
+                            className="flex-1"
                             value={add}
-                            onChange={(event) => setAdd(event.target.value)}
-                        >
-                            <option value="">Add a member...</option>
-                            {candidates.map((user) => (
-                                <option key={user.id} value={user.id}>
-                                    {user.name} ({user.email})
-                                </option>
-                            ))}
-                        </select>
+                            onValueChange={setAdd}
+                            placeholder="Add a member..."
+                            options={candidates.map((user) => ({
+                                value: user.id,
+                                label: `${user.name} (${user.email})`
+                            }))}
+                        />
                         <Button
                             size="sm"
                             variant="ghost"

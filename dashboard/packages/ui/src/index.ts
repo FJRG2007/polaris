@@ -13,6 +13,19 @@ export { Card, CardHeader, CardTitle, CardBody } from "./components/card.js";
 export { Skeleton } from "./components/skeleton.js";
 export { Checkbox, type CheckboxProps } from "./components/checkbox.js";
 export { Switch } from "./components/switch.js";
+export {
+    Select,
+    SelectRoot,
+    SelectGroup,
+    SelectValue,
+    SelectTrigger,
+    SelectContent,
+    SelectLabel,
+    SelectItem,
+    SelectSeparator,
+    type SelectOption,
+    type SelectProps
+} from "./components/select.js";
 export { RadialGauge, type GaugeTone } from "./components/charts.js";
 export * from "./components/dropdown-menu.js";
 export * from "./components/context-menu.js";

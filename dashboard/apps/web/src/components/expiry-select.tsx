@@ -10,9 +10,21 @@
  */
 
 import { useState } from "react";
-import { Input } from "@polaris/ui";
+import { Input, Select, type SelectOption } from "@polaris/ui";
 
 type Mode = "never" | "5m" | "10m" | "30m" | "1h" | "hours" | "days" | "weeks" | "date";
+
+const MODE_OPTIONS: SelectOption[] = [
+    { value: "never", label: "Never" },
+    { value: "5m", label: "In 5 minutes" },
+    { value: "10m", label: "In 10 minutes" },
+    { value: "30m", label: "In 30 minutes" },
+    { value: "1h", label: "In 1 hour" },
+    { value: "hours", label: "In a number of hours..." },
+    { value: "days", label: "In a number of days..." },
+    { value: "weeks", label: "In a number of weeks..." },
+    { value: "date", label: "On a specific date..." }
+];
 
 const PRESET_MS: Partial<Record<Mode, number>> = {
     "5m": 5 * 60_000,
@@ -48,25 +60,15 @@ export function ExpirySelect({ onChange }: { onChange: (iso: string) => void }) 
 
     return (
         <div className="flex flex-col gap-2">
-            <select
+            <Select
                 value={mode}
-                onChange={(event) => {
-                    const next = event.target.value as Mode;
+                onValueChange={(value) => {
+                    const next = value as Mode;
                     setMode(next);
                     emit(next, amount, dateStr);
                 }}
-                className="h-9 rounded-md border border-input bg-surface px-3 text-sm"
-            >
-                <option value="never">Never</option>
-                <option value="5m">In 5 minutes</option>
-                <option value="10m">In 10 minutes</option>
-                <option value="30m">In 30 minutes</option>
-                <option value="1h">In 1 hour</option>
-                <option value="hours">In a number of hours...</option>
-                <option value="days">In a number of days...</option>
-                <option value="weeks">In a number of weeks...</option>
-                <option value="date">On a specific date...</option>
-            </select>
+                options={MODE_OPTIONS}
+            />
 
             {mode === "hours" || mode === "days" || mode === "weeks" ? (
                 <div className="flex items-center gap-2">

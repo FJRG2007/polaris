@@ -4,7 +4,7 @@ import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Copy, Trash2 } from "lucide-react";
 import { createInviteSchema, INVITE_ROLES } from "@polaris/core";
-import { Badge, Button, Card, CardBody, CardHeader, CardTitle, Input } from "@polaris/ui";
+import { Badge, Button, Card, CardBody, CardHeader, CardTitle, Input, Select } from "@polaris/ui";
 import { useZodForm } from "@/lib/use-zod-form";
 import { createInviteAction, revokeInviteAction } from "./actions";
 
@@ -82,21 +82,17 @@ export function UsersAdmin({ users, invites }: { users: UserRow[]; invites: Invi
                                 onBlur={() => form.markTouched("email")}
                                 aria-invalid={Boolean(form.error("email"))}
                             />
-                            {form.error("email") ? <p className="text-xs text-danger">{form.error("email")}</p> : null}
+                            {form.error("email") ? (
+                                <p className="text-xs text-danger">{form.error("email")}</p>
+                            ) : null}
                         </div>
                         <div className="flex flex-col gap-1">
                             <label className="text-sm">Role</label>
-                            <select
-                                className="h-9 rounded-md border border-input bg-surface px-3 text-sm"
+                            <Select
                                 value={values.role}
-                                onChange={(event) => update("role", event.target.value)}
-                            >
-                                {INVITE_ROLES.map((role) => (
-                                    <option key={role} value={role}>
-                                        {role}
-                                    </option>
-                                ))}
-                            </select>
+                                onValueChange={(value) => update("role", value)}
+                                options={INVITE_ROLES.map((role) => ({ value: role, label: role }))}
+                            />
                         </div>
                         {error ? <p className="text-sm text-danger">{error}</p> : null}
                         <Button type="submit" disabled={pending}>
@@ -105,11 +101,22 @@ export function UsersAdmin({ users, invites }: { users: UserRow[]; invites: Invi
                     </form>
                     {link ? (
                         <div className="mt-3 rounded-md border border-border bg-muted/40 p-2">
-                            <p className="mb-1 text-xs text-muted-foreground">Share this link (valid 7 days):</p>
+                            <p className="mb-1 text-xs text-muted-foreground">
+                                Share this link (valid 7 days):
+                            </p>
                             <div className="flex items-center gap-2">
                                 <code className="flex-1 truncate text-xs">{link}</code>
-                                <Button size="icon" variant="ghost" onClick={copyLink} aria-label="Copy link">
-                                    {copied ? <Check className="size-4 text-success" /> : <Copy className="size-4" />}
+                                <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    onClick={copyLink}
+                                    aria-label="Copy link"
+                                >
+                                    {copied ? (
+                                        <Check className="size-4 text-success" />
+                                    ) : (
+                                        <Copy className="size-4" />
+                                    )}
                                 </Button>
                             </div>
                         </div>
@@ -117,10 +124,15 @@ export function UsersAdmin({ users, invites }: { users: UserRow[]; invites: Invi
 
                     {invites.length > 0 ? (
                         <div className="mt-4">
-                            <h3 className="mb-2 text-xs font-medium text-muted-foreground">Pending invites</h3>
+                            <h3 className="mb-2 text-xs font-medium text-muted-foreground">
+                                Pending invites
+                            </h3>
                             <ul className="flex flex-col gap-1">
                                 {invites.map((invite) => (
-                                    <li key={invite.id} className="flex items-center justify-between text-sm">
+                                    <li
+                                        key={invite.id}
+                                        className="flex items-center justify-between text-sm"
+                                    >
                                         <span className="truncate">{invite.email}</span>
                                         <Button
                                             size="icon"
@@ -147,8 +159,12 @@ export function UsersAdmin({ users, invites }: { users: UserRow[]; invites: Invi
                         {users.map((user) => (
                             <li key={user.id} className="flex items-center justify-between gap-2">
                                 <span className="min-w-0">
-                                    <span className="block truncate text-sm font-medium">{user.name}</span>
-                                    <span className="block truncate text-xs text-muted-foreground">{user.email}</span>
+                                    <span className="block truncate text-sm font-medium">
+                                        {user.name}
+                                    </span>
+                                    <span className="block truncate text-xs text-muted-foreground">
+                                        {user.email}
+                                    </span>
                                 </span>
                                 {user.isAdmin ? <Badge variant="primary">admin</Badge> : null}
                             </li>

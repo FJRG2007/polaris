@@ -10,7 +10,16 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowUpRight, Loader2, Lock, ShieldCheck, Trash2, Unlock, User, Users } from "lucide-react";
+import {
+    ArrowUpRight,
+    Loader2,
+    Lock,
+    ShieldCheck,
+    Trash2,
+    Unlock,
+    User,
+    Users
+} from "lucide-react";
 import { DRIVE_ACTIONS, type DriveAction } from "@polaris/core";
 import {
     Badge,
@@ -21,7 +30,8 @@ import {
     DialogDescription,
     DialogHeader,
     DialogTitle,
-    Input
+    Input,
+    Select
 } from "@polaris/ui";
 import {
     getAccessSettingsAction,
@@ -52,13 +62,20 @@ const ACTION_LABELS: Record<DriveAction, string> = {
 /** One-click access levels; "Custom" just leaves the checkboxes as-is. */
 const PRESETS: { id: string; label: string; actions: DriveAction[] }[] = [
     { id: "viewer", label: "Viewer", actions: ["read", "download"] },
-    { id: "editor", label: "Editor", actions: ["read", "download", "write", "rename", "copy", "delete"] }
+    {
+        id: "editor",
+        label: "Editor",
+        actions: ["read", "download", "write", "rename", "copy", "delete"]
+    }
 ];
 
 /** Whether a chosen action set exactly matches a preset. */
 function presetMatch(actions: Set<DriveAction>): string {
     for (const preset of PRESETS) {
-        if (preset.actions.length === actions.size && preset.actions.every((action) => actions.has(action))) {
+        if (
+            preset.actions.length === actions.size &&
+            preset.actions.every((action) => actions.has(action))
+        ) {
             return preset.id;
         }
     }
@@ -117,7 +134,9 @@ export function AccessDialog({
     const grants = (settings?.acls ?? []).filter((acl) => acl.path === path);
     const lock = (settings?.locks ?? []).find((entry) => entry.path === path) ?? null;
     const principalLabel = (type: string, id: string): string => {
-        const match = settings?.principals.find((option) => option.type === type && option.id === id);
+        const match = settings?.principals.find(
+            (option) => option.type === type && option.id === id
+        );
         return match ? match.label : `${type}:${id}`;
     };
 
@@ -180,9 +199,10 @@ export function AccessDialog({
                             <div>
                                 <h3 className="text-sm font-medium">Who can access this</h3>
                                 <p className="text-xs text-muted-foreground">
-                                    The owner and admins always have full access. Add people or groups below to give
-                                    them specific actions; a <span className="text-danger">Deny</span> always wins over
-                                    an allow.
+                                    The owner and admins always have full access. Add people or
+                                    groups below to give them specific actions; a{" "}
+                                    <span className="text-danger">Deny</span> always wins over an
+                                    allow.
                                 </p>
                             </div>
                             {grants.length === 0 ? (
@@ -205,12 +225,21 @@ export function AccessDialog({
                                                 <div className="min-w-0">
                                                     <span className="flex items-center gap-1.5">
                                                         <span className="truncate font-medium">
-                                                            {principalLabel(grant.principalType, grant.principalId)}
+                                                            {principalLabel(
+                                                                grant.principalType,
+                                                                grant.principalId
+                                                            )}
                                                         </span>
                                                         <Badge
-                                                            variant={grant.effect === "deny" ? "danger" : "success"}
+                                                            variant={
+                                                                grant.effect === "deny"
+                                                                    ? "danger"
+                                                                    : "success"
+                                                            }
                                                         >
-                                                            {grant.effect === "deny" ? "Denied" : "Allowed"}
+                                                            {grant.effect === "deny"
+                                                                ? "Denied"
+                                                                : "Allowed"}
                                                         </Badge>
                                                     </span>
                                                     <span className="mt-1 flex flex-wrap gap-1">
@@ -231,7 +260,12 @@ export function AccessDialog({
                                                 aria-label="Remove grant"
                                                 disabled={busy}
                                                 onClick={() =>
-                                                    run(() => removeDriveAclAction(target!.connectionId, grant.id))
+                                                    run(() =>
+                                                        removeDriveAclAction(
+                                                            target!.connectionId,
+                                                            grant.id
+                                                        )
+                                                    )
                                                 }
                                             >
                                                 <Trash2 className="size-4" />
@@ -242,20 +276,17 @@ export function AccessDialog({
                             )}
 
                             <div className="flex flex-col gap-2 rounded-md border border-border bg-surface/40 p-3">
-                                <select
-                                    className="h-9 rounded-md border border-input bg-surface px-3 text-sm"
+                                <Select
                                     value={principal}
-                                    onChange={(event) => setPrincipal(event.target.value)}
-                                >
-                                    <option value="">Add a user or group...</option>
-                                    {(settings?.principals ?? []).map((option) => (
-                                        <option key={`${option.type}:${option.id}`} value={`${option.type}:${option.id}`}>
-                                            {option.type === "group" ? "Group: " : ""}
-                                            {option.label}
-                                            {option.sublabel ? ` (${option.sublabel})` : ""}
-                                        </option>
-                                    ))}
-                                </select>
+                                    onValueChange={setPrincipal}
+                                    placeholder="Add a user or group..."
+                                    options={(settings?.principals ?? []).map((option) => ({
+                                        value: `${option.type}:${option.id}`,
+                                        label: `${option.type === "group" ? "Group: " : ""}${option.label}${
+                                            option.sublabel ? ` (${option.sublabel})` : ""
+                                        }`
+                                    }))}
+                                />
                                 <div className="flex items-center gap-1.5">
                                     <span className="text-xs text-muted-foreground">Level</span>
                                     <div className="flex items-center gap-1 rounded-md border border-border p-0.5">
@@ -288,7 +319,10 @@ export function AccessDialog({
                                 </div>
                                 <div className="flex flex-wrap gap-2">
                                     {DRIVE_ACTIONS.map((action) => (
-                                        <label key={action} className="flex items-center gap-1.5 text-xs">
+                                        <label
+                                            key={action}
+                                            className="flex items-center gap-1.5 text-xs"
+                                        >
                                             <Checkbox
                                                 checked={actions.has(action)}
                                                 onChange={() => toggleAction(action)}
@@ -299,14 +333,17 @@ export function AccessDialog({
                                     ))}
                                 </div>
                                 <div className="flex items-center justify-between gap-2">
-                                    <select
-                                        className="h-9 rounded-md border border-input bg-surface px-3 text-sm"
+                                    <Select
+                                        className="w-32"
                                         value={effect}
-                                        onChange={(event) => setEffect(event.target.value as "allow" | "deny")}
-                                    >
-                                        <option value="allow">Allow</option>
-                                        <option value="deny">Deny</option>
-                                    </select>
+                                        onValueChange={(value) =>
+                                            setEffect(value as "allow" | "deny")
+                                        }
+                                        options={[
+                                            { value: "allow", label: "Allow" },
+                                            { value: "deny", label: "Deny" }
+                                        ]}
+                                    />
                                     <Button size="sm" disabled={busy} onClick={addGrant}>
                                         Add grant
                                     </Button>
@@ -330,13 +367,18 @@ export function AccessDialog({
                             {lock ? (
                                 <div className="flex items-center justify-between gap-2 text-sm">
                                     <span className="text-muted-foreground">
-                                        This item is password-gated. Anyone opening it must unlock it first.
+                                        This item is password-gated. Anyone opening it must unlock
+                                        it first.
                                     </span>
                                     <Button
                                         size="sm"
                                         variant="ghost"
                                         disabled={busy}
-                                        onClick={() => run(() => removeLockAction(target!.connectionId, lock.id))}
+                                        onClick={() =>
+                                            run(() =>
+                                                removeLockAction(target!.connectionId, lock.id)
+                                            )
+                                        }
                                     >
                                         <Unlock className="size-4" />
                                         Remove
@@ -358,7 +400,11 @@ export function AccessDialog({
                                         disabled={busy || password.length < 4}
                                         onClick={() =>
                                             run(async () => {
-                                                const result = await lockPathAction(target!.connectionId, path, password);
+                                                const result = await lockPathAction(
+                                                    target!.connectionId,
+                                                    path,
+                                                    password
+                                                );
                                                 setPassword("");
                                                 return result;
                                             })

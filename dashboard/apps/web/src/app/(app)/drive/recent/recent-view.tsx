@@ -11,7 +11,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Clock, File as FileIcon, FolderOpen } from "lucide-react";
 import { formatBytes } from "@polaris/core";
-import { Card, CardBody, cn } from "@polaris/ui";
+import { Card, CardBody, Select, cn } from "@polaris/ui";
 import { RelativeTime } from "@/components/relative-time";
 
 interface RecentEntry {
@@ -55,8 +55,10 @@ export function RecentView({ connections }: { connections: { id: string; name: s
             .then((body) => {
                 if (controller.signal.aborted) return;
                 if (body.error) setError(body.error);
-                else if (body.locked) setError("This connection is locked. Unlock it in Files first.");
-                else if (body.needsSmbShare) setError("Finish setting up this connection in Files first.");
+                else if (body.locked)
+                    setError("This connection is locked. Unlock it in Files first.");
+                else if (body.needsSmbShare)
+                    setError("Finish setting up this connection in Files first.");
                 else setEntries(Array.isArray(body.entries) ? body.entries : []);
             })
             .catch(() => {
@@ -103,17 +105,15 @@ export function RecentView({ connections }: { connections: { id: string; name: s
                     ))}
                 </div>
                 {connections.length > 1 ? (
-                    <select
+                    <Select
+                        className="h-8 w-48"
                         value={connectionId}
-                        onChange={(event) => setConnectionId(event.target.value)}
-                        className="h-8 rounded-md border border-input bg-surface px-2 text-sm"
-                    >
-                        {connections.map((connection) => (
-                            <option key={connection.id} value={connection.id}>
-                                {connection.name}
-                            </option>
-                        ))}
-                    </select>
+                        onValueChange={setConnectionId}
+                        options={connections.map((connection) => ({
+                            value: connection.id,
+                            label: connection.name
+                        }))}
+                    />
                 ) : null}
             </div>
 
@@ -125,21 +125,24 @@ export function RecentView({ connections }: { connections: { id: string; name: s
                         <p className="p-8 text-center text-sm text-danger">{error}</p>
                     ) : entries.length === 0 ? (
                         <p className="p-8 text-center text-sm text-muted-foreground">
-                            {lens === "opened"
-                                ? "No files opened here yet."
-                                : "Nothing here yet."}
+                            {lens === "opened" ? "No files opened here yet." : "Nothing here yet."}
                         </p>
                     ) : (
                         <ul>
                             {entries.map((entry) => (
-                                <li key={entry.path} className="border-t border-border first:border-t-0">
+                                <li
+                                    key={entry.path}
+                                    className="border-t border-border first:border-t-0"
+                                >
                                     <Link
                                         href={`/drive?c=${connectionId}&p=${encodeURIComponent(parentOf(entry.path))}`}
                                         className="group flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-card-hover"
                                     >
                                         <FileIcon className="size-4 shrink-0 text-muted-foreground" />
                                         <div className="min-w-0 flex-1">
-                                            <p className="truncate text-sm font-medium">{entry.name}</p>
+                                            <p className="truncate text-sm font-medium">
+                                                {entry.name}
+                                            </p>
                                             <p className="truncate text-xs text-muted-foreground">
                                                 /{parentOf(entry.path) || ""}
                                             </p>
