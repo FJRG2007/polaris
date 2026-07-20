@@ -84,6 +84,7 @@ import { FILE_CATEGORIES, categoryOfExtension, extensionOf, type FileCategory } 
 import { FileViewer, isViewable, type ViewerTarget } from "./file-viewer";
 import { ITEM_ICONS, ITEM_ICON_COLORS, iconColorClass, iconComponent } from "./item-icons";
 import { matchesStructured, parseSearch } from "./search-query";
+import { SelectionZipMenu } from "./selection-zip-menu";
 import { RelativeTime } from "@/components/relative-time";
 import { UserProfileDialog } from "@/components/user-profile-dialog";
 import type { DriveEntry } from "./types";
@@ -1352,6 +1353,11 @@ export function FilesView({
                                     ? "Download ZIP"
                                     : "Download"}
                             </Button>
+                            <SelectionZipMenu
+                                connectionId={connectionId}
+                                entries={selectedEntries}
+                                currentPath={path}
+                            />
                             <Button size="sm" variant="ghost" onClick={() => onDelete(selectedEntries)} disabled={pending}>
                                 <Trash2 className="size-4" />
                                 Delete
