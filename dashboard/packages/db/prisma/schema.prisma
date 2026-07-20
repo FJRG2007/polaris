@@ -836,6 +836,9 @@ model Application {
     commitFilter        String?
     // Last git SHA deployed, for the polling fallback and change detection.
     lastDeployedSha     String?
+    // Keep previous deployments running (Railway-style multi-version). Off by
+    // default: a new deploy replaces the old container.
+    keepReleases        Boolean   @default(false)
     createdAt           DateTime  @default(now())
     updatedAt           DateTime  @updatedAt
 

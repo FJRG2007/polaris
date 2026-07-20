@@ -18,11 +18,14 @@ import {
     deleteEnvironment,
     deleteProject,
     deployApplication,
+    listDeployments,
     removeApplicationDomain,
     saveEnvironmentLayout,
-    updateAutoDeploy
+    updateAutoDeploy,
+    type DeploymentSummary
 } from "@/lib/deploy-service";
 import { createDatabase, deployDatabase, type DbEngine } from "@/lib/database-service";
+import { deleteEnvVar, listEnvVars, setEnvVar, type EnvVarView } from "@/lib/env-var-service";
 import {
     getGithubStatus,
     inspectGithubRepo,
@@ -171,19 +174,56 @@ export async function setAutoDeployAction(input: {
     autoDeploy: boolean;
     deployBranch?: string;
     commitFilter?: string;
+    keepReleases?: boolean;
 }): Promise<{ error?: string }> {
     const user = await requirePermission("deploy.manage");
     try {
         await updateAutoDeploy(input.applicationId, user.id, {
             autoDeploy: input.autoDeploy,
             deployBranch: input.deployBranch,
-            commitFilter: input.commitFilter
+            commitFilter: input.commitFilter,
+            keepReleases: input.keepReleases
         });
         revalidatePath(DEPLOY_PATH);
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not save auto-deploy settings" };
+        return { error: caught instanceof Error ? caught.message : "Could not save settings" };
     }
+}
+
+/** Application env vars (secret values masked). */
+export async function listEnvVarsAction(applicationId: string): Promise<EnvVarView[]> {
+    const user = await requirePermission("deploy.manage");
+    return listEnvVars(applicationId, user.id);
+}
+
+export async function saveEnvVarAction(input: {
+    applicationId: string;
+    key: string;
+    value: string;
+    isSecret: boolean;
+}): Promise<{ error?: string }> {
+    const user = await requirePermission("deploy.manage");
+    try {
+        await setEnvVar(input.applicationId, user.id, { key: input.key, value: input.value, isSecret: input.isSecret });
+        revalidatePath(DEPLOY_PATH);
+        return {};
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not save the variable" };
+    }
+}
+
+export async function deleteEnvVarAction(id: string): Promise<{ error?: string }> {
+    const user = await requirePermission("deploy.manage");
+    await deleteEnvVar(id, user.id);
+    revalidatePath(DEPLOY_PATH);
+    return {};
+}
+
+/** An application's deployment history. */
+export async function listDeploymentsAction(applicationId: string): Promise<DeploymentSummary[]> {
+    const user = await requirePermission("deploy.manage");
+    return listDeployments(applicationId, user.id);
 }
 
 export async function deployApplicationAction(applicationId: string): Promise<{ error?: string; deploymentId?: string }> {

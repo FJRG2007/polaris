@@ -12,8 +12,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ChevronLeft, List, Loader2, Plus, Trash2, Waypoints } from "lucide-react";
 import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, Input } from "@polaris/ui";
-import { EnvironmentServices, NewServiceButton, type ProjectSummary } from "./deploy-view";
+import { EnvironmentServices, NewServiceButton, type ProjectApp, type ProjectSummary } from "./deploy-view";
 import { DeployCanvas } from "./deploy-canvas";
+import { ServiceDetail } from "./service-detail";
 import { createEnvironmentAction, deleteEnvironmentAction, deleteProjectAction } from "./actions";
 
 export function ProjectDetail({
@@ -35,6 +36,7 @@ export function ProjectDetail({
 
     const [confirmDeleteProject, setConfirmDeleteProject] = useState(false);
     const [view, setView] = useState<"canvas" | "list">("canvas");
+    const [detailApp, setDetailApp] = useState<ProjectApp | null>(null);
     const [pending, startTransition] = useTransition();
 
     return (
@@ -138,12 +140,25 @@ export function ProjectDetail({
 
             {active ? (
                 view === "canvas" ? (
-                    <DeployCanvas environment={active} canManage={canManage} />
+                    <DeployCanvas environment={active} canManage={canManage} onOpenService={setDetailApp} />
                 ) : (
-                    <EnvironmentServices environment={active} canManage={canManage} onChanged={refresh} />
+                    <EnvironmentServices
+                        environment={active}
+                        canManage={canManage}
+                        onChanged={refresh}
+                        onOpenService={setDetailApp}
+                    />
                 )
             ) : (
                 <p className="text-sm text-muted-foreground">This project has no environments.</p>
+            )}
+
+            {detailApp && (
+                <ServiceDetail
+                    app={detailApp}
+                    onChanged={refresh}
+                    onClose={() => setDetailApp(null)}
+                />
             )}
         </div>
     );

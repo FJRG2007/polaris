@@ -313,6 +313,36 @@ export async function deployApplication(applicationId: string, ownerId: string, 
     return deployment.id;
 }
 
+export interface DeploymentSummary {
+    id: string;
+    status: string;
+    error: string | null;
+    createdAt: string;
+    isCurrent: boolean;
+}
+
+/** An application's deployment history, most recent first (owner-checked). */
+export async function listDeployments(applicationId: string, ownerId: string): Promise<DeploymentSummary[]> {
+    const app = await prisma.application.findFirst({
+        where: { id: applicationId, environment: { project: { ownerId } } },
+        select: { id: true, currentDeploymentId: true }
+    });
+    if (!app) throw new Error("Application not found");
+    const rows = await prisma.deployment.findMany({
+        where: { deployableType: "application", deployableId: applicationId },
+        orderBy: { createdAt: "desc" },
+        take: 30,
+        select: { id: true, status: true, error: true, createdAt: true }
+    });
+    return rows.map((row) => ({
+        id: row.id,
+        status: row.status,
+        error: row.error,
+        createdAt: row.createdAt.toISOString(),
+        isCurrent: row.id === app.currentDeploymentId
+    }));
+}
+
 /** Map deployment ids to their current status (for showing running/failed/…). */
 export async function getDeploymentStatuses(ids: string[]): Promise<Record<string, string>> {
     const unique = [...new Set(ids.filter(Boolean))];
@@ -325,7 +355,7 @@ export async function getDeploymentStatuses(ids: string[]): Promise<Record<strin
 export async function updateAutoDeploy(
     applicationId: string,
     ownerId: string,
-    settings: { autoDeploy: boolean; deployBranch?: string | null; commitFilter?: string | null }
+    settings: { autoDeploy: boolean; deployBranch?: string | null; commitFilter?: string | null; keepReleases?: boolean }
 ): Promise<void> {
     const app = await prisma.application.findFirst({
         where: { id: applicationId, environment: { project: { ownerId } } }
@@ -336,7 +366,8 @@ export async function updateAutoDeploy(
         data: {
             autoDeploy: settings.autoDeploy,
             deployBranch: settings.deployBranch?.trim() || null,
-            commitFilter: settings.commitFilter?.trim() || null
+            commitFilter: settings.commitFilter?.trim() || null,
+            ...(settings.keepReleases !== undefined ? { keepReleases: settings.keepReleases } : {})
         }
     });
 }

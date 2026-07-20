@@ -10,7 +10,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
-import { ServiceIcon, dbTone, serviceKindOf, type ProjectSummary, type ServiceKind } from "./deploy-view";
+import { ServiceIcon, dbTone, serviceKindOf, type ProjectApp, type ProjectSummary, type ServiceKind } from "./deploy-view";
 import { saveLayoutAction } from "./actions";
 
 const NODE_W = 220;
@@ -103,10 +103,12 @@ const TONE_DOT: Record<Tone, string> = {
 
 export function DeployCanvas({
     environment,
-    canManage
+    canManage,
+    onOpenService
 }: {
     environment: ProjectSummary["environments"][number];
     canManage: boolean;
+    onOpenService?: (app: ProjectApp) => void;
 }) {
     const nodes = useMemo(() => nodesFromEnvironment(environment), [environment]);
     const nodeIds = useMemo(() => new Set(nodes.map((node) => node.id)), [nodes]);
@@ -157,13 +159,15 @@ export function DeployCanvas({
     const [dragId, setDragId] = useState<string | null>(null);
 
     function onNodePointerDown(event: React.PointerEvent, id: string) {
-        if (!canManage) return;
         event.preventDefault();
         const start = { x: event.clientX, y: event.clientY };
         const origin = posRef.current[id] ?? { x: 0, y: 0 };
-        setDragId(id);
+        let moved = false;
+        if (canManage) setDragId(id);
 
         function move(moveEvent: PointerEvent) {
+            if (Math.abs(moveEvent.clientX - start.x) + Math.abs(moveEvent.clientY - start.y) > 4) moved = true;
+            if (!canManage || !moved) return;
             const nx = Math.round((origin.x + moveEvent.clientX - start.x) / 8) * 8;
             const ny = Math.round((origin.y + moveEvent.clientY - start.y) / 8) * 8;
             setPos((prev) => ({ ...prev, [id]: { x: Math.max(0, nx), y: Math.max(0, ny) } }));
@@ -172,7 +176,13 @@ export function DeployCanvas({
             window.removeEventListener("pointermove", move);
             window.removeEventListener("pointerup", up);
             setDragId(null);
-            persist(posRef.current, links);
+            // A click (no meaningful drag) opens the service detail for app nodes.
+            if (!moved) {
+                const app = environment.applications.find((item) => item.id === id);
+                if (app && onOpenService) onOpenService(app);
+                return;
+            }
+            if (canManage) persist(posRef.current, links);
         }
         window.addEventListener("pointermove", move);
         window.addEventListener("pointerup", up);

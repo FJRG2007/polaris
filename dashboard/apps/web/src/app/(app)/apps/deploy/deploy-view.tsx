@@ -61,7 +61,7 @@ const ENGINE_OPTIONS: SelectOption[] = DB_ENGINES.map((engine) => ({
     icon: <Database className="size-4 text-muted-foreground" />
 }));
 
-type ProjectApp = ProjectSummary["environments"][number]["applications"][number];
+export type ProjectApp = ProjectSummary["environments"][number]["applications"][number];
 type ProjectDatabase = ProjectSummary["environments"][number]["databases"][number];
 
 export interface ProjectSummary {
@@ -83,6 +83,7 @@ export interface ProjectSummary {
             autoDeploy: boolean;
             deployBranch: string | null;
             commitFilter: string | null;
+            keepReleases: boolean;
             domains: { id: string; hostname: string; kind: string }[];
         }[];
         databases: { id: string; name: string; engine: string; status: string }[];
@@ -107,11 +108,13 @@ export function ServiceIcon({ kind, className = "size-4" }: { kind: ServiceKind;
 export function EnvironmentServices({
     environment,
     canManage,
-    onChanged
+    onChanged,
+    onOpenService
 }: {
     environment: ProjectSummary["environments"][number];
     canManage: boolean;
     onChanged: () => void;
+    onOpenService?: (app: ProjectApp) => void;
 }) {
     const isEmpty = environment.applications.length === 0 && environment.databases.length === 0;
 
@@ -129,7 +132,13 @@ export function EnvironmentServices({
             ) : (
                 <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                     {environment.applications.map((app) => (
-                        <AppCard key={app.id} app={app} canManage={canManage} onChanged={onChanged} />
+                        <AppCard
+                            key={app.id}
+                            app={app}
+                            canManage={canManage}
+                            onChanged={onChanged}
+                            onOpen={onOpenService ? () => onOpenService(app) : undefined}
+                        />
                     ))}
                     {environment.databases.map((database) => (
                         <DatabaseCard key={database.id} database={database} canManage={canManage} onChanged={onChanged} />
@@ -140,7 +149,17 @@ export function EnvironmentServices({
     );
 }
 
-function AppCard({ app, canManage, onChanged }: { app: ProjectApp; canManage: boolean; onChanged: () => void }) {
+function AppCard({
+    app,
+    canManage,
+    onChanged,
+    onOpen
+}: {
+    app: ProjectApp;
+    canManage: boolean;
+    onChanged: () => void;
+    onOpen?: () => void;
+}) {
     const [busy, startTransition] = useTransition();
     const [showTerminal, setShowTerminal] = useState(false);
     const [showFiles, setShowFiles] = useState(false);
@@ -163,10 +182,15 @@ function AppCard({ app, canManage, onChanged }: { app: ProjectApp; canManage: bo
     return (
         <div className="flex flex-col gap-3 rounded-lg border border-border/60 bg-surface/60 p-4 transition-colors hover:border-border">
             <div className="flex items-start justify-between gap-2">
-                <div className="flex min-w-0 items-center gap-2">
+                <button
+                    type="button"
+                    onClick={onOpen}
+                    disabled={!onOpen}
+                    className="flex min-w-0 items-center gap-2 text-left enabled:hover:text-primary"
+                >
                     <ServiceIcon kind={serviceKindOf(app.sourceType)} className="size-4 shrink-0 text-foreground" />
                     <span className="truncate text-sm font-medium">{app.name}</span>
-                </div>
+                </button>
                 <StatusPill
                     tone={app.currentDeploymentId ? dbTone(app.deployStatus ?? "") : "idle"}
                     label={app.currentDeploymentId ? (app.deployStatus ?? "deployed") : "Not deployed"}
@@ -886,7 +910,7 @@ export function EmptyState({ icon, title, description }: { icon: ReactNode; titl
     );
 }
 
-function DeploymentLogs({ deploymentId, onDone }: { deploymentId: string; onDone: () => void }) {
+export function DeploymentLogs({ deploymentId, onDone }: { deploymentId: string; onDone: () => void }) {
     const [log, setLog] = useState("");
     const [status, setStatus] = useState("queued");
     const preRef = useRef<HTMLPreElement>(null);
