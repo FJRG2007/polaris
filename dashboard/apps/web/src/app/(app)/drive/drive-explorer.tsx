@@ -13,7 +13,18 @@
 import { useCallback, useEffect, useRef, useState, useTransition, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Folder, HardDrive, Info, Loader2, Pencil, ShieldCheck, Trash2, X } from "lucide-react";
+import {
+    AlertTriangle,
+    Folder,
+    HardDrive,
+    Info,
+    KeyRound,
+    Loader2,
+    Pencil,
+    ShieldCheck,
+    Trash2,
+    X
+} from "lucide-react";
 import {
     Badge,
     Button,
@@ -346,9 +357,26 @@ export function DriveExplorer({
                                 >
                                     <HardDrive className="size-4 text-muted-foreground" />
                                     <span className="flex-1 truncate">{connection.name}</span>
+                                    {connection.needsRekey ? (
+                                        <Badge variant="warning" className="gap-1">
+                                            <AlertTriangle className="size-3" />
+                                            key changed
+                                        </Badge>
+                                    ) : null}
                                     {connection.shared ? <Badge variant="neutral">shared</Badge> : null}
                                     {connection.requiresHostd ? <Badge variant="neutral">host</Badge> : null}
                                 </Link>
+                                {connection.canManageAccess && connection.needsRekey ? (
+                                    <button
+                                        type="button"
+                                        onClick={() => setEditConn(connection)}
+                                        className="rounded-md p-1 text-warning transition-colors hover:bg-warning/10"
+                                        aria-label={`Update credentials for ${connection.name}`}
+                                        title="Update credentials"
+                                    >
+                                        <KeyRound className="size-4" />
+                                    </button>
+                                ) : null}
                                 {connection.canManageAccess ? (
                                     <button
                                         type="button"
@@ -379,6 +407,36 @@ export function DriveExplorer({
                 {!connectionId ? (
                     <div className="rounded-md border border-border bg-card p-8 text-center text-sm text-muted-foreground">
                         Add a storage connection to start browsing.
+                    </div>
+                ) : selectedConnection?.needsRekey ? (
+                    <div className="rounded-md border border-warning/40 bg-warning/10 p-6">
+                        <div className="flex items-start gap-3">
+                            <AlertTriangle className="mt-0.5 size-5 shrink-0 text-warning" />
+                            <div className="flex flex-col gap-2">
+                                <h3 className="text-sm font-medium">Saved credentials need updating</h3>
+                                <p className="text-sm text-muted-foreground">
+                                    This connection&apos;s credentials were encrypted with a different master key and
+                                    can no longer be read. Enter the password (or key) again to restore access - your
+                                    files, shares, ACLs, and settings are all kept.
+                                </p>
+                                {selectedConnection.canManageAccess ? (
+                                    <div>
+                                        <Button
+                                            size="sm"
+                                            onClick={() => setEditConn(selectedConnection)}
+                                            className="mt-1"
+                                        >
+                                            <KeyRound className="size-4" />
+                                            Update credentials
+                                        </Button>
+                                    </div>
+                                ) : (
+                                    <p className="text-xs text-muted-foreground">
+                                        Ask the owner to update this connection&apos;s credentials.
+                                    </p>
+                                )}
+                            </div>
+                        </div>
                     </div>
                 ) : needsSmbShare ? (
                     <UnasSmbSetup connectionId={connectionId} onSaved={() => void load()} />

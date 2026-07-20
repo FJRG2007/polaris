@@ -15,6 +15,7 @@ import {
     createDriver,
     decryptCredentials,
     encryptCredentials,
+    keyFingerprint,
     LocalDriver,
     SftpDriver,
     SmbDriver,
@@ -181,7 +182,9 @@ export async function getUnasMetrics(connectionId: string, ownerId: string): Pro
     });
 }
 
-/** The non-secret columns of a connection the Drive UI needs. */
+/** The non-secret columns of a connection the Drive UI needs. `credentialKeyId`
+ *  is the master-key fingerprint (never the key), used only to flag rows whose
+ *  credentials predate the current master key; it is not sent to the client. */
 const CONNECTION_SUMMARY_SELECT = {
     id: true,
     name: true,
@@ -189,16 +192,40 @@ const CONNECTION_SUMMARY_SELECT = {
     status: true,
     requiresHostd: true,
     config: true,
-    createdAt: true
+    createdAt: true,
+    credentialKeyId: true
 } as const;
 
-/** All connections owned by a user, without secret material. */
+/**
+ * True when a stored credential was encrypted under a master key other than the
+ * current one: it can no longer be decrypted, so the connection needs its secret
+ * re-entered (which re-encrypts under the current key, keeping everything else).
+ * A row with no stored credential (null keyId) is never flagged.
+ */
+function isRekeyNeeded(credentialKeyId: string | null, currentFingerprint: string): boolean {
+    return credentialKeyId !== null && credentialKeyId !== currentFingerprint;
+}
+
+/** Drop the raw key fingerprint from a summary row, replacing it with the derived
+ *  `needsRekey` flag the UI actually consumes. */
+function annotateRekey<T extends { credentialKeyId: string | null }>(
+    row: T,
+    currentFingerprint: string
+): Omit<T, "credentialKeyId"> & { needsRekey: boolean } {
+    const { credentialKeyId, ...rest } = row;
+    return { ...rest, needsRekey: isRekeyNeeded(credentialKeyId, currentFingerprint) };
+}
+
+/** All connections owned by a user, without secret material. Each carries a
+ *  `needsRekey` flag when its credentials no longer match the master key. */
 export async function listConnections(ownerId: string) {
-    return prisma.storageConnection.findMany({
+    const rows = await prisma.storageConnection.findMany({
         where: { ownerId },
         select: CONNECTION_SUMMARY_SELECT,
         orderBy: { createdAt: "asc" }
     });
+    const fingerprint = keyFingerprint(loadEnv().POLARIS_MASTER_KEY);
+    return rows.map((row) => annotateRekey(row, fingerprint));
 }
 
 /**
@@ -215,6 +242,7 @@ export async function listAccessibleConnections(userId: string) {
     ]);
     const ownedIds = new Set(owned.map((row) => row.id));
     const sharedIds = grantedIds.filter((id) => !ownedIds.has(id));
+    const fingerprint = keyFingerprint(loadEnv().POLARIS_MASTER_KEY);
     const shared =
         sharedIds.length === 0
             ? []
@@ -224,7 +252,8 @@ export async function listAccessibleConnections(userId: string) {
                   orderBy: { createdAt: "asc" }
               });
     // Global Hosts appear as SFTP sources so a server registered once is
-    // browsable in Drive. Managed in the Servers app, so not editable here.
+    // browsable in Drive. Managed in the Servers app, so not editable (or
+    // re-keyed) here - hence needsRekey is always false for them.
     const hostSummaries = hosts.map((host) => ({
         id: `${HOST_CONNECTION_PREFIX}${host.id}`,
         name: host.name,
@@ -239,11 +268,12 @@ export async function listAccessibleConnections(userId: string) {
             username: host.username
         }),
         createdAt: host.createdAt,
-        shared: false
+        shared: false,
+        needsRekey: false
     }));
     return [
         ...owned.map((row) => ({ ...row, shared: false })),
-        ...shared.map((row) => ({ ...row, shared: true })),
+        ...shared.map((row) => ({ ...annotateRekey(row, fingerprint), shared: true })),
         ...hostSummaries
     ];
 }

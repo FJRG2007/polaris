@@ -15,6 +15,9 @@ export interface ConnectionSummary {
     canManageAccess?: boolean;
     /** Non-secret connection config (host, port, share, ...) for the edit form. */
     config?: Record<string, unknown>;
+    /** True when the stored credentials were encrypted under a previous master
+     *  key and can no longer be decrypted, so they must be re-entered. */
+    needsRekey?: boolean;
 }
 
 export interface DriveEntry {

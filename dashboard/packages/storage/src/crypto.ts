@@ -81,7 +81,7 @@ export function decryptSecret(blob: EncryptedBlob, masterKeyB64: string): string
     // encrypted with a master key that has since changed; say so precisely.
     if (blob.keyId && blob.keyId !== keyFingerprint(masterKeyB64)) {
         throw new CredentialDecryptError(
-            "This connection's saved credentials were encrypted with a different master key. Remove and re-add the connection."
+            "This connection's saved credentials were encrypted with a different master key. Update its credentials to restore access."
         );
     }
     const body = blob.ciphertext.subarray(0, blob.ciphertext.length - TAG_BYTES);
@@ -92,7 +92,7 @@ export function decryptSecret(blob: EncryptedBlob, masterKeyB64: string): string
         return Buffer.concat([decipher.update(body), decipher.final()]).toString("utf8");
     } catch {
         throw new CredentialDecryptError(
-            "This connection's saved credentials could not be decrypted (the master key may have changed). Remove and re-add the connection."
+            "This connection's saved credentials could not be decrypted (the master key may have changed). Update its credentials to restore access."
         );
     }
 }
