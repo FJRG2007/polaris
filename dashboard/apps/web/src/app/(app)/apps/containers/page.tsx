@@ -13,7 +13,7 @@ import {
 } from "@/lib/docker-service";
 import { listHosts } from "@/lib/host-service";
 import { ContainersView } from "./containers-view";
-import type { ContainerRow, DockerConnectionSummary, OverviewData } from "./types";
+import type { ContainerRow, DockerConnectionSummary, LocalHostDiagnostic, OverviewData } from "./types";
 
 export const dynamic = "force-dynamic";
 
@@ -36,7 +36,23 @@ export default async function ContainersPage({
     // the local host shows the moment hostd reports Docker - no dependence on the
     // background refresh having run, and no up-to-30s blind spot after a restart.
     const canManage = await userHasManage(user, "system.manage");
-    const localAvailable = canManage && (await refreshCapabilities()).docker;
+    const caps = canManage ? await refreshCapabilities() : null;
+    const localAvailable = Boolean(caps?.docker);
+
+    // When an admin has no local host, explain WHY (edition / hostd / socket) so
+    // it is diagnosable instead of a silent "connect a host" prompt.
+    const localDiagnostic: LocalHostDiagnostic | null =
+        canManage && caps && !caps.docker
+            ? {
+                  edition: caps.edition,
+                  hostdPresent: caps.hostd.present,
+                  hostdVersion: caps.hostd.version,
+                  dockerReported: caps.docker,
+                  reason: !caps.hostd.present
+                      ? "polaris-hostd (the privileged host daemon) is not answering, so Polaris is in the limited edition. The local Docker host needs the full edition: re-run the installer (full is the default) and check that a `polaris-hostd` service shows in `docker compose ps` - if it is missing, COMPOSE_PROFILES=full is not set in your .env."
+                      : "The host daemon is running but reports no Docker socket. Make sure /var/run/docker.sock is mounted into the polaris-hostd container (it is by default in docker/docker-compose.yml)."
+              }
+            : null;
 
     const stored: DockerConnectionSummary[] = (await listDockerConnections(user.id)).map((row) => ({
         id: row.id,
@@ -130,6 +146,7 @@ export default async function ContainersPage({
                 overview={overview}
                 containers={containers}
                 error={error}
+                localDiagnostic={localDiagnostic}
             />
         </>
     );

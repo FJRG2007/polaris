@@ -14,6 +14,17 @@ export interface DockerConnectionSummary {
     host?: boolean;
 }
 
+/** Why the auto-provisioned local Docker host is not available, shown to admins
+ *  so a missing local host is diagnosable instead of a silent empty state. */
+export interface LocalHostDiagnostic {
+    edition: string;
+    hostdPresent: boolean;
+    hostdVersion?: string;
+    dockerReported: boolean;
+    /** Human-readable cause + remedy. */
+    reason: string;
+}
+
 export interface ContainerRow {
     id: string;
     name: string;
