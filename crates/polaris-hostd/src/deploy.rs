@@ -394,6 +394,9 @@ struct ChildReader {
     pos: usize,
     child: ChildGuard,
     finished: bool,
+    // Emit a non-zero-exit trailer for diagnostic streams (build/compose/pull), but
+    // never for binary-safe reads (fs read/cat) where it would corrupt the bytes.
+    emit_exit: bool,
 }
 
 impl Read for ChildReader {
@@ -416,6 +419,9 @@ impl Read for ChildReader {
                         return Ok(0);
                     }
                     self.finished = true;
+                    if !self.emit_exit {
+                        return Ok(0);
+                    }
                     // Surface a non-zero exit as a trailer line the client parses, so a
                     // failed build/compose is never a silent success on a streamed 200.
                     let code = self
@@ -469,6 +475,7 @@ fn stream_command_ext(mut cmd: Command, merge_stderr: bool) -> io::Result<Box<dy
         pos: 0,
         child: ChildGuard(child),
         finished: false,
+        emit_exit: merge_stderr,
     }))
 }
 
