@@ -18,7 +18,10 @@ function Invoke-PolarisInstall {
 
     $ErrorActionPreference = "Stop"
     $repoUrl = if ($env:POLARIS_REPO_URL) { $env:POLARIS_REPO_URL } else { "https://github.com/FJRG2007/polaris.git" }
-    $installDir = if ($env:POLARIS_INSTALL_DIR) { $env:POLARIS_INSTALL_DIR } else { Join-Path $HOME "polaris" }
+    # Fixed, machine-wide default (ProgramData) so the same command resolves to the
+    # same place regardless of which user runs it; a running deployment is found via
+    # Docker regardless (see below).
+    $installDir = if ($env:POLARIS_INSTALL_DIR) { $env:POLARIS_INSTALL_DIR } else { Join-Path $env:ProgramData "Polaris" }
 
     # Env flag lets `irm | iex` opt into the full edition without arguments.
     if ($env:POLARIS_FULL -and $env:POLARIS_FULL -notin @("0", "false", "no", "")) {
@@ -68,7 +71,7 @@ function Invoke-PolarisInstall {
         $script:SecretsStore = $env:POLARIS_SECRETS_FILE
     }
     else {
-        $script:SecretsStore = Join-Path $HOME ".polaris/secrets.env"
+        $script:SecretsStore = Join-Path $env:ProgramData "Polaris\secrets.env"
     }
 
     # Read a remembered secret's value for a key (empty string if none).

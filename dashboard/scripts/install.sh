@@ -21,7 +21,10 @@
 set -eu
 
 REPO_URL="${POLARIS_REPO_URL:-https://github.com/FJRG2007/polaris.git}"
-INSTALL_DIR="${POLARIS_INSTALL_DIR:-$HOME/polaris}"
+# Fixed, $HOME-independent default so the same line resolves to the same place no
+# matter who runs it (a user, or root via sudo - which changes $HOME). An already
+# running deployment is found via Docker regardless of this (see main).
+INSTALL_DIR="${POLARIS_INSTALL_DIR:-/opt/polaris}"
 
 log() { printf 'polaris: %s\n' "$1"; }
 err() { printf 'polaris: %s\n' "$1" >&2; }
@@ -31,9 +34,11 @@ err() { printf 'polaris: %s\n' "$1" >&2; }
 # credentials) lived only in .env - so a deleted or regenerated .env would mint a
 # NEW key and orphan every already-encrypted credential in that surviving volume.
 # This store keeps those secrets outside .env so they are REUSED across installs:
-# only genuinely-new secrets are generated, existing ones are never changed.
-# Override the location with POLARIS_SECRETS_FILE.
-SECRETS_STORE="${POLARIS_SECRETS_FILE:-$HOME/.polaris/secrets.env}"
+# only genuinely-new secrets are generated, existing ones are never changed. A
+# fixed, $HOME-independent path so sudo and non-sudo runs share one store (writes
+# are best-effort; when the path is not writable the Docker-based recovery in
+# durable_secret still keeps the key stable). Override with POLARIS_SECRETS_FILE.
+SECRETS_STORE="${POLARIS_SECRETS_FILE:-/var/lib/polaris/secrets.env}"
 
 # Echo a remembered secret's value for KEY (empty if the store has none).
 recall_secret() {
@@ -42,17 +47,19 @@ recall_secret() {
 }
 
 # Persist KEY=VALUE in the store (created 0600), replacing any prior line for KEY.
+# Best-effort: if the store path is not writable (e.g. a fixed system path under a
+# non-root run), skip silently - the Docker-based recovery still keeps keys stable.
 remember_secret() {
     key="$1"
     value="$2"
     dir=$(dirname -- "$SECRETS_STORE")
-    [ -d "$dir" ] || mkdir -p "$dir"
-    [ -f "$SECRETS_STORE" ] || : > "$SECRETS_STORE"
+    { [ -d "$dir" ] || mkdir -p "$dir" 2>/dev/null; } || return 0
+    { [ -f "$SECRETS_STORE" ] || : > "$SECRETS_STORE" 2>/dev/null; } || return 0
     chmod 600 "$SECRETS_STORE" 2>/dev/null || true
-    tmp=$(mktemp)
+    tmp=$(mktemp 2>/dev/null) || return 0
     grep -v "^${key}=" "$SECRETS_STORE" 2>/dev/null > "$tmp" || true
     printf '%s=%s\n' "$key" "$value" >> "$tmp"
-    cat "$tmp" > "$SECRETS_STORE"
+    cat "$tmp" > "$SECRETS_STORE" 2>/dev/null || true
     rm -f "$tmp"
 }
 
