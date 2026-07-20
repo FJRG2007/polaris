@@ -266,7 +266,7 @@ export function DeployCanvas({
             )}
             <div
                 ref={containerRef}
-                className="relative h-[calc(100vh-13rem)] min-h-[420px] overflow-auto rounded-lg border border-border/60"
+                className="relative h-[calc(100vh-11rem)] min-h-[460px] overflow-auto rounded-lg border border-border/60"
                 style={DOT_BG}
             >
                 <div ref={boardRef} className="relative" style={{ width: extent.w, height: extent.h }}>

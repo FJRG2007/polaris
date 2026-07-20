@@ -40,7 +40,7 @@ export function ProjectDetail({
     const [pending, startTransition] = useTransition();
 
     return (
-        <div className="mx-auto flex w-full max-w-6xl flex-col gap-5">
+        <div className="flex w-full flex-col gap-4">
             <div className="flex items-center gap-3">
                 <Link
                     href="/apps/deploy"

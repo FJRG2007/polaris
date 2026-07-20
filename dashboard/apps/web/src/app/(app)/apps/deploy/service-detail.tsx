@@ -8,8 +8,8 @@
  */
 
 import { useEffect, useState, useTransition } from "react";
-import { Eye, EyeOff, Globe, Loader2, Plus, Trash2 } from "lucide-react";
-import { Badge, Button, Dialog, DialogContent, DialogHeader, DialogTitle, Input, Switch } from "@polaris/ui";
+import { Eye, EyeOff, Globe, Loader2, Maximize2, Minimize2, Plus, Trash2 } from "lucide-react";
+import { Badge, Button, Dialog, DialogContent, DialogHeader, DialogTitle, Input, Switch, cn } from "@polaris/ui";
 import { ServiceIcon, StatusPill, DeploymentLogs, dbTone, serviceKindOf, type ProjectApp } from "./deploy-view";
 import { TerminalPanel } from "./terminal-panel";
 import { FilesPanel } from "./files-panel";
@@ -17,6 +17,7 @@ import {
     addDomainAction,
     deleteEnvVarAction,
     deployApplicationAction,
+    importEnvVarsAction,
     listDeploymentsAction,
     listEnvVarsAction,
     saveEnvVarAction,
@@ -28,28 +29,40 @@ type Tab = (typeof TABS)[number];
 
 export function ServiceDetail({ app, onChanged, onClose }: { app: ProjectApp; onChanged: () => void; onClose: () => void }) {
     const [tab, setTab] = useState<Tab>("Deployments");
+    const [full, setFull] = useState(false);
     const isGit = app.sourceType === "dockerfile" || app.sourceType === "nixpacks";
 
     return (
         <Dialog open onOpenChange={(open) => !open && onClose()}>
-            <DialogContent className="max-w-4xl">
-                <DialogHeader>
-                    <DialogTitle className="flex items-center gap-2">
-                        <ServiceIcon kind={serviceKindOf(app.sourceType)} className="size-5 text-foreground" />
-                        {app.name}
-                        {app.currentDeploymentId && (
-                            <StatusPill tone={dbTone(app.deployStatus ?? "")} label={app.deployStatus ?? "deployed"} />
-                        )}
-                    </DialogTitle>
-                </DialogHeader>
+            <DialogContent
+                className={cn(
+                    "left-0 top-0 flex h-full max-h-none translate-x-0 translate-y-0 flex-col gap-0 rounded-none rounded-r-xl border-y-0 border-l-0 p-0 data-[state=open]:slide-in-from-left-4",
+                    full ? "w-full max-w-none" : "w-full max-w-none sm:w-[760px]"
+                )}
+            >
+                <div className="flex items-center gap-3 border-b border-border/60 px-5 py-4">
+                    <ServiceIcon kind={serviceKindOf(app.sourceType)} className="size-5 shrink-0 text-foreground" />
+                    <DialogTitle className="truncate text-base font-semibold">{app.name}</DialogTitle>
+                    {app.currentDeploymentId && (
+                        <StatusPill tone={dbTone(app.deployStatus ?? "")} label={app.deployStatus ?? "deployed"} />
+                    )}
+                    <button
+                        type="button"
+                        onClick={() => setFull((value) => !value)}
+                        title={full ? "Exit full screen" : "Full screen"}
+                        className="ml-auto mr-8 rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    >
+                        {full ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
+                    </button>
+                </div>
 
-                <div className="flex items-center gap-1 border-b border-border/60 text-sm">
+                <div className="flex items-center gap-1 overflow-x-auto border-b border-border/60 px-5 text-sm">
                     {TABS.map((name) => (
                         <button
                             key={name}
                             type="button"
                             onClick={() => setTab(name)}
-                            className={`-mb-px border-b-2 px-3 py-2 transition-colors ${
+                            className={`-mb-px whitespace-nowrap border-b-2 px-3 py-2 transition-colors ${
                                 tab === name
                                     ? "border-primary text-foreground"
                                     : "border-transparent text-muted-foreground hover:text-foreground"
@@ -60,7 +73,7 @@ export function ServiceDetail({ app, onChanged, onClose }: { app: ProjectApp; on
                     ))}
                 </div>
 
-                <div className="min-h-[22rem]">
+                <div className="flex-1 overflow-y-auto px-5 py-3">
                     {tab === "Deployments" && <DeploymentsTab app={app} onChanged={onChanged} />}
                     {tab === "Variables" && <VariablesTab applicationId={app.id} />}
                     {tab === "Metrics" && <MetricsTab applicationId={app.id} />}
@@ -87,9 +100,22 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
 
     return (
         <div className="flex flex-col gap-3 py-2">
-            <div className="flex justify-end">
+            <div className="flex items-center gap-2">
+                {app.domains[0] ? (
+                    <a
+                        href={`https://${app.domains[0].hostname}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex min-w-0 items-center gap-1 truncate text-sm text-primary hover:underline"
+                    >
+                        <Globe className="size-3.5 shrink-0" /> {app.domains[0].hostname}
+                    </a>
+                ) : (
+                    <span className="text-sm text-muted-foreground">No domain yet</span>
+                )}
                 <Button
                     size="sm"
+                    className="ml-auto"
                     disabled={busy}
                     onClick={() =>
                         startTransition(async () => {
@@ -147,11 +173,29 @@ function VariablesTab({ applicationId }: { applicationId: string }) {
     const [reveal, setReveal] = useState<Record<string, boolean>>({});
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
+    const [raw, setRaw] = useState("");
+    const [rawOpen, setRawOpen] = useState(false);
+    const [note, setNote] = useState<string | null>(null);
 
     function reload() {
         void listEnvVarsAction(applicationId).then(setItems);
     }
     useEffect(reload, [applicationId]);
+
+    function importRaw() {
+        setError(null);
+        setNote(null);
+        startTransition(async () => {
+            const result = await importEnvVarsAction({ applicationId, text: raw, isSecret: true });
+            if (result.error) setError(result.error);
+            else {
+                setRaw("");
+                setRawOpen(false);
+                setNote(`Imported ${result.count} variable${result.count === 1 ? "" : "s"}.`);
+                reload();
+            }
+        });
+    }
 
     function add() {
         setError(null);
@@ -169,7 +213,32 @@ function VariablesTab({ applicationId }: { applicationId: string }) {
 
     return (
         <div className="flex flex-col gap-4 py-2">
-            <p className="text-xs text-muted-foreground">Variables are injected into the container on the next deploy.</p>
+            <div className="flex items-center justify-between gap-2">
+                <p className="text-xs text-muted-foreground">Injected into the container on the next deploy.</p>
+                <Button variant="outline" size="sm" onClick={() => setRawOpen((value) => !value)}>
+                    {rawOpen ? "Close" : "Paste .env"}
+                </Button>
+            </div>
+            {note && <p className="text-xs text-success">{note}</p>}
+            {rawOpen && (
+                <div className="flex flex-col gap-2 rounded-md border border-border/60 p-3">
+                    <span className="text-xs font-medium text-muted-foreground">
+                        Paste a .env - KEY=value per line. Quotes, spaces, `export` and # comments are handled.
+                    </span>
+                    <textarea
+                        value={raw}
+                        onChange={(event) => setRaw(event.target.value)}
+                        rows={6}
+                        placeholder={'DATABASE_URL="postgres://user:pass@host:5432/db"\nAPI_KEY=abc123 # inline comment\nexport NODE_ENV=production'}
+                        className="rounded-md border border-input bg-surface px-3 py-2 font-mono text-xs shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    />
+                    <div className="flex justify-end">
+                        <Button onClick={importRaw} disabled={pending || !raw.trim()}>
+                            {pending && <Loader2 className="size-4 animate-spin" />} Import
+                        </Button>
+                    </div>
+                </div>
+            )}
             {items === null ? (
                 <Loading />
             ) : items.length === 0 ? (

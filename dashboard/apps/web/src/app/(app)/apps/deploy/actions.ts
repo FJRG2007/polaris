@@ -25,7 +25,7 @@ import {
     type DeploymentSummary
 } from "@/lib/deploy-service";
 import { createDatabase, deployDatabase, type DbEngine } from "@/lib/database-service";
-import { deleteEnvVar, listEnvVars, setEnvVar, type EnvVarView } from "@/lib/env-var-service";
+import { deleteEnvVar, listEnvVars, parseDotEnv, setEnvVar, setEnvVars, type EnvVarView } from "@/lib/env-var-service";
 import {
     getGithubStatus,
     inspectGithubRepo,
@@ -210,6 +210,24 @@ export async function saveEnvVarAction(input: {
         return {};
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Could not save the variable" };
+    }
+}
+
+/** Import a pasted .env blob as variables (quotes/spaces/export handled). */
+export async function importEnvVarsAction(input: {
+    applicationId: string;
+    text: string;
+    isSecret: boolean;
+}): Promise<{ error?: string; count?: number }> {
+    const user = await requirePermission("deploy.manage");
+    try {
+        const parsed = parseDotEnv(input.text).map((item) => ({ ...item, isSecret: input.isSecret }));
+        if (parsed.length === 0) return { error: "No KEY=value lines found" };
+        const count = await setEnvVars(input.applicationId, user.id, parsed);
+        revalidatePath(DEPLOY_PATH);
+        return { count };
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not import variables" };
     }
 }
 
