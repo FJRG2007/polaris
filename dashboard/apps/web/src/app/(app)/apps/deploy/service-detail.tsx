@@ -75,7 +75,7 @@ export function ServiceDetail({ app, onChanged, onClose }: { app: ProjectApp; on
 
                 <div className="flex-1 overflow-y-auto px-5 py-3">
                     {tab === "Deployments" && <DeploymentsTab app={app} onChanged={onChanged} />}
-                    {tab === "Variables" && <VariablesTab applicationId={app.id} />}
+                    {tab === "Variables" && <VariablesTab app={app} />}
                     {tab === "Metrics" && <MetricsTab applicationId={app.id} />}
                     {tab === "Console" && (
                         <TerminalPanel targetId={app.targetId} containerRef={app.containerRef} label={app.containerRef} />
@@ -165,7 +165,9 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
     );
 }
 
-function VariablesTab({ applicationId }: { applicationId: string }) {
+function VariablesTab({ app }: { app: ProjectApp }) {
+    const [scope, setScope] = useState<"application" | "environment">("application");
+    const scopeId = scope === "application" ? app.id : app.environmentId;
     const [items, setItems] = useState<Awaited<ReturnType<typeof listEnvVarsAction>> | null>(null);
     const [key, setKey] = useState("");
     const [value, setValue] = useState("");
@@ -178,15 +180,16 @@ function VariablesTab({ applicationId }: { applicationId: string }) {
     const [note, setNote] = useState<string | null>(null);
 
     function reload() {
-        void listEnvVarsAction(applicationId).then(setItems);
+        setItems(null);
+        void listEnvVarsAction(scope, scopeId).then(setItems);
     }
-    useEffect(reload, [applicationId]);
+    useEffect(reload, [scope, scopeId]);
 
     function importRaw() {
         setError(null);
         setNote(null);
         startTransition(async () => {
-            const result = await importEnvVarsAction({ applicationId, text: raw, isSecret: true });
+            const result = await importEnvVarsAction({ scope, scopeId, text: raw, isSecret: true });
             if (result.error) setError(result.error);
             else {
                 setRaw("");
@@ -200,7 +203,7 @@ function VariablesTab({ applicationId }: { applicationId: string }) {
     function add() {
         setError(null);
         startTransition(async () => {
-            const result = await saveEnvVarAction({ applicationId, key, value, isSecret });
+            const result = await saveEnvVarAction({ scope, scopeId, key, value, isSecret });
             if (result.error) {
                 setError(result.error);
                 return;
@@ -213,9 +216,32 @@ function VariablesTab({ applicationId }: { applicationId: string }) {
 
     return (
         <div className="flex flex-col gap-4 py-2">
+            <div className="grid grid-cols-2 gap-1 rounded-md bg-muted p-1 text-sm">
+                {(
+                    [
+                        ["application", "This service"],
+                        ["environment", "Environment (shared)"]
+                    ] as const
+                ).map(([value, label]) => (
+                    <button
+                        key={value}
+                        type="button"
+                        onClick={() => setScope(value)}
+                        className={`rounded px-3 py-1.5 font-medium transition-colors ${
+                            scope === value ? "bg-surface text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                        }`}
+                    >
+                        {label}
+                    </button>
+                ))}
+            </div>
             <div className="flex items-center justify-between gap-2">
-                <p className="text-xs text-muted-foreground">Injected into the container on the next deploy.</p>
-                <Button variant="outline" size="sm" onClick={() => setRawOpen((value) => !value)}>
+                <p className="text-xs text-muted-foreground">
+                    {scope === "environment"
+                        ? "Shared by every service in this environment."
+                        : "Injected into this service on the next deploy."}
+                </p>
+                <Button variant="outline" size="sm" onClick={() => setRawOpen((open) => !open)}>
                     {rawOpen ? "Close" : "Paste .env"}
                 </Button>
             </div>
@@ -232,7 +258,19 @@ function VariablesTab({ applicationId }: { applicationId: string }) {
                         placeholder={'DATABASE_URL="postgres://user:pass@host:5432/db"\nAPI_KEY=abc123 # inline comment\nexport NODE_ENV=production'}
                         className="rounded-md border border-input bg-surface px-3 py-2 font-mono text-xs shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     />
-                    <div className="flex justify-end">
+                    <div className="flex items-center justify-between gap-2">
+                        <label className="cursor-pointer text-xs text-primary hover:underline">
+                            Upload a .env file
+                            <input
+                                type="file"
+                                accept=".env,text/plain"
+                                className="hidden"
+                                onChange={(event) => {
+                                    const file = event.target.files?.[0];
+                                    if (file) void file.text().then((text) => setRaw((prev) => (prev ? `${prev}\n${text}` : text)));
+                                }}
+                            />
+                        </label>
                         <Button onClick={importRaw} disabled={pending || !raw.trim()}>
                             {pending && <Loader2 className="size-4 animate-spin" />} Import
                         </Button>

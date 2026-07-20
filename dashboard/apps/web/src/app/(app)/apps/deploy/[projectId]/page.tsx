@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { serviceName } from "@polaris/deploy";
 import { refreshCapabilities } from "@polaris/hostd-client";
 import { requirePermission, userHasManage } from "@/lib/session";
-import { getDeploymentStatuses, getProjectFull } from "@/lib/deploy-service";
+import { getDeploymentStatuses, getProjectFull, listProjects } from "@/lib/deploy-service";
 import { ProjectDetail } from "../project-detail";
 import type { ProjectSummary } from "../deploy-view";
 
@@ -23,6 +23,7 @@ export default async function DeployProjectPage({ params }: { params: Promise<{ 
         environment.applications.map((app) => app.currentDeploymentId).filter((id): id is string => Boolean(id))
     );
     const statuses = await getDeploymentStatuses(deploymentIds);
+    const allProjects = (await listProjects(user.id)).map((item) => ({ id: item.id, name: item.name }));
 
     const summary: ProjectSummary = {
         id: project.id,
@@ -35,6 +36,7 @@ export default async function DeployProjectPage({ params }: { params: Promise<{ 
             applications: environment.applications.map((app) => ({
                 id: app.id,
                 name: app.name,
+                environmentId: environment.id,
                 sourceType: app.sourceType,
                 currentDeploymentId: app.currentDeploymentId,
                 deployStatus: app.currentDeploymentId ? (statuses[app.currentDeploymentId] ?? null) : null,
@@ -55,5 +57,5 @@ export default async function DeployProjectPage({ params }: { params: Promise<{ 
         }))
     };
 
-    return <ProjectDetail project={summary} canManage={canManage} localReady={localReady} />;
+    return <ProjectDetail project={summary} projects={allProjects} canManage={canManage} localReady={localReady} />;
 }

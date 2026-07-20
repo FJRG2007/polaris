@@ -11,7 +11,7 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ChevronLeft, List, Loader2, Plus, Trash2, Waypoints } from "lucide-react";
-import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, Input } from "@polaris/ui";
+import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, Input, Select } from "@polaris/ui";
 import { EnvironmentServices, NewServiceButton, type ProjectApp, type ProjectSummary } from "./deploy-view";
 import { DeployCanvas } from "./deploy-canvas";
 import { ServiceDetail } from "./service-detail";
@@ -19,10 +19,12 @@ import { createEnvironmentAction, deleteEnvironmentAction, deleteProjectAction }
 
 export function ProjectDetail({
     project,
+    projects,
     canManage,
     localReady
 }: {
     project: ProjectSummary;
+    projects: { id: string; name: string }[];
     canManage: boolean;
     localReady: boolean;
 }) {
@@ -49,7 +51,13 @@ export function ProjectDetail({
                     <ChevronLeft className="size-4" /> Projects
                 </Link>
                 <span className="text-muted-foreground/40">/</span>
-                <h1 className="text-lg font-semibold">{project.name}</h1>
+                <Select
+                    value={project.id}
+                    onValueChange={(id) => router.push(`/apps/deploy/${id}`)}
+                    options={projects.map((item) => ({ value: item.id, label: item.name }))}
+                    className="h-8 w-52 font-medium"
+                    aria-label="Project"
+                />
                 {canManage && (
                     <div className="ml-auto">
                         {confirmDeleteProject ? (

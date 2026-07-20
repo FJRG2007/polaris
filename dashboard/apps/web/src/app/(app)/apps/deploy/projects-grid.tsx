@@ -6,10 +6,11 @@
  * shows an "N/M services online" status. Clicking a card opens the project.
  */
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { LayoutGrid, List, Loader2, Plus } from "lucide-react";
+import Fuse from "fuse.js";
+import { LayoutGrid, List, Loader2, Plus, Search } from "lucide-react";
 import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, Input } from "@polaris/ui";
 import { ServiceIcon, type ServiceKind } from "./deploy-view";
 import { RegistryCredentialsButton } from "./registry-credentials";
@@ -34,6 +35,9 @@ export function ProjectsGrid({
     localReady: boolean;
 }) {
     const [layout, setLayout] = useState<"grid" | "list">("grid");
+    const [search, setSearch] = useState("");
+    const fuse = useMemo(() => new Fuse(projects, { keys: ["name"], threshold: 0.4 }), [projects]);
+    const filtered = search.trim() ? fuse.search(search.trim()).map((result) => result.item) : projects;
     const count = projects.length;
 
     return (
@@ -57,9 +61,15 @@ export function ProjectsGrid({
             )}
 
             <div className="flex items-center justify-between gap-2">
-                <span className="text-sm text-muted-foreground">
-                    {count} project{count === 1 ? "" : "s"}
-                </span>
+                <div className="relative max-w-xs flex-1">
+                    <Search className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                        value={search}
+                        onChange={(event) => setSearch(event.target.value)}
+                        placeholder={`Search ${count} project${count === 1 ? "" : "s"}`}
+                        className="h-8 pl-8"
+                    />
+                </div>
                 <div className="flex items-center gap-1 rounded-md border border-border p-0.5">
                     <button
                         type="button"
@@ -87,15 +97,17 @@ export function ProjectsGrid({
                         Create a project to group environments, applications, and databases.
                     </p>
                 </div>
+            ) : filtered.length === 0 ? (
+                <p className="py-16 text-center text-sm text-muted-foreground">No projects match &ldquo;{search}&rdquo;.</p>
             ) : layout === "grid" ? (
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                    {projects.map((project) => (
+                    {filtered.map((project) => (
                         <ProjectCard key={project.id} project={project} />
                     ))}
                 </div>
             ) : (
                 <div className="flex flex-col gap-2">
-                    {projects.map((project) => (
+                    {filtered.map((project) => (
                         <ProjectRow key={project.id} project={project} />
                     ))}
                 </div>
@@ -148,7 +160,7 @@ function ProjectCard({ project }: { project: ProjectCardData }) {
             <div className="px-4 py-3">
                 <h3 className="truncate text-sm font-medium">{project.name}</h3>
             </div>
-            <div className="mx-4 flex min-h-28 flex-1 items-center justify-center rounded-lg border border-border/60" style={DOT_CANVAS}>
+            <div className="mx-4 flex min-h-44 flex-1 items-center justify-center rounded-lg border border-border/60" style={DOT_CANVAS}>
                 {project.total === 0 ? (
                     <span className="text-xs text-muted-foreground">Empty project</span>
                 ) : (

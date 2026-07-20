@@ -18,19 +18,31 @@ export interface EnvVarView {
     value: string | null;
 }
 
-async function assertOwnsApp(applicationId: string, ownerId: string): Promise<void> {
+export type EnvScope = "application" | "environment";
+
+/** Confirm the signed-in owner owns the app or environment the scope points at. */
+async function assertOwnsScope(scope: EnvScope, scopeId: string, ownerId: string): Promise<void> {
+    if (scope === "environment") {
+        const env = await prisma.environment.findFirst({
+            where: { id: scopeId, project: { ownerId } },
+            select: { id: true }
+        });
+        if (!env) throw new Error("Environment not found");
+        return;
+    }
     const app = await prisma.application.findFirst({
-        where: { id: applicationId, environment: { project: { ownerId } } },
+        where: { id: scopeId, environment: { project: { ownerId } } },
         select: { id: true }
     });
     if (!app) throw new Error("Application not found");
 }
 
-/** List an application's variables (secret values masked). */
-export async function listEnvVars(applicationId: string, ownerId: string): Promise<EnvVarView[]> {
-    await assertOwnsApp(applicationId, ownerId);
+/** List a scope's variables (secret values masked). Application scope is a service;
+ *  environment scope is shared by every service in that environment. */
+export async function listEnvVars(scope: EnvScope, scopeId: string, ownerId: string): Promise<EnvVarView[]> {
+    await assertOwnsScope(scope, scopeId, ownerId);
     const rows = await prisma.envVar.findMany({
-        where: { scopeType: "application", scopeId: applicationId },
+        where: { scopeType: scope, scopeId },
         orderBy: { key: "asc" }
     });
     return rows.map((row) => ({
@@ -45,16 +57,17 @@ const VALID_KEY = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 /** Create or replace a variable by key. A secret value is encrypted at rest. */
 export async function setEnvVar(
-    applicationId: string,
+    scope: EnvScope,
+    scopeId: string,
     ownerId: string,
     input: { key: string; value: string; isSecret: boolean }
 ): Promise<void> {
-    await assertOwnsApp(applicationId, ownerId);
+    await assertOwnsScope(scope, scopeId, ownerId);
     const key = input.key.trim();
     if (!VALID_KEY.test(key)) throw new Error("Key must be letters, digits and underscores, not starting with a digit");
 
     const existing = await prisma.envVar.findFirst({
-        where: { scopeType: "application", scopeId: applicationId, key }
+        where: { scopeType: scope, scopeId, key }
     });
 
     let data: {
@@ -74,7 +87,7 @@ export async function setEnvVar(
     if (existing) {
         await prisma.envVar.update({ where: { id: existing.id }, data });
     } else {
-        await prisma.envVar.create({ data: { scopeType: "application", scopeId: applicationId, key, ...data } });
+        await prisma.envVar.create({ data: { scopeType: scope, scopeId, key, ...data } });
     }
 }
 
@@ -106,15 +119,16 @@ export function parseDotEnv(text: string): Array<{ key: string; value: string }>
 
 /** Set many variables at once (used by the .env paste import). */
 export async function setEnvVars(
-    applicationId: string,
+    scope: EnvScope,
+    scopeId: string,
     ownerId: string,
     vars: Array<{ key: string; value: string; isSecret: boolean }>
 ): Promise<number> {
-    await assertOwnsApp(applicationId, ownerId);
+    await assertOwnsScope(scope, scopeId, ownerId);
     let saved = 0;
     for (const item of vars) {
         try {
-            await setEnvVar(applicationId, ownerId, item);
+            await setEnvVar(scope, scopeId, ownerId, item);
             saved += 1;
         } catch {
             // Skip an invalid key; import the rest.
@@ -126,7 +140,7 @@ export async function setEnvVars(
 /** Delete a variable the owner owns. */
 export async function deleteEnvVar(id: string, ownerId: string): Promise<void> {
     const row = await prisma.envVar.findUnique({ where: { id }, select: { scopeId: true, scopeType: true } });
-    if (!row || row.scopeType !== "application") return;
-    await assertOwnsApp(row.scopeId, ownerId);
+    if (!row || (row.scopeType !== "application" && row.scopeType !== "environment")) return;
+    await assertOwnsScope(row.scopeType as EnvScope, row.scopeId, ownerId);
     await prisma.envVar.delete({ where: { id } });
 }

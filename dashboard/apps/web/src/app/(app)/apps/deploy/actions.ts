@@ -25,7 +25,15 @@ import {
     type DeploymentSummary
 } from "@/lib/deploy-service";
 import { createDatabase, deployDatabase, type DbEngine } from "@/lib/database-service";
-import { deleteEnvVar, listEnvVars, parseDotEnv, setEnvVar, setEnvVars, type EnvVarView } from "@/lib/env-var-service";
+import {
+    deleteEnvVar,
+    listEnvVars,
+    parseDotEnv,
+    setEnvVar,
+    setEnvVars,
+    type EnvScope,
+    type EnvVarView
+} from "@/lib/env-var-service";
 import {
     getGithubStatus,
     inspectGithubRepo,
@@ -191,21 +199,22 @@ export async function setAutoDeployAction(input: {
     }
 }
 
-/** Application env vars (secret values masked). */
-export async function listEnvVarsAction(applicationId: string): Promise<EnvVarView[]> {
+/** Env vars for a scope (application service or shared environment); secrets masked. */
+export async function listEnvVarsAction(scope: EnvScope, scopeId: string): Promise<EnvVarView[]> {
     const user = await requirePermission("deploy.manage");
-    return listEnvVars(applicationId, user.id);
+    return listEnvVars(scope, scopeId, user.id);
 }
 
 export async function saveEnvVarAction(input: {
-    applicationId: string;
+    scope: EnvScope;
+    scopeId: string;
     key: string;
     value: string;
     isSecret: boolean;
 }): Promise<{ error?: string }> {
     const user = await requirePermission("deploy.manage");
     try {
-        await setEnvVar(input.applicationId, user.id, { key: input.key, value: input.value, isSecret: input.isSecret });
+        await setEnvVar(input.scope, input.scopeId, user.id, { key: input.key, value: input.value, isSecret: input.isSecret });
         revalidatePath(DEPLOY_PATH);
         return {};
     } catch (caught) {
@@ -215,7 +224,8 @@ export async function saveEnvVarAction(input: {
 
 /** Import a pasted .env blob as variables (quotes/spaces/export handled). */
 export async function importEnvVarsAction(input: {
-    applicationId: string;
+    scope: EnvScope;
+    scopeId: string;
     text: string;
     isSecret: boolean;
 }): Promise<{ error?: string; count?: number }> {
@@ -223,7 +233,7 @@ export async function importEnvVarsAction(input: {
     try {
         const parsed = parseDotEnv(input.text).map((item) => ({ ...item, isSecret: input.isSecret }));
         if (parsed.length === 0) return { error: "No KEY=value lines found" };
-        const count = await setEnvVars(input.applicationId, user.id, parsed);
+        const count = await setEnvVars(input.scope, input.scopeId, user.id, parsed);
         revalidatePath(DEPLOY_PATH);
         return { count };
     } catch (caught) {

@@ -75,6 +75,7 @@ export interface ProjectSummary {
         applications: {
             id: string;
             name: string;
+            environmentId: string;
             sourceType: string;
             currentDeploymentId: string | null;
             deployStatus: string | null;
