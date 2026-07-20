@@ -62,9 +62,21 @@ Containers app (Docker):
 - [x] Modular `@polaris/docker` connector: transports (socket / SSH / TCP) behind a `DockerRpc` seam, driver, registry (4 tests)
 - [x] Containers app: host overview (CPU/mem/counts), container table with live stats, start/stop/restart; DockerConnection model
 - [x] Local host with NO flags: auto-registered, reached through hostd's allowlisted `POST /v1/docker` proxy (ping/info/list/stats/start/stop/restart only) - the web container never mounts the socket. Gated on `system.manage` + full edition
-- [ ] Live end-to-end run against a real Docker host (built + unit-tested; hostd proxy + local host not yet exercised on this Docker-off dev machine)
-- [ ] Remote-host SSH host-key pinning per connection, TLS-cert/pasted-key credential paths (encryption wired; UI present)
-- [ ] Container logs, images, compose stacks, and Kubernetes (future apps)
+- [x] Global Hosts appear as Docker-over-SSH targets (derived from the Servers app), alongside the local host and legacy socket/TCP connections
+- [ ] Live end-to-end run against a real Docker host (built + unit-tested; hostd proxy + local host + host-over-SSH not yet exercised on this Docker-off dev machine)
+- [ ] TLS-cert/pasted-key credential paths for one-off TCP hosts (encryption wired; UI present)
+- [ ] Container logs, images, compose stacks
+
+Servers (global hosts):
+- [x] `@polaris/ssh` shared primitive: one authenticated ssh2 client + mandatory host-key pinning, used by BOTH the Docker connector and the SFTP driver (dedup; fixed SFTP blind-TOFU + dropped passphrase)
+- [x] `Host` model (owner-scoped, encrypted creds, pinned host key) + Servers app: add/list/delete with password or private-key(+passphrase) auth and trust-on-add (test-connect validates creds and captures the host key to pin)
+- [x] A Host registered once derives a Docker-over-SSH target in Containers AND an SFTP source in Drive
+- [ ] Live SSH run against a real host (built + typechecked; not exercised on this machine)
+- [ ] OpenSSH user-certificate auth (deferred: ssh2 exposes no typed cert field; password + key ship now)
+- [ ] Edit a host; per-host SFTP root; VMs/deploys
+
+Kubernetes:
+- [ ] Reviewed: only stubs today - hostd `/v1/k8s` returns not-implemented, capability detection via `KUBECONFIG`/service-account exists, and the app is unlocked-pending. No k8s client, kubeconfig parsing, or model yet. Path: a `Cluster` entity (kubeconfig, encrypted) + a read-only client (list nodes/pods/deployments) mirroring the Docker connector, then lifecycle.
 
 Platform:
 - [ ] User management, roles/permissions, invites
