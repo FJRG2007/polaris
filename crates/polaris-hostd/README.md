@@ -40,7 +40,9 @@ the Polaris fleet:
 | `POLARIS_HOSTD_TOKEN_FILE` | `/run/polaris/hostd.token` | Where the per-run bearer token is written (mode 0600). |
 | `POLARIS_HOSTD_ROOT` | `/` | Allowlist root for `/v1/fs/*`. Paths canonicalizing outside it are rejected. |
 | `POLARIS_HOSTD_MOUNT_ROOT` | `/mnt/polaris` | Allowlist root for mount targets. |
-| `POLARIS_HOSTD_AUTOUPDATE` | `true` | Set to `false` to report auto-update as unavailable. |
+| `POLARIS_HOSTD_DOCKER_SOCKET` | `/var/run/docker.sock` | Docker Engine socket the `/v1/docker` proxy forwards to. Only this daemon touches it. |
+| `POLARIS_HOSTD_AUTOUPDATE` | `true` | Set to `false` to report auto-update as unavailable and refuse `/v1/update`. |
+| `POLARIS_HOSTD_UPDATE_CMD` | _(unset)_ | Shell command run detached by `/v1/update`. Operator-set only; no request input reaches it. Unset -> `/v1/update` reports `501`. |
 
 A fresh **256-bit bearer token** is generated on every start and written to the
 token file. **Every** request (including `/v1/health`) must carry
@@ -59,8 +61,9 @@ All paths are prefixed `/v1`.
 | `DELETE` | `/v1/fs/<path>` | Remove the file. |
 | `POST` | `/v1/mounts` | Body `{ id, kind: "smb"\|"nfs", source, target, options? }`. Mounts under the mount root. `201` with `{ id, mountpoint }`. |
 | `DELETE` | `/v1/mounts/<id>` | Unmount the target created for `<id>`. |
-| `POST` | `/v1/update` | Auto-update. **Stub -> `501`** (lands later). |
-| `*` | `/v1/docker/*`, `/v1/k8s/*`, `/v1/systemd/*` | Future control planes. **Stubs -> `501`**. |
+| `POST` | `/v1/update` | Run the operator-configured update command (`POLARIS_HOSTD_UPDATE_CMD`) detached. `202` `{ status: "started" }`. `403` if auto-update is disabled; `501` if no command is configured. No request input reaches the command. |
+| `POST` | `/v1/docker` | Allowlisted Docker Engine API proxy. Body `{ method, path }`; only ping/info/version, `containers/json`, `containers/<id>/stats`, and `containers/<id>/{start,stop,restart}` are permitted. Returns `200` `{ status, body }` (the Docker status and raw response); `403` if not allowlisted; `502` if the socket is unreachable. |
+| `*` | `/v1/k8s/*`, `/v1/systemd/*` | Future control planes. **Stubs -> `501`**. |
 
 Unknown route -> `404`. Malformed JSON or failed validation -> `400` with a
 safe, generic message (internal error detail is never leaked).
@@ -77,6 +80,12 @@ safe, generic message (internal error detail is never leaked).
   additionally rejected if they contain shell metacharacters or NUL (defense in
   depth). `kind` selects the `-t` filesystem type, so no client string reaches
   it. Ids are held to an `[A-Za-z0-9_-]` allowlist.
+- **Docker proxy least privilege** - the web container is never given the Docker
+  socket (it is root-equivalent). `/v1/docker` forwards only a fixed allowlist of
+  read and lifecycle calls; `create`, `exec`, image pulls, and arbitrary runs are
+  refused. Forwarded paths must be printable ASCII with no spaces, which blocks
+  CRLF request-smuggling into the socket, and `<id>` segments are charset-checked.
+  No request body is ever relayed.
 - **Bounded input** - control (JSON) bodies are capped at 16 MiB; the request
   head is capped at 64 KiB; body reads are bounded to `Content-Length`.
 - **No secret logging** - the token is never logged.

@@ -12,6 +12,7 @@ use std::sync::Mutex;
 use serde::Deserialize;
 
 use crate::config::Config;
+use crate::docker;
 use crate::http::{self, Request, Response};
 use crate::security::{self, PathError};
 
@@ -53,7 +54,7 @@ fn capabilities(config: &Config) -> serde_json::Value {
     serde_json::json!({
         "hostFilesystem": true,
         "nativeMounts": true,
-        "docker": path_exists("/var/run/docker.sock"),
+        "docker": config.docker_socket.exists(),
         "kubernetes": kubernetes,
         "systemd": path_exists("/run/systemd/system"),
         "autoUpdate": config.auto_update,
@@ -65,6 +66,16 @@ fn capabilities(config: &Config) -> serde_json::Value {
 enum MountKind {
     Smb,
     Nfs,
+}
+
+/// A request to forward to the Docker socket. Only `method` and `path` are
+/// accepted; no request body is ever relayed (the allowlisted endpoints take
+/// none), which removes an entire class of forwarding surface.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct DockerProxyRequest {
+    method: String,
+    path: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -87,12 +98,10 @@ pub fn dispatch<R: Read>(state: &AppState, req: &Request, body: &mut R) -> Respo
         ("GET", "/v1/health") => health(state),
         ("POST", "/v1/mounts") => mount_create(state, req, body),
         ("POST", "/v1/update") => update(state),
+        ("POST", "/v1/docker") => docker_proxy(state, req, body),
         _ if path.starts_with("/v1/fs/") => fs_handler(state, req, body),
         ("DELETE", _) if path.starts_with("/v1/mounts/") => {
             mount_delete(state, &path["/v1/mounts/".len()..])
-        }
-        _ if path.starts_with("/v1/docker/") => {
-            Response::not_implemented("docker control not yet implemented")
         }
         _ if path.starts_with("/v1/k8s/") => {
             Response::not_implemented("kubernetes control not yet implemented")
@@ -162,6 +171,43 @@ fn spawn_update(_cmd: &str) -> std::io::Result<()> {
         std::io::ErrorKind::Unsupported,
         "update is only supported on unix hosts",
     ))
+}
+
+/// Proxy an allowlisted Docker Engine API call. The body is a `{ method, path }`
+/// envelope; the pair is validated against a fixed allowlist before anything is
+/// forwarded, and the Docker reply is returned wrapped as
+/// `{ status, body }` so the Docker status never masquerades as this daemon's
+/// own HTTP status. The Docker response is untrusted: it is passed back verbatim
+/// as a string, never parsed or acted on here.
+fn docker_proxy<R: Read>(state: &AppState, req: &Request, body: &mut R) -> Response {
+    let raw = match read_control_body(req, body) {
+        Ok(b) => b,
+        Err(resp) => return resp,
+    };
+    let request: DockerProxyRequest = match serde_json::from_slice(&raw) {
+        Ok(r) => r,
+        Err(_) => return Response::bad_request("invalid docker proxy request body"),
+    };
+
+    let allowed = match docker::validate(&request.method, &request.path) {
+        Ok(a) => a,
+        Err(msg) => return Response::forbidden(msg),
+    };
+
+    match docker::forward(&state.config.docker_socket, &allowed) {
+        Ok((status, body)) => Response::json(
+            200,
+            "OK",
+            &serde_json::json!({
+                "status": status,
+                "body": String::from_utf8_lossy(&body),
+            }),
+        ),
+        Err(e) if e.kind() == std::io::ErrorKind::Unsupported => {
+            Response::not_implemented("docker proxy is only supported on unix hosts")
+        }
+        Err(_) => Response::text(502, "Bad Gateway", "could not reach the docker socket"),
+    }
 }
 
 /// Map a path-resolution error to a safe 403/400 response.
