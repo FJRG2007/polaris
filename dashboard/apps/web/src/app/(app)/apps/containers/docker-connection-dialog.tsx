@@ -20,7 +20,8 @@ import {
     DialogHeader,
     DialogTitle,
     DialogTrigger,
-    Input
+    Input,
+    Select
 } from "@polaris/ui";
 import { createDockerConnectionAction } from "./actions";
 
@@ -99,17 +100,11 @@ export function DockerConnectionDialog({ sshEnabled }: { sshEnabled: boolean }) 
                 <form onSubmit={onSubmit} className="flex flex-col gap-3">
                     <label className="flex flex-col gap-1 text-sm">
                         Transport
-                        <select
-                            className="h-9 rounded-md border border-input bg-surface px-3 text-sm"
+                        <Select
                             value={transport}
-                            onChange={(event) => setTransport(event.target.value as DockerTransport)}
-                        >
-                            {DOCKER_TRANSPORTS.map((value) => (
-                                <option key={value} value={value}>
-                                    {TRANSPORT_LABELS[value]}
-                                </option>
-                            ))}
-                        </select>
+                            onValueChange={(value) => setTransport(value as DockerTransport)}
+                            options={DOCKER_TRANSPORTS.map((value) => ({ value, label: TRANSPORT_LABELS[value] }))}
+                        />
                     </label>
                     <label className="flex flex-col gap-1 text-sm">
                         Name

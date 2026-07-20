@@ -20,7 +20,8 @@ import {
     DialogHeader,
     DialogTitle,
     DialogTrigger,
-    Input
+    Input,
+    Select
 } from "@polaris/ui";
 import { createHostAction } from "./actions";
 
@@ -103,17 +104,11 @@ export function HostDialog() {
                     </div>
                     <label className="flex flex-col gap-1 text-sm">
                         Authentication
-                        <select
-                            className="h-9 rounded-md border border-input bg-surface px-3 text-sm"
+                        <Select
                             value={authMethod}
-                            onChange={(event) => setAuthMethod(event.target.value as SshAuthMethod)}
-                        >
-                            {SSH_AUTH_METHODS.map((value) => (
-                                <option key={value} value={value}>
-                                    {AUTH_LABELS[value]}
-                                </option>
-                            ))}
-                        </select>
+                            onValueChange={(value) => setAuthMethod(value as SshAuthMethod)}
+                            options={SSH_AUTH_METHODS.map((value) => ({ value, label: AUTH_LABELS[value] }))}
+                        />
                     </label>
 
                     {authMethod === "password" ? (

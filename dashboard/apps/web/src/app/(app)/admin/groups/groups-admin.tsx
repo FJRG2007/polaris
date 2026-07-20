@@ -9,7 +9,7 @@
 import { useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Trash2, UserPlus, X } from "lucide-react";
-import { Badge, Button, Card, CardBody, CardHeader, CardTitle, Input } from "@polaris/ui";
+import { Badge, Button, Card, CardBody, CardHeader, CardTitle, Input, Select } from "@polaris/ui";
 import {
     addGroupMemberAction,
     createGroupAction,
@@ -162,18 +162,16 @@ function GroupCard({
                 )}
                 {candidates.length > 0 ? (
                     <div className="flex items-center gap-2">
-                        <select
-                            className="h-9 flex-1 rounded-md border border-input bg-surface px-3 text-sm"
+                        <Select
+                            className="flex-1"
                             value={add}
-                            onChange={(event) => setAdd(event.target.value)}
-                        >
-                            <option value="">Add a member...</option>
-                            {candidates.map((user) => (
-                                <option key={user.id} value={user.id}>
-                                    {user.name} ({user.email})
-                                </option>
-                            ))}
-                        </select>
+                            onValueChange={setAdd}
+                            placeholder="Add a member..."
+                            options={candidates.map((user) => ({
+                                value: user.id,
+                                label: `${user.name} (${user.email})`
+                            }))}
+                        />
                         <Button
                             size="sm"
                             variant="ghost"

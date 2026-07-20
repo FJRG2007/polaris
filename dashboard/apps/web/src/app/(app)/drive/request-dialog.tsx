@@ -11,7 +11,7 @@
 
 import { useState, type FormEvent } from "react";
 import { Check, Copy, Inbox } from "lucide-react";
-import { Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Input, cn } from "@polaris/ui";
+import { Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Input, Select, cn } from "@polaris/ui";
 import { GeoPicker } from "@/components/geo-picker";
 import { ExpirySelect } from "@/components/expiry-select";
 import { FILE_CATEGORIES, categoryDef, type FileCategory } from "./file-categories";
@@ -186,17 +186,14 @@ export function RequestDialog({
                             <div className="grid grid-cols-2 gap-3">
                                 <label className="flex flex-col gap-1 text-sm">
                                     Connection
-                                    <select
+                                    <Select
                                         value={pickConnection}
-                                        onChange={(event) => setPickConnection(event.target.value)}
-                                        className="h-9 rounded-md border border-input bg-surface px-3 text-sm"
-                                    >
-                                        {connections?.map((connection) => (
-                                            <option key={connection.id} value={connection.id}>
-                                                {connection.name}
-                                            </option>
-                                        ))}
-                                    </select>
+                                        onValueChange={setPickConnection}
+                                        options={(connections ?? []).map((connection) => ({
+                                            value: connection.id,
+                                            label: connection.name
+                                        }))}
+                                    />
                                 </label>
                                 <label className="flex flex-col gap-1 text-sm">
                                     Destination folder

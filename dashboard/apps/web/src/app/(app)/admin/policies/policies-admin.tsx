@@ -10,7 +10,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronDown, Plus, Trash2, X } from "lucide-react";
-import { Badge, Button, Card, CardBody, CardHeader, CardTitle, Input } from "@polaris/ui";
+import { Badge, Button, Card, CardBody, CardHeader, CardTitle, Input, Select } from "@polaris/ui";
 import {
     attachPolicyAction,
     createPolicyAction,
@@ -253,18 +253,16 @@ function PolicyCard({
                     )}
                 </div>
                 <div className="flex items-center gap-2">
-                    <select
-                        className="h-9 flex-1 rounded-md border border-input bg-surface px-3 text-sm"
+                    <Select
+                        className="flex-1"
                         value={attach}
-                        onChange={(event) => setAttach(event.target.value)}
-                    >
-                        <option value="">Attach to...</option>
-                        {principals.map((principal) => (
-                            <option key={`${principal.type}:${principal.id}`} value={`${principal.type}:${principal.id}`}>
-                                {principal.label}
-                            </option>
-                        ))}
-                    </select>
+                        onValueChange={setAttach}
+                        placeholder="Attach to..."
+                        options={principals.map((principal) => ({
+                            value: `${principal.type}:${principal.id}`,
+                            label: principal.label
+                        }))}
+                    />
                     <Button size="sm" variant="ghost" disabled={disabled || !attach} onClick={onAttach}>
                         <Plus className="size-4" />
                         Attach

@@ -4,7 +4,7 @@ import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Copy, Trash2 } from "lucide-react";
 import { createInviteSchema, INVITE_ROLES } from "@polaris/core";
-import { Badge, Button, Card, CardBody, CardHeader, CardTitle, Input } from "@polaris/ui";
+import { Badge, Button, Card, CardBody, CardHeader, CardTitle, Input, Select } from "@polaris/ui";
 import { useZodForm } from "@/lib/use-zod-form";
 import { createInviteAction, revokeInviteAction } from "./actions";
 
@@ -86,17 +86,11 @@ export function UsersAdmin({ users, invites }: { users: UserRow[]; invites: Invi
                         </div>
                         <div className="flex flex-col gap-1">
                             <label className="text-sm">Role</label>
-                            <select
-                                className="h-9 rounded-md border border-input bg-surface px-3 text-sm"
+                            <Select
                                 value={values.role}
-                                onChange={(event) => update("role", event.target.value)}
-                            >
-                                {INVITE_ROLES.map((role) => (
-                                    <option key={role} value={role}>
-                                        {role}
-                                    </option>
-                                ))}
-                            </select>
+                                onValueChange={(value) => update("role", value)}
+                                options={INVITE_ROLES.map((role) => ({ value: role, label: role }))}
+                            />
                         </div>
                         {error ? <p className="text-sm text-danger">{error}</p> : null}
                         <Button type="submit" disabled={pending}>

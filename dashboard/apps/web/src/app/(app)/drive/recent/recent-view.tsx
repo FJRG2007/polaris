@@ -11,7 +11,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Clock, File as FileIcon, FolderOpen } from "lucide-react";
 import { formatBytes } from "@polaris/core";
-import { Card, CardBody, cn } from "@polaris/ui";
+import { Card, CardBody, Select, cn } from "@polaris/ui";
 import { RelativeTime } from "@/components/relative-time";
 
 interface RecentEntry {
@@ -103,17 +103,15 @@ export function RecentView({ connections }: { connections: { id: string; name: s
                     ))}
                 </div>
                 {connections.length > 1 ? (
-                    <select
+                    <Select
+                        className="h-8 w-48"
                         value={connectionId}
-                        onChange={(event) => setConnectionId(event.target.value)}
-                        className="h-8 rounded-md border border-input bg-surface px-2 text-sm"
-                    >
-                        {connections.map((connection) => (
-                            <option key={connection.id} value={connection.id}>
-                                {connection.name}
-                            </option>
-                        ))}
-                    </select>
+                        onValueChange={setConnectionId}
+                        options={connections.map((connection) => ({
+                            value: connection.id,
+                            label: connection.name
+                        }))}
+                    />
                 ) : null}
             </div>
 

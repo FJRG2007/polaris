@@ -21,7 +21,8 @@ import {
     DialogDescription,
     DialogHeader,
     DialogTitle,
-    Input
+    Input,
+    Select
 } from "@polaris/ui";
 import {
     getAccessSettingsAction,
@@ -242,20 +243,17 @@ export function AccessDialog({
                             )}
 
                             <div className="flex flex-col gap-2 rounded-md border border-border bg-surface/40 p-3">
-                                <select
-                                    className="h-9 rounded-md border border-input bg-surface px-3 text-sm"
+                                <Select
                                     value={principal}
-                                    onChange={(event) => setPrincipal(event.target.value)}
-                                >
-                                    <option value="">Add a user or group...</option>
-                                    {(settings?.principals ?? []).map((option) => (
-                                        <option key={`${option.type}:${option.id}`} value={`${option.type}:${option.id}`}>
-                                            {option.type === "group" ? "Group: " : ""}
-                                            {option.label}
-                                            {option.sublabel ? ` (${option.sublabel})` : ""}
-                                        </option>
-                                    ))}
-                                </select>
+                                    onValueChange={setPrincipal}
+                                    placeholder="Add a user or group..."
+                                    options={(settings?.principals ?? []).map((option) => ({
+                                        value: `${option.type}:${option.id}`,
+                                        label: `${option.type === "group" ? "Group: " : ""}${option.label}${
+                                            option.sublabel ? ` (${option.sublabel})` : ""
+                                        }`
+                                    }))}
+                                />
                                 <div className="flex items-center gap-1.5">
                                     <span className="text-xs text-muted-foreground">Level</span>
                                     <div className="flex items-center gap-1 rounded-md border border-border p-0.5">
@@ -299,14 +297,15 @@ export function AccessDialog({
                                     ))}
                                 </div>
                                 <div className="flex items-center justify-between gap-2">
-                                    <select
-                                        className="h-9 rounded-md border border-input bg-surface px-3 text-sm"
+                                    <Select
+                                        className="w-32"
                                         value={effect}
-                                        onChange={(event) => setEffect(event.target.value as "allow" | "deny")}
-                                    >
-                                        <option value="allow">Allow</option>
-                                        <option value="deny">Deny</option>
-                                    </select>
+                                        onValueChange={(value) => setEffect(value as "allow" | "deny")}
+                                        options={[
+                                            { value: "allow", label: "Allow" },
+                                            { value: "deny", label: "Deny" }
+                                        ]}
+                                    />
                                     <Button size="sm" disabled={busy} onClick={addGrant}>
                                         Add grant
                                     </Button>
