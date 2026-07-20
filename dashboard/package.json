@@ -14,7 +14,7 @@
         "apps/*"
     ],
     "scripts": {
-        "build": "npm run build -w @polaris/config && npm run build -w @polaris/core && npm run build -w @polaris/db && npm run build -w @polaris/auth && npm run build -w @polaris/hostd-client && npm run build -w @polaris/storage && npm run build -w @polaris/docker && npm run build -w @polaris/web",
+        "build": "npm run build -w @polaris/config && npm run build -w @polaris/core && npm run build -w @polaris/db && npm run build -w @polaris/auth && npm run build -w @polaris/hostd-client && npm run build -w @polaris/ssh && npm run build -w @polaris/storage && npm run build -w @polaris/docker && npm run build -w @polaris/web",
         "typecheck": "npm run typecheck --workspaces --if-present",
         "lint": "npm run lint --workspaces --if-present",
         "test": "npm run test --workspaces --if-present",

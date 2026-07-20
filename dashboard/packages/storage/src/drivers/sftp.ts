@@ -7,7 +7,8 @@
  */
 
 import { Readable } from "node:stream";
-import { Client, type SFTPWrapper } from "ssh2";
+import type { Client, SFTPWrapper } from "ssh2";
+import { openSshClient } from "@polaris/ssh";
 import { baseName, joinUnderRoot, normalizeRelPath } from "@polaris/core";
 import {
     StorageError,
@@ -38,6 +39,11 @@ export interface SftpDriverOptions {
     readonly password?: string;
     readonly privateKey?: string;
     readonly passphrase?: string;
+    /** Pinned server public key (base64). When set, a changed key is refused;
+     *  when absent (legacy connections), the first key is trusted. */
+    readonly pinnedHostKey?: string;
+    /** Receives the server key (base64) on connect, for trust-on-add capture. */
+    readonly onHostKey?: (hostKey: string) => void;
 }
 
 export class SftpDriver implements StorageDriver {
@@ -58,21 +64,29 @@ export class SftpDriver implements StorageDriver {
     }
 
     public async connect(): Promise<void> {
-        const client = new Client();
-        await new Promise<void>((resolve, reject) => {
-            client.on("ready", () => resolve());
-            client.on("error", (error) =>
-                reject(new StorageError("connection_failed", `SSH connection failed: ${error.message}`))
-            );
-            client.connect({
+        // Auth method follows the material provided: a private key when present,
+        // otherwise a password. Host-key pinning + auth live in @polaris/ssh.
+        const auth = this.options.privateKey
+            ? ({
+                  method: "key" as const,
+                  privateKey: this.options.privateKey,
+                  passphrase: this.options.passphrase
+              })
+            : ({ method: "password" as const, password: this.options.password ?? "" });
+        let client: Client;
+        try {
+            client = await openSshClient({
                 host: this.options.host,
                 port: this.options.port,
                 username: this.options.username,
-                password: this.options.password,
-                privateKey: this.options.privateKey,
-                passphrase: this.options.passphrase
+                auth,
+                pinnedHostKey: this.options.pinnedHostKey,
+                onHostKey: this.options.onHostKey
             });
-        });
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            throw new StorageError("connection_failed", `SSH connection failed: ${message}`);
+        }
         this.client = client;
         this.sftp = await new Promise<SFTPWrapper>((resolve, reject) => {
             client.sftp((error, sftp) => (error ? reject(error) : resolve(sftp)));

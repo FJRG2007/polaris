@@ -63,7 +63,8 @@ export function createDriver(record: ConnectionRecord, deps: DriverDeps): Storag
                 username: config.username,
                 root: config.root,
                 password: creds.password,
-                privateKey: creds.privateKey
+                privateKey: creds.privateKey,
+                passphrase: creds.passphrase
             });
         }
         case "smb": {

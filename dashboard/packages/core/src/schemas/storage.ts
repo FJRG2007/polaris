@@ -73,7 +73,7 @@ export type StorageConfig = z.infer<typeof storageConfigSchema>;
 // anonymous or key-file access supplied out of band.
 export const storageCredentialsSchema = z.discriminatedUnion("kind", [
     z.object({ kind: z.literal("local") }),
-    z.object({ kind: z.literal("sftp"), password: z.string().optional(), privateKey: z.string().optional() }),
+    z.object({ kind: z.literal("sftp"), password: z.string().optional(), privateKey: z.string().optional(), passphrase: z.string().optional() }),
     z.object({ kind: z.literal("webdav"), password: z.string().optional() }),
     z.object({ kind: z.literal("s3"), secretAccessKey: z.string().min(1) }),
     z.object({ kind: z.literal("smb"), password: z.string().optional() }),
