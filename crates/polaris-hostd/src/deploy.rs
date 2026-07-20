@@ -127,7 +127,9 @@ pub fn validate_spec(spec: &DeploySpec, config: &Config) -> Result<(), String> {
                 return Err(format!("invalid label key: {key}"));
             }
             if has_control(value) {
-                return Err(format!("label value for {key} contains a control character"));
+                return Err(format!(
+                    "label value for {key} contains a control character"
+                ));
             }
         }
         for arg in &service.command {
@@ -210,14 +212,20 @@ pub fn render_compose(spec: &DeploySpec, config: &Config) -> String {
     for service in &spec.services {
         out.push_str(&format!("  {}:\n", service.name));
         out.push_str(&format!("    image: {}\n", yaml_quote(&service.image)));
-        out.push_str(&format!("    container_name: {}\n", yaml_quote(&service.name)));
+        out.push_str(&format!(
+            "    container_name: {}\n",
+            yaml_quote(&service.name)
+        ));
         if let Some(restart) = &service.restart {
             out.push_str(&format!("    restart: {}\n", yaml_quote(restart)));
         }
         if !service.env.is_empty() {
             out.push_str("    environment:\n");
             for (key, value) in &service.env {
-                out.push_str(&format!("      - {}\n", yaml_quote(&format!("{key}={value}"))));
+                out.push_str(&format!(
+                    "      - {}\n",
+                    yaml_quote(&format!("{key}={value}"))
+                ));
             }
         }
         if !service.ports.is_empty() {
@@ -250,7 +258,10 @@ pub fn render_compose(spec: &DeploySpec, config: &Config) -> String {
         if !service.labels.is_empty() {
             out.push_str("    labels:\n");
             for (key, value) in &service.labels {
-                out.push_str(&format!("      - {}\n", yaml_quote(&format!("{key}={value}"))));
+                out.push_str(&format!(
+                    "      - {}\n",
+                    yaml_quote(&format!("{key}={value}"))
+                ));
             }
         }
         if !service.networks.is_empty() {
@@ -285,7 +296,9 @@ pub fn render_compose(spec: &DeploySpec, config: &Config) -> String {
         }
         if let Some(replicas) = service.replicas {
             // Swarm scaling: `docker stack deploy` reads this; plain compose ignores it.
-            out.push_str(&format!("    deploy:\n      mode: replicated\n      replicas: {replicas}\n"));
+            out.push_str(&format!(
+                "    deploy:\n      mode: replicated\n      replicas: {replicas}\n"
+            ));
         }
     }
     if !spec.networks.is_empty() {
@@ -328,16 +341,15 @@ pub fn valid_name(name: &str) -> bool {
         Some(c) if c.is_ascii_alphanumeric() => {}
         _ => return false,
     }
-    name.len() <= 64
-        && chars.all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '.' || c == '-')
+    name.len() <= 64 && chars.all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '.' || c == '-')
 }
 
 pub fn valid_image(image: &str) -> bool {
     !image.is_empty()
         && image.len() <= 256
-        && image
-            .bytes()
-            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'_' | b'.' | b'/' | b':' | b'@' | b'-'))
+        && image.bytes().all(|b| {
+            b.is_ascii_alphanumeric() || matches!(b, b'_' | b'.' | b'/' | b':' | b'@' | b'-')
+        })
 }
 
 fn valid_env_key(key: &str) -> bool {
@@ -415,7 +427,11 @@ fn stream_command(cmd: Command) -> io::Result<Box<dyn Read + Send>> {
 /// commands merge it so the caller sees errors inline.
 fn stream_command_ext(mut cmd: Command, merge_stderr: bool) -> io::Result<Box<dyn Read + Send>> {
     cmd.stdout(Stdio::piped());
-    cmd.stderr(if merge_stderr { Stdio::piped() } else { Stdio::null() });
+    cmd.stderr(if merge_stderr {
+        Stdio::piped()
+    } else {
+        Stdio::null()
+    });
     let mut child = cmd.spawn()?;
     let stdout = child.stdout.take().expect("stdout piped");
     let (tx, rx) = mpsc::channel();
@@ -480,7 +496,11 @@ fn pump<R: Read>(mut reader: R, tx: mpsc::Sender<Vec<u8>>) {
 /// Write the rendered compose file for `project` under the deploy root and
 /// `docker compose up -d`, streaming build/up output. The project directory is
 /// confined under the deploy root.
-pub fn compose_up(config: &Config, project: &str, compose_yaml: &str) -> io::Result<Box<dyn Read + Send>> {
+pub fn compose_up(
+    config: &Config,
+    project: &str,
+    compose_yaml: &str,
+) -> io::Result<Box<dyn Read + Send>> {
     let dir = project_dir(config, project)?;
     std::fs::create_dir_all(&dir)?;
     let file = dir.join("compose.yml");
@@ -514,7 +534,11 @@ pub fn compose_down(config: &Config, project: &str) -> io::Result<Box<dyn Read +
 }
 
 /// `docker stack deploy` a rendered compose file onto a swarm, streaming output.
-pub fn stack_up(config: &Config, project: &str, compose_yaml: &str) -> io::Result<Box<dyn Read + Send>> {
+pub fn stack_up(
+    config: &Config,
+    project: &str,
+    compose_yaml: &str,
+) -> io::Result<Box<dyn Read + Send>> {
     let dir = project_dir(config, project)?;
     std::fs::create_dir_all(&dir)?;
     let file = dir.join("compose.yml");
@@ -540,7 +564,11 @@ pub fn stack_down(project: &str) -> io::Result<Box<dyn Read + Send>> {
 }
 
 /// `docker build` from a tar context on stdin, streaming build output.
-pub fn build(tag: &str, dockerfile: &str, context_tar: std::fs::File) -> io::Result<Box<dyn Read + Send>> {
+pub fn build(
+    tag: &str,
+    dockerfile: &str,
+    context_tar: std::fs::File,
+) -> io::Result<Box<dyn Read + Send>> {
     let mut cmd = Command::new("docker");
     cmd.arg("build")
         .arg("-t")
@@ -708,14 +736,17 @@ mod tests {
         // refused at parse time - it can never reach validation or rendering.
         let bad = r#"{"project":"p","services":[{"name":"a","image":"nginx","privileged":true}]}"#;
         assert!(serde_json::from_str::<DeploySpec>(bad).is_err());
-        let bad2 = r#"{"project":"p","services":[{"name":"a","image":"nginx","network_mode":"host"}]}"#;
+        let bad2 =
+            r#"{"project":"p","services":[{"name":"a","image":"nginx","network_mode":"host"}]}"#;
         assert!(serde_json::from_str::<DeploySpec>(bad2).is_err());
     }
 
     #[test]
     fn validates_a_good_spec() {
         let config = test_config();
-        let s = spec(r#"{"project":"proj","services":[{"name":"web","image":"nginx:1.27","env":{"PORT":"3000"},"networks":["polaris-proxy"]}],"networks":["polaris-proxy"]}"#);
+        let s = spec(
+            r#"{"project":"proj","services":[{"name":"web","image":"nginx:1.27","env":{"PORT":"3000"},"networks":["polaris-proxy"]}],"networks":["polaris-proxy"]}"#,
+        );
         assert!(validate_spec(&s, &config).is_ok());
     }
 
@@ -724,9 +755,11 @@ mod tests {
         let config = test_config();
         let bad_name = spec(r#"{"project":"p","services":[{"name":"../x","image":"nginx"}]}"#);
         assert!(validate_spec(&bad_name, &config).is_err());
-        let bad_image = spec(r#"{"project":"p","services":[{"name":"a","image":"nginx; rm -rf /"}]}"#);
+        let bad_image =
+            spec(r#"{"project":"p","services":[{"name":"a","image":"nginx; rm -rf /"}]}"#);
         assert!(validate_spec(&bad_image, &config).is_err());
-        let bad_project = spec(r#"{"project":"Bad Proj","services":[{"name":"a","image":"nginx"}]}"#);
+        let bad_project =
+            spec(r#"{"project":"Bad Proj","services":[{"name":"a","image":"nginx"}]}"#);
         assert!(validate_spec(&bad_project, &config).is_err());
     }
 
@@ -742,14 +775,18 @@ mod tests {
     #[test]
     fn rejects_control_chars_in_env() {
         let config = test_config();
-        let s = spec(r#"{"project":"p","services":[{"name":"a","image":"nginx","env":{"K":"v\nINJECT"}}]}"#);
+        let s = spec(
+            r#"{"project":"p","services":[{"name":"a","image":"nginx","env":{"K":"v\nINJECT"}}]}"#,
+        );
         assert!(validate_spec(&s, &config).is_err());
     }
 
     #[test]
     fn renders_quoted_scalars() {
         let config = test_config();
-        let s = spec(r#"{"project":"p","services":[{"name":"web","image":"nginx:1.27","env":{"A":"b"},"ports":[{"host":8080,"container":80}],"labels":{"traefik.enable":"true"},"networks":["polaris-proxy"]}],"networks":["polaris-proxy"]}"#);
+        let s = spec(
+            r#"{"project":"p","services":[{"name":"web","image":"nginx:1.27","env":{"A":"b"},"ports":[{"host":8080,"container":80}],"labels":{"traefik.enable":"true"},"networks":["polaris-proxy"]}],"networks":["polaris-proxy"]}"#,
+        );
         let yaml = render_compose(&s, &config);
         assert!(yaml.contains("image: \"nginx:1.27\""));
         assert!(yaml.contains("- \"A=b\""));

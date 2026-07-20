@@ -395,7 +395,10 @@ fn deploy_build<R: Read>(state: &AppState, req: &Request, body: &mut R) -> Respo
     if !deploy::valid_image(tag) {
         return Response::bad_request("invalid or missing X-Polaris-Tag");
     }
-    if dockerfile.is_empty() || dockerfile.bytes().any(|b| b < 0x20 || b == 0x7f) || dockerfile.contains("..") {
+    if dockerfile.is_empty()
+        || dockerfile.bytes().any(|b| b < 0x20 || b == 0x7f)
+        || dockerfile.contains("..")
+    {
         return Response::bad_request("invalid X-Polaris-Dockerfile");
     }
 
@@ -524,7 +527,8 @@ fn deploy_fs_read<R: Read>(req: &Request, body: &mut R) -> Response {
         }
     }
     match deploy::exec_run(&request.container, &request.argv, None, false) {
-        Ok(reader) => Response::stream(200, "OK", reader).with_header("Content-Type", "application/octet-stream"),
+        Ok(reader) => Response::stream(200, "OK", reader)
+            .with_header("Content-Type", "application/octet-stream"),
         Err(_) => Response::text(502, "Bad Gateway", "could not run the command"),
     }
 }

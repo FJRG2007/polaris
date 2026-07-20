@@ -120,7 +120,11 @@ fn serve_unix(socket: &std::path::Path, state: Arc<AppState>) -> io::Result<()> 
 /// Serve one request on an accepted connection: parse, authenticate, dispatch,
 /// and write the response. Generic over the concrete stream type so the unix
 /// and TCP paths share it.
-fn handle<R: Read + Send + 'static, W: Write>(mut reader: BufReader<R>, mut writer: W, state: &AppState) {
+fn handle<R: Read + Send + 'static, W: Write>(
+    mut reader: BufReader<R>,
+    mut writer: W,
+    state: &AppState,
+) {
     let request = match http::read_request(&mut reader) {
         Ok(Some(r)) => r,
         Ok(None) => return, // client closed without sending
@@ -212,7 +216,7 @@ fn exec_start<R: Read + Send + 'static, W: Write>(
     #[cfg(not(unix))]
     {
         let _ = (state, reader);
-        let _ = Response::not_implemented("exec is only supported on unix hosts")
-            .write_to(&mut writer);
+        let _ =
+            Response::not_implemented("exec is only supported on unix hosts").write_to(&mut writer);
     }
 }
