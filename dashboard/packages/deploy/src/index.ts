@@ -21,7 +21,6 @@ export {
 export type {
     RuntimePorts,
     OutputSink,
-    ComposeArtifact,
     BuildRequest,
     ExecSpec,
     ExecStream,
@@ -39,3 +38,16 @@ export type {
     RuntimeStatus,
     HealthcheckSpec
 } from "./runtime/driver.js";
+export {
+    appComposeSpec,
+    dbComposeSpec,
+    defaultDbPort,
+    renderComposeYaml,
+    type ComposeSpec,
+    type ComposeSpecService,
+    type ComposeSpecPort,
+    type ComposeSpecVolume,
+    type ComposeSpecHealth
+} from "./compose-spec.js";
+export { ComposeRuntime } from "./runtime/compose.js";
+export { parseContainerState, type ContainerState } from "./runtime/status.js";

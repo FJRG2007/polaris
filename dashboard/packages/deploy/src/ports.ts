@@ -10,15 +10,9 @@
  */
 
 import type { Duplex, Readable } from "node:stream";
+import type { ComposeSpec } from "./compose-spec.js";
 
 export type OutputSink = (chunk: Buffer) => void;
-
-export interface ComposeArtifact {
-    /** Compose project name (also the config directory name on the target). */
-    readonly project: string;
-    /** The rendered compose file contents. */
-    readonly composeYaml: string;
-}
 
 export interface BuildRequest {
     /** Image tag to produce. */
@@ -54,8 +48,9 @@ export interface LogOptions {
 }
 
 export interface RuntimePorts {
-    /** Write the compose file to the target and `up -d`, streaming output. */
-    composeUp(files: ComposeArtifact, onOutput?: OutputSink): Promise<void>;
+    /** Validate/render the spec on the target and `up -d`, streaming output.
+     *  Local sends the structured spec to the daemon; remote renders YAML. */
+    composeUp(spec: ComposeSpec, onOutput?: OutputSink): Promise<void>;
     composeDown(project: string, onOutput?: OutputSink): Promise<void>;
     /** Build an image from a tar context; resolves the produced tag. */
     build(request: BuildRequest, onOutput?: OutputSink): Promise<string>;

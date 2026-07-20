@@ -1,15 +1,42 @@
 import { PageHeader } from "@polaris/ui";
-import { requirePermission } from "@/lib/session";
-import { listDeployTargets } from "@/lib/deploy-target-service";
+import { refreshCapabilities } from "@polaris/hostd-client";
+import { requirePermission, userHasManage } from "@/lib/session";
+import { getOrCreateLocalTarget } from "@/lib/deploy-target-service";
+import { listProjects } from "@/lib/deploy-service";
+import { DeployView, type ProjectSummary } from "./deploy-view";
 
 export const dynamic = "force-dynamic";
 
-// Landing shell for the unified Deploy app. Projects, environments, the deploy
-// pipeline, terminals, and the file browser land in later phases; this phase
-// establishes the route and the target model that everything hangs off.
 export default async function DeployPage() {
     const user = await requirePermission("deploy.read");
-    const targets = await listDeployTargets(user.id);
+    const canManage = await userHasManage(user, "deploy.manage");
+
+    // Seed the local target so the first deploy needs no server setup, and report
+    // whether the local host can actually build/deploy (full edition + daemon).
+    if (canManage) await getOrCreateLocalTarget(user.id);
+    const caps = canManage ? await refreshCapabilities() : null;
+    const localReady = Boolean(caps?.deploy);
+
+    const projects: ProjectSummary[] = (await listProjects(user.id)).map((project) => ({
+        id: project.id,
+        name: project.name,
+        environments: project.environments.map((environment) => ({
+            id: environment.id,
+            name: environment.name,
+            applications: environment.applications.map((app) => ({
+                id: app.id,
+                name: app.name,
+                sourceType: app.sourceType,
+                currentDeploymentId: app.currentDeploymentId
+            })),
+            databases: environment.databases.map((database) => ({
+                id: database.id,
+                name: database.name,
+                engine: database.engine,
+                status: database.status
+            }))
+        }))
+    }));
 
     return (
         <>
@@ -17,11 +44,7 @@ export default async function DeployPage() {
                 title="Deploy"
                 description="Deploy apps and databases across your local host and remote servers."
             />
-            <p className="text-sm text-muted-foreground">
-                {targets.length === 0
-                    ? "No targets yet. Add a server or enable the local host to start deploying."
-                    : `${targets.length} target${targets.length === 1 ? "" : "s"} ready.`}
-            </p>
+            <DeployView projects={projects} canManage={canManage} localReady={localReady} />
         </>
     );
 }
