@@ -14,10 +14,14 @@ import { Boxes, Database, Plus, Rocket, Trash2 } from "lucide-react";
 import { Badge, Button, Card, CardBody, CardHeader, CardTitle, Input } from "@polaris/ui";
 import {
     createApplicationAction,
+    createDatabaseAction,
     createProjectAction,
     deleteProjectAction,
-    deployApplicationAction
+    deployApplicationAction,
+    deployDatabaseAction
 } from "./actions";
+
+const DB_ENGINES = ["postgres", "mysql", "mariadb", "mongo", "redis"] as const;
 
 export interface ProjectSummary {
     id: string;
@@ -149,6 +153,8 @@ function EnvironmentBlock({
     const [pending, startTransition] = useTransition();
     const [name, setName] = useState("");
     const [image, setImage] = useState("");
+    const [dbName, setDbName] = useState("");
+    const [dbEngine, setDbEngine] = useState<(typeof DB_ENGINES)[number]>("postgres");
     const [error, setError] = useState<string | null>(null);
 
     function onCreateApp() {
@@ -164,9 +170,26 @@ function EnvironmentBlock({
         });
     }
 
+    function onCreateDatabase() {
+        setError(null);
+        startTransition(async () => {
+            const result = await createDatabaseAction({ environmentId: environment.id, engine: dbEngine, name: dbName });
+            if (result.error) setError(result.error);
+            else setDbName("");
+            onChanged();
+        });
+    }
+
     function onDeploy(applicationId: string) {
         startTransition(async () => {
             await deployApplicationAction(applicationId);
+            onChanged();
+        });
+    }
+
+    function onDeployDatabase(databaseId: string) {
+        startTransition(async () => {
+            await deployDatabaseAction(databaseId);
             onChanged();
         });
     }
@@ -199,8 +222,13 @@ function EnvironmentBlock({
                             <Database className="size-4 text-muted-foreground" />
                             <span className="text-sm">{database.name}</span>
                             <Badge>{database.engine}</Badge>
+                            <Badge>{database.status}</Badge>
                         </div>
-                        <Badge>{database.status}</Badge>
+                        {canManage && (
+                            <Button variant="secondary" onClick={() => onDeployDatabase(database.id)} disabled={pending}>
+                                Provision
+                            </Button>
+                        )}
                     </div>
                 ))}
             </div>
@@ -221,6 +249,30 @@ function EnvironmentBlock({
                     />
                     <Button onClick={onCreateApp} disabled={pending || !name.trim() || !image.trim()}>
                         <Plus className="size-4" /> Add app
+                    </Button>
+                </div>
+            )}
+            {canManage && (
+                <div className="mt-2 flex flex-wrap items-end gap-2">
+                    <Input
+                        value={dbName}
+                        onChange={(event) => setDbName(event.target.value)}
+                        placeholder="database name"
+                        className="w-40"
+                    />
+                    <select
+                        value={dbEngine}
+                        onChange={(event) => setDbEngine(event.target.value as (typeof DB_ENGINES)[number])}
+                        className="h-9 rounded-md border border-input bg-transparent px-2 text-sm"
+                    >
+                        {DB_ENGINES.map((engine) => (
+                            <option key={engine} value={engine}>
+                                {engine}
+                            </option>
+                        ))}
+                    </select>
+                    <Button variant="outline" onClick={onCreateDatabase} disabled={pending || !dbName.trim()}>
+                        <Database className="size-4" /> Add database
                     </Button>
                 </div>
             )}

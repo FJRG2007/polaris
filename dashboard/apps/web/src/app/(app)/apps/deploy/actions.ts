@@ -16,6 +16,9 @@ import {
     deleteProject,
     deployApplication
 } from "@/lib/deploy-service";
+import { createDatabase, deployDatabase, type DbEngine } from "@/lib/database-service";
+
+const DB_ENGINES: DbEngine[] = ["postgres", "mysql", "mariadb", "mongo", "redis"];
 
 const DEPLOY_PATH = "/apps/deploy";
 
@@ -76,5 +79,44 @@ export async function deployApplicationAction(applicationId: string): Promise<{ 
         return { deploymentId };
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Could not start the deployment" };
+    }
+}
+
+export async function createDatabaseAction(input: {
+    environmentId: string;
+    engine: string;
+    name: string;
+    version?: string;
+}): Promise<{ error?: string }> {
+    const user = await requirePermission("deploy.manage");
+    const name = input.name?.trim();
+    if (!name) return { error: "A database name is required" };
+    if (!DB_ENGINES.includes(input.engine as DbEngine)) return { error: "Unsupported database engine" };
+    try {
+        const target = await getOrCreateLocalTarget(user.id);
+        const database = await createDatabase(user.id, {
+            environmentId: input.environmentId,
+            targetId: target.id,
+            engine: input.engine as DbEngine,
+            name,
+            version: input.version
+        });
+        await recordAudit({ actorId: user.id, action: "deploy.db.create", targetType: "database", targetId: database.id });
+        revalidatePath(DEPLOY_PATH);
+        return {};
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not create the database" };
+    }
+}
+
+export async function deployDatabaseAction(databaseId: string): Promise<{ error?: string; deploymentId?: string }> {
+    const user = await requirePermission("deploy.manage");
+    try {
+        const deploymentId = await deployDatabase(databaseId, user.id, user.id);
+        await recordAudit({ actorId: user.id, action: "deploy.db.deploy", targetType: "database", targetId: databaseId });
+        revalidatePath(DEPLOY_PATH);
+        return { deploymentId };
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not provision the database" };
     }
 }

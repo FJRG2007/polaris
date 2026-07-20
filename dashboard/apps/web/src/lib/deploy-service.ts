@@ -11,7 +11,7 @@ import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { loadEnv } from "@polaris/config";
 import { prisma } from "@polaris/db";
-import { serviceName, shortHash, slugify, type AppDeployPlan } from "@polaris/deploy";
+import { serviceName, shortHash, slugify, type AppDeployPlan, type DeployResult, type RuntimeContext, type RuntimeDriver } from "@polaris/deploy";
 import { decryptSecret } from "@polaris/storage";
 import { getDriver, getPorts, toTargetInfo, type TargetRow } from "./deploy/runtime";
 
@@ -192,10 +192,24 @@ export async function deployApplication(applicationId: string, ownerId: string, 
     return deployment.id;
 }
 
-async function runDeployment(deploymentId: string, plan: AppDeployPlan, target: TargetRow, ownerId: string): Promise<void> {
+function runDeployment(deploymentId: string, plan: AppDeployPlan, target: TargetRow, ownerId: string): Promise<void> {
+    return executeDeployment(deploymentId, target, ownerId, (ctx, driver) => driver.deployApplication(plan, ctx));
+}
+
+/**
+ * The shared deploy runner used by application and database deploys: open the log
+ * file, resolve the ports and driver for the target, run the caller's work with a
+ * RuntimeContext streaming into that log, and record the final status. Exported so
+ * database-service reuses the exact same lifecycle.
+ */
+export async function executeDeployment(
+    deploymentId: string,
+    target: TargetRow,
+    ownerId: string,
+    run: (ctx: RuntimeContext, driver: RuntimeDriver) => Promise<DeployResult>
+): Promise<void> {
     await mkdir(logDir(), { recursive: true });
-    const logPath = deployLogPath(deploymentId);
-    const logStream = createWriteStream(logPath, { flags: "a" });
+    const logStream = createWriteStream(deployLogPath(deploymentId), { flags: "a" });
     const log = (chunk: Buffer): void => {
         logStream.write(chunk);
     };
@@ -208,11 +222,7 @@ async function runDeployment(deploymentId: string, plan: AppDeployPlan, target: 
     const ports = await getPorts(target, ownerId);
     const driver = getDriver(target);
     try {
-        const result = await driver.deployApplication(plan, {
-            ports,
-            target: toTargetInfo(target),
-            log
-        });
+        const result = await run({ ports, target: toTargetInfo(target), log }, driver);
         await prisma.deployment.update({
             where: { id: deploymentId },
             data: {
@@ -232,6 +242,11 @@ async function runDeployment(deploymentId: string, plan: AppDeployPlan, target: 
         await ports.dispose();
         logStream.end();
     }
+}
+
+/** Enqueue a job serialized behind any prior job for the same target. */
+export function enqueueOnTarget(targetId: string, job: () => Promise<void>): void {
+    queue.enqueue(targetId, job);
 }
 
 // --- per-target FIFO queue (no external broker) -----------------------------
