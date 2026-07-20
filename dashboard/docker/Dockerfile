@@ -19,12 +19,29 @@ RUN apt-get update \
 
 WORKDIR /build
 
-# Reproducible install: copy the lockfile-bearing manifests first so this layer
-# is cached until dependencies actually change. The full tree follows.
-COPY . .
+# Dependency layer: copy only the workspace manifests + lockfile first so the
+# `npm ci` layer is cached and re-runs ONLY when dependencies change, not on every
+# source edit (the old `COPY . .` before install invalidated it on any file change).
+# The npm cache mount avoids re-downloading even when the layer does rebuild.
+COPY package.json package-lock.json ./
+COPY apps/web/package.json ./apps/web/
+COPY packages/auth/package.json ./packages/auth/
+COPY packages/config/package.json ./packages/config/
+COPY packages/core/package.json ./packages/core/
+COPY packages/db/package.json ./packages/db/
+COPY packages/deploy/package.json ./packages/deploy/
+COPY packages/docker/package.json ./packages/docker/
+COPY packages/hostd-client/package.json ./packages/hostd-client/
+COPY packages/ssh/package.json ./packages/ssh/
+COPY packages/storage/package.json ./packages/storage/
+COPY packages/ui/package.json ./packages/ui/
 
 # `npm ci` installs the whole workspace from the committed lockfile.
-RUN npm ci
+RUN --mount=type=cache,target=/root/.npm npm ci
+
+# The source tree follows (node_modules/.next/dist are .dockerignore'd, so this
+# does not clobber the installed dependencies above).
+COPY . .
 
 # Generate the Prisma client (output: packages/db/generated/client) and build
 # all packages, then the app. `npm run build` fans out across the workspaces.
