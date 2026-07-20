@@ -11,10 +11,12 @@ import { requirePermission } from "@/lib/session";
 import { recordAudit } from "@/lib/audit-service";
 import { getOrCreateLocalTarget } from "@/lib/deploy-target-service";
 import {
+    addApplicationDomain,
     createApplication,
     createProject,
     deleteProject,
-    deployApplication
+    deployApplication,
+    removeApplicationDomain
 } from "@/lib/deploy-service";
 import { createDatabase, deployDatabase, type DbEngine } from "@/lib/database-service";
 
@@ -80,6 +82,33 @@ export async function deployApplicationAction(applicationId: string): Promise<{ 
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Could not start the deployment" };
     }
+}
+
+export async function addDomainAction(input: {
+    applicationId: string;
+    hostname?: string;
+    targetPort: number;
+}): Promise<{ error?: string; hostname?: string }> {
+    const user = await requirePermission("deploy.manage");
+    const port = Number(input.targetPort);
+    if (!Number.isInteger(port) || port < 1 || port > 65535) return { error: "A valid target port is required" };
+    try {
+        const hostname = await addApplicationDomain(input.applicationId, user.id, {
+            hostname: input.hostname,
+            targetPort: port
+        });
+        await recordAudit({ actorId: user.id, action: "deploy.domain.add", targetType: "application", targetId: input.applicationId });
+        revalidatePath(DEPLOY_PATH);
+        return { hostname };
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not add the domain" };
+    }
+}
+
+export async function removeDomainAction(domainId: string): Promise<void> {
+    const user = await requirePermission("deploy.manage");
+    await removeApplicationDomain(domainId, user.id);
+    revalidatePath(DEPLOY_PATH);
 }
 
 export async function createDatabaseAction(input: {

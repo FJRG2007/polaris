@@ -10,9 +10,10 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Boxes, Database, Plus, Rocket, Trash2 } from "lucide-react";
+import { Boxes, Database, Globe, Plus, Rocket, Trash2 } from "lucide-react";
 import { Badge, Button, Card, CardBody, CardHeader, CardTitle, Input } from "@polaris/ui";
 import {
+    addDomainAction,
     createApplicationAction,
     createDatabaseAction,
     createProjectAction,
@@ -29,7 +30,13 @@ export interface ProjectSummary {
     environments: {
         id: string;
         name: string;
-        applications: { id: string; name: string; sourceType: string; currentDeploymentId: string | null }[];
+        applications: {
+            id: string;
+            name: string;
+            sourceType: string;
+            currentDeploymentId: string | null;
+            domains: { id: string; hostname: string; kind: string }[];
+        }[];
         databases: { id: string; name: string; engine: string; status: string }[];
     }[];
 }
@@ -141,6 +148,96 @@ export function DeployView({
     );
 }
 
+function ApplicationRow({
+    app,
+    canManage,
+    pending,
+    onDeploy,
+    onChanged
+}: {
+    app: ProjectSummary["environments"][number]["applications"][number];
+    canManage: boolean;
+    pending: boolean;
+    onDeploy: () => void;
+    onChanged: () => void;
+}) {
+    const [busy, startTransition] = useTransition();
+    const [showDomain, setShowDomain] = useState(false);
+    const [hostname, setHostname] = useState("");
+    const [port, setPort] = useState("80");
+    const [error, setError] = useState<string | null>(null);
+
+    function onAddDomain() {
+        setError(null);
+        startTransition(async () => {
+            const result = await addDomainAction({
+                applicationId: app.id,
+                hostname: hostname.trim() || undefined,
+                targetPort: Number(port)
+            });
+            if (result.error) setError(result.error);
+            else {
+                setHostname("");
+                setShowDomain(false);
+            }
+            onChanged();
+        });
+    }
+
+    return (
+        <div className="flex flex-col gap-1">
+            <div className="flex items-center justify-between gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                    <Rocket className="size-4 text-muted-foreground" />
+                    <span className="text-sm">{app.name}</span>
+                    <Badge>{app.sourceType}</Badge>
+                    {app.domains.map((domain) => (
+                        <a
+                            key={domain.id}
+                            href={`https://${domain.hostname}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1 text-xs text-sky-400 hover:underline"
+                        >
+                            <Globe className="size-3" /> {domain.hostname}
+                        </a>
+                    ))}
+                </div>
+                {canManage && (
+                    <div className="flex items-center gap-2">
+                        <Button variant="ghost" onClick={() => setShowDomain((value) => !value)}>
+                            <Globe className="size-4" />
+                        </Button>
+                        <Button variant="secondary" onClick={onDeploy} disabled={pending || busy}>
+                            Deploy
+                        </Button>
+                    </div>
+                )}
+            </div>
+            {showDomain && canManage && (
+                <div className="flex flex-wrap items-end gap-2 pl-6">
+                    <Input
+                        value={hostname}
+                        onChange={(event) => setHostname(event.target.value)}
+                        placeholder="custom domain (blank = free subdomain)"
+                        className="w-64"
+                    />
+                    <Input
+                        value={port}
+                        onChange={(event) => setPort(event.target.value)}
+                        placeholder="port"
+                        className="w-20"
+                    />
+                    <Button variant="outline" onClick={onAddDomain} disabled={busy}>
+                        Add domain
+                    </Button>
+                    {error && <span className="text-xs text-red-400">{error}</span>}
+                </div>
+            )}
+        </div>
+    );
+}
+
 function EnvironmentBlock({
     environment,
     canManage,
@@ -203,18 +300,14 @@ function EnvironmentBlock({
                     <p className="text-sm text-muted-foreground">No applications yet.</p>
                 )}
                 {environment.applications.map((app) => (
-                    <div key={app.id} className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2">
-                            <Rocket className="size-4 text-muted-foreground" />
-                            <span className="text-sm">{app.name}</span>
-                            <Badge>{app.sourceType}</Badge>
-                        </div>
-                        {canManage && (
-                            <Button variant="secondary" onClick={() => onDeploy(app.id)} disabled={pending}>
-                                Deploy
-                            </Button>
-                        )}
-                    </div>
+                    <ApplicationRow
+                        key={app.id}
+                        app={app}
+                        canManage={canManage}
+                        pending={pending}
+                        onDeploy={() => onDeploy(app.id)}
+                        onChanged={onChanged}
+                    />
                 ))}
                 {environment.databases.map((database) => (
                     <div key={database.id} className="flex items-center justify-between gap-2">

@@ -147,9 +147,46 @@ services:
         bind:
           propagation: rshared
 
+  # --- Deploy app proxy (opt-in) --------------------------------------------
+  # Traefik edge for containers deployed through the Deploy app. It discovers
+  # deployed services by their labels on the shared `polaris-proxy` network and
+  # issues Let's Encrypt certs (HTTP-01). Kept in the `proxy` profile because it
+  # binds 80/443 - enable it INSTEAD of Caddy when you route deployed apps and
+  # the dashboard through one edge (set POLARIS_ACME_EMAIL). The same Traefik is
+  # installed on remote servers by the Deploy onboarding script.
+  traefik:
+    profiles: ["proxy"]
+    image: traefik:v3.1
+    restart: unless-stopped
+    command:
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network=polaris-proxy"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge=true"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
+      - "--certificatesresolvers.letsencrypt.acme.email=${POLARIS_ACME_EMAIL:-admin@example.com}"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/traefik/acme.json"
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - polaris-traefik:/traefik
+    networks:
+      - default
+      - polaris-proxy
+
+networks:
+  # Shared network deployed services and the proxy join for name-based routing.
+  polaris-proxy:
+    name: polaris-proxy
+
 volumes:
   polaris-postgres:
   polaris-run:
   polaris-data:
   polaris-caddy-data:
   polaris-caddy-config:
+  polaris-traefik:

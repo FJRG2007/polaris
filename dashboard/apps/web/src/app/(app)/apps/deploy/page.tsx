@@ -27,7 +27,8 @@ export default async function DeployPage() {
                 id: app.id,
                 name: app.name,
                 sourceType: app.sourceType,
-                currentDeploymentId: app.currentDeploymentId
+                currentDeploymentId: app.currentDeploymentId,
+                domains: app.domains.map((domain) => ({ id: domain.id, hostname: domain.hostname, kind: domain.kind }))
             })),
             databases: environment.databases.map((database) => ({
                 id: database.id,

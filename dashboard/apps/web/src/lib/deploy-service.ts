@@ -14,6 +14,7 @@ import { prisma } from "@polaris/db";
 import { serviceName, shortHash, slugify, type AppDeployPlan, type DeployResult, type RuntimeContext, type RuntimeDriver } from "@polaris/deploy";
 import { decryptSecret } from "@polaris/storage";
 import { getDriver, getPorts, toTargetInfo, type TargetRow } from "./deploy/runtime";
+import { autoSubdomainUrl } from "./domain-service";
 
 /** Directory the web process writes deploy log files to (tailed by the UI). */
 function logDir(): string {
@@ -30,7 +31,12 @@ export async function listProjects(ownerId: string) {
     return prisma.project.findMany({
         where: { ownerId },
         orderBy: { createdAt: "asc" },
-        include: { environments: { include: { applications: true, databases: true } } }
+        include: {
+            environments: {
+                include: { applications: { include: { domains: true } }, databases: true },
+                orderBy: { createdAt: "asc" }
+            }
+        }
     });
 }
 
@@ -92,6 +98,44 @@ export async function createApplication(ownerId: string, input: CreateApplicatio
             sourceType: input.sourceType,
             sourceConfig: JSON.stringify(input.sourceConfig)
         }
+    });
+}
+
+/**
+ * Attach a domain to an application. With no hostname a free auto subdomain is
+ * generated (Traefik + Let's Encrypt serves it); the routing labels take effect
+ * on the next deploy. Returns the hostname.
+ */
+export async function addApplicationDomain(
+    applicationId: string,
+    ownerId: string,
+    opts: { hostname?: string; targetPort: number }
+): Promise<string> {
+    const app = await prisma.application.findFirst({
+        where: { id: applicationId, environment: { project: { ownerId } } }
+    });
+    if (!app) throw new Error("Application not found");
+    let hostname = opts.hostname?.trim();
+    let kind = "custom";
+    if (!hostname) {
+        const auto = await autoSubdomainUrl(app.slug);
+        if (!auto) {
+            throw new Error(
+                "No public IP is configured for free subdomains. Set one in domain settings, or enter a custom domain."
+            );
+        }
+        hostname = new URL(auto).host;
+        kind = "auto";
+    }
+    await prisma.domain.create({
+        data: { applicationId, hostname, kind, targetPort: opts.targetPort, certResolver: "le" }
+    });
+    return hostname;
+}
+
+export async function removeApplicationDomain(domainId: string, ownerId: string): Promise<void> {
+    await prisma.domain.deleteMany({
+        where: { id: domainId, application: { environment: { project: { ownerId } } } }
     });
 }
 
