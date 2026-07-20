@@ -9,14 +9,14 @@
 
 import { revalidatePath } from "next/cache";
 import { createHostSchema } from "@polaris/core";
-import { requireUser } from "@/lib/session";
+import { requirePermission } from "@/lib/session";
 import { createHost, deleteHost } from "@/lib/host-service";
 import { recordAudit } from "@/lib/audit-service";
 
 const SERVERS_PATH = "/apps/servers";
 
 export async function createHostAction(input: unknown): Promise<{ error?: string }> {
-    const user = await requireUser();
+    const user = await requirePermission("system.manage");
     const parsed = createHostSchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid host" };
     try {
@@ -36,7 +36,7 @@ export async function createHostAction(input: unknown): Promise<{ error?: string
 }
 
 export async function deleteHostAction(hostId: string): Promise<void> {
-    const user = await requireUser();
+    const user = await requirePermission("system.manage");
     await deleteHost(user.id, hostId);
     await recordAudit({ actorId: user.id, action: "host.delete", targetType: "host", targetId: hostId });
     revalidatePath(SERVERS_PATH);

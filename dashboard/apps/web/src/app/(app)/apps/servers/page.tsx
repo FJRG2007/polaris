@@ -1,12 +1,12 @@
 import { PageHeader } from "@polaris/ui";
-import { requireUser } from "@/lib/session";
+import { requirePermission } from "@/lib/session";
 import { listHosts } from "@/lib/host-service";
 import { ServersView, type HostSummary } from "./servers-view";
 
 export const dynamic = "force-dynamic";
 
 export default async function ServersPage() {
-    const user = await requireUser();
+    const user = await requirePermission("system.manage");
     const hosts: HostSummary[] = (await listHosts(user.id)).map((host) => ({
         id: host.id,
         name: host.name,
