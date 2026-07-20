@@ -44,6 +44,10 @@ export class HostdPorts implements RuntimePorts {
         await drain(res, onOutput);
     }
 
+    public async login(registry: string, username: string, password: string): Promise<void> {
+        await this.client.deployLogin(registry, username, password);
+    }
+
     public async inspect(ref: string): Promise<unknown> {
         const response = await this.client.dockerRequest("GET", `/containers/${encodeURIComponent(ref)}/json`);
         if (response.status < 200 || response.status >= 300) {

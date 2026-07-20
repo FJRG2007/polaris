@@ -771,6 +771,25 @@ model Project {
     @@index([ownerId])
 }
 
+// A private container-registry login, owner-scoped, one per registry host. The
+// password is envelope-encrypted at rest; deploys `docker login` before pulling a
+// private image whose registry matches.
+model RegistryCredential {
+    id                String   @id @default(uuid(7)) @db.Uuid
+    ownerId           String   @db.Uuid
+    // Registry host, e.g. "ghcr.io" or "docker.io" (Docker Hub).
+    registry          String
+    username          String
+    encryptedPassword Bytes
+    passwordNonce     Bytes
+    passwordKeyId     String
+    createdAt         DateTime @default(now())
+    updatedAt         DateTime @updatedAt
+
+    @@unique([ownerId, registry])
+    @@index([ownerId])
+}
+
 model Environment {
     id        String   @id @default(uuid(7)) @db.Uuid
     projectId String   @db.Uuid

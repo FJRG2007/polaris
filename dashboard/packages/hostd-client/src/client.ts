@@ -141,6 +141,23 @@ export class HostdClient {
         return this.callStream("POST", "/v1/deploy/pull", JSON.stringify({ image }));
     }
 
+    /** Authenticate to a private registry (`docker login`). Resolves on success and
+     *  throws on failure; the password rides in the JSON body, never in argv. */
+    public async deployLogin(registry: string, username: string, password: string): Promise<void> {
+        const res = await this.callStream(
+            "POST",
+            "/v1/deploy/login",
+            JSON.stringify({ registry, username, password })
+        );
+        const status = res.statusCode ?? 0;
+        await new Promise<void>((resolve) => {
+            res.on("end", resolve);
+            res.on("error", () => resolve());
+            res.resume();
+        });
+        if (status < 200 || status >= 300) throw new Error("registry login failed");
+    }
+
     /** Stream a container's logs, optionally following. */
     public async deployLogs(options: {
         container: string;

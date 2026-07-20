@@ -386,7 +386,10 @@ function NewImageForm({ environmentId, onDone }: { environmentId: string; onDone
             <Field label="Name">
                 <Input value={name} onChange={(event) => setName(event.target.value)} placeholder="my-app" autoFocus />
             </Field>
-            <Field label="Image" hint="Docker Hub, GHCR, Quay, GitLab or MCR. e.g. ghcr.io/user/repo:latest">
+            <Field
+                label="Image"
+                hint="Docker Hub, GHCR, Quay, GitLab or MCR. Private images: add a login under Registries."
+            >
                 <Input
                     value={image}
                     onChange={(event) => setImage(event.target.value)}

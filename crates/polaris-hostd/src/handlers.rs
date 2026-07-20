@@ -94,6 +94,15 @@ struct PullRequest {
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
+struct LoginRequest {
+    #[serde(default)]
+    registry: String,
+    username: String,
+    password: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct LogsRequest {
     container: String,
     #[serde(default)]
@@ -154,6 +163,7 @@ pub fn dispatch<R: Read>(state: &AppState, req: &Request, body: &mut R) -> Respo
         ("POST", "/v1/deploy/stack/up") => deploy_stack_up(state, req, body),
         ("POST", "/v1/deploy/stack/down") => deploy_stack_down(state, req, body),
         ("POST", "/v1/deploy/pull") => deploy_pull(state, req, body),
+        ("POST", "/v1/deploy/login") => deploy_login(state, req, body),
         ("POST", "/v1/deploy/logs") => deploy_logs(state, req, body),
         ("POST", "/v1/deploy/build") => deploy_build(state, req, body),
         ("POST", "/v1/deploy/exec/create") => deploy_exec_create(state, req, body),
@@ -366,6 +376,30 @@ fn deploy_pull<R: Read>(_state: &AppState, req: &Request, body: &mut R) -> Respo
     match deploy::pull(&request.image) {
         Ok(reader) => stream_response(reader),
         Err(_) => Response::text(502, "Bad Gateway", "could not pull the image"),
+    }
+}
+
+fn deploy_login<R: Read>(_state: &AppState, req: &Request, body: &mut R) -> Response {
+    let raw = match read_control_body(req, body) {
+        Ok(b) => b,
+        Err(resp) => return resp,
+    };
+    let request: LoginRequest = match serde_json::from_slice(&raw) {
+        Ok(r) => r,
+        Err(_) => return Response::bad_request("invalid login request"),
+    };
+    if !deploy::valid_registry(&request.registry)
+        || !deploy::valid_registry_username(&request.username)
+    {
+        return Response::bad_request("invalid registry or username");
+    }
+    if request.password.is_empty() || request.password.len() > 4096 {
+        return Response::bad_request("invalid password");
+    }
+    match deploy::login(&request.registry, &request.username, &request.password) {
+        Ok(true) => Response::empty(204, "No Content"),
+        Ok(false) => Response::text(502, "Bad Gateway", "registry login failed"),
+        Err(_) => Response::text(502, "Bad Gateway", "could not run registry login"),
     }
 }
 

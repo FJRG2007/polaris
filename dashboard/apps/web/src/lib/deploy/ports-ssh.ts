@@ -89,6 +89,30 @@ export class SshPorts implements RuntimePorts {
         await this.run(`docker pull ${quoteArg(image)}`, onOutput);
     }
 
+    public async login(registry: string, username: string, password: string): Promise<void> {
+        const client = await this.connect();
+        const parts = ["docker", "login"];
+        if (registry) parts.push(quoteArg(registry));
+        parts.push("-u", quoteArg(username), "--password-stdin");
+        const command = parts.join(" ");
+        // The password rides the encrypted channel's stdin, never the command line.
+        await new Promise<void>((resolve, reject) => {
+            client.exec(command, (error, channel) => {
+                if (error) return reject(error);
+                let code: number | null = null;
+                channel.on("data", () => undefined);
+                channel.stderr.on("data", () => undefined);
+                channel.on("exit", (exitCode: number) => {
+                    code = exitCode;
+                });
+                channel.on("close", () => (code === 0 ? resolve() : reject(new Error("registry login failed"))));
+                channel.on("error", reject);
+                channel.write(password);
+                channel.end();
+            });
+        });
+    }
+
     public async inspect(ref: string): Promise<unknown> {
         let out = "";
         await this.run(`docker inspect ${quoteArg(ref)}`, (chunk) => {

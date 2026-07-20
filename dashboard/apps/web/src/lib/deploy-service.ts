@@ -17,6 +17,7 @@ import { getDriver, getPorts, toTargetInfo, type TargetRow } from "./deploy/runt
 import { autoSubdomainUrl } from "./domain-service";
 import { gitBuildContext, type GitSource } from "./git-build-service";
 import { githubCloneAuthHeader } from "./github-service";
+import { resolveRegistryLogin } from "./registry-credential-service";
 
 /** Directory the web process writes deploy log files to (tailed by the UI). */
 function logDir(): string {
@@ -319,7 +320,16 @@ function runDeployment(
     ownerId: string,
     gitSource?: GitSource
 ): Promise<void> {
-    return executeDeployment(deploymentId, target, ownerId, (ctx, driver) => driver.deployApplication(plan, ctx), gitSource);
+    // Only an image source pulls a registry image that may need a login.
+    const pullImages = plan.build.method === "image" && plan.build.imageRef ? [plan.build.imageRef] : [];
+    return executeDeployment(
+        deploymentId,
+        target,
+        ownerId,
+        (ctx, driver) => driver.deployApplication(plan, ctx),
+        gitSource,
+        pullImages
+    );
 }
 
 /**
@@ -333,7 +343,8 @@ export async function executeDeployment(
     target: TargetRow,
     ownerId: string,
     run: (ctx: RuntimeContext, driver: RuntimeDriver) => Promise<DeployResult>,
-    buildSource?: GitSource
+    buildSource?: GitSource,
+    pullImages: string[] = []
 ): Promise<void> {
     await mkdir(logDir(), { recursive: true });
     const logStream = createWriteStream(deployLogPath(deploymentId), { flags: "a" });
@@ -350,6 +361,19 @@ export async function executeDeployment(
     const driver = getDriver(target);
     const buildContext = buildSource ? gitBuildContext(buildSource, log) : undefined;
     try {
+        // Authenticate to any private registry whose image this deploy pulls, so the
+        // pull below (inside the driver) is authorized. A login failure is logged but
+        // not fatal - the pull surfaces the real error if the image is truly private.
+        for (const image of pullImages) {
+            const auth = await resolveRegistryLogin(ownerId, image);
+            if (!auth) continue;
+            log(Buffer.from(`Authenticating to ${auth.registry || "Docker Hub"}...\n`));
+            try {
+                await ports.login(auth.registry, auth.username, auth.password);
+            } catch {
+                log(Buffer.from("[warn] registry login failed; the pull may be unauthorized\n"));
+            }
+        }
         const result = await run({ ports, target: toTargetInfo(target), log, buildContext }, driver);
         await prisma.deployment.update({
             where: { id: deploymentId },

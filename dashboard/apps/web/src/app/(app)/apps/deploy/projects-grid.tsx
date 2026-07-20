@@ -12,6 +12,7 @@ import { useRouter } from "next/navigation";
 import { LayoutGrid, List, Loader2, Plus } from "lucide-react";
 import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, Input } from "@polaris/ui";
 import { ServiceIcon, type ServiceKind } from "./deploy-view";
+import { RegistryCredentialsButton } from "./registry-credentials";
 import { createProjectAction } from "./actions";
 
 export interface ProjectCardData {
@@ -39,7 +40,12 @@ export function ProjectsGrid({
         <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
             <div className="flex items-center justify-between gap-4">
                 <h1 className="text-2xl font-semibold">Projects</h1>
-                {canManage && <CreateProjectButton />}
+                {canManage && (
+                    <div className="flex items-center gap-2">
+                        <RegistryCredentialsButton />
+                        <CreateProjectButton />
+                    </div>
+                )}
             </div>
 
             {!localReady && canManage && (

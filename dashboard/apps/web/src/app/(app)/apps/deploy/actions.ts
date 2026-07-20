@@ -23,6 +23,12 @@ import {
 } from "@/lib/deploy-service";
 import { createDatabase, deployDatabase, type DbEngine } from "@/lib/database-service";
 import { getGithubStatus, listGithubRepos, type GithubRepo } from "@/lib/github-service";
+import {
+    deleteRegistryCredential,
+    listRegistryCredentials,
+    upsertRegistryCredential,
+    type RegistryCredentialView
+} from "@/lib/registry-credential-service";
 
 const DB_ENGINES: DbEngine[] = ["postgres", "mysql", "mariadb", "mongo", "redis"];
 
@@ -211,6 +217,36 @@ export async function deployDatabaseAction(databaseId: string): Promise<{ error?
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Could not provision the database" };
     }
+}
+
+/** List the owner's private-registry logins (password-free). Gated on deploy.manage. */
+export async function listRegistryCredentialsAction(): Promise<RegistryCredentialView[]> {
+    const user = await requirePermission("deploy.manage");
+    return listRegistryCredentials(user.id);
+}
+
+/** Add or replace a private-registry login. Gated on deploy.manage. */
+export async function saveRegistryCredentialAction(input: {
+    registry: string;
+    username: string;
+    password: string;
+}): Promise<{ error?: string }> {
+    const user = await requirePermission("deploy.manage");
+    try {
+        await upsertRegistryCredential(user.id, input);
+        await recordAudit({ actorId: user.id, action: "deploy.registry.save", targetType: "registry", targetId: input.registry });
+        return {};
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not save the registry login" };
+    }
+}
+
+/** Remove a private-registry login. Gated on deploy.manage. */
+export async function deleteRegistryCredentialAction(id: string): Promise<{ error?: string }> {
+    const user = await requirePermission("deploy.manage");
+    await deleteRegistryCredential(id, user.id);
+    await recordAudit({ actorId: user.id, action: "deploy.registry.delete", targetType: "registry", targetId: id });
+    return {};
 }
 
 /** The connected GitHub account (if any) and the repositories it can deploy, for the

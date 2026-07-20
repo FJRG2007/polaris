@@ -587,6 +587,42 @@ pub fn pull(image: &str) -> io::Result<Box<dyn Read + Send>> {
     stream_command(cmd)
 }
 
+/// `docker login` to a registry, reading the password from stdin so it never
+/// appears in the process arguments or logs. An empty registry logs in to Docker
+/// Hub. Returns whether the login succeeded.
+pub fn login(registry: &str, username: &str, password: &str) -> io::Result<bool> {
+    use std::io::Write;
+    let mut cmd = Command::new("docker");
+    cmd.arg("login");
+    if !registry.is_empty() {
+        cmd.arg(registry);
+    }
+    cmd.arg("-u")
+        .arg(username)
+        .arg("--password-stdin")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null());
+    let mut child = cmd.spawn()?;
+    if let Some(mut stdin) = child.stdin.take() {
+        stdin.write_all(password.as_bytes())?;
+    }
+    Ok(child.wait()?.success())
+}
+
+/// Whether a registry host is well-formed (empty = Docker Hub).
+pub fn valid_registry(registry: &str) -> bool {
+    registry.len() <= 253
+        && registry
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'-' | b':' | b'/'))
+}
+
+/// Whether a registry username is well-formed (printable, non-empty).
+pub fn valid_registry_username(username: &str) -> bool {
+    !username.is_empty() && username.len() <= 256 && username.bytes().all(|b| b.is_ascii_graphic())
+}
+
 /// `docker logs` for a container, streaming (optionally following) output.
 pub fn logs(container: &str, follow: bool, tail: Option<u32>) -> io::Result<Box<dyn Read + Send>> {
     let mut cmd = Command::new("docker");

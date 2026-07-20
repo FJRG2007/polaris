@@ -189,7 +189,14 @@ export async function deployDatabase(databaseId: string, ownerId: string, userId
     });
 
     enqueueOnTarget(db.targetId, async () => {
-        await executeDeployment(deployment.id, db.target, ownerId, (ctx, driver) => driver.deployDatabase(plan, ctx));
+        await executeDeployment(
+            deployment.id,
+            db.target,
+            ownerId,
+            (ctx, driver) => driver.deployDatabase(plan, ctx),
+            undefined,
+            plan.image ? [plan.image] : []
+        );
         const final = await prisma.deployment.findUnique({ where: { id: deployment.id }, select: { status: true } });
         await prisma.managedDatabase.update({
             where: { id: db.id },

@@ -58,6 +58,10 @@ export interface RuntimePorts {
     /** Build an image from a tar context; resolves the produced tag. */
     build(request: BuildRequest, onOutput?: OutputSink): Promise<string>;
     pull(image: string, onOutput?: OutputSink): Promise<void>;
+    /** Authenticate to a private registry (`docker login`) so a following pull can
+     *  access it. An empty registry targets Docker Hub. The password is sent out of
+     *  band (stdin / request body), never on the command line. */
+    login(registry: string, username: string, password: string): Promise<void>;
     /** Inspect a container/service (parsed JSON) - reads `.State.Health` etc. */
     inspect(ref: string): Promise<unknown>;
     logs(ref: string, onData: OutputSink, options?: LogOptions): Promise<void>;
