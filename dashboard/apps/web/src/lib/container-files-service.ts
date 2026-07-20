@@ -18,7 +18,7 @@ export interface ContainerEntry {
 
 /** Resolve an application to its local container name, checking ownership and that
  *  the target is the local host. Throws a client-safe message otherwise. */
-async function resolveLocalContainer(applicationId: string, ownerId: string): Promise<string> {
+export async function resolveLocalContainer(applicationId: string, ownerId: string): Promise<string> {
     const app = await prisma.application.findFirst({
         where: { id: applicationId, environment: { project: { ownerId } } },
         include: { environment: { include: { project: true } }, target: true }

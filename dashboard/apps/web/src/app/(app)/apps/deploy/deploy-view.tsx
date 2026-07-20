@@ -215,6 +215,7 @@ function ApplicationRow({
                     <Rocket className="size-4 text-muted-foreground" />
                     <span className="text-sm">{app.name}</span>
                     <Badge>{app.sourceType}</Badge>
+                    <MetricsBadge applicationId={app.id} />
                     {app.domains.map((domain) => (
                         <a
                             key={domain.id}
@@ -465,4 +466,28 @@ function DeploymentLogs({ deploymentId, onDone }: { deploymentId: string; onDone
             </pre>
         </div>
     );
+}
+
+function MetricsBadge({ applicationId }: { applicationId: string }) {
+    const [text, setText] = useState<string | null>(null);
+
+    useEffect(() => {
+        let active = true;
+        void fetch(`/api/deploy/apps/${applicationId}/metrics`, { cache: "no-store" })
+            .then((res) => (res.ok ? res.json() : null))
+            .then((data: { state?: string; cpuPercent?: number | null; memPercent?: number | null } | null) => {
+                if (!active || !data?.state) return;
+                const parts = [data.state];
+                if (typeof data.cpuPercent === "number") parts.push(`${data.cpuPercent.toFixed(0)}% cpu`);
+                if (typeof data.memPercent === "number") parts.push(`${data.memPercent.toFixed(0)}% mem`);
+                setText(parts.join(" · "));
+            })
+            .catch(() => undefined);
+        return () => {
+            active = false;
+        };
+    }, [applicationId]);
+
+    if (!text) return null;
+    return <Badge>{text}</Badge>;
 }
