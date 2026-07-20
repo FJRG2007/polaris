@@ -1,0 +1,234 @@
+"use client";
+
+/**
+ * Project detail: the Railway-style project view. A top bar with the project name
+ * and an environment switcher (production, development, ...); the active
+ * environment's services render below. Creating and deleting environments and the
+ * project itself are in-app, confirmation-gated actions.
+ */
+
+import { useState, useTransition } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { ChevronLeft, Loader2, Plus, Trash2 } from "lucide-react";
+import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, Input } from "@polaris/ui";
+import { EnvironmentServices, type ProjectSummary } from "./deploy-view";
+import { createEnvironmentAction, deleteEnvironmentAction, deleteProjectAction } from "./actions";
+
+export function ProjectDetail({
+    project,
+    canManage,
+    localReady
+}: {
+    project: ProjectSummary;
+    canManage: boolean;
+    localReady: boolean;
+}) {
+    const router = useRouter();
+    const refresh = () => router.refresh();
+
+    const environments = project.environments;
+    const defaultEnv = environments.find((env) => env.isDefault) ?? environments[0];
+    const [activeId, setActiveId] = useState(defaultEnv?.id ?? "");
+    const active = environments.find((env) => env.id === activeId) ?? defaultEnv;
+
+    const [confirmDeleteProject, setConfirmDeleteProject] = useState(false);
+    const [pending, startTransition] = useTransition();
+
+    return (
+        <div className="mx-auto flex w-full max-w-6xl flex-col gap-5">
+            <div className="flex items-center gap-3">
+                <Link
+                    href="/apps/deploy"
+                    className="inline-flex items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
+                >
+                    <ChevronLeft className="size-4" /> Projects
+                </Link>
+                <span className="text-muted-foreground/40">/</span>
+                <h1 className="text-lg font-semibold">{project.name}</h1>
+                {canManage && (
+                    <div className="ml-auto">
+                        {confirmDeleteProject ? (
+                            <div className="flex items-center gap-2">
+                                <span className="text-xs text-muted-foreground">Delete project and everything in it?</span>
+                                <Button
+                                    variant="danger"
+                                    size="sm"
+                                    disabled={pending}
+                                    onClick={() =>
+                                        startTransition(async () => {
+                                            await deleteProjectAction(project.id);
+                                            router.push("/apps/deploy");
+                                        })
+                                    }
+                                >
+                                    {pending && <Loader2 className="size-4 animate-spin" />} Confirm
+                                </Button>
+                                <Button variant="ghost" size="sm" onClick={() => setConfirmDeleteProject(false)}>
+                                    Cancel
+                                </Button>
+                            </div>
+                        ) : (
+                            <Button variant="ghost" size="icon" title="Delete project" onClick={() => setConfirmDeleteProject(true)}>
+                                <Trash2 className="size-4" />
+                            </Button>
+                        )}
+                    </div>
+                )}
+            </div>
+
+            {!localReady && canManage && (
+                <div className="rounded-lg border border-warning/30 bg-warning/5 px-4 py-3 text-sm text-muted-foreground">
+                    The local host is not ready to build and deploy. This needs the full edition with a running{" "}
+                    <code className="rounded bg-muted px-1 py-0.5 text-xs text-foreground">polaris-hostd</code>.
+                </div>
+            )}
+
+            <div className="flex items-center gap-2 border-b border-border/60">
+                {environments.map((env) => (
+                    <button
+                        key={env.id}
+                        type="button"
+                        onClick={() => setActiveId(env.id)}
+                        className={`-mb-px border-b-2 px-3 py-2 text-sm transition-colors ${
+                            env.id === active?.id
+                                ? "border-primary text-foreground"
+                                : "border-transparent text-muted-foreground hover:text-foreground"
+                        }`}
+                    >
+                        {env.name}
+                    </button>
+                ))}
+                {canManage && <NewEnvironmentButton projectId={project.id} onChanged={refresh} />}
+                {canManage && active && !active.isDefault && (
+                    <DeleteEnvironmentButton
+                        environmentId={active.id}
+                        projectId={project.id}
+                        onDeleted={() => {
+                            setActiveId(defaultEnv?.id ?? "");
+                            refresh();
+                        }}
+                    />
+                )}
+            </div>
+
+            {active ? (
+                <EnvironmentServices environment={active} canManage={canManage} onChanged={refresh} />
+            ) : (
+                <p className="text-sm text-muted-foreground">This project has no environments.</p>
+            )}
+        </div>
+    );
+}
+
+function NewEnvironmentButton({ projectId, onChanged }: { projectId: string; onChanged: () => void }) {
+    const [open, setOpen] = useState(false);
+    const [name, setName] = useState("");
+    const [error, setError] = useState<string | null>(null);
+    const [pending, startTransition] = useTransition();
+
+    function submit() {
+        if (!name.trim()) return;
+        setError(null);
+        startTransition(async () => {
+            const result = await createEnvironmentAction({ projectId, name });
+            if (result.error) {
+                setError(result.error);
+                return;
+            }
+            setName("");
+            setOpen(false);
+            onChanged();
+        });
+    }
+
+    return (
+        <>
+            <button
+                type="button"
+                onClick={() => setOpen(true)}
+                title="New environment"
+                className="ml-1 rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            >
+                <Plus className="size-4" />
+            </button>
+            <Dialog open={open} onOpenChange={setOpen}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>New environment</DialogTitle>
+                    </DialogHeader>
+                    <div className="flex flex-col gap-3">
+                        <label className="flex flex-col gap-1.5">
+                            <span className="text-xs font-medium text-muted-foreground">Name</span>
+                            <Input
+                                autoFocus
+                                value={name}
+                                onChange={(event) => setName(event.target.value)}
+                                placeholder="development"
+                                onKeyDown={(event) => event.key === "Enter" && submit()}
+                            />
+                        </label>
+                        {error && <p className="text-sm text-danger">{error}</p>}
+                        <div className="flex justify-end gap-2">
+                            <Button variant="ghost" onClick={() => setOpen(false)}>
+                                Cancel
+                            </Button>
+                            <Button onClick={submit} disabled={pending || !name.trim()}>
+                                {pending && <Loader2 className="size-4 animate-spin" />} Create
+                            </Button>
+                        </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
+        </>
+    );
+}
+
+function DeleteEnvironmentButton({
+    environmentId,
+    projectId,
+    onDeleted
+}: {
+    environmentId: string;
+    projectId: string;
+    onDeleted: () => void;
+}) {
+    const [confirm, setConfirm] = useState(false);
+    const [pending, startTransition] = useTransition();
+
+    if (!confirm) {
+        return (
+            <button
+                type="button"
+                onClick={() => setConfirm(true)}
+                title="Delete environment"
+                className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-danger"
+            >
+                <Trash2 className="size-4" />
+            </button>
+        );
+    }
+
+    return (
+        <span className="flex items-center gap-1 pl-1 text-xs text-muted-foreground">
+            Delete?
+            <Button
+                variant="danger"
+                size="sm"
+                disabled={pending}
+                onClick={() =>
+                    startTransition(async () => {
+                        await deleteEnvironmentAction({ environmentId, projectId });
+                        setConfirm(false);
+                        onDeleted();
+                    })
+                }
+            >
+                {pending && <Loader2 className="size-4 animate-spin" />} Yes
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => setConfirm(false)}>
+                No
+            </Button>
+        </span>
+    );
+}

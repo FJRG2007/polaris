@@ -69,6 +69,40 @@ export async function getProject(projectId: string, ownerId: string) {
     });
 }
 
+/** One project with the full environment/service tree the detail view renders. */
+export async function getProjectFull(projectId: string, ownerId: string) {
+    return prisma.project.findFirst({
+        where: { id: projectId, ownerId },
+        include: {
+            environments: {
+                include: { applications: { include: { domains: true } }, databases: true },
+                orderBy: { createdAt: "asc" }
+            }
+        }
+    });
+}
+
+/** Add an environment (e.g. "Development") to a project the owner owns. */
+export async function createEnvironment(projectId: string, ownerId: string, name: string) {
+    const project = await prisma.project.findFirst({ where: { id: projectId, ownerId } });
+    if (!project) throw new Error("Project not found");
+    const slug = slugify(name);
+    if (!slug) throw new Error("Environment name must contain letters or digits");
+    const existing = await prisma.environment.findFirst({ where: { projectId, slug } });
+    if (existing) throw new Error("An environment with that name already exists");
+    return prisma.environment.create({ data: { projectId, name, slug, isDefault: false } });
+}
+
+/** Delete a non-default environment (and everything in it) the owner owns. */
+export async function deleteEnvironment(environmentId: string, ownerId: string) {
+    const environment = await prisma.environment.findFirst({
+        where: { id: environmentId, project: { ownerId } }
+    });
+    if (!environment) throw new Error("Environment not found");
+    if (environment.isDefault) throw new Error("The default environment cannot be deleted");
+    await prisma.environment.delete({ where: { id: environmentId } });
+}
+
 /** Create a project with a default "production" environment. */
 export async function createProject(ownerId: string, name: string) {
     const slug = slugify(name);

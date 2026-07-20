@@ -1,12 +1,13 @@
-import { PageHeader } from "@polaris/ui";
-import { serviceName } from "@polaris/deploy";
 import { refreshCapabilities } from "@polaris/hostd-client";
 import { requirePermission, userHasManage } from "@/lib/session";
 import { getOrCreateLocalTarget } from "@/lib/deploy-target-service";
 import { listProjects } from "@/lib/deploy-service";
-import { DeployView, type ProjectSummary } from "./deploy-view";
+import { ProjectsGrid, type ProjectCardData } from "./projects-grid";
+import type { ServiceKind } from "./deploy-view";
 
 export const dynamic = "force-dynamic";
+
+const ONLINE_DB_STATES = new Set(["running", "active", "healthy", "ready"]);
 
 export default async function DeployPage() {
     const user = await requirePermission("deploy.read");
@@ -18,37 +19,27 @@ export default async function DeployPage() {
     const caps = canManage ? await refreshCapabilities() : null;
     const localReady = Boolean(caps?.deploy);
 
-    const projects: ProjectSummary[] = (await listProjects(user.id)).map((project) => ({
-        id: project.id,
-        name: project.name,
-        environments: project.environments.map((environment) => ({
-            id: environment.id,
-            name: environment.name,
-            applications: environment.applications.map((app) => ({
-                id: app.id,
-                name: app.name,
-                sourceType: app.sourceType,
-                currentDeploymentId: app.currentDeploymentId,
-                targetId: app.targetId,
-                containerRef: serviceName(project.slug, app.slug, app.id),
-                domains: app.domains.map((domain) => ({ id: domain.id, hostname: domain.hostname, kind: domain.kind }))
-            })),
-            databases: environment.databases.map((database) => ({
-                id: database.id,
-                name: database.name,
-                engine: database.engine,
-                status: database.status
-            }))
-        }))
-    }));
+    const projects = await listProjects(user.id);
+    const cards: ProjectCardData[] = projects.map((project) => {
+        const env = project.environments.find((environment) => environment.isDefault) ?? project.environments[0];
+        const apps = env?.applications ?? [];
+        const databases = env?.databases ?? [];
+        const services: ServiceKind[] = [
+            ...apps.map((app): ServiceKind => (app.sourceType === "image" ? "image" : "github")),
+            ...databases.map((): ServiceKind => "database")
+        ];
+        const online =
+            apps.filter((app) => app.currentDeploymentId).length +
+            databases.filter((database) => ONLINE_DB_STATES.has(database.status.toLowerCase())).length;
+        return {
+            id: project.id,
+            name: project.name,
+            environmentName: env?.name ?? "production",
+            services,
+            online,
+            total: apps.length + databases.length
+        };
+    });
 
-    return (
-        <>
-            <PageHeader
-                title="Deploy"
-                description="Deploy apps and databases across your local host and remote servers."
-            />
-            <DeployView projects={projects} canManage={canManage} localReady={localReady} />
-        </>
-    );
+    return <ProjectsGrid projects={cards} canManage={canManage} localReady={localReady} />;
 }

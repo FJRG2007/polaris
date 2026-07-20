@@ -13,7 +13,9 @@ import { getOrCreateLocalTarget } from "@/lib/deploy-target-service";
 import {
     addApplicationDomain,
     createApplication,
+    createEnvironment,
     createProject,
+    deleteEnvironment,
     deleteProject,
     deployApplication,
     removeApplicationDomain
@@ -44,6 +46,32 @@ export async function deleteProjectAction(projectId: string): Promise<void> {
     await deleteProject(projectId, user.id);
     await recordAudit({ actorId: user.id, action: "deploy.project.delete", targetType: "project", targetId: projectId });
     revalidatePath(DEPLOY_PATH);
+}
+
+export async function createEnvironmentAction(input: { projectId: string; name: string }): Promise<{ error?: string; id?: string }> {
+    const user = await requirePermission("deploy.manage");
+    const name = input.name?.trim();
+    if (!name) return { error: "An environment name is required" };
+    try {
+        const environment = await createEnvironment(input.projectId, user.id, name);
+        await recordAudit({ actorId: user.id, action: "deploy.env.create", targetType: "environment", targetId: environment.id });
+        revalidatePath(`${DEPLOY_PATH}/${input.projectId}`);
+        return { id: environment.id };
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not create the environment" };
+    }
+}
+
+export async function deleteEnvironmentAction(input: { environmentId: string; projectId: string }): Promise<{ error?: string }> {
+    const user = await requirePermission("deploy.manage");
+    try {
+        await deleteEnvironment(input.environmentId, user.id);
+        await recordAudit({ actorId: user.id, action: "deploy.env.delete", targetType: "environment", targetId: input.environmentId });
+        revalidatePath(`${DEPLOY_PATH}/${input.projectId}`);
+        return {};
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not delete the environment" };
+    }
 }
 
 export async function createApplicationAction(input: {

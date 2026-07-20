@@ -1,0 +1,48 @@
+import { notFound } from "next/navigation";
+import { serviceName } from "@polaris/deploy";
+import { refreshCapabilities } from "@polaris/hostd-client";
+import { requirePermission, userHasManage } from "@/lib/session";
+import { getProjectFull } from "@/lib/deploy-service";
+import { ProjectDetail } from "../project-detail";
+import type { ProjectSummary } from "../deploy-view";
+
+export const dynamic = "force-dynamic";
+
+export default async function DeployProjectPage({ params }: { params: Promise<{ projectId: string }> }) {
+    const { projectId } = await params;
+    const user = await requirePermission("deploy.read");
+    const canManage = await userHasManage(user, "deploy.manage");
+
+    const project = await getProjectFull(projectId, user.id);
+    if (!project) notFound();
+
+    const caps = canManage ? await refreshCapabilities() : null;
+    const localReady = Boolean(caps?.deploy);
+
+    const summary: ProjectSummary = {
+        id: project.id,
+        name: project.name,
+        environments: project.environments.map((environment) => ({
+            id: environment.id,
+            name: environment.name,
+            isDefault: environment.isDefault,
+            applications: environment.applications.map((app) => ({
+                id: app.id,
+                name: app.name,
+                sourceType: app.sourceType,
+                currentDeploymentId: app.currentDeploymentId,
+                targetId: app.targetId,
+                containerRef: serviceName(project.slug, app.slug, app.id),
+                domains: app.domains.map((domain) => ({ id: domain.id, hostname: domain.hostname, kind: domain.kind }))
+            })),
+            databases: environment.databases.map((database) => ({
+                id: database.id,
+                name: database.name,
+                engine: database.engine,
+                status: database.status
+            }))
+        }))
+    };
+
+    return <ProjectDetail project={summary} canManage={canManage} localReady={localReady} />;
+}

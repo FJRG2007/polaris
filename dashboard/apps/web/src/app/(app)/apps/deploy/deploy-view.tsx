@@ -9,10 +9,8 @@
  */
 
 import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
-import { useRouter } from "next/navigation";
 import {
     ArrowLeft,
-    Boxes,
     ChevronRight,
     Database,
     FolderOpen,
@@ -21,8 +19,7 @@ import {
     Lock,
     Plus,
     Rocket,
-    TerminalSquare,
-    Trash2
+    TerminalSquare
 } from "lucide-react";
 import {
     Badge,
@@ -44,8 +41,6 @@ import {
     addDomainAction,
     createApplicationAction,
     createDatabaseAction,
-    createProjectAction,
-    deleteProjectAction,
     deployApplicationAction,
     deployDatabaseAction,
     githubReposAction
@@ -68,6 +63,7 @@ export interface ProjectSummary {
     environments: {
         id: string;
         name: string;
+        isDefault: boolean;
         applications: {
             id: string;
             name: string;
@@ -81,175 +77,22 @@ export interface ProjectSummary {
     }[];
 }
 
-export function DeployView({
-    projects,
-    canManage,
-    localReady
-}: {
-    projects: ProjectSummary[];
-    canManage: boolean;
-    localReady: boolean;
-}) {
-    const router = useRouter();
-    const refresh = () => router.refresh();
+export type ServiceKind = "github" | "image" | "database";
 
-    return (
-        <div className="flex flex-col gap-6">
-            {!localReady && canManage && (
-                <Card className="border-warning/30 bg-warning/5">
-                    <CardBody className="text-sm text-muted-foreground">
-                        The local host is not ready to build and deploy. This needs the full edition with a running{" "}
-                        <code className="rounded bg-muted px-1 py-0.5 text-xs text-foreground">polaris-hostd</code>.
-                        Remote servers added in the Servers view work regardless.
-                    </CardBody>
-                </Card>
-            )}
-
-            {canManage && (
-                <div className="flex items-center justify-between gap-4">
-                    <p className="text-sm text-muted-foreground">
-                        {projects.length === 0
-                            ? "No projects yet."
-                            : `${projects.length} project${projects.length === 1 ? "" : "s"}`}
-                    </p>
-                    <CreateProjectButton onChanged={refresh} />
-                </div>
-            )}
-
-            {projects.length === 0 ? (
-                <EmptyState
-                    icon={<Boxes className="size-6 text-muted-foreground" />}
-                    title="Deploy your first app"
-                    description="Create a project to group environments, applications, and databases."
-                />
-            ) : (
-                projects.map((project) => (
-                    <ProjectCard key={project.id} project={project} canManage={canManage} onChanged={refresh} />
-                ))
-            )}
-        </div>
-    );
+/** The service kind an application's source maps to (for icons). */
+export function serviceKindOf(sourceType: string): ServiceKind {
+    return sourceType === "image" ? "image" : "github";
 }
 
-function CreateProjectButton({ onChanged }: { onChanged: () => void }) {
-    const [open, setOpen] = useState(false);
-    const [name, setName] = useState("");
-    const [error, setError] = useState<string | null>(null);
-    const [pending, startTransition] = useTransition();
-
-    function submit() {
-        if (!name.trim()) return;
-        setError(null);
-        startTransition(async () => {
-            const result = await createProjectAction({ name });
-            if (result.error) {
-                setError(result.error);
-                return;
-            }
-            setName("");
-            setOpen(false);
-            onChanged();
-        });
-    }
-
-    return (
-        <>
-            <Button onClick={() => setOpen(true)}>
-                <Plus className="size-4" /> New project
-            </Button>
-            <Dialog open={open} onOpenChange={setOpen}>
-                <DialogContent className="max-w-md">
-                    <DialogHeader>
-                        <DialogTitle>New project</DialogTitle>
-                    </DialogHeader>
-                    <div className="flex flex-col gap-3">
-                        <Field label="Project name">
-                            <Input
-                                autoFocus
-                                value={name}
-                                onChange={(event) => setName(event.target.value)}
-                                placeholder="my-project"
-                                onKeyDown={(event) => event.key === "Enter" && submit()}
-                            />
-                        </Field>
-                        {error && <p className="text-sm text-danger">{error}</p>}
-                        <div className="flex justify-end gap-2">
-                            <Button variant="ghost" onClick={() => setOpen(false)}>
-                                Cancel
-                            </Button>
-                            <Button onClick={submit} disabled={pending || !name.trim()}>
-                                {pending && <Loader2 className="size-4 animate-spin" />} Create
-                            </Button>
-                        </div>
-                    </div>
-                </DialogContent>
-            </Dialog>
-        </>
-    );
+/** Brand-accurate icon for a service kind (GitHub / Docker / database). */
+export function ServiceIcon({ kind, className = "size-4" }: { kind: ServiceKind; className?: string }) {
+    if (kind === "github") return <GitHubMark className={className} />;
+    if (kind === "image") return <DockerMark className={className} />;
+    return <Database className={className} />;
 }
 
-function ProjectCard({
-    project,
-    canManage,
-    onChanged
-}: {
-    project: ProjectSummary;
-    canManage: boolean;
-    onChanged: () => void;
-}) {
-    const [confirmDelete, setConfirmDelete] = useState(false);
-    const [pending, startTransition] = useTransition();
-
-    return (
-        <Card>
-            <div className="flex items-center justify-between gap-2 border-b border-border/60 px-5 py-4">
-                <div className="flex items-center gap-2">
-                    <Boxes className="size-4 text-muted-foreground" />
-                    <h2 className="text-base font-medium">{project.name}</h2>
-                </div>
-                {canManage &&
-                    (confirmDelete ? (
-                        <div className="flex items-center gap-2">
-                            <span className="text-xs text-muted-foreground">Delete project and everything in it?</span>
-                            <Button
-                                variant="danger"
-                                size="sm"
-                                disabled={pending}
-                                onClick={() =>
-                                    startTransition(async () => {
-                                        await deleteProjectAction(project.id);
-                                        setConfirmDelete(false);
-                                        onChanged();
-                                    })
-                                }
-                            >
-                                {pending && <Loader2 className="size-4 animate-spin" />} Confirm
-                            </Button>
-                            <Button variant="ghost" size="sm" onClick={() => setConfirmDelete(false)}>
-                                Cancel
-                            </Button>
-                        </div>
-                    ) : (
-                        <Button variant="ghost" size="icon" onClick={() => setConfirmDelete(true)} title="Delete project">
-                            <Trash2 className="size-4" />
-                        </Button>
-                    ))}
-            </div>
-            <CardBody className="flex flex-col gap-6">
-                {project.environments.map((environment) => (
-                    <EnvironmentSection
-                        key={environment.id}
-                        environment={environment}
-                        canManage={canManage}
-                        onChanged={onChanged}
-                    />
-                ))}
-            </CardBody>
-        </Card>
-    );
-}
-
-function EnvironmentSection({
+/** One environment's services as a Railway-style card grid plus the new-service action. */
+export function EnvironmentServices({
     environment,
     canManage,
     onChanged
@@ -261,18 +104,22 @@ function EnvironmentSection({
     const isEmpty = environment.applications.length === 0 && environment.databases.length === 0;
 
     return (
-        <section className="flex flex-col gap-3">
-            <div className="flex items-center justify-between gap-2">
-                <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    {environment.name}
-                </span>
-                {canManage && <NewServiceButton environmentId={environment.id} onChanged={onChanged} />}
-            </div>
+        <div className="flex flex-col gap-3">
+            {canManage && (
+                <div className="flex justify-end">
+                    <NewServiceButton environmentId={environment.id} onChanged={onChanged} />
+                </div>
+            )}
 
             {isEmpty ? (
-                <p className="rounded-md border border-dashed border-border/60 px-4 py-6 text-center text-sm text-muted-foreground">
-                    No services yet.
-                </p>
+                <div className="rounded-lg border border-dashed border-border/60 px-4 py-16 text-center">
+                    <p className="text-sm text-muted-foreground">No services in this environment yet.</p>
+                    {canManage && (
+                        <p className="mt-1 text-xs text-muted-foreground/70">
+                            Add a GitHub repository, a Docker image, or a database.
+                        </p>
+                    )}
+                </div>
             ) : (
                 <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                     {environment.applications.map((app) => (
@@ -283,7 +130,7 @@ function EnvironmentSection({
                     ))}
                 </div>
             )}
-        </section>
+        </div>
     );
 }
 
@@ -309,7 +156,7 @@ function AppCard({ app, canManage, onChanged }: { app: ProjectApp; canManage: bo
         <div className="flex flex-col gap-3 rounded-lg border border-border/60 bg-surface/60 p-4 transition-colors hover:border-border">
             <div className="flex items-start justify-between gap-2">
                 <div className="flex min-w-0 items-center gap-2">
-                    <Rocket className="size-4 shrink-0 text-primary" />
+                    <ServiceIcon kind={serviceKindOf(app.sourceType)} className="size-4 shrink-0 text-foreground" />
                     <span className="truncate text-sm font-medium">{app.name}</span>
                 </div>
                 <StatusPill
@@ -814,7 +661,7 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
     );
 }
 
-function StatusPill({ tone, label }: { tone: "success" | "warning" | "danger" | "idle"; label: string }) {
+export function StatusPill({ tone, label }: { tone: "success" | "warning" | "danger" | "idle"; label: string }) {
     const dot = {
         success: "bg-success",
         warning: "bg-warning",
@@ -837,7 +684,7 @@ function dbTone(status: string): "success" | "warning" | "danger" | "idle" {
     return "idle";
 }
 
-function EmptyState({ icon, title, description }: { icon: ReactNode; title: string; description: string }) {
+export function EmptyState({ icon, title, description }: { icon: ReactNode; title: string; description: string }) {
     return (
         <Card>
             <CardBody className="flex flex-col items-center gap-2 py-12 text-center">
