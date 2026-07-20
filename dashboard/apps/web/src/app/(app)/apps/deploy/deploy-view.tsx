@@ -1,28 +1,40 @@
 "use client";
 
 /**
- * Deploy app view. Lists projects and their applications, and drives create and
- * deploy actions. Projects group environments; each environment holds
- * applications and managed databases. All confirmations are in-app (no native
- * dialogs). Full build/deploy on the local host needs the full edition; the view
- * says so plainly when it is unavailable rather than failing silently.
+ * Deploy app view. A Railway-style canvas: projects hold environments, each
+ * environment holds a grid of service cards (applications and managed databases).
+ * Creation flows live in focused dialogs instead of cramped inline forms, all
+ * confirmations are in-app (no native dialogs), and the local build/deploy path
+ * says plainly when it needs the full edition rather than failing silently.
  */
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { Boxes, Database, FolderOpen, Globe, Plus, Rocket, TerminalSquare, Trash2 } from "lucide-react";
+import {
+    Boxes,
+    Container,
+    Database,
+    FolderOpen,
+    GitBranch,
+    Globe,
+    Loader2,
+    Plus,
+    Rocket,
+    TerminalSquare,
+    Trash2
+} from "lucide-react";
 import {
     Badge,
     Button,
     Card,
     CardBody,
-    CardHeader,
-    CardTitle,
     Dialog,
     DialogContent,
     DialogHeader,
     DialogTitle,
-    Input
+    Input,
+    Select,
+    type SelectOption
 } from "@polaris/ui";
 import { TerminalPanel } from "./terminal-panel";
 import { FilesPanel } from "./files-panel";
@@ -37,6 +49,20 @@ import {
 } from "./actions";
 
 const DB_ENGINES = ["postgres", "mysql", "mariadb", "mongo", "redis"] as const;
+
+const SOURCE_OPTIONS: SelectOption[] = [
+    { value: "image", label: "Docker image", icon: <Container className="size-4 text-muted-foreground" /> },
+    { value: "dockerfile", label: "Git + Dockerfile", icon: <GitBranch className="size-4 text-muted-foreground" /> }
+];
+
+const ENGINE_OPTIONS: SelectOption[] = DB_ENGINES.map((engine) => ({
+    value: engine,
+    label: engine,
+    icon: <Database className="size-4 text-muted-foreground" />
+}));
+
+type ProjectApp = ProjectSummary["environments"][number]["applications"][number];
+type ProjectDatabase = ProjectSummary["environments"][number]["databases"][number];
 
 export interface ProjectSummary {
     id: string;
@@ -67,122 +93,212 @@ export function DeployView({
     localReady: boolean;
 }) {
     const router = useRouter();
-    const [pending, startTransition] = useTransition();
-    const [newProject, setNewProject] = useState("");
-    const [error, setError] = useState<string | null>(null);
-    const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
-
-    function onCreateProject() {
-        if (!newProject.trim()) return;
-        setError(null);
-        startTransition(async () => {
-            const result = await createProjectAction({ name: newProject });
-            if (result.error) setError(result.error);
-            else setNewProject("");
-            router.refresh();
-        });
-    }
+    const refresh = () => router.refresh();
 
     return (
         <div className="flex flex-col gap-6">
             {!localReady && canManage && (
-                <Card>
+                <Card className="border-warning/30 bg-warning/5">
                     <CardBody className="text-sm text-muted-foreground">
-                        The local host is not ready to build and deploy. This needs the full edition with a
-                        running <code>polaris-hostd</code>. Remote servers added in the Servers view work regardless.
+                        The local host is not ready to build and deploy. This needs the full edition with a running{" "}
+                        <code className="rounded bg-muted px-1 py-0.5 text-xs text-foreground">polaris-hostd</code>.
+                        Remote servers added in the Servers view work regardless.
                     </CardBody>
                 </Card>
             )}
 
             {canManage && (
-                <div className="flex items-end gap-2">
-                    <div className="flex flex-col gap-1">
-                        <label className="text-xs text-muted-foreground">New project</label>
-                        <Input
-                            value={newProject}
-                            onChange={(event) => setNewProject(event.target.value)}
-                            placeholder="my-project"
-                            onKeyDown={(event) => event.key === "Enter" && onCreateProject()}
-                        />
-                    </div>
-                    <Button onClick={onCreateProject} disabled={pending || !newProject.trim()}>
-                        <Plus className="size-4" /> Create
-                    </Button>
+                <div className="flex items-center justify-between gap-4">
+                    <p className="text-sm text-muted-foreground">
+                        {projects.length === 0
+                            ? "No projects yet."
+                            : `${projects.length} project${projects.length === 1 ? "" : "s"}`}
+                    </p>
+                    <CreateProjectButton onChanged={refresh} />
                 </div>
             )}
-            {error && <p className="text-sm text-red-400">{error}</p>}
 
             {projects.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No projects yet. Create one to deploy your first app.</p>
+                <EmptyState
+                    icon={<Boxes className="size-6 text-muted-foreground" />}
+                    title="Deploy your first app"
+                    description="Create a project to group environments, applications, and databases."
+                />
             ) : (
                 projects.map((project) => (
-                    <Card key={project.id}>
-                        <CardHeader className="flex items-center justify-between">
-                            <CardTitle className="flex items-center gap-2">
-                                <Boxes className="size-4" /> {project.name}
-                            </CardTitle>
-                            {canManage &&
-                                (confirmDelete === project.id ? (
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-xs text-muted-foreground">Delete project?</span>
-                                        <Button
-                                            variant="danger"
-                                            onClick={() =>
-                                                startTransition(async () => {
-                                                    await deleteProjectAction(project.id);
-                                                    setConfirmDelete(null);
-                                                    router.refresh();
-                                                })
-                                            }
-                                        >
-                                            Confirm
-                                        </Button>
-                                        <Button variant="ghost" onClick={() => setConfirmDelete(null)}>
-                                            Cancel
-                                        </Button>
-                                    </div>
-                                ) : (
-                                    <Button variant="ghost" onClick={() => setConfirmDelete(project.id)}>
-                                        <Trash2 className="size-4" />
-                                    </Button>
-                                ))}
-                        </CardHeader>
-                        <CardBody className="flex flex-col gap-4">
-                            {project.environments.map((environment) => (
-                                <EnvironmentBlock
-                                    key={environment.id}
-                                    environment={environment}
-                                    canManage={canManage}
-                                    onChanged={() => router.refresh()}
-                                />
-                            ))}
-                        </CardBody>
-                    </Card>
+                    <ProjectCard key={project.id} project={project} canManage={canManage} onChanged={refresh} />
                 ))
             )}
         </div>
     );
 }
 
-function ApplicationRow({
-    app,
+function CreateProjectButton({ onChanged }: { onChanged: () => void }) {
+    const [open, setOpen] = useState(false);
+    const [name, setName] = useState("");
+    const [error, setError] = useState<string | null>(null);
+    const [pending, startTransition] = useTransition();
+
+    function submit() {
+        if (!name.trim()) return;
+        setError(null);
+        startTransition(async () => {
+            const result = await createProjectAction({ name });
+            if (result.error) {
+                setError(result.error);
+                return;
+            }
+            setName("");
+            setOpen(false);
+            onChanged();
+        });
+    }
+
+    return (
+        <>
+            <Button onClick={() => setOpen(true)}>
+                <Plus className="size-4" /> New project
+            </Button>
+            <Dialog open={open} onOpenChange={setOpen}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>New project</DialogTitle>
+                    </DialogHeader>
+                    <div className="flex flex-col gap-3">
+                        <Field label="Project name">
+                            <Input
+                                autoFocus
+                                value={name}
+                                onChange={(event) => setName(event.target.value)}
+                                placeholder="my-project"
+                                onKeyDown={(event) => event.key === "Enter" && submit()}
+                            />
+                        </Field>
+                        {error && <p className="text-sm text-danger">{error}</p>}
+                        <div className="flex justify-end gap-2">
+                            <Button variant="ghost" onClick={() => setOpen(false)}>
+                                Cancel
+                            </Button>
+                            <Button onClick={submit} disabled={pending || !name.trim()}>
+                                {pending && <Loader2 className="size-4 animate-spin" />} Create
+                            </Button>
+                        </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
+        </>
+    );
+}
+
+function ProjectCard({
+    project,
     canManage,
     onChanged
 }: {
-    app: ProjectSummary["environments"][number]["applications"][number];
+    project: ProjectSummary;
     canManage: boolean;
     onChanged: () => void;
 }) {
+    const [confirmDelete, setConfirmDelete] = useState(false);
+    const [pending, startTransition] = useTransition();
+
+    return (
+        <Card>
+            <div className="flex items-center justify-between gap-2 border-b border-border/60 px-5 py-4">
+                <div className="flex items-center gap-2">
+                    <Boxes className="size-4 text-muted-foreground" />
+                    <h2 className="text-base font-medium">{project.name}</h2>
+                </div>
+                {canManage &&
+                    (confirmDelete ? (
+                        <div className="flex items-center gap-2">
+                            <span className="text-xs text-muted-foreground">Delete project and everything in it?</span>
+                            <Button
+                                variant="danger"
+                                size="sm"
+                                disabled={pending}
+                                onClick={() =>
+                                    startTransition(async () => {
+                                        await deleteProjectAction(project.id);
+                                        setConfirmDelete(false);
+                                        onChanged();
+                                    })
+                                }
+                            >
+                                {pending && <Loader2 className="size-4 animate-spin" />} Confirm
+                            </Button>
+                            <Button variant="ghost" size="sm" onClick={() => setConfirmDelete(false)}>
+                                Cancel
+                            </Button>
+                        </div>
+                    ) : (
+                        <Button variant="ghost" size="icon" onClick={() => setConfirmDelete(true)} title="Delete project">
+                            <Trash2 className="size-4" />
+                        </Button>
+                    ))}
+            </div>
+            <CardBody className="flex flex-col gap-6">
+                {project.environments.map((environment) => (
+                    <EnvironmentSection
+                        key={environment.id}
+                        environment={environment}
+                        canManage={canManage}
+                        onChanged={onChanged}
+                    />
+                ))}
+            </CardBody>
+        </Card>
+    );
+}
+
+function EnvironmentSection({
+    environment,
+    canManage,
+    onChanged
+}: {
+    environment: ProjectSummary["environments"][number];
+    canManage: boolean;
+    onChanged: () => void;
+}) {
+    const isEmpty = environment.applications.length === 0 && environment.databases.length === 0;
+
+    return (
+        <section className="flex flex-col gap-3">
+            <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    {environment.name}
+                </span>
+                {canManage && <NewServiceButton environmentId={environment.id} onChanged={onChanged} />}
+            </div>
+
+            {isEmpty ? (
+                <p className="rounded-md border border-dashed border-border/60 px-4 py-6 text-center text-sm text-muted-foreground">
+                    No services yet.
+                </p>
+            ) : (
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                    {environment.applications.map((app) => (
+                        <AppCard key={app.id} app={app} canManage={canManage} onChanged={onChanged} />
+                    ))}
+                    {environment.databases.map((database) => (
+                        <DatabaseCard key={database.id} database={database} canManage={canManage} onChanged={onChanged} />
+                    ))}
+                </div>
+            )}
+        </section>
+    );
+}
+
+function AppCard({ app, canManage, onChanged }: { app: ProjectApp; canManage: boolean; onChanged: () => void }) {
     const [busy, startTransition] = useTransition();
-    const [showDomain, setShowDomain] = useState(false);
     const [showTerminal, setShowTerminal] = useState(false);
     const [showFiles, setShowFiles] = useState(false);
+    const [showDomain, setShowDomain] = useState(false);
     const [logsFor, setLogsFor] = useState<string | null>(null);
-    const [hostname, setHostname] = useState("");
-    const [port, setPort] = useState("80");
     const [error, setError] = useState<string | null>(null);
 
     function onDeploy() {
+        setError(null);
         startTransition(async () => {
             const result = await deployApplicationAction(app.id);
             if (result.error) setError(result.error);
@@ -191,60 +307,58 @@ function ApplicationRow({
         });
     }
 
-    function onAddDomain() {
-        setError(null);
-        startTransition(async () => {
-            const result = await addDomainAction({
-                applicationId: app.id,
-                hostname: hostname.trim() || undefined,
-                targetPort: Number(port)
-            });
-            if (result.error) setError(result.error);
-            else {
-                setHostname("");
-                setShowDomain(false);
-            }
-            onChanged();
-        });
-    }
-
     return (
-        <div className="flex flex-col gap-1">
-            <div className="flex items-center justify-between gap-2">
-                <div className="flex flex-wrap items-center gap-2">
-                    <Rocket className="size-4 text-muted-foreground" />
-                    <span className="text-sm">{app.name}</span>
-                    <Badge>{app.sourceType}</Badge>
-                    <MetricsBadge applicationId={app.id} />
+        <div className="flex flex-col gap-3 rounded-lg border border-border/60 bg-surface/60 p-4 transition-colors hover:border-border">
+            <div className="flex items-start justify-between gap-2">
+                <div className="flex min-w-0 items-center gap-2">
+                    <Rocket className="size-4 shrink-0 text-primary" />
+                    <span className="truncate text-sm font-medium">{app.name}</span>
+                </div>
+                <StatusPill
+                    tone={app.currentDeploymentId ? "success" : "idle"}
+                    label={app.currentDeploymentId ? "Deployed" : "Not deployed"}
+                />
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+                <Badge>{app.sourceType === "dockerfile" ? "git" : app.sourceType}</Badge>
+                <MetricsBadge applicationId={app.id} />
+            </div>
+
+            {app.domains.length > 0 && (
+                <div className="flex flex-col gap-1">
                     {app.domains.map((domain) => (
                         <a
                             key={domain.id}
                             href={`https://${domain.hostname}`}
                             target="_blank"
                             rel="noreferrer"
-                            className="inline-flex items-center gap-1 text-xs text-sky-400 hover:underline"
+                            className="inline-flex items-center gap-1 truncate text-xs text-primary hover:underline"
                         >
-                            <Globe className="size-3" /> {domain.hostname}
+                            <Globe className="size-3 shrink-0" /> {domain.hostname}
                         </a>
                     ))}
                 </div>
-                {canManage && (
-                    <div className="flex items-center gap-2">
-                        <Button variant="ghost" onClick={() => setShowFiles(true)} title="Files">
-                            <FolderOpen className="size-4" />
-                        </Button>
-                        <Button variant="ghost" onClick={() => setShowTerminal(true)} title="Terminal">
-                            <TerminalSquare className="size-4" />
-                        </Button>
-                        <Button variant="ghost" onClick={() => setShowDomain((value) => !value)} title="Domains">
-                            <Globe className="size-4" />
-                        </Button>
-                        <Button variant="secondary" onClick={onDeploy} disabled={busy}>
-                            Deploy
-                        </Button>
-                    </div>
-                )}
-            </div>
+            )}
+
+            {error && <p className="text-xs text-danger">{error}</p>}
+
+            {canManage && (
+                <div className="mt-auto flex items-center gap-1 border-t border-border/60 pt-3">
+                    <Button size="sm" variant="secondary" onClick={onDeploy} disabled={busy} className="mr-auto">
+                        {busy ? <Loader2 className="size-4 animate-spin" /> : <Rocket className="size-4" />} Deploy
+                    </Button>
+                    <Button variant="ghost" size="icon" onClick={() => setShowFiles(true)} title="Files">
+                        <FolderOpen className="size-4" />
+                    </Button>
+                    <Button variant="ghost" size="icon" onClick={() => setShowTerminal(true)} title="Terminal">
+                        <TerminalSquare className="size-4" />
+                    </Button>
+                    <Button variant="ghost" size="icon" onClick={() => setShowDomain(true)} title="Domains">
+                        <Globe className="size-4" />
+                    </Button>
+                </div>
+            )}
 
             <Dialog open={showTerminal} onOpenChange={setShowTerminal}>
                 <DialogContent className="max-w-3xl">
@@ -266,6 +380,8 @@ function ApplicationRow({
                 </DialogContent>
             </Dialog>
 
+            <DomainDialog app={app} open={showDomain} onOpenChange={setShowDomain} onChanged={onChanged} />
+
             <Dialog open={logsFor !== null} onOpenChange={(open) => !open && setLogsFor(null)}>
                 <DialogContent className="max-w-3xl">
                     <DialogHeader>
@@ -274,178 +390,337 @@ function ApplicationRow({
                     {logsFor && <DeploymentLogs deploymentId={logsFor} onDone={onChanged} />}
                 </DialogContent>
             </Dialog>
-            {showDomain && canManage && (
-                <div className="flex flex-wrap items-end gap-2 pl-6">
-                    <Input
-                        value={hostname}
-                        onChange={(event) => setHostname(event.target.value)}
-                        placeholder="custom domain (blank = free subdomain)"
-                        className="w-64"
-                    />
-                    <Input
-                        value={port}
-                        onChange={(event) => setPort(event.target.value)}
-                        placeholder="port"
-                        className="w-20"
-                    />
-                    <Button variant="outline" onClick={onAddDomain} disabled={busy}>
-                        Add domain
+        </div>
+    );
+}
+
+function DatabaseCard({
+    database,
+    canManage,
+    onChanged
+}: {
+    database: ProjectDatabase;
+    canManage: boolean;
+    onChanged: () => void;
+}) {
+    const [pending, startTransition] = useTransition();
+
+    return (
+        <div className="flex flex-col gap-3 rounded-lg border border-border/60 bg-surface/60 p-4 transition-colors hover:border-border">
+            <div className="flex items-start justify-between gap-2">
+                <div className="flex min-w-0 items-center gap-2">
+                    <Database className="size-4 shrink-0 text-accent" />
+                    <span className="truncate text-sm font-medium">{database.name}</span>
+                </div>
+                <StatusPill tone={dbTone(database.status)} label={database.status} />
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+                <Badge>{database.engine}</Badge>
+            </div>
+
+            {canManage && (
+                <div className="mt-auto flex border-t border-border/60 pt-3">
+                    <Button
+                        size="sm"
+                        variant="secondary"
+                        disabled={pending}
+                        onClick={() =>
+                            startTransition(async () => {
+                                await deployDatabaseAction(database.id);
+                                onChanged();
+                            })
+                        }
+                    >
+                        {pending ? <Loader2 className="size-4 animate-spin" /> : <Rocket className="size-4" />} Provision
                     </Button>
-                    {error && <span className="text-xs text-red-400">{error}</span>}
                 </div>
             )}
         </div>
     );
 }
 
-function EnvironmentBlock({
-    environment,
-    canManage,
-    onChanged
-}: {
-    environment: ProjectSummary["environments"][number];
-    canManage: boolean;
-    onChanged: () => void;
-}) {
-    const [pending, startTransition] = useTransition();
-    const [name, setName] = useState("");
-    const [image, setImage] = useState("");
-    const [srcType, setSrcType] = useState<"image" | "dockerfile">("image");
-    const [repoUrl, setRepoUrl] = useState("");
-    const [dbName, setDbName] = useState("");
-    const [dbEngine, setDbEngine] = useState<(typeof DB_ENGINES)[number]>("postgres");
-    const [error, setError] = useState<string | null>(null);
+function NewServiceButton({ environmentId, onChanged }: { environmentId: string; onChanged: () => void }) {
+    const [open, setOpen] = useState(false);
+    const [kind, setKind] = useState<"app" | "database">("app");
 
-    function onCreateApp() {
+    return (
+        <>
+            <Button variant="outline" size="sm" onClick={() => setOpen(true)}>
+                <Plus className="size-4" /> New service
+            </Button>
+            <Dialog open={open} onOpenChange={setOpen}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>New service</DialogTitle>
+                    </DialogHeader>
+                    <div className="flex flex-col gap-4">
+                        <div className="grid grid-cols-2 gap-1 rounded-md bg-muted p-1">
+                            <SegmentButton active={kind === "app"} onClick={() => setKind("app")}>
+                                <Rocket className="size-4" /> Application
+                            </SegmentButton>
+                            <SegmentButton active={kind === "database"} onClick={() => setKind("database")}>
+                                <Database className="size-4" /> Database
+                            </SegmentButton>
+                        </div>
+                        {kind === "app" ? (
+                            <NewAppForm
+                                environmentId={environmentId}
+                                onDone={() => {
+                                    setOpen(false);
+                                    onChanged();
+                                }}
+                            />
+                        ) : (
+                            <NewDatabaseForm
+                                environmentId={environmentId}
+                                onDone={() => {
+                                    setOpen(false);
+                                    onChanged();
+                                }}
+                            />
+                        )}
+                    </div>
+                </DialogContent>
+            </Dialog>
+        </>
+    );
+}
+
+function NewAppForm({ environmentId, onDone }: { environmentId: string; onDone: () => void }) {
+    const [name, setName] = useState("");
+    const [srcType, setSrcType] = useState<"image" | "dockerfile">("image");
+    const [image, setImage] = useState("");
+    const [repoUrl, setRepoUrl] = useState("");
+    const [error, setError] = useState<string | null>(null);
+    const [pending, startTransition] = useTransition();
+
+    const canSubmit = name.trim() && (srcType === "image" ? image.trim() : repoUrl.trim());
+
+    function submit() {
         setError(null);
         startTransition(async () => {
             const result = await createApplicationAction({
-                environmentId: environment.id,
+                environmentId,
                 name,
                 sourceType: srcType,
                 imageRef: image,
                 repoUrl
             });
             if (result.error) setError(result.error);
-            else {
-                setName("");
-                setImage("");
-                setRepoUrl("");
-            }
-            onChanged();
-        });
-    }
-
-    function onCreateDatabase() {
-        setError(null);
-        startTransition(async () => {
-            const result = await createDatabaseAction({ environmentId: environment.id, engine: dbEngine, name: dbName });
-            if (result.error) setError(result.error);
-            else setDbName("");
-            onChanged();
-        });
-    }
-
-    function onDeployDatabase(databaseId: string) {
-        startTransition(async () => {
-            await deployDatabaseAction(databaseId);
-            onChanged();
+            else onDone();
         });
     }
 
     return (
-        <div className="rounded-md border border-border/60 p-3">
-            <div className="mb-2 text-xs uppercase tracking-wide text-muted-foreground">{environment.name}</div>
-
-            <div className="flex flex-col gap-2">
-                {environment.applications.length === 0 && environment.databases.length === 0 && (
-                    <p className="text-sm text-muted-foreground">No applications yet.</p>
-                )}
-                {environment.applications.map((app) => (
-                    <ApplicationRow key={app.id} app={app} canManage={canManage} onChanged={onChanged} />
-                ))}
-                {environment.databases.map((database) => (
-                    <div key={database.id} className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2">
-                            <Database className="size-4 text-muted-foreground" />
-                            <span className="text-sm">{database.name}</span>
-                            <Badge>{database.engine}</Badge>
-                            <Badge>{database.status}</Badge>
-                        </div>
-                        {canManage && (
-                            <Button variant="secondary" onClick={() => onDeployDatabase(database.id)} disabled={pending}>
-                                Provision
-                            </Button>
-                        )}
-                    </div>
-                ))}
+        <div className="flex flex-col gap-3">
+            <Field label="Name">
+                <Input value={name} onChange={(event) => setName(event.target.value)} placeholder="my-app" autoFocus />
+            </Field>
+            <Field label="Source">
+                <Select
+                    value={srcType}
+                    onValueChange={(value) => setSrcType(value as "image" | "dockerfile")}
+                    options={SOURCE_OPTIONS}
+                />
+            </Field>
+            {srcType === "image" ? (
+                <Field label="Image">
+                    <Input
+                        value={image}
+                        onChange={(event) => setImage(event.target.value)}
+                        placeholder="nginx:latest"
+                    />
+                </Field>
+            ) : (
+                <Field label="Repository">
+                    <Input
+                        value={repoUrl}
+                        onChange={(event) => setRepoUrl(event.target.value)}
+                        placeholder="https://github.com/user/repo"
+                    />
+                </Field>
+            )}
+            {error && <p className="text-sm text-danger">{error}</p>}
+            <div className="flex justify-end">
+                <Button onClick={submit} disabled={pending || !canSubmit}>
+                    {pending && <Loader2 className="size-4 animate-spin" />} Add application
+                </Button>
             </div>
-
-            {canManage && (
-                <div className="mt-3 flex flex-wrap items-end gap-2">
-                    <Input
-                        value={name}
-                        onChange={(event) => setName(event.target.value)}
-                        placeholder="app name"
-                        className="w-40"
-                    />
-                    <select
-                        value={srcType}
-                        onChange={(event) => setSrcType(event.target.value as "image" | "dockerfile")}
-                        className="h-9 rounded-md border border-input bg-transparent px-2 text-sm"
-                    >
-                        <option value="image">Image</option>
-                        <option value="dockerfile">Git + Dockerfile</option>
-                    </select>
-                    {srcType === "image" ? (
-                        <Input
-                            value={image}
-                            onChange={(event) => setImage(event.target.value)}
-                            placeholder="image e.g. nginx:latest"
-                            className="w-56"
-                        />
-                    ) : (
-                        <Input
-                            value={repoUrl}
-                            onChange={(event) => setRepoUrl(event.target.value)}
-                            placeholder="https://github.com/user/repo"
-                            className="w-64"
-                        />
-                    )}
-                    <Button
-                        onClick={onCreateApp}
-                        disabled={pending || !name.trim() || (srcType === "image" ? !image.trim() : !repoUrl.trim())}
-                    >
-                        <Plus className="size-4" /> Add app
-                    </Button>
-                </div>
-            )}
-            {canManage && (
-                <div className="mt-2 flex flex-wrap items-end gap-2">
-                    <Input
-                        value={dbName}
-                        onChange={(event) => setDbName(event.target.value)}
-                        placeholder="database name"
-                        className="w-40"
-                    />
-                    <select
-                        value={dbEngine}
-                        onChange={(event) => setDbEngine(event.target.value as (typeof DB_ENGINES)[number])}
-                        className="h-9 rounded-md border border-input bg-transparent px-2 text-sm"
-                    >
-                        {DB_ENGINES.map((engine) => (
-                            <option key={engine} value={engine}>
-                                {engine}
-                            </option>
-                        ))}
-                    </select>
-                    <Button variant="outline" onClick={onCreateDatabase} disabled={pending || !dbName.trim()}>
-                        <Database className="size-4" /> Add database
-                    </Button>
-                </div>
-            )}
-            {error && <p className="mt-2 text-sm text-red-400">{error}</p>}
         </div>
+    );
+}
+
+function NewDatabaseForm({ environmentId, onDone }: { environmentId: string; onDone: () => void }) {
+    const [name, setName] = useState("");
+    const [engine, setEngine] = useState<(typeof DB_ENGINES)[number]>("postgres");
+    const [error, setError] = useState<string | null>(null);
+    const [pending, startTransition] = useTransition();
+
+    function submit() {
+        setError(null);
+        startTransition(async () => {
+            const result = await createDatabaseAction({ environmentId, engine, name });
+            if (result.error) setError(result.error);
+            else onDone();
+        });
+    }
+
+    return (
+        <div className="flex flex-col gap-3">
+            <Field label="Name">
+                <Input value={name} onChange={(event) => setName(event.target.value)} placeholder="my-db" autoFocus />
+            </Field>
+            <Field label="Engine">
+                <Select
+                    value={engine}
+                    onValueChange={(value) => setEngine(value as (typeof DB_ENGINES)[number])}
+                    options={ENGINE_OPTIONS}
+                />
+            </Field>
+            {error && <p className="text-sm text-danger">{error}</p>}
+            <div className="flex justify-end">
+                <Button onClick={submit} disabled={pending || !name.trim()}>
+                    {pending && <Loader2 className="size-4 animate-spin" />} Add database
+                </Button>
+            </div>
+        </div>
+    );
+}
+
+function DomainDialog({
+    app,
+    open,
+    onOpenChange,
+    onChanged
+}: {
+    app: ProjectApp;
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    onChanged: () => void;
+}) {
+    const [hostname, setHostname] = useState("");
+    const [port, setPort] = useState("80");
+    const [error, setError] = useState<string | null>(null);
+    const [pending, startTransition] = useTransition();
+
+    function submit() {
+        setError(null);
+        startTransition(async () => {
+            const result = await addDomainAction({
+                applicationId: app.id,
+                hostname: hostname.trim() || undefined,
+                targetPort: Number(port)
+            });
+            if (result.error) setError(result.error);
+            else {
+                setHostname("");
+                onOpenChange(false);
+                onChanged();
+            }
+        });
+    }
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="max-w-md">
+                <DialogHeader>
+                    <DialogTitle>Domains - {app.name}</DialogTitle>
+                </DialogHeader>
+                <div className="flex flex-col gap-3">
+                    {app.domains.length > 0 && (
+                        <div className="flex flex-col gap-1">
+                            {app.domains.map((domain) => (
+                                <a
+                                    key={domain.id}
+                                    href={`https://${domain.hostname}`}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                                >
+                                    <Globe className="size-3" /> {domain.hostname}
+                                </a>
+                            ))}
+                        </div>
+                    )}
+                    <Field label="Custom domain" hint="Leave blank for a free subdomain.">
+                        <Input
+                            value={hostname}
+                            onChange={(event) => setHostname(event.target.value)}
+                            placeholder="app.example.com"
+                        />
+                    </Field>
+                    <Field label="Target port">
+                        <Input value={port} onChange={(event) => setPort(event.target.value)} placeholder="80" className="w-28" />
+                    </Field>
+                    {error && <p className="text-sm text-danger">{error}</p>}
+                    <div className="flex justify-end">
+                        <Button onClick={submit} disabled={pending}>
+                            {pending && <Loader2 className="size-4 animate-spin" />} Add domain
+                        </Button>
+                    </div>
+                </div>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
+    return (
+        <label className="flex flex-col gap-1.5">
+            <span className="text-xs font-medium text-muted-foreground">{label}</span>
+            {children}
+            {hint && <span className="text-xs text-muted-foreground/70">{hint}</span>}
+        </label>
+    );
+}
+
+function SegmentButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            className={`flex items-center justify-center gap-2 rounded px-3 py-1.5 text-sm font-medium transition-colors ${
+                active ? "bg-surface text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+            }`}
+        >
+            {children}
+        </button>
+    );
+}
+
+function StatusPill({ tone, label }: { tone: "success" | "warning" | "danger" | "idle"; label: string }) {
+    const dot = {
+        success: "bg-success",
+        warning: "bg-warning",
+        danger: "bg-danger",
+        idle: "bg-muted-foreground"
+    }[tone];
+    return (
+        <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-border/60 bg-surface px-2 py-0.5 text-xs text-muted-foreground">
+            <span className={`size-1.5 rounded-full ${dot}`} />
+            {label}
+        </span>
+    );
+}
+
+function dbTone(status: string): "success" | "warning" | "danger" | "idle" {
+    const value = status.toLowerCase();
+    if (["running", "active", "healthy", "ready"].includes(value)) return "success";
+    if (["failed", "error", "stopped"].includes(value)) return "danger";
+    if (["queued", "provisioning", "deploying", "pending", "building"].includes(value)) return "warning";
+    return "idle";
+}
+
+function EmptyState({ icon, title, description }: { icon: ReactNode; title: string; description: string }) {
+    return (
+        <Card>
+            <CardBody className="flex flex-col items-center gap-2 py-12 text-center">
+                <div className="flex size-12 items-center justify-center rounded-full bg-muted">{icon}</div>
+                <h3 className="text-sm font-medium">{title}</h3>
+                <p className="max-w-sm text-sm text-muted-foreground">{description}</p>
+            </CardBody>
+        </Card>
     );
 }
 
@@ -486,7 +761,7 @@ function DeploymentLogs({ deploymentId, onDone }: { deploymentId: string; onDone
 
     return (
         <div className="flex flex-col gap-2">
-            <div className="text-xs text-muted-foreground">Status: {status}</div>
+            <StatusPill tone={dbTone(status)} label={`Status: ${status}`} />
             <pre
                 ref={preRef}
                 className="h-80 overflow-auto rounded-md bg-[#0b0e14] p-3 text-xs leading-relaxed text-zinc-300"
