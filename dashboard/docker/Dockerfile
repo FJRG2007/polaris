@@ -78,6 +78,13 @@ COPY --from=builder /build/apps/web/.next/standalone ./
 COPY --from=builder /build/apps/web/.next/static ./apps/web/.next/static
 COPY --from=builder /build/apps/web/public ./apps/web/public
 
+# The deploy terminal sidecar (launched alongside the Next server by the
+# entrypoint) and its `ws` dependency are not imported by server.js, so Next's
+# output tracing does not bundle them; copy both explicitly. Its other imports
+# (@polaris/db, @polaris/core, @polaris/hostd-client) are traced already.
+COPY --from=builder /build/apps/web/ws-server.mjs ./apps/web/ws-server.mjs
+COPY --from=builder /build/node_modules/ws ./node_modules/ws
+
 # Schema + migrations so the entrypoint can run `prisma migrate deploy`.
 COPY --from=builder /build/packages/db/prisma ./packages/db/prisma
 
