@@ -7,7 +7,7 @@
  */
 
 import { createWriteStream } from "node:fs";
-import { mkdir } from "node:fs/promises";
+import { mkdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { loadEnv } from "@polaris/config";
 import { prisma } from "@polaris/db";
@@ -23,6 +23,21 @@ function logDir(): string {
 
 export function deployLogPath(deploymentId: string): string {
     return join(logDir(), `${deploymentId}.log`);
+}
+
+/** Read a deployment's status and current log, ownership-checked. Returns null if
+ *  the deployment does not belong to the owner. */
+export async function readDeployment(
+    deploymentId: string,
+    ownerId: string
+): Promise<{ status: string; error: string | null; log: string } | null> {
+    const deployment = await prisma.deployment.findFirst({
+        where: { id: deploymentId, target: { ownerId } },
+        select: { id: true, status: true, error: true }
+    });
+    if (!deployment) return null;
+    const log = await readFile(deployLogPath(deploymentId), "utf8").catch(() => "");
+    return { status: deployment.status, error: deployment.error, log };
 }
 
 // --- projects / environments / applications --------------------------------

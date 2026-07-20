@@ -8,7 +8,7 @@
  * says so plainly when it is unavailable rather than failing silently.
  */
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Boxes, Database, Globe, Plus, Rocket, TerminalSquare, Trash2 } from "lucide-react";
 import {
@@ -166,22 +166,28 @@ export function DeployView({
 function ApplicationRow({
     app,
     canManage,
-    pending,
-    onDeploy,
     onChanged
 }: {
     app: ProjectSummary["environments"][number]["applications"][number];
     canManage: boolean;
-    pending: boolean;
-    onDeploy: () => void;
     onChanged: () => void;
 }) {
     const [busy, startTransition] = useTransition();
     const [showDomain, setShowDomain] = useState(false);
     const [showTerminal, setShowTerminal] = useState(false);
+    const [logsFor, setLogsFor] = useState<string | null>(null);
     const [hostname, setHostname] = useState("");
     const [port, setPort] = useState("80");
     const [error, setError] = useState<string | null>(null);
+
+    function onDeploy() {
+        startTransition(async () => {
+            const result = await deployApplicationAction(app.id);
+            if (result.error) setError(result.error);
+            else if (result.deploymentId) setLogsFor(result.deploymentId);
+            onChanged();
+        });
+    }
 
     function onAddDomain() {
         setError(null);
@@ -227,7 +233,7 @@ function ApplicationRow({
                         <Button variant="ghost" onClick={() => setShowDomain((value) => !value)} title="Domains">
                             <Globe className="size-4" />
                         </Button>
-                        <Button variant="secondary" onClick={onDeploy} disabled={pending || busy}>
+                        <Button variant="secondary" onClick={onDeploy} disabled={busy}>
                             Deploy
                         </Button>
                     </div>
@@ -242,6 +248,15 @@ function ApplicationRow({
                     {showTerminal && (
                         <TerminalPanel targetId={app.targetId} containerRef={app.containerRef} label={app.containerRef} />
                     )}
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={logsFor !== null} onOpenChange={(open) => !open && setLogsFor(null)}>
+                <DialogContent className="max-w-3xl">
+                    <DialogHeader>
+                        <DialogTitle>Deployment - {app.name}</DialogTitle>
+                    </DialogHeader>
+                    {logsFor && <DeploymentLogs deploymentId={logsFor} onDone={onChanged} />}
                 </DialogContent>
             </Dialog>
             {showDomain && canManage && (
@@ -307,13 +322,6 @@ function EnvironmentBlock({
         });
     }
 
-    function onDeploy(applicationId: string) {
-        startTransition(async () => {
-            await deployApplicationAction(applicationId);
-            onChanged();
-        });
-    }
-
     function onDeployDatabase(databaseId: string) {
         startTransition(async () => {
             await deployDatabaseAction(databaseId);
@@ -330,14 +338,7 @@ function EnvironmentBlock({
                     <p className="text-sm text-muted-foreground">No applications yet.</p>
                 )}
                 {environment.applications.map((app) => (
-                    <ApplicationRow
-                        key={app.id}
-                        app={app}
-                        canManage={canManage}
-                        pending={pending}
-                        onDeploy={() => onDeploy(app.id)}
-                        onChanged={onChanged}
-                    />
+                    <ApplicationRow key={app.id} app={app} canManage={canManage} onChanged={onChanged} />
                 ))}
                 {environment.databases.map((database) => (
                     <div key={database.id} className="flex items-center justify-between gap-2">
@@ -400,6 +401,54 @@ function EnvironmentBlock({
                 </div>
             )}
             {error && <p className="mt-2 text-sm text-red-400">{error}</p>}
+        </div>
+    );
+}
+
+function DeploymentLogs({ deploymentId, onDone }: { deploymentId: string; onDone: () => void }) {
+    const [log, setLog] = useState("");
+    const [status, setStatus] = useState("queued");
+    const preRef = useRef<HTMLPreElement>(null);
+
+    useEffect(() => {
+        let active = true;
+        let timer: ReturnType<typeof setTimeout>;
+
+        async function poll(): Promise<void> {
+            const res = await fetch(`/api/deploy/deployments/${deploymentId}/log`, { cache: "no-store" });
+            if (!active) return;
+            if (res.ok) {
+                const data = (await res.json()) as { status: string; log: string };
+                setLog(data.log);
+                setStatus(data.status);
+                if (["running", "failed", "cancelled", "rolled_back"].includes(data.status)) {
+                    onDone();
+                    return;
+                }
+            }
+            timer = setTimeout(poll, 1500);
+        }
+
+        void poll();
+        return () => {
+            active = false;
+            clearTimeout(timer);
+        };
+    }, [deploymentId, onDone]);
+
+    useEffect(() => {
+        if (preRef.current) preRef.current.scrollTop = preRef.current.scrollHeight;
+    }, [log]);
+
+    return (
+        <div className="flex flex-col gap-2">
+            <div className="text-xs text-muted-foreground">Status: {status}</div>
+            <pre
+                ref={preRef}
+                className="h-80 overflow-auto rounded-md bg-[#0b0e14] p-3 text-xs leading-relaxed text-zinc-300"
+            >
+                {log || "Waiting for output..."}
+            </pre>
         </div>
     );
 }
