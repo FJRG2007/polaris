@@ -46,6 +46,22 @@ Drive (storage):
 - [ ] Chunked/resumable upload; range/streaming download
 - [ ] hostd routing for kernel mounts (SMB/NFS) in the full edition
 
+Drive explorer (interaction):
+- [x] Non-reflowing selection: the action bar is a reserved fixed-height row, so
+      selecting items never shifts the file list
+- [x] Empty a folder (delete its contents, keep the folder) as a distinct action
+      from delete, behind an explicit in-app confirm
+- [x] Zip a selection to the NAS, optionally AES-256 encrypted with a password on
+      the archive itself (archiver + archiver-zip-encrypted), and optionally mint a
+      share link for the produced zip
+- [x] Extract a zip/rar in place into a chosen folder, with an optional password;
+      server-side zip-slip confinement + decompression-bomb caps (entry count +
+      aggregate bytes), reading the archive via a private temp file
+- [x] Preview/analyze a zip/rar (list entries + sizes) without extracting; rar is
+      read-only (node-unrar-js WASM), zip via node-stream-zip
+- [ ] Live end-to-end run against a real NAS/SFTP backend (built + typechecked;
+      archive read/write paths not exercised on this dev machine)
+
 Sharing:
 - [ ] Public share links (hashed token)
 - [ ] Link password (argon2), download limit, expiration
