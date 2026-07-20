@@ -83,17 +83,19 @@ export function ContainersView({
                                 >
                                     <Server className="size-4 text-muted-foreground" />
                                     <span className="flex-1 truncate">{connection.name}</span>
-                                    <Badge variant="neutral">{connection.transport}</Badge>
+                                    <Badge variant="neutral">{connection.local ? "local" : connection.transport}</Badge>
                                 </Link>
-                                <Button
-                                    size="icon"
-                                    variant="ghost"
-                                    onClick={() => onDeleteConnection(connection.id)}
-                                    aria-label={`Remove ${connection.name}`}
-                                    className="opacity-0 group-hover:opacity-100"
-                                >
-                                    <Trash2 className="size-4" />
-                                </Button>
+                                {connection.local ? null : (
+                                    <Button
+                                        size="icon"
+                                        variant="ghost"
+                                        onClick={() => onDeleteConnection(connection.id)}
+                                        aria-label={`Remove ${connection.name}`}
+                                        className="opacity-0 group-hover:opacity-100"
+                                    >
+                                        <Trash2 className="size-4" />
+                                    </Button>
+                                )}
                             </div>
                         ))
                     )}
@@ -104,11 +106,10 @@ export function ContainersView({
                 {!connectionId ? (
                     <div className="rounded-md border border-border bg-card p-8 text-center text-sm text-muted-foreground">
                         Connect a Docker host to monitor and manage containers.
-                        {sshEnabled ? null : (
-                            <span className="mt-2 block">
-                                Tip: run the installer with <code>--ssh</code> to grant secure host access.
-                            </span>
-                        )}
+                        <span className="mt-2 block">
+                            The local host appears here automatically in the full edition. Use Add host for a
+                            remote engine.
+                        </span>
                     </div>
                 ) : error ? (
                     <div className="rounded-md border border-danger/40 bg-danger/10 p-3 text-sm text-danger">

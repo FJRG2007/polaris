@@ -13,4 +13,11 @@ export async function register(): Promise<void> {
     process.on("unhandledRejection", (reason) => {
         console.error("polaris: unhandled rejection (server kept alive):", reason);
     });
+
+    // Detect the edition and keep it live: probe polaris-hostd on startup and on
+    // an interval, folding its capability report into the shared snapshot that
+    // getCapabilities() serves. Without this the dashboard is stuck reporting the
+    // limited edition even when the daemon is running.
+    const { startCapabilityRefresh } = await import("@polaris/hostd-client");
+    startCapabilityRefresh();
 }

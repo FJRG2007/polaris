@@ -6,10 +6,32 @@
  */
 
 import { loadEnv } from "@polaris/config";
-import type { DockerConfig, DockerCredentials } from "@polaris/docker";
-import { createDockerDriver, type DockerConnectionRecord } from "@polaris/docker";
+import type { DockerConfig, DockerCredentials, DockerRpc } from "@polaris/docker";
+import { createDockerDriver, DockerDriver, type DockerConnectionRecord } from "@polaris/docker";
 import { prisma } from "@polaris/db";
+import { HostdClient } from "@polaris/hostd-client";
 import { decryptCredentials, encryptCredentials } from "@polaris/storage";
+
+/**
+ * Reserved id of the auto-provisioned local host. It is not a stored row: it is
+ * reached through polaris-hostd's allowlisted Docker proxy, so the web container
+ * never touches the socket itself. Callers must authorize it (system.manage) -
+ * it is host-wide, not owner-scoped.
+ */
+export const LOCAL_DOCKER_CONNECTION_ID = "local";
+
+/**
+ * Driver for the local host, brokered by polaris-hostd. Every call is forwarded
+ * through the daemon's `/v1/docker` allowlist; there is no transport to close.
+ */
+export function localDockerDriver(): DockerDriver {
+    const client = new HostdClient();
+    const rpc: DockerRpc = {
+        request: (method, path) => client.dockerRequest(method, path),
+        dispose: async () => undefined
+    };
+    return new DockerDriver(rpc);
+}
 
 export async function listDockerConnections(ownerId: string) {
     return prisma.dockerConnection.findMany({

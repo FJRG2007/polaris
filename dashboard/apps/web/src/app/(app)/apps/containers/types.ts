@@ -7,6 +7,8 @@ export interface DockerConnectionSummary {
     name: string;
     transport: DockerTransport;
     status: string;
+    /** The auto-provisioned local host (brokered by hostd). Not deletable. */
+    local?: boolean;
 }
 
 export interface ContainerRow {

@@ -61,3 +61,10 @@ export async function requireAdmin(): Promise<SessionUser> {
     if (!user.isAdmin) redirect("/drive?denied=1");
     return user;
 }
+
+/** Non-redirecting permission check for a resolved user. Admins always pass.
+ *  Use to decide whether to surface an operator-only affordance to a user who
+ *  is allowed on the page but may not manage it. */
+export async function userHasManage(user: SessionUser, permission: Permission): Promise<boolean> {
+    return user.isAdmin || userHasPermission(user.id, permission);
+}
