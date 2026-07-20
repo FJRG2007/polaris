@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { serviceName } from "@polaris/deploy";
 import { refreshCapabilities } from "@polaris/hostd-client";
 import { requirePermission, userHasManage } from "@/lib/session";
-import { getProjectFull } from "@/lib/deploy-service";
+import { getDeploymentStatuses, getProjectFull } from "@/lib/deploy-service";
 import { ProjectDetail } from "../project-detail";
 import type { ProjectSummary } from "../deploy-view";
 
@@ -19,6 +19,11 @@ export default async function DeployProjectPage({ params }: { params: Promise<{ 
     const caps = canManage ? await refreshCapabilities() : null;
     const localReady = Boolean(caps?.deploy);
 
+    const deploymentIds = project.environments.flatMap((environment) =>
+        environment.applications.map((app) => app.currentDeploymentId).filter((id): id is string => Boolean(id))
+    );
+    const statuses = await getDeploymentStatuses(deploymentIds);
+
     const summary: ProjectSummary = {
         id: project.id,
         name: project.name,
@@ -32,6 +37,7 @@ export default async function DeployProjectPage({ params }: { params: Promise<{ 
                 name: app.name,
                 sourceType: app.sourceType,
                 currentDeploymentId: app.currentDeploymentId,
+                deployStatus: app.currentDeploymentId ? (statuses[app.currentDeploymentId] ?? null) : null,
                 targetId: app.targetId,
                 containerRef: serviceName(project.slug, app.slug, app.id),
                 autoDeploy: app.autoDeploy,

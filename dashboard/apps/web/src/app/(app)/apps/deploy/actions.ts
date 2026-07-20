@@ -107,7 +107,8 @@ export async function createApplicationAction(input: {
     branch?: string;
     dockerfilePath?: string;
     provider?: string;
-}): Promise<{ error?: string }> {
+    port?: number;
+}): Promise<{ error?: string; deploymentId?: string }> {
     const user = await requirePermission("deploy.manage");
     const name = input.name?.trim();
     if (!name) return { error: "An application name is required" };
@@ -143,8 +144,23 @@ export async function createApplicationAction(input: {
             sourceConfig
         });
         await recordAudit({ actorId: user.id, action: "deploy.app.create", targetType: "application", targetId: app.id });
+        // Give it a free testing subdomain (best-effort; needs a public IP) and kick
+        // off the first deploy right away, like Railway/Dokploy.
+        const targetPort = Number.isInteger(input.port) ? Number(input.port) : isGit ? 3000 : 80;
+        try {
+            await addApplicationDomain(app.id, user.id, { targetPort });
+        } catch {
+            // No public IP / free-subdomain base configured; the user can add a domain.
+        }
+        let deploymentId: string | undefined;
+        try {
+            deploymentId = await deployApplication(app.id, user.id, user.id);
+            await recordAudit({ actorId: user.id, action: "deploy.app.deploy", targetType: "application", targetId: app.id });
+        } catch {
+            // Surfaced on the app's next manual deploy; creation still succeeds.
+        }
         revalidatePath(DEPLOY_PATH);
-        return {};
+        return { deploymentId };
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Could not create the application" };
     }

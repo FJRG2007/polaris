@@ -313,6 +313,14 @@ export async function deployApplication(applicationId: string, ownerId: string, 
     return deployment.id;
 }
 
+/** Map deployment ids to their current status (for showing running/failed/…). */
+export async function getDeploymentStatuses(ids: string[]): Promise<Record<string, string>> {
+    const unique = [...new Set(ids.filter(Boolean))];
+    if (unique.length === 0) return {};
+    const rows = await prisma.deployment.findMany({ where: { id: { in: unique } }, select: { id: true, status: true } });
+    return Object.fromEntries(rows.map((row) => [row.id, row.status]));
+}
+
 /** Update an application's auto-deploy settings (owner-checked). */
 export async function updateAutoDeploy(
     applicationId: string,

@@ -77,6 +77,7 @@ export interface ProjectSummary {
             name: string;
             sourceType: string;
             currentDeploymentId: string | null;
+            deployStatus: string | null;
             targetId: string;
             containerRef: string;
             autoDeploy: boolean;
@@ -167,8 +168,8 @@ function AppCard({ app, canManage, onChanged }: { app: ProjectApp; canManage: bo
                     <span className="truncate text-sm font-medium">{app.name}</span>
                 </div>
                 <StatusPill
-                    tone={app.currentDeploymentId ? "success" : "idle"}
-                    label={app.currentDeploymentId ? "Deployed" : "Not deployed"}
+                    tone={app.currentDeploymentId ? dbTone(app.deployStatus ?? "") : "idle"}
+                    label={app.currentDeploymentId ? (app.deployStatus ?? "deployed") : "Not deployed"}
                 />
             </div>
 

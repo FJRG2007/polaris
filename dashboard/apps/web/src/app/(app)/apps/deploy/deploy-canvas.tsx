@@ -49,8 +49,8 @@ function nodesFromEnvironment(environment: ProjectSummary["environments"][number
         name: app.name,
         kind: serviceKindOf(app.sourceType),
         subtitle: app.domains[0]?.hostname ?? (app.sourceType === "image" ? "Docker image" : "Git repository"),
-        tone: app.currentDeploymentId ? "success" : "idle",
-        statusLabel: app.currentDeploymentId ? "Deployed" : "Not deployed"
+        tone: app.currentDeploymentId ? dbTone(app.deployStatus ?? "") : "idle",
+        statusLabel: app.currentDeploymentId ? (app.deployStatus ?? "deployed") : "Not deployed"
     }));
     const databases = environment.databases.map((database): CanvasNode => ({
         id: database.id,
@@ -256,7 +256,7 @@ export function DeployCanvas({
             )}
             <div
                 ref={containerRef}
-                className="relative h-[560px] overflow-auto rounded-lg border border-border/60"
+                className="relative h-[calc(100vh-13rem)] min-h-[420px] overflow-auto rounded-lg border border-border/60"
                 style={DOT_BG}
             >
                 <div ref={boardRef} className="relative" style={{ width: extent.w, height: extent.h }}>
