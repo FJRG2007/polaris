@@ -392,7 +392,8 @@ struct ChildReader {
     rx: mpsc::Receiver<Vec<u8>>,
     leftover: Vec<u8>,
     pos: usize,
-    _child: ChildGuard,
+    child: ChildGuard,
+    finished: bool,
 }
 
 impl Read for ChildReader {
@@ -410,7 +411,27 @@ impl Read for ChildReader {
                     self.pos = 0;
                 }
                 // All senders dropped: the process has exited and its pipes closed.
-                Err(_) => return Ok(0),
+                Err(_) => {
+                    if self.finished {
+                        return Ok(0);
+                    }
+                    self.finished = true;
+                    // Surface a non-zero exit as a trailer line the client parses, so a
+                    // failed build/compose is never a silent success on a streamed 200.
+                    let code = self
+                        .child
+                        .0
+                        .wait()
+                        .ok()
+                        .and_then(|s| s.code())
+                        .unwrap_or(-1);
+                    if code != 0 {
+                        self.leftover = format!("\n[polaris:exit:{code}]\n").into_bytes();
+                        self.pos = 0;
+                    } else {
+                        return Ok(0);
+                    }
+                }
             }
         }
     }
@@ -446,7 +467,8 @@ fn stream_command_ext(mut cmd: Command, merge_stderr: bool) -> io::Result<Box<dy
         rx,
         leftover: Vec::new(),
         pos: 0,
-        _child: ChildGuard(child),
+        child: ChildGuard(child),
+        finished: false,
     }))
 }
 

@@ -94,9 +94,19 @@ export class HostdPorts implements RuntimePorts {
 /** Pipe a streamed daemon response into a sink and resolve when it ends. */
 function drain(stream: Readable, onOutput?: OutputSink): Promise<void> {
     return new Promise((resolve, reject) => {
-        if (onOutput) stream.on("data", (chunk: Buffer) => onOutput(chunk));
-        else stream.resume();
-        stream.on("end", () => resolve());
+        // The daemon appends a "[polaris:exit:N]" trailer when a streamed command
+        // (build, compose up, pull, ...) exits non-zero. Watch the tail for it so a
+        // failed command is a rejected promise, not a silent success on a 200.
+        let tail = "";
+        stream.on("data", (chunk: Buffer) => {
+            if (onOutput) onOutput(chunk);
+            tail = (tail + chunk.toString("utf8")).slice(-120);
+        });
+        stream.on("end", () => {
+            const match = tail.match(/\[polaris:exit:(-?\d+)\]/);
+            if (match && match[1] !== "0") reject(new Error(`the command failed (exit ${match[1]})`));
+            else resolve();
+        });
         stream.on("error", reject);
     });
 }

@@ -31,7 +31,9 @@ FROM alpine:3
 # the download fails the image still builds and Dockerfile-based deploys keep working.
 ARG TARGETARCH
 ARG NIXPACKS_VERSION=1.29.0
-RUN apk add --no-cache docker-cli tar ca-certificates \
+# docker-cli-compose is REQUIRED: deploys run `docker compose up`. Without the
+# plugin the daemon has no `compose` subcommand and every deploy fails.
+RUN apk add --no-cache docker-cli docker-cli-compose docker-cli-buildx tar ca-certificates \
     && case "$TARGETARCH" in \
         arm64) NARCH=aarch64 ;; \
         *) NARCH=x86_64 ;; \
