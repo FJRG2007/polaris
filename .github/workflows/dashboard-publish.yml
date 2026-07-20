@@ -113,32 +113,73 @@ jobs:
           cache-from: type=gha,scope=mdns
           cache-to: type=gha,mode=max,scope=mdns
 
-  # Privileged host daemon. Build context is the repo root (the Rust workspace).
-  # Multi-arch so both amd64 and arm64 hosts can pull; a host can also fall back
-  # to the local `build:` context in compose, which builds natively. arm64 runs
-  # under QEMU, so this is the slowest image - hence gated to crates/** changes.
+  # Privileged host daemon (Rust workspace at the repo root). Built per-arch on
+  # NATIVE runners - amd64 on ubuntu-latest, arm64 on ubuntu-24.04-arm - instead of
+  # emulating arm64 under QEMU (which made this the ~7-minute bottleneck). Each arch
+  # pushes by digest; the manifest job below stitches them into the :latest tag.
   hostd:
     needs: changes
     if: ${{ needs.changes.outputs.hostd == 'true' || github.event_name == 'workflow_dispatch' }}
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-latest
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
-      - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
       - uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - uses: docker/build-push-action@v6
+      - id: build
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: crates/polaris-hostd/Dockerfile
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: ghcr.io/fjrg2007/polaris-hostd:latest
-          cache-from: type=gha,scope=hostd
-          cache-to: type=gha,mode=max,scope=hostd
+          platforms: ${{ matrix.platform }}
+          cache-from: type=gha,scope=hostd-${{ matrix.platform }}
+          cache-to: type=gha,mode=max,scope=hostd-${{ matrix.platform }}
+          outputs: type=image,name=ghcr.io/fjrg2007/polaris-hostd,push-by-digest=true,name-canonical=true,push=true
+      - name: Export digest
+        run: |
+          mkdir -p "${{ runner.temp }}/digests"
+          digest="${{ steps.build.outputs.digest }}"
+          touch "${{ runner.temp }}/digests/${digest#sha256:}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hostd-digest-${{ strategy.job-index }}
+          path: ${{ runner.temp }}/digests/*
+          retention-days: 1
+          if-no-files-found: error
+
+  # Stitch the per-arch digests into the multi-arch :latest manifest.
+  hostd-manifest:
+    needs: [changes, hostd]
+    if: ${{ needs.changes.outputs.hostd == 'true' || github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: ${{ runner.temp }}/digests
+          pattern: hostd-digest-*
+          merge-multiple: true
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Create manifest list
+        working-directory: ${{ runner.temp }}/digests
+        run: |
+          docker buildx imagetools create -t ghcr.io/fjrg2007/polaris-hostd:latest \
+            $(printf 'ghcr.io/fjrg2007/polaris-hostd@sha256:%s ' *)
 
   # One-shot self-update runner spawned by hostd's /v1/update.
   updater:
