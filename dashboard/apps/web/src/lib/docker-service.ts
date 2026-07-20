@@ -7,10 +7,11 @@
 
 import { loadEnv } from "@polaris/config";
 import type { DockerConfig, DockerCredentials, DockerRpc } from "@polaris/docker";
-import { createDockerDriver, DockerDriver, type DockerConnectionRecord } from "@polaris/docker";
+import { createDockerDriver, DockerDriver, sshTransport, streamRpc, type DockerConnectionRecord } from "@polaris/docker";
 import { prisma } from "@polaris/db";
 import { HostdClient } from "@polaris/hostd-client";
 import { decryptCredentials, encryptCredentials } from "@polaris/storage";
+import { getHostConnection } from "./host-service";
 
 /**
  * Reserved id of the auto-provisioned local host. It is not a stored row: it is
@@ -84,4 +85,24 @@ export async function createDockerConnection(
 
 export async function deleteDockerConnection(ownerId: string, connectionId: string) {
     await prisma.dockerConnection.deleteMany({ where: { id: connectionId, ownerId } });
+}
+
+/** Prefix marking a Containers connection id that resolves to a global Host
+ *  (Docker over SSH), so the app can route it without a separate lookup. */
+export const HOST_DOCKER_PREFIX = "host:";
+
+/** Docker driver for a global Host, over SSH via the shared, pinned primitive. */
+export async function hostDockerDriver(hostId: string, ownerId: string): Promise<DockerDriver> {
+    const conn = await getHostConnection(hostId, ownerId);
+    return new DockerDriver(
+        streamRpc(
+            sshTransport({
+                host: conn.address,
+                port: conn.port,
+                username: conn.username,
+                auth: conn.auth,
+                pinnedHostKey: conn.hostKey
+            })
+        )
+    );
 }

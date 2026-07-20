@@ -4,10 +4,13 @@ import { PageHeader } from "@polaris/ui";
 import { requireUser, userHasManage } from "@/lib/session";
 import {
     getDockerDriver,
+    hostDockerDriver,
+    HOST_DOCKER_PREFIX,
     listDockerConnections,
     localDockerDriver,
     LOCAL_DOCKER_CONNECTION_ID
 } from "@/lib/docker-service";
+import { listHosts } from "@/lib/host-service";
 import { ContainersView } from "./containers-view";
 import type { ContainerRow, DockerConnectionSummary, OverviewData } from "./types";
 
@@ -40,7 +43,16 @@ export default async function ContainersPage({
     const localHost: DockerConnectionSummary[] = localAvailable
         ? [{ id: LOCAL_DOCKER_CONNECTION_ID, name: "Local host", transport: "socket", status: "active", local: true }]
         : [];
-    const connections = [...localHost, ...stored];
+    // Global Hosts (managed in the Servers app) appear here as Docker-over-SSH
+    // targets - a server registered once is usable in Containers too.
+    const hostTargets: DockerConnectionSummary[] = (await listHosts(user.id)).map((host) => ({
+        id: `${HOST_DOCKER_PREFIX}${host.id}`,
+        name: host.name,
+        transport: "ssh",
+        status: host.status,
+        host: true
+    }));
+    const connections = [...localHost, ...stored, ...hostTargets];
 
     const connectionId = pick(params.c) ?? connections[0]?.id ?? null;
 
@@ -49,12 +61,17 @@ export default async function ContainersPage({
     let error: string | null = null;
 
     const isLocal = connectionId === LOCAL_DOCKER_CONNECTION_ID;
+    const isHost = connectionId?.startsWith(HOST_DOCKER_PREFIX) ?? false;
     if (connectionId && isLocal && !canManage) {
         // A non-manager forced ?c=local via the URL: deny, never resolve the driver.
         error = "You do not have access to the local host.";
     } else if (connectionId) {
         try {
-            const driver = isLocal ? localDockerDriver() : await getDockerDriver(connectionId, user.id);
+            const driver = isLocal
+                ? localDockerDriver()
+                : isHost
+                  ? await hostDockerDriver(connectionId.slice(HOST_DOCKER_PREFIX.length), user.id)
+                  : await getDockerDriver(connectionId, user.id);
             try {
                 const info = await driver.info();
                 const list = await driver.listContainers();

@@ -14,6 +14,8 @@ import {
     createDockerConnection,
     deleteDockerConnection,
     getDockerDriver,
+    hostDockerDriver,
+    HOST_DOCKER_PREFIX,
     localDockerDriver,
     LOCAL_DOCKER_CONNECTION_ID
 } from "@/lib/docker-service";
@@ -59,8 +61,9 @@ export async function createDockerConnectionAction(input: unknown): Promise<{ er
 
 export async function deleteDockerConnectionAction(connectionId: string): Promise<void> {
     const user = await requirePermission("system.manage");
-    // The auto-provisioned local host is not a stored row and cannot be removed.
-    if (connectionId === LOCAL_DOCKER_CONNECTION_ID) return;
+    // The local host and global Hosts are not stored Docker rows here (Hosts are
+    // managed in the Servers app), so there is nothing to remove.
+    if (connectionId === LOCAL_DOCKER_CONNECTION_ID || connectionId.startsWith(HOST_DOCKER_PREFIX)) return;
     await deleteDockerConnection(user.id, connectionId);
     await recordAudit({ actorId: user.id, action: "docker.connection.delete", targetType: "docker", targetId: connectionId });
     revalidatePath(CONTAINERS_PATH);
@@ -75,7 +78,9 @@ export async function containerAction(
     const driver =
         connectionId === LOCAL_DOCKER_CONNECTION_ID
             ? localDockerDriver()
-            : await getDockerDriver(connectionId, user.id);
+            : connectionId.startsWith(HOST_DOCKER_PREFIX)
+              ? await hostDockerDriver(connectionId.slice(HOST_DOCKER_PREFIX.length), user.id)
+              : await getDockerDriver(connectionId, user.id);
     try {
         if (action === "start") await driver.start(containerId);
         else if (action === "stop") await driver.stop(containerId);

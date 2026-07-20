@@ -9,6 +9,9 @@ export interface DockerConnectionSummary {
     status: string;
     /** The auto-provisioned local host (brokered by hostd). Not deletable. */
     local?: boolean;
+    /** A global Host (managed in the Servers app), reached over SSH. Not
+     *  deletable from here. */
+    host?: boolean;
 }
 
 export interface ContainerRow {

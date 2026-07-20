@@ -85,7 +85,7 @@ export function ContainersView({
                                     <span className="flex-1 truncate">{connection.name}</span>
                                     <Badge variant="neutral">{connection.local ? "local" : connection.transport}</Badge>
                                 </Link>
-                                {connection.local ? null : (
+                                {connection.local || connection.host ? null : (
                                     <Button
                                         size="icon"
                                         variant="ghost"
