@@ -1,4 +1,5 @@
 import { PageHeader } from "@polaris/ui";
+import { serviceName } from "@polaris/deploy";
 import { refreshCapabilities } from "@polaris/hostd-client";
 import { requirePermission, userHasManage } from "@/lib/session";
 import { getOrCreateLocalTarget } from "@/lib/deploy-target-service";
@@ -28,6 +29,8 @@ export default async function DeployPage() {
                 name: app.name,
                 sourceType: app.sourceType,
                 currentDeploymentId: app.currentDeploymentId,
+                targetId: app.targetId,
+                containerRef: serviceName(project.slug, app.slug, app.id),
                 domains: app.domains.map((domain) => ({ id: domain.id, hostname: domain.hostname, kind: domain.kind }))
             })),
             databases: environment.databases.map((database) => ({

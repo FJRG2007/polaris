@@ -29,6 +29,11 @@
 		-Server
 	}
 
+	# Interactive deploy terminals run in a sidecar on an internal port; route the
+	# WebSocket path there (Caddy upgrades transparently). Everything else goes to
+	# the Next server.
+	@ws path /api/deploy/ws
+	reverse_proxy @ws web:${POLARIS_WS_PORT:-3001}
 	reverse_proxy web:3000
 }
 

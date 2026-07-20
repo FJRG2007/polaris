@@ -10,8 +10,21 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Boxes, Database, Globe, Plus, Rocket, Trash2 } from "lucide-react";
-import { Badge, Button, Card, CardBody, CardHeader, CardTitle, Input } from "@polaris/ui";
+import { Boxes, Database, Globe, Plus, Rocket, TerminalSquare, Trash2 } from "lucide-react";
+import {
+    Badge,
+    Button,
+    Card,
+    CardBody,
+    CardHeader,
+    CardTitle,
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    Input
+} from "@polaris/ui";
+import { TerminalPanel } from "./terminal-panel";
 import {
     addDomainAction,
     createApplicationAction,
@@ -35,6 +48,8 @@ export interface ProjectSummary {
             name: string;
             sourceType: string;
             currentDeploymentId: string | null;
+            targetId: string;
+            containerRef: string;
             domains: { id: string; hostname: string; kind: string }[];
         }[];
         databases: { id: string; name: string; engine: string; status: string }[];
@@ -163,6 +178,7 @@ function ApplicationRow({
 }) {
     const [busy, startTransition] = useTransition();
     const [showDomain, setShowDomain] = useState(false);
+    const [showTerminal, setShowTerminal] = useState(false);
     const [hostname, setHostname] = useState("");
     const [port, setPort] = useState("80");
     const [error, setError] = useState<string | null>(null);
@@ -205,7 +221,10 @@ function ApplicationRow({
                 </div>
                 {canManage && (
                     <div className="flex items-center gap-2">
-                        <Button variant="ghost" onClick={() => setShowDomain((value) => !value)}>
+                        <Button variant="ghost" onClick={() => setShowTerminal(true)} title="Terminal">
+                            <TerminalSquare className="size-4" />
+                        </Button>
+                        <Button variant="ghost" onClick={() => setShowDomain((value) => !value)} title="Domains">
                             <Globe className="size-4" />
                         </Button>
                         <Button variant="secondary" onClick={onDeploy} disabled={pending || busy}>
@@ -214,6 +233,17 @@ function ApplicationRow({
                     </div>
                 )}
             </div>
+
+            <Dialog open={showTerminal} onOpenChange={setShowTerminal}>
+                <DialogContent className="max-w-3xl">
+                    <DialogHeader>
+                        <DialogTitle>Terminal - {app.name}</DialogTitle>
+                    </DialogHeader>
+                    {showTerminal && (
+                        <TerminalPanel targetId={app.targetId} containerRef={app.containerRef} label={app.containerRef} />
+                    )}
+                </DialogContent>
+            </Dialog>
             {showDomain && canManage && (
                 <div className="flex flex-wrap items-end gap-2 pl-6">
                     <Input

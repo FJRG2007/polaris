@@ -23,6 +23,8 @@
         "@polaris/storage": "0.1.0",
         "@polaris/ui": "0.1.0",
         "@tanstack/react-virtual": "3.11.2",
+        "@xterm/addon-fit": "0.10.0",
+        "@xterm/xterm": "5.5.0",
         "archiver": "7.0.1",
         "archiver-zip-encrypted": "2.0.0",
         "better-auth": "1.6.23",
@@ -39,12 +41,14 @@
         "react": "19.0.0",
         "react-dom": "19.0.0",
         "undici": "6.21.1",
+        "ws": "8.18.0",
         "xlsx": "0.18.5",
         "zod": "3.24.1"
     },
     "devDependencies": {
         "@types/archiver": "8.0.0",
         "@types/node": "22.10.7",
+        "@types/ws": "8.5.13",
         "@types/react": "19.0.7",
         "@types/react-dom": "19.0.3",
         "autoprefixer": "10.4.20",

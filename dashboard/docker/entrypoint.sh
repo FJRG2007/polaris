@@ -38,6 +38,16 @@ while [ "$i" -le "$attempts" ]; do
     sleep 2
 done
 
+# --- Deploy terminal sidecar (best-effort) ----------------------------------
+# The interactive-terminal WebSocket server runs alongside the Next server on an
+# internal port (the reverse proxy forwards /api/deploy/ws to it). Started in the
+# background and non-fatally: if it is not present or exits, the dashboard still
+# serves - only live terminals are affected.
+if [ -f apps/web/ws-server.mjs ]; then
+    echo "polaris: starting deploy terminal sidecar on :${POLARIS_WS_PORT:-3001}"
+    node apps/web/ws-server.mjs &
+fi
+
 # --- Start the server -------------------------------------------------------
 # exec so the Node process becomes PID 1 and receives container signals.
 echo "polaris: starting dashboard on ${HOSTNAME:-0.0.0.0}:${PORT:-3000}"
