@@ -60,7 +60,10 @@ services:
       - polaris-data:/var/lib/polaris
       # Dedicated SSH key + pinned known_hosts for the Docker connector, mounted
       # read-only. Populated by `install.sh --ssh`; empty (and ignored) otherwise.
-      - ./secrets/ssh:/run/polaris-ssh:ro
+      # Absolute host path so the mount is correct even when compose runs inside the
+      # self-update container (POLARIS_HOST_REPO is the true host repo root); the
+      # `../..` default resolves to the repo root for a direct host run.
+      - ${POLARIS_HOST_REPO:-../..}/dashboard/docker/secrets/ssh:/run/polaris-ssh:ro
     # Not published to the host: Caddy is the only public entry point.
     expose:
       - "3000"
@@ -89,7 +92,9 @@ services:
       - "443:443"
       - "443:443/udp"
     volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # Absolute host path (see the hostd ssh mount note) so caddy's Caddyfile mount
+      # survives a self-update, where compose runs from the container path /polaris.
+      - ${POLARIS_HOST_REPO:-../..}/dashboard/docker/Caddyfile:/etc/caddy/Caddyfile:ro
       - polaris-caddy-data:/data
       - polaris-caddy-config:/config
 
