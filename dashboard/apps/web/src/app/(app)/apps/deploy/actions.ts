@@ -18,7 +18,8 @@ import {
     deleteEnvironment,
     deleteProject,
     deployApplication,
-    removeApplicationDomain
+    removeApplicationDomain,
+    saveEnvironmentLayout
 } from "@/lib/deploy-service";
 import { createDatabase, deployDatabase, type DbEngine } from "@/lib/database-service";
 import { getGithubStatus, listGithubRepos, type GithubRepo } from "@/lib/github-service";
@@ -59,6 +60,16 @@ export async function createEnvironmentAction(input: { projectId: string; name: 
         return { id: environment.id };
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Could not create the environment" };
+    }
+}
+
+export async function saveLayoutAction(input: { environmentId: string; layout: string }): Promise<{ error?: string }> {
+    const user = await requirePermission("deploy.manage");
+    try {
+        await saveEnvironmentLayout(input.environmentId, user.id, input.layout);
+        return {};
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not save the layout" };
     }
 }
 

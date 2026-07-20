@@ -10,9 +10,10 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, Loader2, Plus, Trash2 } from "lucide-react";
+import { ChevronLeft, List, Loader2, Plus, Trash2, Waypoints } from "lucide-react";
 import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, Input } from "@polaris/ui";
-import { EnvironmentServices, type ProjectSummary } from "./deploy-view";
+import { EnvironmentServices, NewServiceButton, type ProjectSummary } from "./deploy-view";
+import { DeployCanvas } from "./deploy-canvas";
 import { createEnvironmentAction, deleteEnvironmentAction, deleteProjectAction } from "./actions";
 
 export function ProjectDetail({
@@ -33,6 +34,7 @@ export function ProjectDetail({
     const active = environments.find((env) => env.id === activeId) ?? defaultEnv;
 
     const [confirmDeleteProject, setConfirmDeleteProject] = useState(false);
+    const [view, setView] = useState<"canvas" | "list">("canvas");
     const [pending, startTransition] = useTransition();
 
     return (
@@ -110,10 +112,36 @@ export function ProjectDetail({
                         }}
                     />
                 )}
+
+                <div className="ml-auto flex items-center gap-2 pb-1">
+                    {canManage && active && <NewServiceButton environmentId={active.id} onChanged={refresh} />}
+                    <div className="flex items-center gap-1 rounded-md border border-border p-0.5">
+                        <button
+                            type="button"
+                            onClick={() => setView("canvas")}
+                            aria-label="Canvas view"
+                            className={`rounded p-1.5 transition-colors ${view === "canvas" ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                        >
+                            <Waypoints className="size-4" />
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setView("list")}
+                            aria-label="List view"
+                            className={`rounded p-1.5 transition-colors ${view === "list" ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                        >
+                            <List className="size-4" />
+                        </button>
+                    </div>
+                </div>
             </div>
 
             {active ? (
-                <EnvironmentServices environment={active} canManage={canManage} onChanged={refresh} />
+                view === "canvas" ? (
+                    <DeployCanvas environment={active} canManage={canManage} />
+                ) : (
+                    <EnvironmentServices environment={active} canManage={canManage} onChanged={refresh} />
+                )
             ) : (
                 <p className="text-sm text-muted-foreground">This project has no environments.</p>
             )}

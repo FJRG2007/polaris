@@ -93,6 +93,17 @@ export async function createEnvironment(projectId: string, ownerId: string, name
     return prisma.environment.create({ data: { projectId, name, slug, isDefault: false } });
 }
 
+/** Persist an environment's canvas layout (node positions + links) as JSON. */
+export async function saveEnvironmentLayout(environmentId: string, ownerId: string, layout: string): Promise<void> {
+    const environment = await prisma.environment.findFirst({
+        where: { id: environmentId, project: { ownerId } }
+    });
+    if (!environment) throw new Error("Environment not found");
+    // Guard against unbounded blobs; a layout is small even for large projects.
+    if (layout.length > 100_000) throw new Error("Layout is too large");
+    await prisma.environment.update({ where: { id: environmentId }, data: { layout } });
+}
+
 /** Delete a non-default environment (and everything in it) the owner owns. */
 export async function deleteEnvironment(environmentId: string, ownerId: string) {
     const environment = await prisma.environment.findFirst({

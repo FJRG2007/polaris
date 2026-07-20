@@ -26,6 +26,7 @@ export default async function DeployProjectPage({ params }: { params: Promise<{ 
             id: environment.id,
             name: environment.name,
             isDefault: environment.isDefault,
+            layout: environment.layout,
             applications: environment.applications.map((app) => ({
                 id: app.id,
                 name: app.name,

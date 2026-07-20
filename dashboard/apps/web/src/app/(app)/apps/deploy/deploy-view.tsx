@@ -64,6 +64,7 @@ export interface ProjectSummary {
         id: string;
         name: string;
         isDefault: boolean;
+        layout: string;
         applications: {
             id: string;
             name: string;
@@ -105,12 +106,6 @@ export function EnvironmentServices({
 
     return (
         <div className="flex flex-col gap-3">
-            {canManage && (
-                <div className="flex justify-end">
-                    <NewServiceButton environmentId={environment.id} onChanged={onChanged} />
-                </div>
-            )}
-
             {isEmpty ? (
                 <div className="rounded-lg border border-dashed border-border/60 px-4 py-16 text-center">
                     <p className="text-sm text-muted-foreground">No services in this environment yet.</p>
@@ -299,7 +294,7 @@ const SERVICE_TITLES: Record<Exclude<ServiceView, "list">, string> = {
     database: "Database"
 };
 
-function NewServiceButton({ environmentId, onChanged }: { environmentId: string; onChanged: () => void }) {
+export function NewServiceButton({ environmentId, onChanged }: { environmentId: string; onChanged: () => void }) {
     const [open, setOpen] = useState(false);
     const [view, setView] = useState<ServiceView>("list");
 
@@ -676,7 +671,7 @@ export function StatusPill({ tone, label }: { tone: "success" | "warning" | "dan
     );
 }
 
-function dbTone(status: string): "success" | "warning" | "danger" | "idle" {
+export function dbTone(status: string): "success" | "warning" | "danger" | "idle" {
     const value = status.toLowerCase();
     if (["running", "active", "healthy", "ready"].includes(value)) return "success";
     if (["failed", "error", "stopped"].includes(value)) return "danger";

@@ -777,6 +777,8 @@ model Environment {
     name      String
     slug      String
     isDefault Boolean  @default(false)
+    // Canvas layout as stringified JSON: { pos: {serviceId:{x,y}}, links: [{source,target}] }.
+    layout    String   @default("{}")
     createdAt DateTime @default(now())
 
     project      Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
