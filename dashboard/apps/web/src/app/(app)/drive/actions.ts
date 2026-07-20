@@ -238,6 +238,28 @@ export async function deleteEntryAction(connectionId: string, path: string): Pro
 }
 
 /**
+ * Empty a folder: permanently delete everything inside it but keep the folder
+ * itself. Authorized with "delete" on the folder (same right as deleting it),
+ * then each direct child is removed recursively. This is a permanent delete, not
+ * a move to Trash - matching deleteEntryAction.
+ */
+export async function emptyFolderAction(connectionId: string, path: string): Promise<void> {
+    const user = await requireUser();
+    const driver = await requireDriveDriver(user.id, connectionId, path, "delete");
+    try {
+        const rel = normalizeRelPath(path);
+        const { entries } = await driver.list(rel);
+        for (const child of entries) {
+            await driver.delete(normalizeRelPath(child.path), { recursive: true });
+        }
+    } finally {
+        await driver.dispose();
+    }
+    await recordAudit({ actorId: user.id, action: "drive.empty", targetType: "connection", targetId: connectionId, metadata: { path } });
+    revalidatePath("/drive");
+}
+
+/**
  * Schedule an item's deletion for a future time. Owner/ACL-authorized like a real
  * delete; the sweep (lazy on browse, or the cron) carries it out later. `permanent`
  * chooses a real delete over the recycle bin.

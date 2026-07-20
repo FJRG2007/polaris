@@ -23,6 +23,7 @@ import {
     ClipboardPaste,
     Copy,
     Download,
+    Eraser,
     Eye,
     EyeOff,
     File,
@@ -195,6 +196,7 @@ export function FilesView({
     onCopy,
     onManageAccess,
     onDeletePermanent,
+    onEmptyFolder,
     onScheduleDelete,
     headerActions
 }: {
@@ -225,6 +227,7 @@ export function FilesView({
     onManageAccess?: (entry: DriveEntry) => void;
     /** Delete items for good, bypassing the recycle bin. */
     onDeletePermanent: (entries: DriveEntry[]) => void;
+    onEmptyFolder: (entry: DriveEntry) => void;
     /** Schedule items to be deleted at a future time. */
     onScheduleDelete: (entries: DriveEntry[]) => void;
     /** Connection-level actions (Access, Open console) rendered in the toolbar, left of the panel. */
@@ -679,6 +682,10 @@ export function FilesView({
                         <ContextMenuItem onSelect={() => onRequestFiles(entry.path, entry.name)}>
                             <Inbox className="size-4" />
                             Request files here
+                        </ContextMenuItem>
+                        <ContextMenuItem onSelect={() => onEmptyFolder(entry)}>
+                            <Eraser className="size-4" />
+                            Empty folder
                         </ContextMenuItem>
                         {clipboard ? (
                             <ContextMenuItem
@@ -1320,31 +1327,47 @@ export function FilesView({
                 </div>
             ) : null}
 
-            {selectedEntries.length > 0 ? (
-                <div className="mb-3 flex flex-wrap items-center gap-2 rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-sm">
-                    <span className="font-medium">{selectedEntries.length} selected</span>
-                    <div className="ml-auto flex items-center gap-1">
-                        <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => downloadSelection(connectionId, selectedEntries)}
-                        >
-                            <Download className="size-4" />
-                            {selectedEntries.length > 1 || selectedEntries.some((entry) => entry.kind === "dir")
-                                ? "Download ZIP"
-                                : "Download"}
-                        </Button>
-                        <Button size="sm" variant="ghost" onClick={() => onDelete(selectedEntries)} disabled={pending}>
-                            <Trash2 className="size-4" />
-                            Delete
-                        </Button>
-                        <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>
-                            <X className="size-4" />
-                            Clear
-                        </Button>
-                    </div>
-                </div>
-            ) : null}
+            {/* Always-present, fixed-height action row so beginning a selection
+                never reflows the list. Empty (a subtle hint) when nothing is
+                selected; actions appear in place when items are selected. */}
+            <div
+                className={cn(
+                    "mb-3 flex h-10 items-center gap-2 rounded-md border px-3 text-sm transition-colors",
+                    selectedEntries.length > 0
+                        ? "border-primary/40 bg-primary/5"
+                        : "border-transparent"
+                )}
+            >
+                {selectedEntries.length > 0 ? (
+                    <>
+                        <span className="font-medium">{selectedEntries.length} selected</span>
+                        <div className="ml-auto flex items-center gap-1">
+                            <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => downloadSelection(connectionId, selectedEntries)}
+                            >
+                                <Download className="size-4" />
+                                {selectedEntries.length > 1 || selectedEntries.some((entry) => entry.kind === "dir")
+                                    ? "Download ZIP"
+                                    : "Download"}
+                            </Button>
+                            <Button size="sm" variant="ghost" onClick={() => onDelete(selectedEntries)} disabled={pending}>
+                                <Trash2 className="size-4" />
+                                Delete
+                            </Button>
+                            <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>
+                                <X className="size-4" />
+                                Clear
+                            </Button>
+                        </div>
+                    </>
+                ) : (
+                    <span className="text-xs text-muted-foreground">
+                        Select files to download, zip, or delete them.
+                    </span>
+                )}
+            </div>
 
             <ContextMenu>
             <ContextMenuTrigger asChild>

@@ -34,6 +34,7 @@ import {
     createFileAction,
     deleteConnectionAction,
     deleteEntryAction,
+    emptyFolderAction,
     discoverUnasSharesAction,
     mkdirAction,
     moveToTrashAction,
@@ -85,6 +86,7 @@ export function DriveExplorer({
     const [newFileName, setNewFileName] = useState("Untitled.txt");
     const [deleteTargets, setDeleteTargets] = useState<DriveEntry[] | null>(null);
     const [permanentTargets, setPermanentTargets] = useState<DriveEntry[] | null>(null);
+    const [emptyTarget, setEmptyTarget] = useState<DriveEntry | null>(null);
     const [scheduleTargets, setScheduleTargets] = useState<DriveEntry[] | null>(null);
     const [deleteConn, setDeleteConn] = useState<ConnectionSummary | null>(null);
     const [editConn, setEditConn] = useState<ConnectionSummary | null>(null);
@@ -304,6 +306,13 @@ export function DriveExplorer({
         });
     }
 
+    function confirmEmpty() {
+        if (!connectionId || !emptyTarget) return;
+        const target = emptyTarget;
+        setEmptyTarget(null);
+        runOp(`Emptying ${target.name}`, () => emptyFolderAction(connectionId, target.path));
+    }
+
     function confirmDeleteConnection() {
         if (!deleteConn) return;
         const target = deleteConn;
@@ -397,6 +406,7 @@ export function DriveExplorer({
                         onUpload={onUpload}
                         onDelete={(items) => setDeleteTargets(items)}
                         onDeletePermanent={(items) => setPermanentTargets(items)}
+                        onEmptyFolder={(entry) => setEmptyTarget(entry)}
                         onScheduleDelete={(items) => setScheduleTargets(items)}
                         onRename={onRename}
                         onShare={(entry) =>
@@ -569,6 +579,27 @@ export function DriveExplorer({
                         </Button>
                         <Button type="button" variant="danger" onClick={confirmDelete}>
                             Move to Trash
+                        </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={emptyTarget !== null} onOpenChange={(open) => !open && setEmptyTarget(null)}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Empty folder</DialogTitle>
+                        <DialogDescription className="truncate">
+                            {emptyTarget
+                                ? `Everything inside ${emptyTarget.name} will be permanently deleted. The folder itself is kept. This cannot be undone.`
+                                : ""}
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="flex justify-end gap-2">
+                        <Button type="button" variant="ghost" onClick={() => setEmptyTarget(null)}>
+                            Cancel
+                        </Button>
+                        <Button type="button" variant="danger" onClick={confirmEmpty}>
+                            Empty folder
                         </Button>
                     </div>
                 </DialogContent>
