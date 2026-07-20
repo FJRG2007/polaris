@@ -114,6 +114,13 @@ struct ExecCreateRequest {
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
+struct FsReadRequest {
+    container: String,
+    argv: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct ExecResizeRequest {
     #[serde(rename = "execId")]
     exec_id: String,
@@ -149,6 +156,8 @@ pub fn dispatch<R: Read>(state: &AppState, req: &Request, body: &mut R) -> Respo
         ("POST", "/v1/deploy/build") => deploy_build(state, req, body),
         ("POST", "/v1/deploy/exec/create") => deploy_exec_create(state, req, body),
         ("POST", "/v1/deploy/exec/resize") => deploy_exec_resize(state, req, body),
+        ("POST", "/v1/deploy/fs/read") => deploy_fs_read(req, body),
+        ("POST", "/v1/deploy/fs/write") => deploy_fs_write(state, req, body),
         _ if path.starts_with("/v1/fs/") => fs_handler(state, req, body),
         ("DELETE", _) if path.starts_with("/v1/mounts/") => {
             mount_delete(state, &path["/v1/mounts/".len()..])
@@ -442,6 +451,88 @@ fn deploy_exec_resize<R: Read>(state: &AppState, req: &Request, body: &mut R) ->
 /// Wrap a streaming reader as a plain-text streamed response.
 fn stream_response(reader: Box<dyn std::io::Read + Send>) -> Response {
     Response::stream(200, "OK", reader).with_header("Content-Type", "text/plain; charset=utf-8")
+}
+
+/// Read-only container filesystem commands (list/stat/read/tar). argv[0] is held
+/// to a small allowlist; the file browser only ever uses these.
+const FS_READ_ALLOWED: &[&str] = &["ls", "stat", "cat", "tar", "find", "test"];
+
+/// Run a read-only filesystem command inside a container and stream stdout. stderr
+/// is dropped so a binary read (cat/tar) is never corrupted by diagnostics.
+fn deploy_fs_read<R: Read>(req: &Request, body: &mut R) -> Response {
+    let raw = match read_control_body(req, body) {
+        Ok(b) => b,
+        Err(resp) => return resp,
+    };
+    let request: FsReadRequest = match serde_json::from_slice(&raw) {
+        Ok(r) => r,
+        Err(_) => return Response::bad_request("invalid fs read request"),
+    };
+    if !deploy::valid_container_ref(&request.container) {
+        return Response::bad_request("invalid container reference");
+    }
+    if request.argv.is_empty() || request.argv.len() > 32 {
+        return Response::bad_request("argv must have 1-32 elements");
+    }
+    if !FS_READ_ALLOWED.contains(&request.argv[0].as_str()) {
+        return Response::forbidden("command not permitted by the fs read allowlist");
+    }
+    for arg in &request.argv {
+        if arg.len() > 4096 || arg.bytes().any(|b| b == 0) {
+            return Response::bad_request("argv element too long or contains a NUL");
+        }
+    }
+    match deploy::exec_run(&request.container, &request.argv, None, false) {
+        Ok(reader) => Response::stream(200, "OK", reader).with_header("Content-Type", "application/octet-stream"),
+        Err(_) => Response::text(502, "Bad Gateway", "could not run the command"),
+    }
+}
+
+/// Write a file inside a container: stream the request body to the path via
+/// `docker exec -i <c> sh -c 'cat > "$1"' _ <path>`. The path is a positional
+/// argument (`$1`), never interpolated into the shell command, so it cannot inject.
+fn deploy_fs_write<R: Read>(state: &AppState, req: &Request, body: &mut R) -> Response {
+    let container = req.header("x-polaris-container").unwrap_or("");
+    let path = req.header("x-polaris-path").unwrap_or("");
+    if !deploy::valid_container_ref(container) {
+        return Response::bad_request("invalid or missing X-Polaris-Container");
+    }
+    if path.is_empty() || path.len() > 4096 || path.bytes().any(|b| b < 0x20 || b == 0x7f) {
+        return Response::bad_request("invalid or missing X-Polaris-Path");
+    }
+
+    let build_dir = state.config.deploy_root.join("_fs");
+    if std::fs::create_dir_all(&build_dir).is_err() {
+        return Response::server_error();
+    }
+    let tmp = build_dir.join(format!("up-{}.bin", std::process::id()));
+    let mut file = match std::fs::File::create(&tmp) {
+        Ok(f) => f,
+        Err(_) => return Response::server_error(),
+    };
+    const MAX_UPLOAD: u64 = 4 * 1024 * 1024 * 1024;
+    let mut limited = body.take(req.content_length.min(MAX_UPLOAD));
+    if std::io::copy(&mut limited, &mut file).is_err() {
+        let _ = std::fs::remove_file(&tmp);
+        return Response::server_error();
+    }
+    drop(file);
+    let reopened = match std::fs::File::open(&tmp) {
+        Ok(f) => f,
+        Err(_) => return Response::server_error(),
+    };
+    let _ = std::fs::remove_file(&tmp);
+    let argv = vec![
+        "sh".to_string(),
+        "-c".to_string(),
+        "cat > \"$1\"".to_string(),
+        "polaris".to_string(),
+        path.to_string(),
+    ];
+    match deploy::exec_run(container, &argv, Some(reopened), true) {
+        Ok(reader) => stream_response(reader),
+        Err(_) => Response::text(502, "Bad Gateway", "could not write the file"),
+    }
 }
 
 /// Map a path-resolution error to a safe 403/400 response.

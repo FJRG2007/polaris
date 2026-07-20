@@ -10,7 +10,7 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Boxes, Database, Globe, Plus, Rocket, TerminalSquare, Trash2 } from "lucide-react";
+import { Boxes, Database, FolderOpen, Globe, Plus, Rocket, TerminalSquare, Trash2 } from "lucide-react";
 import {
     Badge,
     Button,
@@ -25,6 +25,7 @@ import {
     Input
 } from "@polaris/ui";
 import { TerminalPanel } from "./terminal-panel";
+import { FilesPanel } from "./files-panel";
 import {
     addDomainAction,
     createApplicationAction,
@@ -175,6 +176,7 @@ function ApplicationRow({
     const [busy, startTransition] = useTransition();
     const [showDomain, setShowDomain] = useState(false);
     const [showTerminal, setShowTerminal] = useState(false);
+    const [showFiles, setShowFiles] = useState(false);
     const [logsFor, setLogsFor] = useState<string | null>(null);
     const [hostname, setHostname] = useState("");
     const [port, setPort] = useState("80");
@@ -227,6 +229,9 @@ function ApplicationRow({
                 </div>
                 {canManage && (
                     <div className="flex items-center gap-2">
+                        <Button variant="ghost" onClick={() => setShowFiles(true)} title="Files">
+                            <FolderOpen className="size-4" />
+                        </Button>
                         <Button variant="ghost" onClick={() => setShowTerminal(true)} title="Terminal">
                             <TerminalSquare className="size-4" />
                         </Button>
@@ -248,6 +253,15 @@ function ApplicationRow({
                     {showTerminal && (
                         <TerminalPanel targetId={app.targetId} containerRef={app.containerRef} label={app.containerRef} />
                     )}
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={showFiles} onOpenChange={setShowFiles}>
+                <DialogContent className="max-w-2xl">
+                    <DialogHeader>
+                        <DialogTitle>Files - {app.name}</DialogTitle>
+                    </DialogHeader>
+                    {showFiles && <FilesPanel applicationId={app.id} />}
                 </DialogContent>
             </Dialog>
 

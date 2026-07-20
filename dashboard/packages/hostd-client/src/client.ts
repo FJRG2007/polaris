@@ -153,6 +153,21 @@ export class HostdClient {
         });
     }
 
+    /** Run a read-only filesystem command in a container, streaming stdout (stderr
+     *  dropped so a binary read is not corrupted). */
+    public async fsRead(container: string, argv: string[]): Promise<IncomingMessage> {
+        return this.callStream("POST", "/v1/deploy/fs/read", JSON.stringify({ container, argv }));
+    }
+
+    /** Write a file inside a container by streaming its content. */
+    public async fsWrite(container: string, path: string, content: Buffer): Promise<IncomingMessage> {
+        return this.callStream("POST", "/v1/deploy/fs/write", content, {
+            "content-type": "application/octet-stream",
+            "x-polaris-container": container,
+            "x-polaris-path": path
+        });
+    }
+
     /** Create an interactive exec in a container; returns the exec id. */
     public async execCreate(spec: {
         container: string;

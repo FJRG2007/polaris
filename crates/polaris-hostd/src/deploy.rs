@@ -399,21 +399,61 @@ impl Read for ChildReader {
 
 /// Spawn `cmd`, streaming its merged stdout+stderr. stdin is whatever the caller
 /// configured (default null); stdout/stderr are captured here.
-fn stream_command(mut cmd: Command) -> io::Result<Box<dyn Read + Send>> {
-    cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
+fn stream_command(cmd: Command) -> io::Result<Box<dyn Read + Send>> {
+    stream_command_ext(cmd, true)
+}
+
+/// Spawn `cmd` streaming stdout, optionally merging stderr. Reads (e.g. `cat` of a
+/// binary file) drop stderr so diagnostics never corrupt the byte stream; other
+/// commands merge it so the caller sees errors inline.
+fn stream_command_ext(mut cmd: Command, merge_stderr: bool) -> io::Result<Box<dyn Read + Send>> {
+    cmd.stdout(Stdio::piped());
+    cmd.stderr(if merge_stderr { Stdio::piped() } else { Stdio::null() });
     let mut child = cmd.spawn()?;
     let stdout = child.stdout.take().expect("stdout piped");
-    let stderr = child.stderr.take().expect("stderr piped");
     let (tx, rx) = mpsc::channel();
-    let tx_err = tx.clone();
+    if merge_stderr {
+        if let Some(stderr) = child.stderr.take() {
+            let tx_err = tx.clone();
+            thread::spawn(move || pump(stderr, tx_err));
+        }
+    }
     thread::spawn(move || pump(stdout, tx));
-    thread::spawn(move || pump(stderr, tx_err));
     Ok(Box::new(ChildReader {
         rx,
         leftover: Vec::new(),
         pos: 0,
         _child: ChildGuard(child),
     }))
+}
+
+/// Run `docker exec` inside a container and stream the result. For a read (binary
+/// safe) pass `merge_stderr = false`; for a command whose diagnostics matter pass
+/// true. `stdin` supplies the exec's stdin (e.g. file content to write).
+pub fn exec_run(
+    container: &str,
+    argv: &[String],
+    stdin: Option<std::fs::File>,
+    merge_stderr: bool,
+) -> io::Result<Box<dyn Read + Send>> {
+    let mut cmd = Command::new("docker");
+    cmd.arg("exec");
+    if stdin.is_some() {
+        cmd.arg("-i");
+    }
+    cmd.arg(container);
+    for arg in argv {
+        cmd.arg(arg);
+    }
+    match stdin {
+        Some(file) => {
+            cmd.stdin(Stdio::from(file));
+        }
+        None => {
+            cmd.stdin(Stdio::null());
+        }
+    }
+    stream_command_ext(cmd, merge_stderr)
 }
 
 fn pump<R: Read>(mut reader: R, tx: mpsc::Sender<Vec<u8>>) {
