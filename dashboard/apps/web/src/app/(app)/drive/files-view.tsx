@@ -27,6 +27,7 @@ import {
     Eye,
     EyeOff,
     File,
+    FileArchive,
     FilePlus,
     Files,
     Folder,
@@ -85,6 +86,7 @@ import { FileViewer, isViewable, type ViewerTarget } from "./file-viewer";
 import { ITEM_ICONS, ITEM_ICON_COLORS, iconColorClass, iconComponent } from "./item-icons";
 import { matchesStructured, parseSearch } from "./search-query";
 import { SelectionZipMenu } from "./selection-zip-menu";
+import { ArchiveDialog } from "./archive-dialog";
 import { RelativeTime } from "@/components/relative-time";
 import { UserProfileDialog } from "@/components/user-profile-dialog";
 import type { DriveEntry } from "./types";
@@ -278,6 +280,7 @@ export function FilesView({
     const [moveTargets, setMoveTargets] = useState<DriveEntry[] | null>(null);
     const [moveDest, setMoveDest] = useState("");
     const [activity, setActivity] = useState<ActivityItem[]>([]);
+    const [archiveTarget, setArchiveTarget] = useState<DriveEntry | null>(null);
     const [activityLoading, setActivityLoading] = useState(false);
 
     function openNote(entry: DriveEntry) {
@@ -715,6 +718,12 @@ export function FilesView({
                             <Download className="size-4" />
                             Download
                         </ContextMenuItem>
+                        {/\.(zip|rar)$/i.test(entry.name) ? (
+                            <ContextMenuItem onSelect={() => setArchiveTarget(entry)}>
+                                <FileArchive className="size-4" />
+                                Open archive
+                            </ContextMenuItem>
+                        ) : null}
                     </>
                 )}
                 <ContextMenuItem onSelect={() => startRename(entry)}>
@@ -1859,6 +1868,14 @@ export function FilesView({
             />
 
             <UserProfileDialog userId={profileUserId} onOpenChange={(open) => !open && setProfileUserId(null)} />
+
+            <ArchiveDialog
+                key={archiveTarget?.path ?? "none"}
+                connectionId={connectionId}
+                target={archiveTarget}
+                currentPath={path}
+                onOpenChange={(open) => !open && setArchiveTarget(null)}
+            />
 
             <Dialog open={pendingFolder !== null} onOpenChange={(open) => !open && setPendingFolder(null)}>
                 <DialogContent>
