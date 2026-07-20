@@ -1,5 +1,6 @@
-import { getCapabilities, loadEnv } from "@polaris/config";
+import { loadEnv } from "@polaris/config";
 import type { DockerTransport } from "@polaris/docker";
+import { refreshCapabilities } from "@polaris/hostd-client";
 import { PageHeader } from "@polaris/ui";
 import { requireUser, userHasManage } from "@/lib/session";
 import {
@@ -31,8 +32,11 @@ export default async function ContainersPage({
 
     // The local host is host-wide, so it is only offered to operators who may
     // manage the system, and only in the full edition (hostd reports docker).
+    // Probe the daemon directly here rather than trusting the cached snapshot, so
+    // the local host shows the moment hostd reports Docker - no dependence on the
+    // background refresh having run, and no up-to-30s blind spot after a restart.
     const canManage = await userHasManage(user, "system.manage");
-    const localAvailable = canManage && getCapabilities().docker;
+    const localAvailable = canManage && (await refreshCapabilities()).docker;
 
     const stored: DockerConnectionSummary[] = (await listDockerConnections(user.id)).map((row) => ({
         id: row.id,
