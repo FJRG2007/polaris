@@ -46,6 +46,22 @@ Drive (storage):
 - [ ] Chunked/resumable upload; range/streaming download
 - [ ] hostd routing for kernel mounts (SMB/NFS) in the full edition
 
+Drive explorer (interaction):
+- [x] Non-reflowing selection: the action bar is a reserved fixed-height row, so
+      selecting items never shifts the file list
+- [x] Empty a folder (delete its contents, keep the folder) as a distinct action
+      from delete, behind an explicit in-app confirm
+- [x] Zip a selection to the NAS, optionally AES-256 encrypted with a password on
+      the archive itself (archiver + archiver-zip-encrypted), and optionally mint a
+      share link for the produced zip
+- [x] Extract a zip/rar in place into a chosen folder, with an optional password;
+      server-side zip-slip confinement + decompression-bomb caps (entry count +
+      aggregate bytes), reading the archive via a private temp file
+- [x] Preview/analyze a zip/rar (list entries + sizes) without extracting; rar is
+      read-only (node-unrar-js WASM), zip via node-stream-zip
+- [ ] Live end-to-end run against a real NAS/SFTP backend (built + typechecked;
+      archive read/write paths not exercised on this dev machine)
+
 Sharing:
 - [ ] Public share links (hashed token)
 - [ ] Link password (argon2), download limit, expiration
@@ -58,18 +74,32 @@ File requests (upload-in):
 - [ ] Anonymous-upload hardening (streamed size limit, sniffed MIME, rate limit)
 
 Containers app (Docker):
-- [x] Secure per-install SSH access provisioning (`install.sh --ssh`): unique key, forced-command `docker system dial-stdio`, `restrict` + `from=`, pinned known_hosts
-- [x] Modular `@polaris/docker` connector: transports (socket / SSH / TCP), driver, registry (4 tests)
+- [x] Secure per-install SSH access provisioning (`install.sh --ssh`, REMOTE hosts only now): unique key, forced-command `docker system dial-stdio`, `restrict` + `from=`, pinned known_hosts
+- [x] Modular `@polaris/docker` connector: transports (socket / SSH / TCP) behind a `DockerRpc` seam, driver, registry (4 tests)
 - [x] Containers app: host overview (CPU/mem/counts), container table with live stats, start/stop/restart; DockerConnection model
-- [ ] Live end-to-end run against a real Docker host (built + unit-tested; not yet exercised on this Docker-off dev machine)
-- [ ] Remote-host SSH host-key pinning per connection, TLS-cert/pasted-key credential paths (encryption wired; UI present)
-- [ ] Container logs, images, compose stacks, and Kubernetes (future apps)
+- [x] Local host with NO flags: auto-registered, reached through hostd's allowlisted `POST /v1/docker` proxy (ping/info/list/stats/start/stop/restart only) - the web container never mounts the socket. Gated on `system.manage` + full edition
+- [x] Global Hosts appear as Docker-over-SSH targets (derived from the Servers app), alongside the local host and legacy socket/TCP connections
+- [ ] Live end-to-end run against a real Docker host (built + unit-tested; hostd proxy + local host + host-over-SSH not yet exercised on this Docker-off dev machine)
+- [ ] TLS-cert/pasted-key credential paths for one-off TCP hosts (encryption wired; UI present)
+- [ ] Container logs, images, compose stacks
+
+Servers (global hosts):
+- [x] `@polaris/ssh` shared primitive: one authenticated ssh2 client + mandatory host-key pinning, used by BOTH the Docker connector and the SFTP driver (dedup; fixed SFTP blind-TOFU + dropped passphrase)
+- [x] `Host` model (owner-scoped, encrypted creds, pinned host key) + Servers app: add/list/delete with password or private-key(+passphrase) auth and trust-on-add (test-connect validates creds and captures the host key to pin)
+- [x] A Host registered once derives a Docker-over-SSH target in Containers AND an SFTP source in Drive
+- [ ] Live SSH run against a real host (built + typechecked; not exercised on this machine)
+- [ ] OpenSSH user-certificate auth (deferred: ssh2 exposes no typed cert field; password + key ship now)
+- [ ] Edit a host; per-host SFTP root; VMs/deploys
+
+Kubernetes:
+- [ ] Reviewed: only stubs today - hostd `/v1/k8s` returns not-implemented, capability detection via `KUBECONFIG`/service-account exists, and the app is unlocked-pending. No k8s client, kubeconfig parsing, or model yet. Path: a `Cluster` entity (kubeconfig, encrypted) + a read-only client (list nodes/pods/deployments) mirroring the Docker connector, then lifecycle.
 
 Platform:
 - [ ] User management, roles/permissions, invites
-- [ ] Edition/capability boundary + graceful degradation
-- [ ] Docker Compose stack + one-command install
-- [ ] Auto-update (digest-verified, via hostd)
+- [x] Edition/capability boundary + graceful degradation (fixed: the capability refresh loop now actually runs from `instrumentation.register()`, so the edition flips to full when hostd answers - it was never started before)
+- [x] Full edition is the installer default (opt out with `install.sh --limited`): hostd runs by default so in-band updates and the local Docker host work with no flags. hostd + updater container images now build and publish (were missing entirely)
+- [x] Auto-update via hostd: `POST /v1/update` runs a one-shot `polaris-updater` container that re-runs `install.sh` (git pull -> reconcile .env -> pull images -> migrate -> redeploy -> verify)
+- [ ] Digest/signature-verified image provenance for updates (still trusts the `latest` tag, as before - pre-existing accepted risk)
 - [ ] CI / release / deploy / agent-maintenance workflows
 - [ ] Marketing landing + demo
 

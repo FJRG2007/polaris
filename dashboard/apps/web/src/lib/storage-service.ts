@@ -15,7 +15,9 @@ import {
     createDriver,
     decryptCredentials,
     encryptCredentials,
+    keyFingerprint,
     LocalDriver,
+    SftpDriver,
     SmbDriver,
     type ConnectionRecord,
     type StorageDriver
@@ -23,6 +25,29 @@ import {
 import { fetchUnasMetrics, type UnasMetrics } from "@/lib/unifi-unas";
 import { listSmbShares } from "@/lib/smb-shares";
 import { grantedConnectionIds } from "@/lib/drive-acl-service";
+import { getHostConnection, listHosts } from "@/lib/host-service";
+
+/** Connection-id prefix for a global Host browsed over SFTP in Drive. The Host is
+ *  managed in the Servers app; Drive consumes it read/write over SFTP. */
+export const HOST_CONNECTION_PREFIX = "host:";
+
+/** SFTP driver for a global Host. Browses from the SSH root, host-key pinned. */
+async function buildHostSftpDriver(hostId: string, ownerId: string): Promise<StorageDriver> {
+    const conn = await getHostConnection(hostId, ownerId);
+    const driver = new SftpDriver({
+        id: `${HOST_CONNECTION_PREFIX}${conn.id}`,
+        host: conn.address,
+        port: conn.port,
+        username: conn.username,
+        root: "/",
+        password: conn.auth.method === "password" ? conn.auth.password : undefined,
+        privateKey: conn.auth.method === "key" ? conn.auth.privateKey : undefined,
+        passphrase: conn.auth.method === "key" ? conn.auth.passphrase : undefined,
+        pinnedHostKey: conn.hostKey
+    });
+    await driver.connect();
+    return driver;
+}
 
 /** Base path under which the host daemon mounts SMB/NFS shares. */
 const HOSTD_MOUNT_ROOT = "/mnt/polaris";
@@ -109,8 +134,13 @@ async function buildDriver(row: ConnectionRow): Promise<StorageDriver> {
     return driver;
 }
 
-/** Build a connected driver for a connection owned by the given user. */
+/** Build a connected driver for a connection owned by the given user. A `host:`
+ *  id resolves to a global Host browsed over SFTP; everything else is a stored
+ *  storage connection. */
 export async function getDriver(connectionId: string, ownerId: string): Promise<StorageDriver> {
+    if (connectionId.startsWith(HOST_CONNECTION_PREFIX)) {
+        return buildHostSftpDriver(connectionId.slice(HOST_CONNECTION_PREFIX.length), ownerId);
+    }
     return buildDriver(await loadConnection(connectionId, ownerId));
 }
 
@@ -152,7 +182,9 @@ export async function getUnasMetrics(connectionId: string, ownerId: string): Pro
     });
 }
 
-/** The non-secret columns of a connection the Drive UI needs. */
+/** The non-secret columns of a connection the Drive UI needs. `credentialKeyId`
+ *  is the master-key fingerprint (never the key), used only to flag rows whose
+ *  credentials predate the current master key; it is not sent to the client. */
 const CONNECTION_SUMMARY_SELECT = {
     id: true,
     name: true,
@@ -160,16 +192,40 @@ const CONNECTION_SUMMARY_SELECT = {
     status: true,
     requiresHostd: true,
     config: true,
-    createdAt: true
+    createdAt: true,
+    credentialKeyId: true
 } as const;
 
-/** All connections owned by a user, without secret material. */
+/**
+ * True when a stored credential was encrypted under a master key other than the
+ * current one: it can no longer be decrypted, so the connection needs its secret
+ * re-entered (which re-encrypts under the current key, keeping everything else).
+ * A row with no stored credential (null keyId) is never flagged.
+ */
+function isRekeyNeeded(credentialKeyId: string | null, currentFingerprint: string): boolean {
+    return credentialKeyId !== null && credentialKeyId !== currentFingerprint;
+}
+
+/** Drop the raw key fingerprint from a summary row, replacing it with the derived
+ *  `needsRekey` flag the UI actually consumes. */
+function annotateRekey<T extends { credentialKeyId: string | null }>(
+    row: T,
+    currentFingerprint: string
+): Omit<T, "credentialKeyId"> & { needsRekey: boolean } {
+    const { credentialKeyId, ...rest } = row;
+    return { ...rest, needsRekey: isRekeyNeeded(credentialKeyId, currentFingerprint) };
+}
+
+/** All connections owned by a user, without secret material. Each carries a
+ *  `needsRekey` flag when its credentials no longer match the master key. */
 export async function listConnections(ownerId: string) {
-    return prisma.storageConnection.findMany({
+    const rows = await prisma.storageConnection.findMany({
         where: { ownerId },
         select: CONNECTION_SUMMARY_SELECT,
         orderBy: { createdAt: "asc" }
     });
+    const fingerprint = keyFingerprint(loadEnv().POLARIS_MASTER_KEY);
+    return rows.map((row) => annotateRekey(row, fingerprint));
 }
 
 /**
@@ -179,9 +235,14 @@ export async function listConnections(ownerId: string) {
  * per-path enforcement still happens in the Drive routes and actions.
  */
 export async function listAccessibleConnections(userId: string) {
-    const [owned, grantedIds] = await Promise.all([listConnections(userId), grantedConnectionIds(userId)]);
+    const [owned, grantedIds, hosts] = await Promise.all([
+        listConnections(userId),
+        grantedConnectionIds(userId),
+        listHosts(userId)
+    ]);
     const ownedIds = new Set(owned.map((row) => row.id));
     const sharedIds = grantedIds.filter((id) => !ownedIds.has(id));
+    const fingerprint = keyFingerprint(loadEnv().POLARIS_MASTER_KEY);
     const shared =
         sharedIds.length === 0
             ? []
@@ -190,9 +251,30 @@ export async function listAccessibleConnections(userId: string) {
                   select: CONNECTION_SUMMARY_SELECT,
                   orderBy: { createdAt: "asc" }
               });
+    // Global Hosts appear as SFTP sources so a server registered once is
+    // browsable in Drive. Managed in the Servers app, so not editable (or
+    // re-keyed) here - hence needsRekey is always false for them.
+    const hostSummaries = hosts.map((host) => ({
+        id: `${HOST_CONNECTION_PREFIX}${host.id}`,
+        name: host.name,
+        kind: "sftp",
+        status: host.status,
+        requiresHostd: false,
+        config: JSON.stringify({
+            kind: "sftp",
+            host: host.address,
+            port: host.port,
+            root: "/",
+            username: host.username
+        }),
+        createdAt: host.createdAt,
+        shared: false,
+        needsRekey: false
+    }));
     return [
         ...owned.map((row) => ({ ...row, shared: false })),
-        ...shared.map((row) => ({ ...row, shared: true }))
+        ...shared.map((row) => ({ ...annotateRekey(row, fingerprint), shared: true })),
+        ...hostSummaries
     ];
 }
 

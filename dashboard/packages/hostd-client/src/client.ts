@@ -93,6 +93,24 @@ export class HostdClient {
         throw new Error(`hostd update failed (${response.status}): ${response.body}`);
     }
 
+    /**
+     * Forward one allowlisted Docker Engine API call through the daemon and
+     * return the Docker status and raw response body. The daemon enforces the
+     * allowlist and never mounts the socket into this container; the reply is
+     * untrusted and returned verbatim for the caller to parse.
+     */
+    public async dockerRequest(method: string, path: string): Promise<RawResponse> {
+        const response = await this.call("POST", "/v1/docker", JSON.stringify({ method, path }));
+        if (response.status !== 200) {
+            throw new Error(`hostd docker proxy failed (${response.status}): ${response.body}`);
+        }
+        const parsed = JSON.parse(response.body) as unknown;
+        if (!isDockerEnvelope(parsed)) {
+            throw new Error("hostd docker proxy returned an unexpected shape");
+        }
+        return { status: parsed.status, body: parsed.body };
+    }
+
     private async token(): Promise<string> {
         return (await readFile(this.tokenFile, "utf8")).trim();
     }
@@ -125,6 +143,13 @@ export class HostdClient {
 function splitTcp(url: string): { host: string; port: number } {
     const parsed = new URL(url);
     return { host: parsed.hostname, port: Number(parsed.port) || 80 };
+}
+
+/** Structural check on the untrusted docker-proxy envelope `{ status, body }`. */
+function isDockerEnvelope(value: unknown): value is { status: number; body: string } {
+    if (typeof value !== "object" || value === null) return false;
+    const record = value as Record<string, unknown>;
+    return typeof record.status === "number" && typeof record.body === "string";
 }
 
 /** Structural check on an untrusted health payload. */

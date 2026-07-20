@@ -1,6 +1,7 @@
 import { Duplex } from "node:stream";
 import { describe, expect, it } from "vitest";
 import { DockerDriver } from "../src/driver.js";
+import { streamRpc } from "../src/rpc.js";
 import type { DockerTransportConn } from "../src/transports.js";
 
 /** A stream that answers each written request with a canned HTTP response. */
@@ -28,7 +29,7 @@ function driverReturning(response: Buffer): DockerDriver {
         stream: async () => new CannedStream(response),
         close: async () => undefined
     };
-    return new DockerDriver(conn);
+    return new DockerDriver(streamRpc(conn));
 }
 
 describe("docker driver", () => {

@@ -15,6 +15,9 @@ on:
       - "dashboard/mdns/**"
       - "dashboard/package.json"
       - "dashboard/package-lock.json"
+      - "crates/polaris-hostd/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
       - ".github/workflows/dashboard-publish.yml"
   workflow_dispatch:
 
@@ -55,5 +58,34 @@ jobs:
           context: dashboard/mdns
           push: true
           tags: ghcr.io/fjrg2007/polaris-mdns:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # QEMU lets buildx produce the arm64 variants below on the amd64 runner.
+      - uses: docker/setup-qemu-action@v3
+
+      # Privileged host daemon. Build context is the repo root (the Rust
+      # workspace). Multi-arch so both amd64 and arm64 hosts can pull; a host can
+      # also fall back to the local `build:` context in compose, which builds
+      # natively.
+      - name: Build and push hostd (latest only)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: crates/polaris-hostd/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ghcr.io/fjrg2007/polaris-hostd:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # One-shot self-update runner spawned by hostd's /v1/update.
+      - name: Build and push updater (latest only)
+        uses: docker/build-push-action@v6
+        with:
+          context: dashboard/docker/updater
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ghcr.io/fjrg2007/polaris-updater:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max

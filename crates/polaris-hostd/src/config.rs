@@ -13,6 +13,7 @@ const DEFAULT_SOCKET: &str = "/run/polaris/hostd.sock";
 const DEFAULT_TOKEN_FILE: &str = "/run/polaris/hostd.token";
 const DEFAULT_ROOT: &str = "/";
 const DEFAULT_MOUNT_ROOT: &str = "/mnt/polaris";
+const DEFAULT_DOCKER_SOCKET: &str = "/var/run/docker.sock";
 
 #[derive(Debug, Clone)]
 pub struct Config {
@@ -29,6 +30,10 @@ pub struct Config {
     pub root: PathBuf,
     /// Allowlist root for mount targets. Targets outside it are rejected.
     pub mount_root: PathBuf,
+    /// Docker Engine API socket the `/v1/docker` proxy forwards to. The web
+    /// container never mounts this socket itself; only this daemon touches it,
+    /// and only through the allowlisted proxy.
+    pub docker_socket: PathBuf,
     /// Whether the host reports the auto-update capability.
     pub auto_update: bool,
     /// Shell command run (detached) to update and redeploy Polaris on the host,
@@ -58,6 +63,9 @@ impl Config {
             mount_root: env("POLARIS_HOSTD_MOUNT_ROOT")
                 .map(PathBuf::from)
                 .unwrap_or_else(|| PathBuf::from(DEFAULT_MOUNT_ROOT)),
+            docker_socket: env("POLARIS_HOSTD_DOCKER_SOCKET")
+                .map(PathBuf::from)
+                .unwrap_or_else(|| PathBuf::from(DEFAULT_DOCKER_SOCKET)),
             // Auto-update is on unless explicitly disabled. Anything other than
             // a literal "false" leaves it enabled (fail-safe toward the default).
             auto_update: env("POLARIS_HOSTD_AUTOUPDATE")

@@ -6,8 +6,7 @@
  * behave identically. Only non-streaming endpoints are used.
  */
 
-import { httpOverStream } from "./http.js";
-import type { DockerTransportConn } from "./transports.js";
+import type { DockerRpc } from "./rpc.js";
 
 export interface DockerInfo {
     readonly name: string;
@@ -36,11 +35,10 @@ export interface ContainerStats {
 }
 
 export class DockerDriver {
-    public constructor(private readonly conn: DockerTransportConn) {}
+    public constructor(private readonly rpc: DockerRpc) {}
 
     private async request(method: string, path: string): Promise<{ status: number; body: string }> {
-        const stream = await this.conn.stream();
-        return httpOverStream(stream, { method, path });
+        return this.rpc.request(method, path);
     }
 
     private async json<T>(method: string, path: string): Promise<T> {
@@ -52,7 +50,7 @@ export class DockerDriver {
     }
 
     public async dispose(): Promise<void> {
-        await this.conn.close();
+        await this.rpc.dispose();
     }
 
     /** True if the Engine answers /_ping. Used to validate a new connection. */

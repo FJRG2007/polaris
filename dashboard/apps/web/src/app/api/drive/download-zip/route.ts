@@ -14,22 +14,13 @@ import { requireUser } from "@/lib/session";
 import { getDriverForConnection, SmbShareRequiredError } from "@/lib/storage-service";
 import { authorizeDrive, DriveAccessError, DriveLockedError } from "@/lib/drive-authz";
 import { listLocks } from "@/lib/access-lock-service";
-import { isReservedRootPath } from "@/lib/system-paths";
 import { recordAudit } from "@/lib/audit-service";
 import { createZipStream, type ZipSource } from "@/lib/zip-stream";
+import { baseNameOf, zipSourcesFor } from "@/lib/drive-archive";
 import type { StorageDriver } from "@polaris/storage";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-/** Hard ceiling on directories walked so a pathological tree cannot hang the zip. */
-const MAX_NODES = 50000;
-
-/** Base name of a relative path ("a/b/c" -> "c"), for the archive root name. */
-function baseNameOf(path: string): string {
-    const slash = path.lastIndexOf("/");
-    return slash >= 0 ? path.slice(slash + 1) : path;
-}
 
 /** Turn a filename into a safe ASCII fallback for the Content-Disposition header. */
 function asciiFallback(name: string): string {
@@ -79,67 +70,9 @@ export async function GET(request: Request): Promise<Response> {
 
     const lockedRoots = new Set((await listLocks(connectionId)).map((lock) => lock.path).filter(Boolean));
 
-    /** Walk one requested path, yielding zip sources with archive-relative names. */
-    async function* walk(root: string): AsyncGenerator<ZipSource> {
-        const rootName = baseNameOf(root);
-        let stat;
-        try {
-            stat = await driver.stat(root);
-        } catch {
-            return; // A vanished/unreadable item is skipped rather than failing the whole zip.
-        }
-        if (stat.kind === "file") {
-            yield {
-                name: rootName,
-                kind: "file",
-                size: stat.size,
-                mtime: stat.modifiedAt,
-                body: () => driver.readStream(root)
-            };
-            return;
-        }
-
-        // A folder: breadth-first, re-rooting each descendant under the folder name.
-        let nodes = 0;
-        const queue: Array<{ path: string; archive: string }> = [{ path: root, archive: rootName }];
-        // Preserve empty top-level folders too.
-        yield { name: `${rootName}/`, kind: "dir", size: 0n, mtime: stat.modifiedAt };
-        while (queue.length > 0) {
-            if (nodes >= MAX_NODES) break;
-            const current = queue.shift()!;
-            nodes++;
-            let listing;
-            try {
-                listing = await driver.list(current.path);
-            } catch {
-                continue;
-            }
-            for (const entry of listing.entries) {
-                if (isReservedRootPath(entry.path)) continue;
-                const archivePath = `${current.archive}/${entry.name}`;
-                if (entry.kind === "dir") {
-                    if (lockedRoots.has(entry.path)) continue; // never descend a locked subtree
-                    yield { name: `${archivePath}/`, kind: "dir", size: 0n, mtime: entry.modifiedAt };
-                    queue.push({ path: entry.path, archive: archivePath });
-                } else if (entry.kind === "file") {
-                    const filePath = entry.path;
-                    yield {
-                        name: archivePath,
-                        kind: "file",
-                        size: entry.size,
-                        mtime: entry.modifiedAt,
-                        body: () => driver.readStream(filePath)
-                    };
-                }
-            }
-        }
-    }
-
     async function* sources(): AsyncGenerator<ZipSource> {
         try {
-            for (const path of paths) {
-                yield* walk(path);
-            }
+            yield* zipSourcesFor(driver, paths, lockedRoots);
         } finally {
             await driver.dispose();
         }

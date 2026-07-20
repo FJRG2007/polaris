@@ -28,6 +28,9 @@ import {
 } from "@/lib/storage-service";
 import { detectHost, type NasDetection } from "@/lib/nas-detect";
 import { fetchUnasMetrics } from "@/lib/unifi-unas";
+import { listLocks } from "@/lib/access-lock-service";
+import { writeArchiveToDriver, zipSourcesFor } from "@/lib/drive-archive";
+import { archiveFormatOf, extractArchiveTo, listArchiveEntries, type ArchiveEntry } from "@/lib/drive-archive-read";
 import { moveItemMeta, recordItemCreator, setItemFavorite, setItemHidden, setItemIcon, setItemNote } from "@/lib/drive-meta-service";
 import { deleteTrashForever, emptyTrash, moveToTrash, restoreTrash } from "@/lib/trash-service";
 import { createScheduledDeletion } from "@/lib/scheduled-deletion-service";
@@ -234,6 +237,160 @@ export async function deleteEntryAction(connectionId: string, path: string): Pro
         await driver.dispose();
     }
     await recordAudit({ actorId: user.id, action: "drive.delete", targetType: "connection", targetId: connectionId, metadata: { path } });
+    revalidatePath("/drive");
+}
+
+/**
+ * Bundle the selected items into a single zip written to the NAS at
+ * `<destFolder>/<name>.zip`. When a password is given the archive is AES-256
+ * encrypted (the zip itself, not a link). Every source is authorized for download
+ * and the destination folder for write; returns the created path so the caller
+ * can, for example, generate a share link for it.
+ */
+export async function generateZipAction(
+    connectionId: string,
+    paths: string[],
+    destFolder: string,
+    name: string,
+    password?: string
+): Promise<{ path?: string; error?: string }> {
+    const user = await requireUser();
+    const sourcePaths = paths.map((entry) => normalizeRelPath(entry)).filter((entry) => entry.length > 0);
+    if (sourcePaths.length === 0) return { error: "Nothing selected" };
+
+    try {
+        for (const source of sourcePaths) {
+            await authorizeDrive(user.id, connectionId, source, "download");
+        }
+        await authorizeDrive(user.id, connectionId, normalizeRelPath(destFolder), "write");
+    } catch (caught) {
+        if (caught instanceof DriveLockedError) return { error: "A selected item is locked" };
+        if (caught instanceof DriveAccessError) return { error: "You cannot write there" };
+        throw caught;
+    }
+
+    const safeName = name.replace(/[/\\]/g, "_").trim() || "archive";
+    const fileName = safeName.toLowerCase().endsWith(".zip") ? safeName : `${safeName}.zip`;
+    const destPath = normalizeRelPath(destFolder ? `${destFolder}/${fileName}` : fileName);
+
+    const driver = await getDriver(connectionId, user.id);
+    try {
+        const parent = destPath.split("/").slice(0, -1).join("/");
+        if (parent) await driver.mkdir(parent);
+        const lockedRoots = new Set((await listLocks(connectionId)).map((lock) => lock.path).filter(Boolean));
+        await writeArchiveToDriver(driver, destPath, zipSourcesFor(driver, sourcePaths, lockedRoots), {
+            password: password || undefined
+        });
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not create the archive" };
+    } finally {
+        await driver.dispose();
+    }
+
+    await recordAudit({
+        actorId: user.id,
+        action: "drive.zip.create",
+        targetType: "connection",
+        targetId: connectionId,
+        metadata: { path: destPath, encrypted: Boolean(password), count: sourcePaths.length }
+    });
+    revalidatePath("/drive");
+    return { path: destPath };
+}
+
+/**
+ * List an archive's contents (zip/rar) without extracting. A password is only
+ * needed for an encrypted archive. Read-only; authorized for download.
+ */
+export async function previewArchiveAction(
+    connectionId: string,
+    archivePath: string,
+    password?: string
+): Promise<{ entries?: ArchiveEntry[]; error?: string }> {
+    const user = await requireUser();
+    const src = normalizeRelPath(archivePath);
+    const format = archiveFormatOf(baseName(src));
+    if (!format) return { error: "Unsupported archive format" };
+    try {
+        await authorizeDrive(user.id, connectionId, src, "download");
+    } catch (caught) {
+        if (caught instanceof DriveLockedError) return { error: "This item is locked" };
+        if (caught instanceof DriveAccessError) return { error: "Not allowed" };
+        throw caught;
+    }
+    const driver = await getDriver(connectionId, user.id);
+    try {
+        return { entries: await listArchiveEntries(driver, src, format, password || undefined) };
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not read the archive" };
+    } finally {
+        await driver.dispose();
+    }
+}
+
+/**
+ * Extract an archive (zip/rar) into a folder on the NAS. Entry names are confined
+ * under the destination (zip-slip) and total size/count are capped (bombs) inside
+ * extractArchiveTo. Authorized for download on the archive and write on the dest.
+ */
+export async function extractArchiveAction(
+    connectionId: string,
+    archivePath: string,
+    destFolder: string,
+    password?: string
+): Promise<{ count?: number; error?: string }> {
+    const user = await requireUser();
+    const src = normalizeRelPath(archivePath);
+    const format = archiveFormatOf(baseName(src));
+    if (!format) return { error: "Unsupported archive format" };
+    const dest = normalizeRelPath(destFolder);
+    try {
+        await authorizeDrive(user.id, connectionId, src, "download");
+        await authorizeDrive(user.id, connectionId, dest, "write");
+    } catch (caught) {
+        if (caught instanceof DriveLockedError) return { error: "A path is locked" };
+        if (caught instanceof DriveAccessError) return { error: "You cannot write there" };
+        throw caught;
+    }
+    const driver = await getDriver(connectionId, user.id);
+    let count = 0;
+    try {
+        count = await extractArchiveTo(driver, src, format, dest, password || undefined);
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Extraction failed" };
+    } finally {
+        await driver.dispose();
+    }
+    await recordAudit({
+        actorId: user.id,
+        action: "drive.archive.extract",
+        targetType: "connection",
+        targetId: connectionId,
+        metadata: { path: src, dest, count }
+    });
+    revalidatePath("/drive");
+    return { count };
+}
+
+/**
+ * Empty a folder: permanently delete everything inside it but keep the folder
+ * itself. Authorized with "delete" on the folder (same right as deleting it),
+ * then each direct child is removed recursively. This is a permanent delete, not
+ * a move to Trash - matching deleteEntryAction.
+ */
+export async function emptyFolderAction(connectionId: string, path: string): Promise<void> {
+    const user = await requireUser();
+    const driver = await requireDriveDriver(user.id, connectionId, path, "delete");
+    try {
+        const rel = normalizeRelPath(path);
+        const { entries } = await driver.list(rel);
+        for (const child of entries) {
+            await driver.delete(normalizeRelPath(child.path), { recursive: true });
+        }
+    } finally {
+        await driver.dispose();
+    }
+    await recordAudit({ actorId: user.id, action: "drive.empty", targetType: "connection", targetId: connectionId, metadata: { path } });
     revalidatePath("/drive");
 }
 

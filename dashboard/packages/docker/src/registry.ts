@@ -9,6 +9,7 @@
 import { readFileSync } from "node:fs";
 import { loadEnv } from "@polaris/config";
 import { DockerDriver } from "./driver.js";
+import { streamRpc } from "./rpc.js";
 import type { DockerConfig, DockerCredentials } from "./schema.js";
 import { socketTransport, sshTransport, tcpTransport } from "./transports.js";
 
@@ -22,18 +23,20 @@ export function createDockerDriver(record: DockerConnectionRecord): DockerDriver
     const config = record.config;
     switch (config.transport) {
         case "socket":
-            return new DockerDriver(socketTransport(config.socketPath));
+            return new DockerDriver(streamRpc(socketTransport(config.socketPath)));
         case "tcp": {
             const creds = record.credentials as Extract<DockerCredentials, { transport: "tcp" }>;
             return new DockerDriver(
-                tcpTransport({
-                    host: config.host,
-                    port: config.port,
-                    tls: config.tls,
-                    ca: creds.ca,
-                    cert: creds.cert,
-                    key: creds.key
-                })
+                streamRpc(
+                    tcpTransport({
+                        host: config.host,
+                        port: config.port,
+                        tls: config.tls,
+                        ca: creds.ca,
+                        cert: creds.cert,
+                        key: creds.key
+                    })
+                )
             );
         }
         case "ssh": {
@@ -43,15 +46,21 @@ export function createDockerDriver(record: DockerConnectionRecord): DockerDriver
                 ? readKey(env.POLARIS_SSH_KEY)
                 : creds.privateKey ?? "";
             if (!privateKey) throw new Error("SSH connection has no private key");
+            const pinnedHostKey = allPinnedKeys(
+                readKey(env.POLARIS_SSH_KNOWN_HOSTS),
+                config.host,
+                config.port
+            );
             return new DockerDriver(
-                sshTransport({
-                    host: config.host,
-                    port: config.port,
-                    username: config.username,
-                    privateKey,
-                    passphrase: creds.passphrase,
-                    knownHosts: readKey(env.POLARIS_SSH_KNOWN_HOSTS)
-                })
+                streamRpc(
+                    sshTransport({
+                        host: config.host,
+                        port: config.port,
+                        username: config.username,
+                        auth: { method: "key", privateKey, passphrase: creds.passphrase },
+                        pinnedHostKey
+                    })
+                )
             );
         }
     }
@@ -63,4 +72,22 @@ function readKey(path: string): string {
     } catch {
         throw new Error(`Cannot read ${path}; is SSH docker access provisioned?`);
     }
+}
+
+/** All base64 host keys pinned for a host (or its [host]:port form) in a
+ *  known_hosts file. A host commonly has several (rsa/ecdsa/ed25519) and the
+ *  client negotiates one, so the transport must accept any of them. Keys are in
+ *  the same base64 encoding the shared SSH client compares against. */
+function allPinnedKeys(knownHosts: string, host: string, port: number): string[] {
+    const aliases = new Set([host, `[${host}]:${port}`]);
+    const keys: string[] = [];
+    for (const line of knownHosts.split("\n")) {
+        const trimmed = line.trim();
+        if (trimmed === "" || trimmed.startsWith("#")) continue;
+        const [hostField, , keyField] = trimmed.split(/\s+/);
+        if (hostField && keyField && hostField.split(",").some((entry) => aliases.has(entry))) {
+            keys.push(keyField);
+        }
+    }
+    return keys;
 }

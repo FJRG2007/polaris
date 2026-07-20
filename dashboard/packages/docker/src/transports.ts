@@ -11,7 +11,8 @@
 import { connect as netConnect } from "node:net";
 import { connect as tlsConnect } from "node:tls";
 import type { Duplex } from "node:stream";
-import { Client } from "ssh2";
+import { openSshClient, type SshAuth } from "@polaris/ssh";
+import type { Client } from "ssh2";
 
 export interface DockerTransportConn {
     /** Open a fresh HTTP-capable stream to the Docker API. */
@@ -55,44 +56,36 @@ export interface SshTransportOptions {
     readonly host: string;
     readonly port: number;
     readonly username: string;
-    readonly privateKey: string | Buffer;
-    readonly passphrase?: string;
-    /** Contents of a known_hosts file used to pin the server's host key. */
-    readonly knownHosts: string;
+    readonly auth: SshAuth;
+    /** Pinned server public key(s), base64. SSH is refused without at least one. */
+    readonly pinnedHostKey?: string | string[];
 }
 
 export function sshTransport(options: SshTransportOptions): DockerTransportConn {
-    const pinned = pinnedKeysFor(options.knownHosts, options.host, options.port);
     let client: Client | undefined;
 
     async function ensureClient(): Promise<Client> {
         if (client) return client;
-        const conn = new Client();
-        await new Promise<void>((resolve, reject) => {
-            conn.on("ready", () => resolve());
-            conn.on("error", reject);
-            conn.connect({
-                host: options.host,
-                port: options.port,
-                username: options.username,
-                privateKey: options.privateKey,
-                passphrase: options.passphrase,
-                hostVerifier: (key: Buffer) => pinned.has(key.toString("base64"))
-            });
+        const pins = options.pinnedHostKey;
+        if (!pins || (Array.isArray(pins) && pins.length === 0)) {
+            throw new Error("Refusing SSH: no pinned host key");
+        }
+        client = await openSshClient({
+            host: options.host,
+            port: options.port,
+            username: options.username,
+            auth: options.auth,
+            pinnedHostKey: options.pinnedHostKey
         });
-        client = conn;
-        return conn;
+        return client;
     }
 
     return {
         stream: async () => {
-            if (pinned.size === 0) {
-                throw new Error("Refusing SSH: no pinned host key (known_hosts is empty)");
-            }
             const conn = await ensureClient();
             return new Promise<Duplex>((resolve, reject) => {
-                // The command is ignored when the key is locked to a forced
-                // command; it is the correct command for unlocked remote hosts.
+                // Ignored when the install key is locked to a forced command; the
+                // correct command for an unlocked remote host or a global Host.
                 conn.exec("docker system dial-stdio", (error, channel) => {
                     if (error) reject(error);
                     else resolve(channel);
@@ -104,19 +97,4 @@ export function sshTransport(options: SshTransportOptions): DockerTransportConn 
             client = undefined;
         }
     };
-}
-
-/** Base64 host keys pinned for a host (and its [host]:port form) in known_hosts. */
-function pinnedKeysFor(knownHosts: string, host: string, port: number): Set<string> {
-    const aliases = new Set([host, `[${host}]:${port}`]);
-    const keys = new Set<string>();
-    for (const line of knownHosts.split("\n")) {
-        const trimmed = line.trim();
-        if (trimmed === "" || trimmed.startsWith("#")) continue;
-        const [hostField, , keyField] = trimmed.split(/\s+/);
-        if (hostField && keyField && hostField.split(",").some((entry) => aliases.has(entry))) {
-            keys.add(keyField);
-        }
-    }
-    return keys;
 }

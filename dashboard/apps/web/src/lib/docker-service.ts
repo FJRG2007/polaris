@@ -6,10 +6,33 @@
  */
 
 import { loadEnv } from "@polaris/config";
-import type { DockerConfig, DockerCredentials } from "@polaris/docker";
-import { createDockerDriver, type DockerConnectionRecord } from "@polaris/docker";
+import type { DockerConfig, DockerCredentials, DockerRpc } from "@polaris/docker";
+import { createDockerDriver, DockerDriver, sshTransport, streamRpc, type DockerConnectionRecord } from "@polaris/docker";
 import { prisma } from "@polaris/db";
+import { HostdClient } from "@polaris/hostd-client";
 import { decryptCredentials, encryptCredentials } from "@polaris/storage";
+import { getHostConnection } from "./host-service";
+
+/**
+ * Reserved id of the auto-provisioned local host. It is not a stored row: it is
+ * reached through polaris-hostd's allowlisted Docker proxy, so the web container
+ * never touches the socket itself. Callers must authorize it (system.manage) -
+ * it is host-wide, not owner-scoped.
+ */
+export const LOCAL_DOCKER_CONNECTION_ID = "local";
+
+/**
+ * Driver for the local host, brokered by polaris-hostd. Every call is forwarded
+ * through the daemon's `/v1/docker` allowlist; there is no transport to close.
+ */
+export function localDockerDriver(): DockerDriver {
+    const client = new HostdClient();
+    const rpc: DockerRpc = {
+        request: (method, path) => client.dockerRequest(method, path),
+        dispose: async () => undefined
+    };
+    return new DockerDriver(rpc);
+}
 
 export async function listDockerConnections(ownerId: string) {
     return prisma.dockerConnection.findMany({
@@ -62,4 +85,24 @@ export async function createDockerConnection(
 
 export async function deleteDockerConnection(ownerId: string, connectionId: string) {
     await prisma.dockerConnection.deleteMany({ where: { id: connectionId, ownerId } });
+}
+
+/** Prefix marking a Containers connection id that resolves to a global Host
+ *  (Docker over SSH), so the app can route it without a separate lookup. */
+export const HOST_DOCKER_PREFIX = "host:";
+
+/** Docker driver for a global Host, over SSH via the shared, pinned primitive. */
+export async function hostDockerDriver(hostId: string, ownerId: string): Promise<DockerDriver> {
+    const conn = await getHostConnection(hostId, ownerId);
+    return new DockerDriver(
+        streamRpc(
+            sshTransport({
+                host: conn.address,
+                port: conn.port,
+                username: conn.username,
+                auth: conn.auth,
+                pinnedHostKey: conn.hostKey
+            })
+        )
+    );
 }

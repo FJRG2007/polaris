@@ -8,4 +8,5 @@
 export * from "./schema.js";
 export * from "./driver.js";
 export { createDockerDriver, type DockerConnectionRecord } from "./registry.js";
-export type { DockerTransportConn } from "./transports.js";
+export { streamRpc, type DockerRpc, type DockerRpcResponse } from "./rpc.js";
+export { sshTransport, socketTransport, tcpTransport, type DockerTransportConn, type SshTransportOptions } from "./transports.js";

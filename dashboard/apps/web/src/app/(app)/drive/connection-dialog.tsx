@@ -12,7 +12,7 @@
 
 import { useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, CheckCircle2, ChevronRight, Plus, Radar, XCircle } from "lucide-react";
+import { AlertTriangle, ArrowLeft, CheckCircle2, ChevronRight, Plus, Radar, XCircle } from "lucide-react";
 import { type StorageProviderKind } from "@polaris/core";
 import {
     Button,
@@ -192,13 +192,19 @@ export function EditConnectionDialog({
     if (!connection) return null;
     const kind = connection.kind;
     const config = connection.config ?? {};
+    // Re-key mode: the stored secret was encrypted under a previous master key and
+    // can no longer be decrypted, so "leave blank to keep" would keep a dead
+    // secret. Prompt for the credential and explain that everything else is kept.
+    const rekey = Boolean(connection.needsRekey);
 
     async function onSubmit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
         setPending(true);
         setError(null);
         const form = new FormData(event.currentTarget);
-        const nextConfig: Record<string, unknown> = { kind };
+        // Start from the stored config so keys without a form field (e.g. a UNAS
+        // `secure` flag) are preserved rather than dropped on save.
+        const nextConfig: Record<string, unknown> = { ...config, kind };
         const credentials: Record<string, unknown> = { kind };
         for (const field of FIELDS[kind]) {
             const raw = form.get(field.name);
@@ -229,11 +235,23 @@ export function EditConnectionDialog({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Edit {LABELS[kind]}</DialogTitle>
+                    <DialogTitle>{rekey ? `Update ${LABELS[kind]} credentials` : `Edit ${LABELS[kind]}`}</DialogTitle>
                     <DialogDescription>
-                        Change the name, host, and settings. Leave a password or key blank to keep the current one.
+                        {rekey
+                            ? "Re-enter the password or key to restore access. Your files, shares, and settings are kept."
+                            : "Change the name, host, and settings. Leave a password or key blank to keep the current one."}
                     </DialogDescription>
                 </DialogHeader>
+                {rekey ? (
+                    <div className="flex items-start gap-2 rounded-md border border-warning/40 bg-warning/10 p-2 text-xs text-muted-foreground">
+                        <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" />
+                        <span>
+                            The saved credentials were encrypted with a different master key and can no longer be read.
+                            Entering them again re-encrypts under the current key - nothing else about this connection
+                            changes.
+                        </span>
+                    </div>
+                ) : null}
                 <form key={connection.id} onSubmit={onSubmit} className="flex flex-col gap-3">
                     <label className="flex flex-col gap-1 text-sm">
                         Name
@@ -264,7 +282,9 @@ export function EditConnectionDialog({
                                             required={field.required && field.group === "config"}
                                             placeholder={
                                                 field.group === "credentials"
-                                                    ? "Leave blank to keep current"
+                                                    ? rekey
+                                                        ? "Enter to restore access"
+                                                        : "Leave blank to keep current"
                                                     : field.placeholder
                                             }
                                             defaultValue={

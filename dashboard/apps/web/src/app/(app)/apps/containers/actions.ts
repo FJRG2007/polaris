@@ -10,7 +10,15 @@
 import { revalidatePath } from "next/cache";
 import { createDockerConnectionSchema, createDockerDriver } from "@polaris/docker";
 import { requirePermission } from "@/lib/session";
-import { createDockerConnection, deleteDockerConnection, getDockerDriver } from "@/lib/docker-service";
+import {
+    createDockerConnection,
+    deleteDockerConnection,
+    getDockerDriver,
+    hostDockerDriver,
+    HOST_DOCKER_PREFIX,
+    localDockerDriver,
+    LOCAL_DOCKER_CONNECTION_ID
+} from "@/lib/docker-service";
 import { recordAudit } from "@/lib/audit-service";
 
 const CONTAINERS_PATH = "/apps/containers";
@@ -53,6 +61,9 @@ export async function createDockerConnectionAction(input: unknown): Promise<{ er
 
 export async function deleteDockerConnectionAction(connectionId: string): Promise<void> {
     const user = await requirePermission("system.manage");
+    // The local host and global Hosts are not stored Docker rows here (Hosts are
+    // managed in the Servers app), so there is nothing to remove.
+    if (connectionId === LOCAL_DOCKER_CONNECTION_ID || connectionId.startsWith(HOST_DOCKER_PREFIX)) return;
     await deleteDockerConnection(user.id, connectionId);
     await recordAudit({ actorId: user.id, action: "docker.connection.delete", targetType: "docker", targetId: connectionId });
     revalidatePath(CONTAINERS_PATH);
@@ -64,7 +75,12 @@ export async function containerAction(
     action: "start" | "stop" | "restart"
 ): Promise<{ error?: string }> {
     const user = await requirePermission("system.manage");
-    const driver = await getDockerDriver(connectionId, user.id);
+    const driver =
+        connectionId === LOCAL_DOCKER_CONNECTION_ID
+            ? localDockerDriver()
+            : connectionId.startsWith(HOST_DOCKER_PREFIX)
+              ? await hostDockerDriver(connectionId.slice(HOST_DOCKER_PREFIX.length), user.id)
+              : await getDockerDriver(connectionId, user.id);
     try {
         if (action === "start") await driver.start(containerId);
         else if (action === "stop") await driver.stop(containerId);

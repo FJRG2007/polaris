@@ -12,6 +12,7 @@
 //! because this process runs effectively as root.
 
 mod config;
+mod docker;
 mod handlers;
 mod http;
 mod security;

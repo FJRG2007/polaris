@@ -43,7 +43,10 @@ export default async function DrivePage({
         // shared connection is browse-only from the grantee's side.
         canManageAccess: !row.shared || user.isAdmin,
         // Non-secret config for the edit form; parsed defensively.
-        config: parseConfig(row.config)
+        config: parseConfig(row.config),
+        // Flag connections whose credentials predate the current master key so the
+        // UI can offer a re-key instead of a dead "cannot decrypt" error.
+        needsRekey: row.needsRekey
     }));
 
     const connectionId = pick(params.c) ?? connections[0]?.id ?? null;

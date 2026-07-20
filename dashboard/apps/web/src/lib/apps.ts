@@ -21,6 +21,6 @@ export const POLARIS_APPS: AppEntry[] = [
     { id: "containers", label: "Containers", description: "Docker & Compose", icon: Container, href: "/apps/containers" },
     { id: "backups", label: "Backups", description: "Databases, Polaris & NAS", icon: DatabaseBackup, href: "/apps/backups" },
     { id: "kubernetes", label: "Kubernetes", description: "Clusters & workloads", icon: Boxes, href: "/apps/kubernetes", locked: true },
-    { id: "servers", label: "Servers", description: "Hosts, VMs & deploys", icon: Server, href: "/apps/servers", locked: true },
+    { id: "servers", label: "Servers", description: "SSH hosts for Containers & Drive", icon: Server, href: "/apps/servers" },
     { id: "home", label: "Home", description: "Home Assistant", icon: Home, href: "/apps/home", locked: true }
 ];

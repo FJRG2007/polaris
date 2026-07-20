@@ -1,0 +1,26 @@
+{
+    "name": "@polaris/ssh",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "description": "Shared SSH primitive: one authenticated ssh2 client with host-key pinning for the Docker and SFTP connectors.",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        }
+    },
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "scripts": {
+        "build": "tsup src/index.ts --format esm --dts --clean",
+        "typecheck": "tsc --noEmit",
+        "test": "vitest run --passWithNoTests"
+    },
+    "dependencies": {
+        "ssh2": "1.16.0"
+    },
+    "devDependencies": {
+        "@types/ssh2": "1.15.1"
+    }
+}
