@@ -22,6 +22,16 @@ export class HostdPorts implements RuntimePorts {
         await drain(res, onOutput);
     }
 
+    public async stackUp(spec: ComposeSpec, onOutput?: OutputSink): Promise<void> {
+        const res = await this.client.stackUp(spec);
+        await drain(res, onOutput);
+    }
+
+    public async stackDown(project: string, onOutput?: OutputSink): Promise<void> {
+        const res = await this.client.stackDown(project);
+        await drain(res, onOutput);
+    }
+
     public async build(
         request: { tag: string; dockerfile?: string; contextTar: Readable },
         onOutput?: OutputSink

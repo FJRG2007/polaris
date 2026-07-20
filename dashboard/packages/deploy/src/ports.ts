@@ -52,6 +52,9 @@ export interface RuntimePorts {
      *  Local sends the structured spec to the daemon; remote renders YAML. */
     composeUp(spec: ComposeSpec, onOutput?: OutputSink): Promise<void>;
     composeDown(project: string, onOutput?: OutputSink): Promise<void>;
+    /** Deploy/remove the same spec on a swarm (`docker stack deploy`/`rm`). */
+    stackUp(spec: ComposeSpec, onOutput?: OutputSink): Promise<void>;
+    stackDown(project: string, onOutput?: OutputSink): Promise<void>;
     /** Build an image from a tar context; resolves the produced tag. */
     build(request: BuildRequest, onOutput?: OutputSink): Promise<string>;
     pull(image: string, onOutput?: OutputSink): Promise<void>;

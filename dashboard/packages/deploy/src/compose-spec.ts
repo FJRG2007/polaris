@@ -39,6 +39,8 @@ export interface ComposeSpecService {
     readonly dependsOn?: string[];
     readonly restart?: string;
     readonly healthcheck?: ComposeSpecHealth;
+    /** Replica count for swarm deploys; ignored by plain compose. */
+    readonly replicas?: number;
 }
 
 export interface ComposeSpec {
@@ -68,6 +70,7 @@ export function appComposeSpec(plan: AppDeployPlan, imageTag: string, network: s
                 labels,
                 networks: [network],
                 restart: "unless-stopped",
+                replicas: plan.replicas > 1 ? plan.replicas : undefined,
                 healthcheck: plan.healthcheck
                     ? {
                           test: [...plan.healthcheck.test],
@@ -163,6 +166,9 @@ export function renderComposeYaml(spec: ComposeSpec, volumeRoot: string): string
             if (service.healthcheck.interval) lines.push(`      interval: ${service.healthcheck.interval}s`);
             if (service.healthcheck.retries) lines.push(`      retries: ${service.healthcheck.retries}`);
             if (service.healthcheck.startPeriod) lines.push(`      start_period: ${service.healthcheck.startPeriod}s`);
+        }
+        if (service.replicas && service.replicas > 1) {
+            lines.push(`    deploy:\n      mode: replicated\n      replicas: ${service.replicas}`);
         }
     }
     if (spec.networks.length > 0) {

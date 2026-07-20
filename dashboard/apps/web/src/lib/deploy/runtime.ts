@@ -5,7 +5,7 @@
  * compose-vs-swarm, so the pipeline stays engine- and location-agnostic.
  */
 
-import { ComposeRuntime, type DeployTargetInfo, type RuntimeDriver, type RuntimePorts } from "@polaris/deploy";
+import { ComposeRuntime, SwarmRuntime, type DeployTargetInfo, type RuntimeDriver, type RuntimePorts } from "@polaris/deploy";
 import { getHostConnection } from "../host-service";
 import { HostdPorts } from "./ports-hostd";
 import { SshPorts } from "./ports-ssh";
@@ -32,10 +32,10 @@ export async function getPorts(target: TargetRow, ownerId: string): Promise<Runt
     });
 }
 
-/** The engine driver for a target. Swarm lands in a later phase; until then every
- *  target runs on the compose runtime. */
-export function getDriver(_target: TargetRow): RuntimeDriver {
-    return new ComposeRuntime();
+/** The engine driver for a target: swarm where the target opted into it, else the
+ *  plain-compose runtime. Both satisfy the same interface. */
+export function getDriver(target: TargetRow): RuntimeDriver {
+    return target.runtime === "swarm" ? new SwarmRuntime() : new ComposeRuntime();
 }
 
 /** Immutable target descriptor passed into the runtime context. */

@@ -60,6 +60,9 @@ pub struct ServiceSpec {
     pub depends_on: Vec<String>,
     pub restart: Option<String>,
     pub healthcheck: Option<HealthSpec>,
+    /// Replica count for swarm deploys (rendered as `deploy.replicas`). Ignored by
+    /// plain compose.
+    pub replicas: Option<u32>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -279,6 +282,10 @@ pub fn render_compose(spec: &DeploySpec, config: &Config) -> String {
             if let Some(start) = health.start_period {
                 out.push_str(&format!("      start_period: {start}s\n"));
             }
+        }
+        if let Some(replicas) = service.replicas {
+            // Swarm scaling: `docker stack deploy` reads this; plain compose ignores it.
+            out.push_str(&format!("    deploy:\n      mode: replicated\n      replicas: {replicas}\n"));
         }
     }
     if !spec.networks.is_empty() {
@@ -503,6 +510,32 @@ pub fn compose_down(config: &Config, project: &str) -> io::Result<Box<dyn Read +
         .arg(&file)
         .arg("down")
         .stdin(Stdio::null());
+    stream_command(cmd)
+}
+
+/// `docker stack deploy` a rendered compose file onto a swarm, streaming output.
+pub fn stack_up(config: &Config, project: &str, compose_yaml: &str) -> io::Result<Box<dyn Read + Send>> {
+    let dir = project_dir(config, project)?;
+    std::fs::create_dir_all(&dir)?;
+    let file = dir.join("compose.yml");
+    std::fs::write(&file, compose_yaml)?;
+    let mut cmd = Command::new("docker");
+    cmd.arg("stack")
+        .arg("deploy")
+        .arg("-c")
+        .arg(&file)
+        .arg("--detach=true")
+        .arg("--with-registry-auth")
+        .arg("--prune")
+        .arg(project)
+        .stdin(Stdio::null());
+    stream_command(cmd)
+}
+
+/// `docker stack rm` for a swarm stack, streaming output.
+pub fn stack_down(project: &str) -> io::Result<Box<dyn Read + Send>> {
+    let mut cmd = Command::new("docker");
+    cmd.arg("stack").arg("rm").arg(project).stdin(Stdio::null());
     stream_command(cmd)
 }
 

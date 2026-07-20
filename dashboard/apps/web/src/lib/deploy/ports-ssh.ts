@@ -61,6 +61,24 @@ export class SshPorts implements RuntimePorts {
         );
     }
 
+    public async stackUp(spec: ComposeSpec, onOutput?: OutputSink): Promise<void> {
+        const yaml = renderComposeYaml(spec, REMOTE_VOLUME_ROOT);
+        const b64 = Buffer.from(yaml, "utf8").toString("base64");
+        const dir = `${REMOTE_DEPLOY_ROOT}/${spec.project}`;
+        const file = `${dir}/compose.yml`;
+        const command = [
+            "set -e",
+            `mkdir -p ${quoteArg(dir)} ${quoteArg(REMOTE_VOLUME_ROOT)}`,
+            `printf %s ${quoteArg(b64)} | base64 -d > ${quoteArg(file)}`,
+            `docker stack deploy -c ${quoteArg(file)} --detach=true --with-registry-auth --prune ${quoteArg(spec.project)}`
+        ].join("; ");
+        await this.run(command, onOutput);
+    }
+
+    public async stackDown(project: string, onOutput?: OutputSink): Promise<void> {
+        await this.run(`docker stack rm ${quoteArg(project)}`, onOutput);
+    }
+
     public async build(): Promise<string> {
         // Remote build from a tar context streamed over an exec channel is a
         // follow-up; the remote path currently deploys prebuilt images.

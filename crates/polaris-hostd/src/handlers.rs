@@ -151,6 +151,8 @@ pub fn dispatch<R: Read>(state: &AppState, req: &Request, body: &mut R) -> Respo
         ("POST", "/v1/docker") => docker_proxy(state, req, body),
         ("POST", "/v1/deploy/up") => deploy_up(state, req, body),
         ("POST", "/v1/deploy/down") => deploy_down(state, req, body),
+        ("POST", "/v1/deploy/stack/up") => deploy_stack_up(state, req, body),
+        ("POST", "/v1/deploy/stack/down") => deploy_stack_down(state, req, body),
         ("POST", "/v1/deploy/pull") => deploy_pull(state, req, body),
         ("POST", "/v1/deploy/logs") => deploy_logs(state, req, body),
         ("POST", "/v1/deploy/build") => deploy_build(state, req, body),
@@ -289,6 +291,45 @@ fn deploy_up<R: Read>(state: &AppState, req: &Request, body: &mut R) -> Response
     match deploy::compose_up(&state.config, &spec.project, &yaml) {
         Ok(reader) => stream_response(reader),
         Err(_) => Response::text(502, "Bad Gateway", "could not start docker compose"),
+    }
+}
+
+/// Deploy a validated spec onto a swarm via `docker stack deploy`, streaming
+/// output. Same structured spec as compose up; replicas are honored by swarm.
+fn deploy_stack_up<R: Read>(state: &AppState, req: &Request, body: &mut R) -> Response {
+    let raw = match read_control_body(req, body) {
+        Ok(b) => b,
+        Err(resp) => return resp,
+    };
+    let spec: DeploySpec = match serde_json::from_slice(&raw) {
+        Ok(s) => s,
+        Err(_) => return Response::bad_request("invalid deploy spec"),
+    };
+    if let Err(msg) = deploy::validate_spec(&spec, &state.config) {
+        return Response::bad_request(&msg);
+    }
+    let yaml = deploy::render_compose(&spec, &state.config);
+    match deploy::stack_up(&state.config, &spec.project, &yaml) {
+        Ok(reader) => stream_response(reader),
+        Err(_) => Response::text(502, "Bad Gateway", "could not deploy the stack"),
+    }
+}
+
+fn deploy_stack_down<R: Read>(_state: &AppState, req: &Request, body: &mut R) -> Response {
+    let raw = match read_control_body(req, body) {
+        Ok(b) => b,
+        Err(resp) => return resp,
+    };
+    let request: DownRequest = match serde_json::from_slice(&raw) {
+        Ok(r) => r,
+        Err(_) => return Response::bad_request("invalid down request"),
+    };
+    if !deploy::valid_project(&request.project) {
+        return Response::bad_request("invalid project name");
+    }
+    match deploy::stack_down(&request.project) {
+        Ok(reader) => stream_response(reader),
+        Err(_) => Response::text(502, "Bad Gateway", "could not remove the stack"),
     }
 }
 

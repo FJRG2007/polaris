@@ -50,5 +50,6 @@ export {
     type ComposeSpecHealth
 } from "./compose-spec.js";
 export { ComposeRuntime } from "./runtime/compose.js";
+export { SwarmRuntime } from "./runtime/swarm.js";
 export { parseContainerState, type ContainerState } from "./runtime/status.js";
 export { onboardingScript, type OnboardingOptions } from "./onboarding.js";

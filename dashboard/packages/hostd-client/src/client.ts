@@ -126,6 +126,16 @@ export class HostdClient {
         return this.callStream("POST", "/v1/deploy/down", JSON.stringify({ project }));
     }
 
+    /** Deploy a spec onto a swarm (`docker stack deploy`), streaming output. */
+    public async stackUp(spec: unknown): Promise<IncomingMessage> {
+        return this.callStream("POST", "/v1/deploy/stack/up", JSON.stringify(spec));
+    }
+
+    /** Remove a swarm stack, streaming output. */
+    public async stackDown(project: string): Promise<IncomingMessage> {
+        return this.callStream("POST", "/v1/deploy/stack/down", JSON.stringify({ project }));
+    }
+
     /** Pull an image, streaming progress. */
     public async deployPull(image: string): Promise<IncomingMessage> {
         return this.callStream("POST", "/v1/deploy/pull", JSON.stringify({ image }));
