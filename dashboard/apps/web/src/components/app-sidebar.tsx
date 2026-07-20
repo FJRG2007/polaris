@@ -10,9 +10,26 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Clock, Container, Database, FolderOpen, Inbox, LayoutDashboard, Link2, Trash2, type LucideIcon } from "lucide-react";
+import {
+    Activity,
+    Blocks,
+    Clock,
+    Container,
+    Database,
+    FolderOpen,
+    Globe,
+    Inbox,
+    LayoutDashboard,
+    Link2,
+    Settings,
+    ShieldCheck,
+    Trash2,
+    Users,
+    UsersRound,
+    type LucideIcon
+} from "lucide-react";
 import { cn } from "@polaris/ui";
-import { POLARIS_APPS } from "@/lib/apps";
+import { resolveActiveApp } from "@/lib/apps";
 
 interface SidebarItem {
     label: string;
@@ -31,29 +48,38 @@ const APP_SIDEBARS: Record<string, SidebarItem[]> = {
         { label: "Trash", href: "/trash", icon: Trash2 }
     ],
     containers: [{ label: "Containers", href: "/apps/containers", icon: Container }],
-    backups: [{ label: "Databases", href: "/apps/backups", icon: Database }]
+    backups: [{ label: "Databases", href: "/apps/backups", icon: Database }],
+    admin: [
+        { label: "Overview", href: "/admin", icon: LayoutDashboard },
+        { label: "Users", href: "/admin/users", icon: Users },
+        { label: "Groups", href: "/admin/groups", icon: UsersRound },
+        { label: "Policies", href: "/admin/policies", icon: ShieldCheck },
+        { label: "Activity", href: "/admin/activity", icon: Activity },
+        { label: "Domains", href: "/admin/domains", icon: Globe },
+        { label: "Integrations", href: "/integrations", icon: Blocks },
+        { label: "Updates & settings", href: "/settings", icon: Settings }
+    ]
 };
+
+/** Section roots that must match their own path exactly, so they do not stay
+ *  highlighted while a sibling sub-route is open. */
+const EXACT_MATCH = new Set(["/drive", "/admin"]);
 
 export function AppSidebar() {
     const pathname = usePathname();
-    const app =
-        POLARIS_APPS.find((entry) => pathname === entry.href || pathname.startsWith(`${entry.href}/`)) ??
-        POLARIS_APPS[0];
-    const items = app ? (APP_SIDEBARS[app.id] ?? []) : [];
+    const app = resolveActiveApp(pathname);
+    const items = APP_SIDEBARS[app.id] ?? [];
     if (items.length === 0) return null;
 
     return (
         <nav className="flex flex-col gap-1">
             <p className="px-2 pb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                {app?.label}
+                {app.label}
             </p>
             {items.map((item) => {
-                // Files ("/drive") matches only itself; the nested drive apps
-                // (shared links, drop points) stay highlighted on their subtrees.
-                const active =
-                    item.href === "/drive"
-                        ? pathname === "/drive"
-                        : pathname === item.href || pathname.startsWith(`${item.href}/`);
+                const active = EXACT_MATCH.has(item.href)
+                    ? pathname === item.href
+                    : pathname === item.href || pathname.startsWith(`${item.href}/`);
                 const Icon = item.icon;
                 return (
                     <Link

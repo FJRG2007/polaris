@@ -20,14 +20,14 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     return (
         <CapabilityProvider capabilities={capabilities}>
             <AppShell
-                switcher={<AppNav />}
+                switcher={<AppNav isAdmin={user.isAdmin} />}
                 sidebar={<AppSidebar />}
                 account={
                     <>
                         {user.isAdmin ? <UpdateIndicator /> : null}
                         <NotificationBell />
                         <EditionBadge />
-                        <AccountMenu name={user.name} email={user.email} isAdmin={user.isAdmin} />
+                        <AccountMenu name={user.name} email={user.email} />
                     </>
                 }
             >
