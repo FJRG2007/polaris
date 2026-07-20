@@ -11,3 +11,14 @@ export {
     type SshAuth,
     type SshConnectOptions
 } from "./client.js";
+export {
+    execCommand,
+    openShell,
+    openSftp,
+    forwardOut,
+    clampDim,
+    type ExecResult,
+    type ExecOptions,
+    type ShellOptions
+} from "./exec.js";
+export { SshPool } from "./pool.js";

@@ -1,0 +1,41 @@
+/**
+ * @polaris/deploy - the deploy engine. Pure, Docker-free building blocks (naming,
+ * free subdomains, Traefik labels, builders) plus the interfaces the runtime
+ * drivers and the local/remote execution seam are written against. Runtime
+ * implementations (compose/swarm drivers, the deploy pipeline) build on these.
+ */
+
+export { slugify, shortHash, serviceName, imageTag } from "./naming.js";
+export { magicDomain, isMagicBase, DEFAULT_SUBDOMAIN_BASE } from "./subdomain.js";
+export { quoteArg, quoteArgv } from "./shell.js";
+export { traefikLabels, configHash, type TraefikDomain, type CertResolver, type TraefikServiceInput } from "./traefik.js";
+export {
+    buildSpec,
+    buildCommand,
+    DEFAULT_BUILDPACKS_BUILDER,
+    DEFAULT_DOCKERFILE,
+    type BuildMethod,
+    type BuildInput,
+    type BuildSpec
+} from "./builders/index.js";
+export type {
+    RuntimePorts,
+    OutputSink,
+    ComposeArtifact,
+    BuildRequest,
+    ExecSpec,
+    ExecStream,
+    LogOptions
+} from "./ports.js";
+export type {
+    RuntimeDriver,
+    RuntimeEngine,
+    RuntimeContext,
+    DeployTargetInfo,
+    ServiceRef,
+    AppDeployPlan,
+    DbDeployPlan,
+    DeployResult,
+    RuntimeStatus,
+    HealthcheckSpec
+} from "./runtime/driver.js";

@@ -1,0 +1,69 @@
+/**
+ * RuntimePorts is the single execution seam every runtime driver is written
+ * against, so a feature is implemented once and works on both backends:
+ *   - HostdPorts (local): each method maps to a validated polaris-hostd endpoint,
+ *     never a generic shell, so the local host stays least-privilege.
+ *   - SshPorts (remote): each method runs over the shared SSH client (the user's
+ *     own server, where running bash is expected).
+ * The concrete implementations live in later phases; this is the contract they
+ * satisfy and the driver depends on.
+ */
+
+import type { Duplex, Readable } from "node:stream";
+
+export type OutputSink = (chunk: Buffer) => void;
+
+export interface ComposeArtifact {
+    /** Compose project name (also the config directory name on the target). */
+    readonly project: string;
+    /** The rendered compose file contents. */
+    readonly composeYaml: string;
+}
+
+export interface BuildRequest {
+    /** Image tag to produce. */
+    readonly tag: string;
+    /** Dockerfile path within the context (default "Dockerfile"). */
+    readonly dockerfile?: string;
+    /** A tar stream of the build context. */
+    readonly contextTar: Readable;
+    readonly buildArgs?: Readonly<Record<string, string>>;
+}
+
+export interface ExecSpec {
+    /** Container id or name to exec into. */
+    readonly container: string;
+    /** Command argv; defaults to an interactive login shell. */
+    readonly cmd?: readonly string[];
+    readonly tty?: boolean;
+    readonly cols?: number;
+    readonly rows?: number;
+}
+
+export interface ExecStream {
+    /** Bidirectional raw byte stream (PTY when tty). */
+    readonly stream: Duplex;
+    resize(cols: number, rows: number): Promise<void>;
+    close(): Promise<void>;
+}
+
+export interface LogOptions {
+    readonly tail?: number;
+    readonly follow?: boolean;
+    readonly timestamps?: boolean;
+}
+
+export interface RuntimePorts {
+    /** Write the compose file to the target and `up -d`, streaming output. */
+    composeUp(files: ComposeArtifact, onOutput?: OutputSink): Promise<void>;
+    composeDown(project: string, onOutput?: OutputSink): Promise<void>;
+    /** Build an image from a tar context; resolves the produced tag. */
+    build(request: BuildRequest, onOutput?: OutputSink): Promise<string>;
+    pull(image: string, onOutput?: OutputSink): Promise<void>;
+    /** Inspect a container/service (parsed JSON) - reads `.State.Health` etc. */
+    inspect(ref: string): Promise<unknown>;
+    logs(ref: string, onData: OutputSink, options?: LogOptions): Promise<void>;
+    /** Open an interactive exec/attach stream. */
+    exec(spec: ExecSpec): Promise<ExecStream>;
+    dispose(): Promise<void>;
+}
