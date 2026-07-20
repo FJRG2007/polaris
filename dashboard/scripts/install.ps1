@@ -94,12 +94,41 @@ function Invoke-PolarisInstall {
         [System.IO.File]::WriteAllText($script:SecretsStore, (($lines -join "`n") + "`n"))
     }
 
-    # Reuse a remembered secret for Key, or generate one and remember it. This is
-    # what makes a regenerated .env recover the SAME master key.
+    # Recover a secret from a Polaris deployment already running on this host (its
+    # web container's environment). Docker volumes are global to the `polaris`
+    # compose project, so reusing the live master key stops a fresh .env from
+    # orphaning the database's encrypted credentials. Empty if none is running.
+    function Get-RunningSecret {
+        param([string]$Key)
+        if (-not (Test-Command "docker")) { return "" }
+        $cid = (docker ps -q --filter "label=com.docker.compose.project=polaris" --filter "label=com.docker.compose.service=web" 2>$null | Select-Object -First 1)
+        if (-not $cid) { return "" }
+        $envLines = docker inspect $cid --format '{{range .Config.Env}}{{println .}}{{end}}' 2>$null
+        foreach ($line in $envLines) {
+            if ($line -match "^$([regex]::Escape($Key))=(.*)$") { return $Matches[1] }
+        }
+        return ""
+    }
+
+    # The host directory (compose working dir) of a running Polaris deployment, so
+    # a bare install updates that one in place instead of a divergent checkout.
+    function Get-RunningDeploymentDir {
+        if (-not (Test-Command "docker")) { return "" }
+        $cid = (docker ps -q --filter "label=com.docker.compose.project=polaris" --filter "label=com.docker.compose.service=web" 2>$null | Select-Object -First 1)
+        if (-not $cid) { return "" }
+        return (docker inspect $cid --format '{{index .Config.Labels "com.docker.compose.project.working_dir"}}' 2>$null | Select-Object -First 1)
+    }
+
+    # Reuse a remembered secret for Key, else adopt the value from a Polaris
+    # deployment already running here, else generate one. Each source is
+    # remembered. This makes a regenerated .env - or a fresh checkout in another
+    # directory - recover the SAME master key.
     function Get-DurableSecret {
         param([string]$Key, [int]$Bytes, [switch]$Hex)
         $existing = Get-StoredSecret $Key
         if ($existing) { return $existing }
+        $recovered = Get-RunningSecret $Key
+        if ($recovered) { Set-StoredSecret $Key $recovered; return $recovered }
         if ($Hex) { $value = New-Secret -Bytes $Bytes -Hex } else { $value = New-Secret -Bytes $Bytes }
         Set-StoredSecret $Key $value
         return $value
@@ -178,6 +207,14 @@ function Invoke-PolarisInstall {
         $workdir = "."
     }
     else {
+        # Prefer a deployment already running on this host: update IT in place so a
+        # bare install (from any directory) never spins up a second, divergent
+        # checkout with a fresh master key against the shared Docker volumes.
+        $runningDir = Get-RunningDeploymentDir
+        if ($runningDir -and (Test-Path (Join-Path $runningDir "docker-compose.yml"))) {
+            $installDir = (Resolve-Path (Join-Path $runningDir "..\..")).Path
+            Write-Log "found the running Polaris deployment at $installDir; updating it in place"
+        }
         if (-not (Test-Command "git")) {
             Write-Error "git not found. Install git so the installer can fetch the Polaris repository."
             return
