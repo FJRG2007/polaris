@@ -54,6 +54,7 @@ model User {
     invitesSent  Invite[]                @relation("InviteInviter")
     connections       StorageConnection[]
     dockerConnections DockerConnection[]
+    hosts             Host[]
     shares            Share[]
     shareInvites      ShareInvite[]
     fileRequests      FileRequest[]
@@ -353,6 +354,33 @@ model DockerConnection {
     config              String
     // Envelope-encrypted credentials (pasted SSH key / TLS certs). Null for the
     // socket transport and for SSH using the install-provisioned key.
+    encryptedCredential Bytes?
+    credentialNonce     Bytes?
+    credentialKeyId     String?
+    status              String   @default("active")
+    createdAt           DateTime @default(now())
+    updatedAt           DateTime @updatedAt
+
+    owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+    @@index([ownerId])
+}
+
+// A global server registered once (SSH) and consumed by multiple apps: Docker
+// over SSH in Containers, and SFTP browsing in Drive.
+model Host {
+    id                  String   @id @default(uuid(7)) @db.Uuid
+    name                String
+    ownerId             String   @db.Uuid
+    // SSH endpoint.
+    address             String
+    port                Int      @default(22)
+    username            String
+    // password | key
+    authMethod          String
+    // Server public key (base64) pinned on the trust-on-add test connect.
+    hostKey             String?
+    // Envelope-encrypted credentials (password, or private key + passphrase).
     encryptedCredential Bytes?
     credentialNonce     Bytes?
     credentialKeyId     String?
