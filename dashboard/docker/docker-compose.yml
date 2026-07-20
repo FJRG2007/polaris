@@ -1,16 +1,18 @@
 # Polaris dashboard stack.
 #
-# Two editions share this one file:
-#   - Limited (default): `docker compose up -d` starts postgres + web + caddy.
-#     Cloud/API and userspace storage providers work; host access is disabled.
-#   - Full:  `docker compose --profile full up -d` additionally starts the
-#     privileged `hostd` daemon, which unlocks kernel mounts (SMB/NFS), host
-#     filesystem access, container/systemd control and daemon-driven updates.
+# Two editions share this one file, selected by the `full` compose profile:
+#   - Full (installer default): additionally starts the privileged `hostd`
+#     daemon, which unlocks kernel mounts (SMB/NFS), host filesystem access, the
+#     allowlisted Docker proxy, and daemon-driven updates. The installer sets
+#     COMPOSE_PROFILES=full in .env so every `docker compose` picks it up.
+#   - Limited (`install.sh --limited`, or a bare `docker compose up` with no
+#     profile): postgres + web + caddy only. Cloud/API and userspace storage
+#     providers work; host access is disabled.
 #
-# The privileged daemon is deliberately behind a compose profile so the limited
-# edition never grants host access by accident: an operator must opt in with
-# `--profile full`, and even then the dashboard only reports the `full` edition
-# once the daemon answers over the shared socket with a valid token.
+# The privileged daemon stays behind the profile so a bare `up` without the
+# profile never grants host access by accident. Even with it enabled, the
+# dashboard only reports the `full` edition once the daemon answers over the
+# shared socket with a valid token.
 name: polaris
 
 services:
@@ -107,16 +109,21 @@ services:
       POLARIS_MDNS_HOSTNAME: ${POLARIS_MDNS_HOSTNAME:-polaris}
       POLARIS_MDNS_PORT: ${POLARIS_MDNS_PORT:-80}
 
-  # --- Full edition only ----------------------------------------------------
+  # --- Full edition ---------------------------------------------------------
   # Privileged host daemon. Runs the static musl `polaris-hostd` binary and
-  # brokers host access for the web container over the shared unix socket. Kept
-  # in the `full` profile so it is never started by the default `up`.
+  # brokers host access for the web container over the shared unix socket:
+  # native mounts, host filesystem, the allowlisted Docker proxy, and in-band
+  # updates. Kept in the `full` profile; the installer enables that profile by
+  # default (opt out with `install.sh --limited`), so a bare `docker compose up`
+  # without the profile still starts only the sandboxed services.
   hostd:
     profiles: ["full"]
-    # The release pipeline publishes the polaris-hostd static musl binaries as
-    # GitHub Release assets; this image wraps that binary. See the TODO in
-    # dashboard-release.yml about producing the container image.
     image: ghcr.io/fjrg2007/polaris-hostd:${POLARIS_IMAGE_TAG:-latest}
+    # Build from the Rust workspace when the published image is unavailable
+    # (offline, or before the registry has it). Context is the repo root.
+    build:
+      context: ../..
+      dockerfile: crates/polaris-hostd/Dockerfile
     pull_policy: always
     restart: unless-stopped
     # Required for kernel mounts (SMB/NFS) and host filesystem access.
@@ -124,6 +131,10 @@ services:
     environment:
       POLARIS_HOSTD_SOCKET: /run/polaris/hostd.sock
       POLARIS_HOSTD_TOKEN_FILE: /run/polaris/hostd.token
+      # Auto-update: mirrors the app's master switch. The command is written by
+      # the installer with the host repo path baked in; unset -> /v1/update 501.
+      POLARIS_HOSTD_AUTOUPDATE: ${POLARIS_AUTO_UPDATE:-true}
+      POLARIS_HOSTD_UPDATE_CMD: ${POLARIS_HOSTD_UPDATE_CMD:-}
     volumes:
       # Same socket/token volume the web container reads.
       - polaris-run:/run/polaris

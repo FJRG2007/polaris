@@ -1,0 +1,15 @@
+# Keep the polaris-hostd build context (repo root) small: only the Rust
+# workspace (crates/ + plugins/*/{core,agent}) is needed. The dashboard image
+# builds from dashboard/ with its own .dockerignore, so this file only affects
+# the hostd build. Excluding dashboard/ also keeps its .env secrets out of this
+# build context entirely.
+.git
+.github
+.claude
+references
+target
+dashboard
+**/node_modules
+**/target
+plugins/*/homeassistant
+**/*.log
