@@ -58,18 +58,20 @@ File requests (upload-in):
 - [ ] Anonymous-upload hardening (streamed size limit, sniffed MIME, rate limit)
 
 Containers app (Docker):
-- [x] Secure per-install SSH access provisioning (`install.sh --ssh`): unique key, forced-command `docker system dial-stdio`, `restrict` + `from=`, pinned known_hosts
-- [x] Modular `@polaris/docker` connector: transports (socket / SSH / TCP), driver, registry (4 tests)
+- [x] Secure per-install SSH access provisioning (`install.sh --ssh`, REMOTE hosts only now): unique key, forced-command `docker system dial-stdio`, `restrict` + `from=`, pinned known_hosts
+- [x] Modular `@polaris/docker` connector: transports (socket / SSH / TCP) behind a `DockerRpc` seam, driver, registry (4 tests)
 - [x] Containers app: host overview (CPU/mem/counts), container table with live stats, start/stop/restart; DockerConnection model
-- [ ] Live end-to-end run against a real Docker host (built + unit-tested; not yet exercised on this Docker-off dev machine)
+- [x] Local host with NO flags: auto-registered, reached through hostd's allowlisted `POST /v1/docker` proxy (ping/info/list/stats/start/stop/restart only) - the web container never mounts the socket. Gated on `system.manage` + full edition
+- [ ] Live end-to-end run against a real Docker host (built + unit-tested; hostd proxy + local host not yet exercised on this Docker-off dev machine)
 - [ ] Remote-host SSH host-key pinning per connection, TLS-cert/pasted-key credential paths (encryption wired; UI present)
 - [ ] Container logs, images, compose stacks, and Kubernetes (future apps)
 
 Platform:
 - [ ] User management, roles/permissions, invites
-- [ ] Edition/capability boundary + graceful degradation
-- [ ] Docker Compose stack + one-command install
-- [ ] Auto-update (digest-verified, via hostd)
+- [x] Edition/capability boundary + graceful degradation (fixed: the capability refresh loop now actually runs from `instrumentation.register()`, so the edition flips to full when hostd answers - it was never started before)
+- [x] Full edition is the installer default (opt out with `install.sh --limited`): hostd runs by default so in-band updates and the local Docker host work with no flags. hostd + updater container images now build and publish (were missing entirely)
+- [x] Auto-update via hostd: `POST /v1/update` runs a one-shot `polaris-updater` container that re-runs `install.sh` (git pull -> reconcile .env -> pull images -> migrate -> redeploy -> verify)
+- [ ] Digest/signature-verified image provenance for updates (still trusts the `latest` tag, as before - pre-existing accepted risk)
 - [ ] CI / release / deploy / agent-maintenance workflows
 - [ ] Marketing landing + demo
 

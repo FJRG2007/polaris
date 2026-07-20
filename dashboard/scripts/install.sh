@@ -5,10 +5,15 @@
 # to manage.
 #
 #   curl -fsSL https://raw.githubusercontent.com/FJRG2007/polaris/main/dashboard/scripts/install.sh | sh
-#   # full edition (starts the privileged host daemon):
-#   curl -fsSL .../install.sh | sh -s -- --full
-#   # grant the container secure SSH access to the host Docker Engine:
+#   # sandboxed edition (no privileged host daemon; no in-band updates or local
+#   # Docker host):
+#   curl -fsSL .../install.sh | sh -s -- --limited
+#   # also grant SSH access to a REMOTE host's Docker Engine (the local host
+#   # works without this in the full edition):
 #   curl -fsSL .../install.sh | sh -s -- --ssh
+#
+# The full edition (privileged host daemon) is the default: it unlocks in-band
+# self-update and the local Docker host with no extra flags.
 #
 # Idempotent: re-running reconciles the stack and never overwrites an existing
 # .env. Everything is wrapped in main() so a truncated download cannot execute a
@@ -143,6 +148,50 @@ reconcile_env() {
     fi
 }
 
+# Upsert KEY=VALUE in the env file, replacing any existing line for KEY. The
+# value is written verbatim (never through sed), so it may safely contain spaces
+# and shell metacharacters - as the generated update command does.
+set_env_var() {
+    file="$1"
+    key="$2"
+    value="$3"
+    tmp=$(mktemp)
+    grep -v "^${key}=" "$file" 2>/dev/null > "$tmp" || true
+    printf '%s=%s\n' "$key" "$value" >> "$tmp"
+    cat "$tmp" > "$file"
+    rm -f "$tmp"
+    chmod 600 "$file"
+}
+
+# Select the edition by writing the compose profile into .env, so every
+# `docker compose` - installer and CLI alike - picks it up. In the full edition
+# also write the in-band update command with this host's repo path baked in:
+# hostd (in its container) launches a throwaway updater container that
+# bind-mounts this repo and the docker socket and re-runs the updater script
+# (git pull -> reconcile .env -> pull images -> migrate -> redeploy -> verify).
+# Limited clears both so a bare `docker compose up` stays sandboxed.
+configure_edition() {
+    mode="$1"
+    env_file="$2"
+    if [ "$mode" = "yes" ]; then
+        # The updater's bind-mount source must be the HOST repo path even when
+        # this installer runs INSIDE the updater container (where the repo is
+        # mounted at /polaris, so `cd ../..` would resolve to the wrong path and
+        # corrupt the command on the next self-update). hostd passes the real
+        # host path back in as POLARIS_HOST_REPO; on a normal host install it is
+        # unset and the working tree is correct.
+        host_repo="${POLARIS_HOST_REPO:-$(cd ../.. && pwd)}"
+        set_env_var "$env_file" "COMPOSE_PROFILES" "full"
+        update_cmd="docker rm -f polaris-updater >/dev/null 2>&1; docker run --name polaris-updater --rm -e POLARIS_HOST_REPO=${host_repo} -v /var/run/docker.sock:/var/run/docker.sock -v ${host_repo}:/polaris -w /polaris/dashboard ghcr.io/fjrg2007/polaris-updater:latest sh scripts/update.sh"
+        set_env_var "$env_file" "POLARIS_HOSTD_UPDATE_CMD" "$update_cmd"
+        log "full edition (privileged host daemon, in-band updates, local Docker host)"
+    else
+        set_env_var "$env_file" "COMPOSE_PROFILES" ""
+        set_env_var "$env_file" "POLARIS_HOSTD_UPDATE_CMD" ""
+        log "limited edition (no privileged host daemon)"
+    fi
+}
+
 # Keep POLARIS_DATABASE_URL's password in lockstep with POSTGRES_PASSWORD so the
 # two can never drift apart (the classic P1000 auth failure). Only rewrites a URL
 # that targets the bundled `postgres` service; an external database URL is left
@@ -241,11 +290,15 @@ align_db_password() {
 }
 
 main() {
-    full="no"
+    # Full edition (privileged host daemon) is the default: it is what unlocks
+    # in-band updates and the local Docker host with no extra flags. `--limited`
+    # opts out to the sandboxed edition; `--full` is accepted for compatibility.
+    full="yes"
     ssh="no"
     for arg in "$@"; do
         case "$arg" in
             --full) full="yes" ;;
+            --limited) full="no" ;;
             --ssh) ssh="yes" ;;
             *) err "unknown argument: $arg"; exit 1 ;;
         esac
@@ -319,10 +372,10 @@ main() {
         POLARIS_ENV_FILE="$(pwd)/.env" sh ../scripts/setup-ssh-access.sh
     fi
 
-    if [ "$full" = "yes" ]; then
-        log "enabling the full edition (privileged host daemon)"
-        export COMPOSE_PROFILES="full"
-    fi
+    # Select the edition (full by default) and, for full, provision the in-band
+    # update command. Writes COMPOSE_PROFILES into .env, which the pull/up below
+    # and the `polaris` CLI all honour.
+    configure_edition "$full" ".env"
 
     # Install and update are the same command: prefer the published `latest` image
     # (fast), falling back to building from source if the registry is unavailable.
