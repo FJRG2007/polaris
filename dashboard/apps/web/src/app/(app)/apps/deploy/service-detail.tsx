@@ -8,8 +8,8 @@
  */
 
 import { useEffect, useState, useTransition } from "react";
-import { Eye, EyeOff, Globe, Loader2, Maximize2, Minimize2, Plus, Trash2 } from "lucide-react";
-import { Badge, Button, Dialog, DialogContent, DialogHeader, DialogTitle, Input, Switch, cn } from "@polaris/ui";
+import { ChevronLeft, ChevronRight, Eye, EyeOff, Globe, Loader2, Maximize2, Minimize2, Plus, Trash2 } from "lucide-react";
+import { Badge, Button, Dialog, DialogContent, DialogTitle, Input, Switch, cn } from "@polaris/ui";
 import { ServiceIcon, StatusPill, DeploymentLogs, dbTone, serviceKindOf, type ProjectApp } from "./deploy-view";
 import { TerminalPanel } from "./terminal-panel";
 import { FilesPanel } from "./files-panel";
@@ -36,8 +36,8 @@ export function ServiceDetail({ app, onChanged, onClose }: { app: ProjectApp; on
         <Dialog open onOpenChange={(open) => !open && onClose()}>
             <DialogContent
                 className={cn(
-                    "left-0 top-0 flex h-full max-h-none translate-x-0 translate-y-0 flex-col gap-0 rounded-none rounded-r-xl border-y-0 border-l-0 p-0 data-[state=open]:slide-in-from-left-4",
-                    full ? "w-full max-w-none" : "w-full max-w-none sm:w-[760px]"
+                    "right-0 left-auto top-0 flex h-full max-h-none translate-x-0 translate-y-0 flex-col gap-0 rounded-none rounded-l-xl border-y-0 border-r-0 p-0 data-[state=open]:slide-in-from-right-4",
+                    full ? "w-full max-w-none" : "w-full max-w-none sm:w-[820px]"
                 )}
             >
                 <div className="flex items-center gap-3 border-b border-border/60 px-5 py-4">
@@ -98,6 +98,35 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
     }
     useEffect(reload, [app.id]);
 
+    function deploy() {
+        startTransition(async () => {
+            try {
+                const result = await deployApplicationAction(app.id);
+                if (result.deploymentId) setLogsFor(result.deploymentId);
+                reload();
+                onChanged();
+            } catch {
+                // A failure surfaces on the refreshed status; never crash the panel.
+            }
+        });
+    }
+
+    // Logs render INLINE (no separate dialog), Railway-style, with log categories.
+    if (logsFor) {
+        return (
+            <div className="flex flex-col gap-2 py-2">
+                <button
+                    type="button"
+                    onClick={() => setLogsFor(null)}
+                    className="inline-flex w-fit items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
+                >
+                    <ChevronLeft className="size-4" /> Deployments
+                </button>
+                <DeploymentLogsView deploymentId={logsFor} onDone={reload} />
+            </div>
+        );
+    }
+
     return (
         <div className="flex flex-col gap-3 py-2">
             <div className="flex items-center gap-2">
@@ -113,19 +142,7 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
                 ) : (
                     <span className="text-sm text-muted-foreground">No domain yet</span>
                 )}
-                <Button
-                    size="sm"
-                    className="ml-auto"
-                    disabled={busy}
-                    onClick={() =>
-                        startTransition(async () => {
-                            const result = await deployApplicationAction(app.id);
-                            if (result.deploymentId) setLogsFor(result.deploymentId);
-                            reload();
-                            onChanged();
-                        })
-                    }
-                >
+                <Button size="sm" className="ml-auto" disabled={busy} onClick={deploy}>
                     {busy ? <Loader2 className="size-4 animate-spin" /> : "Deploy"}
                 </Button>
             </div>
@@ -134,33 +151,51 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
             ) : items.length === 0 ? (
                 <Empty text="No deployments yet." />
             ) : (
-                <ul className="flex flex-col gap-1">
+                <ul className="flex flex-col">
                     {items.map((deployment) => (
                         <li
                             key={deployment.id}
-                            className="flex items-center gap-2 rounded-md border border-border/60 px-3 py-2 text-sm"
+                            onClick={() => setLogsFor(deployment.id)}
+                            className="flex cursor-pointer items-center gap-2 border-b border-border/40 px-1 py-2.5 text-sm transition-colors hover:bg-muted/40"
                         >
                             <StatusPill tone={dbTone(deployment.status)} label={deployment.status} />
                             {deployment.isCurrent && <Badge variant="success">current</Badge>}
-                            <span className="text-xs text-muted-foreground">
+                            <span className="ml-auto text-xs text-muted-foreground">
                                 {new Date(deployment.createdAt).toLocaleString()}
                             </span>
-                            <Button variant="ghost" size="sm" className="ml-auto" onClick={() => setLogsFor(deployment.id)}>
-                                Logs
-                            </Button>
+                            <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
                         </li>
                     ))}
                 </ul>
             )}
+        </div>
+    );
+}
 
-            <Dialog open={logsFor !== null} onOpenChange={(open) => !open && setLogsFor(null)}>
-                <DialogContent className="max-w-3xl">
-                    <DialogHeader>
-                        <DialogTitle>Deployment logs</DialogTitle>
-                    </DialogHeader>
-                    {logsFor && <DeploymentLogs deploymentId={logsFor} onDone={reload} />}
-                </DialogContent>
-            </Dialog>
+function DeploymentLogsView({ deploymentId, onDone }: { deploymentId: string; onDone: () => void }) {
+    const CATS = ["Build Logs", "Deploy Logs", "HTTP Logs", "Network Flow Logs"] as const;
+    const [cat, setCat] = useState<(typeof CATS)[number]>("Deploy Logs");
+    return (
+        <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-3 overflow-x-auto border-b border-border/60 text-sm">
+                {CATS.map((name) => (
+                    <button
+                        key={name}
+                        type="button"
+                        onClick={() => setCat(name)}
+                        className={`-mb-px whitespace-nowrap border-b-2 px-1 py-1.5 transition-colors ${
+                            cat === name ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"
+                        }`}
+                    >
+                        {name}
+                    </button>
+                ))}
+            </div>
+            {cat === "HTTP Logs" || cat === "Network Flow Logs" ? (
+                <Empty text={`No ${cat.toLowerCase()} yet.`} />
+            ) : (
+                <DeploymentLogs deploymentId={deploymentId} onDone={onDone} />
+            )}
         </div>
     );
 }
@@ -177,6 +212,7 @@ function VariablesTab({ app }: { app: ProjectApp }) {
     const [pending, startTransition] = useTransition();
     const [raw, setRaw] = useState("");
     const [rawOpen, setRawOpen] = useState(false);
+    const [showAdd, setShowAdd] = useState(false);
     const [note, setNote] = useState<string | null>(null);
 
     function reload() {
@@ -236,14 +272,18 @@ function VariablesTab({ app }: { app: ProjectApp }) {
                 ))}
             </div>
             <div className="flex items-center justify-between gap-2">
-                <p className="text-xs text-muted-foreground">
-                    {scope === "environment"
-                        ? "Shared by every service in this environment."
-                        : "Injected into this service on the next deploy."}
-                </p>
-                <Button variant="outline" size="sm" onClick={() => setRawOpen((open) => !open)}>
-                    {rawOpen ? "Close" : "Paste .env"}
-                </Button>
+                <span className="text-sm font-medium">
+                    {items ? items.length : 0} {scope === "environment" ? "environment" : "service"} variable
+                    {items && items.length === 1 ? "" : "s"}
+                </span>
+                <div className="flex items-center gap-2">
+                    <Button variant="ghost" size="sm" onClick={() => setRawOpen((open) => !open)}>
+                        {"{ } Raw Editor"}
+                    </Button>
+                    <Button size="sm" onClick={() => setShowAdd((open) => !open)}>
+                        <Plus className="size-4" /> New Variable
+                    </Button>
+                </div>
             </div>
             {note && <p className="text-xs text-success">{note}</p>}
             {rawOpen && (
@@ -277,62 +317,54 @@ function VariablesTab({ app }: { app: ProjectApp }) {
                     </div>
                 </div>
             )}
+            {showAdd && (
+                <div className="flex flex-wrap items-center gap-2 rounded-md border border-border/60 p-2">
+                    <Input value={key} onChange={(event) => setKey(event.target.value)} placeholder="KEY" className="w-44 font-mono" />
+                    <Input value={value} onChange={(event) => setValue(event.target.value)} placeholder="value" className="min-w-0 flex-1" />
+                    <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <Switch checked={isSecret} onChange={setIsSecret} aria-label="Secret" /> secret
+                    </label>
+                    <Button onClick={add} disabled={pending || !key.trim()}>
+                        {pending ? <Loader2 className="size-4 animate-spin" /> : "Add"}
+                    </Button>
+                </div>
+            )}
             {items === null ? (
                 <Loading />
             ) : items.length === 0 ? (
-                <Empty text="No variables yet." />
+                <Empty text="No variables yet. Add one or paste a .env." />
             ) : (
-                <ul className="flex flex-col gap-1">
+                <ul className="flex flex-col">
                     {items.map((item) => (
-                        <li key={item.id} className="flex items-center gap-2 rounded-md border border-border/60 px-3 py-2 text-sm">
-                            <span className="font-mono text-xs font-medium">{item.key}</span>
-                            <span className="ml-2 truncate font-mono text-xs text-muted-foreground">
-                                {item.isSecret ? (reveal[item.id] ? "••••••" : "••••••") : item.value}
+                        <li key={item.id} className="group flex items-center gap-3 border-b border-border/40 py-2.5 text-sm">
+                            <span className="text-xs text-muted-foreground/50">{"{ }"}</span>
+                            <span className="w-60 shrink-0 truncate font-mono text-xs font-medium">{item.key}</span>
+                            <span className="min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground">
+                                {item.isSecret ? "•••••••" : reveal[item.id] ? (item.value ?? "") : "•••••••"}
                             </span>
                             {!item.isSecret && (
                                 <button
                                     type="button"
                                     onClick={() => setReveal((prev) => ({ ...prev, [item.id]: !prev[item.id] }))}
-                                    className="text-muted-foreground hover:text-foreground"
-                                    aria-label="Toggle"
+                                    className="text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100"
+                                    aria-label="Toggle value"
                                 >
                                     {reveal[item.id] ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
                                 </button>
                             )}
-                            {item.isSecret && <Badge variant="neutral">secret</Badge>}
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                className="ml-auto"
+                            <button
+                                type="button"
                                 title="Remove"
-                                onClick={() =>
-                                    startTransition(async () => {
-                                        await deleteEnvVarAction(item.id);
-                                        reload();
-                                    })
-                                }
+                                onClick={() => startTransition(async () => { await deleteEnvVarAction(item.id); reload(); })}
+                                className="text-muted-foreground opacity-0 transition-opacity hover:text-danger group-hover:opacity-100"
                             >
                                 <Trash2 className="size-4" />
-                            </Button>
+                            </button>
                         </li>
                     ))}
                 </ul>
             )}
-
-            <div className="flex flex-col gap-2 border-t border-border/60 pt-3">
-                <span className="text-xs font-medium text-muted-foreground">New variable</span>
-                <div className="flex flex-wrap items-center gap-2">
-                    <Input value={key} onChange={(event) => setKey(event.target.value)} placeholder="KEY" className="w-40 font-mono" />
-                    <Input value={value} onChange={(event) => setValue(event.target.value)} placeholder="value" className="flex-1" />
-                    <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                        <Switch checked={isSecret} onChange={setIsSecret} aria-label="Secret" /> secret
-                    </label>
-                    <Button onClick={add} disabled={pending || !key.trim()}>
-                        {pending ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />} Add
-                    </Button>
-                </div>
-                {error && <p className="text-sm text-danger">{error}</p>}
-            </div>
+            {error && <p className="text-sm text-danger">{error}</p>}
         </div>
     );
 }

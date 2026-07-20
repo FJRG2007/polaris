@@ -915,9 +915,14 @@ export function DeploymentLogs({ deploymentId, onDone }: { deploymentId: string;
     const [log, setLog] = useState("");
     const [status, setStatus] = useState("queued");
     const preRef = useRef<HTMLPreElement>(null);
+    // Keep onDone out of the effect deps: it is recreated every render, and calling
+    // it (a state update) here would otherwise re-run the effect and loop.
+    const onDoneRef = useRef(onDone);
+    onDoneRef.current = onDone;
 
     useEffect(() => {
         let active = true;
+        let done = false;
         let timer: ReturnType<typeof setTimeout>;
 
         async function poll(): Promise<void> {
@@ -928,7 +933,10 @@ export function DeploymentLogs({ deploymentId, onDone }: { deploymentId: string;
                 setLog(data.log);
                 setStatus(data.status);
                 if (["running", "failed", "cancelled", "rolled_back"].includes(data.status)) {
-                    onDone();
+                    if (!done) {
+                        done = true;
+                        onDoneRef.current();
+                    }
                     return;
                 }
             }
@@ -940,7 +948,7 @@ export function DeploymentLogs({ deploymentId, onDone }: { deploymentId: string;
             active = false;
             clearTimeout(timer);
         };
-    }, [deploymentId, onDone]);
+    }, [deploymentId]);
 
     useEffect(() => {
         if (preRef.current) preRef.current.scrollTop = preRef.current.scrollHeight;
