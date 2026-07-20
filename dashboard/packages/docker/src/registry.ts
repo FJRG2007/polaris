@@ -9,6 +9,7 @@
 import { readFileSync } from "node:fs";
 import { loadEnv } from "@polaris/config";
 import { DockerDriver } from "./driver.js";
+import { streamRpc } from "./rpc.js";
 import type { DockerConfig, DockerCredentials } from "./schema.js";
 import { socketTransport, sshTransport, tcpTransport } from "./transports.js";
 
@@ -22,18 +23,20 @@ export function createDockerDriver(record: DockerConnectionRecord): DockerDriver
     const config = record.config;
     switch (config.transport) {
         case "socket":
-            return new DockerDriver(socketTransport(config.socketPath));
+            return new DockerDriver(streamRpc(socketTransport(config.socketPath)));
         case "tcp": {
             const creds = record.credentials as Extract<DockerCredentials, { transport: "tcp" }>;
             return new DockerDriver(
-                tcpTransport({
-                    host: config.host,
-                    port: config.port,
-                    tls: config.tls,
-                    ca: creds.ca,
-                    cert: creds.cert,
-                    key: creds.key
-                })
+                streamRpc(
+                    tcpTransport({
+                        host: config.host,
+                        port: config.port,
+                        tls: config.tls,
+                        ca: creds.ca,
+                        cert: creds.cert,
+                        key: creds.key
+                    })
+                )
             );
         }
         case "ssh": {
@@ -44,14 +47,16 @@ export function createDockerDriver(record: DockerConnectionRecord): DockerDriver
                 : creds.privateKey ?? "";
             if (!privateKey) throw new Error("SSH connection has no private key");
             return new DockerDriver(
-                sshTransport({
-                    host: config.host,
-                    port: config.port,
-                    username: config.username,
-                    privateKey,
-                    passphrase: creds.passphrase,
-                    knownHosts: readKey(env.POLARIS_SSH_KNOWN_HOSTS)
-                })
+                streamRpc(
+                    sshTransport({
+                        host: config.host,
+                        port: config.port,
+                        username: config.username,
+                        privateKey,
+                        passphrase: creds.passphrase,
+                        knownHosts: readKey(env.POLARIS_SSH_KNOWN_HOSTS)
+                    })
+                )
             );
         }
     }
