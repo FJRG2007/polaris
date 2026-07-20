@@ -57,8 +57,8 @@ export interface SshTransportOptions {
     readonly port: number;
     readonly username: string;
     readonly auth: SshAuth;
-    /** Pinned server public key (base64). SSH is refused without it. */
-    readonly pinnedHostKey?: string;
+    /** Pinned server public key(s), base64. SSH is refused without at least one. */
+    readonly pinnedHostKey?: string | string[];
 }
 
 export function sshTransport(options: SshTransportOptions): DockerTransportConn {
@@ -66,7 +66,8 @@ export function sshTransport(options: SshTransportOptions): DockerTransportConn 
 
     async function ensureClient(): Promise<Client> {
         if (client) return client;
-        if (!options.pinnedHostKey) {
+        const pins = options.pinnedHostKey;
+        if (!pins || (Array.isArray(pins) && pins.length === 0)) {
             throw new Error("Refusing SSH: no pinned host key");
         }
         client = await openSshClient({

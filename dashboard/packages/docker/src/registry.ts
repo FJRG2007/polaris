@@ -46,7 +46,7 @@ export function createDockerDriver(record: DockerConnectionRecord): DockerDriver
                 ? readKey(env.POLARIS_SSH_KEY)
                 : creds.privateKey ?? "";
             if (!privateKey) throw new Error("SSH connection has no private key");
-            const pinnedHostKey = firstPinnedKey(
+            const pinnedHostKey = allPinnedKeys(
                 readKey(env.POLARIS_SSH_KNOWN_HOSTS),
                 config.host,
                 config.port
@@ -74,18 +74,20 @@ function readKey(path: string): string {
     }
 }
 
-/** First base64 host key pinned for a host (or its [host]:port form) in a
- *  known_hosts file, if any. The shared SSH client compares the server key in
- *  the same base64 encoding. */
-function firstPinnedKey(knownHosts: string, host: string, port: number): string | undefined {
+/** All base64 host keys pinned for a host (or its [host]:port form) in a
+ *  known_hosts file. A host commonly has several (rsa/ecdsa/ed25519) and the
+ *  client negotiates one, so the transport must accept any of them. Keys are in
+ *  the same base64 encoding the shared SSH client compares against. */
+function allPinnedKeys(knownHosts: string, host: string, port: number): string[] {
     const aliases = new Set([host, `[${host}]:${port}`]);
+    const keys: string[] = [];
     for (const line of knownHosts.split("\n")) {
         const trimmed = line.trim();
         if (trimmed === "" || trimmed.startsWith("#")) continue;
         const [hostField, , keyField] = trimmed.split(/\s+/);
         if (hostField && keyField && hostField.split(",").some((entry) => aliases.has(entry))) {
-            return keyField;
+            keys.push(keyField);
         }
     }
-    return undefined;
+    return keys;
 }

@@ -29,12 +29,26 @@ export interface SshConnectOptions {
     readonly port: number;
     readonly username: string;
     readonly auth: SshAuth;
-    /** Pinned server public key (base64 of the raw key blob). When set, the
-     *  server key MUST match. Omit only during trust-on-add. */
-    readonly pinnedHostKey?: string;
+    /** Pinned server public key(s), base64 of the raw key blob. When set, the
+     *  presented key MUST be one of them - a set is needed because a host's
+     *  known_hosts holds several key types (rsa/ecdsa/ed25519) and the client
+     *  negotiates just one. Omit ONLY during trust-on-add; an empty array means
+     *  "pinning required but nothing known" and is refused (fail-closed). */
+    readonly pinnedHostKey?: string | string[];
     /** Invoked with the server's key (base64) as soon as it is presented. */
     readonly onHostKey?: (hostKey: string) => void;
     readonly readyTimeoutMs?: number;
+}
+
+/**
+ * Whether a presented server key is accepted given the pin(s). `undefined` pins
+ * mean trust-on-add (accept once, for capture); a string or array means the key
+ * must be a member (an empty array refuses - fail-closed). Pure and unit-tested.
+ */
+export function hostKeyAccepted(presented: string, pins: string | string[] | undefined): boolean {
+    if (pins === undefined) return true;
+    const list = Array.isArray(pins) ? pins : [pins];
+    return list.includes(presented);
 }
 
 /** Open an authenticated ssh2 client. Rejects if the host key does not match the
@@ -85,9 +99,7 @@ function buildConnectConfig(options: SshConnectOptions): ConnectConfig {
         hostVerifier: (key: Buffer): boolean => {
             const presented = key.toString("base64");
             options.onHostKey?.(presented);
-            // Trust-on-add: no pin yet, accept once so the caller can capture it.
-            if (!options.pinnedHostKey) return true;
-            return presented === options.pinnedHostKey;
+            return hostKeyAccepted(presented, options.pinnedHostKey);
         }
     };
 

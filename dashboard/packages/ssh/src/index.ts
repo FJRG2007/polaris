@@ -4,4 +4,10 @@
  * @polaris/storage (SFTP), so SSH auth and pinning live in exactly one place.
  */
 
-export { openSshClient, testAndCaptureHostKey, type SshAuth, type SshConnectOptions } from "./client.js";
+export {
+    openSshClient,
+    testAndCaptureHostKey,
+    hostKeyAccepted,
+    type SshAuth,
+    type SshConnectOptions
+} from "./client.js";
