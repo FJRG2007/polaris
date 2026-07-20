@@ -503,9 +503,16 @@ main() {
     fi
 
     # Select the edition (full by default) and, for full, provision the in-band
-    # update command. Writes COMPOSE_PROFILES into .env, which the pull/up below
-    # and the `polaris` CLI all honour.
+    # update command. Writes COMPOSE_PROFILES into .env.
     configure_edition "$full" ".env"
+
+    # Honour the profile deterministically: export it for every compose call below.
+    # Relying on COMPOSE_PROFILES from .env alone is not reliable across Docker
+    # Compose versions - when it is ignored, the full edition's privileged daemon
+    # (hostd, in the `full` profile) never starts and the dashboard is stuck on the
+    # limited edition, so the local Docker host never appears.
+    COMPOSE_PROFILES=$(sed -n 's/^COMPOSE_PROFILES=//p' .env | head -n1)
+    export COMPOSE_PROFILES
 
     # Install and update are the same command: prefer the published `latest` image
     # (fast), falling back to building from source if the registry is unavailable.
@@ -527,6 +534,16 @@ main() {
 
     # Now bring up the rest against the already-aligned database.
     $compose up -d $build_flag --remove-orphans
+
+    # In the full edition, confirm the privileged daemon actually started - a
+    # silently-missing hostd is exactly what leaves the dashboard on "limited" and
+    # hides the local Docker host. Warn loudly (do not fail the whole deploy).
+    if [ "$full" = "yes" ] && [ -z "$($compose ps -q hostd 2>/dev/null)" ]; then
+        err "full edition selected but the polaris-hostd service is not running."
+        err "recent hostd logs:"
+        $compose logs --tail 20 hostd >&2 2>/dev/null || true
+        err "the local Docker host needs hostd; inspect with 'polaris status' / 'docker compose ps'."
+    fi
 
     # The Caddyfile is bind-mounted, so `up -d` does NOT restart Caddy when it
     # changes - which is why a proxy/TLS change from an update would silently not

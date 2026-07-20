@@ -25,7 +25,11 @@ compose() {
         echo "polaris: docker is required for this command" >&2
         exit 1
     fi
-    (cd "$COMPOSE_DIR" && docker compose "$@")
+    # Activate the deployment's compose profile via the environment, not just the
+    # .env - COMPOSE_PROFILES in .env is not honoured reliably across Compose
+    # versions, which would leave the full edition's hostd service unstarted.
+    profiles=$(val COMPOSE_PROFILES)
+    (cd "$COMPOSE_DIR" && COMPOSE_PROFILES="$profiles" docker compose "$@")
 }
 
 # Pretty stack status: one colored line per service with its health and restart
