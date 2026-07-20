@@ -16,7 +16,7 @@ import { formatBytes } from "@polaris/core";
 import { Badge, Button, Card, CardBody, cn } from "@polaris/ui";
 import { containerAction, deleteDockerConnectionAction } from "./actions";
 import { DockerConnectionDialog } from "./docker-connection-dialog";
-import type { ContainerRow, DockerConnectionSummary, OverviewData } from "./types";
+import type { ContainerRow, DockerConnectionSummary, LocalHostDiagnostic, OverviewData } from "./types";
 
 const REFRESH_MS = 5000;
 
@@ -26,7 +26,8 @@ export function ContainersView({
     sshEnabled,
     overview,
     containers,
-    error
+    error,
+    localDiagnostic
 }: {
     connections: DockerConnectionSummary[];
     connectionId: string | null;
@@ -34,6 +35,7 @@ export function ContainersView({
     overview: OverviewData | null;
     containers: ContainerRow[];
     error: string | null;
+    localDiagnostic: LocalHostDiagnostic | null;
 }) {
     const router = useRouter();
     const [pending, startTransition] = useTransition();
@@ -103,6 +105,24 @@ export function ContainersView({
             </aside>
 
             <section className="min-w-0">
+                {localDiagnostic ? (
+                    <div className="mb-4 rounded-md border border-warning/40 bg-warning/10 p-4 text-sm">
+                        <p className="font-medium">The local Docker host is not available yet</p>
+                        <p className="mt-1 text-muted-foreground">{localDiagnostic.reason}</p>
+                        <dl className="mt-3 grid grid-cols-[auto,1fr] gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                            <dt>Edition</dt>
+                            <dd className="font-mono">{localDiagnostic.edition}</dd>
+                            <dt>Host daemon</dt>
+                            <dd className="font-mono">
+                                {localDiagnostic.hostdPresent
+                                    ? `present${localDiagnostic.hostdVersion ? ` (v${localDiagnostic.hostdVersion})` : ""}`
+                                    : "not detected"}
+                            </dd>
+                            <dt>Docker socket</dt>
+                            <dd className="font-mono">{localDiagnostic.dockerReported ? "reported" : "not reported"}</dd>
+                        </dl>
+                    </div>
+                ) : null}
                 {!connectionId ? (
                     <div className="rounded-md border border-border bg-card p-8 text-center text-sm text-muted-foreground">
                         Connect a Docker host to monitor and manage containers.
