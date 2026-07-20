@@ -14,6 +14,8 @@ const DEFAULT_TOKEN_FILE: &str = "/run/polaris/hostd.token";
 const DEFAULT_ROOT: &str = "/";
 const DEFAULT_MOUNT_ROOT: &str = "/mnt/polaris";
 const DEFAULT_DOCKER_SOCKET: &str = "/var/run/docker.sock";
+const DEFAULT_DEPLOY_ROOT: &str = "/var/lib/polaris/deploy";
+const DEFAULT_VOLUME_ROOT: &str = "/var/lib/polaris/volumes";
 
 #[derive(Debug, Clone)]
 pub struct Config {
@@ -34,6 +36,12 @@ pub struct Config {
     /// container never mounts this socket itself; only this daemon touches it,
     /// and only through the allowlisted proxy.
     pub docker_socket: PathBuf,
+    /// Root the deploy endpoints render compose files and build contexts under.
+    /// Bind-mount sources in a deploy spec must resolve within this or the
+    /// volume root; anything outside is refused.
+    pub deploy_root: PathBuf,
+    /// Root for named/bind volume data of deployed services.
+    pub volume_root: PathBuf,
     /// Whether the host reports the auto-update capability.
     pub auto_update: bool,
     /// Shell command run (detached) to update and redeploy Polaris on the host,
@@ -66,6 +74,12 @@ impl Config {
             docker_socket: env("POLARIS_HOSTD_DOCKER_SOCKET")
                 .map(PathBuf::from)
                 .unwrap_or_else(|| PathBuf::from(DEFAULT_DOCKER_SOCKET)),
+            deploy_root: env("POLARIS_HOSTD_DEPLOY_DIR")
+                .map(PathBuf::from)
+                .unwrap_or_else(|| PathBuf::from(DEFAULT_DEPLOY_ROOT)),
+            volume_root: env("POLARIS_HOSTD_VOLUME_DIR")
+                .map(PathBuf::from)
+                .unwrap_or_else(|| PathBuf::from(DEFAULT_VOLUME_ROOT)),
             // Auto-update is on unless explicitly disabled. Anything other than
             // a literal "false" leaves it enabled (fail-safe toward the default).
             auto_update: env("POLARIS_HOSTD_AUTOUPDATE")

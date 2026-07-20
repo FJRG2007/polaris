@@ -12,6 +12,7 @@ use std::sync::Mutex;
 use serde::Deserialize;
 
 use crate::config::Config;
+use crate::deploy::{self, DeploySpec};
 use crate::docker;
 use crate::http::{self, Request, Response};
 use crate::security::{self, PathError};
@@ -55,6 +56,7 @@ fn capabilities(config: &Config) -> serde_json::Value {
         "hostFilesystem": true,
         "nativeMounts": true,
         "docker": config.docker_socket.exists(),
+        "deploy": config.docker_socket.exists(),
         "kubernetes": kubernetes,
         "systemd": path_exists("/run/systemd/system"),
         "autoUpdate": config.auto_update,
@@ -80,6 +82,47 @@ struct DockerProxyRequest {
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
+struct DownRequest {
+    project: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct PullRequest {
+    image: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct LogsRequest {
+    container: String,
+    #[serde(default)]
+    follow: bool,
+    tail: Option<u32>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+// cmd/tty are forwarded to the socket only on unix; unused on the dev shim.
+#[cfg_attr(not(unix), allow(dead_code))]
+struct ExecCreateRequest {
+    container: String,
+    cmd: Vec<String>,
+    #[serde(default)]
+    tty: bool,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ExecResizeRequest {
+    #[serde(rename = "execId")]
+    exec_id: String,
+    width: u32,
+    height: u32,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct MountRequest {
     id: String,
     // Selects the `-t` filesystem type in run_mount (unix only).
@@ -99,6 +142,13 @@ pub fn dispatch<R: Read>(state: &AppState, req: &Request, body: &mut R) -> Respo
         ("POST", "/v1/mounts") => mount_create(state, req, body),
         ("POST", "/v1/update") => update(state),
         ("POST", "/v1/docker") => docker_proxy(state, req, body),
+        ("POST", "/v1/deploy/up") => deploy_up(state, req, body),
+        ("POST", "/v1/deploy/down") => deploy_down(state, req, body),
+        ("POST", "/v1/deploy/pull") => deploy_pull(state, req, body),
+        ("POST", "/v1/deploy/logs") => deploy_logs(state, req, body),
+        ("POST", "/v1/deploy/build") => deploy_build(state, req, body),
+        ("POST", "/v1/deploy/exec/create") => deploy_exec_create(state, req, body),
+        ("POST", "/v1/deploy/exec/resize") => deploy_exec_resize(state, req, body),
         _ if path.starts_with("/v1/fs/") => fs_handler(state, req, body),
         ("DELETE", _) if path.starts_with("/v1/mounts/") => {
             mount_delete(state, &path["/v1/mounts/".len()..])
@@ -208,6 +258,190 @@ fn docker_proxy<R: Read>(state: &AppState, req: &Request, body: &mut R) -> Respo
         }
         Err(_) => Response::text(502, "Bad Gateway", "could not reach the docker socket"),
     }
+}
+
+/// Deploy a validated compose project on the local host, streaming `docker
+/// compose up` output. The spec is structured (never raw YAML), validated, and
+/// rendered here, so the web container can only ever request Polaris-shaped
+/// containers.
+fn deploy_up<R: Read>(state: &AppState, req: &Request, body: &mut R) -> Response {
+    let raw = match read_control_body(req, body) {
+        Ok(b) => b,
+        Err(resp) => return resp,
+    };
+    let spec: DeploySpec = match serde_json::from_slice(&raw) {
+        Ok(s) => s,
+        Err(_) => return Response::bad_request("invalid deploy spec"),
+    };
+    if let Err(msg) = deploy::validate_spec(&spec, &state.config) {
+        return Response::bad_request(&msg);
+    }
+    let yaml = deploy::render_compose(&spec, &state.config);
+    match deploy::compose_up(&state.config, &spec.project, &yaml) {
+        Ok(reader) => stream_response(reader),
+        Err(_) => Response::text(502, "Bad Gateway", "could not start docker compose"),
+    }
+}
+
+fn deploy_down<R: Read>(state: &AppState, req: &Request, body: &mut R) -> Response {
+    let raw = match read_control_body(req, body) {
+        Ok(b) => b,
+        Err(resp) => return resp,
+    };
+    let request: DownRequest = match serde_json::from_slice(&raw) {
+        Ok(r) => r,
+        Err(_) => return Response::bad_request("invalid down request"),
+    };
+    if !deploy::valid_project(&request.project) {
+        return Response::bad_request("invalid project name");
+    }
+    match deploy::compose_down(&state.config, &request.project) {
+        Ok(reader) => stream_response(reader),
+        Err(_) => Response::text(502, "Bad Gateway", "could not stop the project"),
+    }
+}
+
+fn deploy_pull<R: Read>(_state: &AppState, req: &Request, body: &mut R) -> Response {
+    let raw = match read_control_body(req, body) {
+        Ok(b) => b,
+        Err(resp) => return resp,
+    };
+    let request: PullRequest = match serde_json::from_slice(&raw) {
+        Ok(r) => r,
+        Err(_) => return Response::bad_request("invalid pull request"),
+    };
+    if !deploy::valid_image(&request.image) {
+        return Response::bad_request("invalid image reference");
+    }
+    match deploy::pull(&request.image) {
+        Ok(reader) => stream_response(reader),
+        Err(_) => Response::text(502, "Bad Gateway", "could not pull the image"),
+    }
+}
+
+fn deploy_logs<R: Read>(_state: &AppState, req: &Request, body: &mut R) -> Response {
+    let raw = match read_control_body(req, body) {
+        Ok(b) => b,
+        Err(resp) => return resp,
+    };
+    let request: LogsRequest = match serde_json::from_slice(&raw) {
+        Ok(r) => r,
+        Err(_) => return Response::bad_request("invalid logs request"),
+    };
+    if !deploy::valid_container_ref(&request.container) {
+        return Response::bad_request("invalid container reference");
+    }
+    match deploy::logs(&request.container, request.follow, request.tail) {
+        Ok(reader) => stream_response(reader),
+        Err(_) => Response::text(502, "Bad Gateway", "could not read container logs"),
+    }
+}
+
+/// Build an image from a tar context streamed as the request body. The image tag
+/// and dockerfile path travel in headers, since hostd strips query strings.
+fn deploy_build<R: Read>(state: &AppState, req: &Request, body: &mut R) -> Response {
+    let tag = req.header("x-polaris-tag").unwrap_or("");
+    let dockerfile = req.header("x-polaris-dockerfile").unwrap_or("Dockerfile");
+    if !deploy::valid_image(tag) {
+        return Response::bad_request("invalid or missing X-Polaris-Tag");
+    }
+    if dockerfile.is_empty() || dockerfile.bytes().any(|b| b < 0x20 || b == 0x7f) || dockerfile.contains("..") {
+        return Response::bad_request("invalid X-Polaris-Dockerfile");
+    }
+
+    // Stream the tar context to a private file under the deploy root, bounded.
+    let build_dir = state.config.deploy_root.join("_build");
+    if std::fs::create_dir_all(&build_dir).is_err() {
+        return Response::server_error();
+    }
+    let tar_path = build_dir.join(format!("ctx-{}.tar", std::process::id()));
+    let mut file = match std::fs::File::create(&tar_path) {
+        Ok(f) => f,
+        Err(_) => return Response::server_error(),
+    };
+    const MAX_CONTEXT: u64 = 2 * 1024 * 1024 * 1024;
+    let mut limited = body.take(req.content_length.min(MAX_CONTEXT));
+    if std::io::copy(&mut limited, &mut file).is_err() {
+        let _ = std::fs::remove_file(&tar_path);
+        return Response::server_error();
+    }
+    drop(file);
+    let reopened = match std::fs::File::open(&tar_path) {
+        Ok(f) => f,
+        Err(_) => return Response::server_error(),
+    };
+    // The tar file can be removed now; the child holds an open descriptor.
+    let _ = std::fs::remove_file(&tar_path);
+    match deploy::build(tag, dockerfile, reopened) {
+        Ok(reader) => stream_response(reader),
+        Err(_) => Response::text(502, "Bad Gateway", "could not start the build"),
+    }
+}
+
+#[cfg_attr(not(unix), allow(unused_variables))]
+fn deploy_exec_create<R: Read>(state: &AppState, req: &Request, body: &mut R) -> Response {
+    let raw = match read_control_body(req, body) {
+        Ok(b) => b,
+        Err(resp) => return resp,
+    };
+    let request: ExecCreateRequest = match serde_json::from_slice(&raw) {
+        Ok(r) => r,
+        Err(_) => return Response::bad_request("invalid exec request"),
+    };
+    if !deploy::valid_container_ref(&request.container) {
+        return Response::bad_request("invalid container reference");
+    }
+    #[cfg(unix)]
+    {
+        match deploy::exec_create(
+            &state.config.docker_socket,
+            &request.container,
+            &request.cmd,
+            request.tty,
+        ) {
+            Ok(id) => Response::json(200, "OK", &serde_json::json!({ "execId": id })),
+            Err(_) => Response::text(502, "Bad Gateway", "could not create the exec"),
+        }
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = (state, request);
+        Response::not_implemented("exec is only supported on unix hosts")
+    }
+}
+
+#[cfg_attr(not(unix), allow(unused_variables))]
+fn deploy_exec_resize<R: Read>(state: &AppState, req: &Request, body: &mut R) -> Response {
+    let raw = match read_control_body(req, body) {
+        Ok(b) => b,
+        Err(resp) => return resp,
+    };
+    let request: ExecResizeRequest = match serde_json::from_slice(&raw) {
+        Ok(r) => r,
+        Err(_) => return Response::bad_request("invalid resize request"),
+    };
+    if !deploy::valid_container_ref(&request.exec_id) {
+        return Response::bad_request("invalid exec id");
+    }
+    let width = request.width.clamp(1, 500);
+    let height = request.height.clamp(1, 300);
+    #[cfg(unix)]
+    {
+        match deploy::exec_resize(&state.config.docker_socket, &request.exec_id, width, height) {
+            Ok(()) => Response::empty(200, "OK"),
+            Err(_) => Response::text(502, "Bad Gateway", "could not resize the exec"),
+        }
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = (state, width, height);
+        Response::not_implemented("exec is only supported on unix hosts")
+    }
+}
+
+/// Wrap a streaming reader as a plain-text streamed response.
+fn stream_response(reader: Box<dyn std::io::Read + Send>) -> Response {
+    Response::stream(200, "OK", reader).with_header("Content-Type", "text/plain; charset=utf-8")
 }
 
 /// Map a path-resolution error to a safe 403/400 response.

@@ -11,7 +11,8 @@
  */
 
 import { readFile } from "node:fs/promises";
-import { request as httpRequest, type RequestOptions } from "node:http";
+import { request as httpRequest, type IncomingMessage, type RequestOptions } from "node:http";
+import { connect as netConnect, type Socket } from "node:net";
 import { loadEnv } from "@polaris/config";
 import type { HostdHealth } from "@polaris/config";
 
@@ -111,8 +112,146 @@ export class HostdClient {
         return { status: parsed.status, body: parsed.body };
     }
 
+    /**
+     * Deploy a validated compose project on the local host. The spec is
+     * structured (never raw YAML) - the daemon validates and renders it - and the
+     * response streams `docker compose up` output line by line.
+     */
+    public async deployUp(spec: unknown): Promise<IncomingMessage> {
+        return this.callStream("POST", "/v1/deploy/up", JSON.stringify(spec));
+    }
+
+    /** Tear a project down, streaming output. */
+    public async deployDown(project: string): Promise<IncomingMessage> {
+        return this.callStream("POST", "/v1/deploy/down", JSON.stringify({ project }));
+    }
+
+    /** Pull an image, streaming progress. */
+    public async deployPull(image: string): Promise<IncomingMessage> {
+        return this.callStream("POST", "/v1/deploy/pull", JSON.stringify({ image }));
+    }
+
+    /** Stream a container's logs, optionally following. */
+    public async deployLogs(options: {
+        container: string;
+        follow?: boolean;
+        tail?: number;
+    }): Promise<IncomingMessage> {
+        return this.callStream("POST", "/v1/deploy/logs", JSON.stringify(options));
+    }
+
+    /**
+     * Build an image from a tar context, streaming build output. The tag and
+     * dockerfile ride in headers because the daemon strips query strings; the
+     * body is the raw tar (its length is known, so no chunked framing).
+     */
+    public async deployBuild(tag: string, dockerfile: string, contextTar: Buffer): Promise<IncomingMessage> {
+        return this.callStream("POST", "/v1/deploy/build", contextTar, {
+            "content-type": "application/x-tar",
+            "x-polaris-tag": tag,
+            "x-polaris-dockerfile": dockerfile
+        });
+    }
+
+    /** Create an interactive exec in a container; returns the exec id. */
+    public async execCreate(spec: {
+        container: string;
+        cmd: string[];
+        tty?: boolean;
+    }): Promise<string> {
+        const response = await this.call("POST", "/v1/deploy/exec/create", JSON.stringify(spec));
+        if (response.status !== 200) {
+            throw new Error(`hostd exec create failed (${response.status}): ${response.body}`);
+        }
+        const parsed = JSON.parse(response.body) as { execId?: unknown };
+        if (typeof parsed.execId !== "string") throw new Error("hostd exec create returned no id");
+        return parsed.execId;
+    }
+
+    /** Resize an exec's TTY. */
+    public async execResize(execId: string, width: number, height: number): Promise<void> {
+        const response = await this.call(
+            "POST",
+            "/v1/deploy/exec/resize",
+            JSON.stringify({ execId, width, height })
+        );
+        if (response.status !== 200) {
+            throw new Error(`hostd exec resize failed (${response.status})`);
+        }
+    }
+
+    /**
+     * Start an interactive exec and return a raw duplex to the container's PTY.
+     * A raw socket is used (not node:http) so the client's keystrokes reach the
+     * daemon as plain bytes, never chunk-framed; the daemon's short HTTP response
+     * head is consumed here, so the returned stream is purely terminal I/O.
+     */
+    public async execStart(execId: string): Promise<Socket> {
+        const token = await this.token();
+        const socket = this.tcpUrl
+            ? netConnect(splitTcp(this.tcpUrl))
+            : netConnect({ path: this.socketPath ?? "" });
+        return new Promise<Socket>((resolve, reject) => {
+            const onError = (error: Error): void => reject(error);
+            socket.once("error", onError);
+            socket.on("connect", () => {
+                const head =
+                    `POST /v1/deploy/exec/start/${encodeURIComponent(execId)} HTTP/1.1\r\n` +
+                    "Host: hostd\r\n" +
+                    `Authorization: Bearer ${token}\r\n` +
+                    "Connection: Upgrade\r\n" +
+                    "Upgrade: tcp\r\n\r\n";
+                socket.write(head);
+            });
+            // Consume the daemon's response head; unshift the rest as raw output.
+            let buffer = Buffer.alloc(0);
+            const onData = (chunk: Buffer): void => {
+                buffer = Buffer.concat([buffer, chunk]);
+                const end = buffer.indexOf("\r\n\r\n");
+                if (end === -1) {
+                    if (buffer.length > 16 * 1024) {
+                        socket.destroy();
+                        reject(new Error("hostd exec start header too large"));
+                    }
+                    return;
+                }
+                socket.off("data", onData);
+                socket.off("error", onError);
+                const rest = buffer.subarray(end + 4);
+                if (rest.length > 0) socket.unshift(rest);
+                resolve(socket);
+            };
+            socket.on("data", onData);
+        });
+    }
+
     private async token(): Promise<string> {
         return (await readFile(this.tokenFile, "utf8")).trim();
+    }
+
+    /** Perform a request and resolve with the live response stream (unbuffered),
+     *  for endpoints that stream output. The caller consumes/closes the stream. */
+    private async callStream(
+        method: string,
+        path: string,
+        body?: Buffer | string,
+        extraHeaders?: Record<string, string>
+    ): Promise<IncomingMessage> {
+        const token = await this.token();
+        const headers: Record<string, string> = { authorization: `Bearer ${token}`, ...extraHeaders };
+        if (body !== undefined) {
+            if (!headers["content-type"]) headers["content-type"] = "application/json";
+            headers["content-length"] = String(Buffer.byteLength(body));
+        }
+        const options: RequestOptions = this.tcpUrl
+            ? { ...splitTcp(this.tcpUrl), path, method, headers }
+            : { socketPath: this.socketPath, path, method, headers };
+        return new Promise<IncomingMessage>((resolve, reject) => {
+            const req = httpRequest(options, (res) => resolve(res));
+            req.on("error", reject);
+            if (body !== undefined) req.write(body);
+            req.end();
+        });
     }
 
     private async call(method: string, path: string, body?: string): Promise<RawResponse> {

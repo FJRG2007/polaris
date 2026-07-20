@@ -62,6 +62,7 @@ pub fn validate<'a>(method: &'a str, path: &'a str) -> Result<AllowedRequest<'a>
         ("GET", ["info"]) => true,
         ("GET", ["version"]) => true,
         ("GET", ["containers", "json"]) => true,
+        ("GET", ["containers", id, "json"]) => valid_container_id(id),
         ("GET", ["containers", id, "stats"]) => valid_container_id(id),
         ("POST", ["containers", id, "start"]) => valid_container_id(id),
         ("POST", ["containers", id, "stop"]) => valid_container_id(id),
@@ -94,6 +95,21 @@ fn valid_container_id(id: &str) -> bool {
 /// so the body is read to EOF. Unix-only: the socket is a Unix domain socket.
 #[cfg(unix)]
 pub fn forward(socket: &Path, request: &AllowedRequest) -> io::Result<(u16, Vec<u8>)> {
+    // No request body is ever forwarded: the allowlisted endpoints take none.
+    socket_request(socket, request.method, request.path, None)
+}
+
+/// Perform one buffered HTTP round-trip against the Docker Unix socket, with an
+/// optional JSON body, and return the parsed status and decoded body. Shared by
+/// the allowlisted proxy and the deploy exec-create/resize calls, which are the
+/// only callers that talk to the socket directly. Unix-only.
+#[cfg(unix)]
+pub(crate) fn socket_request(
+    socket: &Path,
+    method: &str,
+    path: &str,
+    body: Option<&str>,
+) -> io::Result<(u16, Vec<u8>)> {
     use std::io::{Read, Write};
     use std::os::unix::net::UnixStream;
 
@@ -101,12 +117,16 @@ pub fn forward(socket: &Path, request: &AllowedRequest) -> io::Result<(u16, Vec<
     stream.set_read_timeout(Some(DOCKER_TIMEOUT))?;
     stream.set_write_timeout(Some(DOCKER_TIMEOUT))?;
 
-    // No request body is ever forwarded: the allowlisted endpoints take none.
-    let head = format!(
-        "{} {} HTTP/1.1\r\nHost: docker\r\nConnection: close\r\nAccept: application/json\r\n\r\n",
-        request.method, request.path
-    );
+    let mut head = format!("{method} {path} HTTP/1.1\r\nHost: docker\r\nConnection: close\r\nAccept: application/json\r\n");
+    if let Some(payload) = body {
+        head.push_str("Content-Type: application/json\r\n");
+        head.push_str(&format!("Content-Length: {}\r\n", payload.len()));
+    }
+    head.push_str("\r\n");
     stream.write_all(head.as_bytes())?;
+    if let Some(payload) = body {
+        stream.write_all(payload.as_bytes())?;
+    }
     stream.flush()?;
 
     let mut raw = Vec::new();
@@ -206,6 +226,7 @@ mod tests {
         assert!(validate("GET", "/info").is_ok());
         assert!(validate("GET", "/version").is_ok());
         assert!(validate("GET", "/containers/json?all=1").is_ok());
+        assert!(validate("GET", "/containers/abc123/json").is_ok());
         assert!(validate("GET", "/containers/abc123/stats?stream=false").is_ok());
         assert!(validate("POST", "/containers/abc123/start").is_ok());
         assert!(validate("POST", "/containers/web.1/stop").is_ok());

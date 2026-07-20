@@ -11,6 +11,7 @@ use std::net::TcpListener;
 use std::sync::Arc;
 use std::thread;
 
+use crate::deploy;
 use crate::handlers::{self, AppState};
 use crate::http::{self, Response};
 use crate::security::constant_time_eq;
@@ -119,7 +120,7 @@ fn serve_unix(socket: &std::path::Path, state: Arc<AppState>) -> io::Result<()> 
 /// Serve one request on an accepted connection: parse, authenticate, dispatch,
 /// and write the response. Generic over the concrete stream type so the unix
 /// and TCP paths share it.
-fn handle<R: Read, W: Write>(mut reader: BufReader<R>, mut writer: W, state: &AppState) {
+fn handle<R: Read + Send + 'static, W: Write>(mut reader: BufReader<R>, mut writer: W, state: &AppState) {
     let request = match http::read_request(&mut reader) {
         Ok(Some(r)) => r,
         Ok(None) => return, // client closed without sending
@@ -140,9 +141,78 @@ fn handle<R: Read, W: Write>(mut reader: BufReader<R>, mut writer: W, state: &Ap
         return;
     }
 
+    // The interactive exec endpoint hijacks the connection into a raw
+    // bidirectional stream, so it cannot go through the buffered
+    // request/response path; handle it before the normal dispatch.
+    const EXEC_START: &str = "/v1/deploy/exec/start/";
+    if request.method == "POST" && request.path.starts_with(EXEC_START) {
+        let exec_id = request.path[EXEC_START.len()..].to_string();
+        exec_start(state, &exec_id, reader, writer);
+        return;
+    }
+
     // Bound the body reader to the declared Content-Length so a handler never
     // blocks waiting for a client that keeps its write side open.
     let mut body = reader.by_ref().take(request.content_length);
     let response = handlers::dispatch(state, &request, &mut body);
     let _ = response.write_to(&mut writer);
+}
+
+/// Start an interactive exec and shuttle bytes between the web client and the
+/// container's PTY. The request body carries the client's keystrokes; the
+/// response body is the container's terminal output. After a short raw HTTP head
+/// the connection becomes an opaque byte pipe in both directions.
+#[cfg_attr(not(unix), allow(unused_mut, unused_variables))]
+fn exec_start<R: Read + Send + 'static, W: Write>(
+    state: &AppState,
+    exec_id: &str,
+    mut reader: BufReader<R>,
+    mut writer: W,
+) {
+    if !deploy::valid_container_ref(exec_id) {
+        let _ = Response::bad_request("invalid exec id").write_to(&mut writer);
+        return;
+    }
+
+    #[cfg(unix)]
+    {
+        let docker = match deploy::connect_exec_start(&state.config.docker_socket, exec_id, true) {
+            Ok(s) => s,
+            Err(_) => {
+                let _ = Response::text(502, "Bad Gateway", "could not start exec")
+                    .write_to(&mut writer);
+                return;
+            }
+        };
+        // Signal the switch to a raw stream; the client stops parsing HTTP here.
+        if writer
+            .write_all(
+                b"HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Type: application/octet-stream\r\n\r\n",
+            )
+            .is_err()
+        {
+            return;
+        }
+        let _ = writer.flush();
+
+        let mut docker_read = match docker.try_clone() {
+            Ok(s) => s,
+            Err(_) => return,
+        };
+        let mut docker_write = docker;
+        // Client keystrokes -> container stdin, on its own thread.
+        let pump = thread::spawn(move || {
+            let _ = io::copy(&mut reader, &mut docker_write);
+            let _ = docker_write.shutdown(std::net::Shutdown::Write);
+        });
+        // Container output -> client, on this thread until the pty closes.
+        let _ = io::copy(&mut docker_read, &mut writer);
+        let _ = pump.join();
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = (state, reader);
+        let _ = Response::not_implemented("exec is only supported on unix hosts")
+            .write_to(&mut writer);
+    }
 }

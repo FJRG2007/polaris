@@ -150,11 +150,15 @@ pub fn parse_range(value: &str) -> Option<ByteRange> {
     Some(ByteRange { start, end })
 }
 
-/// Response body: either an in-memory buffer or a file already seeked to the
-/// start offset, of which exactly `len` bytes are sent.
+/// Response body: an in-memory buffer, a file seeked to the start offset (of
+/// which exactly `len` bytes are sent), or an open-ended reader streamed to the
+/// client until EOF. A `Stream` body has no known length, so it is framed by
+/// connection close (no `Content-Length`) - used for live build/deploy/log output
+/// whose size is not known up front.
 pub enum Body {
     Bytes(Vec<u8>),
     File { file: File, len: u64 },
+    Stream(Box<dyn Read + Send>),
 }
 
 pub struct Response {
@@ -199,6 +203,12 @@ impl Response {
         Self::new(status, reason, Body::File { file, len })
     }
 
+    /// A response whose body is streamed from `reader` until EOF, framed by
+    /// connection close. The client reads to the end of the connection.
+    pub fn stream(status: u16, reason: &'static str, reader: Box<dyn Read + Send>) -> Self {
+        Self::new(status, reason, Body::Stream(reader))
+    }
+
     // Common error shapes with safe, generic messages.
     pub fn bad_request(msg: &str) -> Self {
         Response::text(400, "Bad Request", msg)
@@ -220,14 +230,19 @@ impl Response {
         Response::text(500, "Internal Server Error", "internal error")
     }
 
-    /// Write the full response to `w`, streaming a file body in chunks.
+    /// Write the full response to `w`, streaming a file or open-ended body in
+    /// chunks. A `Stream` body omits `Content-Length` (its size is unknown) and
+    /// relies on `Connection: close` to frame the end.
     pub fn write_to<W: Write>(mut self, w: &mut W) -> io::Result<()> {
         let content_length = match &self.body {
-            Body::Bytes(b) => b.len() as u64,
-            Body::File { len, .. } => *len,
+            Body::Bytes(b) => Some(b.len() as u64),
+            Body::File { len, .. } => Some(*len),
+            Body::Stream(_) => None,
         };
         let mut head = format!("HTTP/1.1 {} {}\r\n", self.status, self.reason);
-        head.push_str(&format!("Content-Length: {content_length}\r\n"));
+        if let Some(len) = content_length {
+            head.push_str(&format!("Content-Length: {len}\r\n"));
+        }
         head.push_str("Connection: close\r\n");
         for (k, v) in &self.headers {
             head.push_str(&format!("{k}: {v}\r\n"));
@@ -248,6 +263,19 @@ impl Response {
                     }
                     w.write_all(&buf[..n])?;
                     remaining -= n as u64;
+                }
+            }
+            Body::Stream(reader) => {
+                let mut buf = [0u8; 64 * 1024];
+                loop {
+                    let n = reader.read(&mut buf)?;
+                    if n == 0 {
+                        break;
+                    }
+                    w.write_all(&buf[..n])?;
+                    // Flush each chunk so the client sees output as it is produced
+                    // (live build/deploy logs), not only at the end.
+                    w.flush()?;
                 }
             }
         }
