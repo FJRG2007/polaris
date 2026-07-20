@@ -11,11 +11,11 @@
 import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import {
+    ArrowLeft,
     Boxes,
-    Container,
+    ChevronRight,
     Database,
     FolderOpen,
-    GitBranch,
     Globe,
     Loader2,
     Plus,
@@ -36,6 +36,7 @@ import {
     Select,
     type SelectOption
 } from "@polaris/ui";
+import { DockerMark, GitHubMark } from "@/components/brand-icons";
 import { TerminalPanel } from "./terminal-panel";
 import { FilesPanel } from "./files-panel";
 import {
@@ -49,19 +50,6 @@ import {
 } from "./actions";
 
 const DB_ENGINES = ["postgres", "mysql", "mariadb", "mongo", "redis"] as const;
-
-const SOURCE_OPTIONS: SelectOption[] = [
-    {
-        value: "image",
-        label: "Docker image",
-        icon: <Container className="size-4 text-muted-foreground" />
-    },
-    {
-        value: "dockerfile",
-        label: "Git + Dockerfile",
-        icon: <GitBranch className="size-4 text-muted-foreground" />
-    }
-];
 
 const ENGINE_OPTIONS: SelectOption[] = DB_ENGINES.map((engine) => ({
     value: engine,
@@ -108,12 +96,9 @@ export function DeployView({
             {!localReady && canManage && (
                 <Card className="border-warning/30 bg-warning/5">
                     <CardBody className="text-sm text-muted-foreground">
-                        The local host is not ready to build and deploy. This needs the full edition
-                        with a running{" "}
-                        <code className="rounded bg-muted px-1 py-0.5 text-xs text-foreground">
-                            polaris-hostd
-                        </code>
-                        . Remote servers added in the Servers view work regardless.
+                        The local host is not ready to build and deploy. This needs the full edition with a running{" "}
+                        <code className="rounded bg-muted px-1 py-0.5 text-xs text-foreground">polaris-hostd</code>.
+                        Remote servers added in the Servers view work regardless.
                     </CardBody>
                 </Card>
             )}
@@ -137,12 +122,7 @@ export function DeployView({
                 />
             ) : (
                 projects.map((project) => (
-                    <ProjectCard
-                        key={project.id}
-                        project={project}
-                        canManage={canManage}
-                        onChanged={refresh}
-                    />
+                    <ProjectCard key={project.id} project={project} canManage={canManage} onChanged={refresh} />
                 ))
             )}
         </div>
@@ -228,9 +208,7 @@ function ProjectCard({
                 {canManage &&
                     (confirmDelete ? (
                         <div className="flex items-center gap-2">
-                            <span className="text-xs text-muted-foreground">
-                                Delete project and everything in it?
-                            </span>
+                            <span className="text-xs text-muted-foreground">Delete project and everything in it?</span>
                             <Button
                                 variant="danger"
                                 size="sm"
@@ -245,21 +223,12 @@ function ProjectCard({
                             >
                                 {pending && <Loader2 className="size-4 animate-spin" />} Confirm
                             </Button>
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => setConfirmDelete(false)}
-                            >
+                            <Button variant="ghost" size="sm" onClick={() => setConfirmDelete(false)}>
                                 Cancel
                             </Button>
                         </div>
                     ) : (
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => setConfirmDelete(true)}
-                            title="Delete project"
-                        >
+                        <Button variant="ghost" size="icon" onClick={() => setConfirmDelete(true)} title="Delete project">
                             <Trash2 className="size-4" />
                         </Button>
                     ))}
@@ -295,9 +264,7 @@ function EnvironmentSection({
                 <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                     {environment.name}
                 </span>
-                {canManage && (
-                    <NewServiceButton environmentId={environment.id} onChanged={onChanged} />
-                )}
+                {canManage && <NewServiceButton environmentId={environment.id} onChanged={onChanged} />}
             </div>
 
             {isEmpty ? (
@@ -307,20 +274,10 @@ function EnvironmentSection({
             ) : (
                 <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                     {environment.applications.map((app) => (
-                        <AppCard
-                            key={app.id}
-                            app={app}
-                            canManage={canManage}
-                            onChanged={onChanged}
-                        />
+                        <AppCard key={app.id} app={app} canManage={canManage} onChanged={onChanged} />
                     ))}
                     {environment.databases.map((database) => (
-                        <DatabaseCard
-                            key={database.id}
-                            database={database}
-                            canManage={canManage}
-                            onChanged={onChanged}
-                        />
+                        <DatabaseCard key={database.id} database={database} canManage={canManage} onChanged={onChanged} />
                     ))}
                 </div>
             )}
@@ -328,15 +285,7 @@ function EnvironmentSection({
     );
 }
 
-function AppCard({
-    app,
-    canManage,
-    onChanged
-}: {
-    app: ProjectApp;
-    canManage: boolean;
-    onChanged: () => void;
-}) {
+function AppCard({ app, canManage, onChanged }: { app: ProjectApp; canManage: boolean; onChanged: () => void }) {
     const [busy, startTransition] = useTransition();
     const [showTerminal, setShowTerminal] = useState(false);
     const [showFiles, setShowFiles] = useState(false);
@@ -392,42 +341,16 @@ function AppCard({
 
             {canManage && (
                 <div className="mt-auto flex items-center gap-1 border-t border-border/60 pt-3">
-                    <Button
-                        size="sm"
-                        variant="secondary"
-                        onClick={onDeploy}
-                        disabled={busy}
-                        className="mr-auto"
-                    >
-                        {busy ? (
-                            <Loader2 className="size-4 animate-spin" />
-                        ) : (
-                            <Rocket className="size-4" />
-                        )}{" "}
-                        Deploy
+                    <Button size="sm" variant="secondary" onClick={onDeploy} disabled={busy} className="mr-auto">
+                        {busy ? <Loader2 className="size-4 animate-spin" /> : <Rocket className="size-4" />} Deploy
                     </Button>
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setShowFiles(true)}
-                        title="Files"
-                    >
+                    <Button variant="ghost" size="icon" onClick={() => setShowFiles(true)} title="Files">
                         <FolderOpen className="size-4" />
                     </Button>
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setShowTerminal(true)}
-                        title="Terminal"
-                    >
+                    <Button variant="ghost" size="icon" onClick={() => setShowTerminal(true)} title="Terminal">
                         <TerminalSquare className="size-4" />
                     </Button>
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setShowDomain(true)}
-                        title="Domains"
-                    >
+                    <Button variant="ghost" size="icon" onClick={() => setShowDomain(true)} title="Domains">
                         <Globe className="size-4" />
                     </Button>
                 </div>
@@ -439,11 +362,7 @@ function AppCard({
                         <DialogTitle>Terminal - {app.name}</DialogTitle>
                     </DialogHeader>
                     {showTerminal && (
-                        <TerminalPanel
-                            targetId={app.targetId}
-                            containerRef={app.containerRef}
-                            label={app.containerRef}
-                        />
+                        <TerminalPanel targetId={app.targetId} containerRef={app.containerRef} label={app.containerRef} />
                     )}
                 </DialogContent>
             </Dialog>
@@ -457,12 +376,7 @@ function AppCard({
                 </DialogContent>
             </Dialog>
 
-            <DomainDialog
-                app={app}
-                open={showDomain}
-                onOpenChange={setShowDomain}
-                onChanged={onChanged}
-            />
+            <DomainDialog app={app} open={showDomain} onOpenChange={setShowDomain} onChanged={onChanged} />
 
             <Dialog open={logsFor !== null} onOpenChange={(open) => !open && setLogsFor(null)}>
                 <DialogContent className="max-w-3xl">
@@ -514,12 +428,7 @@ function DatabaseCard({
                             })
                         }
                     >
-                        {pending ? (
-                            <Loader2 className="size-4 animate-spin" />
-                        ) : (
-                            <Rocket className="size-4" />
-                        )}{" "}
-                        Provision
+                        {pending ? <Loader2 className="size-4 animate-spin" /> : <Rocket className="size-4" />} Provision
                     </Button>
                 </div>
             )}
@@ -527,71 +436,109 @@ function DatabaseCard({
     );
 }
 
-function NewServiceButton({
-    environmentId,
-    onChanged
-}: {
-    environmentId: string;
-    onChanged: () => void;
-}) {
+const SERVICE_TYPES = [
+    { id: "github", label: "GitHub Repository", icon: <GitHubMark className="size-5" /> },
+    { id: "docker", label: "Docker Image", icon: <DockerMark className="size-5" /> },
+    { id: "database", label: "Database", icon: <Database className="size-5" /> }
+] as const;
+
+type ServiceView = "list" | "github" | "docker" | "database";
+
+const SERVICE_TITLES: Record<Exclude<ServiceView, "list">, string> = {
+    github: "GitHub Repository",
+    docker: "Docker Image",
+    database: "Database"
+};
+
+function NewServiceButton({ environmentId, onChanged }: { environmentId: string; onChanged: () => void }) {
     const [open, setOpen] = useState(false);
-    const [kind, setKind] = useState<"app" | "database">("app");
+    const [view, setView] = useState<ServiceView>("list");
+
+    function done() {
+        setOpen(false);
+        onChanged();
+    }
 
     return (
         <>
-            <Button variant="outline" size="sm" onClick={() => setOpen(true)}>
+            <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                    setView("list");
+                    setOpen(true);
+                }}
+            >
                 <Plus className="size-4" /> New service
             </Button>
             <Dialog open={open} onOpenChange={setOpen}>
                 <DialogContent className="max-w-md">
                     <DialogHeader>
-                        <DialogTitle>New service</DialogTitle>
+                        <DialogTitle className="flex items-center gap-2">
+                            {view !== "list" && (
+                                <button
+                                    type="button"
+                                    onClick={() => setView("list")}
+                                    className="-ml-1 rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                    aria-label="Back"
+                                >
+                                    <ArrowLeft className="size-4" />
+                                </button>
+                            )}
+                            {view === "list" ? "New service" : SERVICE_TITLES[view]}
+                        </DialogTitle>
                     </DialogHeader>
-                    <div className="flex flex-col gap-4">
-                        <div className="grid grid-cols-2 gap-1 rounded-md bg-muted p-1">
-                            <SegmentButton active={kind === "app"} onClick={() => setKind("app")}>
-                                <Rocket className="size-4" /> Application
-                            </SegmentButton>
-                            <SegmentButton
-                                active={kind === "database"}
-                                onClick={() => setKind("database")}
-                            >
-                                <Database className="size-4" /> Database
-                            </SegmentButton>
-                        </div>
-                        {kind === "app" ? (
-                            <NewAppForm
-                                environmentId={environmentId}
-                                onDone={() => {
-                                    setOpen(false);
-                                    onChanged();
-                                }}
-                            />
-                        ) : (
-                            <NewDatabaseForm
-                                environmentId={environmentId}
-                                onDone={() => {
-                                    setOpen(false);
-                                    onChanged();
-                                }}
-                            />
-                        )}
-                    </div>
+                    {view === "list" ? (
+                        <ServiceTypeList onPick={setView} />
+                    ) : view === "database" ? (
+                        <NewDatabaseForm environmentId={environmentId} onDone={done} />
+                    ) : (
+                        <NewAppForm environmentId={environmentId} mode={view} onDone={done} />
+                    )}
                 </DialogContent>
             </Dialog>
         </>
     );
 }
 
-function NewAppForm({ environmentId, onDone }: { environmentId: string; onDone: () => void }) {
+function ServiceTypeList({ onPick }: { onPick: (view: Exclude<ServiceView, "list">) => void }) {
+    return (
+        <div className="flex flex-col gap-1">
+            {SERVICE_TYPES.map((type) => (
+                <button
+                    key={type.id}
+                    type="button"
+                    onClick={() => onPick(type.id)}
+                    className="group flex items-center gap-4 rounded-lg px-3 py-3 text-left text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                >
+                    <span className="flex size-5 shrink-0 items-center justify-center">{type.icon}</span>
+                    <span className="flex-1 text-sm font-medium">{type.label}</span>
+                    <ChevronRight className="size-4 shrink-0 opacity-0 transition-opacity group-hover:opacity-100" />
+                </button>
+            ))}
+        </div>
+    );
+}
+
+function NewAppForm({
+    environmentId,
+    mode,
+    onDone
+}: {
+    environmentId: string;
+    mode: "github" | "docker";
+    onDone: () => void;
+}) {
+    const isGit = mode === "github";
     const [name, setName] = useState("");
-    const [srcType, setSrcType] = useState<"image" | "dockerfile">("image");
     const [image, setImage] = useState("");
     const [repoUrl, setRepoUrl] = useState("");
+    const [branch, setBranch] = useState("");
+    const [dockerfilePath, setDockerfilePath] = useState("");
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
 
-    const canSubmit = name.trim() && (srcType === "image" ? image.trim() : repoUrl.trim());
+    const canSubmit = name.trim() && (isGit ? repoUrl.trim() : image.trim());
 
     function submit() {
         setError(null);
@@ -599,9 +546,11 @@ function NewAppForm({ environmentId, onDone }: { environmentId: string; onDone: 
             const result = await createApplicationAction({
                 environmentId,
                 name,
-                sourceType: srcType,
+                sourceType: isGit ? "dockerfile" : "image",
                 imageRef: image,
-                repoUrl
+                repoUrl,
+                branch: branch.trim() || undefined,
+                dockerfilePath: dockerfilePath.trim() || undefined
             });
             if (result.error) setError(result.error);
             else onDone();
@@ -611,41 +560,43 @@ function NewAppForm({ environmentId, onDone }: { environmentId: string; onDone: 
     return (
         <div className="flex flex-col gap-3">
             <Field label="Name">
-                <Input
-                    value={name}
-                    onChange={(event) => setName(event.target.value)}
-                    placeholder="my-app"
-                    autoFocus
-                />
+                <Input value={name} onChange={(event) => setName(event.target.value)} placeholder="my-app" autoFocus />
             </Field>
-            <Field label="Source">
-                <Select
-                    value={srcType}
-                    onValueChange={(value) => setSrcType(value as "image" | "dockerfile")}
-                    options={SOURCE_OPTIONS}
-                />
-            </Field>
-            {srcType === "image" ? (
-                <Field label="Image">
+            {isGit ? (
+                <>
+                    <Field label="Repository URL" hint="Public http(s) repository.">
+                        <Input
+                            value={repoUrl}
+                            onChange={(event) => setRepoUrl(event.target.value)}
+                            placeholder="https://github.com/user/repo"
+                        />
+                    </Field>
+                    <div className="grid grid-cols-2 gap-3">
+                        <Field label="Branch">
+                            <Input value={branch} onChange={(event) => setBranch(event.target.value)} placeholder="main" />
+                        </Field>
+                        <Field label="Dockerfile">
+                            <Input
+                                value={dockerfilePath}
+                                onChange={(event) => setDockerfilePath(event.target.value)}
+                                placeholder="Dockerfile"
+                            />
+                        </Field>
+                    </div>
+                </>
+            ) : (
+                <Field label="Image" hint="Docker Hub, GHCR, Quay, GitLab or MCR. e.g. ghcr.io/user/repo:latest">
                     <Input
                         value={image}
                         onChange={(event) => setImage(event.target.value)}
-                        placeholder="nginx:latest"
-                    />
-                </Field>
-            ) : (
-                <Field label="Repository">
-                    <Input
-                        value={repoUrl}
-                        onChange={(event) => setRepoUrl(event.target.value)}
-                        placeholder="https://github.com/user/repo"
+                        placeholder="ghcr.io/user/repo:latest"
                     />
                 </Field>
             )}
             {error && <p className="text-sm text-danger">{error}</p>}
             <div className="flex justify-end">
                 <Button onClick={submit} disabled={pending || !canSubmit}>
-                    {pending && <Loader2 className="size-4 animate-spin" />} Add application
+                    {pending && <Loader2 className="size-4 animate-spin" />} {isGit ? "Deploy repository" : "Deploy image"}
                 </Button>
             </div>
         </div>
@@ -670,12 +621,7 @@ function NewDatabaseForm({ environmentId, onDone }: { environmentId: string; onD
     return (
         <div className="flex flex-col gap-3">
             <Field label="Name">
-                <Input
-                    value={name}
-                    onChange={(event) => setName(event.target.value)}
-                    placeholder="my-db"
-                    autoFocus
-                />
+                <Input value={name} onChange={(event) => setName(event.target.value)} placeholder="my-db" autoFocus />
             </Field>
             <Field label="Engine">
                 <Select
@@ -757,12 +703,7 @@ function DomainDialog({
                         />
                     </Field>
                     <Field label="Target port">
-                        <Input
-                            value={port}
-                            onChange={(event) => setPort(event.target.value)}
-                            placeholder="80"
-                            className="w-28"
-                        />
+                        <Input value={port} onChange={(event) => setPort(event.target.value)} placeholder="80" className="w-28" />
                     </Field>
                     {error && <p className="text-sm text-danger">{error}</p>}
                     <div className="flex justify-end">
@@ -786,37 +727,7 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
     );
 }
 
-function SegmentButton({
-    active,
-    onClick,
-    children
-}: {
-    active: boolean;
-    onClick: () => void;
-    children: ReactNode;
-}) {
-    return (
-        <button
-            type="button"
-            onClick={onClick}
-            className={`flex items-center justify-center gap-2 rounded px-3 py-1.5 text-sm font-medium transition-colors ${
-                active
-                    ? "bg-surface text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-            }`}
-        >
-            {children}
-        </button>
-    );
-}
-
-function StatusPill({
-    tone,
-    label
-}: {
-    tone: "success" | "warning" | "danger" | "idle";
-    label: string;
-}) {
+function StatusPill({ tone, label }: { tone: "success" | "warning" | "danger" | "idle"; label: string }) {
     const dot = {
         success: "bg-success",
         warning: "bg-warning",
@@ -835,26 +746,15 @@ function dbTone(status: string): "success" | "warning" | "danger" | "idle" {
     const value = status.toLowerCase();
     if (["running", "active", "healthy", "ready"].includes(value)) return "success";
     if (["failed", "error", "stopped"].includes(value)) return "danger";
-    if (["queued", "provisioning", "deploying", "pending", "building"].includes(value))
-        return "warning";
+    if (["queued", "provisioning", "deploying", "pending", "building"].includes(value)) return "warning";
     return "idle";
 }
 
-function EmptyState({
-    icon,
-    title,
-    description
-}: {
-    icon: ReactNode;
-    title: string;
-    description: string;
-}) {
+function EmptyState({ icon, title, description }: { icon: ReactNode; title: string; description: string }) {
     return (
         <Card>
             <CardBody className="flex flex-col items-center gap-2 py-12 text-center">
-                <div className="flex size-12 items-center justify-center rounded-full bg-muted">
-                    {icon}
-                </div>
+                <div className="flex size-12 items-center justify-center rounded-full bg-muted">{icon}</div>
                 <h3 className="text-sm font-medium">{title}</h3>
                 <p className="max-w-sm text-sm text-muted-foreground">{description}</p>
             </CardBody>
@@ -872,9 +772,7 @@ function DeploymentLogs({ deploymentId, onDone }: { deploymentId: string; onDone
         let timer: ReturnType<typeof setTimeout>;
 
         async function poll(): Promise<void> {
-            const res = await fetch(`/api/deploy/deployments/${deploymentId}/log`, {
-                cache: "no-store"
-            });
+            const res = await fetch(`/api/deploy/deployments/${deploymentId}/log`, { cache: "no-store" });
             if (!active) return;
             if (res.ok) {
                 const data = (await res.json()) as { status: string; log: string };
@@ -919,23 +817,13 @@ function MetricsBadge({ applicationId }: { applicationId: string }) {
         let active = true;
         void fetch(`/api/deploy/apps/${applicationId}/metrics`, { cache: "no-store" })
             .then((res) => (res.ok ? res.json() : null))
-            .then(
-                (
-                    data: {
-                        state?: string;
-                        cpuPercent?: number | null;
-                        memPercent?: number | null;
-                    } | null
-                ) => {
-                    if (!active || !data?.state) return;
-                    const parts = [data.state];
-                    if (typeof data.cpuPercent === "number")
-                        parts.push(`${data.cpuPercent.toFixed(0)}% cpu`);
-                    if (typeof data.memPercent === "number")
-                        parts.push(`${data.memPercent.toFixed(0)}% mem`);
-                    setText(parts.join(" · "));
-                }
-            )
+            .then((data: { state?: string; cpuPercent?: number | null; memPercent?: number | null } | null) => {
+                if (!active || !data?.state) return;
+                const parts = [data.state];
+                if (typeof data.cpuPercent === "number") parts.push(`${data.cpuPercent.toFixed(0)}% cpu`);
+                if (typeof data.memPercent === "number") parts.push(`${data.memPercent.toFixed(0)}% mem`);
+                setText(parts.join(" · "));
+            })
             .catch(() => undefined);
         return () => {
             active = false;
