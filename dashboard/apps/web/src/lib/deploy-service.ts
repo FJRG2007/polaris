@@ -15,6 +15,7 @@ import { serviceName, shortHash, slugify, type AppDeployPlan, type DeployResult,
 import { decryptSecret } from "@polaris/storage";
 import { getDriver, getPorts, toTargetInfo, type TargetRow } from "./deploy/runtime";
 import { autoSubdomainUrl } from "./domain-service";
+import { gitBuildContext, type GitSource } from "./git-build-service";
 
 /** Directory the web process writes deploy log files to (tailed by the UI). */
 function logDir(): string {
@@ -157,7 +158,10 @@ export async function removeApplicationDomain(domainId: string, ownerId: string)
 // --- deployment pipeline ----------------------------------------------------
 
 /** Build the runtime plan for an application from its stored config. */
-async function buildAppPlan(applicationId: string, ownerId: string): Promise<{ plan: AppDeployPlan; target: TargetRow }> {
+async function buildAppPlan(
+    applicationId: string,
+    ownerId: string
+): Promise<{ plan: AppDeployPlan; target: TargetRow; gitSource?: GitSource }> {
     const app = await prisma.application.findFirst({
         where: { id: applicationId, environment: { project: { ownerId } } },
         include: { environment: { include: { project: true } }, target: true, volumes: true, domains: true }
@@ -195,7 +199,11 @@ async function buildAppPlan(applicationId: string, ownerId: string): Promise<{ p
         })),
         healthcheck
     };
-    return { plan, target: app.target };
+    const gitSource =
+        typeof source.repoUrl === "string" && source.repoUrl
+            ? { repoUrl: source.repoUrl, branch: typeof source.branch === "string" ? source.branch : undefined }
+            : undefined;
+    return { plan, target: app.target, gitSource };
 }
 
 /** Merge environment-scoped and application-scoped env vars (app wins), decrypting
@@ -236,7 +244,7 @@ async function mergedEnv(environmentId: string, applicationId: string): Promise<
  * output to the deployment's log file and updates the row's status.
  */
 export async function deployApplication(applicationId: string, ownerId: string, userId: string): Promise<string> {
-    const { plan, target } = await buildAppPlan(applicationId, ownerId);
+    const { plan, target, gitSource } = await buildAppPlan(applicationId, ownerId);
     const deployment = await prisma.deployment.create({
         data: {
             targetId: target.id,
@@ -247,12 +255,18 @@ export async function deployApplication(applicationId: string, ownerId: string, 
         }
     });
     await prisma.application.update({ where: { id: applicationId }, data: { currentDeploymentId: deployment.id } });
-    queue.enqueue(target.id, () => runDeployment(deployment.id, plan, target, ownerId));
+    queue.enqueue(target.id, () => runDeployment(deployment.id, plan, target, ownerId, gitSource));
     return deployment.id;
 }
 
-function runDeployment(deploymentId: string, plan: AppDeployPlan, target: TargetRow, ownerId: string): Promise<void> {
-    return executeDeployment(deploymentId, target, ownerId, (ctx, driver) => driver.deployApplication(plan, ctx));
+function runDeployment(
+    deploymentId: string,
+    plan: AppDeployPlan,
+    target: TargetRow,
+    ownerId: string,
+    gitSource?: GitSource
+): Promise<void> {
+    return executeDeployment(deploymentId, target, ownerId, (ctx, driver) => driver.deployApplication(plan, ctx), gitSource);
 }
 
 /**
@@ -265,7 +279,8 @@ export async function executeDeployment(
     deploymentId: string,
     target: TargetRow,
     ownerId: string,
-    run: (ctx: RuntimeContext, driver: RuntimeDriver) => Promise<DeployResult>
+    run: (ctx: RuntimeContext, driver: RuntimeDriver) => Promise<DeployResult>,
+    buildSource?: GitSource
 ): Promise<void> {
     await mkdir(logDir(), { recursive: true });
     const logStream = createWriteStream(deployLogPath(deploymentId), { flags: "a" });
@@ -280,8 +295,9 @@ export async function executeDeployment(
 
     const ports = await getPorts(target, ownerId);
     const driver = getDriver(target);
+    const buildContext = buildSource ? gitBuildContext(buildSource, log) : undefined;
     try {
-        const result = await run({ ports, target: toTargetInfo(target), log }, driver);
+        const result = await run({ ports, target: toTargetInfo(target), log, buildContext }, driver);
         await prisma.deployment.update({
             where: { id: deploymentId },
             data: {

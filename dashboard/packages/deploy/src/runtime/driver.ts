@@ -26,6 +26,10 @@ export interface RuntimeContext {
     readonly target: DeployTargetInfo;
     /** Append a line to the deployment's streamed log. */
     readonly log: OutputSink;
+    /** Produce the build context (a tar stream) for a build-from-source deploy.
+     *  Injected by the pipeline (which clones the repo), so the runtime and this
+     *  package stay free of git/filesystem concerns. Absent for image sources. */
+    readonly buildContext?: () => Promise<NodeJS.ReadableStream>;
 }
 
 export interface ServiceRef {

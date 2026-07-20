@@ -57,8 +57,10 @@ ENV NODE_ENV=production \
 # openssl for the Prisma engines; ca-certificates for TLS to Postgres; smbclient
 # so Polaris can enumerate and reach SMB shares (e.g. a UniFi UNAS) itself -
 # the user never has to install or run smbclient on the host.
+# git + tar let the Deploy app build applications from a public git repository
+# (clone + tar the context, then build it on the target).
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends openssl ca-certificates smbclient \
+    && apt-get install -y --no-install-recommends openssl ca-certificates smbclient git tar \
     && rm -rf /var/lib/apt/lists/*
 
 # Prisma CLI, pinned to the version used by @polaris/db, so `migrate deploy`

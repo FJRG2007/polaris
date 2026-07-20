@@ -48,21 +48,40 @@ export async function deleteProjectAction(projectId: string): Promise<void> {
 export async function createApplicationAction(input: {
     environmentId: string;
     name: string;
-    imageRef: string;
+    sourceType?: string;
+    imageRef?: string;
+    repoUrl?: string;
+    branch?: string;
+    dockerfilePath?: string;
 }): Promise<{ error?: string }> {
     const user = await requirePermission("deploy.manage");
     const name = input.name?.trim();
-    const imageRef = input.imageRef?.trim();
     if (!name) return { error: "An application name is required" };
-    if (!imageRef) return { error: "An image reference is required (e.g. nginx:latest)" };
+    const isGit = input.sourceType === "dockerfile" || input.sourceType === "git";
+    let sourceType = "image";
+    let sourceConfig: Record<string, unknown>;
+    if (isGit) {
+        const repoUrl = input.repoUrl?.trim();
+        if (!repoUrl) return { error: "A git repository URL is required" };
+        sourceType = "dockerfile";
+        sourceConfig = {
+            repoUrl,
+            branch: input.branch?.trim() || undefined,
+            dockerfilePath: input.dockerfilePath?.trim() || "Dockerfile"
+        };
+    } else {
+        const imageRef = input.imageRef?.trim();
+        if (!imageRef) return { error: "An image reference is required (e.g. nginx:latest)" };
+        sourceConfig = { imageRef };
+    }
     try {
         const target = await getOrCreateLocalTarget(user.id);
         const app = await createApplication(user.id, {
             environmentId: input.environmentId,
             targetId: target.id,
             name,
-            sourceType: "image",
-            sourceConfig: { imageRef }
+            sourceType,
+            sourceConfig
         });
         await recordAudit({ actorId: user.id, action: "deploy.app.create", targetType: "application", targetId: app.id });
         revalidatePath(DEPLOY_PATH);

@@ -6,7 +6,7 @@
  */
 
 import type { Readable } from "node:stream";
-import type { ComposeSpec, ExecSpec, ExecStream, LogOptions, OutputSink, RuntimePorts } from "@polaris/deploy";
+import type { BuildRequest, ComposeSpec, ExecSpec, ExecStream, LogOptions, OutputSink, RuntimePorts } from "@polaris/deploy";
 import { HostdClient } from "@polaris/hostd-client";
 
 export class HostdPorts implements RuntimePorts {
@@ -32,10 +32,7 @@ export class HostdPorts implements RuntimePorts {
         await drain(res, onOutput);
     }
 
-    public async build(
-        request: { tag: string; dockerfile?: string; contextTar: Readable },
-        onOutput?: OutputSink
-    ): Promise<string> {
+    public async build(request: BuildRequest, onOutput?: OutputSink): Promise<string> {
         const tar = await bufferStream(request.contextTar);
         const res = await this.client.deployBuild(request.tag, request.dockerfile ?? "Dockerfile", tar);
         await drain(res, onOutput);
@@ -96,7 +93,7 @@ function drain(stream: Readable, onOutput?: OutputSink): Promise<void> {
 }
 
 /** Collect a readable stream into a single Buffer. */
-function bufferStream(stream: Readable): Promise<Buffer> {
+function bufferStream(stream: NodeJS.ReadableStream): Promise<Buffer> {
     return new Promise((resolve, reject) => {
         const chunks: Buffer[] = [];
         stream.on("data", (chunk: Buffer) => chunks.push(chunk));

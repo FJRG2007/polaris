@@ -8,6 +8,7 @@
  */
 
 import { appComposeSpec, dbComposeSpec } from "../compose-spec.js";
+import { imageTag as toImageTag } from "../naming.js";
 import { parseContainerState } from "./status.js";
 import type {
     AppDeployPlan,
@@ -28,18 +29,25 @@ export class SwarmRuntime implements RuntimeDriver {
 
     public async deployApplication(plan: AppDeployPlan, ctx: RuntimeContext): Promise<DeployResult> {
         const sink = (chunk: Buffer): void => ctx.log(chunk);
-        if (plan.build.method !== "image") {
+        let imageTag: string;
+        if (plan.build.method === "image") {
+            if (!plan.build.imageRef) return { ok: false, error: "an image source needs an image reference" };
+            imageTag = plan.build.imageRef;
+            await ctx.ports.pull(imageTag, sink);
+        } else if (plan.build.method === "dockerfile" && ctx.buildContext) {
+            imageTag = toImageTag(plan.build.name, plan.build.commitSha);
+            const contextTar = await ctx.buildContext();
+            await ctx.ports.build({ tag: imageTag, dockerfile: plan.build.dockerfilePath, contextTar }, sink);
+        } else {
             return { ok: false, error: `build method "${plan.build.method}" is not yet supported on the swarm runtime` };
         }
-        if (!plan.build.imageRef) return { ok: false, error: "an image source needs an image reference" };
-        await ctx.ports.pull(plan.build.imageRef, sink);
-        const spec = appComposeSpec(plan, plan.build.imageRef, ctx.target.proxyNetwork);
+        const spec = appComposeSpec(plan, imageTag, ctx.target.proxyNetwork);
         try {
             await ctx.ports.stackUp(spec, sink);
         } catch (error) {
             return { ok: false, error: error instanceof Error ? error.message : "stack deploy failed" };
         }
-        return { ok: true, imageTag: plan.build.imageRef };
+        return { ok: true, imageTag };
     }
 
     public async deployDatabase(plan: DbDeployPlan, ctx: RuntimeContext): Promise<DeployResult> {

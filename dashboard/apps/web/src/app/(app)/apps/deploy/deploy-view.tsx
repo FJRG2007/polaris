@@ -310,6 +310,8 @@ function EnvironmentBlock({
     const [pending, startTransition] = useTransition();
     const [name, setName] = useState("");
     const [image, setImage] = useState("");
+    const [srcType, setSrcType] = useState<"image" | "dockerfile">("image");
+    const [repoUrl, setRepoUrl] = useState("");
     const [dbName, setDbName] = useState("");
     const [dbEngine, setDbEngine] = useState<(typeof DB_ENGINES)[number]>("postgres");
     const [error, setError] = useState<string | null>(null);
@@ -317,11 +319,18 @@ function EnvironmentBlock({
     function onCreateApp() {
         setError(null);
         startTransition(async () => {
-            const result = await createApplicationAction({ environmentId: environment.id, name, imageRef: image });
+            const result = await createApplicationAction({
+                environmentId: environment.id,
+                name,
+                sourceType: srcType,
+                imageRef: image,
+                repoUrl
+            });
             if (result.error) setError(result.error);
             else {
                 setName("");
                 setImage("");
+                setRepoUrl("");
             }
             onChanged();
         });
@@ -380,13 +389,33 @@ function EnvironmentBlock({
                         placeholder="app name"
                         className="w-40"
                     />
-                    <Input
-                        value={image}
-                        onChange={(event) => setImage(event.target.value)}
-                        placeholder="image e.g. nginx:latest"
-                        className="w-56"
-                    />
-                    <Button onClick={onCreateApp} disabled={pending || !name.trim() || !image.trim()}>
+                    <select
+                        value={srcType}
+                        onChange={(event) => setSrcType(event.target.value as "image" | "dockerfile")}
+                        className="h-9 rounded-md border border-input bg-transparent px-2 text-sm"
+                    >
+                        <option value="image">Image</option>
+                        <option value="dockerfile">Git + Dockerfile</option>
+                    </select>
+                    {srcType === "image" ? (
+                        <Input
+                            value={image}
+                            onChange={(event) => setImage(event.target.value)}
+                            placeholder="image e.g. nginx:latest"
+                            className="w-56"
+                        />
+                    ) : (
+                        <Input
+                            value={repoUrl}
+                            onChange={(event) => setRepoUrl(event.target.value)}
+                            placeholder="https://github.com/user/repo"
+                            className="w-64"
+                        />
+                    )}
+                    <Button
+                        onClick={onCreateApp}
+                        disabled={pending || !name.trim() || (srcType === "image" ? !image.trim() : !repoUrl.trim())}
+                    >
                         <Plus className="size-4" /> Add app
                     </Button>
                 </div>

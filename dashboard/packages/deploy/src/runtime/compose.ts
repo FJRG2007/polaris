@@ -7,6 +7,7 @@
  */
 
 import { appComposeSpec, dbComposeSpec } from "../compose-spec.js";
+import { imageTag as toImageTag } from "../naming.js";
 import { parseContainerState } from "./status.js";
 import type {
     AppDeployPlan,
@@ -35,10 +36,17 @@ export class ComposeRuntime implements RuntimeDriver {
             if (!plan.build.imageRef) return { ok: false, error: "an image source needs an image reference" };
             imageTag = plan.build.imageRef;
             await ctx.ports.pull(imageTag, sink);
+        } else if (plan.build.method === "dockerfile" && ctx.buildContext) {
+            // Build from a Dockerfile in the cloned repo, then run the built image.
+            imageTag = toImageTag(plan.build.name, plan.build.commitSha);
+            const contextTar = await ctx.buildContext();
+            await ctx.ports.build(
+                { tag: imageTag, dockerfile: plan.build.dockerfilePath, contextTar },
+                sink
+            );
         } else {
-            // Build-from-source (git/dockerfile/nixpacks/buildpacks/static) needs a
-            // build context produced by the pipeline; it is wired through
-            // ports.build in a follow-up. Fail clearly rather than silently.
+            // nixpacks/buildpacks/static need a builder toolchain on the target; not
+            // yet wired. Fail clearly rather than silently.
             return { ok: false, error: `build method "${plan.build.method}" is not yet supported on the compose runtime` };
         }
 

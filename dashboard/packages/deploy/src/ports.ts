@@ -9,7 +9,7 @@
  * satisfy and the driver depends on.
  */
 
-import type { Duplex, Readable } from "node:stream";
+import type { Duplex } from "node:stream";
 import type { ComposeSpec } from "./compose-spec.js";
 
 export type OutputSink = (chunk: Buffer) => void;
@@ -20,7 +20,7 @@ export interface BuildRequest {
     /** Dockerfile path within the context (default "Dockerfile"). */
     readonly dockerfile?: string;
     /** A tar stream of the build context. */
-    readonly contextTar: Readable;
+    readonly contextTar: NodeJS.ReadableStream;
     readonly buildArgs?: Readonly<Record<string, string>>;
 }
 
