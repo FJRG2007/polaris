@@ -272,20 +272,33 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
     return (
         <div className="flex flex-col gap-4 py-2">
             <div className="flex items-center gap-3">
-                {app.domains[0] ? (
-                    <a
-                        href={`https://${app.domains[0].hostname}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex min-w-0 items-center gap-1.5 truncate text-sm font-medium text-foreground hover:text-primary hover:underline"
-                    >
-                        <Globe className="size-4 shrink-0 text-muted-foreground" /> {app.domains[0].hostname}
-                    </a>
-                ) : (
-                    <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
-                        <Globe className="size-4 shrink-0" /> No domain yet
-                    </span>
-                )}
+                <div className="flex min-w-0 flex-col gap-0.5">
+                    {app.domains[0] ? (
+                        <a
+                            href={`https://${app.domains[0].hostname}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex min-w-0 items-center gap-1.5 truncate text-sm font-medium text-foreground hover:text-primary hover:underline"
+                        >
+                            <Globe className="size-4 shrink-0 text-muted-foreground" /> {app.domains[0].hostname}
+                        </a>
+                    ) : (
+                        <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
+                            <Globe className="size-4 shrink-0" /> No domain yet
+                        </span>
+                    )}
+                    {app.ipUrl && (
+                        <a
+                            href={app.ipUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex min-w-0 items-center gap-1.5 truncate pl-[1.375rem] text-xs text-muted-foreground hover:text-primary hover:underline"
+                            title="Reachable on the local network (host IP)"
+                        >
+                            {app.ipUrl.replace(/^https?:\/\//, "")}
+                        </a>
+                    )}
+                </div>
                 <div className="ml-auto flex items-center gap-4 text-xs text-muted-foreground">
                     <span className="inline-flex items-center gap-1">
                         <MapPin className="size-3.5" /> {region}

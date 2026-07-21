@@ -46,6 +46,10 @@ export interface AppDeployPlan {
     readonly env: Readonly<Record<string, string>>;
     readonly replicas: number;
     readonly domains: readonly TraefikDomain[];
+    /** Host port to publish so the app is reachable directly over the host's IP
+     *  (LAN/intranet), independent of any reverse proxy. `container` is the port
+     *  the app listens on inside the container. */
+    readonly expose?: { readonly host: number; readonly container: number };
     /** Named volumes / binds to attach: mountPath -> source. */
     readonly volumes: readonly { readonly mountPath: string; readonly source: string; readonly kind: "volume" | "bind" }[];
     /** JSON healthcheck spec (or null for none). */

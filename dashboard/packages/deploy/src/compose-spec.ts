@@ -61,7 +61,10 @@ export function appComposeSpec(plan: AppDeployPlan, imageTag: string, network: s
                 name: plan.ref.name,
                 image: imageTag,
                 env: { ...plan.env },
-                ports: [],
+                // Publish a host port so the app is reachable over the host's IP
+                // (LAN/intranet) with no reverse proxy - bound on all interfaces,
+                // so it is only internet-facing if the operator forwards the port.
+                ports: plan.expose ? [{ host: plan.expose.host, container: plan.expose.container }] : [],
                 volumes: plan.volumes.map((volume) => ({
                     source: volume.source,
                     target: volume.mountPath,

@@ -292,6 +292,12 @@ export async function removeApplicationDeployment(applicationId: string, ownerId
 
 // --- deployment pipeline ----------------------------------------------------
 
+/** A stable host port (20000-39999) for an app, derived from its id so it is
+ *  collision-resistant and consistent across redeploys without a schema column. */
+export function hostPortForApp(id: string): number {
+    return 20000 + (parseInt(shortHash(id, 4), 16) % 20000);
+}
+
 /** Build the runtime plan for an application from its stored config. */
 async function buildAppPlan(
     applicationId: string,
@@ -309,8 +315,15 @@ async function buildAppPlan(
     const env = await mergedEnv(app.environmentId, app.id);
     const healthcheck = app.healthcheck ? (JSON.parse(app.healthcheck) as AppDeployPlan["healthcheck"]) : undefined;
 
+    // Publish the app on a stable host port so it is reachable over the host's IP
+    // (intranet) with no proxy. The container port follows the domain's target
+    // port (configurable), defaulting by source; the host port is derived from the
+    // app id so it stays consistent across redeploys without a schema column.
+    const containerPort = app.domains[0]?.targetPort ?? (app.sourceType === "image" ? 80 : 3000);
+
     const plan: AppDeployPlan = {
         ref: { name: serviceName(project.slug, app.slug, app.id), project: composeProject },
+        expose: { host: hostPortForApp(app.id), container: containerPort },
         build: {
             method: (app.sourceType as AppDeployPlan["build"]["method"]) ?? "image",
             name: app.slug,

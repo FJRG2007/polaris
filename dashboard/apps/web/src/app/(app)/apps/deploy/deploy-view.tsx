@@ -86,6 +86,8 @@ export interface ProjectSummary {
             deployBranch: string | null;
             commitFilter: string | null;
             keepReleases: boolean;
+            /** Direct LAN/intranet URL (host IP + published port), when a public IP is known. */
+            ipUrl: string | null;
             domains: { id: string; hostname: string; kind: string }[];
         }[];
         databases: { id: string; name: string; engine: string; status: string }[];

@@ -2,7 +2,8 @@ import { notFound } from "next/navigation";
 import { serviceName } from "@polaris/deploy";
 import { refreshCapabilities } from "@polaris/hostd-client";
 import { requirePermission, userHasManage } from "@/lib/session";
-import { getDeploymentStatuses, getProjectFull, listProjects } from "@/lib/deploy-service";
+import { getDeploymentStatuses, getProjectFull, hostPortForApp, listProjects } from "@/lib/deploy-service";
+import { getPublicIp } from "@/lib/domain-service";
 import { ProjectDetail } from "../project-detail";
 import type { ProjectSummary } from "../deploy-view";
 
@@ -24,6 +25,7 @@ export default async function DeployProjectPage({ params }: { params: Promise<{ 
     );
     const statuses = await getDeploymentStatuses(deploymentIds);
     const allProjects = (await listProjects(user.id)).map((item) => ({ id: item.id, name: item.name }));
+    const serverIp = await getPublicIp();
 
     const summary: ProjectSummary = {
         id: project.id,
@@ -46,6 +48,7 @@ export default async function DeployProjectPage({ params }: { params: Promise<{ 
                 deployBranch: app.deployBranch,
                 commitFilter: app.commitFilter,
                 keepReleases: app.keepReleases,
+                ipUrl: serverIp ? `http://${serverIp}:${hostPortForApp(app.id)}` : null,
                 domains: app.domains.map((domain) => ({ id: domain.id, hostname: domain.hostname, kind: domain.kind }))
             })),
             databases: environment.databases.map((database) => ({
