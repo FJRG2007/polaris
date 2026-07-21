@@ -18,9 +18,11 @@ import {
     createApplication,
     createEnvironment,
     createProject,
+    deleteApplication,
     deleteEnvironment,
     deleteProject,
     deployApplication,
+    duplicateApplication,
     ensureApplicationDomain,
     listDeployments,
     removeApplicationDeployment,
@@ -384,6 +386,30 @@ export async function removeApplicationDeploymentAction(applicationId: string): 
         return {};
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Could not remove the deployment" };
+    }
+}
+
+export async function deleteApplicationAction(applicationId: string): Promise<{ error?: string }> {
+    const user = await requirePermission("deploy.manage");
+    try {
+        await deleteApplication(applicationId, user.id);
+        await recordAudit({ actorId: user.id, action: "deploy.app.delete", targetType: "application", targetId: applicationId });
+        revalidatePath(DEPLOY_PATH);
+        return {};
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not delete the service" };
+    }
+}
+
+export async function duplicateApplicationAction(applicationId: string): Promise<{ error?: string; id?: string }> {
+    const user = await requirePermission("deploy.manage");
+    try {
+        const id = await duplicateApplication(applicationId, user.id);
+        await recordAudit({ actorId: user.id, action: "deploy.app.duplicate", targetType: "application", targetId: applicationId });
+        revalidatePath(DEPLOY_PATH);
+        return { id };
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not duplicate the service" };
     }
 }
 

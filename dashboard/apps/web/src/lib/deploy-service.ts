@@ -403,6 +403,71 @@ export async function removeApplicationDeployment(applicationId: string, ownerId
     await prisma.application.update({ where: { id: applicationId }, data: { currentDeploymentId: null } });
 }
 
+/**
+ * Delete an application entirely: tear its container down, then remove the record
+ * and everything scoped to it. Domains and volumes cascade on the row delete;
+ * deployments and env vars are polymorphic (no FK), so they are removed by hand.
+ */
+export async function deleteApplication(applicationId: string, ownerId: string): Promise<void> {
+    const app = await prisma.application.findFirst({
+        where: { id: applicationId, environment: { project: { ownerId } } },
+        select: { id: true }
+    });
+    if (!app) throw new Error("Application not found");
+    await removeApplicationDeployment(applicationId, ownerId).catch(() => undefined);
+    await prisma.deployment.deleteMany({ where: { deployableType: "application", deployableId: applicationId } });
+    await prisma.envVar.deleteMany({ where: { scopeType: "application", scopeId: applicationId } });
+    await prisma.application.delete({ where: { id: applicationId } });
+}
+
+/**
+ * Duplicate an application within its environment: a fresh service with the same
+ * source, build, and variables, but its own name/slug and no domains or history.
+ * It is not deployed automatically - the copy is created ready to deploy.
+ */
+export async function duplicateApplication(applicationId: string, ownerId: string): Promise<string> {
+    const app = await prisma.application.findFirst({
+        where: { id: applicationId, environment: { project: { ownerId } } }
+    });
+    if (!app) throw new Error("Application not found");
+    const base = slugify(`${app.name}-copy`) || `${app.slug}-copy`;
+    let slug = base;
+    let suffix = 1;
+    while (await prisma.application.findFirst({ where: { environmentId: app.environmentId, slug }, select: { id: true } })) {
+        suffix += 1;
+        slug = `${base}-${suffix}`;
+    }
+    const created = await prisma.application.create({
+        data: {
+            environmentId: app.environmentId,
+            targetId: app.targetId,
+            name: `${app.name}-copy`,
+            slug,
+            sourceType: app.sourceType,
+            sourceConfig: app.sourceConfig,
+            buildConfig: app.buildConfig,
+            healthcheck: app.healthcheck,
+            replicas: app.replicas,
+            deployBranch: app.deployBranch,
+            commitFilter: app.commitFilter,
+            keepReleases: app.keepReleases
+        }
+    });
+    const vars = await prisma.envVar.findMany({ where: { scopeType: "application", scopeId: app.id } });
+    for (const variable of vars) {
+        await prisma.envVar.create({
+            data: {
+                scopeType: "application",
+                scopeId: created.id,
+                key: variable.key,
+                value: variable.value,
+                isSecret: variable.isSecret
+            }
+        });
+    }
+    return created.id;
+}
+
 // --- deployment pipeline ----------------------------------------------------
 
 /** A stable host port (20000-39999) for an app, derived from its id so it is

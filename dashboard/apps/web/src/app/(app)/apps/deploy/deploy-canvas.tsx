@@ -9,9 +9,22 @@
  */
 
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { HardDrive, Loader2 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Copy, HardDrive, Loader2, ScrollText, Trash2 } from "lucide-react";
+import {
+    Button,
+    ContextMenu,
+    ContextMenuContent,
+    ContextMenuItem,
+    ContextMenuSeparator,
+    ContextMenuTrigger,
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle
+} from "@polaris/ui";
 import { ServiceIcon, dbTone, serviceKindOf, type ProjectApp, type ProjectSummary, type ServiceKind } from "./deploy-view";
-import { saveLayoutAction } from "./actions";
+import { deleteApplicationAction, duplicateApplicationAction, saveLayoutAction } from "./actions";
 
 const NODE_W = 280;
 const NODE_H = 116;
@@ -104,28 +117,20 @@ const TONE_DOT: Record<Tone, string> = {
     idle: "bg-muted-foreground"
 };
 
-/** Resting border for a node, tinted by its deployment tone (Railway-style). */
+/** Status text color, like Railway's "Online" / "Crashed" node label. */
+const TONE_TEXT: Record<Tone, string> = {
+    success: "text-success",
+    warning: "text-warning",
+    danger: "text-danger",
+    idle: "text-muted-foreground"
+};
+
+/** Resting border: neutral, tinted only on failure (Railway keys errors in red). */
 const TONE_BORDER: Record<Tone, string> = {
-    success: "border-border hover:border-success/50",
-    warning: "border-warning/40 hover:border-warning/60",
+    success: "border-border hover:border-muted-foreground/40",
+    warning: "border-border hover:border-muted-foreground/40",
     danger: "border-danger/40 hover:border-danger/60",
-    idle: "border-border hover:border-muted-foreground/50"
-};
-
-/** Tinted status chip inside a node, so the deployment state reads in color. */
-const TONE_CHIP: Record<Tone, string> = {
-    success: "border-success/25 bg-success/10 text-success",
-    warning: "border-warning/25 bg-warning/10 text-warning",
-    danger: "border-danger/25 bg-danger/10 text-danger",
-    idle: "border-border/60 bg-surface text-muted-foreground"
-};
-
-/** Colored left edge on a node, keying its status at a glance. */
-const TONE_BAR: Record<Tone, string> = {
-    success: "bg-success",
-    warning: "bg-warning",
-    danger: "bg-danger",
-    idle: "bg-transparent"
+    idle: "border-border hover:border-muted-foreground/40"
 };
 
 /** A soft edge vignette so the board reads as a lit surface, not a flat panel. */
@@ -157,6 +162,28 @@ export function DeployCanvas({
     const [pos, setPos] = useState<Record<string, Point>>(initial.pos);
     const [links, setLinks] = useState<Link[]>(initial.links);
     const [saving, setSaving] = useState(false);
+
+    const router = useRouter();
+    const [deleteTarget, setDeleteTarget] = useState<ProjectApp | null>(null);
+    const [acting, setActing] = useState(false);
+
+    function duplicate(app: ProjectApp) {
+        setActing(true);
+        void duplicateApplicationAction(app.id).finally(() => {
+            setActing(false);
+            router.refresh();
+        });
+    }
+
+    function confirmDelete() {
+        if (!deleteTarget) return;
+        setActing(true);
+        void deleteApplicationAction(deleteTarget.id).finally(() => {
+            setActing(false);
+            setDeleteTarget(null);
+            router.refresh();
+        });
+    }
 
     const containerRef = useRef<HTMLDivElement>(null);
     const boardRef = useRef<HTMLDivElement>(null);
@@ -355,46 +382,61 @@ export function DeployCanvas({
                         const p = pos[node.id] ?? { x: 0, y: 0 };
                         const label = node.tone === "success" ? "Online" : node.statusLabel;
                         const pulsing = node.tone === "warning";
+                        const app = environment.applications.find((item) => item.id === node.id);
+                        const card = (
+                            <div
+                                className={`group absolute flex select-none flex-col border bg-card shadow-sm transition-[border-color,box-shadow] hover:shadow-lg hover:shadow-black/25 ${
+                                    node.volume ? "rounded-t-2xl" : "rounded-2xl"
+                                } ${dragId === node.id ? "border-primary ring-1 ring-primary/40" : TONE_BORDER[node.tone]} ${
+                                    canManage ? "cursor-grab active:cursor-grabbing" : ""
+                                }`}
+                                style={{ left: p.x, top: p.y, width: NODE_W, height: NODE_H }}
+                                onPointerDown={(event) => onNodePointerDown(event, node.id)}
+                            >
+                                <div className="flex flex-1 flex-col p-4">
+                                    <div className="flex items-center gap-3">
+                                        <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-muted text-foreground">
+                                            <ServiceIcon kind={node.kind} className="size-5" />
+                                        </span>
+                                        <span className="min-w-0 flex-1 truncate text-base font-semibold">{node.name}</span>
+                                    </div>
+                                    <p className="mt-1 truncate text-sm text-muted-foreground">{node.subtitle}</p>
+                                    <div className="mt-auto flex items-center gap-2 text-sm">
+                                        <span className={`size-2 rounded-full ${TONE_DOT[node.tone]} ${pulsing ? "animate-pulse" : ""}`} />
+                                        <span className={TONE_TEXT[node.tone]}>{label}</span>
+                                    </div>
+                                </div>
+                                {canManage && (
+                                    <button
+                                        type="button"
+                                        title="Drag to another service to link"
+                                        onPointerDown={(event) => onHandlePointerDown(event, node.id)}
+                                        className="absolute -right-1.5 top-1/2 size-3.5 -translate-y-1/2 rounded-full border-2 border-primary bg-card opacity-0 transition-opacity hover:bg-primary group-hover:opacity-100"
+                                    />
+                                )}
+                            </div>
+                        );
                         return (
                             <Fragment key={node.id}>
-                                <div
-                                    className={`group absolute flex select-none flex-col border bg-card shadow-sm transition-[border-color,box-shadow] hover:shadow-lg hover:shadow-black/25 ${
-                                        node.volume ? "rounded-t-2xl" : "rounded-2xl"
-                                    } ${dragId === node.id ? "border-primary ring-1 ring-primary/40" : TONE_BORDER[node.tone]} ${
-                                        canManage ? "cursor-grab active:cursor-grabbing" : ""
-                                    }`}
-                                    style={{ left: p.x, top: p.y, width: NODE_W, height: NODE_H }}
-                                    onPointerDown={(event) => onNodePointerDown(event, node.id)}
-                                >
-                                    {node.tone !== "idle" && (
-                                        <span
-                                            className={`absolute left-0 top-0 h-full w-1 ${TONE_BAR[node.tone]} ${node.volume ? "rounded-tl-2xl" : "rounded-l-2xl"}`}
-                                        />
-                                    )}
-                                    <div className="flex flex-1 flex-col p-4">
-                                        <div className="flex items-center gap-3">
-                                            <span className="grid size-9 shrink-0 place-items-center rounded-lg border border-border bg-surface text-foreground">
-                                                <ServiceIcon kind={node.kind} className="size-4" />
-                                            </span>
-                                            <span className="min-w-0 flex-1 truncate text-base font-semibold">{node.name}</span>
-                                        </div>
-                                        <p className="mt-1 truncate text-sm text-muted-foreground">{node.subtitle}</p>
-                                        <div className="mt-auto">
-                                            <span className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs ${TONE_CHIP[node.tone]}`}>
-                                                <span className={`size-1.5 rounded-full ${TONE_DOT[node.tone]} ${pulsing ? "animate-pulse" : ""}`} />
-                                                {label}
-                                            </span>
-                                        </div>
-                                    </div>
-                                    {canManage && (
-                                        <button
-                                            type="button"
-                                            title="Drag to another service to link"
-                                            onPointerDown={(event) => onHandlePointerDown(event, node.id)}
-                                            className="absolute -right-1.5 top-1/2 size-3.5 -translate-y-1/2 rounded-full border-2 border-primary bg-card opacity-0 transition-opacity hover:bg-primary group-hover:opacity-100"
-                                        />
-                                    )}
-                                </div>
+                                {app && canManage ? (
+                                    <ContextMenu>
+                                        <ContextMenuTrigger asChild>{card}</ContextMenuTrigger>
+                                        <ContextMenuContent>
+                                            <ContextMenuItem onSelect={() => onOpenService?.(app)}>
+                                                <ScrollText className="size-4" /> View latest deploy
+                                            </ContextMenuItem>
+                                            <ContextMenuItem onSelect={() => duplicate(app)}>
+                                                <Copy className="size-4" /> Duplicate
+                                            </ContextMenuItem>
+                                            <ContextMenuSeparator />
+                                            <ContextMenuItem variant="danger" onSelect={() => setDeleteTarget(app)}>
+                                                <Trash2 className="size-4" /> Delete
+                                            </ContextMenuItem>
+                                        </ContextMenuContent>
+                                    </ContextMenu>
+                                ) : (
+                                    card
+                                )}
                                 {node.volume && (
                                     <div
                                         className="absolute flex items-center gap-2 rounded-b-2xl border border-t-0 border-border bg-card/60 px-4 py-2.5 text-xs text-muted-foreground"
@@ -413,8 +455,28 @@ export function DeployCanvas({
             {canManage && (
                 <p className="mt-2 text-xs text-muted-foreground/70">
                     Drag nodes to arrange them. Drag from a node's right handle onto another service to link them.
+                    Right-click a service for more.
                 </p>
             )}
+
+            <Dialog open={deleteTarget !== null} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+                <DialogContent className="max-w-sm">
+                    <DialogHeader>
+                        <DialogTitle>Delete {deleteTarget?.name}?</DialogTitle>
+                    </DialogHeader>
+                    <p className="text-sm text-muted-foreground">
+                        This removes the service, its container, domains, and variables. This cannot be undone.
+                    </p>
+                    <div className="mt-2 flex justify-end gap-2">
+                        <Button variant="ghost" onClick={() => setDeleteTarget(null)}>
+                            Cancel
+                        </Button>
+                        <Button variant="danger" disabled={acting} onClick={confirmDelete}>
+                            {acting && <Loader2 className="size-4 animate-spin" />} Delete
+                        </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

@@ -62,7 +62,7 @@ export function ProjectDetail({
                     value={project.id}
                     onValueChange={(id) => (id === NEW_PROJECT ? setShowNewProject(true) : router.push(`/apps/deploy/${id}`))}
                     options={[...projects.map((item) => ({ value: item.id, label: item.name })), ...newProjectOption]}
-                    className="h-8 w-40 font-medium"
+                    className="h-8 w-44 min-w-[11rem] shrink-0 font-medium"
                     aria-label="Project"
                 />
                 <span className="text-muted-foreground/40">/</span>
@@ -70,7 +70,7 @@ export function ProjectDetail({
                     value={active?.id ?? ""}
                     onValueChange={(id) => (id === NEW_ENV ? setShowNewEnv(true) : setActiveId(id))}
                     options={[...environments.map((env) => ({ value: env.id, label: env.name })), ...newEnvOption]}
-                    className="h-8 w-36"
+                    className="h-8 w-40 min-w-[10rem] shrink-0"
                     aria-label="Environment"
                 />
             </HeaderPortal>
