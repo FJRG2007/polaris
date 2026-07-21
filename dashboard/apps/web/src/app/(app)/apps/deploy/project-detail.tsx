@@ -79,7 +79,7 @@ export function ProjectDetail({
                     value={active?.id ?? ""}
                     onValueChange={(id) => (id === NEW_ENV ? setShowNewEnv(true) : setActiveId(id))}
                     options={[...environments.map((env) => ({ value: env.id, label: env.name })), ...newEnvOption]}
-                    className="h-8 w-40 min-w-[10rem] shrink-0"
+                    className="h-8 w-52 min-w-[13rem] shrink-0"
                     aria-label="Environment"
                 />
             </HeaderPortal>

@@ -74,6 +74,7 @@ export function LogViewer({
     className?: string;
 }) {
     const [search, setSearch] = useState("");
+    const [copiedAll, setCopiedAll] = useState(false);
     const scrollRef = useRef<HTMLDivElement>(null);
 
     const entries = useMemo(() => (log ? parseLog(log) : []), [log]);
@@ -96,6 +97,16 @@ export function LogViewer({
         URL.revokeObjectURL(url);
     }
 
+    async function copyAll(): Promise<void> {
+        try {
+            await navigator.clipboard.writeText(log);
+            setCopiedAll(true);
+            setTimeout(() => setCopiedAll(false), 1500);
+        } catch {
+            // Clipboard unavailable (insecure context); the text is still selectable.
+        }
+    }
+
     return (
         <div className="flex flex-col gap-2">
             <div className="flex items-center gap-2">
@@ -115,10 +126,14 @@ export function LogViewer({
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={exportLog}
+                    onClick={copyAll}
                     disabled={!log}
                     className="ml-auto shrink-0"
                 >
+                    {copiedAll ? <Check className="size-4 text-emerald-400" /> : <Copy className="size-4" />}
+                    {copiedAll ? "Copied" : "Copy all"}
+                </Button>
+                <Button type="button" variant="outline" size="sm" onClick={exportLog} disabled={!log} className="shrink-0">
                     <Download className="size-4" />
                     Export
                 </Button>
@@ -158,7 +173,7 @@ function LogRow({ entry }: { entry: LogEntry }) {
                 type="button"
                 onClick={copy}
                 aria-label="Copy log entry"
-                className="absolute right-1 top-0.5 hidden rounded p-1 text-zinc-400 transition-colors hover:bg-white/10 hover:text-zinc-100 group-hover:block"
+                className="absolute right-1 top-1/2 hidden -translate-y-1/2 rounded p-1 text-zinc-400 transition-colors hover:bg-white/10 hover:text-zinc-100 group-hover:block"
             >
                 {copied ? <Check className="size-3.5 text-emerald-400" /> : <Copy className="size-3.5" />}
             </button>

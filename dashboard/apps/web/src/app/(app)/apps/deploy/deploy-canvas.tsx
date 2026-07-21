@@ -91,16 +91,41 @@ function parseLayout(raw: string): Layout {
     }
 }
 
-/** Seed a position for any node missing one, laid out in a tidy grid. */
+/** Seed a position for any node missing one, placed near the centre of the
+ *  existing cluster (or the board centre when empty) and spiralled out to the
+ *  nearest free slot so a new service never lands on top of another. */
 function withSeededPositions(nodes: CanvasNode[], pos: Record<string, Point>): Record<string, Point> {
     const next = { ...pos };
-    let placed = 0;
+    const stepX = NODE_W + 48;
+    const stepY = NODE_H + 64;
+    const overlaps = (x: number, y: number): boolean =>
+        Object.values(next).some((p) => Math.abs(p.x - x) < stepX && Math.abs(p.y - y) < stepY);
+
     for (const node of nodes) {
         if (next[node.id]) continue;
-        const col = placed % 3;
-        const row = Math.floor(placed / 3);
-        next[node.id] = { x: 40 + col * (NODE_W + 48), y: 40 + row * (NODE_H + 56) };
-        placed += 1;
+        const existing = Object.values(next);
+        const anchor =
+            existing.length > 0
+                ? {
+                      x: existing.reduce((sum, p) => sum + p.x, 0) / existing.length,
+                      y: existing.reduce((sum, p) => sum + p.y, 0) / existing.length
+                  }
+                : { x: 320, y: 180 };
+        let spot = { x: Math.max(0, Math.round(anchor.x)), y: Math.max(0, Math.round(anchor.y)) };
+        search: for (let ring = 0; ring < 24; ring += 1) {
+            for (let dy = -ring; dy <= ring; dy += 1) {
+                for (let dx = -ring; dx <= ring; dx += 1) {
+                    if (Math.max(Math.abs(dx), Math.abs(dy)) !== ring) continue;
+                    const x = Math.max(0, Math.round(anchor.x + dx * stepX));
+                    const y = Math.max(0, Math.round(anchor.y + dy * stepY));
+                    if (!overlaps(x, y)) {
+                        spot = { x, y };
+                        break search;
+                    }
+                }
+            }
+        }
+        next[node.id] = spot;
     }
     return next;
 }
@@ -218,6 +243,9 @@ export function DeployCanvas({
     const [dragId, setDragId] = useState<string | null>(null);
 
     function onNodePointerDown(event: React.PointerEvent, id: string) {
+        // Only the primary (left) button drags or opens; a right-click must fall
+        // through to the context menu instead of starting a drag.
+        if (event.button !== 0) return;
         event.preventDefault();
         const start = { x: event.clientX, y: event.clientY };
         const origin = posRef.current[id] ?? { x: 0, y: 0 };

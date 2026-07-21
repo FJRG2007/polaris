@@ -64,3 +64,37 @@ body {
     color: hsl(var(--foreground));
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
 }
+
+/* Themed scrollbars everywhere, so scroll regions match the surface instead of
+   showing the platform default. Firefox uses the standard properties; WebKit and
+   Chromium use the pseudo-elements. The thumb is a low-chroma neutral that lifts
+   slightly on hover. */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--muted-foreground) / 0.28) transparent;
+}
+
+::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--muted-foreground) / 0.25);
+    border: 2px solid transparent;
+    border-radius: 9999px;
+    background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background-color: hsl(var(--muted-foreground) / 0.45);
+    background-clip: padding-box;
+}
+
+::-webkit-scrollbar-corner {
+    background: transparent;
+}
