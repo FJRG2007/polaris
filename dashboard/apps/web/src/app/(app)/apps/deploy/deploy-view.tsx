@@ -40,6 +40,7 @@ import {
     type SelectOption
 } from "@polaris/ui";
 import { DockerMark, GitHubMark } from "@/components/brand-icons";
+import { LogViewer } from "@/components/log-viewer";
 import { TerminalPanel } from "./terminal-panel";
 import { FilesPanel } from "./files-panel";
 import {
@@ -1011,7 +1012,6 @@ export function EmptyState({ icon, title, description }: { icon: ReactNode; titl
 export function DeploymentLogs({ deploymentId, onDone }: { deploymentId: string; onDone: () => void }) {
     const [log, setLog] = useState("");
     const [status, setStatus] = useState("queued");
-    const preRef = useRef<HTMLPreElement>(null);
     // Keep onDone out of the effect deps: it is recreated every render, and calling
     // it (a state update) here would otherwise re-run the effect and loop.
     const onDoneRef = useRef(onDone);
@@ -1047,20 +1047,12 @@ export function DeploymentLogs({ deploymentId, onDone }: { deploymentId: string;
         };
     }, [deploymentId]);
 
-    useEffect(() => {
-        if (preRef.current) preRef.current.scrollTop = preRef.current.scrollHeight;
-    }, [log]);
-
     return (
-        <div className="flex flex-col gap-2">
-            <StatusPill tone={dbTone(status)} label={`Status: ${status}`} />
-            <pre
-                ref={preRef}
-                className="h-80 overflow-auto rounded-md bg-[#0b0e14] p-3 text-xs leading-relaxed text-zinc-300"
-            >
-                {log || "Waiting for output..."}
-            </pre>
-        </div>
+        <LogViewer
+            log={log}
+            name={deploymentId}
+            header={<StatusPill tone={dbTone(status)} label={`Status: ${status}`} />}
+        />
     );
 }
 
