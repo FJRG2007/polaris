@@ -1406,10 +1406,14 @@ function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
                 )}
             </section>
 
-            <QuickTunnelPanel appId={app.id} />
-
-            <section className="flex flex-col gap-2">
-                <h3 className="text-sm font-medium">Domains</h3>
+            <section className="flex flex-col gap-4">
+                <div className="flex flex-col gap-2">
+                    <h3 className="text-sm font-medium">Public access</h3>
+                    <p className="text-xs text-muted-foreground">
+                        Reach this service from the internet - a custom domain you point here, or a Cloudflare tunnel
+                        that needs no DNS or port-forwarding. Add a domain below, or expose it through the tunnel.
+                    </p>
+                </div>
                 {app.domains.length > 0 ? (
                     <ul className="flex flex-col gap-1">
                         {app.domains.map((domain) => (
@@ -1488,6 +1492,9 @@ function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
                             Add domain
                         </Button>
                     </div>
+                </div>
+                <div className="border-t border-border/50 pt-4">
+                    <QuickTunnelPanel appId={app.id} />
                 </div>
             </section>
 
