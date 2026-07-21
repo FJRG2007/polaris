@@ -15,7 +15,8 @@ import { bucketHttpMetrics, parseHttpLogs, serviceName, shortHash, slugify, type
 import { decryptSecret } from "@polaris/storage";
 import { getDriver, getPorts, toTargetInfo, type TargetRow } from "./deploy/runtime";
 import { getOrCreateHostTarget, getOrCreateLocalTarget } from "./deploy-target-service";
-import { autoSubdomainUrl, getPublicIp } from "./domain-service";
+import { getPublicIp } from "./domain-service";
+import { resolveAutoDomain } from "./network-service";
 import { gitBuildContext, type GitSource } from "./git-build-service";
 import { githubCloneAuthHeader } from "./github-service";
 import { resolveRegistryLogin } from "./registry-credential-service";
@@ -192,15 +193,19 @@ export async function addApplicationDomain(
     // private IP, where ACME cannot validate) is served with Caddy's internal CA.
     let certResolver: string = opts.cert ?? "le";
     if (!hostname) {
-        const auto = await autoSubdomainUrl(app.slug);
-        if (!auto) {
+        // The network mode decides the auto domain: a wildcard/public setup mints a
+        // real internet-reachable name with Let's Encrypt; otherwise a LAN-only
+        // sslip.io name (kind "lan") - so the app never gets a subdomain that
+        // silently fails off the network; the UI labels it and offers public setup.
+        const plan = await resolveAutoDomain(app.slug);
+        if (!plan) {
             throw new Error(
-                "No public IP is configured for free subdomains. Set one in domain settings, or enter a custom domain."
+                "No public IP is configured for free subdomains. Set one in Domains settings, or enter a custom domain."
             );
         }
-        hostname = new URL(auto).host;
-        kind = "auto";
-        if (!opts.cert) certResolver = "internal";
+        hostname = plan.hostname;
+        kind = plan.kind;
+        if (!opts.cert) certResolver = plan.cert;
     }
     try {
         await prisma.domain.create({

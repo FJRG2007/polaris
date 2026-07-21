@@ -7,11 +7,18 @@
  * current public IP on demand. Each section saves independently.
  */
 
-import { useState } from "react";
-import { CheckCircle2, Globe, Link2, RefreshCw, TriangleAlert } from "lucide-react";
-import { Badge, Button, Card, CardBody, CardHeader, CardTitle, Input } from "@polaris/ui";
+import { useEffect, useState, type ReactNode } from "react";
+import { CheckCircle2, Globe, Link2, Loader2, Network, RefreshCw, TriangleAlert } from "lucide-react";
+import { Badge, Button, Card, CardBody, CardHeader, CardTitle, Input, Select } from "@polaris/ui";
 import type { DomainConfig } from "@/lib/domain-service";
-import { clearDuckdnsTokenAction, saveDomainsAction, syncDuckDnsAction } from "./actions";
+import type { NetworkMode, NetworkStatus } from "@/lib/network-service";
+import {
+    clearDuckdnsTokenAction,
+    networkStatusAction,
+    saveDomainsAction,
+    saveNetworkConfigAction,
+    syncDuckDnsAction
+} from "./actions";
 
 export function DomainsView({
     initialConfig,
@@ -59,6 +66,8 @@ export function DomainsView({
 
     return (
         <div className="flex max-w-2xl flex-col gap-4">
+            <NetworkExposure />
+
             <Card>
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">
@@ -172,6 +181,197 @@ export function DomainsView({
                     {saving ? "Saving..." : "Save"}
                 </Button>
             </div>
+        </div>
+    );
+}
+
+const MODE_OPTIONS = [
+    { value: "auto", label: "Automatic (detect)" },
+    { value: "lan", label: "LAN only" },
+    { value: "public", label: "Public IP (direct)" },
+    { value: "wildcard", label: "Custom wildcard domain" },
+    { value: "tunnel", label: "Cloudflare / ngrok tunnel" }
+];
+
+/**
+ * Network topology + exposure control. Shows whether the box is publicly reachable
+ * or behind NAT, lets the operator pick how auto domains are exposed, and gives
+ * step-by-step setup for the public options so free subdomains that would only
+ * work on the LAN are never handed out as if they worked everywhere.
+ */
+function NetworkExposure() {
+    const [status, setStatus] = useState<NetworkStatus | null>(null);
+    const [mode, setMode] = useState<NetworkMode>("auto");
+    const [wildcard, setWildcard] = useState("");
+    const [loading, setLoading] = useState(true);
+    const [busy, setBusy] = useState(false);
+    const [saved, setSaved] = useState(false);
+
+    useEffect(() => {
+        void networkStatusAction().then((next) => {
+            setStatus(next);
+            setMode(next.mode);
+            setWildcard(next.wildcardDomain);
+            setLoading(false);
+        });
+    }, []);
+
+    async function redetect() {
+        setBusy(true);
+        setStatus(await networkStatusAction(true));
+        setBusy(false);
+    }
+
+    async function save() {
+        setBusy(true);
+        setSaved(false);
+        setStatus(await saveNetworkConfigAction({ mode, wildcardDomain: wildcard }));
+        setBusy(false);
+        setSaved(true);
+    }
+
+    if (loading || !status) {
+        return (
+            <Card>
+                <CardBody className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="size-4 animate-spin" /> Detecting network...
+                </CardBody>
+            </Card>
+        );
+    }
+
+    const effective = status.effectiveMode;
+    const publiclyReachable = effective === "public" || effective === "wildcard";
+
+    return (
+        <Card>
+            <CardHeader>
+                <div className="flex items-center justify-between gap-2">
+                    <CardTitle className="flex items-center gap-2">
+                        <Network className="size-4 text-primary" /> Network &amp; exposure
+                    </CardTitle>
+                    <Button size="sm" variant="secondary" onClick={redetect} disabled={busy}>
+                        <RefreshCw className={`size-4 ${busy ? "animate-spin" : ""}`} /> Re-detect
+                    </Button>
+                </div>
+            </CardHeader>
+            <CardBody className="flex flex-col gap-4">
+                <div className="grid grid-cols-2 gap-x-6 gap-y-2 rounded-md border border-border/60 p-3 text-xs">
+                    <StatusRow label="Public IP" value={status.publicIp ?? "not detected"} />
+                    <StatusRow label="Server IP" value={status.subdomainIp ?? "unknown"} />
+                    <StatusRow label="Behind NAT" value={status.natted ? "Yes" : "No"} tone={status.natted ? "warn" : "ok"} />
+                    <StatusRow label="Active mode" value={effective} tone={publiclyReachable ? "ok" : "warn"} />
+                </div>
+
+                {status.natted && status.mode === "auto" && (
+                    <p className="flex items-start gap-2 rounded-md border border-warning/30 bg-warning/5 px-3 py-2 text-xs text-muted-foreground">
+                        <TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-warning" />
+                        This looks like a server behind NAT: free subdomains point at the LAN IP ({status.subdomainIp}) and
+                        only work on your network. For public access, choose a wildcard domain or a tunnel below.
+                    </p>
+                )}
+
+                <label className="flex flex-col gap-1 text-sm">
+                    Exposure mode
+                    <Select value={mode} onValueChange={(value) => setMode(value as NetworkMode)} options={MODE_OPTIONS} />
+                </label>
+
+                {mode === "wildcard" && (
+                    <label className="flex flex-col gap-1 text-sm">
+                        Wildcard base domain
+                        <Input
+                            value={wildcard}
+                            onChange={(event) => setWildcard(event.target.value)}
+                            placeholder="apps.example.com"
+                            autoComplete="off"
+                        />
+                    </label>
+                )}
+
+                <ExposureGuidance status={status} mode={mode} wildcard={wildcard} />
+
+                <div className="flex items-center justify-end gap-3">
+                    {saved && <span className="text-sm text-success">Saved.</span>}
+                    <Button onClick={save} disabled={busy}>
+                        {busy ? "Saving..." : "Save exposure"}
+                    </Button>
+                </div>
+            </CardBody>
+        </Card>
+    );
+}
+
+function StatusRow({ label, value, tone }: { label: string; value: string; tone?: "ok" | "warn" }) {
+    const color = tone === "ok" ? "text-success" : tone === "warn" ? "text-warning" : "text-foreground";
+    return (
+        <div className="flex items-center justify-between gap-2">
+            <span className="text-muted-foreground">{label}</span>
+            <span className={`font-mono ${color}`}>{value}</span>
+        </div>
+    );
+}
+
+function ExposureGuidance({ status, mode, wildcard }: { status: NetworkStatus; mode: NetworkMode; wildcard: string }) {
+    const effective = mode === "auto" ? status.effectiveMode : mode;
+    const base = wildcard.trim() || "apps.example.com";
+
+    if (effective === "public") {
+        return (
+            <GuidanceNote ok>
+                Your box is internet-reachable at {status.publicIp ?? status.subdomainIp}. Free subdomains get a real
+                Let&apos;s Encrypt certificate and work from anywhere.
+            </GuidanceNote>
+        );
+    }
+    if (effective === "wildcard") {
+        return (
+            <GuidanceNote>
+                <b>Point a wildcard at your server, then Polaris manages every subdomain:</b>
+                <ol className="mt-1 list-decimal space-y-1 pl-4">
+                    <li>
+                        Create a DNS record <code>*.{base}</code> of type A pointing at your public IP
+                        {status.publicIp ? ` (${status.publicIp})` : ""}.
+                    </li>
+                    <li>
+                        Forward ports <code>80</code> and <code>443</code> on your router to this server
+                        {status.subdomainIp ? ` (${status.subdomainIp})` : ""}.
+                    </li>
+                    <li>
+                        Save. New services get <code>&lt;app&gt;.{base}</code> with an automatic Let&apos;s Encrypt
+                        certificate.
+                    </li>
+                </ol>
+            </GuidanceNote>
+        );
+    }
+    if (effective === "tunnel") {
+        return (
+            <GuidanceNote>
+                Public access runs through a Cloudflare/ngrok tunnel - no open ports or public IP needed. Set one up in{" "}
+                <a className="text-primary hover:underline" href="/integrations">
+                    Integrations
+                </a>
+                , or use the per-service <b>Public tunnel</b> button. Auto subdomains stay LAN-only.
+            </GuidanceNote>
+        );
+    }
+    return (
+        <GuidanceNote>
+            Free subdomains resolve to your LAN IP ({status.subdomainIp ?? "unknown"}) and work only on your local
+            network, served with the internal CA (a one-time browser warning). Pick a wildcard domain or a tunnel to
+            expose services publicly.
+        </GuidanceNote>
+    );
+}
+
+function GuidanceNote({ children, ok }: { children: ReactNode; ok?: boolean }) {
+    return (
+        <div
+            className={`rounded-md border px-3 py-2 text-xs text-muted-foreground ${
+                ok ? "border-success/30 bg-success/5" : "border-border/60 bg-surface/40"
+            }`}
+        >
+            {children}
         </div>
     );
 }

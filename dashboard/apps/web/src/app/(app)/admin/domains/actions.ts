@@ -15,6 +15,13 @@ import {
     syncDuckDns,
     type DomainConfig
 } from "@/lib/domain-service";
+import {
+    detectPublicIp,
+    getNetworkStatus,
+    setNetworkConfig,
+    type NetworkMode,
+    type NetworkStatus
+} from "@/lib/network-service";
 import { recordAudit } from "@/lib/audit-service";
 
 export async function saveDomainsAction(input: {
@@ -40,4 +47,22 @@ export async function clearDuckdnsTokenAction(): Promise<{ config: DomainConfig 
 export async function syncDuckDnsAction(): Promise<{ ok: boolean; detail: string }> {
     await requireAdmin();
     return syncDuckDns();
+}
+
+/** Current network topology + exposure mode (re-detecting the public IP if asked). */
+export async function networkStatusAction(redetect = false): Promise<NetworkStatus> {
+    await requireAdmin();
+    if (redetect) await detectPublicIp(true);
+    return getNetworkStatus();
+}
+
+export async function saveNetworkConfigAction(input: {
+    mode?: NetworkMode;
+    wildcardDomain?: string;
+}): Promise<NetworkStatus> {
+    const user = await requireAdmin();
+    await setNetworkConfig(input);
+    await recordAudit({ actorId: user.id, action: "network.configure", targetType: "setting", targetId: "network" });
+    revalidatePath("/admin/domains");
+    return getNetworkStatus();
 }

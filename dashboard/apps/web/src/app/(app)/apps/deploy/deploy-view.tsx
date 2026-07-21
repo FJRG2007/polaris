@@ -239,15 +239,24 @@ function AppCard({
                 <div className="flex flex-col gap-1">
                     {app.domains.map((domain) =>
                         domain.enabled ? (
-                            <a
-                                key={domain.id}
-                                href={`https://${domain.hostname}`}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="inline-flex items-center gap-1 truncate text-xs text-primary hover:underline"
-                            >
-                                <Globe className="size-3 shrink-0" /> {domain.hostname}
-                            </a>
+                            <span key={domain.id} className="inline-flex min-w-0 items-center gap-1.5">
+                                <a
+                                    href={`https://${domain.hostname}`}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="inline-flex min-w-0 items-center gap-1 truncate text-xs text-primary hover:underline"
+                                >
+                                    <Globe className="size-3 shrink-0" /> {domain.hostname}
+                                </a>
+                                {domain.kind === "lan" && (
+                                    <span
+                                        title="Resolves only on your local network"
+                                        className="shrink-0 rounded bg-warning/10 px-1 text-[10px] font-medium text-warning"
+                                    >
+                                        LAN
+                                    </span>
+                                )}
+                            </span>
                         ) : (
                             <span
                                 key={domain.id}
