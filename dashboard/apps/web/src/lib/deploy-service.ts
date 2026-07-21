@@ -173,7 +173,7 @@ export async function createApplication(ownerId: string, input: CreateApplicatio
 export async function addApplicationDomain(
     applicationId: string,
     ownerId: string,
-    opts: { hostname?: string; targetPort: number }
+    opts: { hostname?: string; targetPort: number; cert?: "internal" | "le" | "none" }
 ): Promise<string> {
     const app = await prisma.application.findFirst({
         where: { id: applicationId, environment: { project: { ownerId } } }
@@ -181,10 +181,11 @@ export async function addApplicationDomain(
     if (!app) throw new Error("Application not found");
     let hostname = opts.hostname?.trim();
     let kind = "custom";
-    // A custom (usually public) domain gets automatic HTTPS from Let's Encrypt; a
-    // free/LAN subdomain (sslip.io on a private IP, where ACME cannot validate) is
-    // served with Caddy's internal CA instead.
-    let certResolver = "le";
+    // Cert/exposure resolution: a caller-chosen mode wins (e.g. "none" for a domain
+    // fronted by a tunnel/proxy that terminates TLS). Otherwise a custom domain gets
+    // automatic HTTPS from Let's Encrypt, and a free/LAN subdomain (sslip.io on a
+    // private IP, where ACME cannot validate) is served with Caddy's internal CA.
+    let certResolver: string = opts.cert ?? "le";
     if (!hostname) {
         const auto = await autoSubdomainUrl(app.slug);
         if (!auto) {
@@ -194,7 +195,7 @@ export async function addApplicationDomain(
         }
         hostname = new URL(auto).host;
         kind = "auto";
-        certResolver = "internal";
+        if (!opts.cert) certResolver = "internal";
     }
     let domain;
     try {

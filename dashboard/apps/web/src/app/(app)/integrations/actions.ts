@@ -20,9 +20,50 @@ import {
     refreshInstallations,
     verifyGithubToken
 } from "@/lib/github-service";
+import { applyTunnel } from "@/lib/tunnel-service";
 import { recordAudit } from "@/lib/audit-service";
 
 const SCAN_ACTIONS = new Set<ScanAction>(["block", "quarantine", "notify"]);
+
+/**
+ * Configure a tunnel provider (cloudflare/ngrok). Enabling one runs the tunnel
+ * container; only one runs per server, so enabling a provider disables the other.
+ * The token is tri-state (a value replaces it, blank keeps it).
+ */
+export async function saveTunnelAction(input: {
+    provider: "cloudflare" | "ngrok";
+    enabled: boolean;
+    token?: string;
+}): Promise<{ error?: string }> {
+    const user = await requireAdmin();
+    const provider = input.provider;
+    if (provider !== "cloudflare" && provider !== "ngrok") return { error: "Unknown tunnel provider" };
+    const existing = await getIntegrationState(provider);
+    const newToken = input.token && input.token.trim() ? input.token.trim() : undefined;
+    const willHaveToken = Boolean(newToken) || Boolean(existing?.hasSecret);
+    if (input.enabled && !willHaveToken) return { error: "Add the token before enabling it" };
+
+    if (input.enabled) {
+        // Only one tunnel per server - turn the other provider off.
+        const other = provider === "cloudflare" ? "ngrok" : "cloudflare";
+        await upsertIntegration(other, { enabled: false });
+    }
+    await upsertIntegration(provider, { enabled: input.enabled, secret: newToken, installedById: user.id });
+    await recordAudit({
+        actorId: user.id,
+        action: "integration.configure",
+        targetType: "integration",
+        targetId: provider,
+        metadata: { enabled: input.enabled }
+    });
+    try {
+        await applyTunnel();
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Saved, but the tunnel could not start" };
+    }
+    revalidatePath("/integrations");
+    return {};
+}
 
 /** Save VirusTotal's settings (enabled flag, detection action, and API key). */
 export async function saveVirusTotalAction(input: {

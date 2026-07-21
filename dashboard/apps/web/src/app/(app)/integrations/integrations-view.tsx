@@ -31,6 +31,7 @@ import {
     disconnectGithubAction,
     refreshGithubInstallationsAction,
     saveDymoAction,
+    saveTunnelAction,
     saveVirusTotalAction,
     testDymoKeyAction,
     testVirusTotalKeyAction
@@ -115,8 +116,67 @@ export function IntegrationsView({ cards }: { cards: IntegrationCard[] }) {
                 <DymoDialog card={configuring} onClose={() => setConfiguring(null)} />
             ) : configuring?.slug === "github" ? (
                 <GitHubDialog card={configuring} onClose={() => setConfiguring(null)} />
+            ) : configuring?.slug === "cloudflare" || configuring?.slug === "ngrok" ? (
+                <TunnelDialog card={configuring} onClose={() => setConfiguring(null)} />
             ) : null}
         </>
+    );
+}
+
+function TunnelDialog({ card, onClose }: { card: IntegrationCard; onClose: () => void }) {
+    const provider = card.slug as "cloudflare" | "ngrok";
+    const [enabled, setEnabled] = useState(card.enabled);
+    const [token, setToken] = useState("");
+    const [error, setError] = useState<string | null>(null);
+    const [pending, startTransition] = useTransition();
+
+    function onSave() {
+        setError(null);
+        startTransition(async () => {
+            const result = await saveTunnelAction({ provider, enabled, token: token || undefined });
+            if (result.error) setError(result.error);
+            else onClose();
+        });
+    }
+
+    return (
+        <Dialog open onOpenChange={(open) => !open && onClose()}>
+            <DialogContent className="max-w-md">
+                <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2">
+                        <IntegrationLogo slug={card.slug} className="size-5" />
+                        {card.name}
+                    </DialogTitle>
+                    <DialogDescription>{card.description}</DialogDescription>
+                </DialogHeader>
+                <div className="flex flex-col gap-4">
+                    <div className="flex items-center justify-between gap-3 rounded-md border border-border p-3 text-sm">
+                        <span>Enabled</span>
+                        <Switch checked={enabled} onChange={setEnabled} aria-label="Enabled" />
+                    </div>
+                    <label className="flex flex-col gap-1 text-sm">
+                        {card.apiKeyLabel ?? "Token"}
+                        <Input
+                            type="password"
+                            value={token}
+                            onChange={(event) => setToken(event.target.value)}
+                            placeholder={card.hasSecret ? "Saved - enter a new token to replace it" : "Paste the token"}
+                            autoComplete="off"
+                        />
+                        {card.apiKeyHelp ? <span className="text-xs text-muted-foreground">{card.apiKeyHelp}</span> : null}
+                    </label>
+                    {error ? <p className="text-sm text-danger">{error}</p> : null}
+                    <div className="flex justify-end gap-2">
+                        <Button variant="ghost" onClick={onClose}>
+                            Cancel
+                        </Button>
+                        <Button onClick={onSave} disabled={pending}>
+                            {pending ? "Applying..." : "Save"}
+                        </Button>
+                    </div>
+                </div>
+            </DialogContent>
+        </Dialog>
     );
 }
 

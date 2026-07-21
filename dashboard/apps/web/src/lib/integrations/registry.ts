@@ -129,6 +129,30 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         apiKeyLabel: "Personal Access Token",
         apiKeyHelp:
             "A fine-grained token with Contents: Read on the repositories you want to deploy (or a classic token with the 'repo' scope)."
+    },
+    {
+        slug: "cloudflare",
+        name: "Cloudflare Tunnel",
+        category: "Automation",
+        summary: "Expose deployed apps over a public domain with no port-forwarding.",
+        description:
+            "Runs a Cloudflare Tunnel from this server so apps are reachable on your domain without opening any ports. Create a tunnel in the Cloudflare dashboard, add a public hostname pointing to http://<this-host-ip>:80, and paste its token here - Polaris routes each hostname to the right app.",
+        docsUrl: "https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/",
+        requiresApiKey: true,
+        apiKeyLabel: "Tunnel token",
+        apiKeyHelp: "The token shown when you create a tunnel (Zero Trust -> Networks -> Tunnels -> Install connector)."
+    },
+    {
+        slug: "ngrok",
+        name: "ngrok",
+        category: "Automation",
+        summary: "Expose deployed apps through an ngrok tunnel, no port-forwarding.",
+        description:
+            "Runs an ngrok agent from this server that forwards inbound traffic to Polaris. Good for quick public access; a reserved domain (ngrok paid) is recommended for a stable URL.",
+        docsUrl: "https://dashboard.ngrok.com/get-started/your-authtoken",
+        requiresApiKey: true,
+        apiKeyLabel: "Authtoken",
+        apiKeyHelp: "Your ngrok authtoken from the ngrok dashboard."
     }
 ];
 

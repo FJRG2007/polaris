@@ -354,6 +354,7 @@ export async function addDomainAction(input: {
     applicationId: string;
     hostname?: string;
     targetPort: number;
+    cert?: "internal" | "le" | "none";
 }): Promise<{ error?: string; hostname?: string }> {
     const user = await requirePermission("deploy.manage");
     const port = Number(input.targetPort);
@@ -363,7 +364,8 @@ export async function addDomainAction(input: {
     try {
         const hostname = await addApplicationDomain(input.applicationId, user.id, {
             hostname: input.hostname,
-            targetPort: port
+            targetPort: port,
+            cert: input.cert
         });
         await recordAudit({ actorId: user.id, action: "deploy.domain.add", targetType: "application", targetId: input.applicationId });
         revalidatePath(DEPLOY_PATH);

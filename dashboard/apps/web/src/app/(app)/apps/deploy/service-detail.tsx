@@ -39,6 +39,7 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
     Input,
+    Select,
     Switch,
     cn
 } from "@polaris/ui";
@@ -788,6 +789,7 @@ function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
     const [keepReleases, setKeepReleases] = useState(app.keepReleases);
     const [hostname, setHostname] = useState("");
     const [port, setPort] = useState("3000");
+    const [exposure, setExposure] = useState<"subdomain" | "le" | "tunnel">("subdomain");
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
 
@@ -808,8 +810,14 @@ function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
 
     function addDomain() {
         setError(null);
+        const isCustom = exposure !== "subdomain";
         startTransition(async () => {
-            const result = await addDomainAction({ applicationId: app.id, hostname: hostname.trim() || undefined, targetPort: Number(port) });
+            const result = await addDomainAction({
+                applicationId: app.id,
+                hostname: isCustom ? hostname.trim() || undefined : undefined,
+                targetPort: Number(port),
+                cert: exposure === "le" ? "le" : exposure === "tunnel" ? "none" : undefined
+            });
             if (result.error) setError(result.error);
             else {
                 setHostname("");
@@ -840,12 +848,44 @@ function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
                 ) : (
                     <p className="text-xs text-muted-foreground">No domains yet.</p>
                 )}
-                <div className="flex flex-wrap items-center gap-2">
-                    <Input value={hostname} onChange={(event) => setHostname(event.target.value)} placeholder="custom domain (blank = free subdomain)" className="flex-1" />
-                    <Input value={port} onChange={(event) => setPort(event.target.value)} placeholder="port" className="w-24" />
-                    <Button variant="outline" onClick={addDomain} disabled={pending}>
-                        Add domain
-                    </Button>
+                <div className="flex flex-col gap-2">
+                    <div className="grid grid-cols-2 gap-2">
+                        <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                            Exposure
+                            <Select
+                                value={exposure}
+                                onValueChange={(value) => setExposure(value as "subdomain" | "le" | "tunnel")}
+                                options={[
+                                    { value: "subdomain", label: "Free subdomain (LAN / internal CA)" },
+                                    { value: "le", label: "Custom domain - Let's Encrypt" },
+                                    { value: "tunnel", label: "Custom domain - behind a tunnel/proxy" }
+                                ]}
+                            />
+                        </label>
+                        <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                            Port
+                            <Input value={port} onChange={(event) => setPort(event.target.value)} placeholder="port" />
+                        </label>
+                    </div>
+                    {exposure !== "subdomain" && (
+                        <Input
+                            value={hostname}
+                            onChange={(event) => setHostname(event.target.value)}
+                            placeholder="app.example.com"
+                        />
+                    )}
+                    <p className="text-xs text-muted-foreground">
+                        {exposure === "subdomain"
+                            ? "A free subdomain on this server, served with Caddy's internal CA - reachable on your network."
+                            : exposure === "le"
+                              ? "Point the domain's DNS at this server's public IP (port-forward / DuckDNS). Caddy gets a Let's Encrypt certificate automatically."
+                              : "For a domain fronted by a tunnel (Cloudflare / ngrok) or an external proxy that terminates TLS. Configure the tunnel under Integrations."}
+                    </p>
+                    <div className="flex justify-end">
+                        <Button variant="outline" onClick={addDomain} disabled={pending}>
+                            Add domain
+                        </Button>
+                    </div>
                 </div>
             </section>
 

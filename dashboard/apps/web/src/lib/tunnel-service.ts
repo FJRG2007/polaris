@@ -3,62 +3,43 @@
  * expose its apps publicly with no port-forwarding. The tunnel runs as one
  * container per server: it connects out to the provider and forwards inbound
  * traffic to the local Caddy (the host's published :80), which then routes each
- * hostname to its app. Only the provider and token are stored (token encrypted);
- * the public hostnames themselves are configured with the provider (e.g. the
- * Cloudflare dashboard maps a hostname to http://<box-ip>:80).
+ * hostname to its app. Credentials live in Integrations (the `cloudflare`/`ngrok`
+ * integration secrets); the public hostnames themselves are configured with the
+ * provider (e.g. the Cloudflare dashboard maps a hostname to http://<box-ip>:80).
  */
 
-import { prisma } from "@polaris/db";
-import { loadEnv } from "@polaris/config";
-import { decryptSecret, encryptSecret } from "@polaris/storage";
 import type { ComposeSpec } from "@polaris/deploy";
 import { HostdPorts } from "./deploy/ports-hostd";
 import { getPublicIp } from "./domain-service";
+import { getIntegrationSecret, getIntegrationState } from "./integration-service";
 
-const KEYS = { provider: "tunnel.provider", token: "tunnel.token" } as const;
 const PROJECT = "polaris-tunnel";
 const SERVICE = "polaris-tunnel";
 const PROXY_NETWORK = "polaris-proxy";
 
 export type TunnelProvider = "none" | "cloudflare" | "ngrok";
+const PROVIDERS = ["cloudflare", "ngrok"] as const;
 
 export interface TunnelStatus {
     provider: TunnelProvider;
-    hasToken: boolean;
     running: boolean;
 }
 
-async function getSetting(key: string): Promise<string | null> {
-    const row = await prisma.setting.findUnique({ where: { key }, select: { value: true } });
-    return row?.value ?? null;
-}
-
-async function setSetting(key: string, value: string | null): Promise<void> {
-    if (value === null) {
-        await prisma.setting.deleteMany({ where: { key } });
-        return;
+/** The enabled tunnel provider and its token, or null when none is configured. A
+ *  single tunnel runs per server, so the first enabled provider with a token wins. */
+async function activeTunnel(): Promise<{ provider: (typeof PROVIDERS)[number]; token: string } | null> {
+    for (const provider of PROVIDERS) {
+        const state = await getIntegrationState(provider);
+        if (!state?.enabled) continue;
+        const token = await getIntegrationSecret(provider);
+        if (token) return { provider, token };
     }
-    await prisma.setting.upsert({ where: { key }, create: { key, value, scope: "global" }, update: { value } });
-}
-
-async function getToken(): Promise<string | null> {
-    const raw = await getSetting(KEYS.token);
-    if (!raw) return null;
-    try {
-        const { c, n, k } = JSON.parse(raw) as { c: string; n: string; k: string };
-        return decryptSecret(
-            { ciphertext: Buffer.from(c, "base64"), nonce: Buffer.from(n, "base64"), keyId: k },
-            loadEnv().POLARIS_MASTER_KEY
-        );
-    } catch {
-        return null;
-    }
+    return null;
 }
 
 export async function getTunnelStatus(): Promise<TunnelStatus> {
-    const provider = ((await getSetting(KEYS.provider)) ?? "none") as TunnelProvider;
-    const hasToken = Boolean(await getSetting(KEYS.token));
-    return { provider, hasToken, running: await tunnelRunning() };
+    const active = await activeTunnel();
+    return { provider: active?.provider ?? "none", running: await tunnelRunning() };
 }
 
 /** Whether the tunnel container is up (best-effort). The tunnel always runs on the
@@ -76,7 +57,7 @@ async function tunnelRunning(): Promise<boolean> {
 }
 
 /** The compose spec for the tunnel container of the chosen provider. */
-function tunnelSpec(provider: TunnelProvider, token: string, boxIp: string | null): ComposeSpec {
+function tunnelSpec(provider: (typeof PROVIDERS)[number], token: string, boxIp: string | null): ComposeSpec {
     const isCloudflare = provider === "cloudflare";
     const env: Record<string, string> = isCloudflare ? { TUNNEL_TOKEN: token } : { NGROK_AUTHTOKEN: token };
     const service = {
@@ -100,38 +81,15 @@ function tunnelSpec(provider: TunnelProvider, token: string, boxIp: string | nul
  * container (or tear it down when set to none / no token). Idempotent.
  */
 export async function applyTunnel(): Promise<void> {
-    const provider = ((await getSetting(KEYS.provider)) ?? "none") as TunnelProvider;
-    const token = await getToken();
+    const active = await activeTunnel();
     const ports = new HostdPorts();
     try {
-        if (provider === "none" || !token) {
+        if (!active) {
             await ports.composeDown(PROJECT).catch(() => undefined);
             return;
         }
-        await ports.composeUp(tunnelSpec(provider, token, await getPublicIp()));
+        await ports.composeUp(tunnelSpec(active.provider, active.token, await getPublicIp()));
     } finally {
         await ports.dispose();
     }
-}
-
-/** Save the tunnel provider and (optionally) a new token, then reconcile. */
-export async function setTunnelConfig(input: { provider: TunnelProvider; token?: string }): Promise<void> {
-    await setSetting(KEYS.provider, input.provider === "none" ? null : input.provider);
-    if (input.token !== undefined) {
-        const trimmed = input.token.trim();
-        if (!trimmed) {
-            await setSetting(KEYS.token, null);
-        } else {
-            const blob = encryptSecret(trimmed, loadEnv().POLARIS_MASTER_KEY);
-            await setSetting(
-                KEYS.token,
-                JSON.stringify({
-                    c: blob.ciphertext.toString("base64"),
-                    n: blob.nonce.toString("base64"),
-                    k: blob.keyId
-                })
-            );
-        }
-    }
-    await applyTunnel();
 }

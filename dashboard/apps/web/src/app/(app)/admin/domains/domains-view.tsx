@@ -8,20 +8,17 @@
  */
 
 import { useState } from "react";
-import { CheckCircle2, Cloud, Globe, Link2, RefreshCw, TriangleAlert } from "lucide-react";
-import { Badge, Button, Card, CardBody, CardHeader, CardTitle, Input, Select } from "@polaris/ui";
+import { CheckCircle2, Globe, Link2, RefreshCw, TriangleAlert } from "lucide-react";
+import { Badge, Button, Card, CardBody, CardHeader, CardTitle, Input } from "@polaris/ui";
 import type { DomainConfig } from "@/lib/domain-service";
-import type { TunnelProvider, TunnelStatus } from "@/lib/tunnel-service";
-import { clearDuckdnsTokenAction, saveDomainsAction, saveTunnelAction, syncDuckDnsAction } from "./actions";
+import { clearDuckdnsTokenAction, saveDomainsAction, syncDuckDnsAction } from "./actions";
 
 export function DomainsView({
     initialConfig,
-    effectiveAppUrl,
-    initialTunnel
+    effectiveAppUrl
 }: {
     initialConfig: DomainConfig;
     effectiveAppUrl: string;
-    initialTunnel: TunnelStatus;
 }) {
     const [config, setConfig] = useState(initialConfig);
     const [appDomain, setAppDomain] = useState(initialConfig.appDomain);
@@ -32,21 +29,6 @@ export function DomainsView({
     const [saved, setSaved] = useState(false);
     const [syncing, setSyncing] = useState(false);
     const [syncResult, setSyncResult] = useState<{ ok: boolean; detail: string } | null>(null);
-    const [tunnel, setTunnel] = useState(initialTunnel);
-    const [tunnelProvider, setTunnelProvider] = useState<TunnelProvider>(initialTunnel.provider);
-    const [tunnelToken, setTunnelToken] = useState("");
-    const [tunnelSaving, setTunnelSaving] = useState(false);
-    const [tunnelError, setTunnelError] = useState<string | null>(null);
-
-    async function onSaveTunnel() {
-        setTunnelSaving(true);
-        setTunnelError(null);
-        const result = await saveTunnelAction({ provider: tunnelProvider, token: tunnelToken || undefined });
-        setTunnel(result.status);
-        setTunnelToken("");
-        setTunnelError(result.error ?? null);
-        setTunnelSaving(false);
-    }
 
     async function onSave() {
         setSaving(true);
@@ -181,69 +163,6 @@ export function DomainsView({
                             {syncResult.ok ? "DuckDNS updated." : syncResult.detail}
                         </p>
                     ) : null}
-                </CardBody>
-            </Card>
-
-            <Card>
-                <CardHeader>
-                    <div className="flex items-center justify-between gap-2">
-                        <CardTitle className="flex items-center gap-2">
-                            <Cloud className="size-4 text-primary" />
-                            Tunnel
-                            {tunnel.running ? (
-                                <Badge variant="success">Running</Badge>
-                            ) : tunnel.provider !== "none" ? (
-                                <Badge variant="warning">Configured</Badge>
-                            ) : null}
-                        </CardTitle>
-                    </div>
-                </CardHeader>
-                <CardBody className="flex flex-col gap-4">
-                    <p className="text-xs text-muted-foreground">
-                        Expose deployed apps publicly with no port-forwarding: the tunnel connects out to Cloudflare or
-                        ngrok and forwards traffic to this host, which routes each domain to its app. Point the
-                        provider&apos;s hostname at <code>http://&lt;this-host-ip&gt;:80</code>.
-                    </p>
-                    <label className="flex flex-col gap-1 text-sm">
-                        Provider
-                        <Select
-                            value={tunnelProvider}
-                            onValueChange={(value) => setTunnelProvider(value as TunnelProvider)}
-                            options={[
-                                { value: "none", label: "None (local / port-forward)" },
-                                { value: "cloudflare", label: "Cloudflare Tunnel" },
-                                { value: "ngrok", label: "ngrok" }
-                            ]}
-                        />
-                    </label>
-                    {tunnelProvider !== "none" ? (
-                        <label className="flex flex-col gap-1 text-sm">
-                            {tunnelProvider === "cloudflare" ? "Tunnel token" : "Authtoken"}
-                            <Input
-                                type="password"
-                                value={tunnelToken}
-                                onChange={(event) => setTunnelToken(event.target.value)}
-                                placeholder={tunnel.hasToken ? "Saved - enter a new token to replace it" : "Paste the token"}
-                                autoComplete="off"
-                            />
-                            <span className="text-xs text-muted-foreground">
-                                {tunnelProvider === "cloudflare"
-                                    ? "Create a tunnel in the Cloudflare dashboard, add a public hostname pointing to http://<this-host-ip>:80, and paste its token here."
-                                    : "Your ngrok authtoken. ngrok forwards to this host; a reserved domain is recommended for stable URLs."}
-                            </span>
-                        </label>
-                    ) : null}
-                    {tunnelError ? (
-                        <p className="flex items-center gap-1.5 text-sm text-danger">
-                            <TriangleAlert className="size-4" />
-                            {tunnelError}
-                        </p>
-                    ) : null}
-                    <div className="flex justify-end">
-                        <Button size="sm" onClick={onSaveTunnel} disabled={tunnelSaving}>
-                            {tunnelSaving ? "Applying..." : "Apply tunnel"}
-                        </Button>
-                    </div>
                 </CardBody>
             </Card>
 
