@@ -15,6 +15,7 @@ import {
     ChevronRight,
     Cloud,
     Copy,
+    Download,
     Eye,
     EyeOff,
     Globe,
@@ -47,6 +48,8 @@ import {
 } from "@polaris/ui";
 import { ServiceIcon, StatusPill, dbTone, serviceKindOf, type ProjectApp } from "./deploy-view";
 import { MetricsHistory, percent, ratioPercent, type MetricSpec } from "@/components/metrics-history";
+import { LogViewer } from "@/components/log-viewer";
+import type { HttpLogEntry } from "@polaris/deploy";
 import { TerminalPanel } from "./terminal-panel";
 import { FilesPanel } from "./files-panel";
 import {
@@ -489,8 +492,10 @@ function DeploymentLogsView({
 
             {cat === "Details" ? (
                 <DetailsPanel app={app} deployment={deployment} />
-            ) : cat === "HTTP Logs" || cat === "Network Flow Logs" ? (
-                <Empty text={`No ${cat.toLowerCase()} yet.`} />
+            ) : cat === "HTTP Logs" ? (
+                <HttpLogsView appId={app.id} />
+            ) : cat === "Network Flow Logs" ? (
+                <Empty text="No network flow logs yet." />
             ) : (
                 <LogStream deploymentId={deploymentId} onDone={onDone} />
             )}
@@ -521,7 +526,6 @@ function DetailsPanel({ app, deployment }: { app: ProjectApp; deployment: DepSum
 
 function LogStream({ deploymentId, onDone }: { deploymentId: string; onDone: () => void }) {
     const [log, setLog] = useState("");
-    const [search, setSearch] = useState("");
     const onDoneRef = useRef(onDone);
     onDoneRef.current = onDone;
 
@@ -552,31 +556,173 @@ function LogStream({ deploymentId, onDone }: { deploymentId: string; onDone: () 
         };
     }, [deploymentId]);
 
-    const lines = log ? log.split("\n") : [];
-    const filtered = search.trim() ? lines.filter((line) => line.toLowerCase().includes(search.toLowerCase())) : lines;
+    return <LogViewer log={log} name={deploymentId} searchable className="h-[26rem]" />;
+}
+
+/** Color an HTTP status by its class: 2xx ok, 3xx redirect, 4xx client, 5xx server. */
+function statusTone(status: number): string {
+    if (status >= 500) return "bg-red-500/10 text-red-600 dark:text-red-400";
+    if (status >= 400) return "bg-amber-500/10 text-amber-600 dark:text-amber-400";
+    if (status >= 300) return "bg-sky-500/10 text-sky-600 dark:text-sky-400";
+    if (status >= 200) return "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400";
+    return "bg-muted text-muted-foreground";
+}
+
+/** Quote a CSV cell when it contains a comma, quote, or newline. */
+function csvCell(value: string | number): string {
+    const text = String(value);
+    return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+}
+
+/**
+ * HTTP access logs for an app: client IP, method, path, status, and User-Agent,
+ * parsed from the container's own stdout and polled live. Apps that do not emit
+ * access logs show an explanatory empty state rather than an error.
+ */
+function HttpLogsView({ appId }: { appId: string }) {
+    const [entries, setEntries] = useState<HttpLogEntry[] | null>(null);
+    const [error, setError] = useState<string | null>(null);
+    const [search, setSearch] = useState("");
+
+    useEffect(() => {
+        let active = true;
+        let timer: ReturnType<typeof setTimeout>;
+        async function poll(): Promise<void> {
+            try {
+                const res = await fetch(`/api/deploy/apps/${appId}/http-logs`, { cache: "no-store" });
+                if (!active) return;
+                if (res.ok) {
+                    const data = (await res.json()) as { entries: HttpLogEntry[] };
+                    setEntries(data.entries);
+                    setError(null);
+                } else {
+                    const data = (await res.json().catch(() => null)) as { error?: string } | null;
+                    setError(data?.error ?? "Could not read HTTP logs");
+                }
+            } catch {
+                if (active) setError("Could not read HTTP logs");
+            }
+            if (active) timer = setTimeout(poll, 5000);
+        }
+        void poll();
+        return () => {
+            active = false;
+            clearTimeout(timer);
+        };
+    }, [appId]);
+
+    const query = search.trim().toLowerCase();
+    const filtered = (entries ?? []).filter(
+        (entry) =>
+            !query ||
+            entry.path.toLowerCase().includes(query) ||
+            entry.ip.toLowerCase().includes(query) ||
+            entry.method.toLowerCase().includes(query) ||
+            String(entry.status).includes(query) ||
+            (entry.userAgent?.toLowerCase().includes(query) ?? false)
+    );
+
+    function exportCsv(): void {
+        const header = ["time", "ip", "method", "path", "status", "host", "bytes", "referer", "user_agent", "duration_ms"];
+        const rows = (entries ?? []).map((entry) => [
+            entry.time ?? "",
+            entry.ip,
+            entry.method,
+            entry.path,
+            entry.status,
+            entry.host ?? "",
+            entry.bytes ?? "",
+            entry.referer ?? "",
+            entry.userAgent ?? "",
+            entry.durationMs ?? ""
+        ]);
+        const csv = [header, ...rows].map((row) => row.map(csvCell).join(",")).join("\n");
+        const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement("a");
+        anchor.href = url;
+        anchor.download = `${appId}-http-logs.csv`;
+        anchor.click();
+        URL.revokeObjectURL(url);
+    }
 
     return (
         <div className="flex flex-col gap-2">
-            <div className="relative">
-                <Search className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                    value={search}
-                    onChange={(event) => setSearch(event.target.value)}
-                    placeholder="Filter and search logs"
-                    className="pl-8 font-mono text-xs"
+            <div className="flex items-center gap-2">
+                <div className="relative min-w-0 flex-1">
+                    <Search className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                        value={search}
+                        onChange={(event) => setSearch(event.target.value)}
+                        placeholder="Filter by path, IP, status, or agent"
+                        className="pl-8 text-xs"
+                    />
+                </div>
+                <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={exportCsv}
+                    disabled={!entries?.length}
+                    className="shrink-0"
+                >
+                    <Download className="size-4" />
+                    Export
+                </Button>
+            </div>
+
+            {entries === null && !error ? (
+                <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">
+                    <Loader2 className="mr-2 size-4 animate-spin" /> Reading logs...
+                </div>
+            ) : error ? (
+                <Empty text={error} />
+            ) : filtered.length === 0 ? (
+                <Empty
+                    text={
+                        entries && entries.length > 0
+                            ? "No requests match the filter."
+                            : "No HTTP requests logged yet. This app may not write access logs to stdout, or uses a format that isn't recognized."
+                    }
                 />
-            </div>
-            <div className="h-[26rem] overflow-auto rounded-md bg-[#0b0e14] py-2 font-mono text-xs leading-relaxed text-zinc-300">
-                {filtered.length === 0 ? (
-                    <p className="px-3 py-2 text-muted-foreground">{log ? "No matching lines." : "Waiting for output..."}</p>
-                ) : (
-                    filtered.map((line, index) => (
-                        <div key={index} className="whitespace-pre-wrap px-3 hover:bg-white/5">
-                            {line || " "}
-                        </div>
-                    ))
-                )}
-            </div>
+            ) : (
+                <div className="max-h-[26rem] overflow-auto rounded-md border border-border/60">
+                    <table className="w-full text-xs">
+                        <thead className="sticky top-0 bg-card text-muted-foreground">
+                            <tr className="border-b border-border/60 text-left">
+                                <th className="whitespace-nowrap px-3 py-2 font-medium">Time</th>
+                                <th className="px-3 py-2 font-medium">Method</th>
+                                <th className="px-3 py-2 font-medium">Status</th>
+                                <th className="px-3 py-2 font-medium">Path</th>
+                                <th className="whitespace-nowrap px-3 py-2 font-medium">Client IP</th>
+                                <th className="px-3 py-2 font-medium">User agent</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border/40">
+                            {filtered.map((entry, index) => (
+                                <tr key={index} className="hover:bg-muted/40">
+                                    <td className="whitespace-nowrap px-3 py-1.5 text-muted-foreground" title={entry.time ?? undefined}>
+                                        {entry.time ? new Date(entry.time).toLocaleTimeString() : "-"}
+                                    </td>
+                                    <td className="px-3 py-1.5 font-mono">{entry.method}</td>
+                                    <td className="px-3 py-1.5">
+                                        <span className={`rounded px-1.5 py-0.5 font-mono ${statusTone(entry.status)}`}>
+                                            {entry.status}
+                                        </span>
+                                    </td>
+                                    <td className="max-w-[18rem] truncate px-3 py-1.5 font-mono" title={entry.path}>
+                                        {entry.path}
+                                    </td>
+                                    <td className="whitespace-nowrap px-3 py-1.5 font-mono text-muted-foreground">{entry.ip}</td>
+                                    <td className="max-w-[16rem] truncate px-3 py-1.5 text-muted-foreground" title={entry.userAgent ?? undefined}>
+                                        {entry.userAgent ?? "-"}
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            )}
         </div>
     );
 }
@@ -721,7 +867,7 @@ function VariablesTab({ app }: { app: ProjectApp }) {
                             <span className="text-xs text-muted-foreground/50">{"{ }"}</span>
                             <span className="w-60 shrink-0 truncate font-mono text-xs font-medium">{item.key}</span>
                             <span className="min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground">
-                                {item.isSecret ? "•••••••" : reveal[item.id] ? (item.value ?? "") : "•••••••"}
+                                {item.isSecret ? "â€¢â€¢â€¢â€¢â€¢â€¢â€¢" : reveal[item.id] ? (item.value ?? "") : "â€¢â€¢â€¢â€¢â€¢â€¢â€¢"}
                             </span>
                             {!item.isSecret && (
                                 <button

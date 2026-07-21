@@ -11,7 +11,7 @@ import { mkdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { loadEnv } from "@polaris/config";
 import { prisma } from "@polaris/db";
-import { serviceName, shortHash, slugify, type AppDeployPlan, type DeployResult, type RuntimeContext, type RuntimeDriver } from "@polaris/deploy";
+import { parseHttpLogs, serviceName, shortHash, slugify, type AppDeployPlan, type DeployResult, type HttpLogEntry, type RuntimeContext, type RuntimeDriver } from "@polaris/deploy";
 import { decryptSecret } from "@polaris/storage";
 import { getDriver, getPorts, toTargetInfo, type TargetRow } from "./deploy/runtime";
 import { getOrCreateHostTarget, getOrCreateLocalTarget } from "./deploy-target-service";
@@ -298,6 +298,31 @@ async function appRuntime(applicationId: string, ownerId: string) {
     const container = serviceName(app.environment.project.slug, app.slug, app.id);
     const project = `polaris-${shortHash(app.id, 8)}`;
     return { app, container, project, target: app.target as TargetRow };
+}
+
+/**
+ * HTTP access logs for an app, parsed from its container's stdout. Most web
+ * servers (nginx, Apache, and framework loggers) already emit one access line per
+ * request there, so this needs no proxy or extra wiring; an app that does not log
+ * access simply yields an empty list. Newest first, capped to `limit`.
+ */
+export async function readAppHttpLogs(
+    applicationId: string,
+    ownerId: string,
+    limit = 500
+): Promise<HttpLogEntry[]> {
+    const { container, target } = await appRuntime(applicationId, ownerId);
+    const ports = await getPorts(target, ownerId);
+    const chunks: Buffer[] = [];
+    try {
+        // Read a generous tail: access lines are a subset of stdout, so we over-fetch
+        // raw lines to land close to `limit` parsed requests without following.
+        await ports.logs(container, (chunk) => chunks.push(chunk), { tail: Math.min(limit * 5, 5000) });
+    } finally {
+        await ports.dispose();
+    }
+    const entries = parseHttpLogs(Buffer.concat(chunks).toString("utf8"));
+    return entries.reverse().slice(0, limit);
 }
 
 /** Restart the app's running container in place (no rebuild). */

@@ -53,3 +53,4 @@ export { ComposeRuntime } from "./runtime/compose.js";
 export { SwarmRuntime } from "./runtime/swarm.js";
 export { parseContainerState, type ContainerState } from "./runtime/status.js";
 export { onboardingScript, type OnboardingOptions } from "./onboarding.js";
+export { parseHttpLogs, type HttpLogEntry } from "./http-logs.js";
