@@ -7,10 +7,10 @@
  * Reuses the existing terminal/files/logs building blocks.
  */
 
-import { useEffect, useState, useTransition } from "react";
-import { ChevronLeft, ChevronRight, Eye, EyeOff, Globe, Loader2, Maximize2, Minimize2, Plus, Trash2 } from "lucide-react";
-import { Badge, Button, Dialog, DialogContent, DialogTitle, Input, Switch, cn } from "@polaris/ui";
-import { ServiceIcon, StatusPill, DeploymentLogs, dbTone, serviceKindOf, type ProjectApp } from "./deploy-view";
+import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
+import { CheckCircle2, ChevronLeft, Eye, EyeOff, Globe, Loader2, Maximize2, Minimize2, Plus, Search, Trash2 } from "lucide-react";
+import { Button, Dialog, DialogContent, DialogTitle, Input, Switch, cn } from "@polaris/ui";
+import { ServiceIcon, StatusPill, dbTone, serviceKindOf, type ProjectApp } from "./deploy-view";
 import { TerminalPanel } from "./terminal-panel";
 import { FilesPanel } from "./files-panel";
 import {
@@ -88,8 +88,34 @@ export function ServiceDetail({ app, onChanged, onClose }: { app: ProjectApp; on
     );
 }
 
+type DepSummary = Awaited<ReturnType<typeof listDeploymentsAction>>[number];
+
+function relativeTime(iso: string): string {
+    const minutes = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+    if (minutes < 1) return "just now";
+    if (minutes < 60) return `${minutes}m ago`;
+    if (minutes < 1440) return `${Math.floor(minutes / 60)}h ago`;
+    if (minutes < 10080) return `${Math.floor(minutes / 1440)}d ago`;
+    return new Date(iso).toLocaleDateString();
+}
+
+function depBadge(deployment: DepSummary): { label: string; cls: string } {
+    if (deployment.isCurrent) return { label: "ACTIVE", cls: "bg-success/15 text-success" };
+    if (["failed", "cancelled", "rolled_back"].includes(deployment.status))
+        return { label: "FAILED", cls: "bg-danger/15 text-danger" };
+    if (["queued", "deploying"].includes(deployment.status))
+        return { label: deployment.status.toUpperCase(), cls: "bg-warning/15 text-warning" };
+    return { label: "REMOVED", cls: "bg-muted text-muted-foreground" };
+}
+
+function depTitle(deployment: DepSummary): string {
+    if (deployment.commitMessage) return deployment.commitMessage;
+    if (deployment.commitSha) return `Deploy ${deployment.commitSha.slice(0, 7)}`;
+    return "Manual deploy";
+}
+
 function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => void }) {
-    const [items, setItems] = useState<Awaited<ReturnType<typeof listDeploymentsAction>> | null>(null);
+    const [items, setItems] = useState<DepSummary[] | null>(null);
     const [logsFor, setLogsFor] = useState<string | null>(null);
     const [busy, startTransition] = useTransition();
 
@@ -111,21 +137,21 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
         });
     }
 
-    // Logs render INLINE (no separate dialog), Railway-style, with log categories.
     if (logsFor) {
+        const deployment = items?.find((item) => item.id === logsFor) ?? null;
         return (
-            <div className="flex flex-col gap-2 py-2">
-                <button
-                    type="button"
-                    onClick={() => setLogsFor(null)}
-                    className="inline-flex w-fit items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
-                >
-                    <ChevronLeft className="size-4" /> Deployments
-                </button>
-                <DeploymentLogsView deploymentId={logsFor} onDone={reload} />
-            </div>
+            <DeploymentLogsView
+                app={app}
+                deploymentId={logsFor}
+                deployment={deployment}
+                onBack={() => setLogsFor(null)}
+                onDone={reload}
+            />
         );
     }
+
+    const active = items?.find((item) => item.isCurrent) ?? null;
+    const history = (items ?? []).filter((item) => !item.isCurrent);
 
     return (
         <div className="flex flex-col gap-3 py-2">
@@ -142,41 +168,108 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
                 ) : (
                     <span className="text-sm text-muted-foreground">No domain yet</span>
                 )}
-                <Button size="sm" className="ml-auto" disabled={busy} onClick={deploy}>
+                <span className="ml-auto text-xs text-muted-foreground">1 Replica</span>
+                <Button size="sm" disabled={busy} onClick={deploy}>
                     {busy ? <Loader2 className="size-4 animate-spin" /> : "Deploy"}
                 </Button>
             </div>
+
             {items === null ? (
                 <Loading />
             ) : items.length === 0 ? (
-                <Empty text="No deployments yet." />
+                <Empty text="No deployments yet. Click Deploy to ship the current source." />
             ) : (
-                <ul className="flex flex-col">
-                    {items.map((deployment) => (
-                        <li
-                            key={deployment.id}
-                            onClick={() => setLogsFor(deployment.id)}
-                            className="flex cursor-pointer items-center gap-2 border-b border-border/40 px-1 py-2.5 text-sm transition-colors hover:bg-muted/40"
+                <>
+                    {active && (
+                        <button
+                            type="button"
+                            onClick={() => setLogsFor(active.id)}
+                            className="flex w-full flex-col gap-2 rounded-lg border border-success/30 bg-success/5 p-3 text-left"
                         >
-                            <StatusPill tone={dbTone(deployment.status)} label={deployment.status} />
-                            {deployment.isCurrent && <Badge variant="success">current</Badge>}
-                            <span className="ml-auto text-xs text-muted-foreground">
-                                {new Date(deployment.createdAt).toLocaleString()}
-                            </span>
-                            <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
-                        </li>
-                    ))}
-                </ul>
+                            <div className="flex items-center gap-3">
+                                <span className="shrink-0 rounded bg-success/15 px-2 py-0.5 text-xs font-medium text-success">
+                                    ACTIVE
+                                </span>
+                                <span className="min-w-0 flex-1 truncate text-sm">{depTitle(active)}</span>
+                                <span className="shrink-0 text-xs text-muted-foreground">{relativeTime(active.createdAt)}</span>
+                                <span className="shrink-0 text-xs text-primary">View logs</span>
+                            </div>
+                            <div className="flex items-center gap-1.5 text-xs text-success">
+                                <CheckCircle2 className="size-3.5" />{" "}
+                                {active.status === "running" ? "Deployment successful" : `Status: ${active.status}`}
+                            </div>
+                        </button>
+                    )}
+                    {history.length > 0 && (
+                        <div className="mt-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">History</div>
+                    )}
+                    <ul className="flex flex-col gap-2">
+                        {history.map((deployment) => {
+                            const badge = depBadge(deployment);
+                            const failed = ["failed", "cancelled", "rolled_back"].includes(deployment.status);
+                            return (
+                                <li
+                                    key={deployment.id}
+                                    onClick={() => setLogsFor(deployment.id)}
+                                    className={`flex cursor-pointer items-center gap-3 rounded-lg border p-3 text-sm transition-colors hover:border-muted-foreground/40 ${
+                                        failed ? "border-danger/30 bg-danger/5" : "border-border/60"
+                                    }`}
+                                >
+                                    <span className={`shrink-0 rounded px-2 py-0.5 text-xs font-medium ${badge.cls}`}>{badge.label}</span>
+                                    <span className="min-w-0 flex-1 truncate">{depTitle(deployment)}</span>
+                                    <span className="shrink-0 text-xs text-muted-foreground">{relativeTime(deployment.createdAt)}</span>
+                                </li>
+                            );
+                        })}
+                    </ul>
+                </>
             )}
         </div>
     );
 }
 
-function DeploymentLogsView({ deploymentId, onDone }: { deploymentId: string; onDone: () => void }) {
-    const CATS = ["Build Logs", "Deploy Logs", "HTTP Logs", "Network Flow Logs"] as const;
+function DeploymentLogsView({
+    app,
+    deploymentId,
+    deployment,
+    onBack,
+    onDone
+}: {
+    app: ProjectApp;
+    deploymentId: string;
+    deployment: DepSummary | null;
+    onBack: () => void;
+    onDone: () => void;
+}) {
+    const CATS = ["Details", "Build Logs", "Deploy Logs", "HTTP Logs", "Network Flow Logs"] as const;
     const [cat, setCat] = useState<(typeof CATS)[number]>("Deploy Logs");
+    const badge = deployment ? depBadge(deployment) : null;
+
     return (
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-2 py-2">
+            <div className="flex items-center gap-2">
+                <button
+                    type="button"
+                    onClick={onBack}
+                    className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    aria-label="Back"
+                >
+                    <ChevronLeft className="size-4" />
+                </button>
+                <ServiceIcon kind={serviceKindOf(app.sourceType)} className="size-4 shrink-0 text-foreground" />
+                <span className="truncate text-sm font-semibold">{app.name}</span>
+                {deployment?.commitSha && (
+                    <>
+                        <span className="text-muted-foreground/40">/</span>
+                        <span className="font-mono text-xs text-muted-foreground">{deployment.commitSha.slice(0, 7)}</span>
+                    </>
+                )}
+                {badge && <span className={`shrink-0 rounded px-2 py-0.5 text-xs font-medium ${badge.cls}`}>{badge.label}</span>}
+                {deployment && (
+                    <span className="ml-auto text-xs text-muted-foreground">{new Date(deployment.createdAt).toLocaleString()}</span>
+                )}
+            </div>
+
             <div className="flex items-center gap-3 overflow-x-auto border-b border-border/60 text-sm">
                 {CATS.map((name) => (
                     <button
@@ -191,11 +284,97 @@ function DeploymentLogsView({ deploymentId, onDone }: { deploymentId: string; on
                     </button>
                 ))}
             </div>
-            {cat === "HTTP Logs" || cat === "Network Flow Logs" ? (
+
+            {cat === "Details" ? (
+                <DetailsPanel app={app} deployment={deployment} />
+            ) : cat === "HTTP Logs" || cat === "Network Flow Logs" ? (
                 <Empty text={`No ${cat.toLowerCase()} yet.`} />
             ) : (
-                <DeploymentLogs deploymentId={deploymentId} onDone={onDone} />
+                <LogStream deploymentId={deploymentId} onDone={onDone} />
             )}
+        </div>
+    );
+}
+
+function DetailsPanel({ app, deployment }: { app: ProjectApp; deployment: DepSummary | null }) {
+    const rows: Array<[string, ReactNode]> = [
+        ["Status", deployment?.status ?? "-"],
+        ["Commit", deployment?.commitSha ? deployment.commitSha.slice(0, 12) : "-"],
+        ["Message", deployment?.commitMessage ?? "-"],
+        ["Started", deployment ? new Date(deployment.createdAt).toLocaleString() : "-"],
+        ["Domain", app.domains[0]?.hostname ?? "-"]
+    ];
+    return (
+        <div className="flex flex-col divide-y divide-border/40 text-sm">
+            {rows.map(([label, value]) => (
+                <div key={label} className="flex gap-4 py-2">
+                    <span className="w-28 shrink-0 text-muted-foreground">{label}</span>
+                    <span className="min-w-0 flex-1 break-words">{value}</span>
+                </div>
+            ))}
+            {deployment?.error && <p className="py-2 text-sm text-danger">{deployment.error}</p>}
+        </div>
+    );
+}
+
+function LogStream({ deploymentId, onDone }: { deploymentId: string; onDone: () => void }) {
+    const [log, setLog] = useState("");
+    const [search, setSearch] = useState("");
+    const onDoneRef = useRef(onDone);
+    onDoneRef.current = onDone;
+
+    useEffect(() => {
+        let active = true;
+        let done = false;
+        let timer: ReturnType<typeof setTimeout>;
+        async function poll(): Promise<void> {
+            const res = await fetch(`/api/deploy/deployments/${deploymentId}/log`, { cache: "no-store" });
+            if (!active) return;
+            if (res.ok) {
+                const data = (await res.json()) as { status: string; log: string };
+                setLog(data.log);
+                if (["running", "failed", "cancelled", "rolled_back"].includes(data.status)) {
+                    if (!done) {
+                        done = true;
+                        onDoneRef.current();
+                    }
+                    return;
+                }
+            }
+            timer = setTimeout(poll, 1500);
+        }
+        void poll();
+        return () => {
+            active = false;
+            clearTimeout(timer);
+        };
+    }, [deploymentId]);
+
+    const lines = log ? log.split("\n") : [];
+    const filtered = search.trim() ? lines.filter((line) => line.toLowerCase().includes(search.toLowerCase())) : lines;
+
+    return (
+        <div className="flex flex-col gap-2">
+            <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                    value={search}
+                    onChange={(event) => setSearch(event.target.value)}
+                    placeholder="Filter and search logs"
+                    className="pl-8 font-mono text-xs"
+                />
+            </div>
+            <div className="h-[26rem] overflow-auto rounded-md bg-[#0b0e14] py-2 font-mono text-xs leading-relaxed text-zinc-300">
+                {filtered.length === 0 ? (
+                    <p className="px-3 py-2 text-muted-foreground">{log ? "No matching lines." : "Waiting for output..."}</p>
+                ) : (
+                    filtered.map((line, index) => (
+                        <div key={index} className="whitespace-pre-wrap px-3 hover:bg-white/5">
+                            {line || " "}
+                        </div>
+                    ))
+                )}
+            </div>
         </div>
     );
 }

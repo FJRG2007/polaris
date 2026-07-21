@@ -8,8 +8,8 @@
  * private networking. Full service controls live in the List view.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { HardDrive, Loader2 } from "lucide-react";
 import { ServiceIcon, dbTone, serviceKindOf, type ProjectApp, type ProjectSummary, type ServiceKind } from "./deploy-view";
 import { saveLayoutAction } from "./actions";
 
@@ -26,6 +26,8 @@ interface CanvasNode {
     subtitle: string;
     tone: Tone;
     statusLabel: string;
+    /** Attached volume row (databases), rendered below the card like Railway. */
+    volume?: string;
 }
 
 interface Point {
@@ -58,7 +60,8 @@ function nodesFromEnvironment(environment: ProjectSummary["environments"][number
         kind: "database",
         subtitle: database.engine,
         tone: dbTone(database.status),
-        statusLabel: database.status
+        statusLabel: database.status,
+        volume: `${database.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-volume`
     }));
     return [...apps, ...databases];
 }
@@ -99,6 +102,13 @@ const TONE_DOT: Record<Tone, string> = {
     warning: "bg-warning",
     danger: "bg-danger",
     idle: "bg-muted-foreground"
+};
+
+const TONE_TEXT: Record<Tone, string> = {
+    success: "text-success",
+    warning: "text-warning",
+    danger: "text-danger",
+    idle: "text-muted-foreground"
 };
 
 export function DeployCanvas({
@@ -311,35 +321,47 @@ export function DeployCanvas({
 
                     {nodes.map((node) => {
                         const p = pos[node.id] ?? { x: 0, y: 0 };
+                        const label = node.tone === "success" ? "Online" : node.statusLabel;
                         return (
-                            <div
-                                key={node.id}
-                                className={`absolute flex select-none flex-col rounded-xl border bg-card p-4 shadow-sm transition-colors ${
-                                    dragId === node.id ? "border-primary" : "border-border hover:border-muted-foreground/40"
-                                } ${canManage ? "cursor-grab active:cursor-grabbing" : ""}`}
-                                style={{ left: p.x, top: p.y, width: NODE_W, height: NODE_H }}
-                                onPointerDown={(event) => onNodePointerDown(event, node.id)}
-                            >
-                                <div className="flex items-center gap-2.5">
-                                    <span className="grid size-8 shrink-0 place-items-center rounded-lg border border-border bg-surface">
-                                        <ServiceIcon kind={node.kind} className="size-4 text-foreground" />
-                                    </span>
-                                    <span className="truncate text-sm font-semibold">{node.name}</span>
+                            <Fragment key={node.id}>
+                                <div
+                                    className={`absolute flex select-none flex-col border bg-card shadow-sm transition-colors ${
+                                        node.volume ? "rounded-t-2xl" : "rounded-2xl"
+                                    } ${dragId === node.id ? "border-primary" : "border-border hover:border-muted-foreground/50"} ${
+                                        canManage ? "cursor-grab active:cursor-grabbing" : ""
+                                    }`}
+                                    style={{ left: p.x, top: p.y, width: NODE_W, height: NODE_H }}
+                                    onPointerDown={(event) => onNodePointerDown(event, node.id)}
+                                >
+                                    <div className="flex flex-1 flex-col p-4">
+                                        <div className="flex items-center gap-3">
+                                            <ServiceIcon kind={node.kind} className="size-7 shrink-0 text-foreground" />
+                                            <span className="truncate text-base font-semibold">{node.name}</span>
+                                        </div>
+                                        <p className="mt-1 truncate text-sm text-muted-foreground">{node.subtitle}</p>
+                                        <div className="mt-auto flex items-center gap-2 text-sm">
+                                            <span className={`size-1.5 rounded-full ${TONE_DOT[node.tone]}`} />
+                                            <span className={TONE_TEXT[node.tone]}>{label}</span>
+                                        </div>
+                                    </div>
+                                    {canManage && (
+                                        <button
+                                            type="button"
+                                            title="Drag to another service to link"
+                                            onPointerDown={(event) => onHandlePointerDown(event, node.id)}
+                                            className="absolute -right-1.5 top-1/2 size-3 -translate-y-1/2 rounded-full border border-border bg-surface hover:border-primary hover:bg-primary"
+                                        />
+                                    )}
                                 </div>
-                                <p className="mt-2 truncate text-xs text-muted-foreground">{node.subtitle}</p>
-                                <div className="mt-auto flex items-center gap-1.5 text-xs text-muted-foreground">
-                                    <span className={`size-1.5 rounded-full ${TONE_DOT[node.tone]}`} />
-                                    {node.statusLabel}
-                                </div>
-                                {canManage && (
-                                    <button
-                                        type="button"
-                                        title="Drag to another service to link"
-                                        onPointerDown={(event) => onHandlePointerDown(event, node.id)}
-                                        className="absolute -right-1.5 top-1/2 size-3 -translate-y-1/2 rounded-full border border-border bg-surface hover:border-primary hover:bg-primary"
-                                    />
+                                {node.volume && (
+                                    <div
+                                        className="absolute flex items-center gap-2 rounded-b-2xl border border-t-0 border-border bg-card/60 px-4 py-2.5 text-xs text-muted-foreground"
+                                        style={{ left: p.x, top: p.y + NODE_H, width: NODE_W }}
+                                    >
+                                        <HardDrive className="size-3.5 shrink-0" /> {node.volume}
+                                    </div>
                                 )}
-                            </div>
+                            </Fragment>
                         );
                     })}
                 </div>

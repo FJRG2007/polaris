@@ -893,6 +893,8 @@ model Deployment {
     status         String    @default("queued")
     imageTag       String?
     commitSha      String?
+    // Head commit message when known (auto-deploy webhook / resolved on deploy).
+    commitMessage  String?
     // Relative path (under the deploy dir) of the streamed build/deploy log file.
     logPath        String?
     triggeredById  String?   @db.Uuid

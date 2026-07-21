@@ -297,7 +297,12 @@ async function mergedEnv(environmentId: string, applicationId: string): Promise<
  * per-target queue. Returns the deployment id immediately; the run streams its
  * output to the deployment's log file and updates the row's status.
  */
-export async function deployApplication(applicationId: string, ownerId: string, userId: string): Promise<string> {
+export async function deployApplication(
+    applicationId: string,
+    ownerId: string,
+    userId: string,
+    meta?: { commitMessage?: string; commitSha?: string }
+): Promise<string> {
     const { plan, target, gitSource } = await buildAppPlan(applicationId, ownerId);
     const deployment = await prisma.deployment.create({
         data: {
@@ -305,7 +310,9 @@ export async function deployApplication(applicationId: string, ownerId: string, 
             deployableType: "application",
             deployableId: applicationId,
             status: "queued",
-            triggeredById: userId
+            triggeredById: userId,
+            commitMessage: meta?.commitMessage?.trim() || null,
+            commitSha: meta?.commitSha || null
         }
     });
     await prisma.application.update({ where: { id: applicationId }, data: { currentDeploymentId: deployment.id } });
@@ -319,6 +326,8 @@ export interface DeploymentSummary {
     error: string | null;
     createdAt: string;
     isCurrent: boolean;
+    commitMessage: string | null;
+    commitSha: string | null;
 }
 
 /** An application's deployment history, most recent first (owner-checked). */
@@ -332,14 +341,16 @@ export async function listDeployments(applicationId: string, ownerId: string): P
         where: { deployableType: "application", deployableId: applicationId },
         orderBy: { createdAt: "desc" },
         take: 30,
-        select: { id: true, status: true, error: true, createdAt: true }
+        select: { id: true, status: true, error: true, createdAt: true, commitMessage: true, commitSha: true }
     });
     return rows.map((row) => ({
         id: row.id,
         status: row.status,
         error: row.error,
         createdAt: row.createdAt.toISOString(),
-        isCurrent: row.id === app.currentDeploymentId
+        isCurrent: row.id === app.currentDeploymentId,
+        commitMessage: row.commitMessage,
+        commitSha: row.commitSha
     }));
 }
 
@@ -429,7 +440,10 @@ export async function triggerAutoDeploysForPush(input: {
         if (!commitPassesFilter(input.commitMessage, app.commitFilter)) continue;
         const ownerId = app.environment.project.ownerId;
         try {
-            await deployApplication(app.id, ownerId, ownerId);
+            await deployApplication(app.id, ownerId, ownerId, {
+                commitMessage: input.commitMessage,
+                commitSha: input.commitSha
+            });
             await prisma.application.update({ where: { id: app.id }, data: { lastDeployedSha: input.commitSha } });
             started += 1;
         } catch {
