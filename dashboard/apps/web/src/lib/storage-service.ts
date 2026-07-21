@@ -27,10 +27,33 @@ import { deleteMetricsForSubject } from "@/lib/metrics-history-service";
 import { listSmbShares } from "@/lib/smb-shares";
 import { grantedConnectionIds } from "@/lib/drive-acl-service";
 import { getHostConnection, listHosts } from "@/lib/host-service";
+import { resolveContainerName, resolveLocalContainer } from "@/lib/container-files-service";
+import { ContainerDriver } from "@/lib/deploy/container-driver";
 
 /** Connection-id prefix for a global Host browsed over SFTP in Drive. The Host is
  *  managed in the Servers app; Drive consumes it read/write over SFTP. */
 export const HOST_CONNECTION_PREFIX = "host:";
+
+/** Connection-id prefix for a deployed local container browsed as a Drive folder.
+ *  The service is managed in the Deploy app; Drive lists it read-only over hostd. */
+export const CONTAINER_CONNECTION_PREFIX = "container:";
+
+/** A StorageDriver over a deployed container's filesystem (owner-scoped resolve). */
+async function buildContainerDriver(applicationId: string, ownerId: string): Promise<StorageDriver> {
+    const container = await resolveLocalContainer(applicationId, ownerId);
+    const driver = new ContainerDriver({ id: `${CONTAINER_CONNECTION_PREFIX}${applicationId}`, container });
+    await driver.connect();
+    return driver;
+}
+
+/** Same as above, without the owner check - for routes that have already
+ *  authorized the container source via `authorizeDrive`. */
+async function buildContainerDriverUnscoped(applicationId: string): Promise<StorageDriver> {
+    const container = await resolveContainerName(applicationId);
+    const driver = new ContainerDriver({ id: `${CONTAINER_CONNECTION_PREFIX}${applicationId}`, container });
+    await driver.connect();
+    return driver;
+}
 
 /** SFTP driver for a global Host. Browses from the SSH root, host-key pinned. */
 async function buildHostSftpDriver(hostId: string, ownerId: string): Promise<StorageDriver> {
@@ -142,6 +165,9 @@ export async function getDriver(connectionId: string, ownerId: string): Promise<
     if (connectionId.startsWith(HOST_CONNECTION_PREFIX)) {
         return buildHostSftpDriver(connectionId.slice(HOST_CONNECTION_PREFIX.length), ownerId);
     }
+    if (connectionId.startsWith(CONTAINER_CONNECTION_PREFIX)) {
+        return buildContainerDriver(connectionId.slice(CONTAINER_CONNECTION_PREFIX.length), ownerId);
+    }
     return buildDriver(await loadConnection(connectionId, ownerId));
 }
 
@@ -152,6 +178,9 @@ export async function getDriver(connectionId: string, ownerId: string): Promise<
  * the caller with getDriver().
  */
 export async function getDriverForConnection(connectionId: string): Promise<StorageDriver> {
+    if (connectionId.startsWith(CONTAINER_CONNECTION_PREFIX)) {
+        return buildContainerDriverUnscoped(connectionId.slice(CONTAINER_CONNECTION_PREFIX.length));
+    }
     const row = await prisma.storageConnection.findUnique({ where: { id: connectionId } });
     if (!row) throw new Error("Connection not found");
     return buildDriver(row);
@@ -236,10 +265,11 @@ export async function listConnections(ownerId: string) {
  * per-path enforcement still happens in the Drive routes and actions.
  */
 export async function listAccessibleConnections(userId: string) {
-    const [owned, grantedIds, hosts] = await Promise.all([
+    const [owned, grantedIds, hosts, containers] = await Promise.all([
         listConnections(userId),
         grantedConnectionIds(userId),
-        listHosts(userId)
+        listHosts(userId),
+        listContainerSources(userId)
     ]);
     const ownedIds = new Set(owned.map((row) => row.id));
     const sharedIds = grantedIds.filter((id) => !ownedIds.has(id));
@@ -275,8 +305,37 @@ export async function listAccessibleConnections(userId: string) {
     return [
         ...owned.map((row) => ({ ...row, shared: false })),
         ...shared.map((row) => ({ ...annotateRekey(row, fingerprint), shared: true })),
-        ...hostSummaries
+        ...hostSummaries,
+        ...containers
     ];
+}
+
+/**
+ * Deployed local containers the user owns, surfaced as read-only Drive sources so
+ * a running service's files are browsable like any other folder. Only local,
+ * currently-deployed apps qualify (a container must exist to browse). Managed in
+ * the Deploy app, so never editable or re-keyed here.
+ */
+async function listContainerSources(userId: string) {
+    const apps = await prisma.application.findMany({
+        where: {
+            currentDeploymentId: { not: null },
+            target: { kind: "local" },
+            environment: { project: { ownerId: userId } }
+        },
+        select: { id: true, name: true, createdAt: true }
+    });
+    return apps.map((app) => ({
+        id: `${CONTAINER_CONNECTION_PREFIX}${app.id}`,
+        name: `${app.name} (container)`,
+        kind: "local",
+        status: "connected",
+        requiresHostd: true,
+        config: JSON.stringify({ kind: "local", root: "/" }),
+        createdAt: app.createdAt,
+        shared: false,
+        needsRekey: false
+    }));
 }
 
 /**

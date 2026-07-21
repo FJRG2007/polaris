@@ -30,6 +30,21 @@ export async function resolveLocalContainer(applicationId: string, ownerId: stri
     return serviceName(app.environment.project.slug, app.slug, app.id);
 }
 
+/** Resolve an application to its local container name WITHOUT an owner check, for
+ *  callers that have already authorized access (the Drive routes authorize the
+ *  container source in `authorizeDrive` before building its driver). */
+export async function resolveContainerName(applicationId: string): Promise<string> {
+    const app = await prisma.application.findFirst({
+        where: { id: applicationId },
+        include: { environment: { include: { project: true } }, target: true }
+    });
+    if (!app) throw new Error("Application not found");
+    if (app.target.kind !== "local") {
+        throw new Error("Container file browsing is currently supported on the local host only");
+    }
+    return serviceName(app.environment.project.slug, app.slug, app.id);
+}
+
 /** List a directory inside the container. Uses `ls -1Ap` so directories carry a
  *  trailing slash; enough to navigate, download, and upload. */
 export async function listContainerFiles(

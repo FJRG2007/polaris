@@ -8,7 +8,8 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowUp, Download, File as FileIcon, Folder, Upload } from "lucide-react";
+import Link from "next/link";
+import { ArrowUp, Download, File as FileIcon, Folder, HardDrive, Upload } from "lucide-react";
 import { Button } from "@polaris/ui";
 
 interface Entry {
@@ -78,7 +79,12 @@ export function FilesPanel({ applicationId }: { applicationId: string }) {
                     <ArrowUp className="size-4" />
                 </Button>
                 <span className="truncate text-xs text-muted-foreground">{path}</span>
-                <div className="ml-auto">
+                <div className="ml-auto flex items-center gap-2">
+                    <Button asChild variant="ghost" title="Open this container in Drive">
+                        <Link href={`/drive?c=container:${applicationId}&p=${encodeURIComponent(path.replace(/^\/+|\/+$/g, ""))}`}>
+                            <HardDrive className="size-4" /> View in Drive
+                        </Link>
+                    </Button>
                     <Button variant="outline" onClick={() => fileInput.current?.click()} disabled={busy}>
                         <Upload className="size-4" /> Upload
                     </Button>

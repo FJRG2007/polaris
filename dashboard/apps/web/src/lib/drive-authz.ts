@@ -20,7 +20,7 @@ import { loadEnv } from "@polaris/config";
 import type { DriveAction, Permission } from "@polaris/core";
 import { userHasPermission } from "@polaris/auth";
 import { prisma } from "@polaris/db";
-import { getDriverForConnection } from "@/lib/storage-service";
+import { CONTAINER_CONNECTION_PREFIX, getDriverForConnection } from "@/lib/storage-service";
 import { canAccessDrive } from "@/lib/drive-acl-service";
 import {
     findLockForPath,
@@ -81,6 +81,26 @@ export async function authorizeDrive(
     action: DriveAction,
     opts?: { skipLock?: boolean }
 ): Promise<void> {
+    // A container source is a deployed service's filesystem, owned by whoever owns
+    // the app's project. It has no StorageConnection row, ACLs, or access locks:
+    // ownership (or admin) plus the global Drive capability is the whole gate.
+    if (connectionId.startsWith(CONTAINER_CONNECTION_PREFIX)) {
+        const appId = connectionId.slice(CONTAINER_CONNECTION_PREFIX.length);
+        const [user, app] = await Promise.all([
+            prisma.user.findUnique({ where: { id: userId }, select: { isAdmin: true } }),
+            prisma.application.findFirst({
+                where: { id: appId },
+                select: { environment: { select: { project: { select: { ownerId: true } } } } }
+            })
+        ]);
+        if (!app) throw new DriveAccessError();
+        if (!user?.isAdmin) {
+            if (app.environment.project.ownerId !== userId) throw new DriveAccessError();
+            if (!(await userHasPermission(userId, OWNER_CAPABILITY[action]))) throw new DriveAccessError();
+        }
+        return;
+    }
+
     const [user, connection] = await Promise.all([
         prisma.user.findUnique({ where: { id: userId }, select: { isAdmin: true } }),
         prisma.storageConnection.findUnique({ where: { id: connectionId }, select: { ownerId: true } })
