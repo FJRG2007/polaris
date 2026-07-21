@@ -46,10 +46,15 @@ import {
 } from "@/lib/deploy/quick-tunnel-service";
 import {
     getNamedTunnelStatus,
+    provisionNamedTunnel,
     startNamedTunnel,
     stopNamedTunnel,
     type NamedTunnelStatus
 } from "@/lib/deploy/named-tunnel-service";
+import {
+    getCloudflareAccountStatus,
+    type CloudflareAccountStatus
+} from "@/lib/integrations/cloudflare-account-service";
 import {
     deleteEnvVar,
     listEnvVars,
@@ -522,7 +527,39 @@ export async function namedTunnelStatusAction(applicationId: string): Promise<Na
     try {
         return await getNamedTunnelStatus(applicationId, user.id);
     } catch {
-        return { running: false, hostname: null, configured: false };
+        return { running: false, hostname: null, configured: false, managed: false };
+    }
+}
+
+/** Whether a Cloudflare API token is connected, so the panel can offer the automatic
+ *  (pick-a-hostname) path instead of the manual connector-token flow. */
+export async function cloudflareAccountStatusAction(): Promise<CloudflareAccountStatus> {
+    await requirePermission("deploy.manage");
+    try {
+        return await getCloudflareAccountStatus();
+    } catch {
+        return { connected: false, accountId: null, accountName: null };
+    }
+}
+
+/** Automatically create the tunnel + DNS for a hostname using the connected Cloudflare
+ *  token; the operator only supplies the hostname. */
+export async function provisionNamedTunnelAction(input: {
+    applicationId: string;
+    hostname: string;
+}): Promise<{ error?: string; hostname?: string | null }> {
+    const user = await requirePermission("deploy.manage");
+    try {
+        const status = await provisionNamedTunnel(input.applicationId, user.id, { hostname: input.hostname });
+        await recordAudit({
+            actorId: user.id,
+            action: "deploy.named-tunnel.provision",
+            targetType: "application",
+            targetId: input.applicationId
+        });
+        return { hostname: status.hostname };
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not set up the tunnel" };
     }
 }
 

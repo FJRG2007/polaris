@@ -8,6 +8,7 @@ import { INTEGRATIONS, readDymoConfig, readVirusTotalConfig } from "@/lib/integr
 import { listIntegrationStates } from "@/lib/integration-service";
 import { getDomainConfig } from "@/lib/domain-service";
 import { getGithubStatus } from "@/lib/github-service";
+import { getCloudflareAccountStatus } from "@/lib/integrations/cloudflare-account-service";
 import { IntegrationsView, type IntegrationCard } from "./integrations-view";
 
 export const dynamic = "force-dynamic";
@@ -18,6 +19,9 @@ export default async function IntegrationsPage() {
     const github = await getGithubStatus();
     // DuckDNS config lives with the domain settings (Setting keys), not an Integration row.
     const domains = await getDomainConfig();
+    // Cloudflare's API-token connection (for automated named tunnels) is separate
+    // from the marketplace connector token that runs the server-wide tunnel.
+    const cloudflare = await getCloudflareAccountStatus();
 
     const cards: IntegrationCard[] = INTEGRATIONS.map((entry) => {
         const state = states.get(entry.slug);
@@ -45,7 +49,9 @@ export default async function IntegrationsPage() {
             githubMethod: entry.slug === "github" ? github.method : undefined,
             githubLogin: entry.slug === "github" ? github.login ?? undefined : undefined,
             githubInstallations: entry.slug === "github" ? github.installations : undefined,
-            githubHtmlUrl: entry.slug === "github" ? github.htmlUrl ?? undefined : undefined
+            githubHtmlUrl: entry.slug === "github" ? github.htmlUrl ?? undefined : undefined,
+            cloudflareApiConnected: entry.slug === "cloudflare" ? cloudflare.connected : undefined,
+            cloudflareAccountName: entry.slug === "cloudflare" ? cloudflare.accountName ?? undefined : undefined
         };
     });
 

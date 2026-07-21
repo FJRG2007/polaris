@@ -22,6 +22,11 @@ import {
 } from "@/lib/github-service";
 import { applyTunnel } from "@/lib/tunnel-service";
 import { setDomainConfig, syncDuckDns } from "@/lib/domain-service";
+import {
+    connectCloudflareAccount,
+    disconnectCloudflareAccount
+} from "@/lib/integrations/cloudflare-account-service";
+import type { CfAccount } from "@/lib/integrations/cloudflare-api";
 import { recordAudit } from "@/lib/audit-service";
 
 const SCAN_ACTIONS = new Set<ScanAction>(["block", "quarantine", "notify"]);
@@ -95,6 +100,43 @@ export async function saveDuckdnsAction(input: {
 export async function syncDuckdnsAction(): Promise<{ ok: boolean; detail: string }> {
     await requireAdmin();
     return syncDuckDns();
+}
+
+/**
+ * Connect a Cloudflare API token for automated named tunnels. Validates the token
+ * and resolves the account; when it can reach several accounts and none is chosen,
+ * returns them so the UI can prompt (nothing is stored until an account is set).
+ */
+export async function connectCloudflareAccountAction(input: {
+    token: string;
+    accountId?: string;
+}): Promise<{ error?: string; connected?: boolean; accounts?: CfAccount[]; accountName?: string }> {
+    const user = await requireAdmin();
+    try {
+        const result = await connectCloudflareAccount(input.token, input.accountId);
+        if (result.connected) {
+            await recordAudit({
+                actorId: user.id,
+                action: "integration.configure",
+                targetType: "integration",
+                targetId: "cloudflare",
+                metadata: { method: "api-token" }
+            });
+            revalidatePath("/integrations");
+        }
+        return { connected: result.connected, accounts: result.accounts, accountName: result.accountName };
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not connect the Cloudflare token" };
+    }
+}
+
+/** Forget the connected Cloudflare API token and account. */
+export async function disconnectCloudflareAccountAction(): Promise<{ error?: string }> {
+    const user = await requireAdmin();
+    await disconnectCloudflareAccount();
+    await recordAudit({ actorId: user.id, action: "integration.disable", targetType: "integration", targetId: "cloudflare" });
+    revalidatePath("/integrations");
+    return {};
 }
 
 /** Save VirusTotal's settings (enabled flag, detection action, and API key). */

@@ -76,7 +76,9 @@ import {
     stopQuickTunnelAction,
     namedTunnelStatusAction,
     startNamedTunnelAction,
-    stopNamedTunnelAction
+    stopNamedTunnelAction,
+    provisionNamedTunnelAction,
+    cloudflareAccountStatusAction
 } from "./actions";
 
 const TABS = ["Deployments", "Variables", "Metrics", "Console", "Files", "Settings"] as const;
@@ -1345,10 +1347,12 @@ function QuickTunnelPanel({ appId }: { appId: string }) {
 }
 
 /** Per-app Cloudflare named tunnel: a STABLE hostname on the operator's own domain.
- *  Guided setup - the tunnel + hostname mapping are created in the Cloudflare
- *  dashboard and its connector token pasted here; Polaris runs the connector. */
+ *  Automatic when a Cloudflare API token is connected (Integrations) - the operator
+ *  only picks a hostname and Polaris creates the tunnel + DNS; otherwise a guided
+ *  manual flow where the tunnel is made in Cloudflare and its connector token pasted. */
 function NamedTunnelPanel({ appId }: { appId: string }) {
     const [status, setStatus] = useState<Awaited<ReturnType<typeof namedTunnelStatusAction>> | null>(null);
+    const [account, setAccount] = useState<Awaited<ReturnType<typeof cloudflareAccountStatusAction>> | null>(null);
     const [open, setOpen] = useState(false);
     const [token, setToken] = useState("");
     const [hostname, setHostname] = useState("");
@@ -1358,12 +1362,19 @@ function NamedTunnelPanel({ appId }: { appId: string }) {
     const reload = () => {
         void namedTunnelStatusAction(appId).then(setStatus);
     };
-    useEffect(reload, [appId]);
+    useEffect(() => {
+        reload();
+        void cloudflareAccountStatusAction().then(setAccount);
+    }, [appId]);
 
-    function connect(): void {
+    const automatic = account?.connected ?? false;
+
+    function submit(): void {
         setError(null);
         startTransition(async () => {
-            const result = await startNamedTunnelAction({ applicationId: appId, token, hostname });
+            const result = automatic
+                ? await provisionNamedTunnelAction({ applicationId: appId, hostname })
+                : await startNamedTunnelAction({ applicationId: appId, token, hostname });
             if (result.error) setError(result.error);
             else {
                 setToken("");
@@ -1388,7 +1399,11 @@ function NamedTunnelPanel({ appId }: { appId: string }) {
         <MethodBlock
             icon={<CloudflareMark className="size-4" />}
             title="Custom domain via Cloudflare tunnel"
-            description="A stable hostname on your own domain, with automatic HTTPS and no port-forwarding. Create the tunnel in Cloudflare and paste its connector token; it reconnects on restart."
+            description={
+                automatic
+                    ? "A stable hostname on your own domain with automatic HTTPS and no port-forwarding. Pick a hostname and Polaris creates the tunnel and DNS record for you."
+                    : "A stable hostname on your own domain, with automatic HTTPS and no port-forwarding. Create the tunnel in Cloudflare and paste its connector token; it reconnects on restart."
+            }
         >
             {configured && status?.hostname && (
                 <div className="flex items-center gap-2 text-xs">
@@ -1402,6 +1417,9 @@ function NamedTunnelPanel({ appId }: { appId: string }) {
                         <CloudflareMark className="size-3.5 shrink-0" /> {status.hostname}
                     </a>
                     <span className="text-muted-foreground">{running ? "connected" : "not running"}</span>
+                    {status.managed && (
+                        <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">auto</span>
+                    )}
                 </div>
             )}
             {error && !open && <p className="text-xs text-danger">{error}</p>}
@@ -1428,49 +1446,69 @@ function NamedTunnelPanel({ appId }: { appId: string }) {
                         <CloudflareMark className="size-5" /> Connect a domain via Cloudflare
                     </DialogTitle>
                     <div className="flex flex-col gap-4">
-                        <ol className="flex flex-col gap-2 text-xs text-muted-foreground">
-                            <li>
-                                <span className="font-medium text-foreground">1.</span> In Cloudflare Zero Trust, open{" "}
-                                <span className="text-foreground">Networks - Tunnels</span> and create a tunnel (Cloudflared).
-                            </li>
-                            <li>
-                                <span className="font-medium text-foreground">2.</span> Add a{" "}
-                                <span className="text-foreground">Public Hostname</span>: your domain to the service{" "}
-                                <span className="font-mono">http://SERVER-IP:PORT</span> (this server's IP and the app's port).
-                            </li>
-                            <li>
-                                <span className="font-medium text-foreground">3.</span> Copy the tunnel's{" "}
-                                <span className="text-foreground">connector token</span> and paste it below.
-                            </li>
-                        </ol>
-                        <a
-                            href="https://one.dash.cloudflare.com/"
-                            target="_blank"
-                            rel="noreferrer"
-                            className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
-                        >
-                            Open the Cloudflare Zero Trust dashboard
-                        </a>
+                        {automatic ? (
+                            <p className="flex items-start gap-1.5 text-xs text-muted-foreground">
+                                <CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-emerald-500" />
+                                Cloudflare connected{account?.accountName ? ` as ${account.accountName}` : ""}. Enter a
+                                hostname on a domain in your account - Polaris creates the tunnel and DNS record for you.
+                            </p>
+                        ) : (
+                            <>
+                                <ol className="flex flex-col gap-2 text-xs text-muted-foreground">
+                                    <li>
+                                        <span className="font-medium text-foreground">1.</span> In Cloudflare Zero Trust,
+                                        open <span className="text-foreground">Networks - Tunnels</span> and create a tunnel
+                                        (Cloudflared).
+                                    </li>
+                                    <li>
+                                        <span className="font-medium text-foreground">2.</span> Add a{" "}
+                                        <span className="text-foreground">Public Hostname</span>: your domain to the service{" "}
+                                        <span className="font-mono">http://SERVER-IP:PORT</span> (this server's IP and the app's port).
+                                    </li>
+                                    <li>
+                                        <span className="font-medium text-foreground">3.</span> Copy the tunnel's{" "}
+                                        <span className="text-foreground">connector token</span> and paste it below.
+                                    </li>
+                                </ol>
+                                <a
+                                    href="https://one.dash.cloudflare.com/"
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                                >
+                                    Open the Cloudflare Zero Trust dashboard
+                                </a>
+                                <p className="text-xs text-muted-foreground">
+                                    Tip: connect a Cloudflare API token under{" "}
+                                    <a href="/integrations" className="text-primary hover:underline">
+                                        Integrations
+                                    </a>{" "}
+                                    to skip these steps - then you only pick a hostname.
+                                </p>
+                            </>
+                        )}
                         <label className="flex flex-col gap-1 text-xs text-muted-foreground">
                             Hostname
                             <Input value={hostname} onChange={(event) => setHostname(event.target.value)} placeholder="app.example.com" />
                         </label>
-                        <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-                            Connector token
-                            <Input
-                                value={token}
-                                onChange={(event) => setToken(event.target.value)}
-                                placeholder="eyJhIjoi..."
-                                className="font-mono"
-                            />
-                        </label>
+                        {!automatic && (
+                            <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                                Connector token
+                                <Input
+                                    value={token}
+                                    onChange={(event) => setToken(event.target.value)}
+                                    placeholder="eyJhIjoi..."
+                                    className="font-mono"
+                                />
+                            </label>
+                        )}
                         {error && <p className="text-xs text-danger">{error}</p>}
                         <div className="flex justify-end gap-2">
                             <Button variant="ghost" onClick={() => setOpen(false)}>
                                 Cancel
                             </Button>
-                            <Button onClick={connect} disabled={pending || !token.trim() || !hostname.trim()}>
-                                {pending && <Loader2 className="size-4 animate-spin" />} Connect
+                            <Button onClick={submit} disabled={pending || !hostname.trim() || (!automatic && !token.trim())}>
+                                {pending && <Loader2 className="size-4 animate-spin" />} {automatic ? "Set up" : "Connect"}
                             </Button>
                         </div>
                     </div>

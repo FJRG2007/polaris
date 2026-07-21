@@ -18,6 +18,18 @@ import { loadEnv } from "@polaris/config";
 import type { ComposeSpec } from "@polaris/deploy";
 import { shortHash } from "@polaris/deploy";
 import { decryptSecret, encryptSecret } from "@polaris/storage";
+import { getPublicIp } from "../domain-service";
+import { hostPortForApp } from "../deploy-service";
+import {
+    createTunnel,
+    deleteDnsRecord,
+    deleteTunnel,
+    getTunnelToken,
+    putTunnelIngress,
+    resolveZoneForHostname,
+    upsertTunnelCname
+} from "../integrations/cloudflare-api";
+import { requireCloudflareAccount } from "../integrations/cloudflare-account-service";
 import { HostdPorts } from "./ports-hostd";
 
 const PROXY_NETWORK = "polaris-proxy";
@@ -29,6 +41,16 @@ export interface NamedTunnelStatus {
     hostname: string | null;
     /** Whether a connector token is stored (so the UI can offer start/stop). */
     configured: boolean;
+    /** True when Polaris created the tunnel + DNS itself via the Cloudflare API. */
+    managed: boolean;
+}
+
+/** Cloudflare resources Polaris created for a managed tunnel, kept for teardown. */
+interface ManagedRefs {
+    tunnelId: string;
+    zoneId: string;
+    dnsId: string;
+    accountId: string;
 }
 
 /** Compose project/service names for an app's named tunnel (charset-safe for hostd). */
@@ -39,6 +61,27 @@ function names(appId: string): { project: string; service: string } {
 
 const tokenKey = (appId: string): string => `deploy.ntunnel.${appId}.token`;
 const hostKey = (appId: string): string => `deploy.ntunnel.${appId}.hostname`;
+const managedKey = (appId: string): string => `deploy.ntunnel.${appId}.managed`;
+
+/** Normalize a hostname the same way the manual and automated flows expect. */
+function normalizeHost(hostname: string): string {
+    return hostname
+        .trim()
+        .replace(/^https?:\/\//, "")
+        .replace(/\/+$/, "")
+        .toLowerCase();
+}
+
+async function loadManaged(appId: string): Promise<ManagedRefs | null> {
+    const raw = await getSetting(managedKey(appId));
+    if (!raw) return null;
+    try {
+        const parsed = JSON.parse(raw) as ManagedRefs;
+        return typeof parsed?.tunnelId === "string" ? parsed : null;
+    } catch {
+        return null;
+    }
+}
 
 async function getSetting(key: string): Promise<string | null> {
     const row = await prisma.setting.findUnique({ where: { key }, select: { value: true } });
@@ -132,6 +175,8 @@ export async function startNamedTunnel(
 
     await storeToken(appId, token);
     await setSetting(hostKey(appId), hostname);
+    // A manually pasted token is not Polaris-managed; drop any stale managed refs.
+    await setSetting(managedKey(appId), null);
 
     const { project, service } = names(appId);
     const ports = new HostdPorts();
@@ -141,12 +186,71 @@ export async function startNamedTunnel(
     } finally {
         await ports.dispose();
     }
-    return { running: true, hostname, configured: true };
+    return { running: true, hostname, configured: true, managed: false };
 }
 
-/** Tear down the named-tunnel sidecar and forget its token + hostname. Idempotent. */
+/**
+ * Automated named tunnel: with a connected Cloudflare API token, create the tunnel,
+ * push its ingress to this app's origin, and point a proxied DNS record at it - the
+ * operator only supplies the hostname. The origin is the app's published host port
+ * (the same IP:port the manual instructions use). Idempotent per hostname: the DNS
+ * record is upserted; a fresh tunnel replaces any previous managed one for this app.
+ */
+export async function provisionNamedTunnel(
+    appId: string,
+    ownerId: string,
+    input: { hostname: string }
+): Promise<NamedTunnelStatus> {
+    await requireLocalApp(appId, ownerId);
+    const hostname = normalizeHost(input.hostname);
+    if (!hostname) throw new Error("Enter the hostname you want to use");
+
+    const { token, accountId } = await requireCloudflareAccount();
+    const zone = await resolveZoneForHostname(token, hostname);
+
+    const originIp = await getPublicIp();
+    if (!originIp) throw new Error("This server has no reachable IP to route the tunnel to");
+    const originUrl = `http://${originIp}:${hostPortForApp(appId)}`;
+
+    // Retire a previous managed tunnel for this app before creating the new one, so
+    // repeated provisioning does not leak tunnels in the operator's account.
+    const previous = await loadManaged(appId);
+
+    const tunnel = await createTunnel(token, accountId, `polaris-${shortHash(appId, 8)}`);
+    const connectorToken = await getTunnelToken(token, accountId, tunnel.id);
+    await putTunnelIngress(token, accountId, tunnel.id, hostname, originUrl);
+    const dnsId = await upsertTunnelCname(token, zone.id, hostname, tunnel.id);
+
+    await storeToken(appId, connectorToken);
+    await setSetting(hostKey(appId), hostname);
+    await setSetting(
+        managedKey(appId),
+        JSON.stringify({ tunnelId: tunnel.id, zoneId: zone.id, dnsId, accountId } satisfies ManagedRefs)
+    );
+
+    const { project, service } = names(appId);
+    const ports = new HostdPorts();
+    try {
+        await ports.composeDown(project).catch(() => undefined);
+        await ports.composeUp(tunnelSpec(project, service, connectorToken));
+    } finally {
+        await ports.dispose();
+    }
+
+    if (previous && previous.tunnelId !== tunnel.id) {
+        // Best-effort: the old connector is gone, so the tunnel can be deleted.
+        await deleteTunnel(token, previous.accountId, previous.tunnelId).catch(() => undefined);
+    }
+    return { running: true, hostname, configured: true, managed: true };
+}
+
+/** Tear down the named-tunnel sidecar and forget its token + hostname. For a
+ *  Polaris-managed tunnel, also remove the DNS record and tunnel it created in the
+ *  operator's Cloudflare account (best-effort, so a hiccup never blocks teardown). */
 export async function stopNamedTunnel(appId: string, ownerId: string): Promise<void> {
     await requireLocalApp(appId, ownerId);
+    const managed = await loadManaged(appId);
+
     const { project } = names(appId);
     const ports = new HostdPorts();
     try {
@@ -154,8 +258,19 @@ export async function stopNamedTunnel(appId: string, ownerId: string): Promise<v
     } finally {
         await ports.dispose();
     }
+
+    if (managed) {
+        const { token } = await requireCloudflareAccount().catch(() => ({ token: null as string | null }));
+        if (token) {
+            await deleteDnsRecord(token, managed.zoneId, managed.dnsId).catch(() => undefined);
+            // The connector is down now, so the tunnel can be deleted.
+            await deleteTunnel(token, managed.accountId, managed.tunnelId).catch(() => undefined);
+        }
+    }
+
     await setSetting(tokenKey(appId), null);
     await setSetting(hostKey(appId), null);
+    await setSetting(managedKey(appId), null);
 }
 
 /** Whether the named tunnel is configured, its hostname, and whether the sidecar
@@ -167,17 +282,22 @@ export async function getNamedTunnelStatus(appId: string, ownerId: string): Prom
     });
     if (!app) throw new Error("Application not found");
 
-    const [hostname, token] = await Promise.all([getSetting(hostKey(appId)), loadToken(appId)]);
+    const [hostname, token, managed] = await Promise.all([
+        getSetting(hostKey(appId)),
+        loadToken(appId),
+        loadManaged(appId)
+    ]);
     const configured = Boolean(token);
-    if (!configured) return { running: false, hostname, configured: false };
+    const isManaged = Boolean(managed);
+    if (!configured) return { running: false, hostname, configured: false, managed: isManaged };
 
     const { service } = names(appId);
     const ports = new HostdPorts();
     try {
         const info = (await ports.inspect(service)) as { State?: { Running?: boolean } };
-        return { running: Boolean(info?.State?.Running), hostname, configured: true };
+        return { running: Boolean(info?.State?.Running), hostname, configured: true, managed: isManaged };
     } catch {
-        return { running: false, hostname, configured: true };
+        return { running: false, hostname, configured: true, managed: isManaged };
     } finally {
         await ports.dispose();
     }

@@ -20,14 +20,17 @@ import {
     DialogHeader,
     DialogTitle,
     Input,
+    Select,
     Switch,
     cn
 } from "@polaris/ui";
 import { DYMO_IP_RULES, SCAN_ACTIONS, type ScanAction } from "@/lib/integrations/registry";
 import { IntegrationLogo } from "@/components/logos";
 import {
+    connectCloudflareAccountAction,
     connectGithubAction,
     connectGithubAppAction,
+    disconnectCloudflareAccountAction,
     disconnectGithubAction,
     refreshGithubInstallationsAction,
     saveDuckdnsAction,
@@ -59,6 +62,10 @@ export interface IntegrationCard {
     deny: string[];
     /** DuckDNS: the configured subdomain (empty when not set). */
     duckdnsSubdomain?: string;
+    /** Cloudflare: whether an API token is connected (for automated named tunnels). */
+    cloudflareApiConnected?: boolean;
+    /** Cloudflare: the connected account name, when an API token is set. */
+    cloudflareAccountName?: string;
     /** GitHub: how it is connected, when connected. */
     githubMethod?: "pat" | "app" | null;
     /** GitHub: the connected account login (PAT) or app name (App). */
@@ -180,9 +187,126 @@ function TunnelDialog({ card, onClose }: { card: IntegrationCard; onClose: () =>
                             {pending ? "Applying..." : "Save"}
                         </Button>
                     </div>
+
+                    {provider === "cloudflare" ? <CloudflareApiTokenSection card={card} /> : null}
                 </div>
             </DialogContent>
         </Dialog>
+    );
+}
+
+/**
+ * Connect a Cloudflare API token so per-app named tunnels can be provisioned
+ * automatically (Polaris creates the tunnel + DNS; the operator only picks a
+ * hostname). Separate from the connector token above, which runs a server-wide
+ * tunnel and grants no API access. Handles the multi-account case by prompting
+ * for which account the token should act on.
+ */
+function CloudflareApiTokenSection({ card }: { card: IntegrationCard }) {
+    const [connected, setConnected] = useState(card.cloudflareApiConnected ?? false);
+    const [accountName, setAccountName] = useState(card.cloudflareAccountName ?? "");
+    const [token, setToken] = useState("");
+    const [accounts, setAccounts] = useState<{ id: string; name: string }[]>([]);
+    const [accountId, setAccountId] = useState("");
+    const [error, setError] = useState<string | null>(null);
+    const [pending, startTransition] = useTransition();
+
+    function onConnect(chosen?: string) {
+        setError(null);
+        startTransition(async () => {
+            const result = await connectCloudflareAccountAction({ token, accountId: chosen });
+            if (result.error) {
+                setError(result.error);
+                return;
+            }
+            if (result.connected) {
+                setConnected(true);
+                setAccountName(result.accountName ?? "");
+                setAccounts([]);
+                setToken("");
+                return;
+            }
+            // Several accounts reachable - let the operator pick one, then reconnect.
+            const options = result.accounts ?? [];
+            setAccounts(options);
+            if (options[0]) setAccountId(options[0].id);
+        });
+    }
+
+    function onDisconnect() {
+        setError(null);
+        startTransition(async () => {
+            const result = await disconnectCloudflareAccountAction();
+            if (result.error) setError(result.error);
+            else {
+                setConnected(false);
+                setAccountName("");
+            }
+        });
+    }
+
+    return (
+        <div className="flex flex-col gap-3 border-t border-border pt-4">
+            <div className="flex flex-col gap-0.5">
+                <span className="text-sm font-medium">Automatic tunnels (API token)</span>
+                <span className="text-xs text-muted-foreground">
+                    Connect an API token and Polaris sets up each app's tunnel and DNS for you - you only pick a
+                    hostname. Scopes: Account - Cloudflare Tunnel: Edit, Zone - DNS: Edit, Zone: Read.
+                </span>
+            </div>
+
+            {connected ? (
+                <div className="flex items-center justify-between gap-3 rounded-md border border-border bg-surface/40 p-2.5 text-sm">
+                    <span className="flex items-center gap-1.5">
+                        <CheckCircle2 className="size-4 text-success" />
+                        Connected{accountName ? ` as ${accountName}` : ""}
+                    </span>
+                    <Button type="button" variant="ghost" size="sm" onClick={onDisconnect} disabled={pending}>
+                        {pending ? <Loader2 className="size-4 animate-spin" /> : "Disconnect"}
+                    </Button>
+                </div>
+            ) : (
+                <div className="flex flex-col gap-2">
+                    <Input
+                        type="password"
+                        autoComplete="off"
+                        value={token}
+                        onChange={(event) => setToken(event.target.value)}
+                        placeholder="Paste a Cloudflare API token"
+                    />
+                    {accounts.length > 0 ? (
+                        <div className="flex flex-col gap-1 text-xs text-muted-foreground">
+                            Account
+                            <Select
+                                value={accountId}
+                                onValueChange={setAccountId}
+                                options={accounts.map((account) => ({ value: account.id, label: account.name }))}
+                            />
+                        </div>
+                    ) : null}
+                    <div className="flex items-center justify-between gap-2">
+                        <a
+                            href="https://dash.cloudflare.com/profile/api-tokens"
+                            target="_blank"
+                            rel="noreferrer noopener"
+                            className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                        >
+                            Create a token <ExternalLink className="size-3" />
+                        </a>
+                        <Button
+                            type="button"
+                            size="sm"
+                            onClick={() => onConnect(accounts.length > 0 ? accountId : undefined)}
+                            disabled={pending || !token.trim() || (accounts.length > 0 && !accountId)}
+                        >
+                            {pending ? <Loader2 className="size-4 animate-spin" /> : accounts.length > 0 ? "Confirm account" : "Connect"}
+                        </Button>
+                    </div>
+                </div>
+            )}
+
+            {error ? <p className="text-sm text-danger">{error}</p> : null}
+        </div>
     );
 }
 
