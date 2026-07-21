@@ -60,6 +60,11 @@ function subjectAltNames(): string[] {
     if (publicDomain && publicDomain !== "polaris.internal") dns.add(publicDomain);
 
     const ips = new Set<string>(["127.0.0.1"]);
+    // The host's LAN IP, so access by IP:port is trusted too. Inside the container
+    // networkInterfaces() only sees the Docker-internal address, so take the
+    // operator-configured public IP (the same one the edge routes on) as well.
+    const configuredIp = process.env.POLARIS_PUBLIC_IP;
+    if (configuredIp && /^\d{1,3}(\.\d{1,3}){3}$/.test(configuredIp)) ips.add(configuredIp);
     for (const list of Object.values(networkInterfaces())) {
         for (const info of list ?? []) {
             if (info.family === "IPv4" && !info.internal) ips.add(info.address);
