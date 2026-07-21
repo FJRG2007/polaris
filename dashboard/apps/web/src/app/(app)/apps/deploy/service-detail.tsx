@@ -1296,10 +1296,9 @@ function ExposureRow({
             {badge && (
                 <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">{badge}</span>
             )}
-            {/* Remove sits before the switch so the switch is always the rightmost
-                element and lines up across every row (domains and tunnels alike). A
-                fixed-width slot keeps the switch position identical whether or not a
-                row has a remove control. */}
+            <Switch checked={enabled} onChange={onToggle} disabled={pending} aria-label={enabled ? "Disable" : "Enable"} />
+            {/* Remove sits to the right of the switch, in a fixed-width slot so the
+                switches still line up across every row whether or not a row has one. */}
             <span className="flex w-5 shrink-0 items-center justify-center">
                 {onRemove && (
                     <button
@@ -1313,7 +1312,6 @@ function ExposureRow({
                     </button>
                 )}
             </span>
-            <Switch checked={enabled} onChange={onToggle} disabled={pending} aria-label={enabled ? "Disable" : "Enable"} />
         </li>
     );
 }
@@ -1524,9 +1522,12 @@ function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
             }
             if (result.error) setError(result.error);
             else {
+                // Reset the add-a-domain form to a clean state after a successful add.
                 setHostname("");
                 setLabel("");
                 setConnectorToken("");
+                setAdvanced(false);
+                setPort(app.port != null ? String(app.port) : "");
                 setTunnelNonce((nonce) => nonce + 1);
                 onChanged();
             }
@@ -1611,6 +1612,11 @@ function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
                             {(domain.kind === "lan" || domain.hostname.endsWith(".plr.local")) && (
                                 <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">local</span>
                             )}
+                            <Switch
+                                checked={domain.enabled}
+                                onChange={(next) => startTransition(async () => { await setDomainEnabledAction(domain.id, next); onChanged(); })}
+                                aria-label={domain.enabled ? "Disable domain" : "Enable domain"}
+                            />
                             <span className="flex w-5 shrink-0 items-center justify-center">
                                 <button
                                     type="button"
@@ -1621,11 +1627,6 @@ function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
                                     <Trash2 className="size-3.5" />
                                 </button>
                             </span>
-                            <Switch
-                                checked={domain.enabled}
-                                onChange={(next) => startTransition(async () => { await setDomainEnabledAction(domain.id, next); onChanged(); })}
-                                aria-label={domain.enabled ? "Disable domain" : "Enable domain"}
-                            />
                         </li>
                     ))}
                     <NamedTunnelRow appId={app.id} nonce={tunnelNonce} onChanged={() => setTunnelNonce((nonce) => nonce + 1)} />
