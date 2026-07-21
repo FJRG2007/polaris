@@ -6,6 +6,12 @@
 # insist on HTTPS. A configured public domain still gets normal automatic HTTPS.
 {
 	auto_https disable_redirects
+	# Expose the admin API on the container network so the dashboard can add and
+	# remove routes for deployed-app subdomains at runtime. Caddy joins only the
+	# internal `default` network (never the untrusted `polaris-proxy` deployed apps
+	# sit on), so a deployed container cannot reach this and hijack the proxy. It is
+	# never published to the host.
+	admin :2019
 }
 
 # Shared proxy behavior, imported by each site below.

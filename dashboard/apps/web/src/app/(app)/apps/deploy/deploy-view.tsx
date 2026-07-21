@@ -458,14 +458,23 @@ function ServerField({ servers, value, onChange }: { servers: ServerOption[]; va
 function NewImageForm({ environmentId, onDone }: { environmentId: string; onDone: () => void }) {
     const [name, setName] = useState("");
     const [image, setImage] = useState("");
+    const [port, setPort] = useState("");
     const { servers, serverId, setServerId } = useDeployServers();
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
 
     function submit() {
         setError(null);
+        const parsedPort = Number(port.trim());
         startTransition(async () => {
-            const result = await createApplicationAction({ environmentId, name, sourceType: "image", imageRef: image, serverId });
+            const result = await createApplicationAction({
+                environmentId,
+                name,
+                sourceType: "image",
+                imageRef: image,
+                serverId,
+                port: port.trim() && Number.isInteger(parsedPort) ? parsedPort : undefined
+            });
             if (result.error) setError(result.error);
             else onDone();
         });
@@ -485,6 +494,12 @@ function NewImageForm({ environmentId, onDone }: { environmentId: string; onDone
                     onChange={(event) => setImage(event.target.value)}
                     placeholder="ghcr.io/user/repo:latest"
                 />
+            </Field>
+            <Field
+                label="Port"
+                hint="The port the container listens on (e.g. 5601 for OpenSearch Dashboards, 8080). Defaults to 80."
+            >
+                <Input value={port} onChange={(event) => setPort(event.target.value)} placeholder="80" inputMode="numeric" />
             </Field>
             <ServerField servers={servers} value={serverId} onChange={setServerId} />
             {error && <p className="text-sm text-danger">{error}</p>}

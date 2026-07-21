@@ -14,7 +14,8 @@ import { prisma } from "@polaris/db";
 import { serviceName, shortHash, slugify, type AppDeployPlan, type DeployResult, type RuntimeContext, type RuntimeDriver } from "@polaris/deploy";
 import { decryptSecret } from "@polaris/storage";
 import { getDriver, getPorts, toTargetInfo, type TargetRow } from "./deploy/runtime";
-import { autoSubdomainUrl } from "./domain-service";
+import { autoSubdomainUrl, getPublicIp } from "./domain-service";
+import { syncDomainRoute, removeDomainRoute } from "./caddy-service";
 import { gitBuildContext, type GitSource } from "./git-build-service";
 import { githubCloneAuthHeader } from "./github-service";
 import { resolveRegistryLogin } from "./registry-credential-service";
@@ -180,6 +181,10 @@ export async function addApplicationDomain(
     if (!app) throw new Error("Application not found");
     let hostname = opts.hostname?.trim();
     let kind = "custom";
+    // A custom (usually public) domain gets automatic HTTPS from Let's Encrypt; a
+    // free/LAN subdomain (sslip.io on a private IP, where ACME cannot validate) is
+    // served with Caddy's internal CA instead.
+    let certResolver = "le";
     if (!hostname) {
         const auto = await autoSubdomainUrl(app.slug);
         if (!auto) {
@@ -189,11 +194,41 @@ export async function addApplicationDomain(
         }
         hostname = new URL(auto).host;
         kind = "auto";
+        certResolver = "internal";
     }
-    await prisma.domain.create({
-        data: { applicationId, hostname, kind, targetPort: opts.targetPort, certResolver: "le" }
+    const domain = await prisma.domain.create({
+        data: { applicationId, hostname, kind, targetPort: opts.targetPort, certResolver }
     });
+    await syncAppDomainRoute(domain.id).catch(() => undefined);
     return hostname;
+}
+
+/**
+ * (Re)register a domain's route on Caddy so its hostname serves the app over its
+ * published host port. Best-effort: routing failures never block a deploy - the
+ * app stays reachable directly over its host IP:port.
+ */
+async function syncAppDomainRoute(domainId: string): Promise<void> {
+    const domain = await prisma.domain.findUnique({
+        where: { id: domainId },
+        select: { id: true, hostname: true, certResolver: true, applicationId: true }
+    });
+    if (!domain?.applicationId) return;
+    const ip = await getPublicIp();
+    if (!ip) return;
+    const cert = domain.certResolver === "none" ? "none" : domain.certResolver === "le" ? "le" : "internal";
+    await syncDomainRoute({
+        domainId: domain.id,
+        hostname: domain.hostname,
+        dial: `${ip}:${hostPortForApp(domain.applicationId)}`,
+        cert
+    });
+}
+
+/** Re-register every domain of an app on Caddy (called after a successful deploy). */
+async function syncAppDomains(applicationId: string): Promise<void> {
+    const domains = await prisma.domain.findMany({ where: { applicationId }, select: { id: true } });
+    for (const domain of domains) await syncAppDomainRoute(domain.id).catch(() => undefined);
 }
 
 /**
@@ -217,6 +252,7 @@ export async function removeApplicationDomain(domainId: string, ownerId: string)
     await prisma.domain.deleteMany({
         where: { id: domainId, application: { environment: { project: { ownerId } } } }
     });
+    await removeDomainRoute(domainId).catch(() => undefined);
 }
 
 // --- deployment lifecycle (restart / disable / remove) ----------------------
@@ -673,6 +709,9 @@ async function promoteDeployment(deploymentId: string): Promise<void> {
         where: { id: dep.deployableId },
         data: { currentDeploymentId: deploymentId }
     });
+    // Re-register the app's domain routes on Caddy - self-heals routes lost to a
+    // proxy reload, and registers a domain whose first deploy just came up.
+    await syncAppDomains(dep.deployableId).catch(() => undefined);
 }
 
 /** Enqueue a job serialized behind any prior job for the same target. */

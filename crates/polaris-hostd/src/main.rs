@@ -49,6 +49,16 @@ fn main() {
         }
     }
 
+    // Ensure the shared proxy network deployed apps attach to exists. Their compose
+    // references it as an external network, so `compose up` fails ("network
+    // polaris-proxy declared as external, but could not be found") if it is absent.
+    // Idempotent - a second create just reports it already exists, which we ignore.
+    let _ = std::process::Command::new("docker")
+        .args(["network", "create", "polaris-proxy"])
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status();
+
     eprintln!(
         "polaris-hostd {} starting (root={}, mount_root={}, deploy_root={})",
         env!("CARGO_PKG_VERSION"),
