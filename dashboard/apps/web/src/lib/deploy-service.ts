@@ -18,6 +18,7 @@ import { LocalRouter, type AppRoute } from "./deploy/router";
 import { getOrCreateHostTarget, getOrCreateLocalTarget } from "./deploy-target-service";
 import { getPublicIp } from "./domain-service";
 import { resolveAutoDomain } from "./network-service";
+import { ensureLocalCa } from "./local-ca-service";
 import { gitBuildContext, type GitSource } from "./git-build-service";
 import { getLatestCommit, githubCloneAuthHeader } from "./github-service";
 import { resolveRegistryLogin } from "./registry-credential-service";
@@ -232,6 +233,9 @@ export async function addApplicationDomain(
         throw new Error("Could not add the domain.");
     }
     await syncAppRoutes().catch(() => undefined);
+    // A LAN name served by the internal CA needs the leaf to cover it, so reissue the
+    // cert to include the new hostname (best-effort; ACME/public domains are unaffected).
+    if (certResolver === "internal") void ensureLocalCa().catch(() => undefined);
     return hostname;
 }
 

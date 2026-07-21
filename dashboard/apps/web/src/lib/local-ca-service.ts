@@ -17,6 +17,7 @@ import { networkInterfaces } from "node:os";
 import { promisify } from "node:util";
 import { join } from "node:path";
 import { mkdir, readFile, writeFile, access } from "node:fs/promises";
+import { prisma } from "@polaris/db";
 import { loadEnv } from "@polaris/config";
 
 const run = promisify(execFile);
@@ -51,15 +52,26 @@ async function exists(path: string): Promise<boolean> {
 }
 
 /** The DNS + IP names the leaf should be valid for: the mDNS hostname and its
- *  `.local` form, an optional configured public domain, and every non-internal
- *  IPv4 the host currently has (so an IP:port hit is trusted too). */
-function subjectAltNames(): string[] {
+ *  `.local` form, an optional configured public domain, every LAN/internal hostname
+ *  Polaris serves (so free sslip.io subdomains and *.plr.local app names are
+ *  trusted-HTTPS too, like polaris.local), and every non-internal IPv4 the host has. */
+async function subjectAltNames(): Promise<string[]> {
     const host = process.env.POLARIS_MDNS_HOSTNAME || process.env.POLARIS_LOCAL_HOSTNAME || "polaris";
-    // `*.plr.local` covers every deployed app's LAN hostname (served by the internal
-    // CA and resolved by the Polaris mDNS responder), so they are trusted-HTTPS too.
     const dns = new Set<string>([host, `${host}.local`, "polaris", "polaris.local", "plr.local", "*.plr.local", "localhost"]);
     const publicDomain = process.env.POLARIS_PUBLIC_DOMAIN;
     if (publicDomain && publicDomain !== "polaris.internal") dns.add(publicDomain);
+
+    // Every internal-cert domain (free sslip.io LAN subdomains, .plr.local app names)
+    // so Traefik's default cert actually matches them instead of throwing a warning.
+    try {
+        const internal = await prisma.domain.findMany({ where: { certResolver: "internal" }, select: { hostname: true } });
+        for (const domain of internal) {
+            const hostname = domain.hostname.trim().toLowerCase();
+            if (hostname && dns.size < 200) dns.add(hostname);
+        }
+    } catch {
+        // The DB may not be reachable at first-boot CA generation; static names still apply.
+    }
 
     const ips = new Set<string>(["127.0.0.1"]);
     // The host's LAN IP, so access by IP:port is trusted too. Inside the container
@@ -99,8 +111,9 @@ async function ensureCertificates(): Promise<{ leafCrt: string; leafKey: string;
             ]);
         }
 
-        // (Re)issue the leaf when missing or when the SAN set changed (e.g. a new IP).
-        const sanLine = `subjectAltName=${subjectAltNames().join(",")}`;
+        // (Re)issue the leaf when missing or when the SAN set changed (e.g. a new IP
+        // or a newly added LAN domain).
+        const sanLine = `subjectAltName=${(await subjectAltNames()).join(",")}`;
         const sanMarker = join(dir, "leaf.san");
         const priorSan = (await exists(sanMarker)) ? await readFile(sanMarker, "utf8") : "";
         if (!(await exists(leafCrt)) || !(await exists(leafKey)) || priorSan.trim() !== sanLine) {
