@@ -215,8 +215,11 @@ services:
       - polaris-proxy
 
 networks:
-  # Shared network deployed services and the proxy join for name-based routing.
+  # Shared network deployed apps and the edge join for name-based routing. hostd
+  # creates it at startup, so it is external here - compose uses the existing
+  # network instead of trying to manage a second one.
   polaris-proxy:
+    external: true
     name: polaris-proxy
 
 volumes:
