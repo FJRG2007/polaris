@@ -54,6 +54,7 @@ import { TerminalPanel } from "./terminal-panel";
 import { FilesPanel } from "./files-panel";
 import {
     addDomainAction,
+    autoExposeAction,
     deleteEnvVarAction,
     deployApplicationAction,
     importEnvVarsAction,
@@ -1448,7 +1449,9 @@ function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
         startTransition(async () => {
             let result: { error?: string } = {};
             if (exposure === "subdomain") {
-                result = await addDomainAction({ applicationId: app.id, targetPort: Number(port) });
+                // Auto = always reachable: a LAN name, plus a free Cloudflare quick
+                // tunnel for public access when the box is behind NAT.
+                result = await autoExposeAction({ applicationId: app.id, targetPort: Number(port) });
             } else if (exposure === "le" || exposure === "duckdns") {
                 result = await addDomainAction({ applicationId: app.id, hostname: hostname.trim() || undefined, targetPort: Number(port), cert: "le" });
             } else if (exposure === "proxy") {
@@ -1605,7 +1608,7 @@ function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
                         )}
                         <p className="text-xs text-muted-foreground">
                             {exposure === "subdomain"
-                                ? "Follows your Network exposure mode (Admin - Domains): public with Let's Encrypt on a reachable box, or LAN-only on a home/NAT box."
+                                ? "Always reachable: a clean <app>.plr.local name on your LAN, plus a public Let's Encrypt subdomain on a reachable box - or, behind NAT, a free Cloudflare quick link so it works from outside too. Connect a Cloudflare account or a custom domain for a stable public URL."
                                 : exposure === "le"
                                   ? "Point the domain's DNS at this server's public IP (port-forward / DuckDNS). Traefik gets a Let's Encrypt certificate automatically."
                                   : exposure === "duckdns"

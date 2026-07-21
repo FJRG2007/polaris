@@ -10,6 +10,7 @@ import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { requirePermission } from "@/lib/session";
 import { ensurePublicIp } from "@/lib/domain-service";
+import { getNetworkStatus } from "@/lib/network-service";
 import { recordAudit } from "@/lib/audit-service";
 import { getOrCreateLocalTarget, getOrCreateHostTarget } from "@/lib/deploy-target-service";
 import { listHosts } from "@/lib/host-service";
@@ -471,6 +472,46 @@ export async function addDomainAction(input: {
         return { hostname };
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Could not add the domain" };
+    }
+}
+
+/**
+ * The "Free subdomain (auto)" flow, made always-reachable: create the auto domain
+ * (a `<app>.plr.local` LAN name on a NATed box, or a public sslip.io name on a
+ * reachable one), and when the box is behind NAT also bring up a free Cloudflare
+ * quick tunnel so there is a working public URL - until the operator connects a
+ * Cloudflare account or a custom domain for a stable one. The tunnel is best-effort:
+ * the domain is still created if it cannot start.
+ */
+export async function autoExposeAction(input: {
+    applicationId: string;
+    targetPort: number;
+}): Promise<{ error?: string; hostname?: string; lanOnly?: boolean; tunnelUrl?: string | null; tunnelError?: string }> {
+    const user = await requirePermission("deploy.manage");
+    const port = Number(input.targetPort);
+    if (!Number.isInteger(port) || port < 1 || port > 65535) return { error: "A valid target port is required" };
+    const requestHeaders = await headers();
+    await ensurePublicIp(requestHeaders.get("x-server-ip") ?? requestHeaders.get("host"));
+    try {
+        const hostname = await addApplicationDomain(input.applicationId, user.id, { targetPort: port });
+        await recordAudit({ actorId: user.id, action: "deploy.domain.add", targetType: "application", targetId: input.applicationId });
+        const status = await getNetworkStatus();
+        if (status.autoSubdomainsPublic) {
+            revalidatePath(DEPLOY_PATH);
+            return { hostname, lanOnly: false };
+        }
+        // Behind NAT: the LAN name only resolves on the local network, so start a free
+        // Cloudflare quick tunnel for public reachability.
+        try {
+            const tunnel = await startQuickTunnel(input.applicationId, user.id);
+            revalidatePath(DEPLOY_PATH);
+            return { hostname, lanOnly: true, tunnelUrl: tunnel.url };
+        } catch (caught) {
+            revalidatePath(DEPLOY_PATH);
+            return { hostname, lanOnly: true, tunnelError: caught instanceof Error ? caught.message : "Could not start a public tunnel" };
+        }
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not create the subdomain" };
     }
 }
 
