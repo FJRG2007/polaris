@@ -1220,6 +1220,33 @@ function Meter({ label, value, unit }: { label: string; value: number | null | u
 
 /** Per-app Cloudflare Quick Tunnel: a public URL with no account/DNS/port-forward.
  *  Loads the live state, then starts/refreshes/stops the cloudflared sidecar. */
+/** One exposure method inside Public access. A shared shell so the domain form and
+ *  the two tunnels read as parallel options of one section, not competing panels. */
+function MethodBlock({
+    icon,
+    title,
+    description,
+    children
+}: {
+    icon: ReactNode;
+    title: string;
+    description: string;
+    children: ReactNode;
+}) {
+    return (
+        <div className="flex flex-col gap-3 rounded-lg border border-border/60 bg-surface/30 p-3">
+            <div className="flex flex-col gap-0.5">
+                <h4 className="flex items-center gap-1.5 text-sm font-medium">
+                    {icon}
+                    {title}
+                </h4>
+                <p className="text-xs text-muted-foreground">{description}</p>
+            </div>
+            {children}
+        </div>
+    );
+}
+
 function QuickTunnelPanel({ appId }: { appId: string }) {
     const [status, setStatus] = useState<{ running: boolean; url: string | null } | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -1268,15 +1295,11 @@ function QuickTunnelPanel({ appId }: { appId: string }) {
 
     const running = status?.running ?? false;
     return (
-        <section className="flex flex-col gap-2">
-            <h3 className="flex items-center gap-1.5 text-sm font-medium">
-                <CloudflareMark className="size-4" /> Public tunnel
-            </h3>
-            <p className="text-xs text-muted-foreground">
-                Expose this app on a public Cloudflare URL - no account, no DNS, no port-forwarding. The link
-                changes each time the tunnel starts; for a stable custom domain, configure a tunnel under
-                Integrations.
-            </p>
+        <MethodBlock
+            icon={<CloudflareMark className="size-4" />}
+            title="Quick public link"
+            description="Expose this app on a throwaway Cloudflare URL - no account, no DNS, no port-forwarding. The link changes each time the tunnel starts."
+        >
             {running && status?.url && (
                 <div className="flex items-center gap-2">
                     <a
@@ -1317,7 +1340,7 @@ function QuickTunnelPanel({ appId }: { appId: string }) {
                     </Button>
                 )}
             </div>
-        </section>
+        </MethodBlock>
     );
 }
 
@@ -1362,14 +1385,11 @@ function NamedTunnelPanel({ appId }: { appId: string }) {
     const configured = status?.configured ?? false;
 
     return (
-        <section className="flex flex-col gap-2">
-            <h3 className="flex items-center gap-1.5 text-sm font-medium">
-                <CloudflareMark className="size-4" /> Custom domain via Cloudflare tunnel
-            </h3>
-            <p className="text-xs text-muted-foreground">
-                A stable hostname on your own domain, with automatic HTTPS and no port-forwarding. Create the tunnel
-                in Cloudflare and paste its connector token; it reconnects on restart.
-            </p>
+        <MethodBlock
+            icon={<CloudflareMark className="size-4" />}
+            title="Custom domain via Cloudflare tunnel"
+            description="A stable hostname on your own domain, with automatic HTTPS and no port-forwarding. Create the tunnel in Cloudflare and paste its connector token; it reconnects on restart."
+        >
             {configured && status?.hostname && (
                 <div className="flex items-center gap-2 text-xs">
                     <span className={cn("size-1.5 rounded-full", running ? "animate-pulse bg-emerald-500" : "bg-muted-foreground/50")} />
@@ -1456,7 +1476,7 @@ function NamedTunnelPanel({ appId }: { appId: string }) {
                     </div>
                 </DialogContent>
             </Dialog>
-        </section>
+        </MethodBlock>
     );
 }
 
@@ -1552,8 +1572,8 @@ function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
                 <div className="flex flex-col gap-2">
                     <h3 className="text-sm font-medium">Public access</h3>
                     <p className="text-xs text-muted-foreground">
-                        Reach this service from the internet - a custom domain you point here, or a Cloudflare tunnel
-                        that needs no DNS or port-forwarding. Add a domain below, or expose it through the tunnel.
+                        Reach this service from the internet. Point a domain here, or expose it through a Cloudflare
+                        tunnel that needs no DNS or port-forwarding - pick whichever method fits your setup.
                     </p>
                 </div>
                 {app.domains.length > 0 ? (
@@ -1596,49 +1616,53 @@ function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
                 ) : (
                     <p className="text-xs text-muted-foreground">No domains yet.</p>
                 )}
-                <div className="flex flex-col gap-2">
-                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                        <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-                            Exposure
-                            <Select
-                                value={exposure}
-                                onValueChange={(value) => setExposure(value as "subdomain" | "le" | "tunnel")}
-                                options={[
-                                    { value: "subdomain", label: "Free subdomain (auto)" },
-                                    { value: "le", label: "Custom domain - Let's Encrypt" },
-                                    { value: "tunnel", label: "Custom domain - behind a tunnel/proxy" }
-                                ]}
-                            />
-                        </label>
-                        <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-                            Port
-                            <Input value={port} onChange={(event) => setPort(event.target.value)} placeholder="port" />
-                        </label>
-                    </div>
-                    {exposure !== "subdomain" && (
-                        <Input
-                            value={hostname}
-                            onChange={(event) => setHostname(event.target.value)}
-                            placeholder="app.example.com"
-                        />
-                    )}
-                    <p className="text-xs text-muted-foreground">
-                        {exposure === "subdomain"
-                            ? "Follows your Network exposure mode (Admin - Domains): public with Let's Encrypt on a reachable box, or LAN-only on a home/NAT box. For public access from home, set a wildcard domain there or start a Public tunnel below."
-                            : exposure === "le"
-                              ? "Point the domain's DNS at this server's public IP (port-forward / DuckDNS). Traefik gets a Let's Encrypt certificate automatically."
-                              : "For a domain fronted by a tunnel (Cloudflare / ngrok) or an external proxy that terminates TLS. Configure the tunnel under Integrations."}
-                    </p>
-                    <div className="flex justify-end">
-                        <Button variant="outline" onClick={addDomain} disabled={pending}>
-                            Add domain
-                        </Button>
-                    </div>
-                </div>
-                <div className="border-t border-border/50 pt-4">
+                <div className="flex flex-col gap-3">
+                    <MethodBlock
+                        icon={<Globe className="size-4" />}
+                        title="Add a domain"
+                        description="Route a hostname to this app - a free auto subdomain, your own domain with Let's Encrypt, or one fronted by a tunnel/proxy."
+                    >
+                        <div className="flex flex-col gap-2">
+                            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                                <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                                    Exposure
+                                    <Select
+                                        value={exposure}
+                                        onValueChange={(value) => setExposure(value as "subdomain" | "le" | "tunnel")}
+                                        options={[
+                                            { value: "subdomain", label: "Free subdomain (auto)" },
+                                            { value: "le", label: "Custom domain - Let's Encrypt" },
+                                            { value: "tunnel", label: "Custom domain - behind a tunnel/proxy" }
+                                        ]}
+                                    />
+                                </label>
+                                <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                                    Port
+                                    <Input value={port} onChange={(event) => setPort(event.target.value)} placeholder="port" />
+                                </label>
+                            </div>
+                            {exposure !== "subdomain" && (
+                                <Input
+                                    value={hostname}
+                                    onChange={(event) => setHostname(event.target.value)}
+                                    placeholder="app.example.com"
+                                />
+                            )}
+                            <p className="text-xs text-muted-foreground">
+                                {exposure === "subdomain"
+                                    ? "Follows your Network exposure mode (Admin - Domains): public with Let's Encrypt on a reachable box, or LAN-only on a home/NAT box. For public access from home, set a wildcard domain there or use a quick public link below."
+                                    : exposure === "le"
+                                      ? "Point the domain's DNS at this server's public IP (port-forward / DuckDNS). Traefik gets a Let's Encrypt certificate automatically."
+                                      : "For a domain fronted by a tunnel (Cloudflare / ngrok) or an external proxy that terminates TLS. Configure the tunnel under Integrations."}
+                            </p>
+                            <div className="flex justify-end">
+                                <Button variant="outline" onClick={addDomain} disabled={pending}>
+                                    Add domain
+                                </Button>
+                            </div>
+                        </div>
+                    </MethodBlock>
                     <NamedTunnelPanel appId={app.id} />
-                </div>
-                <div className="border-t border-border/50 pt-4">
                     <QuickTunnelPanel appId={app.id} />
                 </div>
             </section>
