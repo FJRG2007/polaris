@@ -499,9 +499,9 @@ function NewImageForm({ environmentId, onDone }: { environmentId: string; onDone
             </Field>
             <Field
                 label="Port"
-                hint="The port the container listens on (e.g. 5601 for OpenSearch Dashboards, 8080). Defaults to 80."
+                hint="The port the container listens on. Leave empty to detect it from the image; set it (e.g. 5601 for OpenSearch Dashboards) only if the image exposes several ports or none."
             >
-                <Input value={port} onChange={(event) => setPort(event.target.value)} placeholder="80" inputMode="numeric" />
+                <Input value={port} onChange={(event) => setPort(event.target.value)} placeholder="Auto (from image)" inputMode="numeric" />
             </Field>
             <ServerField servers={servers} value={serverId} onChange={setServerId} />
             {error && <p className="text-sm text-danger">{error}</p>}
