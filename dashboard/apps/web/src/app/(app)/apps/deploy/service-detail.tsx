@@ -515,7 +515,7 @@ function DeploymentLogsView({
             ) : cat === "Deploy Logs" ? (
                 <RuntimeLogView appId={app.id} />
             ) : cat === "HTTP Logs" ? (
-                <HttpLogsView appId={app.id} />
+                <HttpLogsView appId={app.id} deploymentStart={deployment?.createdAt ?? null} />
             ) : cat === "Network Flow Logs" ? (
                 <Empty text="No network flow logs yet." />
             ) : (
@@ -641,29 +641,45 @@ function csvCell(value: string | number): string {
     return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 
+const HTTP_METHODS = ["all", "GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"];
+const STATUS_CLASSES = [
+    { value: "all", label: "Any status" },
+    { value: "2", label: "2xx" },
+    { value: "3", label: "3xx" },
+    { value: "4", label: "4xx" },
+    { value: "5", label: "5xx" }
+];
+const HTTP_PAGE = 100;
+
 /**
- * HTTP access logs for an app: client IP, method, path, status, and User-Agent,
- * parsed from the container's own stdout and polled live. Apps that do not emit
- * access logs show an explanatory empty state rather than an error.
+ * HTTP access logs for an app, from the edge's per-request log so any app is
+ * covered. Polled live. Scoped to the current deployment by default (clear to
+ * search all history), with method / status-class / date-range filters and an
+ * infinite-scroll window so a large log renders only what is on screen.
  */
-function HttpLogsView({ appId }: { appId: string }) {
+function HttpLogsView({ appId, deploymentStart }: { appId: string; deploymentStart: string | null }) {
     const [entries, setEntries] = useState<HttpLogEntry[] | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [search, setSearch] = useState("");
     const [ipFilter, setIpFilter] = useState<string | null>(null);
+    const [method, setMethod] = useState("all");
+    const [statusClass, setStatusClass] = useState("all");
+    const [scopeDeploy, setScopeDeploy] = useState(true);
+    const [from, setFrom] = useState("");
+    const [to, setTo] = useState("");
+    const [visible, setVisible] = useState(HTTP_PAGE);
+    const sentinelRef = useRef<HTMLDivElement>(null);
 
-    // Poll fast while the tab is open so requests appear in near real time; skip
-    // fetches while the page is hidden to avoid pointless load when unattended.
     useEffect(() => {
         let active = true;
         let timer: ReturnType<typeof setTimeout>;
         async function poll(): Promise<void> {
             if (typeof document !== "undefined" && document.hidden) {
-                timer = setTimeout(poll, 2000);
+                timer = setTimeout(poll, 2500);
                 return;
             }
             try {
-                const res = await fetch(`/api/deploy/apps/${appId}/http-logs`, { cache: "no-store" });
+                const res = await fetch(`/api/deploy/apps/${appId}/http-logs?tail=2000`, { cache: "no-store" });
                 if (!active) return;
                 if (res.ok) {
                     const data = (await res.json()) as { entries: HttpLogEntry[] };
@@ -676,7 +692,7 @@ function HttpLogsView({ appId }: { appId: string }) {
             } catch {
                 if (active) setError("Could not read HTTP logs");
             }
-            if (active) timer = setTimeout(poll, 2000);
+            if (active) timer = setTimeout(poll, 2500);
         }
         void poll();
         return () => {
@@ -685,22 +701,60 @@ function HttpLogsView({ appId }: { appId: string }) {
         };
     }, [appId]);
 
+    // An explicit from/to wins; otherwise "this deployment" clamps to its start.
+    const fromMs = from
+        ? new Date(from).getTime()
+        : scopeDeploy && deploymentStart
+          ? new Date(deploymentStart).getTime()
+          : null;
+    const toMs = to ? new Date(to).getTime() : null;
+
     const all = entries ?? [];
     const query = search.trim().toLowerCase();
-    const byIp = ipFilter ? all.filter((entry) => entry.ip === ipFilter) : all;
-    const filtered = query
-        ? byIp.filter(
-              (entry) =>
-                  entry.path.toLowerCase().includes(query) ||
-                  entry.ip.toLowerCase().includes(query) ||
-                  entry.method.toLowerCase().includes(query) ||
-                  String(entry.status).includes(query) ||
-                  (entry.userAgent?.toLowerCase().includes(query) ?? false)
-          )
-        : byIp;
+    const filtered = all.filter((entry) => {
+        if (ipFilter && entry.ip !== ipFilter) return false;
+        if (method !== "all" && entry.method !== method) return false;
+        if (statusClass !== "all" && Math.floor(entry.status / 100) !== Number(statusClass)) return false;
+        if (fromMs !== null || toMs !== null) {
+            const t = entry.time ? Date.parse(entry.time) : NaN;
+            if (!Number.isFinite(t)) {
+                if (fromMs !== null) return false;
+            } else {
+                if (fromMs !== null && t < fromMs) return false;
+                if (toMs !== null && t > toMs) return false;
+            }
+        }
+        if (query) {
+            return (
+                entry.path.toLowerCase().includes(query) ||
+                entry.ip.toLowerCase().includes(query) ||
+                entry.method.toLowerCase().includes(query) ||
+                String(entry.status).includes(query) ||
+                (entry.userAgent?.toLowerCase().includes(query) ?? false)
+            );
+        }
+        return true;
+    });
 
-    // Export exactly what is on screen, so filtering to one IP then exporting
-    // downloads just that IP's requests.
+    // Reset the window whenever the filter set changes.
+    useEffect(() => {
+        setVisible(HTTP_PAGE);
+    }, [ipFilter, method, statusClass, from, to, scopeDeploy, query]);
+
+    // Grow the window as the bottom sentinel scrolls into view (infinite scroll).
+    useEffect(() => {
+        const el = sentinelRef.current;
+        if (!el) return;
+        const observer = new IntersectionObserver((records) => {
+            if (records[0]?.isIntersecting) setVisible((current) => current + HTTP_PAGE);
+        });
+        observer.observe(el);
+        return () => observer.disconnect();
+    }, [filtered.length]);
+
+    const shown = filtered.slice(0, visible);
+    const scoped = scopeDeploy && deploymentStart && !from;
+
     function exportCsv(): void {
         const header = ["time", "ip", "method", "path", "status", "host", "bytes", "referer", "user_agent", "duration_ms"];
         const rows = filtered.map((entry) => [
@@ -737,17 +791,46 @@ function HttpLogsView({ appId }: { appId: string }) {
                         className="pl-8 text-xs"
                     />
                 </div>
-                <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={exportCsv}
-                    disabled={!filtered.length}
-                    className="shrink-0"
-                >
-                    <Download className="size-4" />
-                    Export
+                <Button type="button" variant="outline" size="sm" onClick={exportCsv} disabled={!filtered.length} className="shrink-0">
+                    <Download className="size-4" /> Export
                 </Button>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+                <button
+                    type="button"
+                    onClick={() => {
+                        setScopeDeploy((value) => !value);
+                        setFrom("");
+                        setTo("");
+                    }}
+                    disabled={!deploymentStart}
+                    className={`rounded-md border px-2 py-1 transition-colors disabled:opacity-40 ${
+                        scoped ? "border-primary/40 bg-primary/10 text-primary" : "border-border text-muted-foreground hover:text-foreground"
+                    }`}
+                >
+                    {scoped ? "This deployment" : "All history"}
+                </button>
+                <Select value={method} onValueChange={setMethod} options={HTTP_METHODS.map((m) => ({ value: m, label: m === "all" ? "Any method" : m }))} className="h-8 w-32" aria-label="Method" />
+                <Select value={statusClass} onValueChange={setStatusClass} options={STATUS_CLASSES} className="h-8 w-28" aria-label="Status" />
+                <Input type="datetime-local" value={from} onChange={(event) => setFrom(event.target.value)} className="h-8 w-auto text-xs" aria-label="From" />
+                <span className="text-muted-foreground">to</span>
+                <Input type="datetime-local" value={to} onChange={(event) => setTo(event.target.value)} className="h-8 w-auto text-xs" aria-label="To" />
+                {(from || to || method !== "all" || statusClass !== "all" || ipFilter) && (
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setFrom("");
+                            setTo("");
+                            setMethod("all");
+                            setStatusClass("all");
+                            setIpFilter(null);
+                        }}
+                        className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground"
+                    >
+                        <X className="size-3" /> Clear
+                    </button>
+                )}
             </div>
 
             {entries !== null && !error && all.length > 0 && (
@@ -757,18 +840,13 @@ function HttpLogsView({ appId }: { appId: string }) {
                     </span>
                     <span>
                         {filtered.length} request{filtered.length === 1 ? "" : "s"}
-                        {ipFilter || query ? ` of ${all.length}` : ""}
+                        {filtered.length !== all.length ? ` of ${all.length}` : ""}
                     </span>
                     {ipFilter && (
                         <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-foreground">
                             <span className="text-muted-foreground">IP</span>
                             <span className="font-mono">{ipFilter}</span>
-                            <button
-                                type="button"
-                                onClick={() => setIpFilter(null)}
-                                aria-label="Clear IP filter"
-                                className="ml-0.5 rounded-full p-0.5 hover:bg-card-hover"
-                            >
+                            <button type="button" onClick={() => setIpFilter(null)} aria-label="Clear IP filter" className="ml-0.5 rounded-full p-0.5 hover:bg-card-hover">
                                 <X className="size-3" />
                             </button>
                         </span>
@@ -804,16 +882,14 @@ function HttpLogsView({ appId }: { appId: string }) {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-border/40">
-                            {filtered.map((entry, index) => (
+                            {shown.map((entry, index) => (
                                 <tr key={index} className="hover:bg-muted/40">
                                     <td className="whitespace-nowrap px-3 py-1.5 text-muted-foreground" title={entry.time ?? undefined}>
                                         {entry.time ? new Date(entry.time).toLocaleTimeString() : "-"}
                                     </td>
                                     <td className="px-3 py-1.5 font-mono">{entry.method}</td>
                                     <td className="px-3 py-1.5">
-                                        <span className={`rounded px-1.5 py-0.5 font-mono ${statusTone(entry.status)}`}>
-                                            {entry.status}
-                                        </span>
+                                        <span className={`rounded px-1.5 py-0.5 font-mono ${statusTone(entry.status)}`}>{entry.status}</span>
                                     </td>
                                     <td className="max-w-[18rem] truncate px-3 py-1.5 font-mono" title={entry.path}>
                                         {entry.path}
@@ -837,6 +913,7 @@ function HttpLogsView({ appId }: { appId: string }) {
                             ))}
                         </tbody>
                     </table>
+                    {shown.length < filtered.length && <div ref={sentinelRef} className="h-8 w-full" />}
                 </div>
             )}
         </div>

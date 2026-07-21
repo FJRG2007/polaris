@@ -200,6 +200,28 @@ async function getDuckdnsToken(): Promise<string | null> {
     }
 }
 
+/** Whether a DuckDNS subdomain + token are configured (for the UI + auto-sync). */
+export async function duckdnsConfigured(): Promise<boolean> {
+    const [sub, token] = await Promise.all([getSetting(KEYS.duckSub), getDuckdnsToken()]);
+    return Boolean(sub && token);
+}
+
+let duckdnsStarted = false;
+
+/**
+ * Keep the DuckDNS A record pointed at the box's current public IP so a free
+ * `<sub>.duckdns.org` domain (usable as a wildcard base, since DuckDNS resolves
+ * `*.<sub>.duckdns.org` too) stays reachable as the ISP-assigned IP changes.
+ * Idempotent; a no-op until a subdomain + token are configured.
+ */
+export function startDuckDnsSync(): void {
+    if (duckdnsStarted) return;
+    duckdnsStarted = true;
+    const tick = (): void => void syncDuckDns().catch(() => undefined);
+    setInterval(tick, 10 * 60 * 1000).unref?.();
+    setTimeout(tick, 20_000).unref?.();
+}
+
 /** Update the DuckDNS record to the caller's current public IP. */
 export async function syncDuckDns(): Promise<{ ok: boolean; detail: string }> {
     const sub = await getSetting(KEYS.duckSub);

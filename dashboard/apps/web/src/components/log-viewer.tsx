@@ -34,6 +34,9 @@ const INFO_RE = /\b(info|notice|listening|started|ready|success|succeeded|comple
 // indented text, JS/Java stack frames, "Caused by" chains, and "..." truncations.
 const CONTINUATION_RE = /^(\s+|at\s|\.{3}|caused by\b)/i;
 
+/** Cap on rendered log rows, so a very large stream stays responsive. */
+const MAX_LOG_ROWS = 3000;
+
 function levelOf(line: string): LogLevel {
     if (ERROR_RE.test(line)) return "error";
     if (WARN_RE.test(line)) return "warn";
@@ -79,7 +82,11 @@ export function LogViewer({
 
     const entries = useMemo(() => (log ? parseLog(log) : []), [log]);
     const query = search.trim().toLowerCase();
-    const filtered = query ? entries.filter((entry) => entry.text.toLowerCase().includes(query)) : entries;
+    const matched = query ? entries.filter((entry) => entry.text.toLowerCase().includes(query)) : entries;
+    // Logs are read tail-first, so cap the rendered rows to the most recent slice -
+    // this keeps the DOM light on a huge stream without losing what matters.
+    const filtered = matched.length > MAX_LOG_ROWS ? matched.slice(-MAX_LOG_ROWS) : matched;
+    const hiddenCount = matched.length - filtered.length;
 
     // Follow the tail as new output streams in, matching a live console.
     useEffect(() => {
@@ -146,7 +153,16 @@ export function LogViewer({
                 {filtered.length === 0 ? (
                     <p className="px-3 py-2 text-muted-foreground">{log ? "No matching lines." : emptyText}</p>
                 ) : (
-                    filtered.map((entry, index) => <LogRow key={index} entry={entry} />)
+                    <>
+                        {hiddenCount > 0 && (
+                            <p className="px-3 py-1 text-[11px] text-zinc-500">
+                                {hiddenCount.toLocaleString()} earlier lines hidden - showing the latest {MAX_LOG_ROWS.toLocaleString()}.
+                            </p>
+                        )}
+                        {filtered.map((entry, index) => (
+                            <LogRow key={index} entry={entry} />
+                        ))}
+                    </>
                 )}
             </div>
         </div>

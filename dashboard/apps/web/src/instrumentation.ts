@@ -36,4 +36,9 @@ export async function register(): Promise<void> {
     // commit. Works without a public webhook (LAN installs can't receive one).
     const { startAutoDeployPoller } = await import("./lib/deploy/auto-deploy-poller");
     startAutoDeployPoller();
+
+    // Keep a configured DuckDNS record pointed at the current public IP so a free
+    // dynamic-DNS wildcard base stays reachable as the ISP IP changes.
+    const { startDuckDnsSync } = await import("./lib/domain-service");
+    startDuckDnsSync();
 }

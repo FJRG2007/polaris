@@ -125,7 +125,10 @@ export function DomainsView({
                 </CardHeader>
                 <CardBody className="flex flex-col gap-4">
                     <p className="text-xs text-muted-foreground">
-                        Free dynamic DNS. Polaris points your DuckDNS record at this host&apos;s current public IP.
+                        Free dynamic DNS. Polaris keeps your DuckDNS record pointed at this host&apos;s current public IP,
+                        auto-synced every few minutes. Use <code>&lt;sub&gt;.duckdns.org</code> as the wildcard base above
+                        (DuckDNS resolves <code>*.&lt;sub&gt;.duckdns.org</code> too) for free public subdomains with
+                        Let&apos;s Encrypt.
                     </p>
                     <label className="flex flex-col gap-1 text-sm">
                         Subdomain
@@ -341,6 +344,10 @@ function ExposureGuidance({ status, mode, wildcard }: { status: NetworkStatus; m
                         certificate.
                     </li>
                 </ol>
+                <p className="mt-2">
+                    No domain? Use a free <b>DuckDNS</b> subdomain (<code>&lt;sub&gt;.duckdns.org</code>) as the base -
+                    Polaris keeps its IP updated automatically. Set the token in the DuckDNS card below.
+                </p>
             </GuidanceNote>
         );
     }
