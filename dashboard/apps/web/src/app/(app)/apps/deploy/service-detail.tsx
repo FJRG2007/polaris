@@ -13,7 +13,6 @@ import {
     ChevronDown,
     ChevronLeft,
     ChevronRight,
-    Copy,
     Download,
     Eye,
     EyeOff,
@@ -46,7 +45,7 @@ import {
     Switch,
     cn
 } from "@polaris/ui";
-import { CloudflareMark } from "@/components/brand-icons";
+import { CloudflareMark, NgrokMark } from "@/components/brand-icons";
 import { ServiceIcon, StatusPill, dbTone, serviceKindOf, type ProjectApp } from "./deploy-view";
 import { MetricsHistory, percent, ratioPercent, type MetricSpec } from "@/components/metrics-history";
 import { LogViewer } from "@/components/log-viewer";
@@ -78,7 +77,10 @@ import {
     startNamedTunnelAction,
     stopNamedTunnelAction,
     provisionNamedTunnelAction,
-    cloudflareAccountStatusAction
+    cloudflareAccountStatusAction,
+    ngrokTunnelStatusAction,
+    startNgrokTunnelAction,
+    stopNgrokTunnelAction
 } from "./actions";
 
 const TABS = ["Deployments", "Variables", "Metrics", "Console", "Files", "Settings"] as const;
@@ -1249,274 +1251,147 @@ function MethodBlock({
     );
 }
 
-function QuickTunnelPanel({ appId }: { appId: string }) {
-    const [status, setStatus] = useState<{ running: boolean; url: string | null } | null>(null);
-    const [error, setError] = useState<string | null>(null);
-    const [copied, setCopied] = useState(false);
-    const [pending, startTransition] = useTransition();
-
-    useEffect(() => {
-        let active = true;
-        quickTunnelStatusAction(appId)
-            .then((next) => {
-                if (active) setStatus(next);
-            })
-            .catch(() => undefined);
-        return () => {
-            active = false;
-        };
-    }, [appId]);
-
-    function start(): void {
-        setError(null);
-        startTransition(async () => {
-            const result = await startQuickTunnelAction(appId);
-            if (result.error) setError(result.error);
-            else setStatus({ running: true, url: result.url ?? null });
-        });
-    }
-
-    function stop(): void {
-        setError(null);
-        startTransition(async () => {
-            const result = await stopQuickTunnelAction(appId);
-            if (result.error) setError(result.error);
-            else setStatus({ running: false, url: null });
-        });
-    }
-
-    async function copy(url: string): Promise<void> {
-        try {
-            await navigator.clipboard.writeText(url);
-            setCopied(true);
-            setTimeout(() => setCopied(false), 1500);
-        } catch {
-            // Clipboard unavailable (insecure context); the link is still visible to copy manually.
-        }
-    }
-
-    const running = status?.running ?? false;
+/** One active exposure in the Public access list: a link + optional badge and a
+ *  stop/disconnect control, so tunnels read like the domain rows above them. */
+function ExposureRow({
+    icon,
+    label,
+    href,
+    badge,
+    pending,
+    onStop,
+    stopLabel
+}: {
+    icon: ReactNode;
+    label: string;
+    href: string | null;
+    badge?: string;
+    pending: boolean;
+    onStop: () => void;
+    stopLabel: string;
+}) {
     return (
-        <MethodBlock
-            icon={<CloudflareMark className="size-4" />}
-            title="Quick public link"
-            description="Expose this app on a throwaway Cloudflare URL - no account, no DNS, no port-forwarding. The link changes each time the tunnel starts."
-        >
-            {running && status?.url && (
-                <div className="flex items-center gap-2">
-                    <a
-                        href={status.url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex min-w-0 items-center gap-1 truncate text-xs text-primary hover:underline"
-                    >
-                        <CloudflareMark className="size-3.5 shrink-0" /> {status.url.replace(/^https?:\/\//, "")}
-                    </a>
-                    <button
-                        type="button"
-                        title="Copy link"
-                        onClick={() => copy(status.url as string)}
-                        className="text-muted-foreground transition-colors hover:text-foreground"
-                    >
-                        {copied ? <CheckCircle2 className="size-3.5 text-primary" /> : <Copy className="size-3.5" />}
-                    </button>
-                </div>
+        <li className="group flex items-center gap-2">
+            {href ? (
+                <a
+                    href={href}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex min-w-0 flex-1 items-center gap-1 truncate text-xs text-primary hover:underline"
+                >
+                    <span className="shrink-0">{icon}</span> {label}
+                </a>
+            ) : (
+                <span className="inline-flex min-w-0 flex-1 items-center gap-1 truncate text-xs text-muted-foreground">
+                    <span className="shrink-0">{icon}</span> {label}
+                </span>
             )}
-            {running && !status?.url && (
-                <p className="text-xs text-muted-foreground">Tunnel running - waiting for its public URL...</p>
+            {badge && (
+                <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">{badge}</span>
             )}
-            {error && <p className="text-xs text-danger">{error}</p>}
-            <div className="flex justify-end gap-2">
-                {running ? (
-                    <>
-                        <Button variant="outline" onClick={start} disabled={pending}>
-                            {pending && <Loader2 className="size-4 animate-spin" />} Refresh
-                        </Button>
-                        <Button variant="outline" onClick={stop} disabled={pending}>
-                            Stop tunnel
-                        </Button>
-                    </>
-                ) : (
-                    <Button variant="outline" onClick={start} disabled={pending}>
-                        {pending ? <Loader2 className="size-4 animate-spin" /> : <CloudflareMark className="size-4" />} Expose with Cloudflare
-                    </Button>
-                )}
-            </div>
-        </MethodBlock>
+            <button
+                type="button"
+                title={stopLabel}
+                onClick={onStop}
+                disabled={pending}
+                className="text-muted-foreground opacity-0 transition-opacity hover:text-danger group-hover:opacity-100 disabled:opacity-50"
+            >
+                {pending ? <Loader2 className="size-3.5 animate-spin" /> : <X className="size-3.5" />}
+            </button>
+        </li>
     );
 }
 
-/** Per-app Cloudflare named tunnel: a STABLE hostname on the operator's own domain.
- *  Automatic when a Cloudflare API token is connected (Integrations) - the operator
- *  only picks a hostname and Polaris creates the tunnel + DNS; otherwise a guided
- *  manual flow where the tunnel is made in Cloudflare and its connector token pasted. */
-function NamedTunnelPanel({ appId }: { appId: string }) {
+/** The app's Cloudflare quick tunnel, shown when running. Refetches on `nonce` change. */
+function QuickTunnelRow({ appId, nonce, onChanged }: { appId: string; nonce: number; onChanged: () => void }) {
+    const [status, setStatus] = useState<Awaited<ReturnType<typeof quickTunnelStatusAction>> | null>(null);
+    const [pending, startTransition] = useTransition();
+    useEffect(() => {
+        void quickTunnelStatusAction(appId).then(setStatus).catch(() => undefined);
+    }, [appId, nonce]);
+    if (!status?.running) return null;
+    return (
+        <ExposureRow
+            icon={<CloudflareMark className="size-3.5" />}
+            label={status.url ? status.url.replace(/^https?:\/\//, "") : "starting..."}
+            href={status.url}
+            badge="quick link"
+            pending={pending}
+            stopLabel="Stop tunnel"
+            onStop={() =>
+                startTransition(async () => {
+                    await stopQuickTunnelAction(appId).catch(() => undefined);
+                    onChanged();
+                })
+            }
+        />
+    );
+}
+
+/** The app's ngrok tunnel, shown when running. */
+function NgrokTunnelRow({ appId, nonce, onChanged }: { appId: string; nonce: number; onChanged: () => void }) {
+    const [status, setStatus] = useState<Awaited<ReturnType<typeof ngrokTunnelStatusAction>> | null>(null);
+    const [pending, startTransition] = useTransition();
+    useEffect(() => {
+        void ngrokTunnelStatusAction(appId).then(setStatus).catch(() => undefined);
+    }, [appId, nonce]);
+    if (!status?.running) return null;
+    return (
+        <ExposureRow
+            icon={<NgrokMark className="size-3.5" />}
+            label={status.url ? status.url.replace(/^https?:\/\//, "") : "starting..."}
+            href={status.url}
+            badge="ngrok"
+            pending={pending}
+            stopLabel="Stop tunnel"
+            onStop={() =>
+                startTransition(async () => {
+                    await stopNgrokTunnelAction(appId).catch(() => undefined);
+                    onChanged();
+                })
+            }
+        />
+    );
+}
+
+/** The app's Cloudflare named tunnel (stable hostname), shown when configured. */
+function NamedTunnelRow({ appId, nonce, onChanged }: { appId: string; nonce: number; onChanged: () => void }) {
     const [status, setStatus] = useState<Awaited<ReturnType<typeof namedTunnelStatusAction>> | null>(null);
-    const [account, setAccount] = useState<Awaited<ReturnType<typeof cloudflareAccountStatusAction>> | null>(null);
-    const [open, setOpen] = useState(false);
-    const [token, setToken] = useState("");
-    const [hostname, setHostname] = useState("");
-    const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
-
-    const reload = () => {
-        void namedTunnelStatusAction(appId).then(setStatus);
-    };
     useEffect(() => {
-        reload();
-        void cloudflareAccountStatusAction().then(setAccount);
-    }, [appId]);
-
-    const automatic = account?.connected ?? false;
-
-    function submit(): void {
-        setError(null);
-        startTransition(async () => {
-            const result = automatic
-                ? await provisionNamedTunnelAction({ applicationId: appId, hostname })
-                : await startNamedTunnelAction({ applicationId: appId, token, hostname });
-            if (result.error) setError(result.error);
-            else {
-                setToken("");
-                setOpen(false);
-                reload();
-            }
-        });
-    }
-
-    function disconnect(): void {
-        setError(null);
-        startTransition(async () => {
-            await stopNamedTunnelAction(appId).catch(() => undefined);
-            reload();
-        });
-    }
-
-    const running = status?.running ?? false;
-    const configured = status?.configured ?? false;
-
+        void namedTunnelStatusAction(appId).then(setStatus).catch(() => undefined);
+    }, [appId, nonce]);
+    if (!status?.configured || !status.hostname) return null;
     return (
-        <MethodBlock
-            icon={<CloudflareMark className="size-4" />}
-            title="Custom domain via Cloudflare tunnel"
-            description={
-                automatic
-                    ? "A stable hostname on your own domain with automatic HTTPS and no port-forwarding. Pick a hostname and Polaris creates the tunnel and DNS record for you."
-                    : "A stable hostname on your own domain, with automatic HTTPS and no port-forwarding. Create the tunnel in Cloudflare and paste its connector token; it reconnects on restart."
+        <ExposureRow
+            icon={<CloudflareMark className="size-3.5" />}
+            label={status.hostname}
+            href={`https://${status.hostname}`}
+            badge={status.managed ? "auto" : status.running ? "tunnel" : "not running"}
+            pending={pending}
+            stopLabel="Disconnect"
+            onStop={() =>
+                startTransition(async () => {
+                    await stopNamedTunnelAction(appId).catch(() => undefined);
+                    onChanged();
+                })
             }
-        >
-            {configured && status?.hostname && (
-                <div className="flex items-center gap-2 text-xs">
-                    <span className={cn("size-1.5 rounded-full", running ? "animate-pulse bg-emerald-500" : "bg-muted-foreground/50")} />
-                    <a
-                        href={`https://${status.hostname}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex min-w-0 items-center gap-1 truncate text-primary hover:underline"
-                    >
-                        <CloudflareMark className="size-3.5 shrink-0" /> {status.hostname}
-                    </a>
-                    <span className="text-muted-foreground">{running ? "connected" : "not running"}</span>
-                    {status.managed && (
-                        <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">auto</span>
-                    )}
-                </div>
-            )}
-            {error && !open && <p className="text-xs text-danger">{error}</p>}
-            <div className="flex justify-end gap-2">
-                {configured ? (
-                    <>
-                        <Button variant="outline" onClick={() => setOpen(true)} disabled={pending}>
-                            Reconfigure
-                        </Button>
-                        <Button variant="outline" onClick={disconnect} disabled={pending}>
-                            {pending && <Loader2 className="size-4 animate-spin" />} Disconnect
-                        </Button>
-                    </>
-                ) : (
-                    <Button variant="outline" onClick={() => setOpen(true)}>
-                        <CloudflareMark className="size-4" /> Connect your own domain
-                    </Button>
-                )}
-            </div>
-
-            <Dialog open={open} onOpenChange={setOpen}>
-                <DialogContent className="max-w-lg">
-                    <DialogTitle className="flex items-center gap-2">
-                        <CloudflareMark className="size-5" /> Connect a domain via Cloudflare
-                    </DialogTitle>
-                    <div className="flex flex-col gap-4">
-                        {automatic ? (
-                            <p className="flex items-start gap-1.5 text-xs text-muted-foreground">
-                                <CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-emerald-500" />
-                                Cloudflare connected{account?.accountName ? ` as ${account.accountName}` : ""}. Enter a
-                                hostname on a domain in your account - Polaris creates the tunnel and DNS record for you.
-                            </p>
-                        ) : (
-                            <>
-                                <ol className="flex flex-col gap-2 text-xs text-muted-foreground">
-                                    <li>
-                                        <span className="font-medium text-foreground">1.</span> In Cloudflare Zero Trust,
-                                        open <span className="text-foreground">Networks - Tunnels</span> and create a tunnel
-                                        (Cloudflared).
-                                    </li>
-                                    <li>
-                                        <span className="font-medium text-foreground">2.</span> Add a{" "}
-                                        <span className="text-foreground">Public Hostname</span>: your domain to the service{" "}
-                                        <span className="font-mono">http://SERVER-IP:PORT</span> (this server's IP and the app's port).
-                                    </li>
-                                    <li>
-                                        <span className="font-medium text-foreground">3.</span> Copy the tunnel's{" "}
-                                        <span className="text-foreground">connector token</span> and paste it below.
-                                    </li>
-                                </ol>
-                                <a
-                                    href="https://one.dash.cloudflare.com/"
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
-                                >
-                                    Open the Cloudflare Zero Trust dashboard
-                                </a>
-                                <p className="text-xs text-muted-foreground">
-                                    Tip: connect a Cloudflare API token under{" "}
-                                    <a href="/integrations" className="text-primary hover:underline">
-                                        Integrations
-                                    </a>{" "}
-                                    to skip these steps - then you only pick a hostname.
-                                </p>
-                            </>
-                        )}
-                        <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-                            Hostname
-                            <Input value={hostname} onChange={(event) => setHostname(event.target.value)} placeholder="app.example.com" />
-                        </label>
-                        {!automatic && (
-                            <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-                                Connector token
-                                <Input
-                                    value={token}
-                                    onChange={(event) => setToken(event.target.value)}
-                                    placeholder="eyJhIjoi..."
-                                    className="font-mono"
-                                />
-                            </label>
-                        )}
-                        {error && <p className="text-xs text-danger">{error}</p>}
-                        <div className="flex justify-end gap-2">
-                            <Button variant="ghost" onClick={() => setOpen(false)}>
-                                Cancel
-                            </Button>
-                            <Button onClick={submit} disabled={pending || !hostname.trim() || (!automatic && !token.trim())}>
-                                {pending && <Loader2 className="size-4 animate-spin" />} {automatic ? "Set up" : "Connect"}
-                            </Button>
-                        </div>
-                    </div>
-                </DialogContent>
-            </Dialog>
-        </MethodBlock>
+        />
     );
 }
+
+/** Every way to expose a service, unified into the one Public access selector. */
+type ExposureKind = "subdomain" | "le" | "duckdns" | "proxy" | "cf-named" | "cf-quick" | "ngrok";
+
+const EXPOSURE_OPTIONS: { value: ExposureKind; label: string; icon: ReactNode }[] = [
+    { value: "subdomain", label: "Free subdomain (auto)", icon: <Globe className="size-4 text-muted-foreground" /> },
+    { value: "le", label: "Custom domain - Let's Encrypt", icon: <Globe className="size-4 text-muted-foreground" /> },
+    { value: "cf-named", label: "Cloudflare tunnel - custom domain", icon: <CloudflareMark className="size-4" /> },
+    { value: "cf-quick", label: "Cloudflare quick link (free)", icon: <CloudflareMark className="size-4" /> },
+    { value: "ngrok", label: "ngrok tunnel", icon: <NgrokMark className="size-4" /> },
+    { value: "duckdns", label: "DuckDNS subdomain", icon: <img src="/logos/duckdns.webp" alt="" className="size-4" /> },
+    { value: "proxy", label: "Behind a tunnel/proxy", icon: <Globe className="size-4 text-muted-foreground" /> }
+];
 
 function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolean; onChanged: () => void }) {
     const [autoDeploy, setAutoDeploy] = useState(app.autoDeploy);
@@ -1527,10 +1402,17 @@ function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
     // (see buildAppPlan). Only a value the user types here pins it.
     const [containerPort, setContainerPort] = useState(app.port != null ? String(app.port) : "");
     const [hostname, setHostname] = useState("");
+    const [connectorToken, setConnectorToken] = useState("");
     const [port, setPort] = useState(String(app.port ?? 3000));
-    const [exposure, setExposure] = useState<"subdomain" | "le" | "tunnel">("subdomain");
+    const [exposure, setExposure] = useState<ExposureKind>("subdomain");
+    const [cfConnected, setCfConnected] = useState(false);
+    const [tunnelNonce, setTunnelNonce] = useState(0);
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
+
+    useEffect(() => {
+        void cloudflareAccountStatusAction().then((status) => setCfConnected(status.connected)).catch(() => undefined);
+    }, []);
 
     function saveSettings() {
         setError(null);
@@ -1555,23 +1437,53 @@ function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
         });
     }
 
-    function addDomain() {
+    const isDomainExposure = exposure === "subdomain" || exposure === "le" || exposure === "duckdns" || exposure === "proxy";
+    const needsHostname = exposure === "le" || exposure === "duckdns" || exposure === "proxy" || exposure === "cf-named";
+
+    // One action for every exposure: domains go through addDomainAction, the three
+    // tunnel kinds through their own start/provision actions. Tunnel results show up
+    // in the list above via the row components once the nonce bumps.
+    function submitExposure() {
         setError(null);
-        const isCustom = exposure !== "subdomain";
         startTransition(async () => {
-            const result = await addDomainAction({
-                applicationId: app.id,
-                hostname: isCustom ? hostname.trim() || undefined : undefined,
-                targetPort: Number(port),
-                cert: exposure === "le" ? "le" : exposure === "tunnel" ? "none" : undefined
-            });
+            let result: { error?: string } = {};
+            if (exposure === "subdomain") {
+                result = await addDomainAction({ applicationId: app.id, targetPort: Number(port) });
+            } else if (exposure === "le" || exposure === "duckdns") {
+                result = await addDomainAction({ applicationId: app.id, hostname: hostname.trim() || undefined, targetPort: Number(port), cert: "le" });
+            } else if (exposure === "proxy") {
+                result = await addDomainAction({ applicationId: app.id, hostname: hostname.trim() || undefined, targetPort: Number(port), cert: "none" });
+            } else if (exposure === "cf-named") {
+                result = cfConnected
+                    ? await provisionNamedTunnelAction({ applicationId: app.id, hostname })
+                    : await startNamedTunnelAction({ applicationId: app.id, token: connectorToken, hostname });
+            } else if (exposure === "cf-quick") {
+                result = await startQuickTunnelAction(app.id);
+            } else if (exposure === "ngrok") {
+                result = await startNgrokTunnelAction(app.id);
+            }
             if (result.error) setError(result.error);
             else {
                 setHostname("");
+                setConnectorToken("");
+                setTunnelNonce((nonce) => nonce + 1);
                 onChanged();
             }
         });
     }
+
+    const submitLabel =
+        exposure === "cf-quick" || exposure === "ngrok"
+            ? "Expose"
+            : exposure === "cf-named"
+              ? cfConnected
+                  ? "Set up"
+                  : "Connect"
+              : "Add domain";
+    const submitDisabled =
+        pending ||
+        (needsHostname && !hostname.trim()) ||
+        (exposure === "cf-named" && !cfConnected && !connectorToken.trim());
 
     return (
         <div className="flex flex-col gap-5 py-2">
@@ -1614,95 +1526,107 @@ function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
                         tunnel that needs no DNS or port-forwarding - pick whichever method fits your setup.
                     </p>
                 </div>
-                {app.domains.length > 0 ? (
-                    <ul className="flex flex-col gap-1">
-                        {app.domains.map((domain) => (
-                            <li key={domain.id} className="group flex items-center gap-2">
-                                {domain.enabled ? (
-                                    <a
-                                        href={`https://${domain.hostname}`}
-                                        target="_blank"
-                                        rel="noreferrer"
-                                        className="inline-flex min-w-0 flex-1 items-center gap-1 truncate text-xs text-primary hover:underline"
-                                    >
-                                        <Globe className="size-3 shrink-0" /> {domain.hostname}
-                                    </a>
-                                ) : (
-                                    <span
-                                        title="Domain disabled - not serving"
-                                        className="inline-flex min-w-0 flex-1 items-center gap-1 truncate text-xs text-muted-foreground line-through"
-                                    >
-                                        <Globe className="size-3 shrink-0" /> {domain.hostname}
-                                    </span>
-                                )}
-                                <Switch
-                                    checked={domain.enabled}
-                                    onChange={(next) => startTransition(async () => { await setDomainEnabledAction(domain.id, next); onChanged(); })}
-                                    aria-label={domain.enabled ? "Disable domain" : "Enable domain"}
-                                />
-                                <button
-                                    type="button"
-                                    title="Remove domain"
-                                    onClick={() => startTransition(async () => { await removeDomainAction(domain.id); onChanged(); })}
-                                    className="text-muted-foreground opacity-0 transition-opacity hover:text-danger group-hover:opacity-100"
+                <ul className="flex flex-col gap-1">
+                    {app.domains.map((domain) => (
+                        <li key={domain.id} className="group flex items-center gap-2">
+                            {domain.enabled ? (
+                                <a
+                                    href={`https://${domain.hostname}`}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="inline-flex min-w-0 flex-1 items-center gap-1 truncate text-xs text-primary hover:underline"
                                 >
-                                    <Trash2 className="size-3.5" />
-                                </button>
-                            </li>
-                        ))}
-                    </ul>
-                ) : (
-                    <p className="text-xs text-muted-foreground">No domains yet.</p>
-                )}
-                <div className="flex flex-col gap-3">
-                    <MethodBlock
-                        icon={<Globe className="size-4" />}
-                        title="Add a domain"
-                        description="Route a hostname to this app - a free auto subdomain, your own domain with Let's Encrypt, or one fronted by a tunnel/proxy."
-                    >
-                        <div className="flex flex-col gap-2">
-                            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                                <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-                                    Exposure
-                                    <Select
-                                        value={exposure}
-                                        onValueChange={(value) => setExposure(value as "subdomain" | "le" | "tunnel")}
-                                        options={[
-                                            { value: "subdomain", label: "Free subdomain (auto)" },
-                                            { value: "le", label: "Custom domain - Let's Encrypt" },
-                                            { value: "tunnel", label: "Custom domain - behind a tunnel/proxy" }
-                                        ]}
-                                    />
-                                </label>
+                                    <Globe className="size-3 shrink-0" /> {domain.hostname}
+                                </a>
+                            ) : (
+                                <span
+                                    title="Domain disabled - not serving"
+                                    className="inline-flex min-w-0 flex-1 items-center gap-1 truncate text-xs text-muted-foreground line-through"
+                                >
+                                    <Globe className="size-3 shrink-0" /> {domain.hostname}
+                                </span>
+                            )}
+                            <Switch
+                                checked={domain.enabled}
+                                onChange={(next) => startTransition(async () => { await setDomainEnabledAction(domain.id, next); onChanged(); })}
+                                aria-label={domain.enabled ? "Disable domain" : "Enable domain"}
+                            />
+                            <button
+                                type="button"
+                                title="Remove domain"
+                                onClick={() => startTransition(async () => { await removeDomainAction(domain.id); onChanged(); })}
+                                className="text-muted-foreground opacity-0 transition-opacity hover:text-danger group-hover:opacity-100"
+                            >
+                                <Trash2 className="size-3.5" />
+                            </button>
+                        </li>
+                    ))}
+                    <NamedTunnelRow appId={app.id} nonce={tunnelNonce} onChanged={() => setTunnelNonce((nonce) => nonce + 1)} />
+                    <QuickTunnelRow appId={app.id} nonce={tunnelNonce} onChanged={() => setTunnelNonce((nonce) => nonce + 1)} />
+                    <NgrokTunnelRow appId={app.id} nonce={tunnelNonce} onChanged={() => setTunnelNonce((nonce) => nonce + 1)} />
+                </ul>
+                <MethodBlock
+                    icon={<Globe className="size-4" />}
+                    title="Add a domain"
+                    description="Pick how to expose this service - a free subdomain, your own domain with Let's Encrypt, or a Cloudflare/ngrok tunnel that needs no DNS or port-forwarding."
+                >
+                    <div className="flex flex-col gap-2">
+                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                            <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                                Exposure
+                                <Select
+                                    value={exposure}
+                                    onValueChange={(value) => setExposure(value as ExposureKind)}
+                                    options={EXPOSURE_OPTIONS}
+                                    aria-label="Exposure method"
+                                />
+                            </label>
+                            {isDomainExposure && (
                                 <label className="flex flex-col gap-1 text-xs text-muted-foreground">
                                     Port
                                     <Input value={port} onChange={(event) => setPort(event.target.value)} placeholder="port" />
                                 </label>
-                            </div>
-                            {exposure !== "subdomain" && (
-                                <Input
-                                    value={hostname}
-                                    onChange={(event) => setHostname(event.target.value)}
-                                    placeholder="app.example.com"
-                                />
                             )}
-                            <p className="text-xs text-muted-foreground">
-                                {exposure === "subdomain"
-                                    ? "Follows your Network exposure mode (Admin - Domains): public with Let's Encrypt on a reachable box, or LAN-only on a home/NAT box. For public access from home, set a wildcard domain there or use a quick public link below."
-                                    : exposure === "le"
-                                      ? "Point the domain's DNS at this server's public IP (port-forward / DuckDNS). Traefik gets a Let's Encrypt certificate automatically."
-                                      : "For a domain fronted by a tunnel (Cloudflare / ngrok) or an external proxy that terminates TLS. Configure the tunnel under Integrations."}
-                            </p>
-                            <div className="flex justify-end">
-                                <Button variant="outline" onClick={addDomain} disabled={pending}>
-                                    Add domain
-                                </Button>
-                            </div>
                         </div>
-                    </MethodBlock>
-                    <NamedTunnelPanel appId={app.id} />
-                    <QuickTunnelPanel appId={app.id} />
-                </div>
+                        {needsHostname && (
+                            <Input
+                                value={hostname}
+                                onChange={(event) => setHostname(event.target.value)}
+                                placeholder={exposure === "duckdns" ? "app.yoursub.duckdns.org" : "app.example.com"}
+                            />
+                        )}
+                        {exposure === "cf-named" && !cfConnected && (
+                            <Input
+                                value={connectorToken}
+                                onChange={(event) => setConnectorToken(event.target.value)}
+                                placeholder="Cloudflare connector token (eyJhIjoi...)"
+                                className="font-mono"
+                            />
+                        )}
+                        <p className="text-xs text-muted-foreground">
+                            {exposure === "subdomain"
+                                ? "Follows your Network exposure mode (Admin - Domains): public with Let's Encrypt on a reachable box, or LAN-only on a home/NAT box."
+                                : exposure === "le"
+                                  ? "Point the domain's DNS at this server's public IP (port-forward / DuckDNS). Traefik gets a Let's Encrypt certificate automatically."
+                                  : exposure === "duckdns"
+                                    ? "Use a hostname under your DuckDNS subdomain (it resolves *.yoursub.duckdns.org). Configure DuckDNS under Integrations; Traefik gets a Let's Encrypt certificate automatically."
+                                    : exposure === "proxy"
+                                      ? "For a domain fronted by an external proxy that terminates TLS."
+                                      : exposure === "cf-named"
+                                        ? cfConnected
+                                            ? "Polaris creates the tunnel and the DNS record for you - just enter a hostname on a domain in your Cloudflare account."
+                                            : "Create the tunnel in Cloudflare and paste its connector token. Tip: connect a Cloudflare API token under Integrations to skip this - then you only pick a hostname."
+                                        : exposure === "cf-quick"
+                                          ? "A throwaway *.trycloudflare.com URL - no account, no DNS, no port-forwarding. The link changes each time it starts."
+                                          : "A public ngrok URL forwarded to this app. Add your ngrok authtoken under Integrations first; ngrok's free plan allows one tunnel at a time."}
+                        </p>
+                        <div className="flex justify-end">
+                            <Button variant="outline" onClick={submitExposure} disabled={submitDisabled}>
+                                {pending && <Loader2 className="size-4 animate-spin" />} {submitLabel}
+                            </Button>
+                        </div>
+                    </div>
+                </MethodBlock>
             </section>
 
             {isGit && (

@@ -45,6 +45,12 @@ import {
     type QuickTunnelStatus
 } from "@/lib/deploy/quick-tunnel-service";
 import {
+    getNgrokTunnelStatus,
+    startNgrokTunnel,
+    stopNgrokTunnel,
+    type NgrokTunnelStatus
+} from "@/lib/deploy/ngrok-tunnel-service";
+import {
     getNamedTunnelStatus,
     provisionNamedTunnel,
     startNamedTunnel,
@@ -514,6 +520,39 @@ export async function stopQuickTunnelAction(applicationId: string): Promise<{ er
     const user = await requirePermission("deploy.manage");
     try {
         await stopQuickTunnel(applicationId, user.id);
+        await recordAudit({ actorId: user.id, action: "deploy.tunnel.stop", targetType: "application", targetId: applicationId });
+        return {};
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not stop the tunnel" };
+    }
+}
+
+export async function ngrokTunnelStatusAction(applicationId: string): Promise<NgrokTunnelStatus> {
+    const user = await requirePermission("deploy.manage");
+    try {
+        return await getNgrokTunnelStatus(applicationId, user.id);
+    } catch {
+        return { running: false, url: null, configured: false };
+    }
+}
+
+/** Start (or refresh) an app's ngrok tunnel and return its public URL. */
+export async function startNgrokTunnelAction(applicationId: string): Promise<{ error?: string; url?: string | null }> {
+    const user = await requirePermission("deploy.manage");
+    try {
+        const status = await startNgrokTunnel(applicationId, user.id);
+        await recordAudit({ actorId: user.id, action: "deploy.tunnel.start", targetType: "application", targetId: applicationId });
+        return { url: status.url };
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not start the tunnel" };
+    }
+}
+
+/** Stop an app's ngrok tunnel. */
+export async function stopNgrokTunnelAction(applicationId: string): Promise<{ error?: string }> {
+    const user = await requirePermission("deploy.manage");
+    try {
+        await stopNgrokTunnel(applicationId, user.id);
         await recordAudit({ actorId: user.id, action: "deploy.tunnel.stop", targetType: "application", targetId: applicationId });
         return {};
     } catch (caught) {
