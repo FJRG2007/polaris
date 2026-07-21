@@ -192,6 +192,11 @@ services:
   traefik:
     image: traefik:v3.1
     restart: unless-stopped
+    environment:
+      # The host Docker daemon requires API >= 1.40; pin the provider client to a
+      # supported version so it does not fall back to an unsupported default and
+      # fail to discover services.
+      DOCKER_API_VERSION: "1.44"
     depends_on:
       - web
     command:
