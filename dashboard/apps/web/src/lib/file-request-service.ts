@@ -23,14 +23,6 @@ export type FileRequestUsability =
     | { ok: true }
     | { ok: false; reason: "revoked" | "expired" };
 
-/** The managed folder a drop point collects into: a dedicated, per-drop-point
- *  subfolder under "Drop Points" on the connection, so Polaris organizes uploads
- *  instead of the operator picking a path. */
-function dropPointFolder(title: string): string {
-    const safe = title.replace(/[\\/]+/g, "-").replace(/\s+/g, " ").trim().slice(0, 80) || "Untitled";
-    return `Drop Points/${safe}`;
-}
-
 /** Create a file request and return the one-time raw token to embed in the link. */
 export async function createFileRequest(
     ownerId: string,
@@ -44,9 +36,7 @@ export async function createFileRequest(
             title: input.title,
             instructions: input.instructions ?? null,
             destinationConnectionId: input.destinationConnectionId,
-            // Polaris manages the destination: a dedicated folder under "Drop Points",
-            // not an operator-chosen path.
-            destinationPath: normalizeRelPath(dropPointFolder(input.title)),
+            destinationPath: normalizeRelPath(input.destinationPath),
             requireLogin: input.requireLogin,
             passwordHash: input.password ? await hashLinkPassword(input.password) : null,
             maxSizeBytes: BigInt(input.maxSizeBytes),
