@@ -194,12 +194,17 @@ export async function createApplicationAction(input: {
         } else {
             target = await getOrCreateLocalTarget(user.id);
         }
+        // Git sources track their branch and auto-deploy on new commits by default,
+        // Vercel-style (a poller picks them up even without a public webhook).
+        const branch = input.branch?.trim() || undefined;
         const app = await createApplication(user.id, {
             environmentId: input.environmentId,
             targetId: target.id,
             name,
             sourceType,
-            sourceConfig
+            sourceConfig,
+            autoDeploy: isGit && Boolean(branch),
+            deployBranch: isGit ? (branch ?? null) : null
         });
         await recordAudit({ actorId: user.id, action: "deploy.app.create", targetType: "application", targetId: app.id });
         // Give it a free testing subdomain and kick off the first deploy right away,

@@ -31,4 +31,9 @@ export async function register(): Promise<void> {
     // edge self-heals after a restart or a fresh dynamic volume. Best-effort.
     const { syncAppRoutes } = await import("./lib/deploy-service");
     void syncAppRoutes().catch((error) => console.error("polaris: initial route sync failed:", error));
+
+    // Vercel-style auto-deploy: poll connected GitHub repos and redeploy on a new
+    // commit. Works without a public webhook (LAN installs can't receive one).
+    const { startAutoDeployPoller } = await import("./lib/deploy/auto-deploy-poller");
+    startAutoDeployPoller();
 }

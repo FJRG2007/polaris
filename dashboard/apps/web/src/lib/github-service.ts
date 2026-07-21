@@ -439,23 +439,54 @@ export async function inspectGithubRepo(owner: string, repo: string, branch: str
  * first). GitHub reads the token from the password field regardless of the username.
  */
 export async function githubCloneAuthHeader(owner?: string): Promise<string | null> {
+    const token = await resolveGithubToken(owner);
+    if (!token) return null;
+    return `Authorization: Basic ${Buffer.from(`x-access-token:${token}`).toString("base64")}`;
+}
+
+/** Resolve a GitHub API token, scoped to the owner's installation for the App
+ *  method (falling back to the first) or the PAT otherwise. Null if not connected. */
+async function resolveGithubToken(owner?: string): Promise<string | null> {
     const state = await getIntegrationState(PROVIDER);
     if (!state?.hasSecret) return null;
-
-    let token: string | null = null;
     if (state.config.method === "app") {
         const secrets = await getAppSecrets();
         if (!secrets) return null;
         const installs = Array.isArray(state.config.installations) ? (state.config.installations as Installation[]) : [];
-        const inst =
-            (owner && installs.find((row) => row.login.toLowerCase() === owner.toLowerCase())) || installs[0];
+        const inst = (owner && installs.find((row) => row.login.toLowerCase() === owner.toLowerCase())) || installs[0];
         if (!inst) return null;
-        token = await installationToken(inst.id, secrets.appId, secrets.pem);
-    } else {
-        token = await getPatToken();
+        return installationToken(inst.id, secrets.appId, secrets.pem);
     }
-    if (!token) return null;
-    return `Authorization: Basic ${Buffer.from(`x-access-token:${token}`).toString("base64")}`;
+    return getPatToken();
+}
+
+/**
+ * Latest commit (sha + message) on a repo's branch, used by the auto-deploy
+ * poller. A connected token authenticates the call (required for private repos);
+ * a public repo also resolves unauthenticated. Null on any error, so a poll tick
+ * simply skips this repo rather than failing.
+ */
+export async function getLatestCommit(
+    owner: string,
+    repo: string,
+    branch: string
+): Promise<{ sha: string; message: string } | null> {
+    const token = await resolveGithubToken(owner).catch(() => null);
+    const headers: HeadersInit = token
+        ? apiHeaders(token)
+        : { Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28", "User-Agent": "polaris" };
+    try {
+        const res = await fetch(`${API}/repos/${owner}/${repo}/commits/${encodeURIComponent(branch)}`, {
+            headers,
+            cache: "no-store"
+        });
+        if (!res.ok) return null;
+        const data = (await res.json()) as { sha?: string; commit?: { message?: string } };
+        if (!data.sha) return null;
+        return { sha: data.sha, message: data.commit?.message ?? "" };
+    } catch {
+        return null;
+    }
 }
 
 /** The GitHub App's webhook secret (app method only), used to verify push events. */

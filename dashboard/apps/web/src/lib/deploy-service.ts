@@ -142,6 +142,9 @@ export interface CreateApplicationInput {
     name: string;
     sourceType: string;
     sourceConfig: Record<string, unknown>;
+    /** Track the branch and redeploy on new commits (default for git sources). */
+    autoDeploy?: boolean;
+    deployBranch?: string | null;
 }
 
 export async function createApplication(ownerId: string, input: CreateApplicationInput) {
@@ -161,7 +164,9 @@ export async function createApplication(ownerId: string, input: CreateApplicatio
             name: input.name,
             slug,
             sourceType: input.sourceType,
-            sourceConfig: JSON.stringify(input.sourceConfig)
+            sourceConfig: JSON.stringify(input.sourceConfig),
+            autoDeploy: input.autoDeploy ?? false,
+            deployBranch: input.deployBranch ?? null
         }
     });
 }
