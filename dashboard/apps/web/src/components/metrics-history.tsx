@@ -23,11 +23,13 @@ interface Point {
     diskTotalBytes: number | null;
 }
 
-/** A chart to draw: how to pull a value from a point and how to label it. */
-export interface MetricSpec {
+/** A chart to draw: how to pull a value from a point and how to label it. The
+ *  point type defaults to the consumption Point but can be any `{ t }` series
+ *  (e.g. the HTTP request/latency series), so one panel drives every history. */
+export interface MetricSpec<T = Point> {
     key: string;
     label: string;
-    value: (point: Point) => number | null;
+    value: (point: T) => number | null;
     format: (value: number) => string;
     tone?: GaugeTone;
     /** Fixed Y ceiling (e.g. 100 for a percentage). */
@@ -48,12 +50,18 @@ function toLocalInput(ms: number): string {
     return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
-export function MetricsHistory({ endpoint, metrics }: { endpoint: string; metrics: MetricSpec[] }) {
+export function MetricsHistory<T extends { t: number } = Point>({
+    endpoint,
+    metrics
+}: {
+    endpoint: string;
+    metrics: MetricSpec<T>[];
+}) {
     const [window, setWindow] = useState<Window>({ kind: "preset", preset: "1d" });
     const [customOpen, setCustomOpen] = useState(false);
     const [customFrom, setCustomFrom] = useState(() => toLocalInput(Date.now() - 24 * 3_600_000));
     const [customTo, setCustomTo] = useState(() => toLocalInput(Date.now()));
-    const [points, setPoints] = useState<Point[] | null>(null);
+    const [points, setPoints] = useState<T[] | null>(null);
     const [loading, setLoading] = useState(true);
 
     const { from, to } = useMemo(() => {

@@ -29,7 +29,8 @@ import {
     RotateCw,
     Search,
     Square,
-    Trash2
+    Trash2,
+    X
 } from "lucide-react";
 import {
     Button,
@@ -583,11 +584,18 @@ function HttpLogsView({ appId }: { appId: string }) {
     const [entries, setEntries] = useState<HttpLogEntry[] | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [search, setSearch] = useState("");
+    const [ipFilter, setIpFilter] = useState<string | null>(null);
 
+    // Poll fast while the tab is open so requests appear in near real time; skip
+    // fetches while the page is hidden to avoid pointless load when unattended.
     useEffect(() => {
         let active = true;
         let timer: ReturnType<typeof setTimeout>;
         async function poll(): Promise<void> {
+            if (typeof document !== "undefined" && document.hidden) {
+                timer = setTimeout(poll, 2000);
+                return;
+            }
             try {
                 const res = await fetch(`/api/deploy/apps/${appId}/http-logs`, { cache: "no-store" });
                 if (!active) return;
@@ -602,7 +610,7 @@ function HttpLogsView({ appId }: { appId: string }) {
             } catch {
                 if (active) setError("Could not read HTTP logs");
             }
-            if (active) timer = setTimeout(poll, 5000);
+            if (active) timer = setTimeout(poll, 2000);
         }
         void poll();
         return () => {
@@ -611,20 +619,25 @@ function HttpLogsView({ appId }: { appId: string }) {
         };
     }, [appId]);
 
+    const all = entries ?? [];
     const query = search.trim().toLowerCase();
-    const filtered = (entries ?? []).filter(
-        (entry) =>
-            !query ||
-            entry.path.toLowerCase().includes(query) ||
-            entry.ip.toLowerCase().includes(query) ||
-            entry.method.toLowerCase().includes(query) ||
-            String(entry.status).includes(query) ||
-            (entry.userAgent?.toLowerCase().includes(query) ?? false)
-    );
+    const byIp = ipFilter ? all.filter((entry) => entry.ip === ipFilter) : all;
+    const filtered = query
+        ? byIp.filter(
+              (entry) =>
+                  entry.path.toLowerCase().includes(query) ||
+                  entry.ip.toLowerCase().includes(query) ||
+                  entry.method.toLowerCase().includes(query) ||
+                  String(entry.status).includes(query) ||
+                  (entry.userAgent?.toLowerCase().includes(query) ?? false)
+          )
+        : byIp;
 
+    // Export exactly what is on screen, so filtering to one IP then exporting
+    // downloads just that IP's requests.
     function exportCsv(): void {
         const header = ["time", "ip", "method", "path", "status", "host", "bytes", "referer", "user_agent", "duration_ms"];
-        const rows = (entries ?? []).map((entry) => [
+        const rows = filtered.map((entry) => [
             entry.time ?? "",
             entry.ip,
             entry.method,
@@ -641,7 +654,7 @@ function HttpLogsView({ appId }: { appId: string }) {
         const url = URL.createObjectURL(blob);
         const anchor = document.createElement("a");
         anchor.href = url;
-        anchor.download = `${appId}-http-logs.csv`;
+        anchor.download = ipFilter ? `${appId}-http-logs-${ipFilter.replace(/[^\w.-]/g, "_")}.csv` : `${appId}-http-logs.csv`;
         anchor.click();
         URL.revokeObjectURL(url);
     }
@@ -663,13 +676,39 @@ function HttpLogsView({ appId }: { appId: string }) {
                     variant="outline"
                     size="sm"
                     onClick={exportCsv}
-                    disabled={!entries?.length}
+                    disabled={!filtered.length}
                     className="shrink-0"
                 >
                     <Download className="size-4" />
                     Export
                 </Button>
             </div>
+
+            {entries !== null && !error && all.length > 0 && (
+                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                    <span className="inline-flex items-center gap-1.5">
+                        <span className="size-1.5 animate-pulse rounded-full bg-emerald-500" /> Live
+                    </span>
+                    <span>
+                        {filtered.length} request{filtered.length === 1 ? "" : "s"}
+                        {ipFilter || query ? ` of ${all.length}` : ""}
+                    </span>
+                    {ipFilter && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-foreground">
+                            <span className="text-muted-foreground">IP</span>
+                            <span className="font-mono">{ipFilter}</span>
+                            <button
+                                type="button"
+                                onClick={() => setIpFilter(null)}
+                                aria-label="Clear IP filter"
+                                className="ml-0.5 rounded-full p-0.5 hover:bg-card-hover"
+                            >
+                                <X className="size-3" />
+                            </button>
+                        </span>
+                    )}
+                </div>
+            )}
 
             {entries === null && !error ? (
                 <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">
@@ -680,7 +719,7 @@ function HttpLogsView({ appId }: { appId: string }) {
             ) : filtered.length === 0 ? (
                 <Empty
                     text={
-                        entries && entries.length > 0
+                        all.length > 0
                             ? "No requests match the filter."
                             : "No HTTP requests logged yet. This app may not write access logs to stdout, or uses a format that isn't recognized."
                     }
@@ -713,7 +752,18 @@ function HttpLogsView({ appId }: { appId: string }) {
                                     <td className="max-w-[18rem] truncate px-3 py-1.5 font-mono" title={entry.path}>
                                         {entry.path}
                                     </td>
-                                    <td className="whitespace-nowrap px-3 py-1.5 font-mono text-muted-foreground">{entry.ip}</td>
+                                    <td className="whitespace-nowrap px-3 py-1.5">
+                                        <button
+                                            type="button"
+                                            onClick={() => setIpFilter(ipFilter === entry.ip ? null : entry.ip)}
+                                            title="Show only this IP's requests"
+                                            className={`font-mono hover:underline ${
+                                                ipFilter === entry.ip ? "text-foreground" : "text-muted-foreground hover:text-foreground"
+                                            }`}
+                                        >
+                                            {entry.ip}
+                                        </button>
+                                    </td>
                                     <td className="max-w-[16rem] truncate px-3 py-1.5 text-muted-foreground" title={entry.userAgent ?? undefined}>
                                         {entry.userAgent ?? "-"}
                                     </td>
@@ -931,6 +981,10 @@ function MetricsTab({ applicationId }: { applicationId: string }) {
                 <h3 className="mb-1 text-sm font-medium">History</h3>
                 <MetricsHistory endpoint={`/api/deploy/apps/${applicationId}/metrics/history`} metrics={DEPLOY_METRICS} />
             </div>
+            <div>
+                <h3 className="mb-1 text-sm font-medium">HTTP</h3>
+                <MetricsHistory<HttpPoint> endpoint={`/api/deploy/apps/${applicationId}/http-metrics`} metrics={HTTP_METRICS} />
+            </div>
         </div>
     );
 }
@@ -946,6 +1000,35 @@ const DEPLOY_METRICS: MetricSpec[] = [
         tone: "success",
         max: 100
     }
+];
+
+/** A bucket of the app's HTTP traffic series (mirrors HttpMetricPoint from the API). */
+interface HttpPoint {
+    t: number;
+    requests: number;
+    errorRate: number | null;
+    avgResponseMs: number | null;
+    bytesPerSec: number;
+}
+
+/** Human-readable byte-rate for the traffic chart (B/s, KB/s, MB/s, GB/s). */
+function formatRate(bytesPerSec: number): string {
+    const units = ["B", "KB", "MB", "GB", "TB"];
+    let value = bytesPerSec;
+    let unit = 0;
+    while (value >= 1024 && unit < units.length - 1) {
+        value /= 1024;
+        unit += 1;
+    }
+    return `${unit === 0 ? Math.round(value) : value.toFixed(1)} ${units[unit]}/s`;
+}
+
+/** Charts drawn on the Deploy Metrics tab HTTP section, derived from access logs. */
+const HTTP_METRICS: MetricSpec<HttpPoint>[] = [
+    { key: "req", label: "Requests", value: (point) => point.requests, format: (value) => String(Math.round(value)), tone: "primary" },
+    { key: "err", label: "Request error rate", value: (point) => point.errorRate, format: percent, tone: "danger", max: 100 },
+    { key: "rt", label: "Response time", value: (point) => point.avgResponseMs, format: (value) => `${Math.round(value)} ms`, tone: "warning" },
+    { key: "net", label: "Public network traffic", value: (point) => point.bytesPerSec, format: formatRate, tone: "success" }
 ];
 
 function Meter({ label, value, unit }: { label: string; value: number | null | undefined; unit: string }) {
