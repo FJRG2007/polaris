@@ -26,14 +26,18 @@ export async function GET(
 
         let cpuPercent: number | null = null;
         let memPercent: number | null = null;
+        let memUsedBytes: number | null = null;
+        let memTotalBytes: number | null = null;
         if (state.status === "running") {
             const driver = localDockerDriver();
             const stats = await driver.stats(container).catch(() => null);
             await driver.dispose();
             cpuPercent = stats?.cpuPercent ?? null;
             memPercent = stats?.memPercent ?? null;
+            memUsedBytes = stats?.memUsage ?? null;
+            memTotalBytes = stats?.memLimit ?? null;
         }
-        return NextResponse.json({ state: state.status, health: state.health, cpuPercent, memPercent });
+        return NextResponse.json({ state: state.status, health: state.health, cpuPercent, memPercent, memUsedBytes, memTotalBytes });
     } catch (caught) {
         return NextResponse.json(
             { error: caught instanceof Error ? caught.message : "Could not read metrics" },

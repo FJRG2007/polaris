@@ -47,8 +47,8 @@ import {
     cn
 } from "@polaris/ui";
 import { CloudflareMark, NgrokMark } from "@/components/brand-icons";
-import { ServiceIcon, StatusPill, dbTone, serviceKindOf, type ProjectApp } from "./deploy-view";
-import { MetricsHistory, percent, ratioPercent, type MetricSpec } from "@/components/metrics-history";
+import { ServiceIcon, StatusPill, dbTone, isLocalDomain, primaryDomain, serviceKindOf, type ProjectApp } from "./deploy-view";
+import { MetricsHistory, percent, type MetricSpec } from "@/components/metrics-history";
 import { LogViewer } from "@/components/log-viewer";
 import type { HttpLogEntry } from "@polaris/deploy";
 import { TerminalPanel } from "./terminal-panel";
@@ -315,22 +315,26 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
 
     const active = items?.find((item) => item.isCurrent) ?? null;
     const history = (items ?? []).filter((item) => !item.isCurrent);
-    // The live URL is the first enabled domain; a disabled one is kept but not served.
-    const primaryDomain = app.domains.find((domain) => domain.enabled) ?? null;
-    const region = primaryDomain ? "Deployed" : app.sourceType === "image" ? "Registry" : "GitHub";
+    // The most stable/reachable domain (custom domain > free public subdomain > LAN);
+    // a disabled one is never chosen.
+    const primary = primaryDomain(app.domains);
+    const region = primary ? "Deployed" : app.sourceType === "image" ? "Registry" : "GitHub";
 
     return (
         <div className="flex flex-col gap-4 py-2">
             <div className="flex flex-wrap items-center gap-3">
                 <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                    {primaryDomain ? (
+                    {primary ? (
                         <a
-                            href={`https://${primaryDomain.hostname}`}
+                            href={`https://${primary.hostname}`}
                             target="_blank"
                             rel="noreferrer"
                             className="inline-flex min-w-0 items-center gap-1.5 truncate text-sm font-medium text-foreground hover:text-primary hover:underline"
                         >
-                            <Globe className="size-4 shrink-0 text-muted-foreground" /> {primaryDomain.hostname}
+                            <Globe className="size-4 shrink-0 text-muted-foreground" /> {primary.hostname}
+                            {isLocalDomain(primary) && (
+                                <span className="shrink-0 rounded bg-warning/10 px-1 text-[10px] font-medium text-warning">LAN</span>
+                            )}
                         </a>
                     ) : (
                         <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
@@ -542,7 +546,7 @@ function DetailsPanel({ app, deployment }: { app: ProjectApp; deployment: DepSum
         ["Commit", deployment?.commitSha ? deployment.commitSha.slice(0, 12) : "-"],
         ["Message", deployment?.commitMessage ?? "-"],
         ["Started", deployment ? new Date(deployment.createdAt).toLocaleString() : "-"],
-        ["Domain", app.domains[0]?.hostname ?? "-"]
+        ["Domain", (primaryDomain(app.domains) ?? app.domains[0])?.hostname ?? "-"]
     ];
     return (
         <div className="flex flex-col divide-y divide-border/40 text-sm">
@@ -1126,8 +1130,26 @@ function VariablesTab({ app }: { app: ProjectApp }) {
     );
 }
 
+/** Human-readable byte count (B, KB, MB, GB, TB). */
+function formatBytes(bytes: number): string {
+    const units = ["B", "KB", "MB", "GB", "TB"];
+    let value = bytes;
+    let unit = 0;
+    while (value >= 1024 && unit < units.length - 1) {
+        value /= 1024;
+        unit += 1;
+    }
+    return `${unit === 0 ? Math.round(value) : value.toFixed(1)} ${units[unit]}`;
+}
+
 function MetricsTab({ applicationId }: { applicationId: string }) {
-    const [data, setData] = useState<{ state?: string; cpuPercent?: number | null; memPercent?: number | null } | null>(null);
+    const [data, setData] = useState<{
+        state?: string;
+        cpuPercent?: number | null;
+        memPercent?: number | null;
+        memUsedBytes?: number | null;
+        memTotalBytes?: number | null;
+    } | null>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -1149,7 +1171,16 @@ function MetricsTab({ applicationId }: { applicationId: string }) {
             ) : data?.state ? (
                 <div className="grid gap-3 sm:grid-cols-2">
                     <Meter label="CPU" value={data.cpuPercent} unit="%" />
-                    <Meter label="Memory" value={data.memPercent} unit="%" />
+                    <Meter
+                        label="Memory"
+                        value={data.memPercent}
+                        unit="%"
+                        text={
+                            typeof data.memUsedBytes === "number"
+                                ? `${formatBytes(data.memUsedBytes)}${typeof data.memTotalBytes === "number" ? ` / ${formatBytes(data.memTotalBytes)}` : ""}`
+                                : undefined
+                        }
+                    />
                     <div className="rounded-lg border border-border/60 p-4 text-sm sm:col-span-2">
                         State: <span className="font-medium">{data.state}</span>
                     </div>
@@ -1169,16 +1200,17 @@ function MetricsTab({ applicationId }: { applicationId: string }) {
     );
 }
 
-/** Charts drawn on the Deploy Metrics tab: CPU and memory as percentages. */
+/** Charts drawn on the Deploy Metrics tab: CPU as a percentage, memory as absolute
+ *  usage (a container's memory is a tiny fraction of host RAM, so a percent reads as
+ *  0 - show the real MB/GB and let the chart auto-scale, like the Containers app). */
 const DEPLOY_METRICS: MetricSpec[] = [
     { key: "cpu", label: "CPU", value: (point) => point.cpuPercent, format: percent, tone: "primary", max: 100 },
     {
         key: "mem",
         label: "Memory",
-        value: (point) => ratioPercent(point.memUsedBytes, point.memTotalBytes),
-        format: percent,
-        tone: "success",
-        max: 100
+        value: (point) => point.memUsedBytes,
+        format: formatBytes,
+        tone: "success"
     }
 ];
 
@@ -1211,13 +1243,25 @@ const HTTP_METRICS: MetricSpec<HttpPoint>[] = [
     { key: "net", label: "Public network traffic", value: (point) => point.bytesPerSec, format: formatRate, tone: "success" }
 ];
 
-function Meter({ label, value, unit }: { label: string; value: number | null | undefined; unit: string }) {
+function Meter({
+    label,
+    value,
+    unit,
+    text
+}: {
+    label: string;
+    value: number | null | undefined;
+    unit: string;
+    /** Overrides the displayed value text (e.g. absolute memory); the bar still uses value. */
+    text?: string;
+}) {
     const pct = typeof value === "number" ? Math.max(0, Math.min(100, value)) : 0;
+    const display = text ?? (typeof value === "number" ? `${value.toFixed(0)}${unit}` : "-");
     return (
         <div className="rounded-lg border border-border/60 p-4">
             <div className="flex items-center justify-between text-sm">
                 <span className="font-medium">{label}</span>
-                <span className="text-muted-foreground">{typeof value === "number" ? `${value.toFixed(0)}${unit}` : "-"}</span>
+                <span className="text-muted-foreground">{display}</span>
             </div>
             <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted">
                 <div className="h-full rounded-full bg-primary" style={{ width: `${pct}%` }} />

@@ -110,6 +110,39 @@ export interface ProjectSummary {
 
 export type ServiceKind = "github" | "image" | "database";
 
+/** A domain as carried on an app (the shape shared by the card and service detail). */
+export type AppDomain = { id: string; hostname: string; kind: string; enabled: boolean };
+
+/** Whether a domain resolves only on the local network (a LAN-only exposure). */
+export function isLocalDomain(domain: AppDomain): boolean {
+    return domain.kind === "lan" || domain.hostname.toLowerCase().endsWith(".local");
+}
+
+/** Rank a domain by how stable and reachable it is: the operator's own custom
+ *  domain beats a free public subdomain, which beats a LAN-only name; a disabled
+ *  domain never wins. Used to pick the one domain worth surfacing for a service. */
+function domainRank(domain: AppDomain): number {
+    if (!domain.enabled) return -1;
+    if (isLocalDomain(domain)) return 1;
+    if (domain.kind === "auto" || domain.hostname.toLowerCase().endsWith(".sslip.io")) return 2;
+    if (domain.kind === "custom") return 4;
+    return 3;
+}
+
+/** The best domain to surface for an app (most stable + reachable), or null. */
+export function primaryDomain<T extends AppDomain>(domains: readonly T[]): T | null {
+    let best: T | null = null;
+    let bestRank = 0;
+    for (const domain of domains) {
+        const rank = domainRank(domain);
+        if (rank > bestRank) {
+            best = domain;
+            bestRank = rank;
+        }
+    }
+    return best;
+}
+
 /** The service kind an application's source maps to (for icons). */
 export function serviceKindOf(sourceType: string): ServiceKind {
     return sourceType === "image" ? "image" : "github";
@@ -198,6 +231,7 @@ function AppCard({
     const [logsFor, setLogsFor] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const isGit = app.sourceType === "dockerfile" || app.sourceType === "nixpacks";
+    const primary = primaryDomain(app.domains);
 
     function onDeploy() {
         setError(null);
@@ -235,37 +269,28 @@ function AppCard({
                 <MetricsBadge applicationId={app.id} />
             </div>
 
-            {app.domains.length > 0 && (
-                <div className="flex flex-col gap-1">
-                    {app.domains.map((domain) =>
-                        domain.enabled ? (
-                            <span key={domain.id} className="inline-flex min-w-0 items-center gap-1.5">
-                                <a
-                                    href={`https://${domain.hostname}`}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="inline-flex min-w-0 items-center gap-1 truncate text-xs text-primary hover:underline"
-                                >
-                                    <Globe className="size-3 shrink-0" /> {domain.hostname}
-                                </a>
-                                {domain.kind === "lan" && (
-                                    <span
-                                        title="Resolves only on your local network"
-                                        className="shrink-0 rounded bg-warning/10 px-1 text-[10px] font-medium text-warning"
-                                    >
-                                        LAN
-                                    </span>
-                                )}
-                            </span>
-                        ) : (
-                            <span
-                                key={domain.id}
-                                title="Domain disabled"
-                                className="inline-flex items-center gap-1 truncate text-xs text-muted-foreground line-through"
-                            >
-                                <Globe className="size-3 shrink-0" /> {domain.hostname}
-                            </span>
-                        )
+            {primary && (
+                // The single most stable/reachable domain (custom domain > free public
+                // subdomain > LAN name), so the card surfaces where the service actually lives.
+                <div className="flex min-w-0 items-center gap-1.5">
+                    <a
+                        href={`https://${primary.hostname}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex min-w-0 items-center gap-1 truncate text-xs text-primary hover:underline"
+                    >
+                        <Globe className="size-3 shrink-0" /> {primary.hostname}
+                    </a>
+                    {isLocalDomain(primary) && (
+                        <span
+                            title="Resolves only on your local network"
+                            className="shrink-0 rounded bg-warning/10 px-1 text-[10px] font-medium text-warning"
+                        >
+                            LAN
+                        </span>
+                    )}
+                    {app.domains.length > 1 && (
+                        <span className="shrink-0 text-[10px] text-muted-foreground">+{app.domains.length - 1}</span>
                     )}
                 </div>
             )}
