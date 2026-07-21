@@ -84,8 +84,8 @@ SelectLabel.displayName = "SelectLabel";
 
 export const SelectItem = forwardRef<
     ElementRef<typeof RadixSelect.Item>,
-    ComponentPropsWithoutRef<typeof RadixSelect.Item>
->(({ className, children, ...props }, ref) => (
+    ComponentPropsWithoutRef<typeof RadixSelect.Item> & { icon?: ReactNode }
+>(({ className, children, icon, ...props }, ref) => (
     <RadixSelect.Item
         ref={ref}
         className={cn(
@@ -94,6 +94,8 @@ export const SelectItem = forwardRef<
         )}
         {...props}
     >
+        {/* Icon as a flex sibling so it sits beside the label, never stacked above it. */}
+        {icon != null && <span className="flex shrink-0 items-center">{icon}</span>}
         <RadixSelect.ItemText>{children}</RadixSelect.ItemText>
         <RadixSelect.ItemIndicator className="absolute right-2 flex items-center">
             <Check className="size-4 text-primary" />
@@ -174,8 +176,7 @@ export function Select({
             </SelectTrigger>
             <SelectContent className={contentClassName}>
                 {options.map((option) => (
-                    <SelectItem key={option.value} value={option.value} disabled={option.disabled}>
-                        {option.icon}
+                    <SelectItem key={option.value} value={option.value} disabled={option.disabled} icon={option.icon}>
                         {option.label}
                     </SelectItem>
                 ))}
