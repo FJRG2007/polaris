@@ -8,7 +8,7 @@
  */
 
 import { useEffect, useState, type ReactNode } from "react";
-import { CheckCircle2, Globe, Link2, Loader2, Network, RefreshCw, TriangleAlert } from "lucide-react";
+import { CheckCircle2, Download, Globe, Link2, Loader2, Network, RefreshCw, ShieldCheck, TriangleAlert } from "lucide-react";
 import { Badge, Button, Card, CardBody, CardHeader, CardTitle, Input, Select } from "@polaris/ui";
 import type { DomainConfig } from "@/lib/domain-service";
 import type { NetworkMode, NetworkStatus } from "@/lib/network-service";
@@ -287,6 +287,25 @@ function NetworkExposure() {
                         with Let&apos;s Encrypt and keeps the IP updated automatically.
                     </p>
                 )}
+
+                <div className="flex flex-col gap-2 rounded-md border border-border/60 p-3 text-xs">
+                    <div className="flex items-center gap-2">
+                        <ShieldCheck className="size-4 shrink-0 text-primary" />
+                        <span className="font-medium text-foreground">Trust this device (polaris.local)</span>
+                    </div>
+                    <p className="text-muted-foreground">
+                        LAN hostnames can&apos;t get a public certificate, so Polaris signs its own. Install this root
+                        certificate on your devices once to make <code>https://polaris.local</code> trusted with no
+                        browser warning. macOS/iOS: open it and trust it in Keychain / Profiles. Windows: import into
+                        &quot;Trusted Root Certification Authorities&quot;. Firefox: import under Authorities.
+                    </p>
+                    <a
+                        href="/api/system/local-ca"
+                        className="inline-flex w-fit items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 font-medium text-foreground transition-colors hover:bg-muted"
+                    >
+                        <Download className="size-3.5" /> Download root certificate
+                    </a>
+                </div>
 
                 <label className="flex flex-col gap-1 text-sm">
                     Exposure mode

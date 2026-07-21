@@ -32,6 +32,13 @@ export async function register(): Promise<void> {
     const { syncAppRoutes } = await import("./lib/deploy-service");
     void syncAppRoutes().catch((error) => console.error("polaris: initial route sync failed:", error));
 
+    // Mint (once) an internal CA + leaf for the LAN hostnames and hand the leaf to
+    // Traefik as its default certificate, so polaris.local can be trusted HTTPS
+    // once the operator installs the root. Best-effort: a failure keeps the
+    // self-signed default and never blocks startup.
+    const { ensureLocalCa } = await import("./lib/local-ca-service");
+    void ensureLocalCa().catch((error) => console.error("polaris: local CA setup failed:", error));
+
     // Vercel-style auto-deploy: poll connected GitHub repos and redeploy on a new
     // commit. Works without a public webhook (LAN installs can't receive one).
     const { startAutoDeployPoller } = await import("./lib/deploy/auto-deploy-poller");
