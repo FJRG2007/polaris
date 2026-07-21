@@ -10,8 +10,12 @@
 	# remove routes for deployed-app subdomains at runtime. Caddy joins only the
 	# internal `default` network (never the untrusted `polaris-proxy` deployed apps
 	# sit on), so a deployed container cannot reach this and hijack the proxy. It is
-	# never published to the host.
-	admin :2019
+	# never published to the host. `origins` must list the Host the dashboard uses
+	# to reach it (the `caddy` service name), or Caddy rejects the request as a
+	# cross-origin admin call.
+	admin :2019 {
+		origins caddy:2019 localhost:2019 127.0.0.1:2019
+	}
 }
 
 # Shared proxy behavior, imported by each site below.
