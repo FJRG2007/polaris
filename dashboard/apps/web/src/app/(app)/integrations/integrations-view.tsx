@@ -138,7 +138,8 @@ export function IntegrationsView({ cards }: { cards: IntegrationCard[] }) {
 
 function TunnelDialog({ card, onClose }: { card: IntegrationCard; onClose: () => void }) {
     const provider = card.slug as "cloudflare" | "ngrok";
-    const [enabled, setEnabled] = useState(card.enabled);
+    // Default a first-time setup to enabled; respect the stored state once configured.
+    const [enabled, setEnabled] = useState(card.hasSecret ? card.enabled : true);
     const [token, setToken] = useState("");
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
@@ -247,11 +248,20 @@ function CloudflareApiTokenSection({ card }: { card: IntegrationCard }) {
 
     return (
         <div className="flex flex-col gap-3 border-t border-border pt-4">
-            <div className="flex flex-col gap-0.5">
+            <div className="flex flex-col gap-1">
                 <span className="text-sm font-medium">Automatic tunnels (API token)</span>
                 <span className="text-xs text-muted-foreground">
                     Connect an API token and Polaris sets up each app's tunnel and DNS for you - you only pick a
-                    hostname. Scopes: Account - Cloudflare Tunnel: Edit, Zone - DNS: Edit, Zone: Read.
+                    hostname. Create a Custom Token with these three permissions:
+                </span>
+                <ul className="flex flex-col gap-0.5 text-xs text-muted-foreground">
+                    <li>- Account -&gt; <span className="text-foreground">Cloudflare Tunnel</span> -&gt; Edit</li>
+                    <li>- Zone -&gt; <span className="text-foreground">DNS</span> -&gt; Edit</li>
+                    <li>- Zone -&gt; <span className="text-foreground">Zone</span> -&gt; Read</li>
+                </ul>
+                <span className="text-xs text-muted-foreground">
+                    Add an Account resource row to see the Cloudflare Tunnel permission (it is not under Zone).
+                    Cloudflare has no link that pre-fills these, so add them by hand on the token page.
                 </span>
             </div>
 
@@ -410,7 +420,7 @@ function DuckDnsDialog({ card, onClose }: { card: IntegrationCard; onClose: () =
 }
 
 function DymoDialog({ card, onClose }: { card: IntegrationCard; onClose: () => void }) {
-    const [enabled, setEnabled] = useState(card.enabled);
+    const [enabled, setEnabled] = useState(card.hasSecret ? card.enabled : true);
     const [verifyAccessIp, setVerifyAccessIp] = useState(card.verifyAccessIp);
     const [deny, setDeny] = useState<Set<string>>(new Set(card.deny));
     const [apiKey, setApiKey] = useState("");
@@ -785,7 +795,7 @@ function GitHubConnect({ card, onClose }: { card: IntegrationCard; onClose: () =
 }
 
 function VirusTotalDialog({ card, onClose }: { card: IntegrationCard; onClose: () => void }) {
-    const [enabled, setEnabled] = useState(card.enabled);
+    const [enabled, setEnabled] = useState(card.hasSecret ? card.enabled : true);
     const [scanDropPoints, setScanDropPoints] = useState(card.scanDropPoints);
     const [onDetection, setOnDetection] = useState<ScanAction>(card.onDetection);
     const [apiKey, setApiKey] = useState("");
