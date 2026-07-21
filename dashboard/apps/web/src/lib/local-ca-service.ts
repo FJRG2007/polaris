@@ -55,7 +55,9 @@ async function exists(path: string): Promise<boolean> {
  *  IPv4 the host currently has (so an IP:port hit is trusted too). */
 function subjectAltNames(): string[] {
     const host = process.env.POLARIS_MDNS_HOSTNAME || process.env.POLARIS_LOCAL_HOSTNAME || "polaris";
-    const dns = new Set<string>([host, `${host}.local`, "polaris", "polaris.local", "localhost"]);
+    // `*.plr.local` covers every deployed app's LAN hostname (served by the internal
+    // CA and resolved by the Polaris mDNS responder), so they are trusted-HTTPS too.
+    const dns = new Set<string>([host, `${host}.local`, "polaris", "polaris.local", "plr.local", "*.plr.local", "localhost"]);
     const publicDomain = process.env.POLARIS_PUBLIC_DOMAIN;
     if (publicDomain && publicDomain !== "polaris.internal") dns.add(publicDomain);
 

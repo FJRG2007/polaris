@@ -14,6 +14,9 @@ import makeMdns from "multicast-dns";
 
 const NAME = (process.env.POLARIS_MDNS_HOSTNAME || "polaris").toLowerCase();
 const FQDN = `${NAME}.local`;
+/** Wildcard LAN domain for deployed apps: any `<app>.plr.local` resolves to this
+ *  host, so Polaris can hand out clean local hostnames with no per-name DNS setup. */
+const APP_DOMAIN_SUFFIX = ".plr.local";
 const PORT = Number(process.env.POLARIS_MDNS_PORT || 80);
 const SERVICE_TYPE = "_http._tcp.local";
 const SERVICE_NAME = `Polaris._http._tcp.local`;
@@ -60,6 +63,11 @@ mdns.on("query", (query) => {
     for (const question of query.questions) {
         const name = question.name.toLowerCase();
         if ((question.type === "A" || question.type === "ANY") && name === FQDN) answers.push(r.a);
+        // Any <app>.plr.local resolves to this host, so deployed apps get a clean LAN
+        // hostname (Traefik then routes each name to its app).
+        if ((question.type === "A" || question.type === "ANY") && name.endsWith(APP_DOMAIN_SUFFIX)) {
+            answers.push({ name: question.name, type: "A", ttl: TTL, data: r.a.data });
+        }
         if (question.type === "PTR" && (name === SERVICE_TYPE || name === "_services._dns-sd._udp.local")) {
             answers.push(r.ptr, r.srv, r.txt, r.a);
         }

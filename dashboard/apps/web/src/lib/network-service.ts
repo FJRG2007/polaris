@@ -26,6 +26,10 @@ export type EffectiveMode = Exclude<NetworkMode, "auto">;
 
 const MODES: NetworkMode[] = ["auto", "lan", "public", "wildcard", "tunnel"];
 
+/** Wildcard LAN domain for deployed apps, resolved by the Polaris mDNS responder
+ *  (see mdns/responder.mjs) and served by the internal CA. */
+const LOCAL_DOMAIN_BASE = "plr.local";
+
 const KEYS = {
     mode: "network.mode",
     wildcardDomain: "network.wildcardDomain",
@@ -231,8 +235,11 @@ export async function resolveAutoDomain(name: string, override?: { ip: string })
         return { hostname: magicDomain(name, status.subdomainIp, DEFAULT_SUBDOMAIN_BASE), cert: "le", kind: "auto" };
     }
     if (status.subdomainIp) {
-        // LAN-only: reachable on the network, served by the internal CA, labelled.
-        return { hostname: magicDomain(name, status.subdomainIp, DEFAULT_SUBDOMAIN_BASE), cert: "internal", kind: "lan" };
+        // LAN-only: a clean <app>.plr.local name resolved by the Polaris mDNS responder
+        // on the local network and served by the internal CA. A NATed box's public
+        // reachability is handled separately (an auto Cloudflare quick tunnel), so this
+        // name is purely the friendly local address.
+        return { hostname: magicDomain(name, "", LOCAL_DOMAIN_BASE), cert: "internal", kind: "lan" };
     }
     return null;
 }
