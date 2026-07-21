@@ -77,6 +77,7 @@ import {
     namedTunnelStatusAction,
     startNamedTunnelAction,
     stopNamedTunnelAction,
+    setNamedTunnelEnabledAction,
     provisionNamedTunnelAction,
     cloudflareAccountStatusAction,
     ngrokTunnelStatusAction,
@@ -1252,53 +1253,59 @@ function MethodBlock({
     );
 }
 
-/** One active exposure in the Public access list: a link + optional badge and a
- *  stop/disconnect control, so tunnels read like the domain rows above them. */
+/** One active exposure in the Public access list: a link + optional badge, an
+ *  enable/disable switch, and an optional remove control, so tunnels read and behave
+ *  like the domain rows above them. */
 function ExposureRow({
     icon,
     label,
     href,
     badge,
+    enabled,
     pending,
-    onStop,
-    stopLabel
+    onToggle,
+    onRemove,
+    removeLabel
 }: {
     icon: ReactNode;
     label: string;
     href: string | null;
     badge?: string;
+    enabled: boolean;
     pending: boolean;
-    onStop: () => void;
-    stopLabel: string;
+    onToggle: (next: boolean) => void;
+    onRemove?: () => void;
+    removeLabel?: string;
 }) {
+    const linkClass = enabled
+        ? "inline-flex min-w-0 flex-1 items-center gap-1 truncate text-xs text-primary hover:underline"
+        : "inline-flex min-w-0 flex-1 items-center gap-1 truncate text-xs text-muted-foreground line-through";
     return (
         <li className="group flex items-center gap-2">
-            {href ? (
-                <a
-                    href={href}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex min-w-0 flex-1 items-center gap-1 truncate text-xs text-primary hover:underline"
-                >
+            {href && enabled ? (
+                <a href={href} target="_blank" rel="noreferrer" className={linkClass}>
                     <span className="shrink-0">{icon}</span> {label}
                 </a>
             ) : (
-                <span className="inline-flex min-w-0 flex-1 items-center gap-1 truncate text-xs text-muted-foreground">
+                <span className={linkClass}>
                     <span className="shrink-0">{icon}</span> {label}
                 </span>
             )}
             {badge && (
                 <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">{badge}</span>
             )}
-            <button
-                type="button"
-                title={stopLabel}
-                onClick={onStop}
-                disabled={pending}
-                className="text-muted-foreground opacity-0 transition-opacity hover:text-danger group-hover:opacity-100 disabled:opacity-50"
-            >
-                {pending ? <Loader2 className="size-3.5 animate-spin" /> : <X className="size-3.5" />}
-            </button>
+            <Switch checked={enabled} onChange={onToggle} disabled={pending} aria-label={enabled ? "Disable" : "Enable"} />
+            {onRemove && (
+                <button
+                    type="button"
+                    title={removeLabel ?? "Remove"}
+                    onClick={onRemove}
+                    disabled={pending}
+                    className="text-muted-foreground opacity-0 transition-opacity hover:text-danger group-hover:opacity-100 disabled:opacity-50"
+                >
+                    {pending ? <Loader2 className="size-3.5 animate-spin" /> : <X className="size-3.5" />}
+                </button>
+            )}
         </li>
     );
 }
@@ -1317,9 +1324,9 @@ function QuickTunnelRow({ appId, nonce, onChanged }: { appId: string; nonce: num
             label={status.url ? status.url.replace(/^https?:\/\//, "") : "starting..."}
             href={status.url}
             badge="quick link"
+            enabled
             pending={pending}
-            stopLabel="Stop tunnel"
-            onStop={() =>
+            onToggle={() =>
                 startTransition(async () => {
                     await stopQuickTunnelAction(appId).catch(() => undefined);
                     onChanged();
@@ -1343,9 +1350,9 @@ function NgrokTunnelRow({ appId, nonce, onChanged }: { appId: string; nonce: num
             label={status.url ? status.url.replace(/^https?:\/\//, "") : "starting..."}
             href={status.url}
             badge="ngrok"
+            enabled
             pending={pending}
-            stopLabel="Stop tunnel"
-            onStop={() =>
+            onToggle={() =>
                 startTransition(async () => {
                     await stopNgrokTunnelAction(appId).catch(() => undefined);
                     onChanged();
@@ -1363,20 +1370,28 @@ function NamedTunnelRow({ appId, nonce, onChanged }: { appId: string; nonce: num
         void namedTunnelStatusAction(appId).then(setStatus).catch(() => undefined);
     }, [appId, nonce]);
     if (!status?.configured || !status.hostname) return null;
+    const enabled = status.enabled;
     return (
         <ExposureRow
             icon={<CloudflareMark className="size-3.5" />}
             label={status.hostname}
             href={`https://${status.hostname}`}
-            badge={status.managed ? "auto" : status.running ? "tunnel" : "not running"}
+            badge={!enabled ? "disabled" : status.managed ? "auto" : status.running ? "tunnel" : "not running"}
+            enabled={enabled}
             pending={pending}
-            stopLabel="Disconnect"
-            onStop={() =>
+            onToggle={(next) =>
+                startTransition(async () => {
+                    await setNamedTunnelEnabledAction({ applicationId: appId, enabled: next }).catch(() => undefined);
+                    onChanged();
+                })
+            }
+            onRemove={() =>
                 startTransition(async () => {
                     await stopNamedTunnelAction(appId).catch(() => undefined);
                     onChanged();
                 })
             }
+            removeLabel="Remove tunnel"
         />
     );
 }

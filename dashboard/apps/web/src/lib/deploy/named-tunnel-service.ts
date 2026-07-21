@@ -26,6 +26,7 @@ import {
     deleteTunnel,
     getTunnelToken,
     putTunnelIngress,
+    putTunnelPlaceholder,
     resolveZoneForHostname,
     upsertTunnelCname
 } from "../integrations/cloudflare-api";
@@ -43,6 +44,8 @@ export interface NamedTunnelStatus {
     configured: boolean;
     /** True when Polaris created the tunnel + DNS itself via the Cloudflare API. */
     managed: boolean;
+    /** Whether the tunnel currently routes to the app (off = name reserved, not served). */
+    enabled: boolean;
 }
 
 /** Cloudflare resources Polaris created for a managed tunnel, kept for teardown. */
@@ -62,6 +65,13 @@ function names(appId: string): { project: string; service: string } {
 const tokenKey = (appId: string): string => `deploy.ntunnel.${appId}.token`;
 const hostKey = (appId: string): string => `deploy.ntunnel.${appId}.hostname`;
 const managedKey = (appId: string): string => `deploy.ntunnel.${appId}.managed`;
+const enabledKey = (appId: string): string => `deploy.ntunnel.${appId}.disabled`;
+
+/** Whether the tunnel routes to the app. Stored as a "disabled" flag so the default
+ *  (no row) reads as enabled; a value of "1" means the operator turned it off. */
+async function isEnabled(appId: string): Promise<boolean> {
+    return (await getSetting(enabledKey(appId))) !== "1";
+}
 
 /** Normalize a hostname the same way the manual and automated flows expect. */
 function normalizeHost(hostname: string): string {
@@ -177,6 +187,7 @@ export async function startNamedTunnel(
     await setSetting(hostKey(appId), hostname);
     // A manually pasted token is not Polaris-managed; drop any stale managed refs.
     await setSetting(managedKey(appId), null);
+    await setSetting(enabledKey(appId), null);
 
     const { project, service } = names(appId);
     const ports = new HostdPorts();
@@ -186,7 +197,7 @@ export async function startNamedTunnel(
     } finally {
         await ports.dispose();
     }
-    return { running: true, hostname, configured: true, managed: false };
+    return { running: true, hostname, configured: true, managed: false, enabled: true };
 }
 
 /**
@@ -223,6 +234,7 @@ export async function provisionNamedTunnel(
 
     await storeToken(appId, connectorToken);
     await setSetting(hostKey(appId), hostname);
+    await setSetting(enabledKey(appId), null);
     await setSetting(
         managedKey(appId),
         JSON.stringify({ tunnelId: tunnel.id, zoneId: zone.id, dnsId, accountId } satisfies ManagedRefs)
@@ -241,7 +253,45 @@ export async function provisionNamedTunnel(
         // Best-effort: the old connector is gone, so the tunnel can be deleted.
         await deleteTunnel(token, previous.accountId, previous.tunnelId).catch(() => undefined);
     }
-    return { running: true, hostname, configured: true, managed: true };
+    return { running: true, hostname, configured: true, managed: true, enabled: true };
+}
+
+/**
+ * Turn an app's named tunnel on or off while keeping its name reserved. Enabling
+ * routes the hostname back to the app; disabling stops serving it without deleting
+ * the tunnel. For a Polaris-managed tunnel, disabling repoints the Cloudflare
+ * ingress at a placeholder (so the connector stays up and the hostname/DNS stay
+ * reserved instead of disconnecting); a manual tunnel just stops its connector.
+ */
+export async function setNamedTunnelEnabled(appId: string, ownerId: string, enabled: boolean): Promise<void> {
+    await requireLocalApp(appId, ownerId);
+    const [hostname, token, managed] = await Promise.all([getSetting(hostKey(appId)), loadToken(appId), loadManaged(appId)]);
+    if (!token || !hostname) throw new Error("This app has no named tunnel configured");
+
+    const { project, service } = names(appId);
+    const ports = new HostdPorts();
+    try {
+        if (managed) {
+            const account = await requireCloudflareAccount();
+            if (enabled) {
+                const originIp = await getPublicIp();
+                if (!originIp) throw new Error("This server has no reachable IP to route the tunnel to");
+                await putTunnelIngress(account.token, account.accountId, managed.tunnelId, hostname, `http://${originIp}:${hostPortForApp(appId)}`);
+            } else {
+                await putTunnelPlaceholder(account.token, account.accountId, managed.tunnelId, hostname);
+            }
+            // Keep the connector running either way so the hostname stays reserved.
+            await ports.composeUp(tunnelSpec(project, service, token));
+        } else if (enabled) {
+            await ports.composeUp(tunnelSpec(project, service, token));
+        } else {
+            // No API access to repoint a manual tunnel's ingress; stop its connector.
+            await ports.composeDown(project).catch(() => undefined);
+        }
+    } finally {
+        await ports.dispose();
+    }
+    await setSetting(enabledKey(appId), enabled ? null : "1");
 }
 
 /** Tear down the named-tunnel sidecar and forget its token + hostname. For a
@@ -271,6 +321,7 @@ export async function stopNamedTunnel(appId: string, ownerId: string): Promise<v
     await setSetting(tokenKey(appId), null);
     await setSetting(hostKey(appId), null);
     await setSetting(managedKey(appId), null);
+    await setSetting(enabledKey(appId), null);
 }
 
 /** Whether the named tunnel is configured, its hostname, and whether the sidecar
@@ -282,22 +333,23 @@ export async function getNamedTunnelStatus(appId: string, ownerId: string): Prom
     });
     if (!app) throw new Error("Application not found");
 
-    const [hostname, token, managed] = await Promise.all([
+    const [hostname, token, managed, enabled] = await Promise.all([
         getSetting(hostKey(appId)),
         loadToken(appId),
-        loadManaged(appId)
+        loadManaged(appId),
+        isEnabled(appId)
     ]);
     const configured = Boolean(token);
     const isManaged = Boolean(managed);
-    if (!configured) return { running: false, hostname, configured: false, managed: isManaged };
+    if (!configured) return { running: false, hostname, configured: false, managed: isManaged, enabled };
 
     const { service } = names(appId);
     const ports = new HostdPorts();
     try {
         const info = (await ports.inspect(service)) as { State?: { Running?: boolean } };
-        return { running: Boolean(info?.State?.Running), hostname, configured: true, managed: isManaged };
+        return { running: Boolean(info?.State?.Running), hostname, configured: true, managed: isManaged, enabled };
     } catch {
-        return { running: false, hostname, configured: true, managed: isManaged };
+        return { running: false, hostname, configured: true, managed: isManaged, enabled };
     } finally {
         await ports.dispose();
     }

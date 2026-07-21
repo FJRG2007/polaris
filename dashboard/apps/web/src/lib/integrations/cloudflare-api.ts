@@ -129,6 +129,31 @@ export async function putTunnelIngress(
     });
 }
 
+/**
+ * Point the tunnel's ingress at a placeholder instead of the app, so a disabled
+ * hostname keeps the tunnel connected (Cloudflare needs an ingress) and the name
+ * reserved without exposing the service. Proxies to the Polaris repo for now.
+ */
+export async function putTunnelPlaceholder(
+    token: string,
+    accountId: string,
+    tunnelId: string,
+    hostname: string
+): Promise<void> {
+    await cf(token, "PUT", `/accounts/${accountId}/cfd_tunnel/${tunnelId}/configurations`, {
+        config: {
+            ingress: [
+                {
+                    hostname,
+                    service: "https://github.com/FJRG2007/polaris",
+                    originRequest: { httpHostHeader: "github.com" }
+                },
+                { service: "http_status:404" }
+            ]
+        }
+    });
+}
+
 /** Point `hostname` at the tunnel via a proxied CNAME, creating or updating the record. */
 export async function upsertTunnelCname(
     token: string,

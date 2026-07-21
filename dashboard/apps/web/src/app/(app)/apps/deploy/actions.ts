@@ -54,6 +54,7 @@ import {
 import {
     getNamedTunnelStatus,
     provisionNamedTunnel,
+    setNamedTunnelEnabled,
     startNamedTunnel,
     stopNamedTunnel,
     type NamedTunnelStatus
@@ -607,7 +608,27 @@ export async function namedTunnelStatusAction(applicationId: string): Promise<Na
     try {
         return await getNamedTunnelStatus(applicationId, user.id);
     } catch {
-        return { running: false, hostname: null, configured: false, managed: false };
+        return { running: false, hostname: null, configured: false, managed: false, enabled: true };
+    }
+}
+
+/** Enable or disable an app's named tunnel while keeping its hostname reserved. */
+export async function setNamedTunnelEnabledAction(input: {
+    applicationId: string;
+    enabled: boolean;
+}): Promise<{ error?: string }> {
+    const user = await requirePermission("deploy.manage");
+    try {
+        await setNamedTunnelEnabled(input.applicationId, user.id, input.enabled);
+        await recordAudit({
+            actorId: user.id,
+            action: input.enabled ? "deploy.named-tunnel.start" : "deploy.named-tunnel.stop",
+            targetType: "application",
+            targetId: input.applicationId
+        });
+        return {};
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not update the tunnel" };
     }
 }
 
