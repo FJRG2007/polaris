@@ -196,6 +196,23 @@ export async function addApplicationDomain(
     return hostname;
 }
 
+/**
+ * Give an application a free subdomain if it has none yet - so a service created
+ * before a public IP was known (or one that simply never got a domain) picks one
+ * up on its next deploy, the way Dokploy backfills. Best-effort: no public IP or
+ * base configured just leaves the app domainless. The target port is inferred
+ * from the source (built apps listen on 3000, prebuilt images on 80).
+ */
+export async function ensureApplicationDomain(applicationId: string, ownerId: string): Promise<void> {
+    const app = await prisma.application.findFirst({
+        where: { id: applicationId, environment: { project: { ownerId } } },
+        select: { sourceType: true, _count: { select: { domains: true } } }
+    });
+    if (!app || app._count.domains > 0) return;
+    const targetPort = app.sourceType === "image" ? 80 : 3000;
+    await addApplicationDomain(applicationId, ownerId, { targetPort });
+}
+
 export async function removeApplicationDomain(domainId: string, ownerId: string): Promise<void> {
     await prisma.domain.deleteMany({
         where: { id: domainId, application: { environment: { project: { ownerId } } } }
@@ -315,7 +332,10 @@ export async function deployApplication(
             commitSha: meta?.commitSha || null
         }
     });
-    await prisma.application.update({ where: { id: applicationId }, data: { currentDeploymentId: deployment.id } });
+    // The app keeps pointing at the previous successful release until this one
+    // actually succeeds (see executeDeployment) - so history never shows a build
+    // as "current" before it finishes, and the old version stays active until the
+    // new one is up (zero-downtime cutover, the way Railway does it).
     queue.enqueue(target.id, () => runDeployment(deployment.id, plan, target, ownerId, gitSource));
     return deployment.id;
 }
@@ -524,6 +544,7 @@ export async function executeDeployment(
                 finishedAt: new Date()
             }
         });
+        if (result.ok) await promoteDeployment(deploymentId);
     } catch (error) {
         log(Buffer.from(`\n[error] ${error instanceof Error ? error.message : String(error)}\n`));
         await prisma.deployment.update({
@@ -534,6 +555,40 @@ export async function executeDeployment(
         await ports.dispose();
         logStream.end();
     }
+}
+
+/**
+ * Promote a just-succeeded deployment to be its application's current release.
+ * Unless the app keeps release history (`keepReleases`), any prior release still
+ * marked "running" is superseded to "removed" - so the Deployments tab shows one
+ * ACTIVE release over a REMOVED history, the way Railway does, instead of several
+ * stale "running" rows. No-op for non-application deployables.
+ */
+async function promoteDeployment(deploymentId: string): Promise<void> {
+    const dep = await prisma.deployment.findUnique({
+        where: { id: deploymentId },
+        select: { deployableType: true, deployableId: true }
+    });
+    if (dep?.deployableType !== "application") return;
+    const app = await prisma.application.findUnique({
+        where: { id: dep.deployableId },
+        select: { keepReleases: true }
+    });
+    if (!app?.keepReleases) {
+        await prisma.deployment.updateMany({
+            where: {
+                deployableType: "application",
+                deployableId: dep.deployableId,
+                status: "running",
+                id: { not: deploymentId }
+            },
+            data: { status: "removed", finishedAt: new Date() }
+        });
+    }
+    await prisma.application.update({
+        where: { id: dep.deployableId },
+        data: { currentDeploymentId: deploymentId }
+    });
 }
 
 /** Enqueue a job serialized behind any prior job for the same target. */

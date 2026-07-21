@@ -92,17 +92,29 @@ export class HostdPorts implements RuntimePorts {
 }
 
 /** Pipe a streamed daemon response into a sink and resolve when it ends. */
-function drain(stream: Readable, onOutput?: OutputSink): Promise<void> {
+function drain(stream: Readable & { statusCode?: number }, onOutput?: OutputSink): Promise<void> {
     return new Promise((resolve, reject) => {
-        // The daemon appends a "[polaris:exit:N]" trailer when a streamed command
-        // (build, compose up, pull, ...) exits non-zero. Watch the tail for it so a
-        // failed command is a rejected promise, not a silent success on a 200.
+        // Two failure signals must both surface as a rejected promise, or a failed
+        // deploy reads as a silent success:
+        //   1. A non-2xx HTTP status - the daemon could not even start the command
+        //      (e.g. 502 "could not start docker compose"); the body is the reason.
+        //   2. A "[polaris:exit:N]" trailer the daemon appends when a streamed
+        //      command (build, compose up, pull, ...) itself exits non-zero.
+        const status = stream.statusCode ?? 200;
+        const failedStatus = status < 200 || status >= 300;
         let tail = "";
+        let body = "";
         stream.on("data", (chunk: Buffer) => {
             if (onOutput) onOutput(chunk);
-            tail = (tail + chunk.toString("utf8")).slice(-120);
+            const text = chunk.toString("utf8");
+            tail = (tail + text).slice(-120);
+            if (failedStatus) body = (body + text).slice(-500);
         });
         stream.on("end", () => {
+            if (failedStatus) {
+                reject(new Error(body.trim() || `the daemon returned HTTP ${status}`));
+                return;
+            }
             const match = tail.match(/\[polaris:exit:(-?\d+)\]/);
             if (match && match[1] !== "0") reject(new Error(`the command failed (exit ${match[1]})`));
             else resolve();

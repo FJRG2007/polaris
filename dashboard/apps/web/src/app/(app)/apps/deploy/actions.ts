@@ -11,7 +11,8 @@ import { headers } from "next/headers";
 import { requirePermission } from "@/lib/session";
 import { ensurePublicIp } from "@/lib/domain-service";
 import { recordAudit } from "@/lib/audit-service";
-import { getOrCreateLocalTarget } from "@/lib/deploy-target-service";
+import { getOrCreateLocalTarget, getOrCreateHostTarget } from "@/lib/deploy-target-service";
+import { listHosts } from "@/lib/host-service";
 import {
     addApplicationDomain,
     createApplication,
@@ -20,6 +21,7 @@ import {
     deleteEnvironment,
     deleteProject,
     deployApplication,
+    ensureApplicationDomain,
     listDeployments,
     removeApplicationDomain,
     saveEnvironmentLayout,
@@ -111,6 +113,20 @@ export async function deleteEnvironmentAction(input: { environmentId: string; pr
     }
 }
 
+/**
+ * Servers a service can deploy to: the local host (where Polaris runs) plus any
+ * connected SSH hosts. The local option is always present and first, so a
+ * single-server setup has an obvious default.
+ */
+export async function listDeployServersAction(): Promise<{ id: string; name: string; kind: "local" | "host" }[]> {
+    const user = await requirePermission("deploy.manage");
+    const hosts = await listHosts(user.id);
+    return [
+        { id: "local", name: "Local (this server)", kind: "local" },
+        ...hosts.map((host) => ({ id: host.id, name: host.name, kind: "host" as const }))
+    ];
+}
+
 export async function createApplicationAction(input: {
     environmentId: string;
     name: string;
@@ -121,6 +137,7 @@ export async function createApplicationAction(input: {
     dockerfilePath?: string;
     provider?: string;
     port?: number;
+    serverId?: string;
 }): Promise<{ error?: string; deploymentId?: string }> {
     const user = await requirePermission("deploy.manage");
     const name = input.name?.trim();
@@ -148,7 +165,16 @@ export async function createApplicationAction(input: {
         sourceConfig = { imageRef };
     }
     try {
-        const target = await getOrCreateLocalTarget(user.id);
+        // Resolve the chosen server: the local host by default, or a connected SSH
+        // host adopted as a deploy target on first use.
+        let target;
+        if (input.serverId && input.serverId !== "local") {
+            const host = (await listHosts(user.id)).find((item) => item.id === input.serverId);
+            if (!host) return { error: "The selected server was not found" };
+            target = await getOrCreateHostTarget(host.id, user.id, host.name);
+        } else {
+            target = await getOrCreateLocalTarget(user.id);
+        }
         const app = await createApplication(user.id, {
             environmentId: input.environmentId,
             targetId: target.id,
@@ -262,6 +288,15 @@ export async function listDeploymentsAction(applicationId: string): Promise<Depl
 export async function deployApplicationAction(applicationId: string): Promise<{ error?: string; deploymentId?: string }> {
     const user = await requirePermission("deploy.manage");
     try {
+        // Backfill a free subdomain for apps that never got one (e.g. created before
+        // a public IP was known), so redeploying is enough to make it reachable.
+        const requestHeaders = await headers();
+        await ensurePublicIp(requestHeaders.get("x-server-ip") ?? requestHeaders.get("host"));
+        try {
+            await ensureApplicationDomain(applicationId, user.id);
+        } catch {
+            // No public IP / free-subdomain base; the app can still deploy without one.
+        }
         const deploymentId = await deployApplication(applicationId, user.id, user.id);
         await recordAudit({ actorId: user.id, action: "deploy.app.deploy", targetType: "application", targetId: applicationId });
         revalidatePath(DEPLOY_PATH);
@@ -305,13 +340,21 @@ export async function createDatabaseAction(input: {
     engine: string;
     name: string;
     version?: string;
+    serverId?: string;
 }): Promise<{ error?: string }> {
     const user = await requirePermission("deploy.manage");
     const name = input.name?.trim();
     if (!name) return { error: "A database name is required" };
     if (!DB_ENGINES.includes(input.engine as DbEngine)) return { error: "Unsupported database engine" };
     try {
-        const target = await getOrCreateLocalTarget(user.id);
+        let target;
+        if (input.serverId && input.serverId !== "local") {
+            const host = (await listHosts(user.id)).find((item) => item.id === input.serverId);
+            if (!host) return { error: "The selected server was not found" };
+            target = await getOrCreateHostTarget(host.id, user.id, host.name);
+        } else {
+            target = await getOrCreateLocalTarget(user.id);
+        }
         const database = await createDatabase(user.id, {
             environmentId: input.environmentId,
             targetId: target.id,

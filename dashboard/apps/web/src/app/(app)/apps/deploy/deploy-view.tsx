@@ -50,6 +50,7 @@ import {
     deployDatabaseAction,
     githubReposAction,
     inspectRepoAction,
+    listDeployServersAction,
     setAutoDeployAction
 } from "./actions";
 
@@ -414,16 +415,55 @@ function ServiceTypeList({ onPick }: { onPick: (view: Exclude<ServiceView, "list
     );
 }
 
+interface ServerOption {
+    id: string;
+    name: string;
+}
+
+/**
+ * The servers a new service can deploy to (local host + connected SSH hosts),
+ * with the first one selected by default - so a single-server setup needs no
+ * choice and multi-server setups get an explicit picker.
+ */
+function useDeployServers(): { servers: ServerOption[]; serverId: string; setServerId: (id: string) => void } {
+    const [servers, setServers] = useState<ServerOption[]>([]);
+    const [serverId, setServerId] = useState("local");
+    useEffect(() => {
+        void listDeployServersAction()
+            .then((list) => {
+                setServers(list);
+                if (list[0]) setServerId(list[0].id);
+            })
+            .catch(() => undefined);
+    }, []);
+    return { servers, serverId, setServerId };
+}
+
+function ServerField({ servers, value, onChange }: { servers: ServerOption[]; value: string; onChange: (id: string) => void }) {
+    if (servers.length === 0) return null;
+    return (
+        <Field label="Server" hint="Where this service runs. Connect more under Servers.">
+            <Select
+                value={value}
+                onValueChange={onChange}
+                options={servers.map((server) => ({ value: server.id, label: server.name }))}
+                aria-label="Server"
+            />
+        </Field>
+    );
+}
+
 function NewImageForm({ environmentId, onDone }: { environmentId: string; onDone: () => void }) {
     const [name, setName] = useState("");
     const [image, setImage] = useState("");
+    const { servers, serverId, setServerId } = useDeployServers();
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
 
     function submit() {
         setError(null);
         startTransition(async () => {
-            const result = await createApplicationAction({ environmentId, name, sourceType: "image", imageRef: image });
+            const result = await createApplicationAction({ environmentId, name, sourceType: "image", imageRef: image, serverId });
             if (result.error) setError(result.error);
             else onDone();
         });
@@ -444,6 +484,7 @@ function NewImageForm({ environmentId, onDone }: { environmentId: string; onDone
                     placeholder="ghcr.io/user/repo:latest"
                 />
             </Field>
+            <ServerField servers={servers} value={serverId} onChange={setServerId} />
             {error && <p className="text-sm text-danger">{error}</p>}
             <div className="flex justify-end">
                 <Button onClick={submit} disabled={pending || !name.trim() || !image.trim()}>
@@ -485,6 +526,7 @@ function NewGithubForm({ environmentId, onDone }: { environmentId: string; onDon
     const [dockerfilePath, setDockerfilePath] = useState("Dockerfile");
     const [framework, setFramework] = useState<string | null>(null);
     const [inspecting, setInspecting] = useState(false);
+    const { servers, serverId, setServerId } = useDeployServers();
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
 
@@ -546,7 +588,8 @@ function NewGithubForm({ environmentId, onDone }: { environmentId: string; onDon
                 repoUrl,
                 branch: branch.trim() || undefined,
                 dockerfilePath: builder === "dockerfile" ? dockerfilePath.trim() || undefined : undefined,
-                provider: connected ? "github" : undefined
+                provider: connected ? "github" : undefined,
+                serverId
             });
             if (result.error) setError(result.error);
             else onDone();
@@ -664,6 +707,7 @@ function NewGithubForm({ environmentId, onDone }: { environmentId: string; onDon
                             />
                         </Field>
                     )}
+                    <ServerField servers={servers} value={serverId} onChange={setServerId} />
                 </>
             )}
 
@@ -680,13 +724,14 @@ function NewGithubForm({ environmentId, onDone }: { environmentId: string; onDon
 function NewDatabaseForm({ environmentId, onDone }: { environmentId: string; onDone: () => void }) {
     const [name, setName] = useState("");
     const [engine, setEngine] = useState<(typeof DB_ENGINES)[number]>("postgres");
+    const { servers, serverId, setServerId } = useDeployServers();
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
 
     function submit() {
         setError(null);
         startTransition(async () => {
-            const result = await createDatabaseAction({ environmentId, engine, name });
+            const result = await createDatabaseAction({ environmentId, engine, name, serverId });
             if (result.error) setError(result.error);
             else onDone();
         });
@@ -704,6 +749,7 @@ function NewDatabaseForm({ environmentId, onDone }: { environmentId: string; onD
                     options={ENGINE_OPTIONS}
                 />
             </Field>
+            <ServerField servers={servers} value={serverId} onChange={setServerId} />
             {error && <p className="text-sm text-danger">{error}</p>}
             <div className="flex justify-end">
                 <Button onClick={submit} disabled={pending || !name.trim()}>

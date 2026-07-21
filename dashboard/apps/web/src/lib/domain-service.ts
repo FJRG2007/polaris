@@ -84,9 +84,18 @@ export async function deployBase(): Promise<string> {
     return (await getSetting(KEYS.deployBase)) || DEFAULT_SUBDOMAIN_BASE;
 }
 
-/** The public IP used to build free subdomains (admin-set or onboarding-set). */
+/**
+ * The public IP used to build free subdomains. Resolution order: the admin/
+ * onboarding-set value, then the `POLARIS_PUBLIC_IP` env var (a deterministic,
+ * zero-click default for self-hosters - e.g. the LAN IP the box answers on), so
+ * free subdomains work out of the box without depending on request-time header
+ * detection (which Docker's NAT can mask).
+ */
 export async function getPublicIp(): Promise<string | null> {
-    return getSetting(KEYS.publicIp);
+    const stored = await getSetting(KEYS.publicIp);
+    if (stored) return stored;
+    const env = (process.env.POLARIS_PUBLIC_IP ?? "").trim().replace(/:\d+$/, "");
+    return isRoutableIpv4(env) ? env : null;
 }
 
 /** A routable (non-loopback/unspecified) IPv4 literal. */
