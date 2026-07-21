@@ -7,13 +7,14 @@
  */
 
 import { createWriteStream } from "node:fs";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { loadEnv } from "@polaris/config";
 import { prisma } from "@polaris/db";
 import { bucketHttpMetrics, parseHttpLogs, serviceName, shortHash, slugify, type AppDeployPlan, type DeployResult, type HttpLogEntry, type HttpMetricPoint, type RuntimeContext, type RuntimeDriver } from "@polaris/deploy";
 import { decryptSecret } from "@polaris/storage";
 import { getDriver, getPorts, toTargetInfo, type TargetRow } from "./deploy/runtime";
+import { LocalRouter, type AppRoute } from "./deploy/router";
 import { getOrCreateHostTarget, getOrCreateLocalTarget } from "./deploy-target-service";
 import { getPublicIp } from "./domain-service";
 import { resolveAutoDomain } from "./network-service";
@@ -182,9 +183,13 @@ export async function addApplicationDomain(
     opts: { hostname?: string; targetPort: number; cert?: "internal" | "le" | "none" }
 ): Promise<string> {
     const app = await prisma.application.findFirst({
-        where: { id: applicationId, environment: { project: { ownerId } } }
+        where: { id: applicationId, environment: { project: { ownerId } } },
+        include: { target: { include: { host: true } } }
     });
     if (!app) throw new Error("Application not found");
+    // A remote-server app's auto domain must embed that server's IP (served by its
+    // own edge), not the Polaris host's - otherwise it points at the wrong box.
+    const remoteIp = app.target.kind !== "local" ? app.target.host?.address?.trim() : undefined;
     let hostname = opts.hostname?.trim();
     let kind = "custom";
     // Cert/exposure resolution: a caller-chosen mode wins (e.g. "none" for a domain
@@ -197,7 +202,7 @@ export async function addApplicationDomain(
         // real internet-reachable name with Let's Encrypt; otherwise a LAN-only
         // sslip.io name (kind "lan") - so the app never gets a subdomain that
         // silently fails off the network; the UI labels it and offers public setup.
-        const plan = await resolveAutoDomain(app.slug);
+        const plan = await resolveAutoDomain(app.slug, remoteIp ? { ip: remoteIp } : undefined);
         if (!plan) {
             throw new Error(
                 "No public IP is configured for free subdomains. Set one in Domains settings, or enter a custom domain."
@@ -230,44 +235,57 @@ export async function addApplicationDomain(
     return hostname;
 }
 
-/** Traefik dynamic-config file the edge watches (a shared volume, node-writable). */
-const DYNAMIC_ROUTES_FILE = `${process.env.POLARIS_TRAEFIK_DYNAMIC_DIR ?? "/dynamic"}/polaris-apps.yml`;
-
 /**
- * Regenerate the Traefik dynamic config for every enabled application domain.
- * Each hostname routes to the app's published host port, so the edge needs no
- * per-container labels and reflects a domain being added, removed, enabled, or
- * disabled the instant this runs (Traefik watches the file). HTTPS is automatic:
- * Let's Encrypt for a custom domain, Traefik's self-signed default cert for a
- * free/LAN subdomain, plain HTTP for a domain fronted by a tunnel. Best-effort -
- * no public IP or an unwritable file just leaves routing unchanged.
+ * Regenerate every edge's dynamic routing config from the enabled application
+ * domains, grouped by the server each app runs on (its own edge). The Polaris
+ * host's local edge is written through LocalRouter; each hostname routes to the
+ * app's published host port, so the edge needs no per-container labels and
+ * reflects a domain being added, removed, enabled, or disabled the instant this
+ * runs (Traefik watches the file). HTTPS is automatic: Let's Encrypt for a custom
+ * domain, the edge's default cert for a free/LAN subdomain, plain HTTP for a
+ * domain fronted by a tunnel. Best-effort - no public IP just leaves routing
+ * unchanged.
+ *
+ * A remote-server app is served by that server's OWN edge (so the control plane is
+ * never in its request path); pushing config to a remote edge over SSH is the
+ * next phase, so those domains are not routed through the local edge here - they
+ * are logged instead of being silently funnelled through Polaris (a SPOF).
  */
 export async function syncAppRoutes(): Promise<void> {
     const domains = await prisma.domain.findMany({
         where: { enabled: true },
-        select: { id: true, hostname: true, certResolver: true, applicationId: true }
-    });
-    const ip = await getPublicIp();
-    const routers: string[] = [];
-    const services: string[] = [];
-    for (const domain of domains) {
-        if (!ip) continue;
-        const name = `polaris-app-${domain.id}`;
-        const dial = `${ip}:${hostPortForApp(domain.applicationId)}`;
-        if (domain.certResolver === "none") {
-            routers.push(`    ${name}:\n      rule: "Host(\`${domain.hostname}\`)"\n      entryPoints: [web]\n      service: ${name}`);
-        } else {
-            const tls = domain.certResolver === "le" ? "\n      tls:\n        certResolver: letsencrypt" : "\n      tls: {}";
-            routers.push(`    ${name}:\n      rule: "Host(\`${domain.hostname}\`)"\n      entryPoints: [websecure]\n      service: ${name}${tls}`);
-            routers.push(`    ${name}-http:\n      rule: "Host(\`${domain.hostname}\`)"\n      entryPoints: [web]\n      service: ${name}\n      middlewares: [polaris-redirect-https]`);
+        select: {
+            id: true,
+            hostname: true,
+            certResolver: true,
+            applicationId: true,
+            application: { select: { target: { select: { kind: true } } } }
         }
-        services.push(`    ${name}:\n      loadBalancer:\n        servers:\n          - url: "http://${dial}"`);
+    });
+    const localIp = await getPublicIp();
+    const localRoutes: AppRoute[] = [];
+    const remotePending: string[] = [];
+    for (const domain of domains) {
+        if (domain.application.target.kind === "local") {
+            if (!localIp) continue;
+            localRoutes.push({
+                id: domain.id,
+                hostname: domain.hostname,
+                certResolver: domain.certResolver,
+                dialHost: localIp,
+                dialPort: hostPortForApp(domain.applicationId)
+            });
+        } else {
+            // Served by the remote server's own edge (per-server edge, phase 2).
+            remotePending.push(domain.hostname);
+        }
     }
-    const body =
-        routers.length === 0
-            ? "http: {}\n"
-            : `http:\n  routers:\n${routers.join("\n")}\n  services:\n${services.join("\n")}\n  middlewares:\n    polaris-redirect-https:\n      redirectScheme:\n        scheme: https\n`;
-    await writeFile(DYNAMIC_ROUTES_FILE, body, "utf8");
+    await new LocalRouter().sync(localRoutes);
+    if (remotePending.length > 0) {
+        console.warn(
+            `polaris: ${remotePending.length} remote-server domain(s) await a per-server edge and are not routed by the local edge: ${remotePending.join(", ")}`
+        );
+    }
 }
 
 /**
