@@ -13,6 +13,8 @@ import {
     ChevronDown,
     ChevronLeft,
     ChevronRight,
+    Cloud,
+    Copy,
     Eye,
     EyeOff,
     Globe,
@@ -59,7 +61,10 @@ import {
     saveEnvVarAction,
     setAppPortAction,
     setApplicationRunningAction,
-    setAutoDeployAction
+    setAutoDeployAction,
+    quickTunnelStatusAction,
+    startQuickTunnelAction,
+    stopQuickTunnelAction
 } from "./actions";
 
 const TABS = ["Deployments", "Variables", "Metrics", "Console", "Files", "Settings"] as const;
@@ -784,6 +789,107 @@ function Meter({ label, value, unit }: { label: string; value: number | null | u
     );
 }
 
+/** Per-app Cloudflare Quick Tunnel: a public URL with no account/DNS/port-forward.
+ *  Loads the live state, then starts/refreshes/stops the cloudflared sidecar. */
+function QuickTunnelPanel({ appId }: { appId: string }) {
+    const [status, setStatus] = useState<{ running: boolean; url: string | null } | null>(null);
+    const [error, setError] = useState<string | null>(null);
+    const [copied, setCopied] = useState(false);
+    const [pending, startTransition] = useTransition();
+
+    useEffect(() => {
+        let active = true;
+        quickTunnelStatusAction(appId)
+            .then((next) => {
+                if (active) setStatus(next);
+            })
+            .catch(() => undefined);
+        return () => {
+            active = false;
+        };
+    }, [appId]);
+
+    function start(): void {
+        setError(null);
+        startTransition(async () => {
+            const result = await startQuickTunnelAction(appId);
+            if (result.error) setError(result.error);
+            else setStatus({ running: true, url: result.url ?? null });
+        });
+    }
+
+    function stop(): void {
+        setError(null);
+        startTransition(async () => {
+            const result = await stopQuickTunnelAction(appId);
+            if (result.error) setError(result.error);
+            else setStatus({ running: false, url: null });
+        });
+    }
+
+    async function copy(url: string): Promise<void> {
+        try {
+            await navigator.clipboard.writeText(url);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 1500);
+        } catch {
+            // Clipboard unavailable (insecure context); the link is still visible to copy manually.
+        }
+    }
+
+    const running = status?.running ?? false;
+    return (
+        <section className="flex flex-col gap-2">
+            <h3 className="text-sm font-medium">Public tunnel</h3>
+            <p className="text-xs text-muted-foreground">
+                Expose this app on a public Cloudflare URL - no account, no DNS, no port-forwarding. The link
+                changes each time the tunnel starts; for a stable custom domain, configure a tunnel under
+                Integrations.
+            </p>
+            {running && status?.url && (
+                <div className="flex items-center gap-2">
+                    <a
+                        href={status.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex min-w-0 items-center gap-1 truncate text-xs text-primary hover:underline"
+                    >
+                        <Cloud className="size-3 shrink-0" /> {status.url.replace(/^https?:\/\//, "")}
+                    </a>
+                    <button
+                        type="button"
+                        title="Copy link"
+                        onClick={() => copy(status.url as string)}
+                        className="text-muted-foreground transition-colors hover:text-foreground"
+                    >
+                        {copied ? <CheckCircle2 className="size-3.5 text-primary" /> : <Copy className="size-3.5" />}
+                    </button>
+                </div>
+            )}
+            {running && !status?.url && (
+                <p className="text-xs text-muted-foreground">Tunnel running - waiting for its public URL...</p>
+            )}
+            {error && <p className="text-xs text-danger">{error}</p>}
+            <div className="flex justify-end gap-2">
+                {running ? (
+                    <>
+                        <Button variant="outline" onClick={start} disabled={pending}>
+                            {pending && <Loader2 className="size-4 animate-spin" />} Refresh
+                        </Button>
+                        <Button variant="outline" onClick={stop} disabled={pending}>
+                            Stop tunnel
+                        </Button>
+                    </>
+                ) : (
+                    <Button variant="outline" onClick={start} disabled={pending}>
+                        {pending && <Loader2 className="size-4 animate-spin" />} Expose with Cloudflare
+                    </Button>
+                )}
+            </div>
+        </section>
+    );
+}
+
 function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolean; onChanged: () => void }) {
     const [autoDeploy, setAutoDeploy] = useState(app.autoDeploy);
     const [branch, setBranch] = useState(app.deployBranch ?? "");
@@ -866,6 +972,8 @@ function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
                     </a>
                 )}
             </section>
+
+            <QuickTunnelPanel appId={app.id} />
 
             <section className="flex flex-col gap-2">
                 <h3 className="text-sm font-medium">Domains</h3>

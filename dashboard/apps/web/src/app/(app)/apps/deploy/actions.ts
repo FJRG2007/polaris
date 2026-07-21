@@ -34,6 +34,12 @@ import {
 } from "@/lib/deploy-service";
 import { createDatabase, deployDatabase, type DbEngine } from "@/lib/database-service";
 import {
+    getQuickTunnelStatus,
+    startQuickTunnel,
+    stopQuickTunnel,
+    type QuickTunnelStatus
+} from "@/lib/deploy/quick-tunnel-service";
+import {
     deleteEnvVar,
     listEnvVars,
     parseDotEnv,
@@ -395,6 +401,40 @@ export async function removeDomainAction(domainId: string): Promise<void> {
     const user = await requirePermission("deploy.manage");
     await removeApplicationDomain(domainId, user.id);
     revalidatePath(DEPLOY_PATH);
+}
+
+/** Current public URL / state of an app's Cloudflare Quick Tunnel (no account). */
+export async function quickTunnelStatusAction(applicationId: string): Promise<QuickTunnelStatus> {
+    const user = await requirePermission("deploy.manage");
+    try {
+        return await getQuickTunnelStatus(applicationId, user.id);
+    } catch {
+        return { running: false, url: null };
+    }
+}
+
+/** Start (or refresh) an app's Cloudflare Quick Tunnel and return its public URL. */
+export async function startQuickTunnelAction(applicationId: string): Promise<{ error?: string; url?: string | null }> {
+    const user = await requirePermission("deploy.manage");
+    try {
+        const status = await startQuickTunnel(applicationId, user.id);
+        await recordAudit({ actorId: user.id, action: "deploy.tunnel.start", targetType: "application", targetId: applicationId });
+        return { url: status.url };
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not start the tunnel" };
+    }
+}
+
+/** Stop an app's Cloudflare Quick Tunnel. */
+export async function stopQuickTunnelAction(applicationId: string): Promise<{ error?: string }> {
+    const user = await requirePermission("deploy.manage");
+    try {
+        await stopQuickTunnel(applicationId, user.id);
+        await recordAudit({ actorId: user.id, action: "deploy.tunnel.stop", targetType: "application", targetId: applicationId });
+        return {};
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not stop the tunnel" };
+    }
 }
 
 export async function createDatabaseAction(input: {
