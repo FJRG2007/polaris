@@ -15,11 +15,11 @@
  */
 
 import { WebSocketServer } from "ws";
-import { prisma } from "@polaris/db";
-import { hashToken } from "@polaris/core/tokens";
 import { HostdClient } from "@polaris/hostd-client";
 
 const port = Number(process.env.POLARIS_WS_PORT || 3001);
+const appPort = Number(process.env.PORT || 3000);
+const internalKey = process.env.POLARIS_AUTH_SECRET || "";
 
 const wss = new WebSocketServer({
     port,
@@ -77,8 +77,17 @@ wss.on("connection", async (ws, req) => {
 });
 
 async function redeem(token) {
-    const ticket = await prisma.deployTicket.findUnique({ where: { tokenHash: hashToken(token) } });
-    if (!ticket || ticket.usedAt || ticket.expiresAt < new Date()) return null;
-    await prisma.deployTicket.update({ where: { id: ticket.id }, data: { usedAt: new Date() } });
-    return ticket;
+    // Redeem via the web app's internal loopback route: this process runs outside
+    // the Next standalone bundle and cannot resolve @polaris/db to query Prisma.
+    try {
+        const res = await fetch(`http://127.0.0.1:${appPort}/api/deploy/terminal/redeem`, {
+            method: "POST",
+            headers: { "content-type": "application/json", "x-internal-key": internalKey },
+            body: JSON.stringify({ token })
+        });
+        if (!res.ok) return null;
+        return await res.json();
+    } catch {
+        return null;
+    }
 }

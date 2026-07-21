@@ -33,3 +33,26 @@ export async function mintTerminalTicket(userId: string, input: MintTicketInput)
     });
     return token;
 }
+
+export interface RedeemedTicket {
+    targetId: string;
+    containerRef: string;
+    mode: "terminal" | "logs";
+}
+
+/**
+ * Redeem and burn a one-shot ticket, returning its server-derived target and
+ * container. The terminal sidecar calls this over an internal HTTP route rather
+ * than touching Prisma directly, because it runs as a separate process outside
+ * the Next standalone bundle where the workspace packages are not resolvable.
+ */
+export async function redeemTerminalTicket(token: string): Promise<RedeemedTicket | null> {
+    const ticket = await prisma.deployTicket.findUnique({ where: { tokenHash: hashToken(token) } });
+    if (!ticket || ticket.usedAt || ticket.expiresAt < new Date()) return null;
+    await prisma.deployTicket.update({ where: { id: ticket.id }, data: { usedAt: new Date() } });
+    return {
+        targetId: ticket.targetId,
+        containerRef: ticket.containerRef,
+        mode: ticket.mode === "logs" ? "logs" : "terminal"
+    };
+}

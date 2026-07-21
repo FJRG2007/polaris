@@ -48,6 +48,15 @@ COPY . .
 RUN npm run db:generate
 RUN npm run build
 
+# Bundle the deploy terminal sidecar into one self-contained CJS file. It runs as
+# a separate process alongside the Next server, outside the standalone bundle, so
+# its imports (@polaris/hostd-client, ws) must be inlined or they resolve to
+# nothing at runtime (the old ERR_MODULE_NOT_FOUND). The optional native ws
+# accelerators stay external - ws degrades gracefully without them.
+RUN node_modules/.bin/esbuild apps/web/ws-server.mjs --bundle --platform=node \
+    --format=cjs --external:bufferutil --external:utf-8-validate \
+    --outfile=apps/web/ws-server.bundle.cjs
+
 # The standalone tracer omits an app that ships no public/ dir; guarantee the
 # directory exists so the runtime COPY below never fails.
 RUN mkdir -p /build/apps/web/public
@@ -95,12 +104,10 @@ COPY --from=builder /build/apps/web/.next/standalone ./
 COPY --from=builder /build/apps/web/.next/static ./apps/web/.next/static
 COPY --from=builder /build/apps/web/public ./apps/web/public
 
-# The deploy terminal sidecar (launched alongside the Next server by the
-# entrypoint) and its `ws` dependency are not imported by server.js, so Next's
-# output tracing does not bundle them; copy both explicitly. Its other imports
-# (@polaris/db, @polaris/core, @polaris/hostd-client) are traced already.
-COPY --from=builder /build/apps/web/ws-server.mjs ./apps/web/ws-server.mjs
-COPY --from=builder /build/node_modules/ws ./node_modules/ws
+# The deploy terminal sidecar, bundled into a single self-contained CJS file in
+# the builder stage. server.js does not import it, so Next's output tracing omits
+# it; the bundle inlines every dependency, so no node_modules copy is needed.
+COPY --from=builder /build/apps/web/ws-server.bundle.cjs ./apps/web/ws-server.bundle.cjs
 
 # Schema + migrations so the entrypoint can run `prisma migrate deploy`.
 COPY --from=builder /build/packages/db/prisma ./packages/db/prisma
