@@ -409,15 +409,14 @@ async function readProxyAccessEntries(hosts: Set<string>, tail: number): Promise
         .slice(-tail);
 }
 
-/** Restart the app's running container in place (no rebuild). */
+/**
+ * Restart the app by recreating it from its current spec, so it always comes back
+ * up with the latest environment variables and settings. A plain docker restart
+ * would keep the container's original env; a redeploy re-renders the spec (with an
+ * image-layer cache making an unchanged build fast).
+ */
 export async function restartApplication(applicationId: string, ownerId: string): Promise<void> {
-    const { container, target } = await appRuntime(applicationId, ownerId);
-    const ports = await getPorts(target, ownerId);
-    try {
-        await ports.container(container, "restart");
-    } finally {
-        await ports.dispose();
-    }
+    await deployApplication(applicationId, ownerId, ownerId);
 }
 
 /**
@@ -430,17 +429,23 @@ export async function setApplicationRunning(
     ownerId: string,
     running: boolean
 ): Promise<void> {
+    // Starting recreates from the current spec so it comes up with the latest env;
+    // stopping just halts the container while keeping the deployment record.
+    if (running) {
+        await deployApplication(applicationId, ownerId, ownerId);
+        return;
+    }
     const { app, container, target } = await appRuntime(applicationId, ownerId);
     const ports = await getPorts(target, ownerId);
     try {
-        await ports.container(container, running ? "start" : "stop");
+        await ports.container(container, "stop");
     } finally {
         await ports.dispose();
     }
     if (app.currentDeploymentId) {
         await prisma.deployment.update({
             where: { id: app.currentDeploymentId },
-            data: { status: running ? "running" : "stopped" }
+            data: { status: "stopped" }
         });
     }
 }
