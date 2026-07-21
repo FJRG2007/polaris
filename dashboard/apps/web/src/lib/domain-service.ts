@@ -13,6 +13,7 @@ import { prisma } from "@polaris/db";
 import { loadEnv } from "@polaris/config";
 import { magicDomain, DEFAULT_SUBDOMAIN_BASE } from "@polaris/deploy";
 import { decryptSecret, encryptSecret } from "@polaris/storage";
+import { getPolarisPublicUrl } from "./polaris-tunnel-service";
 
 const KEYS = {
     app: "domain.app",
@@ -136,13 +137,18 @@ export async function appBaseUrl(): Promise<string> {
 
 /**
  * Base URL for share links and drop points. Prefers an explicitly configured
- * sharing domain, then a DuckDNS subdomain, then a free auto subdomain (so shares
- * work with public HTTPS and zero DNS when the operator has set no domain), and
- * finally the app domain / env fallback.
+ * sharing domain, then a running Polaris Cloudflare tunnel (the NAT fallback, since
+ * a DuckDNS/auto name is not reachable from outside a NATed box), then a DuckDNS
+ * subdomain, then a free auto subdomain, and finally the app domain / env fallback.
  */
 export async function sharingBaseUrl(): Promise<string> {
     const configured = normalizeUrl(await getSetting(KEYS.sharing));
     if (configured) return configured;
+
+    // A Polaris Cloudflare tunnel, when running, is a working public URL - prefer it
+    // over the DuckDNS/auto names, which do not resolve to a reachable box behind NAT.
+    const tunnel = normalizeUrl(await getPolarisPublicUrl());
+    if (tunnel) return tunnel;
 
     const duckSub = await getSetting(KEYS.duckSub);
     if (duckSub) return `https://${duckSub}.duckdns.org`;

@@ -12,6 +12,7 @@ import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { loadEnv } from "@polaris/config";
 import { sharingBaseUrl } from "@/lib/domain-service";
+import { ensureShareReachability } from "@/lib/public-reach";
 import { createShareSchema, isCidr, isIpAddress } from "@polaris/core";
 import { requirePermission } from "@/lib/session";
 import {
@@ -75,6 +76,8 @@ export async function createShareAction(
             allowUpload: parsed.data.allowUpload
         }
     });
+    // Behind NAT with no public domain, raise a Cloudflare tunnel so the link works.
+    await ensureShareReachability();
     revalidatePath("/drive/shared-links");
     return { url: `${await sharingBaseUrl()}/s/${token}` };
 }
