@@ -325,6 +325,13 @@ export function DeployCanvas({
         return { x: p.x + NODE_W / 2, y: p.y + NODE_H / 2 };
     };
 
+    // The link handle sits on the node's right edge, vertically centered - the
+    // in-progress drag line starts there, not from the card centre.
+    const handlePoint = (id: string): Point => {
+        const p = pos[id] ?? { x: 0, y: 0 };
+        return { x: p.x + NODE_W, y: p.y + NODE_H / 2 };
+    };
+
     // Board extent so it scrolls to fit the furthest node.
     const extent = useMemo(() => {
         let w = 900;
@@ -396,7 +403,7 @@ export function DeployCanvas({
                         })}
                         {pending && (
                             <path
-                                d={`M ${center(pending.source).x} ${center(pending.source).y} L ${pending.cursor.x} ${pending.cursor.y}`}
+                                d={`M ${handlePoint(pending.source).x} ${handlePoint(pending.source).y} L ${pending.cursor.x} ${pending.cursor.y}`}
                                 fill="none"
                                 stroke="hsl(var(--primary))"
                                 strokeWidth={2}

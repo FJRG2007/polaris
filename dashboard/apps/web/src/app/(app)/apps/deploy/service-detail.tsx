@@ -771,7 +771,7 @@ function HttpLogsView({ appId }: { appId: string }) {
                     text={
                         all.length > 0
                             ? "No requests match the filter."
-                            : "No HTTP requests logged yet. This app may not write access logs to stdout, or uses a format that isn't recognized."
+                            : "No HTTP requests yet. They appear here as soon as traffic reaches the running service."
                     }
                 />
             ) : (
