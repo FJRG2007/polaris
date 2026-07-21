@@ -10,7 +10,7 @@
 
 import { prisma } from "@polaris/db";
 import { DEFAULT_SUBDOMAIN_BASE, magicDomain } from "@polaris/deploy";
-import { deployBase, getPublicIp } from "./domain-service";
+import { deployBase, duckdnsConfigured, getPublicIp } from "./domain-service";
 
 /**
  * - `auto`     : classify from detection (public IP -> public, else LAN-only).
@@ -30,8 +30,47 @@ const KEYS = {
     mode: "network.mode",
     wildcardDomain: "network.wildcardDomain",
     detectedIp: "network.detectedPublicIp",
-    detectedAt: "network.detectedPublicIpAt"
+    detectedAt: "network.detectedPublicIpAt",
+    placement: "network.placement"
 } as const;
+
+/** Where Polaris is hosted, inferred from cloud signals. */
+export type ServerPlacement = "cloud" | "home" | "unknown";
+
+/**
+ * Classify the host as a cloud/data-centre box or a home/office server. The
+ * strongest signal is a cloud metadata service on the 169.254.169.254 link-local
+ * address (AWS/GCP/Azure IMDS answer there and nothing else does); a public server
+ * IP also implies cloud, a private one a home/NAT box. Cached - placement is
+ * stable for the life of the machine.
+ */
+export async function detectPlacement(force = false): Promise<ServerPlacement> {
+    if (!force) {
+        const cached = await getSetting(KEYS.placement);
+        if (cached === "cloud" || cached === "home" || cached === "unknown") return cached;
+    }
+    let placement: ServerPlacement = "unknown";
+    try {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 1500);
+        // Any HTTP response from the metadata IP (200 IMDSv1, 401 IMDSv2, 403/404
+        // on other clouds) means a cloud VM; only cloud networks route this address.
+        const res = await fetch("http://169.254.169.254/latest/meta-data/", {
+            cache: "no-store",
+            signal: controller.signal,
+            headers: { "Metadata-Flavor": "Google" }
+        });
+        clearTimeout(timer);
+        void res;
+        placement = "cloud";
+    } catch {
+        // No metadata endpoint: fall back to the public-IP shape.
+        const ip = await getPublicIp();
+        if (ip) placement = isPrivateIpv4(ip) ? "home" : "cloud";
+    }
+    await setSetting(KEYS.placement, placement);
+    return placement;
+}
 
 /** Re-detect the public IP if the cached value is older than this. */
 const DETECT_TTL_MS = 6 * 60 * 60 * 1000;
@@ -106,15 +145,21 @@ export interface NetworkStatus {
     wildcardDomain: string;
     /** The free-subdomain magic base (sslip.io by default). */
     subdomainBase: string;
+    /** Whether the box looks like a cloud VM or a home/office server. */
+    placement: ServerPlacement;
+    /** Whether a DuckDNS subdomain + token are configured. */
+    duckdns: boolean;
 }
 
 export async function getNetworkStatus(): Promise<NetworkStatus> {
-    const [storedMode, wildcard, subdomainIp, publicIp, base] = await Promise.all([
+    const [storedMode, wildcard, subdomainIp, publicIp, base, placement, duckdns] = await Promise.all([
         getSetting(KEYS.mode),
         getSetting(KEYS.wildcardDomain),
         getPublicIp(),
         detectPublicIp(),
-        deployBase()
+        deployBase(),
+        detectPlacement(),
+        duckdnsConfigured()
     ]);
     const mode = MODES.includes(storedMode as NetworkMode) ? (storedMode as NetworkMode) : "auto";
     const autoSubdomainsPublic = Boolean(subdomainIp) && !isPrivateIpv4(subdomainIp!);
@@ -128,7 +173,9 @@ export async function getNetworkStatus(): Promise<NetworkStatus> {
         natted,
         autoSubdomainsPublic,
         wildcardDomain: wildcard ?? "",
-        subdomainBase: base
+        subdomainBase: base,
+        placement,
+        duckdns
     };
 }
 

@@ -260,10 +260,15 @@ function NetworkExposure() {
             </CardHeader>
             <CardBody className="flex flex-col gap-4">
                 <div className="grid grid-cols-2 gap-x-6 gap-y-2 rounded-md border border-border/60 p-3 text-xs">
+                    <StatusRow
+                        label="Hosting"
+                        value={status.placement === "cloud" ? "Cloud / data centre" : status.placement === "home" ? "Home / local" : "Unknown"}
+                    />
                     <StatusRow label="Public IP" value={status.publicIp ?? "not detected"} />
                     <StatusRow label="Server IP" value={status.subdomainIp ?? "unknown"} />
                     <StatusRow label="Behind NAT" value={status.natted ? "Yes" : "No"} tone={status.natted ? "warn" : "ok"} />
                     <StatusRow label="Active mode" value={effective} tone={publiclyReachable ? "ok" : "warn"} />
+                    <StatusRow label="DuckDNS" value={status.duckdns ? "Configured" : "Not set"} tone={status.duckdns ? "ok" : undefined} />
                 </div>
 
                 {status.natted && status.mode === "auto" && (
@@ -271,6 +276,15 @@ function NetworkExposure() {
                         <TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-warning" />
                         This looks like a server behind NAT: free subdomains point at the LAN IP ({status.subdomainIp}) and
                         only work on your network. For public access, choose a wildcard domain or a tunnel below.
+                    </p>
+                )}
+
+                {status.placement === "home" && !status.duckdns && status.effectiveMode !== "wildcard" && (
+                    <p className="flex items-start gap-2 rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-xs text-muted-foreground">
+                        <TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-primary" />
+                        Recommended for a home/local server: set up <b>DuckDNS</b> below (free) and use{" "}
+                        <code>&lt;sub&gt;.duckdns.org</code> as the wildcard base - Polaris then serves public subdomains
+                        with Let&apos;s Encrypt and keeps the IP updated automatically.
                     </p>
                 )}
 

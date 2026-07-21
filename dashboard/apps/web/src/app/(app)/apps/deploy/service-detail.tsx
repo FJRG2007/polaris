@@ -13,7 +13,6 @@ import {
     ChevronDown,
     ChevronLeft,
     ChevronRight,
-    Cloud,
     Copy,
     Download,
     Eye,
@@ -47,6 +46,7 @@ import {
     Switch,
     cn
 } from "@polaris/ui";
+import { CloudflareMark } from "@/components/brand-icons";
 import { ServiceIcon, StatusPill, dbTone, serviceKindOf, type ProjectApp } from "./deploy-view";
 import { MetricsHistory, percent, ratioPercent, type MetricSpec } from "@/components/metrics-history";
 import { LogViewer } from "@/components/log-viewer";
@@ -1266,7 +1266,9 @@ function QuickTunnelPanel({ appId }: { appId: string }) {
     const running = status?.running ?? false;
     return (
         <section className="flex flex-col gap-2">
-            <h3 className="text-sm font-medium">Public tunnel</h3>
+            <h3 className="flex items-center gap-1.5 text-sm font-medium">
+                <CloudflareMark className="size-4" /> Public tunnel
+            </h3>
             <p className="text-xs text-muted-foreground">
                 Expose this app on a public Cloudflare URL - no account, no DNS, no port-forwarding. The link
                 changes each time the tunnel starts; for a stable custom domain, configure a tunnel under
@@ -1280,7 +1282,7 @@ function QuickTunnelPanel({ appId }: { appId: string }) {
                         rel="noreferrer"
                         className="inline-flex min-w-0 items-center gap-1 truncate text-xs text-primary hover:underline"
                     >
-                        <Cloud className="size-3 shrink-0" /> {status.url.replace(/^https?:\/\//, "")}
+                        <CloudflareMark className="size-3.5 shrink-0" /> {status.url.replace(/^https?:\/\//, "")}
                     </a>
                     <button
                         type="button"
@@ -1308,7 +1310,7 @@ function QuickTunnelPanel({ appId }: { appId: string }) {
                     </>
                 ) : (
                     <Button variant="outline" onClick={start} disabled={pending}>
-                        {pending && <Loader2 className="size-4 animate-spin" />} Expose with Cloudflare
+                        {pending ? <Loader2 className="size-4 animate-spin" /> : <CloudflareMark className="size-4" />} Expose with Cloudflare
                     </Button>
                 )}
             </div>

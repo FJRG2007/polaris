@@ -1,10 +1,28 @@
 /**
- * Official brand marks used in the UI (GitHub, Docker). Kept as inline SVG so they
- * inherit `currentColor` and need no network fetch or icon dependency. Add new
- * marks here rather than pasting raw SVG into feature components.
+ * Official brand marks used in the UI (GitHub, Docker, Cloudflare). Kept as inline
+ * SVG so they inherit `currentColor` (or their fixed brand colour) and need no
+ * network fetch or icon dependency. Add new marks here rather than pasting raw SVG
+ * into feature components.
  */
 
 import type { SVGProps } from "react";
+
+export function CloudflareMark(props: SVGProps<SVGSVGElement>) {
+    // Cloudflare's double-cloud logomark in its two brand oranges (fixed, not
+    // currentColor, so the mark always reads as Cloudflare per the brand guide).
+    return (
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" {...props}>
+            <path
+                fill="#F38020"
+                d="M16.5088 16.8447c.1475-.5068.0908-.9707-.1553-1.3154-.2246-.3164-.6045-.499-1.0615-.5205l-8.6592-.1123a.1559.1559 0 01-.1333-.0713.1615.1615 0 01-.0181-.1553c.0225-.0576.0771-.1006.1406-.1055l8.7383-.1123c1.0361-.0479 2.1592-.8867 2.5537-1.9199l.5-1.3096c.0215-.0557.0273-.1123.0146-.168-.5674-2.5674-2.8564-4.4844-5.5947-4.4844-2.5234 0-4.665 1.6289-5.4326 3.8926-.499-.3721-1.1348-.5713-1.8203-.5059-1.2207.1201-2.2012 1.1006-2.3213 2.3213-.0303.3164-.0068.6229.0625.9082C1.4297 11.0918 0 12.5605 0 14.3652c0 .1611.0117.3193.0342.4756a.1554.1554 0 00.1524.1338h15.9814a.1926.1926 0 00.1836-.1367l.1572-.543z"
+            />
+            <path
+                fill="#FAAE40"
+                d="M19.2656 11.3232c-.0791 0-.1572.002-.2354.0059a.1268.1268 0 00-.1123.0879l-.3408 1.1846c-.1475.5068-.0908.9707.1553 1.3154.2246.3164.6045.499 1.0615.5205l1.8457.1123c.0557.0039.1045.0303.1338.0713a.1615.1615 0 01.0176.1553c-.0225.0576-.0771.1006-.1406.1055l-1.9199.1123c-1.041.0479-2.1592.8867-2.5537 1.9199l-.1387.3623c-.0273.0713.0244.1436.1006.1436h6.6045a.1554.1554 0 00.1494-.1123c.1143-.4082.1758-.8389.1758-1.2842 0-2.5977-2.1113-4.709-4.709-4.709z"
+            />
+        </svg>
+    );
+}
 
 export function GitHubMark(props: SVGProps<SVGSVGElement>) {
     return (
