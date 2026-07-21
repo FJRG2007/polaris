@@ -5,7 +5,8 @@
  */
 
 import { Blocks } from "lucide-react";
-import { GitHubMark } from "./brand-icons";
+import { CloudflareMark, GitHubMark, NgrokMark } from "./brand-icons";
+import { DymoMark } from "./dymo-mark";
 
 interface LogoProps {
     className?: string;
@@ -32,5 +33,10 @@ export function VirusTotalLogo({ className = "size-6", brand }: LogoProps) {
 export function IntegrationLogo({ slug, className }: { slug: string; className?: string }) {
     if (slug === "virustotal") return <VirusTotalLogo className={className} brand />;
     if (slug === "github") return <GitHubMark className={className} />;
+    if (slug === "cloudflare") return <CloudflareMark className={className} />;
+    if (slug === "ngrok") return <NgrokMark className={className} />;
+    if (slug === "dymo") return <DymoMark className={className} />;
+    // DuckDNS ships only an official raster mark; served from public/ as a static asset.
+    if (slug === "duckdns") return <img src="/logos/duckdns.webp" alt="" className={className} />;
     return <Blocks className={className} />;
 }

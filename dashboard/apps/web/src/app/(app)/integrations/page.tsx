@@ -6,6 +6,7 @@
 import { requireAdmin } from "@/lib/session";
 import { INTEGRATIONS, readDymoConfig, readVirusTotalConfig } from "@/lib/integrations/registry";
 import { listIntegrationStates } from "@/lib/integration-service";
+import { getDomainConfig } from "@/lib/domain-service";
 import { getGithubStatus } from "@/lib/github-service";
 import { IntegrationsView, type IntegrationCard } from "./integrations-view";
 
@@ -15,11 +16,15 @@ export default async function IntegrationsPage() {
     await requireAdmin();
     const states = await listIntegrationStates();
     const github = await getGithubStatus();
+    // DuckDNS config lives with the domain settings (Setting keys), not an Integration row.
+    const domains = await getDomainConfig();
 
     const cards: IntegrationCard[] = INTEGRATIONS.map((entry) => {
         const state = states.get(entry.slug);
         const virustotal = entry.slug === "virustotal" ? readVirusTotalConfig(state?.config) : undefined;
         const dymo = entry.slug === "dymo" ? readDymoConfig(state?.config) : undefined;
+        const isDuck = entry.slug === "duckdns";
+        const duckConfigured = isDuck && domains.hasDuckdnsToken && Boolean(domains.duckdnsSubdomain);
         return {
             slug: entry.slug,
             name: entry.name,
@@ -30,8 +35,9 @@ export default async function IntegrationsPage() {
             requiresApiKey: entry.requiresApiKey,
             apiKeyLabel: entry.apiKeyLabel,
             apiKeyHelp: entry.apiKeyHelp,
-            enabled: state?.enabled ?? false,
-            hasSecret: state?.hasSecret ?? false,
+            enabled: isDuck ? duckConfigured : state?.enabled ?? false,
+            hasSecret: isDuck ? domains.hasDuckdnsToken : state?.hasSecret ?? false,
+            duckdnsSubdomain: isDuck ? domains.duckdnsSubdomain : undefined,
             scanDropPoints: virustotal?.scanDropPoints ?? true,
             onDetection: virustotal?.onDetection ?? "block",
             verifyAccessIp: dymo?.verifyAccessIp ?? true,

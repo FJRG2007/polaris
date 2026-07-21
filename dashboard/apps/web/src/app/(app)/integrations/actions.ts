@@ -21,6 +21,7 @@ import {
     verifyGithubToken
 } from "@/lib/github-service";
 import { applyTunnel } from "@/lib/tunnel-service";
+import { setDomainConfig, syncDuckDns } from "@/lib/domain-service";
 import { recordAudit } from "@/lib/audit-service";
 
 const SCAN_ACTIONS = new Set<ScanAction>(["block", "quarantine", "notify"]);
@@ -63,6 +64,37 @@ export async function saveTunnelAction(input: {
     }
     revalidatePath("/integrations");
     return {};
+}
+
+/**
+ * Configure DuckDNS (subdomain + token). Stored with the domain settings, not an
+ * Integration row, and reused by the auto-sync loop. The token is tri-state (a value
+ * replaces it, blank keeps it); enabling requires both a subdomain and a token.
+ */
+export async function saveDuckdnsAction(input: {
+    subdomain: string;
+    token?: string;
+}): Promise<{ error?: string }> {
+    const user = await requireAdmin();
+    const subdomain = input.subdomain.trim();
+    if (!subdomain) return { error: "Enter your DuckDNS subdomain" };
+    await setDomainConfig({ duckdnsSubdomain: subdomain, duckdnsToken: input.token });
+    await recordAudit({
+        actorId: user.id,
+        action: "integration.configure",
+        targetType: "integration",
+        targetId: "duckdns"
+    });
+    // Push the record to the current IP right away so the subdomain resolves.
+    await syncDuckDns().catch(() => undefined);
+    revalidatePath("/integrations");
+    return {};
+}
+
+/** Update the DuckDNS record to this server's current public IP (the dialog's Sync button). */
+export async function syncDuckdnsAction(): Promise<{ ok: boolean; detail: string }> {
+    await requireAdmin();
+    return syncDuckDns();
 }
 
 /** Save VirusTotal's settings (enabled flag, detection action, and API key). */

@@ -153,6 +153,18 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         requiresApiKey: true,
         apiKeyLabel: "Authtoken",
         apiKeyHelp: "Your ngrok authtoken from the ngrok dashboard."
+    },
+    {
+        slug: "duckdns",
+        name: "DuckDNS",
+        category: "Automation",
+        summary: "Free dynamic DNS - keep a subdomain pointed at your changing IP.",
+        description:
+            "Points a free <name>.duckdns.org subdomain at this server's public IP and keeps it updated as your ISP address changes, so a home box stays reachable. DuckDNS also resolves *.<name>.duckdns.org, so it works as a wildcard base for app subdomains.",
+        docsUrl: "https://www.duckdns.org/",
+        requiresApiKey: true,
+        apiKeyLabel: "Token",
+        apiKeyHelp: "The token shown at the top of your DuckDNS account page."
     }
 ];
 

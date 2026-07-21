@@ -8,7 +8,7 @@
  */
 
 import { useState, useTransition } from "react";
-import { CheckCircle2, ExternalLink, Loader2, ShieldCheck } from "lucide-react";
+import { CheckCircle2, ExternalLink, Loader2, RefreshCw, ShieldCheck } from "lucide-react";
 import {
     Badge,
     Button,
@@ -30,9 +30,11 @@ import {
     connectGithubAppAction,
     disconnectGithubAction,
     refreshGithubInstallationsAction,
+    saveDuckdnsAction,
     saveDymoAction,
     saveTunnelAction,
     saveVirusTotalAction,
+    syncDuckdnsAction,
     testDymoKeyAction,
     testVirusTotalKeyAction
 } from "./actions";
@@ -55,6 +57,8 @@ export interface IntegrationCard {
     verifyAccessIp: boolean;
     /** Dymo: IP deny rules (FRAUD, PROXY, ...). */
     deny: string[];
+    /** DuckDNS: the configured subdomain (empty when not set). */
+    duckdnsSubdomain?: string;
     /** GitHub: how it is connected, when connected. */
     githubMethod?: "pat" | "app" | null;
     /** GitHub: the connected account login (PAT) or app name (App). */
@@ -118,6 +122,8 @@ export function IntegrationsView({ cards }: { cards: IntegrationCard[] }) {
                 <GitHubDialog card={configuring} onClose={() => setConfiguring(null)} />
             ) : configuring?.slug === "cloudflare" || configuring?.slug === "ngrok" ? (
                 <TunnelDialog card={configuring} onClose={() => setConfiguring(null)} />
+            ) : configuring?.slug === "duckdns" ? (
+                <DuckDnsDialog card={configuring} onClose={() => setConfiguring(null)} />
             ) : null}
         </>
     );
@@ -172,6 +178,105 @@ function TunnelDialog({ card, onClose }: { card: IntegrationCard; onClose: () =>
                         </Button>
                         <Button onClick={onSave} disabled={pending}>
                             {pending ? "Applying..." : "Save"}
+                        </Button>
+                    </div>
+                </div>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+function DuckDnsDialog({ card, onClose }: { card: IntegrationCard; onClose: () => void }) {
+    const [subdomain, setSubdomain] = useState(card.duckdnsSubdomain ?? "");
+    const [token, setToken] = useState("");
+    const [error, setError] = useState<string | null>(null);
+    const [synced, setSynced] = useState<string | null>(null);
+    const [saving, startSave] = useTransition();
+    const [syncing, startSync] = useTransition();
+
+    function onSave() {
+        setError(null);
+        setSynced(null);
+        startSave(async () => {
+            const result = await saveDuckdnsAction({ subdomain, token: token || undefined });
+            if (result.error) setError(result.error);
+            else onClose();
+        });
+    }
+
+    function onSync() {
+        setError(null);
+        setSynced(null);
+        startSync(async () => {
+            const result = await syncDuckdnsAction();
+            if (result.ok) setSynced(result.detail);
+            else setError(result.detail);
+        });
+    }
+
+    return (
+        <Dialog open onOpenChange={(open) => !open && onClose()}>
+            <DialogContent className="max-w-md">
+                <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2">
+                        <IntegrationLogo slug="duckdns" className="size-5" />
+                        DuckDNS
+                    </DialogTitle>
+                    <DialogDescription>{card.description}</DialogDescription>
+                </DialogHeader>
+
+                <div className="flex flex-col gap-4">
+                    <label className="flex flex-col gap-1 text-sm">
+                        <span className="font-medium">Subdomain</span>
+                        <div className="flex items-center gap-2">
+                            <Input
+                                value={subdomain}
+                                onChange={(event) => setSubdomain(event.target.value)}
+                                placeholder="myhome"
+                                autoComplete="off"
+                            />
+                            <span className="shrink-0 text-sm text-muted-foreground">.duckdns.org</span>
+                        </div>
+                    </label>
+
+                    <label className="flex flex-col gap-1 text-sm">
+                        <span className="font-medium">{card.apiKeyLabel ?? "Token"}</span>
+                        <Input
+                            type="password"
+                            autoComplete="off"
+                            value={token}
+                            onChange={(event) => setToken(event.target.value)}
+                            placeholder={card.hasSecret ? "Saved - enter a new token to replace it" : "Paste your DuckDNS token"}
+                        />
+                        {card.apiKeyHelp ? <span className="text-xs text-muted-foreground">{card.apiKeyHelp}</span> : null}
+                    </label>
+
+                    {card.hasSecret ? (
+                        <div className="flex items-center justify-between gap-3 rounded-md border border-border p-2.5 text-sm">
+                            <span className="text-muted-foreground">
+                                Point the record at this server's current public IP now.
+                            </span>
+                            <Button type="button" variant="ghost" size="sm" onClick={onSync} disabled={syncing}>
+                                {syncing ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
+                                Sync now
+                            </Button>
+                        </div>
+                    ) : null}
+
+                    {synced ? (
+                        <span className="flex items-center gap-1 text-xs text-success">
+                            <CheckCircle2 className="size-3" />
+                            {synced}
+                        </span>
+                    ) : null}
+                    {error ? <p className="text-sm text-danger">{error}</p> : null}
+
+                    <div className="flex justify-end gap-2">
+                        <Button type="button" variant="ghost" onClick={onClose}>
+                            Cancel
+                        </Button>
+                        <Button type="button" onClick={onSave} disabled={saving}>
+                            {saving ? <Loader2 className="size-4 animate-spin" /> : "Save"}
                         </Button>
                     </div>
                 </div>
