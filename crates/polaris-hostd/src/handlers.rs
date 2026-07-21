@@ -94,6 +94,12 @@ struct PullRequest {
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
+struct InspectImageRequest {
+    image: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct LoginRequest {
     #[serde(default)]
     registry: String,
@@ -163,6 +169,7 @@ pub fn dispatch<R: Read>(state: &AppState, req: &Request, body: &mut R) -> Respo
         ("POST", "/v1/deploy/stack/up") => deploy_stack_up(state, req, body),
         ("POST", "/v1/deploy/stack/down") => deploy_stack_down(state, req, body),
         ("POST", "/v1/deploy/pull") => deploy_pull(state, req, body),
+        ("POST", "/v1/deploy/inspect") => deploy_inspect(req, body),
         ("POST", "/v1/deploy/login") => deploy_login(state, req, body),
         ("POST", "/v1/deploy/logs") => deploy_logs(state, req, body),
         ("POST", "/v1/deploy/build") => deploy_build(state, req, body),
@@ -380,6 +387,27 @@ fn deploy_pull<R: Read>(_state: &AppState, req: &Request, body: &mut R) -> Respo
     match deploy::pull(&request.image) {
         Ok(reader) => stream_response(reader),
         Err(_) => Response::text(502, "Bad Gateway", "could not pull the image"),
+    }
+}
+
+/// Report a locally present image's declared exposed TCP ports, so a deploy can
+/// default an app's container port to what the image listens on. Read-only: it
+/// inspects an already-pulled image and neither pulls nor runs anything.
+fn deploy_inspect<R: Read>(req: &Request, body: &mut R) -> Response {
+    let raw = match read_control_body(req, body) {
+        Ok(b) => b,
+        Err(resp) => return resp,
+    };
+    let request: InspectImageRequest = match serde_json::from_slice(&raw) {
+        Ok(r) => r,
+        Err(_) => return Response::bad_request("invalid inspect request"),
+    };
+    if !deploy::valid_image(&request.image) {
+        return Response::bad_request("invalid image reference");
+    }
+    match deploy::inspect_image(&request.image) {
+        Ok(ports) => Response::json(200, "OK", &serde_json::json!({ "exposedPorts": ports })),
+        Err(_) => Response::text(502, "Bad Gateway", "could not inspect the image"),
     }
 }
 

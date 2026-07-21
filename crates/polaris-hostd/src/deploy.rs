@@ -616,6 +616,47 @@ pub fn pull(image: &str) -> io::Result<Box<dyn Read + Send>> {
     stream_command(cmd)
 }
 
+/// A locally present image's declared exposed TCP ports (`Config.ExposedPorts`),
+/// used to default an app's container port to what the image actually listens on
+/// instead of a blind 80/3000 guess. The image must already be pulled (the deploy
+/// pulls it first). Returns the tcp ports ascending; udp entries are ignored. Not
+/// streamed - the output is a single small JSON object.
+pub fn inspect_image(image: &str) -> io::Result<Vec<u16>> {
+    let output = Command::new("docker")
+        .arg("image")
+        .arg("inspect")
+        .arg(image)
+        .arg("--format")
+        .arg("{{json .Config.ExposedPorts}}")
+        .stdin(Stdio::null())
+        .output()?;
+    if !output.status.success() {
+        return Err(io::Error::other("image inspect failed"));
+    }
+    Ok(parse_exposed_ports(&output.stdout))
+}
+
+/// Parse docker's `ExposedPorts` map (`{"5601/tcp":{},"53/udp":{}}`) into the
+/// sorted, de-duplicated set of TCP port numbers. A `null` value (no exposed
+/// ports) or any malformed input yields an empty list.
+fn parse_exposed_ports(raw: &[u8]) -> Vec<u16> {
+    let value: serde_json::Value = match serde_json::from_slice(raw) {
+        Ok(v) => v,
+        Err(_) => return Vec::new(),
+    };
+    let Some(map) = value.as_object() else {
+        return Vec::new();
+    };
+    let mut ports: Vec<u16> = map
+        .keys()
+        .filter_map(|key| key.strip_suffix("/tcp"))
+        .filter_map(|port| port.parse::<u16>().ok())
+        .collect();
+    ports.sort_unstable();
+    ports.dedup();
+    ports
+}
+
 /// Build an image from a source directory with Nixpacks, which auto-detects the
 /// framework (no Dockerfile required). The context directory is removed once the
 /// build finishes. Path/tag are positional args so nothing is shell-interpolated.
@@ -888,5 +929,19 @@ mod tests {
         assert!(valid_container_ref("web.1"));
         assert!(!valid_container_ref("../x"));
         assert!(!valid_container_ref("a b"));
+    }
+
+    #[test]
+    fn parses_exposed_tcp_ports() {
+        // A single tcp port (the common, unambiguous case).
+        assert_eq!(parse_exposed_ports(br#"{"5601/tcp":{}}"#), vec![5601]);
+        // udp is ignored; tcp ports come back sorted.
+        assert_eq!(
+            parse_exposed_ports(br#"{"80/tcp":{},"53/udp":{},"443/tcp":{}}"#),
+            vec![80, 443]
+        );
+        // No exposed ports (docker emits null) or garbage -> empty.
+        assert!(parse_exposed_ports(b"null").is_empty());
+        assert!(parse_exposed_ports(b"not json").is_empty());
     }
 }

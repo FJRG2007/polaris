@@ -141,6 +141,19 @@ export class HostdClient {
         return this.callStream("POST", "/v1/deploy/pull", JSON.stringify({ image }));
     }
 
+    /** A locally present image's declared exposed TCP ports, ascending. Empty when
+     *  the image declares none; throws only on a transport/daemon error. Used to
+     *  default an app's container port to what the image actually listens on. */
+    public async inspectImage(image: string): Promise<number[]> {
+        const response = await this.call("POST", "/v1/deploy/inspect", JSON.stringify({ image }));
+        if (response.status !== 200) {
+            throw new Error(`hostd image inspect failed (${response.status}): ${response.body}`);
+        }
+        const parsed = JSON.parse(response.body) as { exposedPorts?: unknown };
+        if (!Array.isArray(parsed.exposedPorts)) return [];
+        return parsed.exposedPorts.filter((port): port is number => typeof port === "number");
+    }
+
     /** Authenticate to a private registry (`docker login`). Resolves on success and
      *  throws on failure; the password rides in the JSON body, never in argv. */
     public async deployLogin(registry: string, username: string, password: string): Promise<void> {

@@ -373,6 +373,10 @@ async function buildAppPlan(
     const plan: AppDeployPlan = {
         ref: { name: serviceName(project.slug, app.slug, app.id), project: composeProject },
         expose: { host: hostPortForApp(app.id), container: containerPort },
+        // When the user has not pinned a port (and no domain fixed one), the container
+        // port above is a guess; let the runtime refine it from the image's declared
+        // exposed port so IP:port reaches a live socket instead of a dead one.
+        autoContainerPort: storedPort === undefined && !app.domains[0]?.targetPort,
         build: {
             method: (app.sourceType as AppDeployPlan["build"]["method"]) ?? "image",
             name: app.slug,

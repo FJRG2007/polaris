@@ -61,6 +61,10 @@ export interface RuntimePorts {
     /** Build an image from a tar context; resolves the produced tag. */
     build(request: BuildRequest, onOutput?: OutputSink): Promise<string>;
     pull(image: string, onOutput?: OutputSink): Promise<void>;
+    /** A locally present image's declared exposed TCP ports (ascending), so a deploy
+     *  can default the container port to what the image actually listens on. Empty
+     *  when the image declares none or inspection is unavailable. */
+    inspectImage(image: string): Promise<number[]>;
     /** Authenticate to a private registry (`docker login`) so a following pull can
      *  access it. An empty registry targets Docker Hub. The password is sent out of
      *  band (stdin / request body), never on the command line. */

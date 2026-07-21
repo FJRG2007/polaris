@@ -89,6 +89,23 @@ export class SshPorts implements RuntimePorts {
         await this.run(`docker pull ${quoteArg(image)}`, onOutput);
     }
 
+    public async inspectImage(image: string): Promise<number[]> {
+        let out = "";
+        try {
+            await this.run(
+                `docker image inspect ${quoteArg(image)} --format ${quoteArg("{{json .Config.ExposedPorts}}")}`,
+                (chunk) => {
+                    out += chunk.toString("utf8");
+                }
+            );
+        } catch {
+            // The image may not be present / inspectable; the caller falls back to a
+            // default port, so a failure here is not fatal.
+            return [];
+        }
+        return parseExposedTcpPorts(out);
+    }
+
     public async login(registry: string, username: string, password: string): Promise<void> {
         const client = await this.connect();
         const parts = ["docker", "login"];
@@ -172,6 +189,22 @@ export class SshPorts implements RuntimePorts {
             throw new Error(`remote command exited with code ${result.code}`);
         }
     }
+}
+
+/** Parse docker's `ExposedPorts` map ({"5601/tcp":{},"53/udp":{}}) into the sorted
+ *  set of TCP port numbers; udp and malformed input yield an empty list. */
+function parseExposedTcpPorts(raw: string): number[] {
+    let value: unknown;
+    try {
+        value = JSON.parse(raw.trim() || "null");
+    } catch {
+        return [];
+    }
+    if (typeof value !== "object" || value === null) return [];
+    const ports = Object.keys(value)
+        .map((key) => (key.endsWith("/tcp") ? Number(key.slice(0, -"/tcp".length)) : NaN))
+        .filter((port) => Number.isInteger(port) && port > 0 && port <= 65535);
+    return [...new Set(ports)].sort((a, b) => a - b);
 }
 
 /** Open a PTY shell to the server itself (not a container), for the terminal. */

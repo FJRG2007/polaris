@@ -55,13 +55,50 @@ export class ComposeRuntime implements RuntimeDriver {
             return { ok: false, error: `build method "${plan.build.method}" is not yet supported on the compose runtime` };
         }
 
-        const spec = appComposeSpec(plan, imageTag, ctx.target.proxyNetwork);
+        const effectivePlan = await this.refineContainerPort(plan, imageTag, ctx);
+        const spec = appComposeSpec(effectivePlan, imageTag, ctx.target.proxyNetwork);
         try {
             await ctx.ports.composeUp(spec, sink);
         } catch (error) {
             return { ok: false, error: error instanceof Error ? error.message : "compose up failed" };
         }
         return { ok: true, imageTag };
+    }
+
+    /**
+     * When the user has not pinned a container port, refine the fallback guess from
+     * the image's own declared exposed port (now that the image is present). If the
+     * image exposes exactly one TCP port, publish to that - so `IP:port` reaches a
+     * live socket instead of a dead one (the classic "deployed but not reachable"
+     * cause: an image on 5601 mapped to 80). If it exposes several or none, keep the
+     * guess and note it in the log, since we cannot know which the app serves on.
+     */
+    private async refineContainerPort(
+        plan: AppDeployPlan,
+        imageTag: string,
+        ctx: RuntimeContext
+    ): Promise<AppDeployPlan> {
+        if (!plan.autoContainerPort || !plan.expose) return plan;
+        let exposed: number[];
+        try {
+            exposed = await ctx.ports.inspectImage(imageTag);
+        } catch {
+            return plan;
+        }
+        if (exposed.length === 0) return plan;
+        if (exposed.length > 1) {
+            ctx.log(
+                Buffer.from(
+                    `Image exposes multiple ports (${exposed.join(", ")}); publishing container port ${plan.expose.container}. ` +
+                        "Set the container port explicitly if the app serves on a different one.\n"
+                )
+            );
+            return plan;
+        }
+        const detected = exposed[0];
+        if (detected === undefined || detected === plan.expose.container) return plan;
+        ctx.log(Buffer.from(`Detected container port ${detected} from the image (was ${plan.expose.container}).\n`));
+        return { ...plan, expose: { ...plan.expose, container: detected } };
     }
 
     public async deployDatabase(plan: DbDeployPlan, ctx: RuntimeContext): Promise<DeployResult> {

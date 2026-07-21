@@ -49,6 +49,10 @@ export class HostdPorts implements RuntimePorts {
         await drain(res, onOutput);
     }
 
+    public async inspectImage(image: string): Promise<number[]> {
+        return this.client.inspectImage(image);
+    }
+
     public async login(registry: string, username: string, password: string): Promise<void> {
         await this.client.deployLogin(registry, username, password);
     }
