@@ -23,7 +23,10 @@ import {
     deployApplication,
     ensureApplicationDomain,
     listDeployments,
+    removeApplicationDeployment,
     removeApplicationDomain,
+    restartApplication,
+    setApplicationRunning,
     saveEnvironmentLayout,
     updateAutoDeploy,
     type DeploymentSummary
@@ -303,6 +306,47 @@ export async function deployApplicationAction(applicationId: string): Promise<{ 
         return { deploymentId };
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Could not start the deployment" };
+    }
+}
+
+export async function restartApplicationAction(applicationId: string): Promise<{ error?: string }> {
+    const user = await requirePermission("deploy.manage");
+    try {
+        await restartApplication(applicationId, user.id);
+        await recordAudit({ actorId: user.id, action: "deploy.app.restart", targetType: "application", targetId: applicationId });
+        revalidatePath(DEPLOY_PATH);
+        return {};
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not restart the deployment" };
+    }
+}
+
+export async function setApplicationRunningAction(applicationId: string, running: boolean): Promise<{ error?: string }> {
+    const user = await requirePermission("deploy.manage");
+    try {
+        await setApplicationRunning(applicationId, user.id, running);
+        await recordAudit({
+            actorId: user.id,
+            action: running ? "deploy.app.start" : "deploy.app.stop",
+            targetType: "application",
+            targetId: applicationId
+        });
+        revalidatePath(DEPLOY_PATH);
+        return {};
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not update the deployment" };
+    }
+}
+
+export async function removeApplicationDeploymentAction(applicationId: string): Promise<{ error?: string }> {
+    const user = await requirePermission("deploy.manage");
+    try {
+        await removeApplicationDeployment(applicationId, user.id);
+        await recordAudit({ actorId: user.id, action: "deploy.app.remove", targetType: "application", targetId: applicationId });
+        revalidatePath(DEPLOY_PATH);
+        return {};
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not remove the deployment" };
     }
 }
 

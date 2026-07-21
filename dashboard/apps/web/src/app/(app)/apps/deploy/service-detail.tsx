@@ -8,8 +8,40 @@
  */
 
 import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
-import { CheckCircle2, ChevronLeft, Eye, EyeOff, Globe, Loader2, Maximize2, Minimize2, Plus, Search, Trash2 } from "lucide-react";
-import { Button, Dialog, DialogContent, DialogTitle, Input, Switch, cn } from "@polaris/ui";
+import {
+    CheckCircle2,
+    ChevronDown,
+    ChevronLeft,
+    ChevronRight,
+    Eye,
+    EyeOff,
+    Globe,
+    Loader2,
+    MapPin,
+    Maximize2,
+    Minimize2,
+    MoreVertical,
+    Play,
+    Plus,
+    RotateCw,
+    Search,
+    Square,
+    Trash2
+} from "lucide-react";
+import {
+    Button,
+    Dialog,
+    DialogContent,
+    DialogTitle,
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+    Input,
+    Switch,
+    cn
+} from "@polaris/ui";
 import { ServiceIcon, StatusPill, dbTone, serviceKindOf, type ProjectApp } from "./deploy-view";
 import { TerminalPanel } from "./terminal-panel";
 import { FilesPanel } from "./files-panel";
@@ -20,7 +52,10 @@ import {
     importEnvVarsAction,
     listDeploymentsAction,
     listEnvVarsAction,
+    removeApplicationDeploymentAction,
+    restartApplicationAction,
     saveEnvVarAction,
+    setApplicationRunningAction,
     setAutoDeployAction
 } from "./actions";
 
@@ -114,9 +149,89 @@ function depTitle(deployment: DepSummary): string {
     return "Manual deploy";
 }
 
+/** Short source label for a deployment's subtitle ("via GitHub" / "via Registry"). */
+function sourceLabel(app: ProjectApp): string {
+    return app.sourceType === "image" ? "Registry" : "GitHub";
+}
+
+/** A small circular author avatar - a source glyph until real author avatars exist. */
+function DeployAvatar({ app }: { app: ProjectApp }) {
+    return (
+        <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
+            <ServiceIcon kind={serviceKindOf(app.sourceType)} className="size-4" />
+        </span>
+    );
+}
+
+/** The per-deployment overflow menu: redeploy, restart, enable/disable, remove. */
+function DeploymentMenu({
+    app,
+    deployment,
+    onAct,
+    onChanged
+}: {
+    app: ProjectApp;
+    deployment: DepSummary;
+    onAct: () => void;
+    onChanged: () => void;
+}) {
+    const [pending, startTransition] = useTransition();
+    const isActive = deployment.isCurrent;
+    const stopped = deployment.status === "stopped";
+
+    function run(action: () => Promise<{ error?: string }>) {
+        startTransition(async () => {
+            await action().catch(() => undefined);
+            onAct();
+            onChanged();
+        });
+    }
+
+    return (
+        <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+                <button
+                    type="button"
+                    onClick={(event) => event.stopPropagation()}
+                    disabled={pending}
+                    className="shrink-0 rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    aria-label="Deployment actions"
+                >
+                    {pending ? <Loader2 className="size-4 animate-spin" /> : <MoreVertical className="size-4" />}
+                </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" onClick={(event) => event.stopPropagation()}>
+                <DropdownMenuItem onSelect={() => run(() => deployApplicationAction(app.id))}>
+                    <RotateCw className="size-4" /> Redeploy
+                </DropdownMenuItem>
+                {isActive && (
+                    <>
+                        <DropdownMenuItem onSelect={() => run(() => restartApplicationAction(app.id))}>
+                            <RotateCw className="size-4" /> Restart
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => run(() => setApplicationRunningAction(app.id, stopped))}>
+                            {stopped ? <Play className="size-4" /> : <Square className="size-4" />}
+                            {stopped ? "Enable" : "Disable"}
+                        </DropdownMenuItem>
+                    </>
+                )}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                    className="text-danger focus:text-danger"
+                    onSelect={() => run(() => removeApplicationDeploymentAction(app.id))}
+                >
+                    <Trash2 className="size-4" /> Remove
+                </DropdownMenuItem>
+            </DropdownMenuContent>
+        </DropdownMenu>
+    );
+}
+
 function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => void }) {
     const [items, setItems] = useState<DepSummary[] | null>(null);
     const [logsFor, setLogsFor] = useState<string | null>(null);
+    const [historyOpen, setHistoryOpen] = useState(true);
+    const [successOpen, setSuccessOpen] = useState(false);
     const [busy, startTransition] = useTransition();
 
     function reload() {
@@ -152,23 +267,31 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
 
     const active = items?.find((item) => item.isCurrent) ?? null;
     const history = (items ?? []).filter((item) => !item.isCurrent);
+    const region = app.domains[0] ? "Deployed" : app.sourceType === "image" ? "Registry" : "GitHub";
 
     return (
-        <div className="flex flex-col gap-3 py-2">
-            <div className="flex items-center gap-2">
+        <div className="flex flex-col gap-4 py-2">
+            <div className="flex items-center gap-3">
                 {app.domains[0] ? (
                     <a
                         href={`https://${app.domains[0].hostname}`}
                         target="_blank"
                         rel="noreferrer"
-                        className="inline-flex min-w-0 items-center gap-1 truncate text-sm text-primary hover:underline"
+                        className="inline-flex min-w-0 items-center gap-1.5 truncate text-sm font-medium text-foreground hover:text-primary hover:underline"
                     >
-                        <Globe className="size-3.5 shrink-0" /> {app.domains[0].hostname}
+                        <Globe className="size-4 shrink-0 text-muted-foreground" /> {app.domains[0].hostname}
                     </a>
                 ) : (
-                    <span className="text-sm text-muted-foreground">No domain yet</span>
+                    <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
+                        <Globe className="size-4 shrink-0" /> No domain yet
+                    </span>
                 )}
-                <span className="ml-auto text-xs text-muted-foreground">1 Replica</span>
+                <div className="ml-auto flex items-center gap-4 text-xs text-muted-foreground">
+                    <span className="inline-flex items-center gap-1">
+                        <MapPin className="size-3.5" /> {region}
+                    </span>
+                    <span>1 Replica</span>
+                </div>
                 <Button size="sm" disabled={busy} onClick={deploy}>
                     {busy ? <Loader2 className="size-4 animate-spin" /> : "Deploy"}
                 </Button>
@@ -181,47 +304,99 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
             ) : (
                 <>
                     {active && (
-                        <button
-                            type="button"
-                            onClick={() => setLogsFor(active.id)}
-                            className="flex w-full flex-col gap-2 rounded-lg border border-success/30 bg-success/5 p-3 text-left"
-                        >
-                            <div className="flex items-center gap-3">
-                                <span className="shrink-0 rounded bg-success/15 px-2 py-0.5 text-xs font-medium text-success">
+                        <div className="overflow-hidden rounded-xl border border-success/30 bg-success/[0.06]">
+                            <div className="flex items-center gap-3 p-3">
+                                <span className="shrink-0 rounded bg-success/15 px-2 py-0.5 text-[11px] font-semibold tracking-wide text-success">
                                     ACTIVE
                                 </span>
-                                <span className="min-w-0 flex-1 truncate text-sm">{depTitle(active)}</span>
-                                <span className="shrink-0 text-xs text-muted-foreground">{relativeTime(active.createdAt)}</span>
-                                <span className="shrink-0 text-xs text-primary">View logs</span>
-                            </div>
-                            <div className="flex items-center gap-1.5 text-xs text-success">
-                                <CheckCircle2 className="size-3.5" />{" "}
-                                {active.status === "running" ? "Deployment successful" : `Status: ${active.status}`}
-                            </div>
-                        </button>
-                    )}
-                    {history.length > 0 && (
-                        <div className="mt-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">History</div>
-                    )}
-                    <ul className="flex flex-col gap-2">
-                        {history.map((deployment) => {
-                            const badge = depBadge(deployment);
-                            const failed = ["failed", "cancelled", "rolled_back"].includes(deployment.status);
-                            return (
-                                <li
-                                    key={deployment.id}
-                                    onClick={() => setLogsFor(deployment.id)}
-                                    className={`flex cursor-pointer items-center gap-3 rounded-lg border p-3 text-sm transition-colors hover:border-muted-foreground/40 ${
-                                        failed ? "border-danger/30 bg-danger/5" : "border-border/60"
-                                    }`}
+                                <DeployAvatar app={app} />
+                                <div className="min-w-0 flex-1">
+                                    <p className="truncate text-sm font-medium text-foreground">{depTitle(active)}</p>
+                                    <p className="truncate text-xs text-muted-foreground">
+                                        {relativeTime(active.createdAt)} via {sourceLabel(app)}
+                                    </p>
+                                </div>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="shrink-0 border-success/40 text-success hover:bg-success/10 hover:text-success"
+                                    onClick={() => setLogsFor(active.id)}
                                 >
-                                    <span className={`shrink-0 rounded px-2 py-0.5 text-xs font-medium ${badge.cls}`}>{badge.label}</span>
-                                    <span className="min-w-0 flex-1 truncate">{depTitle(deployment)}</span>
-                                    <span className="shrink-0 text-xs text-muted-foreground">{relativeTime(deployment.createdAt)}</span>
-                                </li>
-                            );
-                        })}
-                    </ul>
+                                    View logs
+                                </Button>
+                                <DeploymentMenu app={app} deployment={active} onAct={reload} onChanged={onChanged} />
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setSuccessOpen((value) => !value)}
+                                className="flex w-full items-center gap-1.5 border-t border-success/20 px-3 py-2 text-xs text-success"
+                            >
+                                <CheckCircle2 className="size-3.5" />
+                                {active.status === "running"
+                                    ? "Deployment successful"
+                                    : active.status === "stopped"
+                                      ? "Deployment disabled"
+                                      : `Status: ${active.status}`}
+                                <ChevronDown className={cn("ml-auto size-3.5 transition-transform", successOpen && "rotate-180")} />
+                            </button>
+                            {successOpen && (
+                                <div className="border-t border-success/20 px-3 py-2 text-xs text-muted-foreground">
+                                    {active.commitSha ? (
+                                        <span className="font-mono">{active.commitSha.slice(0, 7)}</span>
+                                    ) : (
+                                        "Manual deploy"
+                                    )}
+                                    {" - "}
+                                    {new Date(active.createdAt).toLocaleString()}
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {history.length > 0 && (
+                        <div className="flex flex-col gap-2">
+                            <div className="flex items-center justify-between">
+                                <button
+                                    type="button"
+                                    onClick={() => setHistoryOpen((value) => !value)}
+                                    className="inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground"
+                                >
+                                    <ChevronRight className={cn("size-3.5 transition-transform", historyOpen && "rotate-90")} />
+                                    History
+                                </button>
+                            </div>
+                            {historyOpen && (
+                                <ul className="flex flex-col gap-2">
+                                    {history.map((deployment) => {
+                                        const badge = depBadge(deployment);
+                                        const failed = ["failed", "cancelled", "rolled_back"].includes(deployment.status);
+                                        return (
+                                            <li
+                                                key={deployment.id}
+                                                onClick={() => setLogsFor(deployment.id)}
+                                                className={cn(
+                                                    "flex cursor-pointer items-center gap-3 rounded-xl border p-3 text-sm transition-colors hover:border-muted-foreground/40",
+                                                    failed ? "border-danger/30 bg-danger/5" : "border-border/60"
+                                                )}
+                                            >
+                                                <span className={cn("shrink-0 rounded px-2 py-0.5 text-[11px] font-semibold tracking-wide", badge.cls)}>
+                                                    {badge.label}
+                                                </span>
+                                                <DeployAvatar app={app} />
+                                                <div className="min-w-0 flex-1">
+                                                    <p className="truncate font-medium text-foreground">{depTitle(deployment)}</p>
+                                                    <p className="truncate text-xs text-muted-foreground">
+                                                        {relativeTime(deployment.createdAt)} via {sourceLabel(app)}
+                                                    </p>
+                                                </div>
+                                                <DeploymentMenu app={app} deployment={deployment} onAct={reload} onChanged={onChanged} />
+                                            </li>
+                                        );
+                                    })}
+                                </ul>
+                            )}
+                        </div>
+                    )}
                 </>
             )}
         </div>

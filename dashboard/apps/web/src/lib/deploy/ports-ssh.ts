@@ -122,6 +122,10 @@ export class SshPorts implements RuntimePorts {
         return Array.isArray(parsed) ? parsed[0] : parsed;
     }
 
+    public async container(ref: string, action: "restart" | "stop" | "start"): Promise<void> {
+        await this.run(`docker ${action} ${quoteArg(ref)}`);
+    }
+
     public async logs(ref: string, onData: OutputSink, options?: LogOptions): Promise<void> {
         const parts = ["docker", "logs", "--timestamps"];
         if (options?.follow) parts.push("--follow");

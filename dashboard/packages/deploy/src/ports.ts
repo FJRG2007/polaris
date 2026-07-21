@@ -67,6 +67,9 @@ export interface RuntimePorts {
     login(registry: string, username: string, password: string): Promise<void>;
     /** Inspect a container/service (parsed JSON) - reads `.State.Health` etc. */
     inspect(ref: string): Promise<unknown>;
+    /** Lifecycle action on an existing container: restart it, or stop/start it to
+     *  disable/enable a deployment without removing it. */
+    container(ref: string, action: "restart" | "stop" | "start"): Promise<void>;
     logs(ref: string, onData: OutputSink, options?: LogOptions): Promise<void>;
     /** Open an interactive exec/attach stream. */
     exec(spec: ExecSpec): Promise<ExecStream>;

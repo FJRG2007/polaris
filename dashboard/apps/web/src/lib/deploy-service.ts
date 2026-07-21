@@ -219,6 +219,77 @@ export async function removeApplicationDomain(domainId: string, ownerId: string)
     });
 }
 
+// --- deployment lifecycle (restart / disable / remove) ----------------------
+
+/** Resolve an app to its runtime container ref, compose project, and target. */
+async function appRuntime(applicationId: string, ownerId: string) {
+    const app = await prisma.application.findFirst({
+        where: { id: applicationId, environment: { project: { ownerId } } },
+        include: { environment: { include: { project: true } }, target: true }
+    });
+    if (!app) throw new Error("Application not found");
+    const container = serviceName(app.environment.project.slug, app.slug, app.id);
+    const project = `polaris-${shortHash(app.id, 8)}`;
+    return { app, container, project, target: app.target as TargetRow };
+}
+
+/** Restart the app's running container in place (no rebuild). */
+export async function restartApplication(applicationId: string, ownerId: string): Promise<void> {
+    const { container, target } = await appRuntime(applicationId, ownerId);
+    const ports = await getPorts(target, ownerId);
+    try {
+        await ports.container(container, "restart");
+    } finally {
+        await ports.dispose();
+    }
+}
+
+/**
+ * Disable or enable a deployment without removing it: stop or start the container
+ * while keeping the deployment record and its release history intact. The current
+ * deployment's status tracks it (running <-> stopped) so the UI can reflect state.
+ */
+export async function setApplicationRunning(
+    applicationId: string,
+    ownerId: string,
+    running: boolean
+): Promise<void> {
+    const { app, container, target } = await appRuntime(applicationId, ownerId);
+    const ports = await getPorts(target, ownerId);
+    try {
+        await ports.container(container, running ? "start" : "stop");
+    } finally {
+        await ports.dispose();
+    }
+    if (app.currentDeploymentId) {
+        await prisma.deployment.update({
+            where: { id: app.currentDeploymentId },
+            data: { status: running ? "running" : "stopped" }
+        });
+    }
+}
+
+/**
+ * Remove the running deployment entirely: tear the project down (compose down /
+ * stack rm) and mark its releases removed, clearing the app's current pointer.
+ * The application config stays, so it can be deployed again later.
+ */
+export async function removeApplicationDeployment(applicationId: string, ownerId: string): Promise<void> {
+    const { project, target } = await appRuntime(applicationId, ownerId);
+    const ports = await getPorts(target, ownerId);
+    try {
+        if (target.runtime === "swarm") await ports.stackDown(project);
+        else await ports.composeDown(project);
+    } finally {
+        await ports.dispose();
+    }
+    await prisma.deployment.updateMany({
+        where: { deployableType: "application", deployableId: applicationId, status: { in: ["running", "stopped"] } },
+        data: { status: "removed", finishedAt: new Date() }
+    });
+    await prisma.application.update({ where: { id: applicationId }, data: { currentDeploymentId: null } });
+}
+
 // --- deployment pipeline ----------------------------------------------------
 
 /** Build the runtime plan for an application from its stored config. */

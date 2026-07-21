@@ -61,6 +61,14 @@ export class HostdPorts implements RuntimePorts {
         return JSON.parse(response.body);
     }
 
+    public async container(ref: string, action: "restart" | "stop" | "start"): Promise<void> {
+        const response = await this.client.dockerRequest("POST", `/containers/${encodeURIComponent(ref)}/${action}`);
+        // 204 = done, 304 = already in that state (start/stop a no-op) - both fine.
+        if (response.status !== 204 && response.status !== 304) {
+            throw new Error(`${action} ${ref} failed (${response.status})`);
+        }
+    }
+
     public async logs(ref: string, onData: OutputSink, options?: LogOptions): Promise<void> {
         const res = await this.client.deployLogs({
             container: ref,
