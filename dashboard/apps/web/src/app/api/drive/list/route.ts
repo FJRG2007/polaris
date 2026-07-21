@@ -67,8 +67,9 @@ export async function GET(request: Request): Promise<Response> {
         if (caught instanceof SmbShareRequiredError) {
             return Response.json({ needsSmbShare: true });
         }
-        const message = caught instanceof Error ? caught.message : "Unable to connect";
-        return Response.json({ error: message }, { status: 502 });
+        // Never surface a driver/internal error verbatim to the client.
+        console.error("drive: connect failed", caught);
+        return Response.json({ error: "Could not connect to this location" }, { status: 502 });
     }
 
     try {
@@ -109,8 +110,9 @@ export async function GET(request: Request): Promise<Response> {
         });
         return Response.json({ entries });
     } catch (caught) {
-        const message = caught instanceof Error ? caught.message : "Unable to list this location";
-        return Response.json({ error: message }, { status: 502 });
+        // Log the real cause server-side; the client only ever sees a generic message.
+        console.error("drive: list failed", caught);
+        return Response.json({ error: "Could not list this location" }, { status: 502 });
     } finally {
         await driver.dispose();
     }

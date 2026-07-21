@@ -265,11 +265,10 @@ export async function listConnections(ownerId: string) {
  * per-path enforcement still happens in the Drive routes and actions.
  */
 export async function listAccessibleConnections(userId: string) {
-    const [owned, grantedIds, hosts, containers] = await Promise.all([
+    const [owned, grantedIds, hosts] = await Promise.all([
         listConnections(userId),
         grantedConnectionIds(userId),
-        listHosts(userId),
-        listContainerSources(userId)
+        listHosts(userId)
     ]);
     const ownedIds = new Set(owned.map((row) => row.id));
     const sharedIds = grantedIds.filter((id) => !ownedIds.has(id));
@@ -305,27 +304,29 @@ export async function listAccessibleConnections(userId: string) {
     return [
         ...owned.map((row) => ({ ...row, shared: false })),
         ...shared.map((row) => ({ ...annotateRekey(row, fingerprint), shared: true })),
-        ...hostSummaries,
-        ...containers
+        ...hostSummaries
     ];
 }
 
 /**
- * Deployed local containers the user owns, surfaced as read-only Drive sources so
- * a running service's files are browsable like any other folder. Only local,
- * currently-deployed apps qualify (a container must exist to browse). Managed in
- * the Deploy app, so never editable or re-keyed here.
+ * A single deployed local container the user owns, surfaced as a read-only Drive
+ * source. Not part of the connections list (a running service is browsed on
+ * demand from Deploy's "View in Drive", not shown as a saved connection), so this
+ * resolves just the one the browser asked for. Returns null when the app is not a
+ * local, currently-deployed app the user owns.
  */
-async function listContainerSources(userId: string) {
-    const apps = await prisma.application.findMany({
+export async function getContainerConnection(userId: string, appId: string) {
+    const app = await prisma.application.findFirst({
         where: {
+            id: appId,
             currentDeploymentId: { not: null },
             target: { kind: "local" },
             environment: { project: { ownerId: userId } }
         },
         select: { id: true, name: true, createdAt: true }
     });
-    return apps.map((app) => ({
+    if (!app) return null;
+    return {
         id: `${CONTAINER_CONNECTION_PREFIX}${app.id}`,
         name: `${app.name} (container)`,
         kind: "local",
@@ -335,7 +336,7 @@ async function listContainerSources(userId: string) {
         createdAt: app.createdAt,
         shared: false,
         needsRekey: false
-    }));
+    };
 }
 
 /**

@@ -8,6 +8,15 @@
 
 import { prisma } from "@polaris/db";
 
+/** DriveItemMeta.connectionId is a UUID column, but some sources (a deployed app's
+ *  container, browsed as an ephemeral `container:<id>` connection) have no persisted
+ *  metadata and a non-UUID id, which the column cannot compare against. Guard every
+ *  query with this so such a source is a clean no-op instead of a DB error. */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function isUuid(id: string): boolean {
+    return UUID_RE.test(id);
+}
+
 export interface ItemMeta {
     hidden: boolean;
     favorite: boolean;
@@ -19,7 +28,7 @@ export interface ItemMeta {
 
 /** Metadata for the given paths in a connection, as a path -> meta map. */
 export async function getMetaMap(connectionId: string, paths: string[]): Promise<Map<string, ItemMeta>> {
-    if (paths.length === 0) return new Map();
+    if (paths.length === 0 || !isUuid(connectionId)) return new Map();
     const rows = await prisma.driveItemMeta.findMany({
         where: { connectionId, path: { in: paths } },
         select: { path: true, hidden: true, favorite: true, icon: true, iconColor: true, note: true, creatorId: true }
@@ -50,7 +59,7 @@ export async function recordItemCreator(
     path: string,
     creatorId: string | null
 ): Promise<void> {
-    if (!creatorId) return;
+    if (!creatorId || !isUuid(connectionId)) return;
     const connection = await prisma.storageConnection.findUnique({
         where: { id: connectionId },
         select: { ownerId: true }
@@ -73,6 +82,7 @@ export async function resolveUserNames(userIds: string[]): Promise<Map<string, s
 
 /** Assert the connection is owned by the user (throws otherwise). */
 async function assertOwns(ownerId: string, connectionId: string): Promise<void> {
+    if (!isUuid(connectionId)) throw new Error("This source cannot be customized");
     const owns = await prisma.storageConnection.count({ where: { id: connectionId, ownerId } });
     if (owns === 0) throw new Error("Connection not found");
 }
@@ -141,5 +151,6 @@ export async function setItemNote(
 
 /** Re-point metadata to a new path after a move/rename so it follows the item. */
 export async function moveItemMeta(connectionId: string, from: string, to: string): Promise<void> {
+    if (!isUuid(connectionId)) return;
     await prisma.driveItemMeta.updateMany({ where: { connectionId, path: from }, data: { path: to } });
 }

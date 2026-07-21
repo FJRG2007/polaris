@@ -1,7 +1,7 @@
 import type { StorageProviderKind } from "@polaris/core";
 import { PageHeader } from "@polaris/ui";
 import { requireUser } from "@/lib/session";
-import { connectionWebUrl, listAccessibleConnections } from "@/lib/storage-service";
+import { connectionWebUrl, getContainerConnection, listAccessibleConnections } from "@/lib/storage-service";
 import { DriveExplorer } from "./drive-explorer";
 import type { ConnectionSummary } from "./types";
 
@@ -49,7 +49,29 @@ export default async function DrivePage({
         needsRekey: row.needsRekey
     }));
 
-    const connectionId = pick(params.c) ?? connections[0]?.id ?? null;
+    const requested = pick(params.c);
+    // A deployed app's container is browsed on demand (Deploy -> View in Drive), not
+    // kept in the connections list. When one is explicitly requested, resolve just it
+    // and add it so the browser can open it without cluttering the saved connections.
+    if (requested?.startsWith("container:") && !connections.some((row) => row.id === requested)) {
+        const appId = requested.slice("container:".length);
+        const container = await getContainerConnection(user.id, appId);
+        if (container) {
+            connections.unshift({
+                id: container.id,
+                name: container.name,
+                kind: container.kind as StorageProviderKind,
+                requiresHostd: container.requiresHostd,
+                webUrl: undefined,
+                shared: false,
+                canManageAccess: false,
+                config: parseConfig(container.config),
+                needsRekey: false
+            });
+        }
+    }
+
+    const connectionId = requested ?? connections[0]?.id ?? null;
     const path = pick(params.p) ?? "";
 
     return (
