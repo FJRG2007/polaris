@@ -1294,18 +1294,24 @@ function ExposureRow({
             {badge && (
                 <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">{badge}</span>
             )}
+            {/* Remove sits before the switch so the switch is always the rightmost
+                element and lines up across every row (domains and tunnels alike). A
+                fixed-width slot keeps the switch position identical whether or not a
+                row has a remove control. */}
+            <span className="flex w-5 shrink-0 items-center justify-center">
+                {onRemove && (
+                    <button
+                        type="button"
+                        title={removeLabel ?? "Remove"}
+                        onClick={onRemove}
+                        disabled={pending}
+                        className="text-muted-foreground opacity-0 transition-opacity hover:text-danger group-hover:opacity-100 disabled:opacity-50"
+                    >
+                        {pending ? <Loader2 className="size-3.5 animate-spin" /> : <X className="size-3.5" />}
+                    </button>
+                )}
+            </span>
             <Switch checked={enabled} onChange={onToggle} disabled={pending} aria-label={enabled ? "Disable" : "Enable"} />
-            {onRemove && (
-                <button
-                    type="button"
-                    title={removeLabel ?? "Remove"}
-                    onClick={onRemove}
-                    disabled={pending}
-                    className="text-muted-foreground opacity-0 transition-opacity hover:text-danger group-hover:opacity-100 disabled:opacity-50"
-                >
-                    {pending ? <Loader2 className="size-3.5 animate-spin" /> : <X className="size-3.5" />}
-                </button>
-            )}
         </li>
     );
 }
@@ -1564,19 +1570,21 @@ function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
                                     <Globe className="size-3 shrink-0" /> {domain.hostname}
                                 </span>
                             )}
+                            <span className="flex w-5 shrink-0 items-center justify-center">
+                                <button
+                                    type="button"
+                                    title="Remove domain"
+                                    onClick={() => startTransition(async () => { await removeDomainAction(domain.id); onChanged(); })}
+                                    className="text-muted-foreground opacity-0 transition-opacity hover:text-danger group-hover:opacity-100"
+                                >
+                                    <Trash2 className="size-3.5" />
+                                </button>
+                            </span>
                             <Switch
                                 checked={domain.enabled}
                                 onChange={(next) => startTransition(async () => { await setDomainEnabledAction(domain.id, next); onChanged(); })}
                                 aria-label={domain.enabled ? "Disable domain" : "Enable domain"}
                             />
-                            <button
-                                type="button"
-                                title="Remove domain"
-                                onClick={() => startTransition(async () => { await removeDomainAction(domain.id); onChanged(); })}
-                                className="text-muted-foreground opacity-0 transition-opacity hover:text-danger group-hover:opacity-100"
-                            >
-                                <Trash2 className="size-3.5" />
-                            </button>
                         </li>
                     ))}
                     <NamedTunnelRow appId={app.id} nonce={tunnelNonce} onChanged={() => setTunnelNonce((nonce) => nonce + 1)} />
