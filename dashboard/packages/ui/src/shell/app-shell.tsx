@@ -22,9 +22,12 @@ export function AppShell({
     return (
         <div className="flex min-h-screen flex-col bg-background">
             <header className="sticky top-0 z-40 flex h-14 shrink-0 items-center justify-between gap-4 border-b border-border bg-surface/80 px-4 backdrop-blur">
-                <div className="flex items-center gap-3">
+                <div className="flex min-w-0 items-center gap-3">
                     <PolarisMark />
                     {switcher}
+                    {/* Pages portal contextual controls here (e.g. the Deploy project +
+                        environment selectors), to the right of the app switcher. */}
+                    <div id="polaris-header-slot" className="flex min-w-0 items-center gap-2" />
                 </div>
                 <div className="flex items-center gap-2">{account}</div>
             </header>

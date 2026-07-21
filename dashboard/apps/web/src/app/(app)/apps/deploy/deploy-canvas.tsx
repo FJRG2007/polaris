@@ -13,8 +13,8 @@ import { Loader2 } from "lucide-react";
 import { ServiceIcon, dbTone, serviceKindOf, type ProjectApp, type ProjectSummary, type ServiceKind } from "./deploy-view";
 import { saveLayoutAction } from "./actions";
 
-const NODE_W = 220;
-const NODE_H = 84;
+const NODE_W = 280;
+const NODE_H = 116;
 const GRID = 16;
 
 type Tone = "success" | "warning" | "danger" | "idle";
@@ -314,18 +314,20 @@ export function DeployCanvas({
                         return (
                             <div
                                 key={node.id}
-                                className={`absolute select-none rounded-lg border bg-card p-3 shadow-sm ${
-                                    dragId === node.id ? "border-primary" : "border-border"
+                                className={`absolute flex select-none flex-col rounded-xl border bg-card p-4 shadow-sm transition-colors ${
+                                    dragId === node.id ? "border-primary" : "border-border hover:border-muted-foreground/40"
                                 } ${canManage ? "cursor-grab active:cursor-grabbing" : ""}`}
-                                style={{ left: p.x, top: p.y, width: NODE_W }}
+                                style={{ left: p.x, top: p.y, width: NODE_W, height: NODE_H }}
                                 onPointerDown={(event) => onNodePointerDown(event, node.id)}
                             >
-                                <div className="flex items-center gap-2">
-                                    <ServiceIcon kind={node.kind} className="size-4 shrink-0 text-foreground" />
-                                    <span className="truncate text-sm font-medium">{node.name}</span>
+                                <div className="flex items-center gap-2.5">
+                                    <span className="grid size-8 shrink-0 place-items-center rounded-lg border border-border bg-surface">
+                                        <ServiceIcon kind={node.kind} className="size-4 text-foreground" />
+                                    </span>
+                                    <span className="truncate text-sm font-semibold">{node.name}</span>
                                 </div>
-                                <p className="mt-1 truncate text-xs text-muted-foreground">{node.subtitle}</p>
-                                <div className="mt-1.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+                                <p className="mt-2 truncate text-xs text-muted-foreground">{node.subtitle}</p>
+                                <div className="mt-auto flex items-center gap-1.5 text-xs text-muted-foreground">
                                     <span className={`size-1.5 rounded-full ${TONE_DOT[node.tone]}`} />
                                     {node.statusLabel}
                                 </div>

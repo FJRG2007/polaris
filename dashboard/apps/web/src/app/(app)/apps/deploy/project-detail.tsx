@@ -7,10 +7,10 @@
  * project itself are in-app, confirmation-gated actions.
  */
 
-import { useState, useTransition } from "react";
-import Link from "next/link";
+import { useEffect, useState, useTransition, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, List, Loader2, Plus, Trash2, Waypoints } from "lucide-react";
+import { List, Loader2, Plus, Trash2, Waypoints } from "lucide-react";
 import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, Input, Select } from "@polaris/ui";
 import { EnvironmentServices, NewServiceButton, type ProjectApp, type ProjectSummary } from "./deploy-view";
 import { DeployCanvas } from "./deploy-canvas";
@@ -43,26 +43,70 @@ export function ProjectDetail({
 
     return (
         <div className="flex w-full flex-col gap-4">
-            <div className="flex items-center gap-3">
-                <Link
-                    href="/apps/deploy"
-                    className="inline-flex items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
-                >
-                    <ChevronLeft className="size-4" /> Projects
-                </Link>
+            <HeaderPortal>
                 <span className="text-muted-foreground/40">/</span>
                 <Select
                     value={project.id}
                     onValueChange={(id) => router.push(`/apps/deploy/${id}`)}
                     options={projects.map((item) => ({ value: item.id, label: item.name }))}
-                    className="h-8 w-52 font-medium"
+                    className="h-8 w-40 font-medium"
                     aria-label="Project"
                 />
-                {canManage && (
-                    <div className="ml-auto">
-                        {confirmDeleteProject ? (
+                <span className="text-muted-foreground/40">/</span>
+                <Select
+                    value={active?.id ?? ""}
+                    onValueChange={setActiveId}
+                    options={environments.map((env) => ({ value: env.id, label: env.name }))}
+                    className="h-8 w-36"
+                    aria-label="Environment"
+                />
+                {canManage && <NewEnvironmentButton projectId={project.id} onChanged={refresh} />}
+            </HeaderPortal>
+
+            {!localReady && canManage && (
+                <div className="rounded-lg border border-warning/30 bg-warning/5 px-4 py-3 text-sm text-muted-foreground">
+                    The local host is not ready to build and deploy. This needs the full edition with a running{" "}
+                    <code className="rounded bg-muted px-1 py-0.5 text-xs text-foreground">polaris-hostd</code>.
+                </div>
+            )}
+
+            <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                    {canManage && active && !active.isDefault && (
+                        <DeleteEnvironmentButton
+                            environmentId={active.id}
+                            projectId={project.id}
+                            onDeleted={() => {
+                                setActiveId(defaultEnv?.id ?? "");
+                                refresh();
+                            }}
+                        />
+                    )}
+                </div>
+                <div className="flex items-center gap-2">
+                    {canManage && active && <NewServiceButton environmentId={active.id} onChanged={refresh} />}
+                    <div className="flex items-center gap-1 rounded-md border border-border p-0.5">
+                        <button
+                            type="button"
+                            onClick={() => setView("canvas")}
+                            aria-label="Canvas view"
+                            className={`rounded p-1.5 transition-colors ${view === "canvas" ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                        >
+                            <Waypoints className="size-4" />
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setView("list")}
+                            aria-label="List view"
+                            className={`rounded p-1.5 transition-colors ${view === "list" ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                        >
+                            <List className="size-4" />
+                        </button>
+                    </div>
+                    {canManage &&
+                        (confirmDeleteProject ? (
                             <div className="flex items-center gap-2">
-                                <span className="text-xs text-muted-foreground">Delete project and everything in it?</span>
+                                <span className="text-xs text-muted-foreground">Delete project?</span>
                                 <Button
                                     variant="danger"
                                     size="sm"
@@ -84,65 +128,7 @@ export function ProjectDetail({
                             <Button variant="ghost" size="icon" title="Delete project" onClick={() => setConfirmDeleteProject(true)}>
                                 <Trash2 className="size-4" />
                             </Button>
-                        )}
-                    </div>
-                )}
-            </div>
-
-            {!localReady && canManage && (
-                <div className="rounded-lg border border-warning/30 bg-warning/5 px-4 py-3 text-sm text-muted-foreground">
-                    The local host is not ready to build and deploy. This needs the full edition with a running{" "}
-                    <code className="rounded bg-muted px-1 py-0.5 text-xs text-foreground">polaris-hostd</code>.
-                </div>
-            )}
-
-            <div className="flex items-center gap-2 border-b border-border/60">
-                {environments.map((env) => (
-                    <button
-                        key={env.id}
-                        type="button"
-                        onClick={() => setActiveId(env.id)}
-                        className={`-mb-px border-b-2 px-3 py-2 text-sm transition-colors ${
-                            env.id === active?.id
-                                ? "border-primary text-foreground"
-                                : "border-transparent text-muted-foreground hover:text-foreground"
-                        }`}
-                    >
-                        {env.name}
-                    </button>
-                ))}
-                {canManage && <NewEnvironmentButton projectId={project.id} onChanged={refresh} />}
-                {canManage && active && !active.isDefault && (
-                    <DeleteEnvironmentButton
-                        environmentId={active.id}
-                        projectId={project.id}
-                        onDeleted={() => {
-                            setActiveId(defaultEnv?.id ?? "");
-                            refresh();
-                        }}
-                    />
-                )}
-
-                <div className="ml-auto flex items-center gap-2 pb-1">
-                    {canManage && active && <NewServiceButton environmentId={active.id} onChanged={refresh} />}
-                    <div className="flex items-center gap-1 rounded-md border border-border p-0.5">
-                        <button
-                            type="button"
-                            onClick={() => setView("canvas")}
-                            aria-label="Canvas view"
-                            className={`rounded p-1.5 transition-colors ${view === "canvas" ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground"}`}
-                        >
-                            <Waypoints className="size-4" />
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setView("list")}
-                            aria-label="List view"
-                            className={`rounded p-1.5 transition-colors ${view === "list" ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground"}`}
-                        >
-                            <List className="size-4" />
-                        </button>
-                    </div>
+                        ))}
                 </div>
             </div>
 
@@ -170,6 +156,15 @@ export function ProjectDetail({
             )}
         </div>
     );
+}
+
+/** Render children into the app-shell header slot (right of the app switcher). */
+function HeaderPortal({ children }: { children: ReactNode }) {
+    const [target, setTarget] = useState<HTMLElement | null>(null);
+    useEffect(() => {
+        setTarget(document.getElementById("polaris-header-slot"));
+    }, []);
+    return target ? createPortal(children, target) : null;
 }
 
 function NewEnvironmentButton({ projectId, onChanged }: { projectId: string; onChanged: () => void }) {
