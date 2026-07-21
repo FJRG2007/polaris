@@ -196,9 +196,19 @@ export async function addApplicationDomain(
         kind = "auto";
         certResolver = "internal";
     }
-    const domain = await prisma.domain.create({
-        data: { applicationId, hostname, kind, targetPort: opts.targetPort, certResolver }
-    });
+    let domain;
+    try {
+        domain = await prisma.domain.create({
+            data: { applicationId, hostname, kind, targetPort: opts.targetPort, certResolver }
+        });
+    } catch (caught) {
+        // Never surface a raw Prisma error to the UI. The only expected failure is a
+        // duplicate hostname (the unique constraint), which gets a plain message.
+        if (caught && typeof caught === "object" && "code" in caught && caught.code === "P2002") {
+            throw new Error(`${hostname} is already in use by another service.`);
+        }
+        throw new Error("Could not add the domain.");
+    }
     await syncAppDomainRoute(domain.id).catch(() => undefined);
     return hostname;
 }
