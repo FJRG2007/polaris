@@ -811,8 +811,8 @@ function HttpLogsView({ appId, deploymentStart }: { appId: string; deploymentSta
                 >
                     {scoped ? "This deployment" : "All history"}
                 </button>
-                <Select value={method} onValueChange={setMethod} options={HTTP_METHODS.map((m) => ({ value: m, label: m === "all" ? "Any method" : m }))} className="h-8 w-32" aria-label="Method" />
-                <Select value={statusClass} onValueChange={setStatusClass} options={STATUS_CLASSES} className="h-8 w-28" aria-label="Status" />
+                <Select value={method} onValueChange={setMethod} options={HTTP_METHODS.map((m) => ({ value: m, label: m === "all" ? "Any method" : m }))} className="h-8 w-36 min-w-[9rem]" aria-label="Method" />
+                <Select value={statusClass} onValueChange={setStatusClass} options={STATUS_CLASSES} className="h-8 w-36 min-w-[9rem]" aria-label="Status" />
                 <Input type="datetime-local" value={from} onChange={(event) => setFrom(event.target.value)} className="h-8 w-auto text-xs" aria-label="From" />
                 <span className="text-muted-foreground">to</span>
                 <Input type="datetime-local" value={to} onChange={(event) => setTo(event.target.value)} className="h-8 w-auto text-xs" aria-label="To" />
