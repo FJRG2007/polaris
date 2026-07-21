@@ -39,11 +39,22 @@ fn main() {
         std::process::exit(1);
     }
 
+    // Ensure the deploy and volume roots exist. Deploys resolve project paths with
+    // `resolve_within`, which canonicalizes the root and therefore fails if it is
+    // missing - so without this, every `compose up` returns a 502 ("could not
+    // start docker compose"). Best-effort: a failure here surfaces on first use.
+    for dir in [&config.deploy_root, &config.volume_root] {
+        if let Err(e) = std::fs::create_dir_all(dir) {
+            eprintln!("polaris-hostd: could not create {}: {e}", dir.display());
+        }
+    }
+
     eprintln!(
-        "polaris-hostd {} starting (root={}, mount_root={})",
+        "polaris-hostd {} starting (root={}, mount_root={}, deploy_root={})",
         env!("CARGO_PKG_VERSION"),
         config.root.display(),
         config.mount_root.display(),
+        config.deploy_root.display(),
     );
 
     let state = Arc::new(AppState::new(config, token));

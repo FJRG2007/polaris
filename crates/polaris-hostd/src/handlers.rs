@@ -300,7 +300,7 @@ fn deploy_up<R: Read>(state: &AppState, req: &Request, body: &mut R) -> Response
     let yaml = deploy::render_compose(&spec, &state.config);
     match deploy::compose_up(&state.config, &spec.project, &yaml) {
         Ok(reader) => stream_response(reader),
-        Err(_) => Response::text(502, "Bad Gateway", "could not start docker compose"),
+        Err(e) => Response::text(502, "Bad Gateway", &format!("could not start docker compose: {e}")),
     }
 }
 
