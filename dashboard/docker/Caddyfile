@@ -34,7 +34,11 @@
 	# the Next server.
 	@ws path /api/deploy/ws
 	reverse_proxy @ws web:{$POLARIS_WS_PORT:3001}
-	reverse_proxy web:3000
+	reverse_proxy web:3000 {
+		# The server's own IP for this connection (e.g. 192.168.1.138), so the app
+		# can auto-generate free sslip.io subdomains even when reached by hostname.
+		header_up X-Server-Ip {http.request.local.host}
+	}
 }
 
 # Public site. A domain (e.g. polaris.example.com) gets automatic HTTPS via

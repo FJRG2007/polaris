@@ -7,7 +7,9 @@
  */
 
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 import { requirePermission } from "@/lib/session";
+import { ensurePublicIp } from "@/lib/domain-service";
 import { recordAudit } from "@/lib/audit-service";
 import { getOrCreateLocalTarget } from "@/lib/deploy-target-service";
 import {
@@ -155,8 +157,11 @@ export async function createApplicationAction(input: {
             sourceConfig
         });
         await recordAudit({ actorId: user.id, action: "deploy.app.create", targetType: "application", targetId: app.id });
-        // Give it a free testing subdomain (best-effort; needs a public IP) and kick
-        // off the first deploy right away, like Railway/Dokploy.
+        // Give it a free testing subdomain and kick off the first deploy right away,
+        // like Railway/Dokploy. Auto-detect the server IP (Caddy's X-Server-Ip) so the
+        // free sslip.io subdomain works with no setup even on a LAN.
+        const requestHeaders = await headers();
+        await ensurePublicIp(requestHeaders.get("x-server-ip") ?? requestHeaders.get("host"));
         const targetPort = Number.isInteger(input.port) ? Number(input.port) : isGit ? 3000 : 80;
         try {
             await addApplicationDomain(app.id, user.id, { targetPort });
@@ -274,6 +279,8 @@ export async function addDomainAction(input: {
     const user = await requirePermission("deploy.manage");
     const port = Number(input.targetPort);
     if (!Number.isInteger(port) || port < 1 || port > 65535) return { error: "A valid target port is required" };
+    const requestHeaders = await headers();
+    await ensurePublicIp(requestHeaders.get("x-server-ip") ?? requestHeaders.get("host"));
     try {
         const hostname = await addApplicationDomain(input.applicationId, user.id, {
             hostname: input.hostname,

@@ -89,6 +89,29 @@ export async function getPublicIp(): Promise<string | null> {
     return getSetting(KEYS.publicIp);
 }
 
+/** A routable (non-loopback/unspecified) IPv4 literal. */
+function isRoutableIpv4(value: string): boolean {
+    const match = value.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+    if (!match) return false;
+    const octets = match.slice(1, 5).map(Number);
+    if (octets.some((n) => n > 255)) return false;
+    return octets[0] !== 127 && octets[0] !== 0;
+}
+
+/**
+ * Auto-fill the free-subdomain public IP from a detected server address the first
+ * time (Caddy sets `X-Server-Ip` to the connection's local host, e.g. 192.168.1.138,
+ * even when reached by hostname), so free subdomains work with zero setup - the way
+ * Dokploy/Coolify do. A manually configured IP is never overwritten.
+ */
+export async function ensurePublicIp(candidate: string | null | undefined): Promise<void> {
+    if (!candidate) return;
+    const ip = candidate.trim().replace(/:\d+$/, "");
+    if (!isRoutableIpv4(ip)) return;
+    if (await getPublicIp()) return;
+    await setSetting(KEYS.publicIp, ip);
+}
+
 /** A free HTTPS subdomain for a named service pointing at the host, or null when
  *  no public IP is known (then callers fall back to a configured domain). */
 export async function autoSubdomainUrl(name: string): Promise<string | null> {
