@@ -917,7 +917,7 @@ function VariablesTab({ app }: { app: ProjectApp }) {
                             <span className="text-xs text-muted-foreground/50">{"{ }"}</span>
                             <span className="w-60 shrink-0 truncate font-mono text-xs font-medium">{item.key}</span>
                             <span className="min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground">
-                                {item.isSecret ? "â€¢â€¢â€¢â€¢â€¢â€¢â€¢" : reveal[item.id] ? (item.value ?? "") : "â€¢â€¢â€¢â€¢â€¢â€¢â€¢"}
+                                {!item.isSecret && reveal[item.id] ? (item.value ?? "") : <SecretMask />}
                             </span>
                             {!item.isSecret && (
                                 <button
@@ -1428,4 +1428,15 @@ function Loading() {
 
 function Empty({ text }: { text: string }) {
     return <p className="py-10 text-center text-sm text-muted-foreground">{text}</p>;
+}
+
+/** A masked value placeholder: fixed-width dots, so secrets never render as text. */
+function SecretMask() {
+    return (
+        <span className="inline-flex items-center gap-0.5 align-middle">
+            {Array.from({ length: 8 }).map((_, index) => (
+                <span key={index} className="size-1 rounded-full bg-muted-foreground/50" />
+            ))}
+        </span>
+    );
 }
