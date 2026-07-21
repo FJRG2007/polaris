@@ -10,6 +10,7 @@ import { useState, useTransition } from "react";
 import { FileText, FolderClosed, RotateCcw, Trash2 } from "lucide-react";
 import { formatBytes } from "@polaris/core";
 import { Button, Card, CardBody } from "@polaris/ui";
+import { useConfirm } from "@/components/confirm-dialog";
 import {
     deleteTrashForeverAction,
     emptyTrashAction,
@@ -31,6 +32,7 @@ export function TrashView({ items }: { items: TrashRow[] }) {
     const [rows, setRows] = useState(items);
     const [pending, startTransition] = useTransition();
     const [busy, setBusy] = useState<string | null>(null);
+    const [confirm, confirmDialog] = useConfirm();
 
     function onRestore(id: string) {
         setBusy(id);
@@ -41,8 +43,8 @@ export function TrashView({ items }: { items: TrashRow[] }) {
         });
     }
 
-    function onDelete(id: string) {
-        if (!window.confirm("Permanently delete this item? This cannot be undone.")) return;
+    async function onDelete(id: string) {
+        if (!(await confirm({ title: "Permanently delete this item?", description: "This cannot be undone.", confirmLabel: "Delete", danger: true }))) return;
         setBusy(id);
         startTransition(async () => {
             await deleteTrashForeverAction(id);
@@ -51,8 +53,8 @@ export function TrashView({ items }: { items: TrashRow[] }) {
         });
     }
 
-    function onEmpty() {
-        if (!window.confirm("Permanently delete everything in the Trash? This cannot be undone.")) return;
+    async function onEmpty() {
+        if (!(await confirm({ title: "Empty the Trash?", description: "Permanently delete everything in the Trash. This cannot be undone.", confirmLabel: "Empty Trash", danger: true }))) return;
         startTransition(async () => {
             await emptyTrashAction();
             setRows([]);
@@ -125,6 +127,7 @@ export function TrashView({ items }: { items: TrashRow[] }) {
                     ))}
                 </div>
             )}
+            {confirmDialog}
         </div>
     );
 }

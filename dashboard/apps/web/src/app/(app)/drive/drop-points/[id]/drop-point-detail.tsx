@@ -34,6 +34,7 @@ import {
     Input
 } from "@polaris/ui";
 import { GeoPicker } from "@/components/geo-picker";
+import { useConfirm } from "@/components/confirm-dialog";
 import { RequestDialog } from "../../request-dialog";
 import {
     reopenFileRequestAction,
@@ -100,6 +101,7 @@ export function DropPointDetail({
     const [pending, startTransition] = useTransition();
     const [editing, setEditing] = useState(false);
     const [cloning, setCloning] = useState(false);
+    const [confirm, confirmDialog] = useConfirm();
 
     const state = status(config);
     const driveHref = `/drive?c=${config.destinationConnectionId}&p=${encodeURIComponent(config.destinationPath)}`;
@@ -111,8 +113,8 @@ export function DropPointDetail({
         });
     }
 
-    function onClose() {
-        if (!window.confirm("Close this drop point? It will stop accepting uploads immediately.")) return;
+    async function onClose() {
+        if (!(await confirm({ title: "Close this drop point?", description: "It will stop accepting uploads immediately.", confirmLabel: "Close", danger: true }))) return;
         startTransition(async () => {
             await revokeFileRequestAction(config.id);
             router.refresh();
@@ -278,6 +280,7 @@ export function DropPointDetail({
                 initial={cloneInitial}
                 onOpenChange={(open) => !open && setCloning(false)}
             />
+            {confirmDialog}
         </div>
     );
 }

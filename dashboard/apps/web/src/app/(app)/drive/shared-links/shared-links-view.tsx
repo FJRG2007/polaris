@@ -30,6 +30,7 @@ import {
     updateShareAction,
     type ShareLogRow
 } from "../share-actions";
+import { useConfirm } from "@/components/confirm-dialog";
 
 export interface ShareRow {
     id: string;
@@ -68,9 +69,10 @@ export function SharedView({ shares }: { shares: ShareRow[] }) {
     const [logsFor, setLogsFor] = useState<ShareRow | null>(null);
     const [revealed, setRevealed] = useState<{ id: string; url: string } | null>(null);
     const [copied, setCopied] = useState(false);
+    const [confirm, confirmDialog] = useConfirm();
 
-    function onRevoke(id: string) {
-        if (!window.confirm("Revoke this link? It will stop working immediately.")) return;
+    async function onRevoke(id: string) {
+        if (!(await confirm({ title: "Revoke this link?", description: "It will stop working immediately.", confirmLabel: "Revoke", danger: true }))) return;
         setBusy(id);
         startTransition(async () => {
             await revokeShareAction(id);
@@ -84,7 +86,7 @@ export function SharedView({ shares }: { shares: ShareRow[] }) {
         const result = await revealShareLinkAction(row.id);
         setBusy(null);
         if (result.error) {
-            window.alert(result.error);
+            await confirm({ title: "Could not reveal the link", description: result.error, alert: true });
             return;
         }
         setRevealed({ id: row.id, url: result.url ?? "" });
@@ -212,6 +214,7 @@ export function SharedView({ shares }: { shares: ShareRow[] }) {
                 }}
             />
             <ShareLogsDialog share={logsFor} onOpenChange={(open) => !open && setLogsFor(null)} />
+            {confirmDialog}
         </>
     );
 }

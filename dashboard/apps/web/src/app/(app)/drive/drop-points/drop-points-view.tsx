@@ -11,6 +11,7 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { Ban, Inbox, Lock, RotateCcw } from "lucide-react";
 import { Badge, Button, Card, CardBody } from "@polaris/ui";
+import { useConfirm } from "@/components/confirm-dialog";
 import { reopenFileRequestAction, revokeFileRequestAction } from "../request-actions";
 
 export interface DropPointRow {
@@ -41,9 +42,10 @@ export function DropPointsView({ requests }: { requests: DropPointRow[] }) {
     const [rows, setRows] = useState(requests);
     const [pending, startTransition] = useTransition();
     const [busy, setBusy] = useState<string | null>(null);
+    const [confirm, confirmDialog] = useConfirm();
 
-    function onRevoke(id: string) {
-        if (!window.confirm("Close this drop point? It will stop accepting uploads immediately.")) return;
+    async function onRevoke(id: string) {
+        if (!(await confirm({ title: "Close this drop point?", description: "It will stop accepting uploads immediately.", confirmLabel: "Close", danger: true }))) return;
         setBusy(id);
         startTransition(async () => {
             await revokeFileRequestAction(id);
@@ -131,6 +133,7 @@ export function DropPointsView({ requests }: { requests: DropPointRow[] }) {
                     </Card>
                 );
             })}
+            {confirmDialog}
         </div>
     );
 }

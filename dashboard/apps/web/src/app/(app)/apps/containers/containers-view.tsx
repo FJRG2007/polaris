@@ -16,6 +16,7 @@ import { formatBytes } from "@polaris/core";
 import { Badge, Button, Card, CardBody, cn } from "@polaris/ui";
 import { containerAction, deleteDockerConnectionAction } from "./actions";
 import { DockerConnectionDialog } from "./docker-connection-dialog";
+import { useConfirm } from "@/components/confirm-dialog";
 import type { ContainerRow, DockerConnectionSummary, LocalHostDiagnostic, OverviewData } from "./types";
 
 const REFRESH_MS = 5000;
@@ -40,6 +41,7 @@ export function ContainersView({
     const router = useRouter();
     const [pending, startTransition] = useTransition();
     const [live, setLive] = useState(true);
+    const [confirm, confirmDialog] = useConfirm();
 
     // Poll for fresh stats by re-rendering the server component.
     useEffect(() => {
@@ -55,8 +57,8 @@ export function ContainersView({
         });
     }
 
-    function onDeleteConnection(id: string) {
-        if (!window.confirm("Remove this Docker connection?")) return;
+    async function onDeleteConnection(id: string) {
+        if (!(await confirm({ title: "Remove this Docker connection?", confirmLabel: "Remove", danger: true }))) return;
         startTransition(async () => {
             await deleteDockerConnectionAction(id);
             router.refresh();
@@ -226,6 +228,7 @@ export function ContainersView({
                     </>
                 )}
             </section>
+            {confirmDialog}
         </div>
     );
 }
