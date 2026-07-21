@@ -9,7 +9,7 @@
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { requirePermission } from "@/lib/session";
-import { ensurePublicIp } from "@/lib/domain-service";
+import { ensurePublicIp, getDomainConfig } from "@/lib/domain-service";
 import { getNetworkStatus } from "@/lib/network-service";
 import { recordAudit } from "@/lib/audit-service";
 import { getOrCreateLocalTarget, getOrCreateHostTarget } from "@/lib/deploy-target-service";
@@ -514,6 +514,14 @@ export async function autoExposeAction(input: {
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Could not create the subdomain" };
     }
+}
+
+/** The configured DuckDNS subdomain, so the domain form can ask for only the label
+ *  (the `.<sub>.duckdns.org` base is already known) instead of a full hostname. */
+export async function duckdnsSubdomainAction(): Promise<{ subdomain: string | null }> {
+    await requirePermission("deploy.manage");
+    const config = await getDomainConfig();
+    return { subdomain: config.duckdnsSubdomain || null };
 }
 
 export async function removeDomainAction(domainId: string): Promise<void> {

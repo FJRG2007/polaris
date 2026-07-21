@@ -14,6 +14,7 @@ import {
     ChevronLeft,
     ChevronRight,
     Download,
+    ExternalLink,
     Eye,
     EyeOff,
     Globe,
@@ -55,6 +56,7 @@ import { FilesPanel } from "./files-panel";
 import {
     addDomainAction,
     autoExposeAction,
+    duckdnsSubdomainAction,
     deleteEnvVarAction,
     deployApplicationAction,
     importEnvVarsAction,
@@ -1403,10 +1405,11 @@ function NamedTunnelRow({ appId, nonce, onChanged }: { appId: string; nonce: num
 }
 
 /** Every way to expose a service, unified into the one Public access selector. */
-type ExposureKind = "subdomain" | "le" | "duckdns" | "proxy" | "cf-named" | "cf-quick" | "ngrok";
+type ExposureKind = "subdomain" | "local" | "le" | "duckdns" | "proxy" | "cf-named" | "cf-quick" | "ngrok";
 
 const EXPOSURE_OPTIONS: { value: ExposureKind; label: string; icon: ReactNode }[] = [
     { value: "subdomain", label: "Free subdomain (auto)", icon: <Globe className="size-4 text-muted-foreground" /> },
+    { value: "local", label: "Local subdomain (LAN)", icon: <MapPin className="size-4 text-muted-foreground" /> },
     { value: "le", label: "Custom domain - Let's Encrypt", icon: <Globe className="size-4 text-muted-foreground" /> },
     { value: "cf-named", label: "Cloudflare tunnel - custom domain", icon: <CloudflareMark className="size-4" /> },
     { value: "cf-quick", label: "Cloudflare quick link (free)", icon: <CloudflareMark className="size-4" /> },
@@ -1414,6 +1417,11 @@ const EXPOSURE_OPTIONS: { value: ExposureKind; label: string; icon: ReactNode }[
     { value: "duckdns", label: "DuckDNS subdomain", icon: <img src="/logos/duckdns.webp" alt="" className="size-4" /> },
     { value: "proxy", label: "Behind a tunnel/proxy", icon: <Globe className="size-4 text-muted-foreground" /> }
 ];
+
+/** A URL-safe label from the app name, the default for a local/DuckDNS subdomain. */
+function defaultLabel(name: string): string {
+    return name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "app";
+}
 
 function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolean; onChanged: () => void }) {
     const [autoDeploy, setAutoDeploy] = useState(app.autoDeploy);
@@ -1424,16 +1432,20 @@ function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
     // (see buildAppPlan). Only a value the user types here pins it.
     const [containerPort, setContainerPort] = useState(app.port != null ? String(app.port) : "");
     const [hostname, setHostname] = useState("");
+    const [label, setLabel] = useState("");
     const [connectorToken, setConnectorToken] = useState("");
-    const [port, setPort] = useState(String(app.port ?? 3000));
+    const [port, setPort] = useState(app.port != null ? String(app.port) : "");
+    const [advanced, setAdvanced] = useState(false);
     const [exposure, setExposure] = useState<ExposureKind>("subdomain");
     const [cfConnected, setCfConnected] = useState(false);
+    const [duckSub, setDuckSub] = useState<string | null>(null);
     const [tunnelNonce, setTunnelNonce] = useState(0);
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
 
     useEffect(() => {
         void cloudflareAccountStatusAction().then((status) => setCfConnected(status.connected)).catch(() => undefined);
+        void duckdnsSubdomainAction().then((result) => setDuckSub(result.subdomain)).catch(() => undefined);
     }, []);
 
     function saveSettings() {
@@ -1459,24 +1471,48 @@ function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
         });
     }
 
-    const isDomainExposure = exposure === "subdomain" || exposure === "le" || exposure === "duckdns" || exposure === "proxy";
-    const needsHostname = exposure === "le" || exposure === "duckdns" || exposure === "proxy" || exposure === "cf-named";
+    // Domain kinds serve on standard 80/443 (the port is a target detail, hidden under
+    // Advanced). "local"/"duckdns" ask for just a label; "le"/"proxy"/"cf-named" a full
+    // hostname; "subdomain"/tunnels need nothing.
+    const isDomainExposure =
+        exposure === "subdomain" || exposure === "local" || exposure === "le" || exposure === "duckdns" || exposure === "proxy";
+    const usesLabel = exposure === "local" || exposure === "duckdns";
+    const needsHostname = exposure === "le" || exposure === "proxy" || exposure === "cf-named";
+    const labelSuffix = exposure === "local" ? ".plr.local" : exposure === "duckdns" && duckSub ? `.${duckSub}.duckdns.org` : "";
+    const duckMissing = exposure === "duckdns" && !duckSub;
+
+    // The target port the route stores: the Advanced override, else the app's known
+    // port, else a sensible default. Routing serves on 80/443 regardless.
+    function targetPort(): number {
+        const override = Number(port.trim());
+        if (advanced && Number.isInteger(override) && override > 0) return override;
+        return app.port ?? (app.sourceType === "image" ? 80 : 3000);
+    }
 
     // One action for every exposure: domains go through addDomainAction, the three
     // tunnel kinds through their own start/provision actions. Tunnel results show up
     // in the list above via the row components once the nonce bumps.
     function submitExposure() {
         setError(null);
+        const labelValue = label.trim() || defaultLabel(app.name);
         startTransition(async () => {
             let result: { error?: string } = {};
             if (exposure === "subdomain") {
-                // Auto = always reachable: a LAN name, plus a free Cloudflare quick
-                // tunnel for public access when the box is behind NAT.
-                result = await autoExposeAction({ applicationId: app.id, targetPort: Number(port) });
-            } else if (exposure === "le" || exposure === "duckdns") {
-                result = await addDomainAction({ applicationId: app.id, hostname: hostname.trim() || undefined, targetPort: Number(port), cert: "le" });
+                // Auto = always reachable: a universally-resolvable sslip.io LAN name,
+                // plus a free Cloudflare quick tunnel for public access when behind NAT.
+                result = await autoExposeAction({ applicationId: app.id, targetPort: targetPort() });
+            } else if (exposure === "local") {
+                result = await addDomainAction({ applicationId: app.id, hostname: `${labelValue}.plr.local`, targetPort: targetPort(), cert: "internal" });
+            } else if (exposure === "duckdns") {
+                if (!duckSub) {
+                    setError("Configure DuckDNS under Integrations first");
+                    return;
+                }
+                result = await addDomainAction({ applicationId: app.id, hostname: `${labelValue}.${duckSub}.duckdns.org`, targetPort: targetPort(), cert: "le" });
+            } else if (exposure === "le") {
+                result = await addDomainAction({ applicationId: app.id, hostname: hostname.trim() || undefined, targetPort: targetPort(), cert: "le" });
             } else if (exposure === "proxy") {
-                result = await addDomainAction({ applicationId: app.id, hostname: hostname.trim() || undefined, targetPort: Number(port), cert: "none" });
+                result = await addDomainAction({ applicationId: app.id, hostname: hostname.trim() || undefined, targetPort: targetPort(), cert: "none" });
             } else if (exposure === "cf-named") {
                 result = cfConnected
                     ? await provisionNamedTunnelAction({ applicationId: app.id, hostname })
@@ -1489,6 +1525,7 @@ function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
             if (result.error) setError(result.error);
             else {
                 setHostname("");
+                setLabel("");
                 setConnectorToken("");
                 setTunnelNonce((nonce) => nonce + 1);
                 onChanged();
@@ -1506,6 +1543,7 @@ function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
               : "Add domain";
     const submitDisabled =
         pending ||
+        duckMissing ||
         (needsHostname && !hostname.trim()) ||
         (exposure === "cf-named" && !cfConnected && !connectorToken.trim());
 
@@ -1570,6 +1608,9 @@ function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
                                     <Globe className="size-3 shrink-0" /> {domain.hostname}
                                 </span>
                             )}
+                            {(domain.kind === "lan" || domain.hostname.endsWith(".plr.local")) && (
+                                <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">local</span>
+                            )}
                             <span className="flex w-5 shrink-0 items-center justify-center">
                                 <button
                                     type="button"
@@ -1597,28 +1638,31 @@ function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
                     description="Pick how to expose this service - a free subdomain, your own domain with Let's Encrypt, or a Cloudflare/ngrok tunnel that needs no DNS or port-forwarding."
                 >
                     <div className="flex flex-col gap-2">
-                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                            <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-                                Exposure
-                                <Select
-                                    value={exposure}
-                                    onValueChange={(value) => setExposure(value as ExposureKind)}
-                                    options={EXPOSURE_OPTIONS}
-                                    aria-label="Exposure method"
+                        <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                            Exposure
+                            <Select
+                                value={exposure}
+                                onValueChange={(value) => setExposure(value as ExposureKind)}
+                                options={EXPOSURE_OPTIONS}
+                                aria-label="Exposure method"
+                            />
+                        </label>
+                        {usesLabel && !duckMissing && (
+                            <div className="flex items-center gap-2">
+                                <Input
+                                    value={label}
+                                    onChange={(event) => setLabel(event.target.value)}
+                                    placeholder={defaultLabel(app.name)}
+                                    autoComplete="off"
                                 />
-                            </label>
-                            {isDomainExposure && (
-                                <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-                                    Port
-                                    <Input value={port} onChange={(event) => setPort(event.target.value)} placeholder="port" />
-                                </label>
-                            )}
-                        </div>
+                                <span className="shrink-0 text-xs text-muted-foreground">{labelSuffix}</span>
+                            </div>
+                        )}
                         {needsHostname && (
                             <Input
                                 value={hostname}
                                 onChange={(event) => setHostname(event.target.value)}
-                                placeholder={exposure === "duckdns" ? "app.yoursub.duckdns.org" : "app.example.com"}
+                                placeholder="app.example.com"
                             />
                         )}
                         {exposure === "cf-named" && !cfConnected && (
@@ -1631,21 +1675,57 @@ function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
                         )}
                         <p className="text-xs text-muted-foreground">
                             {exposure === "subdomain"
-                                ? "Always reachable: a clean <app>.plr.local name on your LAN, plus a public Let's Encrypt subdomain on a reachable box - or, behind NAT, a free Cloudflare quick link so it works from outside too. Connect a Cloudflare account or a custom domain for a stable public URL."
-                                : exposure === "le"
-                                  ? "Point the domain's DNS at this server's public IP (port-forward / DuckDNS). Traefik gets a Let's Encrypt certificate automatically."
-                                  : exposure === "duckdns"
-                                    ? "Use a hostname under your DuckDNS subdomain (it resolves *.yoursub.duckdns.org). Configure DuckDNS under Integrations; Traefik gets a Let's Encrypt certificate automatically."
-                                    : exposure === "proxy"
-                                      ? "For a domain fronted by an external proxy that terminates TLS."
-                                      : exposure === "cf-named"
-                                        ? cfConnected
-                                            ? "Polaris creates the tunnel and the DNS record for you - just enter a hostname on a domain in your Cloudflare account."
-                                            : "Create the tunnel in Cloudflare and paste its connector token. Tip: connect a Cloudflare API token under Integrations to skip this - then you only pick a hostname."
-                                        : exposure === "cf-quick"
-                                          ? "A throwaway *.trycloudflare.com URL - no account, no DNS, no port-forwarding. The link changes each time it starts."
-                                          : "A public ngrok URL forwarded to this app. Add your ngrok authtoken under Integrations first; ngrok's free plan allows one tunnel at a time."}
+                                ? "Always reachable: a free sslip.io subdomain that resolves on any device (a public Let's Encrypt name on a reachable box). Behind NAT, Polaris also starts a free Cloudflare quick link so it works from outside. Connect a Cloudflare account or a custom domain for a stable public URL."
+                                : exposure === "local"
+                                  ? "A friendly <name>.plr.local address, LOCAL only - it resolves on your LAN via mDNS (works on macOS/iOS and most modern devices; Windows may not resolve it, use the free subdomain there). Trusted HTTPS once you install the CA root (Admin - Domains)."
+                                  : exposure === "le"
+                                    ? "Point the domain's DNS at this server's public IP (port-forward / DuckDNS). Traefik gets a Let's Encrypt certificate automatically."
+                                    : exposure === "duckdns"
+                                      ? duckMissing
+                                          ? "Configure DuckDNS under Integrations first, then pick a subdomain here."
+                                          : "Just the subdomain - the base is your DuckDNS domain. It resolves via DuckDNS with a Let's Encrypt certificate automatically."
+                                      : exposure === "proxy"
+                                        ? "For a domain fronted by an external proxy that terminates TLS."
+                                        : exposure === "cf-named"
+                                          ? cfConnected
+                                              ? "Polaris creates the tunnel and the DNS record for you - just enter a hostname on a domain in your Cloudflare account."
+                                              : "Create the tunnel in Cloudflare and paste its connector token. Tip: connect a Cloudflare API token under Integrations to skip this - then you only pick a hostname."
+                                          : exposure === "cf-quick"
+                                            ? "A throwaway *.trycloudflare.com URL - no account, no DNS, no port-forwarding. The link changes each time it starts."
+                                            : "A public ngrok URL forwarded to this app. Add your ngrok authtoken under Integrations first; ngrok's free plan allows one tunnel at a time."}
                         </p>
+                        {duckMissing && (
+                            <a href="/integrations" className="inline-flex w-fit items-center gap-1 text-xs text-primary hover:underline">
+                                Set up DuckDNS <ExternalLink className="size-3" />
+                            </a>
+                        )}
+                        {isDomainExposure && (
+                            <div className="flex flex-col gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setAdvanced((value) => !value)}
+                                    className="inline-flex w-fit items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                                >
+                                    {advanced ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />} Advanced
+                                </button>
+                                {advanced && (
+                                    <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                                        Target port
+                                        <Input
+                                            value={port}
+                                            onChange={(event) => setPort(event.target.value)}
+                                            placeholder={String(app.port ?? "auto")}
+                                            inputMode="numeric"
+                                            className="w-40"
+                                        />
+                                        <span>
+                                            The container port this route targets. The service is served on the standard
+                                            80/443 - you never put a port in the URL. Defaults to the app's port.
+                                        </span>
+                                    </label>
+                                )}
+                            </div>
+                        )}
                         <div className="flex justify-end">
                             <Button variant="outline" onClick={submitExposure} disabled={submitDisabled}>
                                 {pending && <Loader2 className="size-4 animate-spin" />} {submitLabel}
