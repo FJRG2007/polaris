@@ -66,7 +66,6 @@ export function RequestDialog({
     const [url, setUrl] = useState<string | null>(null);
     const [copied, setCopied] = useState(false);
     const [pickConnection, setPickConnection] = useState("");
-    const [pickPath, setPickPath] = useState("");
     const [geoCountries, setGeoCountries] = useState<string[]>([]);
     const [geoContinents, setGeoContinents] = useState<string[]>([]);
     const [expiry, setExpiry] = useState("");
@@ -83,7 +82,6 @@ export function RequestDialog({
             setUrl(null);
             setCopied(false);
             setPickConnection(connections?.[0]?.id ?? "");
-            setPickPath("");
             setGeoCountries(initial?.geoCountries ?? []);
             setGeoContinents(initial?.geoContinents ?? []);
             setExpiry("");
@@ -125,9 +123,9 @@ export function RequestDialog({
         const maxMb = Number(form.get("maxMb") ?? 0);
 
         const destinationConnectionId = needsPicker ? pickConnection : target.connectionId;
-        const destinationPath = needsPicker
-            ? pickPath.trim().replace(/^\/+|\/+$/g, "")
-            : target.path;
+        // The path is managed by Polaris (a dedicated folder under "Drop Points"); the
+        // server derives it from the title, so nothing is collected here.
+        const destinationPath = "";
         if (!destinationConnectionId) {
             setPending(false);
             setError("Choose a connection to collect into");
@@ -199,29 +197,21 @@ export function RequestDialog({
                     </div>
                 ) : (
                     <form onSubmit={onSubmit} className="flex flex-col gap-3">
-                        {needsPicker ? (
-                            <div className="grid grid-cols-2 gap-3">
-                                <label className="flex flex-col gap-1 text-sm">
-                                    Connection
-                                    <Select
-                                        value={pickConnection}
-                                        onValueChange={setPickConnection}
-                                        options={(connections ?? []).map((connection) => ({
-                                            value: connection.id,
-                                            label: connection.name
-                                        }))}
-                                    />
-                                </label>
-                                <label className="flex flex-col gap-1 text-sm">
-                                    Destination folder
-                                    <Input
-                                        value={pickPath}
-                                        onChange={(event) => setPickPath(event.target.value)}
-                                        placeholder="Root (leave empty)"
-                                        autoComplete="off"
-                                    />
-                                </label>
-                            </div>
+                        {/* Only ask which connection when there is a real choice; with a
+                            single connection it is used automatically. The folder is always
+                            managed by Polaris, so there is no destination-folder field. */}
+                        {needsPicker && (connections?.length ?? 0) > 1 ? (
+                            <label className="flex flex-col gap-1 text-sm">
+                                Connection
+                                <Select
+                                    value={pickConnection}
+                                    onValueChange={setPickConnection}
+                                    options={(connections ?? []).map((connection) => ({
+                                        value: connection.id,
+                                        label: connection.name
+                                    }))}
+                                />
+                            </label>
                         ) : null}
                         <label className="flex flex-col gap-1 text-sm">
                             Title
