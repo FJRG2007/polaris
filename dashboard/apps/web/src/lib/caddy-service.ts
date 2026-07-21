@@ -21,7 +21,9 @@ async function adminFetch(path: string, init?: RequestInit): Promise<Response | 
     try {
         return await fetch(`${admin()}${path}`, {
             ...init,
-            headers: { "content-type": "application/json", ...(init?.headers ?? {}) }
+            // Caddy's admin API rejects a non-loopback caller unless the Origin
+            // header matches one of its configured `origins`; send it explicitly.
+            headers: { "content-type": "application/json", origin: admin(), ...(init?.headers ?? {}) }
         });
     } catch {
         // Caddy not reachable (e.g. sandboxed edition without the proxy): routing is
