@@ -65,6 +65,7 @@ import {
     removeApplicationDeploymentAction,
     removeDomainAction,
     restartApplicationAction,
+    revealEnvVarAction,
     saveEnvVarAction,
     setAppPortAction,
     setApplicationRunningAction,
@@ -493,6 +494,10 @@ function DeploymentLogsView({
 
             {cat === "Details" ? (
                 <DetailsPanel app={app} deployment={deployment} />
+            ) : cat === "Build Logs" ? (
+                <LogStream deploymentId={deploymentId} onDone={onDone} />
+            ) : cat === "Deploy Logs" ? (
+                <RuntimeLogView appId={app.id} />
             ) : cat === "HTTP Logs" ? (
                 <HttpLogsView appId={app.id} />
             ) : cat === "Network Flow Logs" ? (
@@ -558,6 +563,51 @@ function LogStream({ deploymentId, onDone }: { deploymentId: string; onDone: () 
     }, [deploymentId]);
 
     return <LogViewer log={log} name={deploymentId} searchable className="h-[26rem]" />;
+}
+
+/** Live runtime stdout/stderr of the app's container - what the app prints while
+ *  running, distinct from the build log. Polled while the tab is open. */
+function RuntimeLogView({ appId }: { appId: string }) {
+    const [log, setLog] = useState<string | null>(null);
+    const [error, setError] = useState<string | null>(null);
+
+    useEffect(() => {
+        let active = true;
+        let timer: ReturnType<typeof setTimeout>;
+        async function poll(): Promise<void> {
+            if (typeof document !== "undefined" && document.hidden) {
+                timer = setTimeout(poll, 3000);
+                return;
+            }
+            try {
+                const res = await fetch(`/api/deploy/apps/${appId}/logs?tail=500`, { cache: "no-store" });
+                if (!active) return;
+                if (res.ok) {
+                    const data = (await res.json()) as { log: string };
+                    setLog(data.log ?? "");
+                    setError(null);
+                } else {
+                    const data = (await res.json().catch(() => null)) as { error?: string } | null;
+                    setError(data?.error ?? "Could not read runtime logs");
+                }
+            } catch {
+                if (active) setError("Could not read runtime logs");
+            }
+            if (active) timer = setTimeout(poll, 2500);
+        }
+        void poll();
+        return () => {
+            active = false;
+            clearTimeout(timer);
+        };
+    }, [appId]);
+
+    if (error) return <Empty text={error} />;
+    if (log === null) return <Loading />;
+    if (!log.trim()) {
+        return <Empty text="No runtime logs yet. The container may have just started, or writes nothing to stdout." />;
+    }
+    return <LogViewer log={log} name={`${appId}-runtime`} searchable className="h-[26rem]" />;
 }
 
 /** Color an HTTP status by its class: 2xx ok, 3xx redirect, 4xx client, 5xx server. */
@@ -784,7 +834,9 @@ function VariablesTab({ app }: { app: ProjectApp }) {
     const [key, setKey] = useState("");
     const [value, setValue] = useState("");
     const [isSecret, setIsSecret] = useState(true);
-    const [reveal, setReveal] = useState<Record<string, boolean>>({});
+    // Revealed values, keyed by id: non-secrets use the listed value, secrets are
+    // decrypted on demand so a secret only reaches the client when the eye is clicked.
+    const [revealed, setRevealed] = useState<Record<string, string>>({});
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
     const [raw, setRaw] = useState("");
@@ -794,9 +846,28 @@ function VariablesTab({ app }: { app: ProjectApp }) {
 
     function reload() {
         setItems(null);
+        setRevealed({});
         void listEnvVarsAction(scope, scopeId).then(setItems);
     }
     useEffect(reload, [scope, scopeId]);
+
+    function toggleReveal(item: { id: string; isSecret: boolean; value: string | null }) {
+        if (item.id in revealed) {
+            setRevealed((prev) => {
+                const next = { ...prev };
+                delete next[item.id];
+                return next;
+            });
+            return;
+        }
+        if (!item.isSecret) {
+            setRevealed((prev) => ({ ...prev, [item.id]: item.value ?? "" }));
+            return;
+        }
+        void revealEnvVarAction(item.id).then((result) => {
+            if (typeof result.value === "string") setRevealed((prev) => ({ ...prev, [item.id]: result.value as string }));
+        });
+    }
 
     function importRaw() {
         setError(null);
@@ -912,33 +983,38 @@ function VariablesTab({ app }: { app: ProjectApp }) {
                 <Empty text="No variables yet. Add one or paste a .env." />
             ) : (
                 <ul className="flex flex-col">
-                    {items.map((item) => (
-                        <li key={item.id} className="group flex items-center gap-3 border-b border-border/40 py-2.5 text-sm">
-                            <span className="text-xs text-muted-foreground/50">{"{ }"}</span>
-                            <span className="w-60 shrink-0 truncate font-mono text-xs font-medium">{item.key}</span>
-                            <span className="min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground">
-                                {!item.isSecret && reveal[item.id] ? (item.value ?? "") : <SecretMask />}
-                            </span>
-                            {!item.isSecret && (
+                    {items.map((item) => {
+                        const shown = item.id in revealed;
+                        return (
+                            <li key={item.id} className="group flex items-center gap-3 border-b border-border/40 py-2.5 text-sm">
+                                <span className="text-xs text-muted-foreground/50">{"{ }"}</span>
+                                <span className="w-60 shrink-0 truncate font-mono text-xs font-medium">{item.key}</span>
+                                <span className="min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground">
+                                    {shown ? (
+                                        revealed[item.id] || <span className="text-muted-foreground/50">(empty)</span>
+                                    ) : (
+                                        <SecretMask />
+                                    )}
+                                </span>
                                 <button
                                     type="button"
-                                    onClick={() => setReveal((prev) => ({ ...prev, [item.id]: !prev[item.id] }))}
+                                    onClick={() => toggleReveal(item)}
                                     className="text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100"
-                                    aria-label="Toggle value"
+                                    aria-label={shown ? "Hide value" : "Reveal value"}
                                 >
-                                    {reveal[item.id] ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
+                                    {shown ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
                                 </button>
-                            )}
-                            <button
-                                type="button"
-                                title="Remove"
-                                onClick={() => startTransition(async () => { await deleteEnvVarAction(item.id); reload(); })}
-                                className="text-muted-foreground opacity-0 transition-opacity hover:text-danger group-hover:opacity-100"
-                            >
-                                <Trash2 className="size-4" />
-                            </button>
-                        </li>
-                    ))}
+                                <button
+                                    type="button"
+                                    title="Remove"
+                                    onClick={() => startTransition(async () => { await deleteEnvVarAction(item.id); reload(); })}
+                                    className="text-muted-foreground opacity-0 transition-opacity hover:text-danger group-hover:opacity-100"
+                                >
+                                    <Trash2 className="size-4" />
+                                </button>
+                            </li>
+                        );
+                    })}
                 </ul>
             )}
             {error && <p className="text-sm text-danger">{error}</p>}

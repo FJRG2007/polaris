@@ -348,6 +348,23 @@ export async function readAppHttpMetrics(
     return bucketHttpMetrics(entries, from, to);
 }
 
+/**
+ * Raw stdout/stderr tail of an app's running container - the Deploy Logs view,
+ * i.e. what the app itself prints at runtime (distinct from the build/pipeline
+ * log stored on the Deployment). Empty if the container is not running.
+ */
+export async function readAppRuntimeLog(applicationId: string, ownerId: string, tail = 500): Promise<string> {
+    const { container, target } = await appRuntime(applicationId, ownerId);
+    const ports = await getPorts(target, ownerId);
+    const chunks: Buffer[] = [];
+    try {
+        await ports.logs(container, (chunk) => chunks.push(chunk), { tail });
+    } finally {
+        await ports.dispose();
+    }
+    return Buffer.concat(chunks).toString("utf8");
+}
+
 /** Read and parse an app container's HTTP access lines from its stdout tail. */
 async function readAppHttpEntries(applicationId: string, ownerId: string, tail: number): Promise<HttpLogEntry[]> {
     const { container, target } = await appRuntime(applicationId, ownerId);

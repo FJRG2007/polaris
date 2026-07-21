@@ -8,7 +8,7 @@
 
 import { loadEnv } from "@polaris/config";
 import { prisma } from "@polaris/db";
-import { encryptSecret } from "@polaris/storage";
+import { decryptSecret, encryptSecret } from "@polaris/storage";
 
 export interface EnvVarView {
     id: string;
@@ -51,6 +51,20 @@ export async function listEnvVars(scope: EnvScope, scopeId: string, ownerId: str
         isSecret: row.isSecret,
         value: row.isSecret ? null : row.value
     }));
+}
+
+/** Reveal a single variable's value, decrypting a secret on demand (owner-gated).
+ *  Used by the eye toggle so a secret is only sent to the client when asked for. */
+export async function revealEnvVar(id: string, ownerId: string): Promise<string | null> {
+    const row = await prisma.envVar.findUnique({ where: { id } });
+    if (!row || (row.scopeType !== "application" && row.scopeType !== "environment")) return null;
+    await assertOwnsScope(row.scopeType as EnvScope, row.scopeId, ownerId);
+    if (!row.isSecret) return row.value;
+    if (!row.encryptedValue || !row.valueNonce || !row.valueKeyId) return null;
+    return decryptSecret(
+        { ciphertext: Buffer.from(row.encryptedValue), nonce: Buffer.from(row.valueNonce), keyId: row.valueKeyId },
+        loadEnv().POLARIS_MASTER_KEY
+    );
 }
 
 const VALID_KEY = /^[A-Za-z_][A-Za-z0-9_]*$/;

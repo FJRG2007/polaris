@@ -47,6 +47,7 @@ import {
     deleteEnvVar,
     listEnvVars,
     parseDotEnv,
+    revealEnvVar,
     setEnvVar,
     setEnvVars,
     type EnvScope,
@@ -293,6 +294,15 @@ export async function importEnvVarsAction(input: {
         return { count };
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Could not import variables" };
+    }
+}
+
+export async function revealEnvVarAction(id: string): Promise<{ value?: string | null; error?: string }> {
+    const user = await requirePermission("deploy.manage");
+    try {
+        return { value: await revealEnvVar(id, user.id) };
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not reveal the variable" };
     }
 }
 
