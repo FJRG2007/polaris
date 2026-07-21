@@ -73,7 +73,10 @@ import {
     setDomainEnabledAction,
     quickTunnelStatusAction,
     startQuickTunnelAction,
-    stopQuickTunnelAction
+    stopQuickTunnelAction,
+    namedTunnelStatusAction,
+    startNamedTunnelAction,
+    stopNamedTunnelAction
 } from "./actions";
 
 const TABS = ["Deployments", "Variables", "Metrics", "Console", "Files", "Settings"] as const;
@@ -1318,6 +1321,145 @@ function QuickTunnelPanel({ appId }: { appId: string }) {
     );
 }
 
+/** Per-app Cloudflare named tunnel: a STABLE hostname on the operator's own domain.
+ *  Guided setup - the tunnel + hostname mapping are created in the Cloudflare
+ *  dashboard and its connector token pasted here; Polaris runs the connector. */
+function NamedTunnelPanel({ appId }: { appId: string }) {
+    const [status, setStatus] = useState<Awaited<ReturnType<typeof namedTunnelStatusAction>> | null>(null);
+    const [open, setOpen] = useState(false);
+    const [token, setToken] = useState("");
+    const [hostname, setHostname] = useState("");
+    const [error, setError] = useState<string | null>(null);
+    const [pending, startTransition] = useTransition();
+
+    const reload = () => {
+        void namedTunnelStatusAction(appId).then(setStatus);
+    };
+    useEffect(reload, [appId]);
+
+    function connect(): void {
+        setError(null);
+        startTransition(async () => {
+            const result = await startNamedTunnelAction({ applicationId: appId, token, hostname });
+            if (result.error) setError(result.error);
+            else {
+                setToken("");
+                setOpen(false);
+                reload();
+            }
+        });
+    }
+
+    function disconnect(): void {
+        setError(null);
+        startTransition(async () => {
+            await stopNamedTunnelAction(appId).catch(() => undefined);
+            reload();
+        });
+    }
+
+    const running = status?.running ?? false;
+    const configured = status?.configured ?? false;
+
+    return (
+        <section className="flex flex-col gap-2">
+            <h3 className="flex items-center gap-1.5 text-sm font-medium">
+                <CloudflareMark className="size-4" /> Custom domain via Cloudflare tunnel
+            </h3>
+            <p className="text-xs text-muted-foreground">
+                A stable hostname on your own domain, with automatic HTTPS and no port-forwarding. Create the tunnel
+                in Cloudflare and paste its connector token; it reconnects on restart.
+            </p>
+            {configured && status?.hostname && (
+                <div className="flex items-center gap-2 text-xs">
+                    <span className={cn("size-1.5 rounded-full", running ? "animate-pulse bg-emerald-500" : "bg-muted-foreground/50")} />
+                    <a
+                        href={`https://${status.hostname}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex min-w-0 items-center gap-1 truncate text-primary hover:underline"
+                    >
+                        <CloudflareMark className="size-3.5 shrink-0" /> {status.hostname}
+                    </a>
+                    <span className="text-muted-foreground">{running ? "connected" : "not running"}</span>
+                </div>
+            )}
+            {error && !open && <p className="text-xs text-danger">{error}</p>}
+            <div className="flex justify-end gap-2">
+                {configured ? (
+                    <>
+                        <Button variant="outline" onClick={() => setOpen(true)} disabled={pending}>
+                            Reconfigure
+                        </Button>
+                        <Button variant="outline" onClick={disconnect} disabled={pending}>
+                            {pending && <Loader2 className="size-4 animate-spin" />} Disconnect
+                        </Button>
+                    </>
+                ) : (
+                    <Button variant="outline" onClick={() => setOpen(true)}>
+                        <CloudflareMark className="size-4" /> Connect your own domain
+                    </Button>
+                )}
+            </div>
+
+            <Dialog open={open} onOpenChange={setOpen}>
+                <DialogContent className="max-w-lg">
+                    <DialogTitle className="flex items-center gap-2">
+                        <CloudflareMark className="size-5" /> Connect a domain via Cloudflare
+                    </DialogTitle>
+                    <div className="flex flex-col gap-4">
+                        <ol className="flex flex-col gap-2 text-xs text-muted-foreground">
+                            <li>
+                                <span className="font-medium text-foreground">1.</span> In Cloudflare Zero Trust, open{" "}
+                                <span className="text-foreground">Networks - Tunnels</span> and create a tunnel (Cloudflared).
+                            </li>
+                            <li>
+                                <span className="font-medium text-foreground">2.</span> Add a{" "}
+                                <span className="text-foreground">Public Hostname</span>: your domain to the service{" "}
+                                <span className="font-mono">http://SERVER-IP:PORT</span> (this server's IP and the app's port).
+                            </li>
+                            <li>
+                                <span className="font-medium text-foreground">3.</span> Copy the tunnel's{" "}
+                                <span className="text-foreground">connector token</span> and paste it below.
+                            </li>
+                        </ol>
+                        <a
+                            href="https://one.dash.cloudflare.com/"
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                        >
+                            Open the Cloudflare Zero Trust dashboard
+                        </a>
+                        <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                            Hostname
+                            <Input value={hostname} onChange={(event) => setHostname(event.target.value)} placeholder="app.example.com" />
+                        </label>
+                        <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                            Connector token
+                            <Input
+                                value={token}
+                                onChange={(event) => setToken(event.target.value)}
+                                placeholder="eyJhIjoi..."
+                                className="font-mono"
+                            />
+                        </label>
+                        {error && <p className="text-xs text-danger">{error}</p>}
+                        <div className="flex justify-end gap-2">
+                            <Button variant="ghost" onClick={() => setOpen(false)}>
+                                Cancel
+                            </Button>
+                            <Button onClick={connect} disabled={pending || !token.trim() || !hostname.trim()}>
+                                {pending && <Loader2 className="size-4 animate-spin" />} Connect
+                            </Button>
+                        </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
+        </section>
+    );
+}
+
 function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolean; onChanged: () => void }) {
     const [autoDeploy, setAutoDeploy] = useState(app.autoDeploy);
     const [branch, setBranch] = useState(app.deployBranch ?? "");
@@ -1492,6 +1634,9 @@ function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
                             Add domain
                         </Button>
                     </div>
+                </div>
+                <div className="border-t border-border/50 pt-4">
+                    <NamedTunnelPanel appId={app.id} />
                 </div>
                 <div className="border-t border-border/50 pt-4">
                     <QuickTunnelPanel appId={app.id} />

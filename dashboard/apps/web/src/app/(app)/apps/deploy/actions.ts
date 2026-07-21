@@ -45,6 +45,12 @@ import {
     type QuickTunnelStatus
 } from "@/lib/deploy/quick-tunnel-service";
 import {
+    getNamedTunnelStatus,
+    startNamedTunnel,
+    stopNamedTunnel,
+    type NamedTunnelStatus
+} from "@/lib/deploy/named-tunnel-service";
+import {
     deleteEnvVar,
     listEnvVars,
     parseDotEnv,
@@ -504,6 +510,44 @@ export async function stopQuickTunnelAction(applicationId: string): Promise<{ er
     try {
         await stopQuickTunnel(applicationId, user.id);
         await recordAudit({ actorId: user.id, action: "deploy.tunnel.stop", targetType: "application", targetId: applicationId });
+        return {};
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not stop the tunnel" };
+    }
+}
+
+/** State of an app's Cloudflare named tunnel (stable custom hostname). */
+export async function namedTunnelStatusAction(applicationId: string): Promise<NamedTunnelStatus> {
+    const user = await requirePermission("deploy.manage");
+    try {
+        return await getNamedTunnelStatus(applicationId, user.id);
+    } catch {
+        return { running: false, hostname: null, configured: false };
+    }
+}
+
+/** Save the connector token + hostname and start the named-tunnel sidecar. */
+export async function startNamedTunnelAction(input: {
+    applicationId: string;
+    token: string;
+    hostname: string;
+}): Promise<{ error?: string; hostname?: string | null }> {
+    const user = await requirePermission("deploy.manage");
+    try {
+        const status = await startNamedTunnel(input.applicationId, user.id, { token: input.token, hostname: input.hostname });
+        await recordAudit({ actorId: user.id, action: "deploy.named-tunnel.start", targetType: "application", targetId: input.applicationId });
+        return { hostname: status.hostname };
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not start the tunnel" };
+    }
+}
+
+/** Stop an app's named tunnel and forget its token. */
+export async function stopNamedTunnelAction(applicationId: string): Promise<{ error?: string }> {
+    const user = await requirePermission("deploy.manage");
+    try {
+        await stopNamedTunnel(applicationId, user.id);
+        await recordAudit({ actorId: user.id, action: "deploy.named-tunnel.stop", targetType: "application", targetId: applicationId });
         return {};
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Could not stop the tunnel" };
