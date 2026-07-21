@@ -58,9 +58,13 @@ services:
       - "traefik.http.routers.polaris-web.rule=Host(`polaris`) || Host(`polaris.local`) || Host(`${POLARIS_PUBLIC_IP:-127.0.0.1}`) || Host(`${POLARIS_PUBLIC_DOMAIN:-polaris.internal}`)"
       - "traefik.http.routers.polaris-web.entrypoints=websecure"
       - "traefik.http.routers.polaris-web.tls=true"
+      # The container exposes two services (dashboard + WS sidecar), so every
+      # router must name its service explicitly - Traefik will not auto-link.
+      - "traefik.http.routers.polaris-web.service=polaris-web"
       - "traefik.http.services.polaris-web.loadbalancer.server.port=3000"
       - "traefik.http.routers.polaris-web-http.rule=Host(`polaris`) || Host(`polaris.local`) || Host(`${POLARIS_PUBLIC_IP:-127.0.0.1}`) || Host(`${POLARIS_PUBLIC_DOMAIN:-polaris.internal}`)"
       - "traefik.http.routers.polaris-web-http.entrypoints=web"
+      - "traefik.http.routers.polaris-web-http.service=polaris-web"
       - "traefik.http.routers.polaris-web-http.middlewares=polaris-redirect-https"
       - "traefik.http.middlewares.polaris-redirect-https.redirectscheme.scheme=https"
       # The interactive-terminal WebSocket sidecar listens on a separate port.
