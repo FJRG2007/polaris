@@ -63,10 +63,13 @@ export function SettingsView({
         setUpdateMsg(null);
         setShowManual(false);
         const { status: result } = await triggerHostUpdateAction();
-        setUpdating(false);
         if (result === "started") {
-            setUpdateMsg("Update started - Polaris is pulling the new image and will restart. Refresh in a minute.");
-        } else if (result === "unavailable") {
+            setUpdateMsg("Pulling the new image and restarting - this page reconnects automatically when Polaris is back.");
+            waitForUpdate();
+            return; // stay in the updating state; the reload ends it
+        }
+        setUpdating(false);
+        if (result === "unavailable") {
             setUpdateMsg("The host agent has no update command set (POLARIS_HOSTD_UPDATE_CMD). Use the manual command for now.");
             setShowManual(true);
         } else if (result === "disabled") {
@@ -78,6 +81,36 @@ export function SettingsView({
         }
     }
 
+    // The web container restarts during an update; poll the cheap local health
+    // endpoint (no GitHub calls), and once it has gone down and come back healthy
+    // on the new build, reload. Keeps downtime visible and self-heals the page.
+    function waitForUpdate(): void {
+        let sawDown = false;
+        let tries = 0;
+        const timer = setInterval(async () => {
+            tries += 1;
+            try {
+                const res = await fetch("/api/health", { cache: "no-store" });
+                if (res.ok) {
+                    if (sawDown) {
+                        clearInterval(timer);
+                        setUpdateMsg("Updated - reloading...");
+                        window.location.reload();
+                    }
+                } else {
+                    sawDown = true;
+                }
+            } catch {
+                sawDown = true;
+            }
+            if (tries >= 150) {
+                clearInterval(timer);
+                setUpdating(false);
+                setUpdateMsg("Update is taking longer than expected. Refresh the page manually.");
+            }
+        }, 2000);
+    }
+
     const behind = typeof status.behindBy === "number" && status.behindBy > 0;
 
     return (
@@ -86,7 +119,7 @@ export function SettingsView({
                 <CardHeader>
                     <div className="flex items-center justify-between gap-2">
                         <CardTitle>Updates</CardTitle>
-                        <Button size="sm" variant="secondary" onClick={onCheck} disabled={pending}>
+                        <Button size="sm" variant="secondary" onClick={onCheck} disabled={pending || updating}>
                             <RefreshCw className={`size-4 ${pending ? "animate-spin" : ""}`} />
                             {pending ? "Checking..." : "Check for updates"}
                         </Button>
@@ -144,7 +177,7 @@ export function SettingsView({
                                     </a>
                                 </span>
                                 <Button size="sm" onClick={onUpdate} disabled={updating}>
-                                    <DownloadCloud className={`size-4 ${updating ? "animate-pulse" : ""}`} />
+                                    {updating ? <RefreshCw className="size-4 animate-spin" /> : <DownloadCloud className="size-4" />}
                                     {updating ? "Updating..." : "Update now"}
                                 </Button>
                             </div>

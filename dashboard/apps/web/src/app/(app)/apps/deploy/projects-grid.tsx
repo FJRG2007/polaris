@@ -162,10 +162,6 @@ const DOT_CANVAS: React.CSSProperties = {
     backgroundSize: "16px 16px"
 };
 
-const CANVAS_VIGNETTE: React.CSSProperties = {
-    background: "radial-gradient(120% 90% at 50% 30%, transparent 55%, hsl(var(--card)) 100%)"
-};
-
 function ProjectCard({ project }: { project: ProjectCardData }) {
     const status = statusTone(project.online, project.total);
     const partial = project.total > 0 && project.online < project.total;
@@ -186,18 +182,11 @@ function ProjectCard({ project }: { project: ProjectCardData }) {
                     {project.total} {project.total === 1 ? "service" : "services"}
                 </span>
             </div>
-            <div className="relative mx-4 flex min-h-44 flex-1 items-center justify-center overflow-hidden rounded-lg border border-border/60" style={DOT_CANVAS}>
-                <div
-                    className="pointer-events-none absolute inset-0"
-                    style={{ background: "radial-gradient(55% 60% at 50% 45%, hsl(var(--primary) / 0.14), transparent 70%)" }}
-                />
-                <div className="pointer-events-none absolute inset-0" style={CANVAS_VIGNETTE} />
+            <div className="mx-4 flex min-h-44 flex-1 items-center justify-center rounded-lg border border-border/60" style={DOT_CANVAS}>
                 {project.total === 0 ? (
-                    <span className="relative text-xs text-muted-foreground">Empty project</span>
+                    <span className="text-xs text-muted-foreground">Empty project</span>
                 ) : (
-                    <div className="relative">
-                        <ServiceTiles services={project.services} />
-                    </div>
+                    <ServiceTiles services={project.services} />
                 )}
             </div>
             <div className="flex items-center justify-between gap-2 px-4 py-3">
