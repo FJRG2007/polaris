@@ -46,6 +46,30 @@ services:
     environment:
       # Trust the local-network names for auth; kept in sync with the mdns service.
       POLARIS_LOCAL_HOSTNAME: ${POLARIS_MDNS_HOSTNAME:-polaris}
+    # Traefik routes the dashboard by these labels (discovered on the default
+    # network). The dashboard answers only on its own names - the local names, the
+    # server IP, and an optional public domain - so an unknown host (e.g. a random
+    # sslip.io subdomain) 404s at the edge instead of leaking the control plane.
+    # TLS on :443 (Traefik's default self-signed cert for the local names, or a
+    # Let's Encrypt cert for a public domain), with :80 redirected to https.
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=polaris_default"
+      - "traefik.http.routers.polaris-web.rule=Host(`polaris`) || Host(`polaris.local`) || Host(`${POLARIS_PUBLIC_IP:-127.0.0.1}`) || Host(`${POLARIS_PUBLIC_DOMAIN:-polaris.internal}`)"
+      - "traefik.http.routers.polaris-web.entrypoints=websecure"
+      - "traefik.http.routers.polaris-web.tls=true"
+      - "traefik.http.services.polaris-web.loadbalancer.server.port=3000"
+      - "traefik.http.routers.polaris-web-http.rule=Host(`polaris`) || Host(`polaris.local`) || Host(`${POLARIS_PUBLIC_IP:-127.0.0.1}`) || Host(`${POLARIS_PUBLIC_DOMAIN:-polaris.internal}`)"
+      - "traefik.http.routers.polaris-web-http.entrypoints=web"
+      - "traefik.http.routers.polaris-web-http.middlewares=polaris-redirect-https"
+      - "traefik.http.middlewares.polaris-redirect-https.redirectscheme.scheme=https"
+      # The interactive-terminal WebSocket sidecar listens on a separate port.
+      - "traefik.http.routers.polaris-ws.rule=PathPrefix(`/api/deploy/ws`)"
+      - "traefik.http.routers.polaris-ws.entrypoints=websecure"
+      - "traefik.http.routers.polaris-ws.tls=true"
+      - "traefik.http.routers.polaris-ws.service=polaris-ws"
+      - "traefik.http.routers.polaris-ws.priority=100"
+      - "traefik.http.services.polaris-ws.loadbalancer.server.port=${POLARIS_WS_PORT:-3001}"
     depends_on:
       postgres:
         condition: service_healthy
@@ -79,7 +103,11 @@ services:
       retries: 5
       start_period: 60s
 
+  # Legacy edge, kept behind the `caddy` profile for rollback. Traefik is the
+  # default edge now (automatic HTTPS for every site); to fall back, stop traefik
+  # and run `docker compose --profile caddy --profile full up -d caddy`.
   caddy:
+    profiles: ["caddy"]
     image: caddy:2-alpine
     restart: unless-stopped
     depends_on:
@@ -152,17 +180,20 @@ services:
         bind:
           propagation: rshared
 
-  # --- Deploy app proxy (opt-in) --------------------------------------------
-  # Traefik edge for containers deployed through the Deploy app. It discovers
-  # deployed services by their labels on the shared `polaris-proxy` network and
-  # issues Let's Encrypt certs (HTTP-01). Kept in the `proxy` profile because it
-  # binds 80/443 - enable it INSTEAD of Caddy when you route deployed apps and
-  # the dashboard through one edge (set POLARIS_ACME_EMAIL). The same Traefik is
-  # installed on remote servers by the Deploy onboarding script.
+  # --- Edge proxy -----------------------------------------------------------
+  # Traefik is the single edge for both the dashboard and deployed apps. It binds
+  # 80/443 and discovers every service by its container labels: the dashboard (on
+  # the default network) and deployed apps (on the shared `polaris-proxy`
+  # network). TLS is automatic - Let's Encrypt (HTTP-01) for public domains, a
+  # self-signed default cert for the local names and free sslip.io subdomains -
+  # and :80 redirects to https. An unknown host 404s instead of falling through
+  # to the dashboard. Set POLARIS_ACME_EMAIL for Let's Encrypt. The same Traefik
+  # is installed on remote servers by the Deploy onboarding script.
   traefik:
-    profiles: ["proxy"]
     image: traefik:v3.1
     restart: unless-stopped
+    depends_on:
+      - web
     command:
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
