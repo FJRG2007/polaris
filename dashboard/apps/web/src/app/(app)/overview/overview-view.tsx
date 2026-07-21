@@ -13,9 +13,36 @@ import Link from "next/link";
 import { FolderOpen, HardDrive } from "lucide-react";
 import { Button, Card, CardBody, Skeleton } from "@polaris/ui";
 import type { UnasMetrics as UnasMetricsData } from "@/lib/unifi-unas";
+import { MetricsHistory, percent, ratioPercent, temp, type MetricSpec } from "@/components/metrics-history";
 import { HardwarePanel } from "../drive/hardware-panel";
 import { UnasMetrics } from "../drive/unas-metrics";
 import type { ConnectionSummary } from "../drive/types";
+
+/** Charts for a rich UniFi UNAS device: CPU, temperature, memory, storage. */
+const UNAS_METRICS: MetricSpec[] = [
+    { key: "cpu", label: "CPU", value: (point) => point.cpuPercent, format: percent, tone: "primary", max: 100 },
+    { key: "temp", label: "CPU temperature", value: (point) => point.cpuTempC, format: temp, tone: "warning" },
+    { key: "mem", label: "Memory", value: (point) => ratioPercent(point.memUsedBytes, point.memTotalBytes), format: percent, tone: "success", max: 100 },
+    { key: "disk", label: "Storage", value: (point) => ratioPercent(point.diskUsedBytes, point.diskTotalBytes), format: percent, tone: "primary", max: 100 }
+];
+
+/** Any other backend reports disk usage only. */
+const STORAGE_METRICS: MetricSpec[] = [
+    { key: "disk", label: "Storage", value: (point) => ratioPercent(point.diskUsedBytes, point.diskTotalBytes), format: percent, tone: "primary", max: 100 }
+];
+
+/** Consumption history for a device, below its live panel. */
+function DeviceHistory({ connection }: { connection: ConnectionSummary }) {
+    return (
+        <div>
+            <h3 className="mb-1 text-sm font-medium">History</h3>
+            <MetricsHistory
+                endpoint={`/api/drive/metrics-history?c=${encodeURIComponent(connection.id)}`}
+                metrics={connection.kind === "unifi-unas" ? UNAS_METRICS : STORAGE_METRICS}
+            />
+        </div>
+    );
+}
 
 function UnasSection({ connection }: { connection: ConnectionSummary }) {
     const [metrics, setMetrics] = useState<UnasMetricsData | null>(null);
@@ -95,6 +122,7 @@ export function OverviewView({ connections }: { connections: ConnectionSummary[]
                     ) : (
                         <HardwarePanel connection={connection} />
                     )}
+                    <DeviceHistory connection={connection} />
                 </section>
             ))}
         </div>

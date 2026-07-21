@@ -917,6 +917,9 @@ model Domain {
     kind          String   @default("auto")
     targetPort    Int
     https         Boolean  @default(true)
+    // When off, the hostname stops serving the app (its route is dropped) but the
+    // record is kept so it can be re-enabled from the service's domain settings.
+    enabled       Boolean  @default(true)
     // le | internal | none
     certResolver  String   @default("le")
     pathPrefix    String?
@@ -985,4 +988,53 @@ model DeployTicket {
     user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
     @@index([userId])
+}
+
+// ---------------------------------------------------------------------------
+// Metrics (time-series consumption history)
+// ---------------------------------------------------------------------------
+
+// One raw consumption sample for a subject: a deployed Application container or a
+// Drive StorageConnection (a NAS/server). Kept a short window at full resolution
+// then folded into MetricRollup, so raw growth stays bounded. Percentages are
+// derived at read time from the byte columns - never stored. subjectId is a
+// polymorphic reference (no FK) resolved by subjectType. The natural composite
+// key (subject + timestamp) is the query index and enforces one sample per tick;
+// it is not an enumerable integer, so the UUID-id rule does not apply here.
+model MetricSample {
+    // app | storage
+    subjectType    String
+    subjectId      String   @db.Uuid
+    ts             DateTime @default(now())
+    cpuPercent     Float?
+    cpuTempC       Float?
+    memUsedBytes   BigInt?
+    memTotalBytes  BigInt?
+    diskUsedBytes  BigInt?
+    diskTotalBytes BigInt?
+
+    @@id([subjectType, subjectId, ts])
+    @@index([ts])
+}
+
+// Hourly aggregate of MetricSample rows, retained far longer than raw so the
+// 7d/30d (and wider) ranges read a compact table instead of scanning raw. The
+// avg columns are the charted line; cpuPercentMax preserves spikes that
+// averaging would hide. `samples` is how many raw points were folded in.
+model MetricRollup {
+    subjectType       String
+    subjectId         String   @db.Uuid
+    // Start of the UTC hour bucket this row aggregates.
+    bucket            DateTime
+    cpuPercentAvg     Float?
+    cpuPercentMax     Float?
+    cpuTempCAvg       Float?
+    memUsedBytesAvg   BigInt?
+    memTotalBytesAvg  BigInt?
+    diskUsedBytesAvg  BigInt?
+    diskTotalBytesAvg BigInt?
+    samples           Int      @default(0)
+
+    @@id([subjectType, subjectId, bucket])
+    @@index([bucket])
 }

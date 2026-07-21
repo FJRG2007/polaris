@@ -53,6 +53,8 @@ export default async function DeployProjectPage({ params }: { params: Promise<{ 
                 currentDeploymentId: app.currentDeploymentId,
                 deployStatus: app.currentDeploymentId ? (statuses[app.currentDeploymentId] ?? null) : null,
                 targetId: app.targetId,
+                serverId: app.target.kind === "local" || !app.target.hostId ? "local" : app.target.hostId,
+                serverName: app.target.name,
                 containerRef: serviceName(project.slug, app.slug, app.id),
                 autoDeploy: app.autoDeploy,
                 deployBranch: app.deployBranch,
@@ -60,7 +62,7 @@ export default async function DeployProjectPage({ params }: { params: Promise<{ 
                 keepReleases: app.keepReleases,
                 port: portOf(app.sourceConfig),
                 ipUrl: serverIp ? `http://${serverIp}:${hostPortForApp(app.id)}` : null,
-                domains: app.domains.map((domain) => ({ id: domain.id, hostname: domain.hostname, kind: domain.kind }))
+                domains: app.domains.map((domain) => ({ id: domain.id, hostname: domain.hostname, kind: domain.kind, enabled: domain.enabled }))
             })),
             databases: environment.databases.map((database) => ({
                 id: database.id,

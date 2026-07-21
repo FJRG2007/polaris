@@ -51,7 +51,8 @@ import {
     githubReposAction,
     inspectRepoAction,
     listDeployServersAction,
-    setAutoDeployAction
+    setAutoDeployAction,
+    setDomainEnabledAction
 } from "./actions";
 
 const DB_ENGINES = ["postgres", "mysql", "mariadb", "mongo", "redis"] as const;
@@ -81,6 +82,10 @@ export interface ProjectSummary {
             currentDeploymentId: string | null;
             deployStatus: string | null;
             targetId: string;
+            /** Server the app runs on: "local" or a Host id (for the Settings picker). */
+            serverId: string;
+            /** Display name of that server (e.g. "Local", or a host's name). */
+            serverName: string;
             containerRef: string;
             autoDeploy: boolean;
             deployBranch: string | null;
@@ -90,7 +95,7 @@ export interface ProjectSummary {
             port: number | null;
             /** Direct LAN/intranet URL (host IP + published port), when a public IP is known. */
             ipUrl: string | null;
-            domains: { id: string; hostname: string; kind: string }[];
+            domains: { id: string; hostname: string; kind: string; enabled: boolean }[];
         }[];
         databases: { id: string; name: string; engine: string; status: string }[];
     }[];
@@ -211,17 +216,27 @@ function AppCard({
 
             {app.domains.length > 0 && (
                 <div className="flex flex-col gap-1">
-                    {app.domains.map((domain) => (
-                        <a
-                            key={domain.id}
-                            href={`https://${domain.hostname}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="inline-flex items-center gap-1 truncate text-xs text-primary hover:underline"
-                        >
-                            <Globe className="size-3 shrink-0" /> {domain.hostname}
-                        </a>
-                    ))}
+                    {app.domains.map((domain) =>
+                        domain.enabled ? (
+                            <a
+                                key={domain.id}
+                                href={`https://${domain.hostname}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-1 truncate text-xs text-primary hover:underline"
+                            >
+                                <Globe className="size-3 shrink-0" /> {domain.hostname}
+                            </a>
+                        ) : (
+                            <span
+                                key={domain.id}
+                                title="Domain disabled"
+                                className="inline-flex items-center gap-1 truncate text-xs text-muted-foreground line-through"
+                            >
+                                <Globe className="size-3 shrink-0" /> {domain.hostname}
+                            </span>
+                        )
+                    )}
                 </div>
             )}
 
@@ -897,15 +912,32 @@ function DomainDialog({
                     {app.domains.length > 0 && (
                         <div className="flex flex-col gap-1">
                             {app.domains.map((domain) => (
-                                <a
-                                    key={domain.id}
-                                    href={`https://${domain.hostname}`}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
-                                >
-                                    <Globe className="size-3" /> {domain.hostname}
-                                </a>
+                                <div key={domain.id} className="flex items-center gap-2">
+                                    {domain.enabled ? (
+                                        <a
+                                            href={`https://${domain.hostname}`}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="inline-flex min-w-0 flex-1 items-center gap-1 truncate text-xs text-primary hover:underline"
+                                        >
+                                            <Globe className="size-3 shrink-0" /> {domain.hostname}
+                                        </a>
+                                    ) : (
+                                        <span className="inline-flex min-w-0 flex-1 items-center gap-1 truncate text-xs text-muted-foreground line-through">
+                                            <Globe className="size-3 shrink-0" /> {domain.hostname}
+                                        </span>
+                                    )}
+                                    <Switch
+                                        checked={domain.enabled}
+                                        onChange={(next) =>
+                                            startTransition(async () => {
+                                                await setDomainEnabledAction(domain.id, next);
+                                                onChanged();
+                                            })
+                                        }
+                                        aria-label={domain.enabled ? "Disable domain" : "Enable domain"}
+                                    />
+                                </div>
                             ))}
                         </div>
                     )}

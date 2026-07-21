@@ -23,6 +23,7 @@ import {
     type StorageDriver
 } from "@polaris/storage";
 import { fetchUnasMetrics, type UnasMetrics } from "@/lib/unifi-unas";
+import { deleteMetricsForSubject } from "@/lib/metrics-history-service";
 import { listSmbShares } from "@/lib/smb-shares";
 import { grantedConnectionIds } from "@/lib/drive-acl-service";
 import { getHostConnection, listHosts } from "@/lib/host-service";
@@ -354,9 +355,10 @@ export async function updateConnection(
     });
 }
 
-/** Delete a connection owned by the user. */
+/** Delete a connection owned by the user, and drop its metrics history. */
 export async function deleteConnection(ownerId: string, connectionId: string) {
     await prisma.storageConnection.deleteMany({ where: { id: connectionId, ownerId } });
+    await deleteMetricsForSubject("storage", connectionId);
 }
 
 /** Discover the SMB shares a UNAS exposes, reusing its stored UniFi account. */

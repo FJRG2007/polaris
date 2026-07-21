@@ -26,7 +26,9 @@ import {
     removeApplicationDeployment,
     removeApplicationDomain,
     restartApplication,
+    setApplicationDomainEnabled,
     setApplicationPort,
+    setApplicationServer,
     setApplicationRunning,
     saveEnvironmentLayout,
     updateAutoDeploy,
@@ -332,6 +334,18 @@ export async function setAppPortAction(applicationId: string, port: number): Pro
     }
 }
 
+export async function setAppServerAction(applicationId: string, serverId: string): Promise<{ error?: string }> {
+    const user = await requirePermission("deploy.manage");
+    try {
+        await setApplicationServer(applicationId, user.id, serverId);
+        await recordAudit({ actorId: user.id, action: "deploy.app.move", targetType: "application", targetId: applicationId, metadata: { serverId } });
+        revalidatePath(DEPLOY_PATH);
+        return {};
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not change the server" };
+    }
+}
+
 export async function restartApplicationAction(applicationId: string): Promise<{ error?: string }> {
     const user = await requirePermission("deploy.manage");
     try {
@@ -402,6 +416,19 @@ export async function removeDomainAction(domainId: string): Promise<void> {
     const user = await requirePermission("deploy.manage");
     await removeApplicationDomain(domainId, user.id);
     revalidatePath(DEPLOY_PATH);
+}
+
+/** Turn a domain on or off without deleting it (drops or restores its route). */
+export async function setDomainEnabledAction(domainId: string, enabled: boolean): Promise<{ error?: string }> {
+    const user = await requirePermission("deploy.manage");
+    try {
+        await setApplicationDomainEnabled(domainId, user.id, enabled);
+        await recordAudit({ actorId: user.id, action: "deploy.domain.toggle", targetType: "domain", targetId: domainId });
+        revalidatePath(DEPLOY_PATH);
+        return {};
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not update the domain" };
+    }
 }
 
 /** Current public URL / state of an app's Cloudflare Quick Tunnel (no account). */

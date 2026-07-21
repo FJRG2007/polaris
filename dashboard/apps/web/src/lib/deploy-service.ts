@@ -14,6 +14,7 @@ import { prisma } from "@polaris/db";
 import { serviceName, shortHash, slugify, type AppDeployPlan, type DeployResult, type RuntimeContext, type RuntimeDriver } from "@polaris/deploy";
 import { decryptSecret } from "@polaris/storage";
 import { getDriver, getPorts, toTargetInfo, type TargetRow } from "./deploy/runtime";
+import { getOrCreateHostTarget, getOrCreateLocalTarget } from "./deploy-target-service";
 import { autoSubdomainUrl, getPublicIp } from "./domain-service";
 import { syncDomainRoute, removeDomainRoute } from "./caddy-service";
 import { gitBuildContext, type GitSource } from "./git-build-service";
@@ -77,7 +78,7 @@ export async function getProjectFull(projectId: string, ownerId: string) {
         where: { id: projectId, ownerId },
         include: {
             environments: {
-                include: { applications: { include: { domains: true } }, databases: true },
+                include: { applications: { include: { domains: true, target: true } }, databases: true },
                 orderBy: { createdAt: "asc" }
             }
         }
@@ -222,9 +223,9 @@ export async function addApplicationDomain(
 async function syncAppDomainRoute(domainId: string): Promise<void> {
     const domain = await prisma.domain.findUnique({
         where: { id: domainId },
-        select: { id: true, hostname: true, certResolver: true, applicationId: true }
+        select: { id: true, hostname: true, certResolver: true, applicationId: true, enabled: true }
     });
-    if (!domain?.applicationId) return;
+    if (!domain?.applicationId || !domain.enabled) return;
     const ip = await getPublicIp();
     if (!ip) return;
     const cert = domain.certResolver === "none" ? "none" : domain.certResolver === "le" ? "le" : "internal";
@@ -264,6 +265,25 @@ export async function removeApplicationDomain(domainId: string, ownerId: string)
         where: { id: domainId, application: { environment: { project: { ownerId } } } }
     });
     await removeDomainRoute(domainId).catch(() => undefined);
+}
+
+/**
+ * Enable or disable a domain without deleting it: flip the flag and either
+ * (re)register its route so the hostname serves the app, or drop the route so it
+ * stops. The record and its settings survive, so it can be toggled back on.
+ */
+export async function setApplicationDomainEnabled(
+    domainId: string,
+    ownerId: string,
+    enabled: boolean
+): Promise<void> {
+    const result = await prisma.domain.updateMany({
+        where: { id: domainId, application: { environment: { project: { ownerId } } } },
+        data: { enabled }
+    });
+    if (result.count === 0) throw new Error("Domain not found");
+    if (enabled) await syncAppDomainRoute(domainId).catch(() => undefined);
+    else await removeDomainRoute(domainId).catch(() => undefined);
 }
 
 // --- deployment lifecycle (restart / disable / remove) ----------------------
@@ -387,12 +407,16 @@ async function buildAppPlan(
         },
         env,
         replicas: app.replicas,
-        domains: app.domains.map((domain) => ({
-            hostname: domain.hostname,
-            targetPort: domain.targetPort,
-            pathPrefix: domain.pathPrefix ?? undefined,
-            certResolver: domain.certResolver as "le" | "internal" | "none"
-        })),
+        // Disabled domains keep their record but are left out of the plan so no route
+        // labels are emitted for them until they are turned back on.
+        domains: app.domains
+            .filter((domain) => domain.enabled)
+            .map((domain) => ({
+                hostname: domain.hostname,
+                targetPort: domain.targetPort,
+                pathPrefix: domain.pathPrefix ?? undefined,
+                certResolver: domain.certResolver as "le" | "internal" | "none"
+            })),
         volumes: app.volumes.map((volume) => ({
             mountPath: volume.mountPath,
             source: volume.source ?? volume.name,
@@ -531,6 +555,53 @@ export async function setApplicationPort(applicationId: string, ownerId: string,
     const source = JSON.parse(app.sourceConfig) as Record<string, unknown>;
     source.port = port;
     await prisma.application.update({ where: { id: app.id }, data: { sourceConfig: JSON.stringify(source) } });
+}
+
+/**
+ * Move an application to a different server (deploy target): the local host or a
+ * connected SSH Host. The current deployment is torn down on the OLD server first
+ * so it does not keep running orphaned, then the app is retargeted; it redeploys
+ * on the new server on the next deploy. No-op when the server is unchanged.
+ */
+export async function setApplicationServer(applicationId: string, ownerId: string, serverId: string): Promise<void> {
+    const app = await prisma.application.findFirst({
+        where: { id: applicationId, environment: { project: { ownerId } } },
+        include: { environment: { include: { project: true } }, target: true }
+    });
+    if (!app) throw new Error("Application not found");
+
+    let newTarget;
+    if (!serverId || serverId === "local") {
+        newTarget = await getOrCreateLocalTarget(ownerId);
+    } else {
+        const host = await prisma.host.findFirst({ where: { id: serverId, ownerId }, select: { id: true, name: true } });
+        if (!host) throw new Error("The selected server was not found");
+        newTarget = await getOrCreateHostTarget(host.id, ownerId, host.name);
+    }
+    if (newTarget.id === app.targetId) return;
+
+    if (app.currentDeploymentId) {
+        const composeProject = `polaris-${shortHash(app.id, 8)}`;
+        const oldTarget = app.target as TargetRow;
+        const ports = await getPorts(oldTarget, ownerId);
+        try {
+            if (oldTarget.runtime === "swarm") await ports.stackDown(composeProject);
+            else await ports.composeDown(composeProject);
+        } catch {
+            // The old server may be unreachable; retarget anyway rather than trap
+            // the app on a dead target.
+        } finally {
+            await ports.dispose();
+        }
+        await prisma.deployment.updateMany({
+            where: { deployableType: "application", deployableId: applicationId, status: { in: ["running", "stopped"] } },
+            data: { status: "removed", finishedAt: new Date() }
+        });
+    }
+    await prisma.application.update({
+        where: { id: applicationId },
+        data: { targetId: newTarget.id, currentDeploymentId: null }
+    });
 }
 
 /** Update an application's auto-deploy settings (owner-checked). */

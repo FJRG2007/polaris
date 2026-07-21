@@ -20,4 +20,10 @@ export async function register(): Promise<void> {
     // limited edition even when the daemon is running.
     const { startCapabilityRefresh } = await import("@polaris/hostd-client");
     startCapabilityRefresh();
+
+    // Sample consumption of deployed apps and Drive devices on an interval, so the
+    // dashboard can chart history and not just the live value. Self-guarding: a bad
+    // tick only logs. Skipped during the build (register runs at server start).
+    const { startMetricsCollector } = await import("./lib/metrics-collector-service");
+    startMetricsCollector();
 }

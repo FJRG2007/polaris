@@ -46,6 +46,7 @@ import {
     cn
 } from "@polaris/ui";
 import { ServiceIcon, StatusPill, dbTone, serviceKindOf, type ProjectApp } from "./deploy-view";
+import { MetricsHistory, percent, ratioPercent, type MetricSpec } from "@/components/metrics-history";
 import { TerminalPanel } from "./terminal-panel";
 import { FilesPanel } from "./files-panel";
 import {
@@ -53,8 +54,10 @@ import {
     deleteEnvVarAction,
     deployApplicationAction,
     importEnvVarsAction,
+    listDeployServersAction,
     listDeploymentsAction,
     listEnvVarsAction,
+    setAppServerAction,
     removeApplicationDeploymentAction,
     removeDomainAction,
     restartApplicationAction,
@@ -62,6 +65,7 @@ import {
     setAppPortAction,
     setApplicationRunningAction,
     setAutoDeployAction,
+    setDomainEnabledAction,
     quickTunnelStatusAction,
     startQuickTunnelAction,
     stopQuickTunnelAction
@@ -275,20 +279,22 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
 
     const active = items?.find((item) => item.isCurrent) ?? null;
     const history = (items ?? []).filter((item) => !item.isCurrent);
-    const region = app.domains[0] ? "Deployed" : app.sourceType === "image" ? "Registry" : "GitHub";
+    // The live URL is the first enabled domain; a disabled one is kept but not served.
+    const primaryDomain = app.domains.find((domain) => domain.enabled) ?? null;
+    const region = primaryDomain ? "Deployed" : app.sourceType === "image" ? "Registry" : "GitHub";
 
     return (
         <div className="flex flex-col gap-4 py-2">
             <div className="flex items-center gap-3">
                 <div className="flex min-w-0 flex-col gap-0.5">
-                    {app.domains[0] ? (
+                    {primaryDomain ? (
                         <a
-                            href={`https://${app.domains[0].hostname}`}
+                            href={`https://${primaryDomain.hostname}`}
                             target="_blank"
                             rel="noreferrer"
                             className="inline-flex min-w-0 items-center gap-1.5 truncate text-sm font-medium text-foreground hover:text-primary hover:underline"
                         >
-                            <Globe className="size-4 shrink-0 text-muted-foreground" /> {app.domains[0].hostname}
+                            <Globe className="size-4 shrink-0 text-muted-foreground" /> {primaryDomain.hostname}
                         </a>
                     ) : (
                         <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
@@ -760,19 +766,41 @@ function MetricsTab({ applicationId }: { applicationId: string }) {
         };
     }, [applicationId]);
 
-    if (loading) return <Loading />;
-    if (!data?.state) return <Empty text="No metrics yet - the service needs a running container." />;
-
     return (
-        <div className="grid gap-3 py-2 sm:grid-cols-2">
-            <Meter label="CPU" value={data.cpuPercent} unit="%" />
-            <Meter label="Memory" value={data.memPercent} unit="%" />
-            <div className="rounded-lg border border-border/60 p-4 text-sm sm:col-span-2">
-                State: <span className="font-medium">{data.state}</span>
+        <div className="flex flex-col gap-4 py-1">
+            {loading ? (
+                <Loading />
+            ) : data?.state ? (
+                <div className="grid gap-3 sm:grid-cols-2">
+                    <Meter label="CPU" value={data.cpuPercent} unit="%" />
+                    <Meter label="Memory" value={data.memPercent} unit="%" />
+                    <div className="rounded-lg border border-border/60 p-4 text-sm sm:col-span-2">
+                        State: <span className="font-medium">{data.state}</span>
+                    </div>
+                </div>
+            ) : (
+                <Empty text="No live metrics - the service has no running container. History below, if any." />
+            )}
+            <div>
+                <h3 className="mb-1 text-sm font-medium">History</h3>
+                <MetricsHistory endpoint={`/api/deploy/apps/${applicationId}/metrics/history`} metrics={DEPLOY_METRICS} />
             </div>
         </div>
     );
 }
+
+/** Charts drawn on the Deploy Metrics tab: CPU and memory as percentages. */
+const DEPLOY_METRICS: MetricSpec[] = [
+    { key: "cpu", label: "CPU", value: (point) => point.cpuPercent, format: percent, tone: "primary", max: 100 },
+    {
+        key: "mem",
+        label: "Memory",
+        value: (point) => ratioPercent(point.memUsedBytes, point.memTotalBytes),
+        format: percent,
+        tone: "success",
+        max: 100
+    }
+];
 
 function Meter({ label, value, unit }: { label: string; value: number | null | undefined; unit: string }) {
     const pct = typeof value === "number" ? Math.max(0, Math.min(100, value)) : 0;
@@ -947,6 +975,8 @@ function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
 
     return (
         <div className="flex flex-col gap-5 py-2">
+            <ServerSection app={app} onChanged={onChanged} />
+
             <section className="flex flex-col gap-2">
                 <h3 className="text-sm font-medium">Networking</h3>
                 <label className="flex flex-col gap-1 text-xs text-muted-foreground">
@@ -984,14 +1014,28 @@ function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
                     <ul className="flex flex-col gap-1">
                         {app.domains.map((domain) => (
                             <li key={domain.id} className="group flex items-center gap-2">
-                                <a
-                                    href={`https://${domain.hostname}`}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="inline-flex min-w-0 items-center gap-1 truncate text-xs text-primary hover:underline"
-                                >
-                                    <Globe className="size-3 shrink-0" /> {domain.hostname}
-                                </a>
+                                {domain.enabled ? (
+                                    <a
+                                        href={`https://${domain.hostname}`}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="inline-flex min-w-0 flex-1 items-center gap-1 truncate text-xs text-primary hover:underline"
+                                    >
+                                        <Globe className="size-3 shrink-0" /> {domain.hostname}
+                                    </a>
+                                ) : (
+                                    <span
+                                        title="Domain disabled - not serving"
+                                        className="inline-flex min-w-0 flex-1 items-center gap-1 truncate text-xs text-muted-foreground line-through"
+                                    >
+                                        <Globe className="size-3 shrink-0" /> {domain.hostname}
+                                    </span>
+                                )}
+                                <Switch
+                                    checked={domain.enabled}
+                                    onChange={(next) => startTransition(async () => { await setDomainEnabledAction(domain.id, next); onChanged(); })}
+                                    aria-label={domain.enabled ? "Disable domain" : "Enable domain"}
+                                />
                                 <button
                                     type="button"
                                     title="Remove domain"
@@ -1087,6 +1131,61 @@ function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
                 </Button>
             </div>
         </div>
+    );
+}
+
+/** Pick which connected server this service runs on. Changing it tears the
+ *  current deployment down on the old server; the service redeploys on the new. */
+function ServerSection({ app, onChanged }: { app: ProjectApp; onChanged: () => void }) {
+    const [servers, setServers] = useState<{ id: string; name: string }[]>([]);
+    const [serverId, setServerId] = useState(app.serverId);
+    const [error, setError] = useState<string | null>(null);
+    const [pending, startTransition] = useTransition();
+
+    useEffect(() => {
+        void listDeployServersAction()
+            .then((list) => setServers(list))
+            .catch(() => undefined);
+    }, []);
+
+    const changed = serverId !== app.serverId;
+
+    function move() {
+        setError(null);
+        startTransition(async () => {
+            const result = await setAppServerAction(app.id, serverId);
+            if (result.error) setError(result.error);
+            else onChanged();
+        });
+    }
+
+    const options = servers.length > 0 ? servers : [{ id: app.serverId, name: app.serverName }];
+
+    return (
+        <section className="flex flex-col gap-2">
+            <h3 className="text-sm font-medium">Server</h3>
+            <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                Where this service runs
+                <Select
+                    value={serverId}
+                    onValueChange={setServerId}
+                    options={options.map((server) => ({ value: server.id, label: server.name }))}
+                    aria-label="Server"
+                />
+                <span>
+                    Move the service to another connected server. Connect more under Servers. Changing this stops the
+                    current container on the old server; redeploy to bring it up on the new one.
+                </span>
+            </label>
+            {error && <p className="text-sm text-danger">{error}</p>}
+            {changed && (
+                <div className="flex justify-end">
+                    <Button variant="outline" onClick={move} disabled={pending}>
+                        {pending && <Loader2 className="size-4 animate-spin" />} Move to {options.find((server) => server.id === serverId)?.name ?? "server"}
+                    </Button>
+                </div>
+            )}
+        </section>
     );
 }
 
