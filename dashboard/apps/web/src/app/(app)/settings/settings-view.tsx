@@ -6,7 +6,7 @@
  * demand; the refresh forces a fresh GitHub comparison via the server action.
  */
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { CheckCircle2, DownloadCloud, RefreshCw, TriangleAlert } from "lucide-react";
 import { Button, Card, CardBody, CardHeader, CardTitle } from "@polaris/ui";
 import type { UpdateStatus } from "@/lib/update-service";
@@ -24,6 +24,10 @@ function formatChecked(iso: string): string {
     const date = new Date(iso);
     return Number.isNaN(date.getTime()) ? "never" : date.toLocaleString();
 }
+
+// Last auto-check timestamp, module-level so the 30s throttle survives navigating
+// away and back within the session.
+let lastAutoCheck = 0;
 
 export function SettingsView({
     initialStatus,
@@ -43,6 +47,16 @@ export function SettingsView({
             setStatus(await checkUpdatesAction());
         });
     }
+
+    // Auto-check on entering the page, throttled to once per 30s across visits so
+    // opening Settings always shows a fresh result without a manual click.
+    useEffect(() => {
+        if (Date.now() - lastAutoCheck > 30_000) {
+            lastAutoCheck = Date.now();
+            onCheck();
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     async function onUpdate() {
         setUpdating(true);

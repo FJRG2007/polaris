@@ -207,6 +207,13 @@ export async function addApplicationDomain(
         kind = plan.kind;
         if (!opts.cert) certResolver = plan.cert;
     }
+    // Idempotent: re-adding the same domain to the same app is a no-op, not an error
+    // (the auto free subdomain is deterministic, so "Add domain" would hit this).
+    const existing = await prisma.domain.findFirst({ where: { hostname, applicationId }, select: { id: true } });
+    if (existing) {
+        await syncAppRoutes().catch(() => undefined);
+        return hostname;
+    }
     try {
         await prisma.domain.create({
             data: { applicationId, hostname, kind, targetPort: opts.targetPort, certResolver }

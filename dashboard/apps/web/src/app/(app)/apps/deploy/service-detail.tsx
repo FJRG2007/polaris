@@ -1456,7 +1456,7 @@ function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
                                 value={exposure}
                                 onValueChange={(value) => setExposure(value as "subdomain" | "le" | "tunnel")}
                                 options={[
-                                    { value: "subdomain", label: "Free subdomain (LAN / internal CA)" },
+                                    { value: "subdomain", label: "Free subdomain (auto)" },
                                     { value: "le", label: "Custom domain - Let's Encrypt" },
                                     { value: "tunnel", label: "Custom domain - behind a tunnel/proxy" }
                                 ]}
@@ -1476,9 +1476,9 @@ function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
                     )}
                     <p className="text-xs text-muted-foreground">
                         {exposure === "subdomain"
-                            ? "A free subdomain on this server, served with Caddy's internal CA - reachable on your network."
+                            ? "Follows your Network exposure mode (Admin - Domains): public with Let's Encrypt on a reachable box, or LAN-only on a home/NAT box. For public access from home, set a wildcard domain there or start a Public tunnel below."
                             : exposure === "le"
-                              ? "Point the domain's DNS at this server's public IP (port-forward / DuckDNS). Caddy gets a Let's Encrypt certificate automatically."
+                              ? "Point the domain's DNS at this server's public IP (port-forward / DuckDNS). Traefik gets a Let's Encrypt certificate automatically."
                               : "For a domain fronted by a tunnel (Cloudflare / ngrok) or an external proxy that terminates TLS. Configure the tunnel under Integrations."}
                     </p>
                     <div className="flex justify-end">
