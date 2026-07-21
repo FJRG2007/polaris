@@ -89,7 +89,7 @@ export function ServiceDetail({ app, onChanged, onClose }: { app: ProjectApp; on
             <DialogContent
                 className={cn(
                     "right-0 left-auto top-0 flex h-full max-h-none translate-x-0 translate-y-0 flex-col gap-0 rounded-none rounded-l-xl border-y-0 border-r-0 p-0 data-[state=open]:slide-in-from-right-4",
-                    full ? "w-full max-w-none" : "w-full max-w-none sm:w-[820px]"
+                    full ? "w-full max-w-none" : "w-full max-w-none sm:w-[820px] sm:max-w-[calc(100vw-2rem)]"
                 )}
             >
                 <div className="flex items-center gap-3 border-b border-border/60 px-5 py-4">
@@ -310,8 +310,8 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
 
     return (
         <div className="flex flex-col gap-4 py-2">
-            <div className="flex items-center gap-3">
-                <div className="flex min-w-0 flex-col gap-0.5">
+            <div className="flex flex-wrap items-center gap-3">
+                <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                     {primaryDomain ? (
                         <a
                             href={`https://${primaryDomain.hostname}`}
@@ -338,7 +338,7 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
                         </a>
                     )}
                 </div>
-                <div className="ml-auto flex items-center gap-4 text-xs text-muted-foreground">
+                <div className="ml-auto hidden items-center gap-4 text-xs text-muted-foreground sm:flex">
                     <span className="inline-flex items-center gap-1">
                         <MapPin className="size-3.5" /> {region}
                     </span>
@@ -1012,7 +1012,7 @@ function VariablesTab({ app }: { app: ProjectApp }) {
                     </button>
                 ))}
             </div>
-            <div className="flex items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="text-sm font-medium">
                     {items ? items.length : 0} {scope === "environment" ? "environment" : "service"} variable
                     {items && items.length === 1 ? "" : "s"}
@@ -1451,7 +1451,7 @@ function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
                     <p className="text-xs text-muted-foreground">No domains yet.</p>
                 )}
                 <div className="flex flex-col gap-2">
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                         <label className="flex flex-col gap-1 text-xs text-muted-foreground">
                             Exposure
                             <Select
@@ -1498,7 +1498,7 @@ function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
                         <span>Deploy on push</span>
                         <Switch checked={autoDeploy} onChange={setAutoDeploy} aria-label="Deploy on push" />
                     </div>
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                         <label className="flex flex-col gap-1 text-xs text-muted-foreground">
                             Branch
                             <Input value={branch} onChange={(event) => setBranch(event.target.value)} placeholder="main" />
