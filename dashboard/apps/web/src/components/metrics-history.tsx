@@ -34,6 +34,9 @@ export interface MetricSpec<T = Point> {
     tone?: GaugeTone;
     /** Fixed Y ceiling (e.g. 100 for a percentage). */
     max?: number;
+    /** How the header number summarizes the window (default "last"): "sum" for a
+     *  count like requests, "avg" for a rate, "max" for a peak. */
+    summary?: "last" | "sum" | "avg" | "max";
 }
 
 type Window = { kind: "preset"; preset: RangePreset } | { kind: "custom"; from: number; to: number };
@@ -169,6 +172,7 @@ export function MetricsHistory<T extends { t: number } = Point>({
                         max={metric.max}
                         tone={metric.tone}
                         format={metric.format}
+                        summary={metric.summary}
                     />
                 ))}
             </div>

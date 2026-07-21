@@ -99,6 +99,7 @@ export function TimeSeriesChart({
     max,
     tone = "primary",
     format = (value) => String(Math.round(value)),
+    summary = "last",
     label,
     height = 132,
     className
@@ -112,6 +113,10 @@ export function TimeSeriesChart({
     tone?: GaugeTone;
     /** Formats the header value and the axis ceiling. */
     format?: (value: number) => string;
+    /** How the header number summarizes the window: the latest bucket ("last", the
+     *  default, for a level like CPU), the total ("sum", for a count like requests),
+     *  the mean ("avg", for a rate), or the peak ("max"). */
+    summary?: "last" | "sum" | "avg" | "max";
     label?: string;
     height?: number;
     className?: string;
@@ -123,7 +128,19 @@ export function TimeSeriesChart({
     const present = points.filter((point): point is { t: number; v: number } => point.v != null);
     const dataMax = present.reduce((peak, point) => Math.max(peak, point.v), 0);
     const yMax = max ?? Math.max(1, dataMax * 1.15);
-    const last = present.length > 0 ? present[present.length - 1]!.v : null;
+    // The header number: a trailing empty bucket (e.g. no requests in the last minutes)
+    // must not read as the window's value, so a count sums and a rate averages instead
+    // of taking the last bucket.
+    const headerValue =
+        present.length === 0
+            ? null
+            : summary === "sum"
+              ? present.reduce((total, point) => total + point.v, 0)
+              : summary === "avg"
+                ? present.reduce((total, point) => total + point.v, 0) / present.length
+                : summary === "max"
+                  ? present.reduce((peak, point) => Math.max(peak, point.v), present[0]!.v)
+                  : present[present.length - 1]!.v;
 
     const x = (t: number): number => ((t - from) / span) * width;
     const y = (v: number): number => height - Math.max(0, Math.min(1, v / yMax)) * height;
@@ -154,7 +171,7 @@ export function TimeSeriesChart({
         <div className={cn("rounded-lg border border-border/60 p-3", className)}>
             <div className="flex items-baseline justify-between">
                 {label ? <span className="text-sm font-medium">{label}</span> : <span />}
-                <span className="text-sm text-muted-foreground">{last != null ? format(last) : "-"}</span>
+                <span className="text-sm text-muted-foreground">{headerValue != null ? format(headerValue) : "-"}</span>
             </div>
             {present.length === 0 ? (
                 <div

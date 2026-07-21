@@ -1237,10 +1237,10 @@ function formatRate(bytesPerSec: number): string {
 
 /** Charts drawn on the Deploy Metrics tab HTTP section, derived from access logs. */
 const HTTP_METRICS: MetricSpec<HttpPoint>[] = [
-    { key: "req", label: "Requests", value: (point) => point.requests, format: (value) => String(Math.round(value)), tone: "primary" },
-    { key: "err", label: "Request error rate", value: (point) => point.errorRate, format: percent, tone: "danger", max: 100 },
-    { key: "rt", label: "Response time", value: (point) => point.avgResponseMs, format: (value) => `${Math.round(value)} ms`, tone: "warning" },
-    { key: "net", label: "Public network traffic", value: (point) => point.bytesPerSec, format: formatRate, tone: "success" }
+    { key: "req", label: "Requests", value: (point) => point.requests, format: (value) => String(Math.round(value)), tone: "primary", summary: "sum" },
+    { key: "err", label: "Request error rate", value: (point) => point.errorRate, format: percent, tone: "danger", max: 100, summary: "avg" },
+    { key: "rt", label: "Response time", value: (point) => point.avgResponseMs, format: (value) => `${Math.round(value)} ms`, tone: "warning", summary: "avg" },
+    { key: "net", label: "Public network traffic", value: (point) => point.bytesPerSec, format: formatRate, tone: "success", summary: "avg" }
 ];
 
 function Meter({
