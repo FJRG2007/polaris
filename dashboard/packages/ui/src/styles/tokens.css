@@ -1,51 +1,52 @@
 /*
- * Polaris design tokens. A calm, dark, control-plane aesthetic in the spirit of
- * a network appliance console: near-black surfaces, low-chroma grays, hairline
- * borders, and a single confident blue accent. Dark is the default; the .light
- * class flips to a bright theme. Colors are HSL channels so Tailwind utilities
- * can compose them with alpha via hsl(var(--token) / <alpha>).
+ * Polaris design tokens. A deep, focused control-plane aesthetic: near-black
+ * surfaces carrying a faint violet cast, hairline borders, and a confident
+ * violet-to-magenta accent - the palette a deployment platform would wear.
+ * Dark is the default; the .light class flips to a bright theme. Colors are HSL
+ * channels so Tailwind utilities can compose them with alpha via
+ * hsl(var(--token) / <alpha>).
  */
 
 :root {
-    --background: 222 20% 7%;
-    --surface: 222 18% 9%;
-    --card: 222 16% 11%;
-    --card-hover: 222 16% 14%;
-    --foreground: 210 20% 92%;
-    --muted: 222 12% 16%;
-    --muted-foreground: 216 12% 60%;
-    --border: 222 12% 18%;
-    --input: 222 14% 20%;
-    --ring: 211 100% 62%;
+    --background: 250 22% 6%;
+    --surface: 250 18% 8%;
+    --card: 250 16% 10%;
+    --card-hover: 250 16% 13%;
+    --foreground: 250 16% 93%;
+    --muted: 250 13% 15%;
+    --muted-foreground: 250 9% 62%;
+    --border: 250 13% 17%;
+    --input: 250 13% 20%;
+    --ring: 262 90% 68%;
 
-    --primary: 211 100% 60%;
-    --primary-foreground: 210 40% 98%;
-    --accent: 189 94% 55%;
-    --accent-foreground: 200 40% 10%;
+    --primary: 262 88% 64%;
+    --primary-foreground: 0 0% 100%;
+    --accent: 288 82% 66%;
+    --accent-foreground: 0 0% 100%;
 
     --success: 152 60% 45%;
     --warning: 38 92% 55%;
     --danger: 358 72% 58%;
-    --danger-foreground: 210 40% 98%;
+    --danger-foreground: 0 0% 100%;
 
     --radius: 0.75rem;
 }
 
 :root.light {
-    --background: 210 40% 98%;
+    --background: 250 40% 98%;
     --surface: 0 0% 100%;
     --card: 0 0% 100%;
-    --card-hover: 210 30% 96%;
-    --foreground: 222 24% 14%;
-    --muted: 214 24% 94%;
-    --muted-foreground: 216 12% 40%;
-    --border: 214 20% 88%;
-    --input: 214 20% 86%;
-    --ring: 211 100% 50%;
+    --card-hover: 250 30% 96%;
+    --foreground: 250 24% 14%;
+    --muted: 250 24% 95%;
+    --muted-foreground: 250 10% 40%;
+    --border: 250 20% 89%;
+    --input: 250 20% 86%;
+    --ring: 262 83% 58%;
 
-    --primary: 211 100% 48%;
+    --primary: 262 83% 56%;
     --primary-foreground: 0 0% 100%;
-    --accent: 189 94% 42%;
+    --accent: 288 76% 52%;
     --accent-foreground: 0 0% 100%;
 
     --success: 152 55% 38%;

@@ -111,6 +111,19 @@ const TONE_TEXT: Record<Tone, string> = {
     idle: "text-muted-foreground"
 };
 
+/** Resting border for a node, tinted by its deployment tone (Railway-style). */
+const TONE_BORDER: Record<Tone, string> = {
+    success: "border-border hover:border-success/50",
+    warning: "border-warning/40 hover:border-warning/60",
+    danger: "border-danger/40 hover:border-danger/60",
+    idle: "border-border hover:border-muted-foreground/50"
+};
+
+/** A soft edge vignette so the board reads as a lit surface, not a flat panel. */
+const VIGNETTE: React.CSSProperties = {
+    background: "radial-gradient(120% 90% at 50% 30%, transparent 55%, hsl(var(--background) / 0.55) 100%)"
+};
+
 export function DeployCanvas({
     environment,
     canManage,
@@ -261,8 +274,20 @@ export function DeployCanvas({
 
     if (nodes.length === 0) {
         return (
-            <div className="flex min-h-72 items-center justify-center rounded-lg border border-dashed border-border/60" style={DOT_BG}>
-                <p className="text-sm text-muted-foreground">No services to map yet.</p>
+            <div
+                className="relative flex h-[calc(100vh-11rem)] min-h-[460px] flex-col items-center justify-center overflow-hidden rounded-lg border border-border/60"
+                style={DOT_BG}
+            >
+                <div className="pointer-events-none absolute inset-0" style={VIGNETTE} />
+                <div className="relative flex flex-col items-center gap-2 text-center">
+                    <span className="grid size-12 place-items-center rounded-xl border border-border bg-card text-muted-foreground">
+                        <HardDrive className="size-5" />
+                    </span>
+                    <p className="text-sm font-medium">Nothing deployed yet</p>
+                    <p className="max-w-xs text-xs text-muted-foreground">
+                        Add a service and it appears here as a node you can arrange and connect.
+                    </p>
+                </div>
             </div>
         );
     }
@@ -274,12 +299,9 @@ export function DeployCanvas({
                     <Loader2 className="size-3 animate-spin" /> Saving
                 </span>
             )}
-            <div
-                ref={containerRef}
-                className="relative h-[calc(100vh-11rem)] min-h-[460px] overflow-auto rounded-lg border border-border/60"
-                style={DOT_BG}
-            >
-                <div ref={boardRef} className="relative" style={{ width: extent.w, height: extent.h }}>
+            <div className="relative h-[calc(100vh-11rem)] min-h-[460px] overflow-hidden rounded-lg border border-border/60">
+                <div ref={containerRef} className="absolute inset-0 overflow-auto" style={DOT_BG}>
+                    <div ref={boardRef} className="relative" style={{ width: extent.w, height: extent.h }}>
                     <svg className="pointer-events-none absolute inset-0" width={extent.w} height={extent.h}>
                         {links.map((link, index) => {
                             const a = center(link.source);
@@ -290,9 +312,9 @@ export function DeployCanvas({
                                     <path
                                         d={`M ${a.x} ${a.y} C ${midX} ${a.y}, ${midX} ${b.y}, ${b.x} ${b.y}`}
                                         fill="none"
-                                        stroke="hsl(var(--muted-foreground) / 0.5)"
-                                        strokeWidth={1.5}
-                                        strokeDasharray="4 4"
+                                        stroke="hsl(var(--muted-foreground) / 0.45)"
+                                        strokeWidth={2}
+                                        strokeLinecap="round"
                                     />
                                     {canManage && (
                                         <circle
@@ -313,8 +335,9 @@ export function DeployCanvas({
                                 d={`M ${center(pending.source).x} ${center(pending.source).y} L ${pending.cursor.x} ${pending.cursor.y}`}
                                 fill="none"
                                 stroke="hsl(var(--primary))"
-                                strokeWidth={1.5}
-                                strokeDasharray="4 4"
+                                strokeWidth={2}
+                                strokeLinecap="round"
+                                strokeDasharray="5 5"
                             />
                         )}
                     </svg>
@@ -322,12 +345,13 @@ export function DeployCanvas({
                     {nodes.map((node) => {
                         const p = pos[node.id] ?? { x: 0, y: 0 };
                         const label = node.tone === "success" ? "Online" : node.statusLabel;
+                        const pulsing = node.tone === "warning";
                         return (
                             <Fragment key={node.id}>
                                 <div
-                                    className={`absolute flex select-none flex-col border bg-card shadow-sm transition-colors ${
+                                    className={`group absolute flex select-none flex-col border bg-card shadow-sm transition-[border-color,box-shadow] hover:shadow-lg hover:shadow-black/25 ${
                                         node.volume ? "rounded-t-2xl" : "rounded-2xl"
-                                    } ${dragId === node.id ? "border-primary" : "border-border hover:border-muted-foreground/50"} ${
+                                    } ${dragId === node.id ? "border-primary ring-1 ring-primary/40" : TONE_BORDER[node.tone]} ${
                                         canManage ? "cursor-grab active:cursor-grabbing" : ""
                                     }`}
                                     style={{ left: p.x, top: p.y, width: NODE_W, height: NODE_H }}
@@ -335,12 +359,14 @@ export function DeployCanvas({
                                 >
                                     <div className="flex flex-1 flex-col p-4">
                                         <div className="flex items-center gap-3">
-                                            <ServiceIcon kind={node.kind} className="size-7 shrink-0 text-foreground" />
+                                            <span className="grid size-9 shrink-0 place-items-center rounded-lg border border-border bg-surface text-foreground">
+                                                <ServiceIcon kind={node.kind} className="size-4" />
+                                            </span>
                                             <span className="truncate text-base font-semibold">{node.name}</span>
                                         </div>
                                         <p className="mt-1 truncate text-sm text-muted-foreground">{node.subtitle}</p>
                                         <div className="mt-auto flex items-center gap-2 text-sm">
-                                            <span className={`size-1.5 rounded-full ${TONE_DOT[node.tone]}`} />
+                                            <span className={`size-1.5 rounded-full ${TONE_DOT[node.tone]} ${pulsing ? "animate-pulse" : ""}`} />
                                             <span className={TONE_TEXT[node.tone]}>{label}</span>
                                         </div>
                                     </div>
@@ -349,7 +375,7 @@ export function DeployCanvas({
                                             type="button"
                                             title="Drag to another service to link"
                                             onPointerDown={(event) => onHandlePointerDown(event, node.id)}
-                                            className="absolute -right-1.5 top-1/2 size-3 -translate-y-1/2 rounded-full border border-border bg-surface hover:border-primary hover:bg-primary"
+                                            className="absolute -right-1.5 top-1/2 size-3.5 -translate-y-1/2 rounded-full border-2 border-primary bg-card opacity-0 transition-opacity hover:bg-primary group-hover:opacity-100"
                                         />
                                     )}
                                 </div>
@@ -364,7 +390,9 @@ export function DeployCanvas({
                             </Fragment>
                         );
                     })}
+                    </div>
                 </div>
+                <div className="pointer-events-none absolute inset-0 rounded-lg" style={VIGNETTE} />
             </div>
             {canManage && (
                 <p className="mt-2 text-xs text-muted-foreground/70">

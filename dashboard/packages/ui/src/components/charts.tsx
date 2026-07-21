@@ -6,6 +6,7 @@
  * tokens so they theme automatically.
  */
 
+import { useId } from "react";
 import { cn } from "../lib/cn.js";
 
 export type GaugeTone = "primary" | "success" | "warning" | "danger";
@@ -116,6 +117,7 @@ export function TimeSeriesChart({
     className?: string;
 }) {
     const color = TONE_VAR[tone];
+    const gradientId = useId();
     const width = 600;
     const span = Math.max(1, to - from);
     const present = points.filter((point): point is { t: number; v: number } => point.v != null);
@@ -171,6 +173,12 @@ export function TimeSeriesChart({
                     role="img"
                     aria-label={label ?? "History"}
                 >
+                    <defs>
+                        <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor={color} stopOpacity={0.35} />
+                            <stop offset="100%" stopColor={color} stopOpacity={0} />
+                        </linearGradient>
+                    </defs>
                     {[0.25, 0.5, 0.75].map((fraction) => (
                         <line
                             key={fraction}
@@ -186,7 +194,7 @@ export function TimeSeriesChart({
                         />
                     ))}
                     {runs.map((segment, index) => (
-                        <path key={`a${index}`} d={areaPath(segment)} fill={color} opacity={0.12} />
+                        <path key={`a${index}`} d={areaPath(segment)} fill={`url(#${gradientId})`} />
                     ))}
                     {runs.map((segment, index) => (
                         <path

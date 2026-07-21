@@ -64,6 +64,12 @@ const ENGINE_OPTIONS: SelectOption[] = DB_ENGINES.map((engine) => ({
     icon: <Database className="size-4 text-muted-foreground" />
 }));
 
+/** The dotted board texture shared with the canvas, for empty states. */
+const DOT_BG: React.CSSProperties = {
+    backgroundImage: "radial-gradient(circle, hsl(var(--muted-foreground) / 0.15) 1px, transparent 1px)",
+    backgroundSize: "16px 16px"
+};
+
 export type ProjectApp = ProjectSummary["environments"][number]["applications"][number];
 type ProjectDatabase = ProjectSummary["environments"][number]["databases"][number];
 
@@ -133,13 +139,25 @@ export function EnvironmentServices({
     return (
         <div className="flex flex-col gap-3">
             {isEmpty ? (
-                <div className="rounded-lg border border-dashed border-border/60 px-4 py-16 text-center">
-                    <p className="text-sm text-muted-foreground">No services in this environment yet.</p>
-                    {canManage && (
-                        <p className="mt-1 text-xs text-muted-foreground/70">
-                            Add a GitHub repository, a Docker image, or a database.
-                        </p>
-                    )}
+                <div
+                    className="relative flex flex-col items-center gap-3 overflow-hidden rounded-xl border border-border/60 px-4 py-20 text-center"
+                    style={DOT_BG}
+                >
+                    <div
+                        className="pointer-events-none absolute inset-0"
+                        style={{ background: "radial-gradient(120% 90% at 50% 40%, transparent 45%, hsl(var(--background)) 100%)" }}
+                    />
+                    <span className="relative grid size-11 place-items-center rounded-xl border border-border bg-card text-primary">
+                        <Rocket className="size-5" />
+                    </span>
+                    <div className="relative">
+                        <p className="text-sm font-medium">No services in this environment yet</p>
+                        {canManage && (
+                            <p className="mt-1 text-xs text-muted-foreground">
+                                Add a GitHub repository, a Docker image, or a database.
+                            </p>
+                        )}
+                    </div>
                 </div>
             ) : (
                 <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -192,16 +210,18 @@ function AppCard({
     }
 
     return (
-        <div className="flex flex-col gap-3 rounded-lg border border-border/60 bg-surface/60 p-4 transition-colors hover:border-border">
+        <div className="flex flex-col gap-3 rounded-xl border border-border/60 bg-surface/60 p-4 transition-[border-color,box-shadow] hover:border-border hover:shadow-md hover:shadow-black/15">
             <div className="flex items-start justify-between gap-2">
                 <button
                     type="button"
                     onClick={onOpen}
                     disabled={!onOpen}
-                    className="flex min-w-0 items-center gap-2 text-left enabled:hover:text-primary"
+                    className="group flex min-w-0 items-center gap-2.5 text-left"
                 >
-                    <ServiceIcon kind={serviceKindOf(app.sourceType)} className="size-4 shrink-0 text-foreground" />
-                    <span className="truncate text-sm font-medium">{app.name}</span>
+                    <span className="grid size-7 shrink-0 place-items-center rounded-md border border-border bg-surface text-foreground transition-colors group-enabled:group-hover:border-primary/40">
+                        <ServiceIcon kind={serviceKindOf(app.sourceType)} className="size-3.5" />
+                    </span>
+                    <span className="truncate text-sm font-medium group-enabled:group-hover:text-primary">{app.name}</span>
                 </button>
                 <StatusPill
                     tone={app.currentDeploymentId ? dbTone(app.deployStatus ?? "") : "idle"}
@@ -315,10 +335,12 @@ function DatabaseCard({
     const [pending, startTransition] = useTransition();
 
     return (
-        <div className="flex flex-col gap-3 rounded-lg border border-border/60 bg-surface/60 p-4 transition-colors hover:border-border">
+        <div className="flex flex-col gap-3 rounded-xl border border-border/60 bg-surface/60 p-4 transition-[border-color,box-shadow] hover:border-border hover:shadow-md hover:shadow-black/15">
             <div className="flex items-start justify-between gap-2">
-                <div className="flex min-w-0 items-center gap-2">
-                    <Database className="size-4 shrink-0 text-accent" />
+                <div className="flex min-w-0 items-center gap-2.5">
+                    <span className="grid size-7 shrink-0 place-items-center rounded-md border border-border bg-surface text-accent">
+                        <Database className="size-3.5" />
+                    </span>
                     <span className="truncate text-sm font-medium">{database.name}</span>
                 </div>
                 <StatusPill tone={dbTone(database.status)} label={database.status} />
@@ -983,7 +1005,7 @@ export function StatusPill({ tone, label }: { tone: "success" | "warning" | "dan
     }[tone];
     return (
         <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-border/60 bg-surface px-2 py-0.5 text-xs text-muted-foreground">
-            <span className={`size-1.5 rounded-full ${dot}`} />
+            <span className={`size-1.5 rounded-full ${dot} ${tone === "warning" ? "animate-pulse" : ""}`} />
             {label}
         </span>
     );

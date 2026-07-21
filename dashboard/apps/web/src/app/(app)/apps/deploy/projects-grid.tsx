@@ -10,7 +10,7 @@ import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Fuse from "fuse.js";
-import { LayoutGrid, List, Loader2, Plus, Search } from "lucide-react";
+import { LayoutGrid, List, Loader2, Plus, Rocket, Search } from "lucide-react";
 import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, Input } from "@polaris/ui";
 import { ServiceIcon, type ServiceKind } from "./deploy-view";
 import { RegistryCredentialsButton } from "./registry-credentials";
@@ -91,11 +91,23 @@ export function ProjectsGrid({
             </div>
 
             {count === 0 ? (
-                <div className="rounded-xl border border-dashed border-border/60 px-6 py-20 text-center">
-                    <h2 className="text-sm font-medium">Deploy your first app</h2>
-                    <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
-                        Create a project to group environments, applications, and databases.
-                    </p>
+                <div
+                    className="relative flex flex-col items-center gap-3 overflow-hidden rounded-xl border border-border/60 px-6 py-24 text-center"
+                    style={DOT_CANVAS}
+                >
+                    <div
+                        className="pointer-events-none absolute inset-0"
+                        style={{ background: "radial-gradient(120% 90% at 50% 40%, transparent 45%, hsl(var(--background)) 100%)" }}
+                    />
+                    <span className="relative grid size-12 place-items-center rounded-xl border border-border bg-card text-primary">
+                        <Rocket className="size-5" />
+                    </span>
+                    <div className="relative">
+                        <h2 className="text-sm font-medium">Deploy your first app</h2>
+                        <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
+                            Create a project to group environments, applications, and databases.
+                        </p>
+                    </div>
                 </div>
             ) : filtered.length === 0 ? (
                 <p className="py-16 text-center text-sm text-muted-foreground">No projects match &ldquo;{search}&rdquo;.</p>
@@ -150,25 +162,33 @@ const DOT_CANVAS: React.CSSProperties = {
     backgroundSize: "16px 16px"
 };
 
+const CANVAS_VIGNETTE: React.CSSProperties = {
+    background: "radial-gradient(120% 90% at 50% 30%, transparent 55%, hsl(var(--card)) 100%)"
+};
+
 function ProjectCard({ project }: { project: ProjectCardData }) {
     const status = statusTone(project.online, project.total);
+    const partial = project.total > 0 && project.online < project.total;
     return (
         <Link
             href={`/apps/deploy/${project.id}`}
-            className="group flex flex-col overflow-hidden rounded-xl border border-border bg-card transition-colors hover:border-muted-foreground/40"
+            className="group flex flex-col overflow-hidden rounded-xl border border-border bg-card transition-[transform,border-color,box-shadow] hover:-translate-y-0.5 hover:border-muted-foreground/40 hover:shadow-lg hover:shadow-black/20"
         >
             <div className="px-4 py-3">
                 <h3 className="truncate text-sm font-medium">{project.name}</h3>
             </div>
-            <div className="mx-4 flex min-h-44 flex-1 items-center justify-center rounded-lg border border-border/60" style={DOT_CANVAS}>
+            <div className="relative mx-4 flex min-h-44 flex-1 items-center justify-center overflow-hidden rounded-lg border border-border/60" style={DOT_CANVAS}>
+                <div className="pointer-events-none absolute inset-0" style={CANVAS_VIGNETTE} />
                 {project.total === 0 ? (
-                    <span className="text-xs text-muted-foreground">Empty project</span>
+                    <span className="relative text-xs text-muted-foreground">Empty project</span>
                 ) : (
-                    <ServiceTiles services={project.services} />
+                    <div className="relative">
+                        <ServiceTiles services={project.services} />
+                    </div>
                 )}
             </div>
             <div className="flex items-center gap-2 px-4 py-3 text-xs">
-                <span className={`size-1.5 rounded-full ${status.dot}`} />
+                <span className={`size-1.5 rounded-full ${status.dot} ${partial ? "animate-pulse" : ""}`} />
                 <span className="text-muted-foreground">{project.environmentName}</span>
                 <span className="text-muted-foreground/50">·</span>
                 <span className={status.text}>{status.label}</span>
