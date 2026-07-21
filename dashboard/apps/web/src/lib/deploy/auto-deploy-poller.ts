@@ -25,7 +25,7 @@ export async function pollAutoDeploys(): Promise<void> {
         where: { autoDeploy: true, sourceType: { in: ["dockerfile", "nixpacks"] } },
         include: { environment: { include: { project: true } } }
     });
-    const commitCache = new Map<string, { sha: string; message: string } | null>();
+    const commitCache = new Map<string, Awaited<ReturnType<typeof getLatestCommit>>>();
 
     for (const app of apps) {
         let source: Record<string, unknown>;
@@ -58,7 +58,12 @@ export async function pollAutoDeploys(): Promise<void> {
 
         const ownerId = app.environment.project.ownerId;
         try {
-            await deployApplication(app.id, ownerId, ownerId, { commitMessage: latest.message, commitSha: latest.sha });
+            await deployApplication(app.id, ownerId, ownerId, {
+                commitMessage: latest.message,
+                commitSha: latest.sha,
+                authorName: latest.authorName ?? undefined,
+                authorAvatarUrl: latest.authorAvatarUrl ?? undefined
+            });
             await prisma.application.update({ where: { id: app.id }, data: { lastDeployedSha: latest.sha } });
         } catch {
             // Leave lastDeployedSha unchanged so the next tick retries this commit.

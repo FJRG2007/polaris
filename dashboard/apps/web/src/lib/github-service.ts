@@ -466,24 +466,38 @@ async function resolveGithubToken(owner?: string): Promise<string | null> {
  * a public repo also resolves unauthenticated. Null on any error, so a poll tick
  * simply skips this repo rather than failing.
  */
-export async function getLatestCommit(
-    owner: string,
-    repo: string,
-    branch: string
-): Promise<{ sha: string; message: string } | null> {
+export interface CommitInfo {
+    sha: string;
+    message: string;
+    /** Commit author's display name (GitHub login or the git author name). */
+    authorName: string | null;
+    /** Commit author's GitHub avatar URL, when the author is a GitHub user. */
+    authorAvatarUrl: string | null;
+}
+
+export async function getLatestCommit(owner: string, repo: string, ref: string): Promise<CommitInfo | null> {
     const token = await resolveGithubToken(owner).catch(() => null);
     const headers: HeadersInit = token
         ? apiHeaders(token)
         : { Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28", "User-Agent": "polaris" };
     try {
-        const res = await fetch(`${API}/repos/${owner}/${repo}/commits/${encodeURIComponent(branch)}`, {
+        const res = await fetch(`${API}/repos/${owner}/${repo}/commits/${encodeURIComponent(ref)}`, {
             headers,
             cache: "no-store"
         });
         if (!res.ok) return null;
-        const data = (await res.json()) as { sha?: string; commit?: { message?: string } };
+        const data = (await res.json()) as {
+            sha?: string;
+            commit?: { message?: string; author?: { name?: string } };
+            author?: { login?: string; avatar_url?: string } | null;
+        };
         if (!data.sha) return null;
-        return { sha: data.sha, message: data.commit?.message ?? "" };
+        return {
+            sha: data.sha,
+            message: data.commit?.message ?? "",
+            authorName: data.author?.login ?? data.commit?.author?.name ?? null,
+            authorAvatarUrl: data.author?.avatar_url ?? null
+        };
     } catch {
         return null;
     }

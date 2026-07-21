@@ -895,6 +895,9 @@ model Deployment {
     commitSha      String?
     // Head commit message when known (auto-deploy webhook / resolved on deploy).
     commitMessage  String?
+    // Commit author (GitHub), resolved at deploy time for the deployment avatar.
+    authorName      String?
+    authorAvatarUrl String?
     // Relative path (under the deploy dir) of the streamed build/deploy log file.
     logPath        String?
     triggeredById  String?   @db.Uuid

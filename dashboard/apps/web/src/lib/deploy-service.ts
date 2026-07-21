@@ -18,7 +18,7 @@ import { getOrCreateHostTarget, getOrCreateLocalTarget } from "./deploy-target-s
 import { getPublicIp } from "./domain-service";
 import { resolveAutoDomain } from "./network-service";
 import { gitBuildContext, type GitSource } from "./git-build-service";
-import { githubCloneAuthHeader } from "./github-service";
+import { getLatestCommit, githubCloneAuthHeader } from "./github-service";
 import { resolveRegistryLogin } from "./registry-credential-service";
 
 /** Directory the web process writes deploy log files to (tailed by the UI). */
@@ -681,13 +681,42 @@ async function mergedEnv(environmentId: string, applicationId: string): Promise<
  * per-target queue. Returns the deployment id immediately; the run streams its
  * output to the deployment's log file and updates the row's status.
  */
+/** Extract owner/repo from a GitHub URL (https or scp-like, with or without .git). */
+function parseGithubRepo(repoUrl: string): { owner: string; repo: string } | null {
+    const match = repoUrl.match(/github\.com[/:]([^/]+)\/([^/]+?)(?:\.git)?\/?$/i);
+    return match ? { owner: match[1]!, repo: match[2]! } : null;
+}
+
 export async function deployApplication(
     applicationId: string,
     ownerId: string,
     userId: string,
-    meta?: { commitMessage?: string; commitSha?: string }
+    meta?: { commitMessage?: string; commitSha?: string; authorName?: string; authorAvatarUrl?: string }
 ): Promise<string> {
     const { plan, target, gitSource } = await buildAppPlan(applicationId, ownerId);
+
+    // Resolve the commit + author so the deployment shows who shipped it, Railway-
+    // style. The provided meta (webhook / poller) wins; otherwise resolve the branch
+    // head from GitHub. Best-effort - a private repo without a token just has none.
+    let commitMessage = meta?.commitMessage?.trim() || null;
+    let commitSha = meta?.commitSha || null;
+    let authorName = meta?.authorName ?? null;
+    let authorAvatarUrl = meta?.authorAvatarUrl ?? null;
+    if (gitSource && !authorAvatarUrl) {
+        const parsed = parseGithubRepo(gitSource.repoUrl);
+        if (parsed) {
+            const commit = await getLatestCommit(parsed.owner, parsed.repo, commitSha ?? gitSource.branch ?? "HEAD").catch(
+                () => null
+            );
+            if (commit) {
+                commitSha = commitSha ?? commit.sha;
+                commitMessage = commitMessage ?? (commit.message.split("\n")[0]?.trim() || null);
+                authorName = authorName ?? commit.authorName;
+                authorAvatarUrl = commit.authorAvatarUrl;
+            }
+        }
+    }
+
     const deployment = await prisma.deployment.create({
         data: {
             targetId: target.id,
@@ -695,8 +724,10 @@ export async function deployApplication(
             deployableId: applicationId,
             status: "queued",
             triggeredById: userId,
-            commitMessage: meta?.commitMessage?.trim() || null,
-            commitSha: meta?.commitSha || null
+            commitMessage,
+            commitSha,
+            authorName,
+            authorAvatarUrl
         }
     });
     // The app keeps pointing at the previous successful release until this one
@@ -715,6 +746,8 @@ export interface DeploymentSummary {
     isCurrent: boolean;
     commitMessage: string | null;
     commitSha: string | null;
+    authorName: string | null;
+    authorAvatarUrl: string | null;
 }
 
 /** An application's deployment history, most recent first (owner-checked). */
@@ -728,7 +761,16 @@ export async function listDeployments(applicationId: string, ownerId: string): P
         where: { deployableType: "application", deployableId: applicationId },
         orderBy: { createdAt: "desc" },
         take: 30,
-        select: { id: true, status: true, error: true, createdAt: true, commitMessage: true, commitSha: true }
+        select: {
+            id: true,
+            status: true,
+            error: true,
+            createdAt: true,
+            commitMessage: true,
+            commitSha: true,
+            authorName: true,
+            authorAvatarUrl: true
+        }
     });
     return rows.map((row) => ({
         id: row.id,
@@ -737,7 +779,9 @@ export async function listDeployments(applicationId: string, ownerId: string): P
         createdAt: row.createdAt.toISOString(),
         isCurrent: row.id === app.currentDeploymentId,
         commitMessage: row.commitMessage,
-        commitSha: row.commitSha
+        commitSha: row.commitSha,
+        authorName: row.authorName,
+        authorAvatarUrl: row.authorAvatarUrl
     }));
 }
 

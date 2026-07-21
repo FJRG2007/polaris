@@ -108,7 +108,7 @@ export function ServiceDetail({ app, onChanged, onClose }: { app: ProjectApp; on
                     </button>
                 </div>
 
-                <div className="flex items-center gap-1 overflow-x-auto border-b border-border/60 px-5 text-sm">
+                <div className="no-scrollbar flex items-center gap-1 overflow-x-auto border-b border-border/60 px-5 text-sm">
                     {TABS.map((name) => (
                         <button
                             key={name}
@@ -171,13 +171,30 @@ function sourceLabel(app: ProjectApp): string {
     return app.sourceType === "image" ? "Registry" : "GitHub";
 }
 
-/** A small circular author avatar - a source glyph until real author avatars exist. */
-function DeployAvatar({ app }: { app: ProjectApp }) {
+/** The commit author's avatar (GitHub), falling back to the source glyph. */
+function DeployAvatar({ app, deployment }: { app: ProjectApp; deployment?: DepSummary | null }) {
+    if (deployment?.authorAvatarUrl) {
+        // eslint-disable-next-line @next/next/no-img-element -- external avatar, no loader needed
+        return (
+            <img
+                src={deployment.authorAvatarUrl}
+                alt={deployment.authorName ?? "author"}
+                title={deployment.authorName ?? undefined}
+                className="size-8 shrink-0 rounded-full border border-border object-cover"
+            />
+        );
+    }
     return (
         <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
             <ServiceIcon kind={serviceKindOf(app.sourceType)} className="size-4" />
         </span>
     );
+}
+
+/** Deployment subtitle: relative time, optional author, and the source. */
+function deploySubtitle(deployment: DepSummary, app: ProjectApp): string {
+    const by = deployment.authorName ? ` by ${deployment.authorName}` : "";
+    return `${relativeTime(deployment.createdAt)}${by} via ${sourceLabel(app)}`;
 }
 
 /** The per-deployment overflow menu: redeploy, restart, enable/disable, remove. */
@@ -277,7 +294,10 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
                 deploymentId={logsFor}
                 deployment={deployment}
                 onBack={() => setLogsFor(null)}
-                onDone={reload}
+                onDone={() => {
+                    reload();
+                    onChanged();
+                }}
             />
         );
     }
@@ -341,12 +361,10 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
                                 <span className="shrink-0 rounded bg-success/15 px-2 py-0.5 text-[11px] font-semibold tracking-wide text-success">
                                     ACTIVE
                                 </span>
-                                <DeployAvatar app={app} />
+                                <DeployAvatar app={app} deployment={active} />
                                 <div className="min-w-0 flex-1">
                                     <p className="truncate text-sm font-medium text-foreground">{depTitle(active)}</p>
-                                    <p className="truncate text-xs text-muted-foreground">
-                                        {relativeTime(active.createdAt)} via {sourceLabel(app)}
-                                    </p>
+                                    <p className="truncate text-xs text-muted-foreground">{deploySubtitle(active, app)}</p>
                                 </div>
                                 <Button
                                     variant="outline"
@@ -414,12 +432,10 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
                                                 <span className={cn("shrink-0 rounded px-2 py-0.5 text-[11px] font-semibold tracking-wide", badge.cls)}>
                                                     {badge.label}
                                                 </span>
-                                                <DeployAvatar app={app} />
+                                                <DeployAvatar app={app} deployment={deployment} />
                                                 <div className="min-w-0 flex-1">
                                                     <p className="truncate font-medium text-foreground">{depTitle(deployment)}</p>
-                                                    <p className="truncate text-xs text-muted-foreground">
-                                                        {relativeTime(deployment.createdAt)} via {sourceLabel(app)}
-                                                    </p>
+                                                    <p className="truncate text-xs text-muted-foreground">{deploySubtitle(deployment, app)}</p>
                                                 </div>
                                                 <DeploymentMenu app={app} deployment={deployment} onAct={reload} onChanged={onChanged} />
                                             </li>
@@ -477,7 +493,7 @@ function DeploymentLogsView({
                 )}
             </div>
 
-            <div className="flex items-center gap-3 overflow-x-auto border-b border-border/60 text-sm">
+            <div className="no-scrollbar flex items-center gap-3 overflow-x-auto border-b border-border/60 text-sm">
                 {CATS.map((name) => (
                     <button
                         key={name}

@@ -98,3 +98,13 @@ body {
 ::-webkit-scrollbar-corner {
     background: transparent;
 }
+
+/* Opt-out for strips that scroll horizontally (tab bars) where a visible
+   scrollbar would just add clutter. */
+.no-scrollbar {
+    scrollbar-width: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+    display: none;
+}
