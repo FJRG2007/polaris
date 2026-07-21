@@ -132,7 +132,7 @@ RUN chmod +x /usr/local/bin/polaris && ln -sf /usr/local/bin/polaris /usr/local/
 # runtime user. Create and own it here so a fresh named volume inherits node's
 # ownership; the backup service still falls back to a temp dir if a bind mount
 # overrides this with root ownership.
-RUN mkdir -p /var/lib/polaris && chown -R node:node /var/lib/polaris
+RUN mkdir -p /var/lib/polaris /dynamic && chown -R node:node /var/lib/polaris /dynamic
 
 # Run as the unprivileged `node` user shipped with the base image.
 RUN chown -R node:node /app

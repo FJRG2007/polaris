@@ -26,4 +26,9 @@ export async function register(): Promise<void> {
     // tick only logs. Skipped during the build (register runs at server start).
     const { startMetricsCollector } = await import("./lib/metrics-collector-service");
     startMetricsCollector();
+
+    // Write the Traefik dynamic routes for deployed-app domains on startup, so the
+    // edge self-heals after a restart or a fresh dynamic volume. Best-effort.
+    const { syncAppRoutes } = await import("./lib/deploy-service");
+    void syncAppRoutes().catch((error) => console.error("polaris: initial route sync failed:", error));
 }

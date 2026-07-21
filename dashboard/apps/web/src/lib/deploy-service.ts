@@ -16,7 +16,7 @@ import { decryptSecret } from "@polaris/storage";
 import { getDriver, getPorts, toTargetInfo, type TargetRow } from "./deploy/runtime";
 import { getOrCreateHostTarget, getOrCreateLocalTarget } from "./deploy-target-service";
 import { autoSubdomainUrl, getPublicIp } from "./domain-service";
-import { syncDomainRoute, removeDomainRoute } from "./caddy-service";
+import { writeFile } from "node:fs/promises";
 import { gitBuildContext, type GitSource } from "./git-build-service";
 import { githubCloneAuthHeader } from "./github-service";
 import { resolveRegistryLogin } from "./registry-credential-service";
@@ -198,9 +198,8 @@ export async function addApplicationDomain(
         kind = "auto";
         if (!opts.cert) certResolver = "internal";
     }
-    let domain;
     try {
-        domain = await prisma.domain.create({
+        await prisma.domain.create({
             data: { applicationId, hostname, kind, targetPort: opts.targetPort, certResolver }
         });
     } catch (caught) {
@@ -211,36 +210,48 @@ export async function addApplicationDomain(
         }
         throw new Error("Could not add the domain.");
     }
-    await syncAppDomainRoute(domain.id).catch(() => undefined);
+    await syncAppRoutes().catch(() => undefined);
     return hostname;
 }
 
-/**
- * (Re)register a domain's route on Caddy so its hostname serves the app over its
- * published host port. Best-effort: routing failures never block a deploy - the
- * app stays reachable directly over its host IP:port.
- */
-async function syncAppDomainRoute(domainId: string): Promise<void> {
-    const domain = await prisma.domain.findUnique({
-        where: { id: domainId },
-        select: { id: true, hostname: true, certResolver: true, applicationId: true, enabled: true }
-    });
-    if (!domain?.applicationId || !domain.enabled) return;
-    const ip = await getPublicIp();
-    if (!ip) return;
-    const cert = domain.certResolver === "none" ? "none" : domain.certResolver === "le" ? "le" : "internal";
-    await syncDomainRoute({
-        domainId: domain.id,
-        hostname: domain.hostname,
-        dial: `${ip}:${hostPortForApp(domain.applicationId)}`,
-        cert
-    });
-}
+/** Traefik dynamic-config file the edge watches (a shared volume, node-writable). */
+const DYNAMIC_ROUTES_FILE = `${process.env.POLARIS_TRAEFIK_DYNAMIC_DIR ?? "/dynamic"}/polaris-apps.yml`;
 
-/** Re-register every domain of an app on Caddy (called after a successful deploy). */
-async function syncAppDomains(applicationId: string): Promise<void> {
-    const domains = await prisma.domain.findMany({ where: { applicationId }, select: { id: true } });
-    for (const domain of domains) await syncAppDomainRoute(domain.id).catch(() => undefined);
+/**
+ * Regenerate the Traefik dynamic config for every enabled application domain.
+ * Each hostname routes to the app's published host port, so the edge needs no
+ * per-container labels and reflects a domain being added, removed, enabled, or
+ * disabled the instant this runs (Traefik watches the file). HTTPS is automatic:
+ * Let's Encrypt for a custom domain, Traefik's self-signed default cert for a
+ * free/LAN subdomain, plain HTTP for a domain fronted by a tunnel. Best-effort -
+ * no public IP or an unwritable file just leaves routing unchanged.
+ */
+export async function syncAppRoutes(): Promise<void> {
+    const domains = await prisma.domain.findMany({
+        where: { enabled: true },
+        select: { id: true, hostname: true, certResolver: true, applicationId: true }
+    });
+    const ip = await getPublicIp();
+    const routers: string[] = [];
+    const services: string[] = [];
+    for (const domain of domains) {
+        if (!ip) continue;
+        const name = `polaris-app-${domain.id}`;
+        const dial = `${ip}:${hostPortForApp(domain.applicationId)}`;
+        if (domain.certResolver === "none") {
+            routers.push(`    ${name}:\n      rule: "Host(\`${domain.hostname}\`)"\n      entryPoints: [web]\n      service: ${name}`);
+        } else {
+            const tls = domain.certResolver === "le" ? "\n      tls:\n        certResolver: letsencrypt" : "\n      tls: {}";
+            routers.push(`    ${name}:\n      rule: "Host(\`${domain.hostname}\`)"\n      entryPoints: [websecure]\n      service: ${name}${tls}`);
+            routers.push(`    ${name}-http:\n      rule: "Host(\`${domain.hostname}\`)"\n      entryPoints: [web]\n      service: ${name}\n      middlewares: [polaris-redirect-https]`);
+        }
+        services.push(`    ${name}:\n      loadBalancer:\n        servers:\n          - url: "http://${dial}"`);
+    }
+    const body =
+        routers.length === 0
+            ? "http: {}\n"
+            : `http:\n  routers:\n${routers.join("\n")}\n  services:\n${services.join("\n")}\n  middlewares:\n    polaris-redirect-https:\n      redirectScheme:\n        scheme: https\n`;
+    await writeFile(DYNAMIC_ROUTES_FILE, body, "utf8");
 }
 
 /**
@@ -264,7 +275,7 @@ export async function removeApplicationDomain(domainId: string, ownerId: string)
     await prisma.domain.deleteMany({
         where: { id: domainId, application: { environment: { project: { ownerId } } } }
     });
-    await removeDomainRoute(domainId).catch(() => undefined);
+    await syncAppRoutes().catch(() => undefined);
 }
 
 /**
@@ -282,8 +293,7 @@ export async function setApplicationDomainEnabled(
         data: { enabled }
     });
     if (result.count === 0) throw new Error("Domain not found");
-    if (enabled) await syncAppDomainRoute(domainId).catch(() => undefined);
-    else await removeDomainRoute(domainId).catch(() => undefined);
+    await syncAppRoutes().catch(() => undefined);
 }
 
 // --- deployment lifecycle (restart / disable / remove) ----------------------
@@ -922,9 +932,9 @@ async function promoteDeployment(deploymentId: string): Promise<void> {
         where: { id: dep.deployableId },
         data: { currentDeploymentId: deploymentId }
     });
-    // Re-register the app's domain routes on Caddy - self-heals routes lost to a
-    // proxy reload, and registers a domain whose first deploy just came up.
-    await syncAppDomains(dep.deployableId).catch(() => undefined);
+    // Refresh the edge routes so a domain whose first deploy just came up starts
+    // serving, and any host-port change is reflected.
+    await syncAppRoutes().catch(() => undefined);
 }
 
 /** Enqueue a job serialized behind any prior job for the same target. */

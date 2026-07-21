@@ -47,6 +47,15 @@ export function ProjectDetail({
     const [showNewEnv, setShowNewEnv] = useState(false);
     const [pending, startTransition] = useTransition();
 
+    // Keep the open service panel in sync with refreshed data: after a change
+    // (e.g. removing a domain) the panel must reflect the new state, and it must
+    // close if the service was deleted, rather than showing a stale snapshot.
+    useEffect(() => {
+        if (!detailApp) return;
+        const fresh = environments.flatMap((env) => env.applications).find((app) => app.id === detailApp.id);
+        if (fresh !== detailApp) setDetailApp(fresh ?? null);
+    }, [environments, detailApp]);
+
     const newProjectOption = canManage
         ? [{ value: NEW_PROJECT, label: "New project", icon: <Plus className="size-3.5 text-muted-foreground" /> }]
         : [];
