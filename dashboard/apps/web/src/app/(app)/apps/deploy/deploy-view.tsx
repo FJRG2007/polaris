@@ -1003,8 +1003,15 @@ export function StatusPill({ tone, label }: { tone: "success" | "warning" | "dan
         danger: "bg-danger",
         idle: "bg-muted-foreground"
     }[tone];
+    // Tint the whole chip by tone so state reads in color at a glance, Railway-style.
+    const chip = {
+        success: "border-success/25 bg-success/10 text-success",
+        warning: "border-warning/25 bg-warning/10 text-warning",
+        danger: "border-danger/25 bg-danger/10 text-danger",
+        idle: "border-border/60 bg-surface text-muted-foreground"
+    }[tone];
     return (
-        <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-border/60 bg-surface px-2 py-0.5 text-xs text-muted-foreground">
+        <span className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs ${chip}`}>
             <span className={`size-1.5 rounded-full ${dot} ${tone === "warning" ? "animate-pulse" : ""}`} />
             {label}
         </span>

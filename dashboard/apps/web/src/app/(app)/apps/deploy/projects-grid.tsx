@@ -169,15 +169,28 @@ const CANVAS_VIGNETTE: React.CSSProperties = {
 function ProjectCard({ project }: { project: ProjectCardData }) {
     const status = statusTone(project.online, project.total);
     const partial = project.total > 0 && project.online < project.total;
+    const chip =
+        project.total === 0
+            ? "border-border/60 bg-surface text-muted-foreground"
+            : partial
+              ? "border-warning/25 bg-warning/10 text-warning"
+              : "border-success/25 bg-success/10 text-success";
     return (
         <Link
             href={`/apps/deploy/${project.id}`}
-            className="group flex flex-col overflow-hidden rounded-xl border border-border bg-card transition-[transform,border-color,box-shadow] hover:-translate-y-0.5 hover:border-muted-foreground/40 hover:shadow-lg hover:shadow-black/20"
+            className="group flex flex-col overflow-hidden rounded-xl border border-border bg-card shadow-sm transition-[transform,border-color,box-shadow] hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-xl hover:shadow-primary/10"
         >
-            <div className="px-4 py-3">
+            <div className="flex items-center justify-between gap-2 px-4 py-3">
                 <h3 className="truncate text-sm font-medium">{project.name}</h3>
+                <span className="shrink-0 text-xs text-muted-foreground">
+                    {project.total} {project.total === 1 ? "service" : "services"}
+                </span>
             </div>
             <div className="relative mx-4 flex min-h-44 flex-1 items-center justify-center overflow-hidden rounded-lg border border-border/60" style={DOT_CANVAS}>
+                <div
+                    className="pointer-events-none absolute inset-0"
+                    style={{ background: "radial-gradient(55% 60% at 50% 45%, hsl(var(--primary) / 0.14), transparent 70%)" }}
+                />
                 <div className="pointer-events-none absolute inset-0" style={CANVAS_VIGNETTE} />
                 {project.total === 0 ? (
                     <span className="relative text-xs text-muted-foreground">Empty project</span>
@@ -187,11 +200,12 @@ function ProjectCard({ project }: { project: ProjectCardData }) {
                     </div>
                 )}
             </div>
-            <div className="flex items-center gap-2 px-4 py-3 text-xs">
-                <span className={`size-1.5 rounded-full ${status.dot} ${partial ? "animate-pulse" : ""}`} />
-                <span className="text-muted-foreground">{project.environmentName}</span>
-                <span className="text-muted-foreground/50">·</span>
-                <span className={status.text}>{status.label}</span>
+            <div className="flex items-center justify-between gap-2 px-4 py-3">
+                <span className="truncate text-xs text-muted-foreground">{project.environmentName}</span>
+                <span className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs ${chip}`}>
+                    <span className={`size-1.5 rounded-full ${status.dot} ${partial ? "animate-pulse" : ""}`} />
+                    {project.total === 0 ? "No services" : `${project.online}/${project.total} online`}
+                </span>
             </div>
         </Link>
     );

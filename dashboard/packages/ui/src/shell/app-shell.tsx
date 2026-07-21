@@ -20,7 +20,13 @@ export function AppShell({
     children: ReactNode;
 }) {
     return (
-        <div className="flex min-h-screen flex-col bg-background">
+        <div className="relative flex min-h-screen flex-col bg-background">
+            {/* Ambient accent glow: a soft violet wash at the top gives every screen
+                atmospheric depth without competing with the content below. */}
+            <div
+                className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[420px]"
+                style={{ background: "radial-gradient(60% 100% at 50% 0%, hsl(var(--primary) / 0.12), transparent 70%)" }}
+            />
             <header className="sticky top-0 z-40 flex h-14 shrink-0 items-center justify-between gap-4 border-b border-border bg-surface/80 px-4 backdrop-blur">
                 <div className="flex min-w-0 items-center gap-3">
                     <PolarisMark />
