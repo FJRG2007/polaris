@@ -895,7 +895,9 @@ function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
     const [branch, setBranch] = useState(app.deployBranch ?? "");
     const [filter, setFilter] = useState(app.commitFilter ?? "");
     const [keepReleases, setKeepReleases] = useState(app.keepReleases);
-    const [containerPort, setContainerPort] = useState(String(app.port ?? (app.sourceType === "image" ? 80 : 3000)));
+    // Empty means "not pinned": the deploy detects the container port from the image
+    // (see buildAppPlan). Only a value the user types here pins it.
+    const [containerPort, setContainerPort] = useState(app.port != null ? String(app.port) : "");
     const [hostname, setHostname] = useState("");
     const [port, setPort] = useState(String(app.port ?? 3000));
     const [exposure, setExposure] = useState<"subdomain" | "le" | "tunnel">("subdomain");
@@ -952,13 +954,14 @@ function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
                     <Input
                         value={containerPort}
                         onChange={(event) => setContainerPort(event.target.value)}
-                        placeholder="80"
+                        placeholder="Auto (from image)"
                         inputMode="numeric"
-                        className="w-32"
+                        className="w-40"
                     />
                     <span>
-                        The port the app listens on inside its container (e.g. 5601 for OpenSearch Dashboards, 3000 for
-                        most Node apps). The IP:port link and every domain route target it. Applies on the next deploy.
+                        The port the app listens on inside its container. Leave empty to detect it from the image
+                        automatically; set it (e.g. 5601 for OpenSearch Dashboards) only when the image exposes several
+                        ports or none. The IP:port link and every domain route target it. Applies on the next deploy.
                     </span>
                 </label>
                 {app.ipUrl && (

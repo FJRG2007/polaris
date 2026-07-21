@@ -154,9 +154,10 @@ export async function createApplicationAction(input: {
     if (!name) return { error: "An application name is required" };
     const isNixpacks = input.sourceType === "nixpacks";
     const isGit = input.sourceType === "dockerfile" || input.sourceType === "git" || isNixpacks;
-    // The port the container listens on. Stored on the app so the IP:port link and
-    // every domain route target it; defaults by source, user-overridable.
-    const port = Number.isInteger(input.port) ? Number(input.port) : isGit ? 3000 : 80;
+    // The container port is stored only when the user pins it, so an image deploy
+    // can otherwise default it to the image's own exposed port (see buildAppPlan) -
+    // storing a guess here would suppress that detection.
+    const port = Number.isInteger(input.port) ? Number(input.port) : undefined;
     let sourceType = "image";
     let sourceConfig: Record<string, unknown>;
     if (isGit) {
@@ -171,12 +172,12 @@ export async function createApplicationAction(input: {
             // Mark GitHub-sourced repos so the build authenticates its clone with the
             // connected token (private repos), transparently for public ones too.
             provider: input.provider === "github" ? "github" : undefined,
-            port
+            ...(port !== undefined ? { port } : {})
         };
     } else {
         const imageRef = input.imageRef?.trim();
         if (!imageRef) return { error: "An image reference is required (e.g. nginx:latest)" };
-        sourceConfig = { imageRef, port };
+        sourceConfig = { imageRef, ...(port !== undefined ? { port } : {}) };
     }
     try {
         // Resolve the chosen server: the local host by default, or a connected SSH
