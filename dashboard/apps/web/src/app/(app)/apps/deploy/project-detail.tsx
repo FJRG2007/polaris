@@ -72,6 +72,7 @@ export function ProjectDetail({
 
             <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
+                    {active && <EnvSummary environment={active} />}
                     {canManage && active && !active.isDefault && (
                         <DeleteEnvironmentButton
                             environmentId={active.id}
@@ -155,6 +156,28 @@ export function ProjectDetail({
                 />
             )}
         </div>
+    );
+}
+
+/** A tinted chip summarizing how many of the environment's services are online. */
+function EnvSummary({ environment }: { environment: ProjectSummary["environments"][number] }) {
+    const online =
+        environment.applications.filter((app) => app.currentDeploymentId).length +
+        environment.databases.filter((db) => ["running", "active", "healthy", "ready"].includes(db.status.toLowerCase())).length;
+    const total = environment.applications.length + environment.databases.length;
+    const partial = total > 0 && online < total;
+    const chip =
+        total === 0
+            ? "border-border/60 bg-surface text-muted-foreground"
+            : partial
+              ? "border-warning/25 bg-warning/10 text-warning"
+              : "border-success/25 bg-success/10 text-success";
+    const dot = total === 0 ? "bg-muted-foreground" : partial ? "bg-warning" : "bg-success";
+    return (
+        <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs ${chip}`}>
+            <span className={`size-1.5 rounded-full ${dot} ${partial ? "animate-pulse" : ""}`} />
+            {total === 0 ? "No services" : `${online}/${total} online`}
+        </span>
     );
 }
 

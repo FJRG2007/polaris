@@ -104,19 +104,28 @@ const TONE_DOT: Record<Tone, string> = {
     idle: "bg-muted-foreground"
 };
 
-const TONE_TEXT: Record<Tone, string> = {
-    success: "text-success",
-    warning: "text-warning",
-    danger: "text-danger",
-    idle: "text-muted-foreground"
-};
-
 /** Resting border for a node, tinted by its deployment tone (Railway-style). */
 const TONE_BORDER: Record<Tone, string> = {
     success: "border-border hover:border-success/50",
     warning: "border-warning/40 hover:border-warning/60",
     danger: "border-danger/40 hover:border-danger/60",
     idle: "border-border hover:border-muted-foreground/50"
+};
+
+/** Tinted status chip inside a node, so the deployment state reads in color. */
+const TONE_CHIP: Record<Tone, string> = {
+    success: "border-success/25 bg-success/10 text-success",
+    warning: "border-warning/25 bg-warning/10 text-warning",
+    danger: "border-danger/25 bg-danger/10 text-danger",
+    idle: "border-border/60 bg-surface text-muted-foreground"
+};
+
+/** Colored left edge on a node, keying its status at a glance. */
+const TONE_BAR: Record<Tone, string> = {
+    success: "bg-success",
+    warning: "bg-warning",
+    danger: "bg-danger",
+    idle: "bg-transparent"
 };
 
 /** A soft edge vignette so the board reads as a lit surface, not a flat panel. */
@@ -357,17 +366,24 @@ export function DeployCanvas({
                                     style={{ left: p.x, top: p.y, width: NODE_W, height: NODE_H }}
                                     onPointerDown={(event) => onNodePointerDown(event, node.id)}
                                 >
+                                    {node.tone !== "idle" && (
+                                        <span
+                                            className={`absolute left-0 top-0 h-full w-1 ${TONE_BAR[node.tone]} ${node.volume ? "rounded-tl-2xl" : "rounded-l-2xl"}`}
+                                        />
+                                    )}
                                     <div className="flex flex-1 flex-col p-4">
                                         <div className="flex items-center gap-3">
                                             <span className="grid size-9 shrink-0 place-items-center rounded-lg border border-border bg-surface text-foreground">
                                                 <ServiceIcon kind={node.kind} className="size-4" />
                                             </span>
-                                            <span className="truncate text-base font-semibold">{node.name}</span>
+                                            <span className="min-w-0 flex-1 truncate text-base font-semibold">{node.name}</span>
                                         </div>
                                         <p className="mt-1 truncate text-sm text-muted-foreground">{node.subtitle}</p>
-                                        <div className="mt-auto flex items-center gap-2 text-sm">
-                                            <span className={`size-1.5 rounded-full ${TONE_DOT[node.tone]} ${pulsing ? "animate-pulse" : ""}`} />
-                                            <span className={TONE_TEXT[node.tone]}>{label}</span>
+                                        <div className="mt-auto">
+                                            <span className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs ${TONE_CHIP[node.tone]}`}>
+                                                <span className={`size-1.5 rounded-full ${TONE_DOT[node.tone]} ${pulsing ? "animate-pulse" : ""}`} />
+                                                {label}
+                                            </span>
                                         </div>
                                     </div>
                                     {canManage && (
