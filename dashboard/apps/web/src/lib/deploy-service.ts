@@ -11,7 +11,7 @@ import { mkdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { loadEnv } from "@polaris/config";
 import { prisma } from "@polaris/db";
-import { parseHttpLogs, serviceName, shortHash, slugify, type AppDeployPlan, type DeployResult, type HttpLogEntry, type RuntimeContext, type RuntimeDriver } from "@polaris/deploy";
+import { bucketHttpMetrics, parseHttpLogs, serviceName, shortHash, slugify, type AppDeployPlan, type DeployResult, type HttpLogEntry, type HttpMetricPoint, type RuntimeContext, type RuntimeDriver } from "@polaris/deploy";
 import { decryptSecret } from "@polaris/storage";
 import { getDriver, getPorts, toTargetInfo, type TargetRow } from "./deploy/runtime";
 import { getOrCreateHostTarget, getOrCreateLocalTarget } from "./deploy-target-service";
@@ -311,18 +311,39 @@ export async function readAppHttpLogs(
     ownerId: string,
     limit = 500
 ): Promise<HttpLogEntry[]> {
+    // Access lines are a subset of stdout, so over-fetch raw lines to land close to
+    // `limit` parsed requests without following.
+    const entries = await readAppHttpEntries(applicationId, ownerId, Math.min(limit * 5, 5000));
+    return entries.reverse().slice(0, limit);
+}
+
+/**
+ * HTTP traffic metrics for an app, bucketed into a time series over [from, to):
+ * request volume, 5xx error rate, response time, and egress throughput. Derived
+ * from the same access-log stream, so it needs no separate collector; the window
+ * is bounded by what the container's log buffer still holds.
+ */
+export async function readAppHttpMetrics(
+    applicationId: string,
+    ownerId: string,
+    from: number,
+    to: number
+): Promise<HttpMetricPoint[]> {
+    const entries = await readAppHttpEntries(applicationId, ownerId, 5000);
+    return bucketHttpMetrics(entries, from, to);
+}
+
+/** Read and parse an app container's HTTP access lines from its stdout tail. */
+async function readAppHttpEntries(applicationId: string, ownerId: string, tail: number): Promise<HttpLogEntry[]> {
     const { container, target } = await appRuntime(applicationId, ownerId);
     const ports = await getPorts(target, ownerId);
     const chunks: Buffer[] = [];
     try {
-        // Read a generous tail: access lines are a subset of stdout, so we over-fetch
-        // raw lines to land close to `limit` parsed requests without following.
-        await ports.logs(container, (chunk) => chunks.push(chunk), { tail: Math.min(limit * 5, 5000) });
+        await ports.logs(container, (chunk) => chunks.push(chunk), { tail });
     } finally {
         await ports.dispose();
     }
-    const entries = parseHttpLogs(Buffer.concat(chunks).toString("utf8"));
-    return entries.reverse().slice(0, limit);
+    return parseHttpLogs(Buffer.concat(chunks).toString("utf8"));
 }
 
 /** Restart the app's running container in place (no rebuild). */

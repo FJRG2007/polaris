@@ -26,6 +26,65 @@ export interface HttpLogEntry {
     readonly durationMs: number | null;
 }
 
+/** One time bucket of HTTP traffic, derived from access-log entries. */
+export interface HttpMetricPoint {
+    /** Bucket start (epoch ms). */
+    readonly t: number;
+    /** Requests in the bucket. */
+    readonly requests: number;
+    /** Percent of requests that returned 5xx, or null when the bucket is empty. */
+    readonly errorRate: number | null;
+    /** Mean response time (ms) over entries that carry a duration, else null. */
+    readonly avgResponseMs: number | null;
+    /** Response throughput (bytes/second) across the bucket. */
+    readonly bytesPerSec: number;
+}
+
+/**
+ * Bucket access-log entries into an evenly spaced time series over [from, to):
+ * request volume, 5xx error rate, mean response time, and egress throughput.
+ * Entries outside the window or without a parseable time are ignored. Pure.
+ */
+export function bucketHttpMetrics(
+    entries: readonly HttpLogEntry[],
+    from: number,
+    to: number,
+    buckets = 60
+): HttpMetricPoint[] {
+    if (!Number.isFinite(from) || !Number.isFinite(to) || to <= from) return [];
+    const count = Math.max(1, Math.min(Math.floor(buckets), 500));
+    const width = (to - from) / count;
+    const slots = Array.from({ length: count }, (_, index) => ({
+        t: Math.round(from + index * width),
+        requests: 0,
+        errors: 0,
+        durSum: 0,
+        durCount: 0,
+        bytes: 0
+    }));
+    for (const entry of entries) {
+        if (!entry.time) continue;
+        const ms = Date.parse(entry.time);
+        if (!Number.isFinite(ms) || ms < from || ms >= to) continue;
+        const slot = slots[Math.min(count - 1, Math.floor((ms - from) / width))]!;
+        slot.requests += 1;
+        if (entry.status >= 500) slot.errors += 1;
+        if (entry.durationMs !== null) {
+            slot.durSum += entry.durationMs;
+            slot.durCount += 1;
+        }
+        if (entry.bytes !== null) slot.bytes += entry.bytes;
+    }
+    const seconds = width / 1000;
+    return slots.map((slot) => ({
+        t: slot.t,
+        requests: slot.requests,
+        errorRate: slot.requests > 0 ? (slot.errors / slot.requests) * 100 : null,
+        avgResponseMs: slot.durCount > 0 ? slot.durSum / slot.durCount : null,
+        bytesPerSec: seconds > 0 ? slot.bytes / seconds : 0
+    }));
+}
+
 // Docker prepends an RFC-3339 timestamp when logs are read with --timestamps (the
 // SSH port does; the local daemon may not), so strip and reuse it as a fallback.
 const DOCKER_TS = /^(\d{4}-\d{2}-\d{2}T[0-9:.]+(?:Z|[+-]\d{2}:?\d{2}))\s+/;
