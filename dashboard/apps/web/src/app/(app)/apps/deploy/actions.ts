@@ -25,6 +25,7 @@ import {
     duplicateApplication,
     ensureApplicationDomain,
     listDeployments,
+    redeployForEnvScope,
     removeApplicationDeployment,
     removeApplicationDomain,
     restartApplication,
@@ -271,6 +272,7 @@ export async function saveEnvVarAction(input: {
     const user = await requirePermission("deploy.manage");
     try {
         await setEnvVar(input.scope, input.scopeId, user.id, { key: input.key, value: input.value, isSecret: input.isSecret });
+        void redeployForEnvScope(input.scope, input.scopeId, user.id).catch(() => undefined);
         revalidatePath(DEPLOY_PATH);
         return {};
     } catch (caught) {
@@ -290,6 +292,7 @@ export async function importEnvVarsAction(input: {
         const parsed = parseDotEnv(input.text).map((item) => ({ ...item, isSecret: input.isSecret }));
         if (parsed.length === 0) return { error: "No KEY=value lines found" };
         const count = await setEnvVars(input.scope, input.scopeId, user.id, parsed);
+        void redeployForEnvScope(input.scope, input.scopeId, user.id).catch(() => undefined);
         revalidatePath(DEPLOY_PATH);
         return { count };
     } catch (caught) {
@@ -308,7 +311,8 @@ export async function revealEnvVarAction(id: string): Promise<{ value?: string |
 
 export async function deleteEnvVarAction(id: string): Promise<{ error?: string }> {
     const user = await requirePermission("deploy.manage");
-    await deleteEnvVar(id, user.id);
+    const scope = await deleteEnvVar(id, user.id);
+    if (scope) void redeployForEnvScope(scope.scope, scope.scopeId, user.id).catch(() => undefined);
     revalidatePath(DEPLOY_PATH);
     return {};
 }

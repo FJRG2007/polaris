@@ -151,10 +151,11 @@ export async function setEnvVars(
     return saved;
 }
 
-/** Delete a variable the owner owns. */
-export async function deleteEnvVar(id: string, ownerId: string): Promise<void> {
+/** Delete a variable the owner owns; returns its scope so the caller can redeploy. */
+export async function deleteEnvVar(id: string, ownerId: string): Promise<{ scope: EnvScope; scopeId: string } | null> {
     const row = await prisma.envVar.findUnique({ where: { id }, select: { scopeId: true, scopeType: true } });
-    if (!row || (row.scopeType !== "application" && row.scopeType !== "environment")) return;
+    if (!row || (row.scopeType !== "application" && row.scopeType !== "environment")) return null;
     await assertOwnsScope(row.scopeType as EnvScope, row.scopeId, ownerId);
     await prisma.envVar.delete({ where: { id } });
+    return { scope: row.scopeType as EnvScope, scopeId: row.scopeId };
 }

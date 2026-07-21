@@ -7,7 +7,7 @@
  */
 
 import { createWriteStream } from "node:fs";
-import { mkdir, readFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { loadEnv } from "@polaris/config";
 import { prisma } from "@polaris/db";
@@ -16,7 +16,6 @@ import { decryptSecret } from "@polaris/storage";
 import { getDriver, getPorts, toTargetInfo, type TargetRow } from "./deploy/runtime";
 import { getOrCreateHostTarget, getOrCreateLocalTarget } from "./deploy-target-service";
 import { autoSubdomainUrl, getPublicIp } from "./domain-service";
-import { writeFile } from "node:fs/promises";
 import { gitBuildContext, type GitSource } from "./git-build-service";
 import { githubCloneAuthHeader } from "./github-service";
 import { resolveRegistryLogin } from "./registry-credential-service";
@@ -365,9 +364,24 @@ export async function readAppRuntimeLog(applicationId: string, ownerId: string, 
     return Buffer.concat(chunks).toString("utf8");
 }
 
-/** Read and parse an app container's HTTP access lines from its stdout tail. */
+/** The edge's per-request access log (JSON), written by Traefik to a shared volume. */
+const ACCESS_LOG_FILE = process.env.POLARIS_TRAEFIK_ACCESSLOG ?? "/traefik-log/access.log";
+
+/**
+ * HTTP access entries for an app. Primary source is the edge's own access log,
+ * which records every proxied request regardless of what the app logs - so it
+ * works for a Next.js server or any framework, not just nginx/Apache. Filtered to
+ * the app's hostnames. Falls back to the container's own stdout for an app that
+ * logs its requests directly or is reached by IP:port off the proxy.
+ */
 async function readAppHttpEntries(applicationId: string, ownerId: string, tail: number): Promise<HttpLogEntry[]> {
     const { container, target } = await appRuntime(applicationId, ownerId);
+    const domains = await prisma.domain.findMany({ where: { applicationId }, select: { hostname: true } });
+    const hosts = new Set(domains.map((domain) => domain.hostname.toLowerCase()));
+
+    const fromEdge = await readProxyAccessEntries(hosts, tail);
+    if (fromEdge.length > 0) return fromEdge;
+
     const ports = await getPorts(target, ownerId);
     const chunks: Buffer[] = [];
     try {
@@ -376,6 +390,23 @@ async function readAppHttpEntries(applicationId: string, ownerId: string, tail: 
         await ports.dispose();
     }
     return parseHttpLogs(Buffer.concat(chunks).toString("utf8"));
+}
+
+/** Parse the edge access log, keeping only requests for the given hostnames. */
+async function readProxyAccessEntries(hosts: Set<string>, tail: number): Promise<HttpLogEntry[]> {
+    if (hosts.size === 0) return [];
+    let raw: string;
+    try {
+        raw = await readFile(ACCESS_LOG_FILE, "utf8");
+    } catch {
+        return [];
+    }
+    // Bound the work on a busy proxy: only parse the tail of the file.
+    const lines = raw.split("\n");
+    const recent = lines.length > tail * 20 ? lines.slice(-tail * 20).join("\n") : raw;
+    return parseHttpLogs(recent)
+        .filter((entry) => entry.host !== null && hosts.has(entry.host.toLowerCase()))
+        .slice(-tail);
 }
 
 /** Restart the app's running container in place (no rebuild). */
@@ -583,6 +614,28 @@ async function buildAppPlan(
 
 /** Merge environment-scoped and application-scoped env vars (app wins), decrypting
  *  any secret values. */
+/**
+ * Redeploy the currently-deployed app(s) a variable change affects, so new values
+ * take effect without a manual redeploy (Vercel-style). Application scope hits the
+ * one service; environment scope hits every deployed service that shares it.
+ * Best-effort and only for already-deployed apps - a change on an undeployed app
+ * simply applies on its first deploy.
+ */
+export async function redeployForEnvScope(
+    scope: "application" | "environment",
+    scopeId: string,
+    ownerId: string
+): Promise<void> {
+    const where =
+        scope === "application"
+            ? { id: scopeId, environment: { project: { ownerId } }, currentDeploymentId: { not: null } }
+            : { environmentId: scopeId, environment: { project: { ownerId } }, currentDeploymentId: { not: null } };
+    const apps = await prisma.application.findMany({ where, select: { id: true } });
+    for (const app of apps) {
+        await deployApplication(app.id, ownerId, ownerId).catch(() => undefined);
+    }
+}
+
 async function mergedEnv(environmentId: string, applicationId: string): Promise<Record<string, string>> {
     const rows = await prisma.envVar.findMany({
         where: {
