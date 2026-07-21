@@ -174,7 +174,7 @@ function ProjectCard({ project }: { project: ProjectCardData }) {
     return (
         <Link
             href={`/apps/deploy/${project.id}`}
-            className="group flex flex-col overflow-hidden rounded-xl border border-border bg-card shadow-sm transition-[transform,border-color,box-shadow] hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-xl hover:shadow-primary/10"
+            className="group flex flex-col overflow-hidden rounded-xl border border-border bg-card transition-colors hover:border-muted-foreground/40 hover:bg-card-hover"
         >
             <div className="flex items-center justify-between gap-2 px-4 py-3">
                 <h3 className="truncate text-sm font-medium">{project.name}</h3>

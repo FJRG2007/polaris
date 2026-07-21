@@ -34,6 +34,7 @@ wss.on("connection", async (ws, req) => {
     const token = (req.headers["sec-websocket-protocol"] || "").split(",")[0]?.trim();
     const ticket = token ? await redeem(token) : null;
     if (!ticket || ticket.mode !== "terminal") {
+        console.error(`polaris ws: rejecting connection - ${token ? "ticket redeem failed / wrong mode" : "no ticket"}`);
         ws.close(4001, "invalid ticket");
         return;
     }
@@ -45,10 +46,12 @@ wss.on("connection", async (ws, req) => {
     try {
         execId = await client.execCreate({ container: ticket.containerRef, cmd: ["/bin/sh"], tty: true });
         socket = await client.execStart(execId);
-    } catch {
+    } catch (error) {
+        console.error(`polaris ws: exec failed for ${ticket.containerRef}:`, error?.message ?? error);
         ws.close(4002, "could not open terminal");
         return;
     }
+    console.error(`polaris ws: terminal open for ${ticket.containerRef}`);
 
     socket.on("data", (chunk) => {
         if (ws.readyState === ws.OPEN) ws.send(chunk);
