@@ -54,8 +54,10 @@ import {
     listDeploymentsAction,
     listEnvVarsAction,
     removeApplicationDeploymentAction,
+    removeDomainAction,
     restartApplicationAction,
     saveEnvVarAction,
+    setAppPortAction,
     setApplicationRunningAction,
     setAutoDeployAction
 } from "./actions";
@@ -787,8 +789,9 @@ function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
     const [branch, setBranch] = useState(app.deployBranch ?? "");
     const [filter, setFilter] = useState(app.commitFilter ?? "");
     const [keepReleases, setKeepReleases] = useState(app.keepReleases);
+    const [containerPort, setContainerPort] = useState(String(app.port ?? (app.sourceType === "image" ? 80 : 3000)));
     const [hostname, setHostname] = useState("");
-    const [port, setPort] = useState("3000");
+    const [port, setPort] = useState(String(app.port ?? 3000));
     const [exposure, setExposure] = useState<"subdomain" | "le" | "tunnel">("subdomain");
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
@@ -796,6 +799,14 @@ function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
     function saveSettings() {
         setError(null);
         startTransition(async () => {
+            const portValue = Number(containerPort.trim());
+            if (Number.isInteger(portValue) && portValue > 0) {
+                const portResult = await setAppPortAction(app.id, portValue);
+                if (portResult.error) {
+                    setError(portResult.error);
+                    return;
+                }
+            }
             const result = await setAutoDeployAction({
                 applicationId: app.id,
                 autoDeploy,
@@ -829,19 +840,55 @@ function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
     return (
         <div className="flex flex-col gap-5 py-2">
             <section className="flex flex-col gap-2">
+                <h3 className="text-sm font-medium">Networking</h3>
+                <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                    Container port
+                    <Input
+                        value={containerPort}
+                        onChange={(event) => setContainerPort(event.target.value)}
+                        placeholder="80"
+                        inputMode="numeric"
+                        className="w-32"
+                    />
+                    <span>
+                        The port the app listens on inside its container (e.g. 5601 for OpenSearch Dashboards, 3000 for
+                        most Node apps). The IP:port link and every domain route target it. Applies on the next deploy.
+                    </span>
+                </label>
+                {app.ipUrl && (
+                    <a
+                        href={app.ipUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex w-fit items-center gap-1 text-xs text-primary hover:underline"
+                    >
+                        <Globe className="size-3" /> {app.ipUrl.replace(/^https?:\/\//, "")}
+                    </a>
+                )}
+            </section>
+
+            <section className="flex flex-col gap-2">
                 <h3 className="text-sm font-medium">Domains</h3>
                 {app.domains.length > 0 ? (
                     <ul className="flex flex-col gap-1">
                         {app.domains.map((domain) => (
-                            <li key={domain.id}>
+                            <li key={domain.id} className="group flex items-center gap-2">
                                 <a
                                     href={`https://${domain.hostname}`}
                                     target="_blank"
                                     rel="noreferrer"
-                                    className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                                    className="inline-flex min-w-0 items-center gap-1 truncate text-xs text-primary hover:underline"
                                 >
-                                    <Globe className="size-3" /> {domain.hostname}
+                                    <Globe className="size-3 shrink-0" /> {domain.hostname}
                                 </a>
+                                <button
+                                    type="button"
+                                    title="Remove domain"
+                                    onClick={() => startTransition(async () => { await removeDomainAction(domain.id); onChanged(); })}
+                                    className="text-muted-foreground opacity-0 transition-opacity hover:text-danger group-hover:opacity-100"
+                                >
+                                    <Trash2 className="size-3.5" />
+                                </button>
                             </li>
                         ))}
                     </ul>

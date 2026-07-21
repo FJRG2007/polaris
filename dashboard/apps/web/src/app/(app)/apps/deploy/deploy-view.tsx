@@ -86,6 +86,8 @@ export interface ProjectSummary {
             deployBranch: string | null;
             commitFilter: string | null;
             keepReleases: boolean;
+            /** The container port the app listens on (for the IP:port link and routes). */
+            port: number | null;
             /** Direct LAN/intranet URL (host IP + published port), when a public IP is known. */
             ipUrl: string | null;
             domains: { id: string; hostname: string; kind: string }[];

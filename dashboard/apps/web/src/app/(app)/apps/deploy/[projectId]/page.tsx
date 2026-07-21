@@ -9,6 +9,16 @@ import type { ProjectSummary } from "../deploy-view";
 
 export const dynamic = "force-dynamic";
 
+/** The container port stored in an app's source config, if any. */
+function portOf(sourceConfig: string): number | null {
+    try {
+        const value = (JSON.parse(sourceConfig) as { port?: unknown }).port;
+        return typeof value === "number" ? value : null;
+    } catch {
+        return null;
+    }
+}
+
 export default async function DeployProjectPage({ params }: { params: Promise<{ projectId: string }> }) {
     const { projectId } = await params;
     const user = await requirePermission("deploy.read");
@@ -48,6 +58,7 @@ export default async function DeployProjectPage({ params }: { params: Promise<{ 
                 deployBranch: app.deployBranch,
                 commitFilter: app.commitFilter,
                 keepReleases: app.keepReleases,
+                port: portOf(app.sourceConfig),
                 ipUrl: serverIp ? `http://${serverIp}:${hostPortForApp(app.id)}` : null,
                 domains: app.domains.map((domain) => ({ id: domain.id, hostname: domain.hostname, kind: domain.kind }))
             })),

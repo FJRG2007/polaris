@@ -26,6 +26,7 @@ import {
     removeApplicationDeployment,
     removeApplicationDomain,
     restartApplication,
+    setApplicationPort,
     setApplicationRunning,
     saveEnvironmentLayout,
     updateAutoDeploy,
@@ -147,6 +148,9 @@ export async function createApplicationAction(input: {
     if (!name) return { error: "An application name is required" };
     const isNixpacks = input.sourceType === "nixpacks";
     const isGit = input.sourceType === "dockerfile" || input.sourceType === "git" || isNixpacks;
+    // The port the container listens on. Stored on the app so the IP:port link and
+    // every domain route target it; defaults by source, user-overridable.
+    const port = Number.isInteger(input.port) ? Number(input.port) : isGit ? 3000 : 80;
     let sourceType = "image";
     let sourceConfig: Record<string, unknown>;
     if (isGit) {
@@ -160,12 +164,13 @@ export async function createApplicationAction(input: {
             dockerfilePath: isNixpacks ? undefined : input.dockerfilePath?.trim() || "Dockerfile",
             // Mark GitHub-sourced repos so the build authenticates its clone with the
             // connected token (private repos), transparently for public ones too.
-            provider: input.provider === "github" ? "github" : undefined
+            provider: input.provider === "github" ? "github" : undefined,
+            port
         };
     } else {
         const imageRef = input.imageRef?.trim();
         if (!imageRef) return { error: "An image reference is required (e.g. nginx:latest)" };
-        sourceConfig = { imageRef };
+        sourceConfig = { imageRef, port };
     }
     try {
         // Resolve the chosen server: the local host by default, or a connected SSH
@@ -306,6 +311,17 @@ export async function deployApplicationAction(applicationId: string): Promise<{ 
         return { deploymentId };
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Could not start the deployment" };
+    }
+}
+
+export async function setAppPortAction(applicationId: string, port: number): Promise<{ error?: string }> {
+    const user = await requirePermission("deploy.manage");
+    try {
+        await setApplicationPort(applicationId, user.id, port);
+        revalidatePath(DEPLOY_PATH);
+        return {};
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not update the port" };
     }
 }
 

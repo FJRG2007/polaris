@@ -363,10 +363,12 @@ async function buildAppPlan(
     const healthcheck = app.healthcheck ? (JSON.parse(app.healthcheck) as AppDeployPlan["healthcheck"]) : undefined;
 
     // Publish the app on a stable host port so it is reachable over the host's IP
-    // (intranet) with no proxy. The container port follows the domain's target
-    // port (configurable), defaulting by source; the host port is derived from the
-    // app id so it stays consistent across redeploys without a schema column.
-    const containerPort = app.domains[0]?.targetPort ?? (app.sourceType === "image" ? 80 : 3000);
+    // (intranet) with no proxy. The container port is the app's stored listening
+    // port (set at create, editable), falling back to a domain's target port or a
+    // source default; the host port is derived from the app id so it stays
+    // consistent across redeploys without a schema column.
+    const storedPort = typeof source.port === "number" ? source.port : undefined;
+    const containerPort = storedPort ?? app.domains[0]?.targetPort ?? (app.sourceType === "image" ? 80 : 3000);
 
     const plan: AppDeployPlan = {
         ref: { name: serviceName(project.slug, app.slug, app.id), project: composeProject },
@@ -511,6 +513,20 @@ export async function getDeploymentStatuses(ids: string[]): Promise<Record<strin
     if (unique.length === 0) return {};
     const rows = await prisma.deployment.findMany({ where: { id: { in: unique } }, select: { id: true, status: true } });
     return Object.fromEntries(rows.map((row) => [row.id, row.status]));
+}
+
+/** Set the container port an application listens on (stored in its source config).
+ *  Takes effect on the next deploy: the IP:port link and domain routes retarget. */
+export async function setApplicationPort(applicationId: string, ownerId: string, port: number): Promise<void> {
+    if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error("A valid port is required");
+    const app = await prisma.application.findFirst({
+        where: { id: applicationId, environment: { project: { ownerId } } },
+        select: { id: true, sourceConfig: true }
+    });
+    if (!app) throw new Error("Application not found");
+    const source = JSON.parse(app.sourceConfig) as Record<string, unknown>;
+    source.port = port;
+    await prisma.application.update({ where: { id: app.id }, data: { sourceConfig: JSON.stringify(source) } });
 }
 
 /** Update an application's auto-deploy settings (owner-checked). */
