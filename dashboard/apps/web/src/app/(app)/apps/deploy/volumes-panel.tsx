@@ -8,6 +8,7 @@
  */
 
 import { useEffect, useState, useTransition } from "react";
+import Link from "next/link";
 import { HardDrive, Plus, Server, Trash2 } from "lucide-react";
 import { Button } from "@polaris/ui";
 import { deleteVolumeAction, listVolumesAction } from "./actions";
@@ -15,6 +16,15 @@ import { VolumeForm } from "./volume-form";
 import type { ProjectApp } from "./deploy-view";
 
 type Volume = Awaited<ReturnType<typeof listVolumesAction>>[number];
+
+/** Where a volume opens in Drive: a nas volume at its NAS connection + folder; any
+ *  other kind at the container's filesystem under the mount path. */
+function volumeDriveHref(appId: string, volume: Volume): string {
+    if (volume.kind === "nas" && volume.connectionId) {
+        return `/drive?c=${volume.connectionId}&p=${encodeURIComponent(volume.source)}`;
+    }
+    return `/drive?c=container:${appId}&p=${encodeURIComponent(volume.mountPath.replace(/^\/+|\/+$/g, ""))}`;
+}
 
 export function VolumesTab({ app }: { app: ProjectApp }) {
     const [items, setItems] = useState<Volume[] | null>(null);
@@ -73,9 +83,16 @@ export function VolumesTab({ app }: { app: ProjectApp }) {
                                 </p>
                             </div>
                         </div>
-                        <Button variant="ghost" size="sm" onClick={() => remove(volume)} disabled={pending} title="Remove">
-                            <Trash2 className="size-4" />
-                        </Button>
+                        <div className="flex shrink-0 items-center gap-1">
+                            <Button asChild variant="ghost" size="sm" title="View in Drive">
+                                <Link href={volumeDriveHref(app.id, volume)}>
+                                    <HardDrive className="size-4" />
+                                </Link>
+                            </Button>
+                            <Button variant="ghost" size="sm" onClick={() => remove(volume)} disabled={pending} title="Remove">
+                                <Trash2 className="size-4" />
+                            </Button>
+                        </div>
                     </div>
                 ))}
             </div>

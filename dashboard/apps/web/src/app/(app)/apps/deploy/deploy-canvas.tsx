@@ -43,9 +43,13 @@ import { NewVolumeDialog } from "./volume-form";
 
 const NODE_W = 280;
 const NODE_H = 116;
+/** Height of an attached volume strip, so multiple stack cleanly below a card. */
+const VOL_STRIP_H = 44;
 const GRID = 16;
 
 type Tone = "success" | "warning" | "danger" | "idle";
+
+type VolumeChip = ProjectSummary["environments"][number]["applications"][number]["volumes"][number];
 
 interface CanvasNode {
     id: string;
@@ -54,8 +58,19 @@ interface CanvasNode {
     subtitle: string;
     tone: Tone;
     statusLabel: string;
-    /** Attached volume row (databases), rendered below the card like Railway. */
+    /** Synthetic volume label for databases, rendered below the card like Railway. */
     volume?: string;
+    /** Real attached volumes (applications), each an interactive strip below the card. */
+    volumes?: VolumeChip[];
+}
+
+/** Where a volume opens in Drive: a nas volume points at its NAS connection + folder;
+ *  any other kind falls back to the container's filesystem at the mount path. */
+function volumeDriveHref(appId: string, volume: VolumeChip): string {
+    if (volume.kind === "nas" && volume.connectionId) {
+        return `/drive?c=${volume.connectionId}&p=${encodeURIComponent(volume.source)}`;
+    }
+    return `/drive?c=container:${appId}&p=${encodeURIComponent(volume.mountPath.replace(/^\/+|\/+$/g, ""))}`;
 }
 
 interface Point {
@@ -80,7 +95,8 @@ function nodesFromEnvironment(environment: ProjectSummary["environments"][number
         kind: serviceKindOf(app.sourceType),
         subtitle: primaryDomain(app.domains)?.hostname ?? (app.sourceType === "image" ? "Docker image" : "Git repository"),
         tone: app.currentDeploymentId ? dbTone(app.deployStatus ?? "") : "idle",
-        statusLabel: app.currentDeploymentId ? (app.deployStatus ?? "deployed") : "Not deployed"
+        statusLabel: app.currentDeploymentId ? (app.deployStatus ?? "deployed") : "Not deployed",
+        volumes: app.volumes
     }));
     const databases = environment.databases.map((database): CanvasNode => ({
         id: database.id,
@@ -601,6 +617,35 @@ export function DeployCanvas({
                                         <HardDrive className="size-3.5 shrink-0" /> {node.volume}
                                     </div>
                                 )}
+                                {node.volumes?.map((vol, vi) => (
+                                    <ContextMenu key={vol.id}>
+                                        <ContextMenuTrigger asChild>
+                                            <button
+                                                type="button"
+                                                onClick={() => app && onOpenService?.(app)}
+                                                onContextMenu={(event) => event.stopPropagation()}
+                                                className="absolute flex items-center gap-2 rounded-b-2xl border border-t-0 border-border bg-card/60 px-4 py-2.5 text-left text-xs text-muted-foreground transition-colors hover:bg-card"
+                                                style={{ left: p.x, top: p.y + NODE_H + vi * VOL_STRIP_H, width: NODE_W }}
+                                            >
+                                                <HardDrive className={`size-3.5 shrink-0 ${vol.kind === "nas" ? "text-sky-400" : ""}`} />
+                                                <span className="truncate">{vol.name}</span>
+                                                <span className="ml-auto shrink-0 truncate text-[10px] text-muted-foreground/70">
+                                                    {vol.kind === "nas" ? (vol.connectionName ?? "NAS") : vol.kind === "bind" ? "Server" : "Volume"}
+                                                </span>
+                                            </button>
+                                        </ContextMenuTrigger>
+                                        <ContextMenuContent>
+                                            <ContextMenuItem onSelect={() => router.push(volumeDriveHref(node.id, vol))}>
+                                                <HardDrive className="size-4" /> View in Drive
+                                            </ContextMenuItem>
+                                            {app && (
+                                                <ContextMenuItem onSelect={() => onOpenService?.(app)}>
+                                                    <ScrollText className="size-4" /> Manage volumes
+                                                </ContextMenuItem>
+                                            )}
+                                        </ContextMenuContent>
+                                    </ContextMenu>
+                                ))}
                             </Fragment>
                         );
                     })}

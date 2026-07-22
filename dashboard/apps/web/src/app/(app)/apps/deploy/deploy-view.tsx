@@ -103,6 +103,15 @@ export interface ProjectSummary {
             /** Direct LAN/intranet URL (host IP + published port), when a public IP is known. */
             ipUrl: string | null;
             domains: { id: string; hostname: string; kind: string; enabled: boolean }[];
+            volumes: {
+                id: string;
+                name: string;
+                kind: string;
+                source: string;
+                mountPath: string;
+                connectionId: string | null;
+                connectionName: string | null;
+            }[];
         }[];
         databases: { id: string; name: string; engine: string; status: string }[];
     }[];

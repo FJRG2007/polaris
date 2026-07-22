@@ -76,7 +76,16 @@ export default async function DeployProjectPage({ params }: { params: Promise<{ 
                 domains: mergeTunnelDomains(
                     app.domains.map((domain) => ({ id: domain.id, hostname: domain.hostname, kind: domain.kind, enabled: domain.enabled })),
                     tunnelDomains.get(app.id) ?? []
-                )
+                ),
+                volumes: app.volumes.map((volume) => ({
+                    id: volume.id,
+                    name: volume.name,
+                    kind: volume.kind,
+                    source: volume.source ?? volume.name,
+                    mountPath: volume.mountPath,
+                    connectionId: volume.connectionId,
+                    connectionName: volume.connection?.name ?? null
+                }))
             })),
             databases: environment.databases.map((database) => ({
                 id: database.id,

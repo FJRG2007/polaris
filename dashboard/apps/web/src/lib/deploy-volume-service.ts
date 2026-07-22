@@ -12,6 +12,7 @@
 
 import { prisma } from "@polaris/db";
 import { slugify } from "@polaris/deploy";
+import { getDriver } from "./storage-service";
 import {
     canHostMount,
     deployVolumeInputSchema,
@@ -114,6 +115,20 @@ export async function createVolume(ownerId: string, input: DeployVolumeInput): P
         },
         include: { connection: { select: { name: true } } }
     });
+
+    // For a nas volume, create the folder on the NAS now (via the userspace driver,
+    // which works even before the kernel mount is wired), so it exists and is
+    // browsable in Drive right away. mkdir builds parents and is idempotent; a
+    // failure (NAS unreachable) is non-fatal - the folder is also created at deploy.
+    if (parsed.kind === "nas" && parsed.connectionId) {
+        try {
+            const driver = await getDriver(parsed.connectionId, ownerId);
+            await driver.mkdir(source);
+        } catch (error) {
+            console.error(`volume ${created.id}: could not pre-create NAS folder ${source}:`, error);
+        }
+    }
+
     return {
         id: created.id,
         name: created.name,

@@ -80,7 +80,12 @@ export async function getProjectFull(projectId: string, ownerId: string) {
         where: { id: projectId, ownerId },
         include: {
             environments: {
-                include: { applications: { include: { domains: true, target: true } }, databases: true },
+                include: {
+                    applications: {
+                        include: { domains: true, target: true, volumes: { include: { connection: { select: { name: true } } } } }
+                    },
+                    databases: true
+                },
                 orderBy: { createdAt: "asc" }
             }
         }
