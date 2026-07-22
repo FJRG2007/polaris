@@ -40,8 +40,8 @@ import {
 } from "@/lib/deploy-service";
 import { createDatabase, deployDatabase, type DbEngine } from "@/lib/database-service";
 import { listVolumes, createVolume, deleteVolume, type VolumeView } from "@/lib/deploy-volume-service";
-import { listConnections } from "@/lib/storage-service";
-import { canHostMount, type DeployVolumeInput, type StorageProviderKind } from "@polaris/core";
+import { listConnections, getDriver } from "@/lib/storage-service";
+import { canHostMount, normalizeRelPath, type DeployVolumeInput, type StorageProviderKind } from "@polaris/core";
 import {
     getQuickTunnelStatus,
     startQuickTunnel,
@@ -809,6 +809,23 @@ export async function listNasConnectionsAction(): Promise<{ id: string; name: st
     return rows
         .filter((row) => canHostMount(row.kind as StorageProviderKind))
         .map((row) => ({ id: row.id, name: row.name, active: row.status === "active" }));
+}
+
+/** List sub-folders of a path on a host-mountable connection, for the volume
+ *  folder picker. Ownership is enforced by getDriver (owner-scoped). */
+export async function listNasFoldersAction(
+    connectionId: string,
+    path: string
+): Promise<{ folders: string[]; error?: string }> {
+    const user = await requirePermission("deploy.manage");
+    try {
+        const driver = await getDriver(connectionId, user.id);
+        const result = await driver.list(normalizeRelPath(path));
+        const folders = result.entries.filter((entry) => entry.kind === "dir").map((entry) => entry.name).sort();
+        return { folders };
+    } catch (caught) {
+        return { folders: [], error: caught instanceof Error ? caught.message : "Could not list folders" };
+    }
 }
 
 export async function createVolumeAction(input: DeployVolumeInput): Promise<{ error?: string }> {

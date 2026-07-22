@@ -8,8 +8,10 @@
  */
 
 import { useEffect, useState, useTransition } from "react";
+import { FolderSearch } from "lucide-react";
 import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, Input } from "@polaris/ui";
 import { createVolumeAction, listNasConnectionsAction } from "./actions";
+import { FolderPicker } from "./folder-picker";
 
 type Kind = "volume" | "bind" | "nas";
 type NasConnection = Awaited<ReturnType<typeof listNasConnectionsAction>>[number];
@@ -47,8 +49,12 @@ export function VolumeForm({
     const [kind, setKind] = useState<Kind>("bind");
     const [name, setName] = useState("");
     const [mountPath, setMountPath] = useState("");
+    // Auto: Polaris generates a structured path under polaris/deploy/... Custom: the
+    // user types the subpath or picks it with the folder browser.
+    const [pathMode, setPathMode] = useState<"auto" | "custom">("auto");
     const [source, setSource] = useState("");
     const [connectionId, setConnectionId] = useState("");
+    const [pickerOpen, setPickerOpen] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
 
@@ -63,8 +69,9 @@ export function VolumeForm({
             setError("Pick a service for this volume");
             return;
         }
-        // Named volumes derive their source from the name; bind/nas use the subpath.
-        const resolvedSource = kind === "volume" ? name.trim() : source.trim();
+        // Auto path and named volumes are generated server-side; custom sends the
+        // typed/picked subpath.
+        const resolvedSource = kind === "volume" || pathMode === "auto" ? undefined : source.trim() || undefined;
         startTransition(async () => {
             const result = await createVolumeAction({
                 applicationId: targetId,
@@ -87,8 +94,8 @@ export function VolumeForm({
         (applicationId || serviceId) &&
         name.trim() &&
         mountPath.trim() &&
-        (kind === "volume" || source.trim()) &&
-        (kind !== "nas" || connectionId);
+        (kind !== "nas" || connectionId) &&
+        (kind === "volume" || pathMode === "auto" || source.trim());
 
     return (
         <div className="flex flex-col gap-3">
@@ -153,11 +160,58 @@ export function VolumeForm({
             )}
 
             {kind !== "volume" && (
-                <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
-                    {kind === "nas" ? "Folder on the NAS" : "Folder on the server"}
-                    <Input value={source} onChange={(event) => setSource(event.target.value)} placeholder="api.tpeoficial.com/secrets" />
-                    <span className="text-[11px] text-muted-foreground">A subpath (no leading slash, no `..`). Created if it does not exist.</span>
-                </label>
+                <div className="flex flex-col gap-2">
+                    <div className="grid grid-cols-2 gap-1 rounded-md bg-muted p-1 text-sm">
+                        {(["auto", "custom"] as const).map((value) => (
+                            <button
+                                key={value}
+                                type="button"
+                                onClick={() => setPathMode(value)}
+                                className={`rounded px-3 py-1.5 font-medium transition-colors ${
+                                    pathMode === value ? "bg-surface text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                                }`}
+                            >
+                                {value === "auto" ? "Auto" : "Choose folder"}
+                            </button>
+                        ))}
+                    </div>
+                    {pathMode === "auto" ? (
+                        <p className="text-[11px] text-muted-foreground">
+                            Polaris creates and organizes it under <code className="text-foreground">polaris/deploy/&lt;project&gt;/&lt;service&gt;/{name.trim() || "name"}</code>.
+                        </p>
+                    ) : (
+                        <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
+                            {kind === "nas" ? "Folder on the NAS" : "Folder on the server"}
+                            <div className="flex items-center gap-2">
+                                <Input value={source} onChange={(event) => setSource(event.target.value)} placeholder="data/uploads" />
+                                {kind === "nas" && (
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        disabled={!connectionId}
+                                        onClick={() => setPickerOpen(true)}
+                                        title={connectionId ? "Browse folders" : "Select a NAS connection first"}
+                                    >
+                                        <FolderSearch className="size-4" /> Browse
+                                    </Button>
+                                )}
+                            </div>
+                            <span className="text-[11px] text-muted-foreground">A subpath (no leading slash, no `..`). Created if it does not exist.</span>
+                        </label>
+                    )}
+                    {kind === "nas" && connectionId && (
+                        <FolderPicker
+                            connectionId={connectionId}
+                            open={pickerOpen}
+                            onOpenChange={setPickerOpen}
+                            onPick={(picked) => {
+                                setSource(picked);
+                                setPathMode("custom");
+                            }}
+                        />
+                    )}
+                </div>
             )}
 
             {error && <p className="text-xs text-red-400">{error}</p>}

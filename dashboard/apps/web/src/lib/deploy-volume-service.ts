@@ -11,6 +11,7 @@
  */
 
 import { prisma } from "@polaris/db";
+import { slugify } from "@polaris/deploy";
 import {
     canHostMount,
     deployVolumeInputSchema,
@@ -62,7 +63,7 @@ export async function createVolume(ownerId: string, input: DeployVolumeInput): P
 
     const app = await prisma.application.findFirst({
         where: { id: parsed.applicationId, environment: { project: { ownerId } } },
-        select: { id: true, targetId: true }
+        select: { id: true, targetId: true, slug: true, environment: { select: { project: { select: { slug: true } } } } }
     });
     if (!app) throw new Error("Application not found");
 
@@ -79,9 +80,17 @@ export async function createVolume(ownerId: string, input: DeployVolumeInput): P
         if (connection.status !== "active") throw new Error("The storage connection is not active");
     }
 
+    // A named docker volume derives its source from the name. For bind/nas, use the
+    // path the user typed or picked; when omitted, generate a structured one under
+    // polaris/deploy/<project>/<app>/<name> so volumes stay organized on the NAS/host.
+    const explicit = parsed.source?.trim();
+    const raw =
+        parsed.kind === "volume"
+            ? parsed.name
+            : explicit || `polaris/deploy/${app.environment.project.slug}/${app.slug}/${slugify(parsed.name)}`;
     let source: string;
     try {
-        source = normalizeVolumeSource(parsed.kind, parsed.source);
+        source = normalizeVolumeSource(parsed.kind, raw);
     } catch (error) {
         if (error instanceof UnsafePathError) throw new Error("The volume source path is invalid");
         throw error;

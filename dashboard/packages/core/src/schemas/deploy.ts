@@ -38,9 +38,10 @@ export const deployVolumeInputSchema = z
         name: z.string().trim().min(1).max(64),
         mountPath: containerMountPath,
         kind: z.enum(DEPLOY_VOLUME_KINDS),
-        // A docker volume name (kind=volume) or a subpath (kind=bind|nas). The
-        // service normalizes it per kind with normalizeVolumeSource.
-        source: z.string().trim().min(1).max(1024),
+        // A docker volume name (kind=volume) or an explicit subpath (kind=bind|nas)
+        // the user typed or picked. Omit for bind/nas to let the service generate a
+        // structured path under polaris/deploy/<project>/<app>/<name>.
+        source: z.string().trim().min(1).max(1024).optional(),
         // Required for nas, forbidden otherwise (enforced below).
         connectionId: z.string().uuid().optional()
     })
