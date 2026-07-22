@@ -147,7 +147,10 @@ export async function startQuickTunnel(appId: string, ownerId: string): Promise<
             await delay(1500);
             url = await readUrlFromLogs(ports, service);
         }
-        await setStoredUrl(appId, url);
+        // Mark the tunnel live even when the URL has not printed yet: the edge route is
+        // keyed on this record's existence (via quickTunnelAppIds), not on a known URL,
+        // so a slow-starting tunnel still gets routed instead of 404'ing.
+        await markTunnelLive(appId, url);
         // Publish the edge route for this tunnel's host so the first request is proxied
         // (and logged) rather than 404'd by the edge for an unknown host.
         await syncAppRoutes().catch(() => undefined);
@@ -167,7 +170,7 @@ export async function stopQuickTunnel(appId: string, ownerId: string): Promise<v
     } finally {
         await ports.dispose();
     }
-    await setStoredUrl(appId, null);
+    await forgetTunnel(appId);
     // Drop the tunnel's edge route now that it is gone.
     await syncAppRoutes().catch(() => undefined);
 }
@@ -185,11 +188,11 @@ export async function getQuickTunnelStatus(appId: string, ownerId: string): Prom
     try {
         const info = (await ports.inspect(service)) as { State?: { Running?: boolean } };
         if (!info?.State?.Running) {
-            await setStoredUrl(appId, null);
+            await forgetTunnel(appId);
             return { running: false, url: null };
         }
         const url = (await readUrlFromLogs(ports, service)) ?? (await getStoredUrl(appId));
-        await setStoredUrl(appId, url);
+        await markTunnelLive(appId, url);
         return { running: true, url };
     } catch {
         return { running: false, url: await getStoredUrl(appId) };
@@ -242,18 +245,26 @@ export async function reconcileQuickTunnels(): Promise<void> {
 
 async function getStoredUrl(appId: string): Promise<string | null> {
     const row = await prisma.setting.findUnique({ where: { key: urlKey(appId) }, select: { value: true } });
-    return row?.value ?? null;
+    // A live-but-URL-unknown tunnel stores an empty marker; report that as no URL yet.
+    return row?.value || null;
 }
 
-async function setStoredUrl(appId: string, url: string | null): Promise<void> {
+/** Record the tunnel as live and cache its URL if known. The record's existence (not its
+ *  value) is what quickTunnelAppIds reports and what syncAppRoutes keys the edge route on,
+ *  so it must be written the moment the sidecar is up - an empty value marks a live tunnel
+ *  whose URL cloudflared has not printed yet. */
+async function markTunnelLive(appId: string, url: string | null): Promise<void> {
     const key = urlKey(appId);
-    if (!url) {
-        await prisma.setting.deleteMany({ where: { key } });
-        return;
-    }
+    const value = url ?? "";
     await prisma.setting.upsert({
         where: { key },
-        create: { key, value: url, scope: "global" },
-        update: { value: url }
+        create: { key, value, scope: "global" },
+        update: { value }
     });
+}
+
+/** Forget the tunnel: drop its liveness record and cached URL. Called only when the tunnel
+ *  is actually gone (stopped or not running), so the edge route is withdrawn with it. */
+async function forgetTunnel(appId: string): Promise<void> {
+    await prisma.setting.deleteMany({ where: { key: urlKey(appId) } });
 }
