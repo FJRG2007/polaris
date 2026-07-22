@@ -192,27 +192,45 @@ export async function deleteConnectionAction(connectionId: string): Promise<void
     revalidatePath("/drive");
 }
 
-export async function mkdirAction(connectionId: string, path: string, name: string): Promise<void> {
+/** Create a folder. Returns a structured error (never throws) so an unsupported
+ *  source - a container filesystem cannot make directories - surfaces a clear
+ *  message instead of a raw server exception. */
+export async function mkdirAction(connectionId: string, path: string, name: string): Promise<{ error?: string }> {
     const user = await requireUser();
     const target = normalizeRelPath(path ? `${path}/${name}` : name);
-    const driver = await requireDriveDriver(user.id, connectionId, path, "write");
+    let driver;
+    try {
+        driver = await requireDriveDriver(user.id, connectionId, path, "write");
+    } catch (caught) {
+        return { error: driveErrorMessage(caught, "You cannot create a folder here.") };
+    }
     try {
         await driver.mkdir(target);
+    } catch (caught) {
+        return { error: driveErrorMessage(caught, "Could not create the folder.") };
     } finally {
         await driver.dispose();
     }
     await recordItemCreator(connectionId, target, user.id);
     await recordAudit({ actorId: user.id, action: "drive.mkdir", targetType: "connection", targetId: connectionId, metadata: { path: target } });
     revalidatePath("/drive");
+    return {};
 }
 
-/** Create an empty file (any name/extension) in the given folder. */
-export async function createFileAction(connectionId: string, path: string, name: string): Promise<void> {
+/** Create an empty file (any name/extension) in the given folder. Returns a
+ *  structured error instead of throwing so a driver that refuses the write reports
+ *  why rather than crashing the page. */
+export async function createFileAction(connectionId: string, path: string, name: string): Promise<{ error?: string }> {
     const user = await requireUser();
     const clean = name.trim();
-    if (!clean) throw new Error("Enter a file name");
+    if (!clean) return { error: "Enter a file name" };
     const target = normalizeRelPath(path ? `${path}/${clean}` : clean);
-    const driver = await requireDriveDriver(user.id, connectionId, path, "write");
+    let driver;
+    try {
+        driver = await requireDriveDriver(user.id, connectionId, path, "write");
+    } catch (caught) {
+        return { error: driveErrorMessage(caught, "You cannot create a file here.") };
+    }
     try {
         const empty = new ReadableStream<Uint8Array>({
             start(controller) {
@@ -220,12 +238,15 @@ export async function createFileAction(connectionId: string, path: string, name:
             }
         });
         await driver.writeStream(target, empty, {});
+    } catch (caught) {
+        return { error: driveErrorMessage(caught, "Could not create the file.") };
     } finally {
         await driver.dispose();
     }
     await recordItemCreator(connectionId, target, user.id);
     await recordAudit({ actorId: user.id, action: "drive.create", targetType: "connection", targetId: connectionId, metadata: { path: target } });
     revalidatePath("/drive");
+    return {};
 }
 
 export async function deleteEntryAction(connectionId: string, path: string): Promise<void> {

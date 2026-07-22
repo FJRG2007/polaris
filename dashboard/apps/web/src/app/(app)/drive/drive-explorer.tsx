@@ -199,10 +199,7 @@ export function DriveExplorer({
         if (!connectionId || !name) return;
         setNewFolderOpen(false);
         setNewFolderName("");
-        startTransition(async () => {
-            await mkdirAction(connectionId, path, name);
-            void load();
-        });
+        runOp(`Creating ${name}`, () => mkdirAction(connectionId, path, name));
     }
 
     function onRename(entry: DriveEntry, nextName: string) {
