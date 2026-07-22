@@ -30,6 +30,10 @@ export interface MountSpec {
 export interface MountResult {
     readonly id: string;
     readonly mountPath: string;
+    /** True when this call created a new mount; false when it was already mounted
+     *  (idempotent no-op). Lets a boot reconcile tell a fresh mount apart from a
+     *  live one and restart only the apps whose mount had to be re-established. */
+    readonly created: boolean;
 }
 
 interface RawResponse {
@@ -72,8 +76,8 @@ export class HostdClient {
         if (response.status !== 201) {
             throw new Error(`hostd mount failed (${response.status}): ${response.body}`);
         }
-        const parsed = JSON.parse(response.body) as MountResult;
-        return parsed;
+        const parsed = JSON.parse(response.body) as { id: string; mountpoint?: string; created?: boolean };
+        return { id: parsed.id, mountPath: parsed.mountpoint ?? "", created: parsed.created ?? false };
     }
 
     /** Release a mount previously created through createMount. */

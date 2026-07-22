@@ -823,7 +823,7 @@ fn mount_create<R: Read>(state: &AppState, req: &Request, body: &mut R) -> Respo
     };
 
     match run_mount(&request, &target) {
-        Ok(()) => {
+        Ok(created) => {
             state
                 .mounts
                 .lock()
@@ -832,6 +832,7 @@ fn mount_create<R: Read>(state: &AppState, req: &Request, body: &mut R) -> Respo
             let body = serde_json::json!({
                 "id": request.id,
                 "mountpoint": target.to_string_lossy(),
+                "created": created,
             });
             Response::json(201, "Created", &body)
         }
@@ -876,8 +877,12 @@ enum MountError {
 /// Run `mount` with an argument vector (never a shell). Filesystem type is
 /// selected from the validated `kind`, so no client string reaches the type
 /// flag. Target has already been confined under the mount root.
+/// Establish a mount. Returns `Ok(true)` when a new mount was created and
+/// `Ok(false)` when the target was already mounted (idempotent no-op). Callers
+/// use the flag to know a mount had to be re-established (e.g. after a host
+/// reboot) and act on it - a boot reconcile restarts the apps bound to it.
 #[cfg(unix)]
-fn run_mount(request: &MountRequest, target: &std::path::Path) -> Result<(), MountError> {
+fn run_mount(request: &MountRequest, target: &std::path::Path) -> Result<bool, MountError> {
     use std::process::Command;
 
     if std::fs::create_dir_all(target).is_err() {
@@ -886,7 +891,7 @@ fn run_mount(request: &MountRequest, target: &std::path::Path) -> Result<(), Mou
     // Idempotent: a live mountpoint is already what the caller wants. Re-mounting
     // would stack mounts (SMB) or fail; deploys call this on every redeploy.
     if is_mountpoint(target) {
-        return Ok(());
+        return Ok(false);
     }
     let fstype = match request.kind {
         MountKind::Smb => "cifs",
@@ -922,7 +927,7 @@ fn run_mount(request: &MountRequest, target: &std::path::Path) -> Result<(), Mou
         let _ = std::fs::remove_file(path);
     }
     match status {
-        Ok(status) if status.success() => Ok(()),
+        Ok(status) if status.success() => Ok(true),
         _ => Err(MountError::Failed),
     }
 }
@@ -955,7 +960,7 @@ fn write_creds_file(path: &std::path::Path, user: &str, pass: &str) -> std::io::
 }
 
 #[cfg(not(unix))]
-fn run_mount(_request: &MountRequest, _target: &std::path::Path) -> Result<(), MountError> {
+fn run_mount(_request: &MountRequest, _target: &std::path::Path) -> Result<bool, MountError> {
     Err(MountError::Unsupported)
 }
 

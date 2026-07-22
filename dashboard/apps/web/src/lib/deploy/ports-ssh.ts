@@ -146,11 +146,17 @@ export class SshPorts implements RuntimePorts {
         await this.run(`docker ${action} ${quoteArg(ref)}`);
     }
 
-    public async ensureMount(spec: MountTarget): Promise<void> {
+    public async ensureMount(spec: MountTarget): Promise<boolean> {
         const target = `${REMOTE_MOUNT_ROOT}/${spec.id}`;
         const fstype = spec.kind === "smb" ? "cifs" : "nfs";
         const staticOpts = spec.options ?? "";
-        const lines = ["set -e", `mkdir -p ${quoteArg(target)}`, `if mountpoint -q ${quoteArg(target)}; then exit 0; fi`];
+        // The script prints a sentinel so we can tell a fresh mount from a live one:
+        // `polaris:already` when the target was mounted, `polaris:created` otherwise.
+        const lines = [
+            "set -e",
+            `mkdir -p ${quoteArg(target)}`,
+            `if mountpoint -q ${quoteArg(target)}; then echo polaris:already; exit 0; fi`
+        ];
         // For CIFS credentials, write a 0600 credentials file so the password never
         // reaches the mount argv; $creds expands in the mount `-o` value below.
         let optionValue = staticOpts;
@@ -164,7 +170,12 @@ export class SshPorts implements RuntimePorts {
         // $creds shell var, so it is embedded in double quotes to let $creds expand.
         lines.push(`mount -t ${fstype} ${quoteArg(spec.source)} ${quoteArg(target)}${optionValue ? ` -o "${optionValue}"` : ""}`);
         if (useCreds) lines.push('rm -f "$creds"');
-        await this.run(lines.join("\n"));
+        lines.push("echo polaris:created");
+        let out = "";
+        await this.run(lines.join("\n"), (chunk) => {
+            out += chunk.toString("utf8");
+        });
+        return out.includes("polaris:created");
     }
 
     public async logs(ref: string, onData: OutputSink, options?: LogOptions): Promise<void> {

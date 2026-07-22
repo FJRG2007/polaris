@@ -29,8 +29,13 @@ export async function register(): Promise<void> {
 
     // Write the Traefik dynamic routes for deployed-app domains on startup, so the
     // edge self-heals after a restart or a fresh dynamic volume. Best-effort.
-    const { syncAppRoutes } = await import("./lib/deploy-service");
+    const { syncAppRoutes, reconcileNasMounts } = await import("./lib/deploy-service");
     void syncAppRoutes().catch((error) => console.error("polaris: initial route sync failed:", error));
+
+    // Re-establish NAS volume mounts a host reboot dropped, restarting any app whose
+    // mount had to be re-created - so a NAS-backed volume survives reboots like a real
+    // docker volume. Best-effort; a routine restart keeps live mounts and is a no-op.
+    void reconcileNasMounts().catch((error) => console.error("polaris: initial NAS mount reconcile failed:", error));
 
     // Mint (once) an internal CA + leaf for the LAN hostnames and hand the leaf to
     // Traefik as its default certificate, so polaris.local can be trusted HTTPS

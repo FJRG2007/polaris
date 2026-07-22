@@ -150,8 +150,9 @@ async function buildDriver(row: ConnectionRow): Promise<StorageDriver> {
 
     const driver = createDriver(record, {
         capabilities: getCapabilities(),
-        // enigma: the mount must already be established by an activation step that
-        // calls HostdClient.createMount; wiring that lifecycle is a pending item.
+        // The kernel mount at HOSTD_MOUNT_ROOT/<id> is established by the deploy
+        // pipeline (ensureMount before composeUp) and re-established on boot by
+        // reconcileNasMounts; here we just point a local driver at that path.
         hostdFactory: (rec) => new LocalDriver({ id: rec.id, root: `${HOSTD_MOUNT_ROOT}/${rec.id}` })
     });
     await driver.connect();

@@ -340,6 +340,62 @@ export async function setApplicationDomainEnabled(
     await syncAppRoutes().catch(() => undefined);
 }
 
+/**
+ * Re-establish NAS volume mounts on server startup, so a NAS-backed volume keeps
+ * behaving like a real docker volume across a host reboot. A nas volume binds onto
+ * a kernel CIFS/NFS mount the deploy pipeline sets up at `<mount_root>/<connId>`;
+ * that mount is lost on a host reboot, and the app container then comes back bound
+ * to an empty local dir. This runs at boot (like `syncAppRoutes`): for every running
+ * app with a nas volume it re-ensures the mount and - only when the mount was
+ * actually absent (`created`, i.e. after a reboot; a routine restart keeps the mount
+ * alive via rshared propagation, so nothing is disturbed) - restarts the app so its
+ * bind resolves back onto the NAS. Best-effort: failures are logged, never fatal.
+ */
+export async function reconcileNasMounts(): Promise<void> {
+    const apps = await prisma.application.findMany({
+        where: {
+            desiredState: "running",
+            currentDeploymentId: { not: null },
+            volumes: { some: { kind: "nas", connectionId: { not: null } } }
+        },
+        include: {
+            environment: { include: { project: { select: { ownerId: true, slug: true } } } },
+            target: true,
+            volumes: { where: { kind: "nas", connectionId: { not: null } }, select: { connectionId: true } }
+        }
+    });
+    for (const app of apps) {
+        const ownerId = app.environment.project.ownerId;
+        const connectionIds = [...new Set(app.volumes.map((volume) => volume.connectionId as string))];
+        let ports;
+        try {
+            ports = await getPorts(app.target as TargetRow, ownerId);
+        } catch (error) {
+            console.error(`polaris: NAS reconcile could not reach ${app.slug}'s target:`, error);
+            continue;
+        }
+        try {
+            let recreated = false;
+            for (const id of connectionIds) {
+                const mount = await resolveMountTarget(id, ownerId).catch(() => null);
+                if (!mount) continue;
+                if (await ports.ensureMount(mount)) recreated = true;
+            }
+            // Only after a mount had to be re-created (a reboot) does the running
+            // container hold a stale bind; restart it so the bind re-resolves.
+            if (recreated) {
+                const container = serviceName(app.environment.project.slug, app.slug, app.id);
+                await ports.container(container, "restart");
+                console.log(`polaris: re-established NAS mount for ${app.slug} and restarted it`);
+            }
+        } catch (error) {
+            console.error(`polaris: NAS mount reconcile failed for ${app.slug}:`, error);
+        } finally {
+            await ports.dispose().catch(() => undefined);
+        }
+    }
+}
+
 // --- deployment lifecycle (restart / disable / remove) ----------------------
 
 /** Resolve an app to its runtime container ref, compose project, and target. */

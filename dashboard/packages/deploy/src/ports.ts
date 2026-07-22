@@ -76,9 +76,11 @@ export interface RuntimePorts {
      *  disable/enable a deployment without removing it. */
     container(ref: string, action: "restart" | "stop" | "start"): Promise<void>;
     /** Ensure a NAS filesystem is mounted at `<mount_root>/<id>` on the target, so a
-     *  bind volume under it resolves onto the NAS. Idempotent (a no-op if already
-     *  mounted). Called before bringing a service with nas volumes up. */
-    ensureMount(spec: MountTarget): Promise<void>;
+     *  bind volume under it resolves onto the NAS. Idempotent. Called before bringing
+     *  a service with nas volumes up. Resolves `true` when it created a new mount and
+     *  `false` when the target was already mounted, so a boot reconcile can restart
+     *  only the apps whose mount had to be re-established (e.g. after a host reboot). */
+    ensureMount(spec: MountTarget): Promise<boolean>;
     logs(ref: string, onData: OutputSink, options?: LogOptions): Promise<void>;
     /** Open an interactive exec/attach stream. */
     exec(spec: ExecSpec): Promise<ExecStream>;

@@ -65,10 +65,10 @@ export class HostdPorts implements RuntimePorts {
         return JSON.parse(response.body);
     }
 
-    public async ensureMount(spec: MountTarget): Promise<void> {
+    public async ensureMount(spec: MountTarget): Promise<boolean> {
         // The daemon confines the target under its mount root, so we pass the bare
         // connection id as the subdir. Idempotent: a live mount returns success.
-        await this.client.createMount({
+        const result = await this.client.createMount({
             id: spec.id,
             kind: spec.kind,
             source: spec.source,
@@ -77,6 +77,7 @@ export class HostdPorts implements RuntimePorts {
             username: spec.username,
             password: spec.password
         });
+        return result.created;
     }
 
     public async container(ref: string, action: "restart" | "stop" | "start"): Promise<void> {
