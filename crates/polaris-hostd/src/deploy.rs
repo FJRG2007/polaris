@@ -76,10 +76,12 @@ pub struct PortSpec {
 #[serde(deny_unknown_fields)]
 pub struct VolumeSpec {
     /// For "volume": a named volume. For "bind": a path confined under the
-    /// volume root (never an arbitrary host path).
+    /// volume root. For "nas": a path confined under the mount root, where
+    /// storage connections are mounted (`<mount_root>/<connectionId>/...`).
+    /// Never an arbitrary host path.
     pub source: String,
     pub target: String,
-    /// volume | bind
+    /// volume | bind | nas
     pub kind: String,
 }
 
@@ -200,6 +202,16 @@ fn validate_volume(volume: &VolumeSpec, config: &Config) -> Result<(), String> {
                 Err(PathError::Escape) => Err("bind source escapes the volume root".into()),
             }
         }
+        "nas" => {
+            // Like "bind", but confined under the mount root, where storage
+            // connections are mounted (`<mount_root>/<connectionId>/...`). Same
+            // confinement guarantee: never an arbitrary host path.
+            match security::resolve_within(&config.mount_root, &volume.source) {
+                Ok(_) => Ok(()),
+                Err(PathError::Nul) => Err("nas source contains a NUL byte".into()),
+                Err(PathError::Escape) => Err("nas source escapes the mount root".into()),
+            }
+        }
         other => Err(format!("invalid volume kind: {other}")),
     }
 }
@@ -240,14 +252,18 @@ pub fn render_compose(spec: &DeploySpec, config: &Config) -> String {
         if !service.volumes.is_empty() {
             out.push_str("    volumes:\n");
             for volume in &service.volumes {
-                let source = if volume.kind == "bind" {
-                    config
+                let source = match volume.kind.as_str() {
+                    "bind" => config
                         .volume_root
                         .join(&volume.source)
                         .to_string_lossy()
-                        .into_owned()
-                } else {
-                    volume.source.clone()
+                        .into_owned(),
+                    "nas" => config
+                        .mount_root
+                        .join(&volume.source)
+                        .to_string_lossy()
+                        .into_owned(),
+                    _ => volume.source.clone(),
                 };
                 out.push_str(&format!(
                     "      - {}\n",
@@ -844,6 +860,8 @@ mod tests {
         let mut config = Config::from_env();
         config.volume_root = std::env::temp_dir().join("polaris-vol-test");
         std::fs::create_dir_all(&config.volume_root).unwrap();
+        config.mount_root = std::env::temp_dir().join("polaris-mount-test");
+        std::fs::create_dir_all(&config.mount_root).unwrap();
         config.deploy_root = std::env::temp_dir().join("polaris-deploy-test");
         std::fs::create_dir_all(&config.deploy_root).unwrap();
         config
@@ -891,6 +909,33 @@ mod tests {
         let config = test_config();
         let escape = spec(
             r#"{"project":"p","services":[{"name":"a","image":"nginx","volumes":[{"source":"../../etc","target":"/data","kind":"bind"}]}]}"#,
+        );
+        assert!(validate_spec(&escape, &config).is_err());
+    }
+
+    #[test]
+    fn accepts_nas_under_mount_root() {
+        // A NAS-backed bind confines its source under the mount root (where
+        // storage connections live at `<mount_root>/<connectionId>/...`).
+        let config = test_config();
+        let ok = spec(
+            r#"{"project":"p","services":[{"name":"a","image":"nginx","volumes":[{"source":"conn-1/secrets","target":"/app/secrets","kind":"nas"}]}]}"#,
+        );
+        assert!(validate_spec(&ok, &config).is_ok());
+        // And it renders under the mount root, never as an arbitrary host path.
+        // Build the expected YAML scalar through the same yaml_quote path so the
+        // check is platform-agnostic (Windows backslashes get escaped identically).
+        let yaml = render_compose(&ok, &config);
+        let source = config.mount_root.join("conn-1/secrets").to_string_lossy().into_owned();
+        let expected = yaml_quote(&format!("{source}:/app/secrets"));
+        assert!(yaml.contains(&expected));
+    }
+
+    #[test]
+    fn rejects_nas_escaping_mount_root() {
+        let config = test_config();
+        let escape = spec(
+            r#"{"project":"p","services":[{"name":"a","image":"nginx","volumes":[{"source":"../../etc","target":"/data","kind":"nas"}]}]}"#,
         );
         assert!(validate_spec(&escape, &config).is_err());
     }

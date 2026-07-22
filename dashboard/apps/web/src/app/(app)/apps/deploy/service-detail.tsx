@@ -53,6 +53,7 @@ import { LogViewer } from "@/components/log-viewer";
 import type { HttpLogEntry } from "@polaris/deploy";
 import { TerminalPanel } from "./terminal-panel";
 import { FilesPanel } from "./files-panel";
+import { VolumesTab } from "./volumes-panel";
 import {
     addDomainAction,
     autoExposeAction,
@@ -87,7 +88,7 @@ import {
     stopNgrokTunnelAction
 } from "./actions";
 
-const TABS = ["Deployments", "Variables", "Metrics", "Console", "Files", "Settings"] as const;
+const TABS = ["Deployments", "Variables", "Metrics", "Console", "Files", "Volumes", "Settings"] as const;
 type Tab = (typeof TABS)[number];
 
 export function ServiceDetail({ app, onChanged, onClose }: { app: ProjectApp; onChanged: () => void; onClose: () => void }) {
@@ -144,6 +145,7 @@ export function ServiceDetail({ app, onChanged, onClose }: { app: ProjectApp; on
                         <TerminalPanel targetId={app.targetId} containerRef={app.containerRef} label={app.containerRef} />
                     )}
                     {tab === "Files" && <FilesPanel applicationId={app.id} />}
+                    {tab === "Volumes" && <VolumesTab app={app} />}
                     {tab === "Settings" && <SettingsTab app={app} isGit={isGit} onChanged={onChanged} />}
                 </div>
             </DialogContent>

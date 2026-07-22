@@ -273,6 +273,7 @@ model StorageConnection {
     acls         DriveAcl[]
     locks        AccessLock[]
     scheduledDeletions ScheduledDeletion[]
+    deployVolumes      Volume[]
 
     @@index([ownerId])
 }
@@ -960,17 +961,23 @@ model Volume {
     applicationId String?  @db.Uuid
     name          String
     mountPath     String
-    // volume | bind
+    // volume | bind | nas
     kind          String   @default("volume")
-    // Named-volume name or host bind source path.
+    // For "volume": the named-volume name. For "bind": a subpath confined under
+    // the host volume root. For "nas": a subpath confined under the storage
+    // connection's mount (the connection id is prefixed when the plan is built).
     source        String?
+    // Storage connection backing a "nas" volume; null for volume/bind.
+    connectionId  String?  @db.Uuid
     createdAt     DateTime @default(now())
 
-    target      DeployTarget @relation(fields: [targetId], references: [id], onDelete: Cascade)
-    application Application? @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+    target      DeployTarget       @relation(fields: [targetId], references: [id], onDelete: Cascade)
+    application Application?       @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+    connection  StorageConnection? @relation(fields: [connectionId], references: [id], onDelete: Restrict)
 
     @@index([applicationId])
     @@index([targetId])
+    @@index([connectionId])
 }
 
 // One-shot bearer ticket for a terminal/logs WebSocket. The client presents the

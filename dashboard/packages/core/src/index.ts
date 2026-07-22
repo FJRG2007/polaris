@@ -15,6 +15,7 @@ export * from "./format.js";
 export * from "./permissions.js";
 export * from "./authz.js";
 export * from "./schemas/storage.js";
+export * from "./schemas/deploy.js";
 export * from "./schemas/share.js";
 export * from "./schemas/file-request.js";
 export * from "./schemas/auth.js";

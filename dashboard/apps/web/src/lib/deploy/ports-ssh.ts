@@ -13,6 +13,9 @@ import { execCommand, openShell, openSshClient, type SshAuth } from "@polaris/ss
 /** Where compose files and volume data live on a managed remote server. */
 const REMOTE_DEPLOY_ROOT = "/var/lib/polaris/deploy";
 const REMOTE_VOLUME_ROOT = "/var/lib/polaris/volumes";
+/** Where storage connections (NAS/UNAS) are mounted on the host; nas-backed binds
+ *  resolve under it. Matches the local daemon's mount root. */
+const REMOTE_MOUNT_ROOT = "/mnt/polaris";
 
 export interface SshTarget {
     readonly address: string;
@@ -40,7 +43,7 @@ export class SshPorts implements RuntimePorts {
     }
 
     public async composeUp(spec: ComposeSpec, onOutput?: OutputSink): Promise<void> {
-        const yaml = renderComposeYaml(spec, REMOTE_VOLUME_ROOT);
+        const yaml = renderComposeYaml(spec, REMOTE_VOLUME_ROOT, REMOTE_MOUNT_ROOT);
         const b64 = Buffer.from(yaml, "utf8").toString("base64");
         const dir = `${REMOTE_DEPLOY_ROOT}/${spec.project}`;
         const file = `${dir}/compose.yml`;
@@ -62,7 +65,7 @@ export class SshPorts implements RuntimePorts {
     }
 
     public async stackUp(spec: ComposeSpec, onOutput?: OutputSink): Promise<void> {
-        const yaml = renderComposeYaml(spec, REMOTE_VOLUME_ROOT);
+        const yaml = renderComposeYaml(spec, REMOTE_VOLUME_ROOT, REMOTE_MOUNT_ROOT);
         const b64 = Buffer.from(yaml, "utf8").toString("base64");
         const dir = `${REMOTE_DEPLOY_ROOT}/${spec.project}`;
         const file = `${dir}/compose.yml`;

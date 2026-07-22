@@ -39,6 +39,9 @@ import {
     type DeploymentSummary
 } from "@/lib/deploy-service";
 import { createDatabase, deployDatabase, type DbEngine } from "@/lib/database-service";
+import { listVolumes, createVolume, deleteVolume, type VolumeView } from "@/lib/deploy-volume-service";
+import { listConnections } from "@/lib/storage-service";
+import type { DeployVolumeInput } from "@polaris/core";
 import {
     getQuickTunnelStatus,
     startQuickTunnel,
@@ -789,6 +792,48 @@ export async function inspectRepoAction(input: {
         return await inspectGithubRepo(input.owner, input.repo, input.branch);
     } catch {
         return { dockerfile: null, framework: null, builder: "nixpacks" };
+    }
+}
+
+export async function listVolumesAction(applicationId: string): Promise<VolumeView[]> {
+    const user = await requirePermission("deploy.manage");
+    return listVolumes(applicationId, user.id);
+}
+
+/** Host-mounted storage connections that can back a NAS volume, for the picker. */
+export async function listNasConnectionsAction(): Promise<{ id: string; name: string; active: boolean }[]> {
+    const user = await requirePermission("deploy.manage");
+    const rows = await listConnections(user.id);
+    return rows
+        .filter((row) => row.requiresHostd)
+        .map((row) => ({ id: row.id, name: row.name, active: row.status === "active" }));
+}
+
+export async function createVolumeAction(input: DeployVolumeInput): Promise<{ error?: string }> {
+    const user = await requirePermission("deploy.manage");
+    try {
+        await createVolume(user.id, input);
+        await recordAudit({ actorId: user.id, action: "deploy.volume.add", targetType: "application", targetId: input.applicationId });
+        // Apply on the running service (a volume takes effect on container recreate),
+        // only if it is currently deployed - same Vercel-style flow as env vars.
+        void redeployForEnvScope("application", input.applicationId, user.id).catch(() => undefined);
+        revalidatePath(DEPLOY_PATH);
+        return {};
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not add the volume" };
+    }
+}
+
+export async function deleteVolumeAction(input: { id: string; applicationId: string }): Promise<{ error?: string }> {
+    const user = await requirePermission("deploy.manage");
+    try {
+        await deleteVolume(input.id, user.id);
+        await recordAudit({ actorId: user.id, action: "deploy.volume.remove", targetType: "application", targetId: input.applicationId });
+        void redeployForEnvScope("application", input.applicationId, user.id).catch(() => undefined);
+        revalidatePath(DEPLOY_PATH);
+        return {};
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not remove the volume" };
     }
 }
 

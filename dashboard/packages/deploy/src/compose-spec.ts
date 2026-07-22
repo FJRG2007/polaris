@@ -17,7 +17,10 @@ export interface ComposeSpecPort {
 export interface ComposeSpecVolume {
     readonly source: string;
     readonly target: string;
-    readonly kind: "volume" | "bind";
+    // volume: named docker volume. bind: path confined under the volume root.
+    // nas: path confined under the mount root (`<connectionId>/<subpath>`), where
+    // storage connections are mounted. Never an arbitrary host path.
+    readonly kind: "volume" | "bind" | "nas";
 }
 
 export interface ComposeSpecHealth {
@@ -125,8 +128,10 @@ export function defaultDbPort(image: string): number {
  * Render a ComposeSpec to a compose file (used by the remote SSH path, where the
  * daemon is not present). Every string is double-quoted so a value can never
  * break its field. The local path never uses this - the daemon renders instead.
+ * `bind` sources are confined under `volumeRoot`, `nas` sources under `mountRoot`
+ * (where storage connections are mounted) - mirroring the daemon's confinement.
  */
-export function renderComposeYaml(spec: ComposeSpec, volumeRoot: string): string {
+export function renderComposeYaml(spec: ComposeSpec, volumeRoot: string, mountRoot: string): string {
     const lines: string[] = ["services:"];
     for (const service of spec.services) {
         lines.push(`  ${service.name}:`);
@@ -146,7 +151,12 @@ export function renderComposeYaml(spec: ComposeSpec, volumeRoot: string): string
         if (service.volumes.length > 0) {
             lines.push("    volumes:");
             for (const volume of service.volumes) {
-                const source = volume.kind === "bind" ? `${volumeRoot}/${volume.source}` : volume.source;
+                const source =
+                    volume.kind === "bind"
+                        ? `${volumeRoot}/${volume.source}`
+                        : volume.kind === "nas"
+                          ? `${mountRoot}/${volume.source}`
+                          : volume.source;
                 lines.push(`      - ${yamlQuote(`${source}:${volume.target}`)}`);
             }
         }

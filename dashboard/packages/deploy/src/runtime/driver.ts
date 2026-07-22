@@ -53,8 +53,13 @@ export interface AppDeployPlan {
     /** True when `expose.container` is a fallback guess (the user did not pin a
      *  port), so the runtime may refine it from the image's own exposed port. */
     readonly autoContainerPort?: boolean;
-    /** Named volumes / binds to attach: mountPath -> source. */
-    readonly volumes: readonly { readonly mountPath: string; readonly source: string; readonly kind: "volume" | "bind" }[];
+    /** Named volumes / binds to attach: mountPath -> source. `nas` is a bind
+     *  confined under the storage mount root (`<connectionId>/<subpath>`). */
+    readonly volumes: readonly {
+        readonly mountPath: string;
+        readonly source: string;
+        readonly kind: "volume" | "bind" | "nas";
+    }[];
     /** JSON healthcheck spec (or null for none). */
     readonly healthcheck?: HealthcheckSpec;
 }

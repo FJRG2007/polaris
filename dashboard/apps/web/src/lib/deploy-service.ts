@@ -630,11 +630,15 @@ async function buildAppPlan(
                 pathPrefix: domain.pathPrefix ?? undefined,
                 certResolver: domain.certResolver as "le" | "internal" | "none"
             })),
-        volumes: app.volumes.map((volume) => ({
-            mountPath: volume.mountPath,
-            source: volume.source ?? volume.name,
-            kind: volume.kind === "bind" ? "bind" : "volume"
-        })),
+        // A nas volume's source is confined under the mount root as
+        // `<connectionId>/<subpath>`, so it resolves onto that connection's host
+        // mount (`/mnt/polaris/<connectionId>/...`). bind/volume pass through.
+        volumes: app.volumes.map((volume) => {
+            const kind = volume.kind === "bind" ? "bind" : volume.kind === "nas" ? "nas" : "volume";
+            const stored = volume.source ?? volume.name;
+            const source = kind === "nas" && volume.connectionId ? `${volume.connectionId}/${stored}` : stored;
+            return { mountPath: volume.mountPath, source, kind };
+        }),
         healthcheck
     };
     let gitSource: GitSource | undefined;
