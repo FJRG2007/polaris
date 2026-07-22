@@ -11,7 +11,14 @@
  */
 
 import { prisma } from "@polaris/db";
-import { deployVolumeInputSchema, normalizeVolumeSource, UnsafePathError, type DeployVolumeInput } from "@polaris/core";
+import {
+    canHostMount,
+    deployVolumeInputSchema,
+    normalizeVolumeSource,
+    UnsafePathError,
+    type DeployVolumeInput,
+    type StorageProviderKind
+} from "@polaris/core";
 
 export interface VolumeView {
     id: string;
@@ -64,10 +71,11 @@ export async function createVolume(ownerId: string, input: DeployVolumeInput): P
     if (parsed.kind === "nas") {
         const connection = await prisma.storageConnection.findFirst({
             where: { id: parsed.connectionId, ownerId },
-            select: { id: true, requiresHostd: true, status: true }
+            select: { id: true, kind: true, status: true }
         });
         if (!connection) throw new Error("Storage connection not found");
-        if (!connection.requiresHostd) throw new Error("This storage connection is not host-mounted, so it cannot back a NAS volume");
+        if (!canHostMount(connection.kind as StorageProviderKind))
+            throw new Error("This storage connection cannot be host-mounted, so it cannot back a NAS volume");
         if (connection.status !== "active") throw new Error("The storage connection is not active");
     }
 

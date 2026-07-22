@@ -41,7 +41,7 @@ import {
 import { createDatabase, deployDatabase, type DbEngine } from "@/lib/database-service";
 import { listVolumes, createVolume, deleteVolume, type VolumeView } from "@/lib/deploy-volume-service";
 import { listConnections } from "@/lib/storage-service";
-import type { DeployVolumeInput } from "@polaris/core";
+import { canHostMount, type DeployVolumeInput, type StorageProviderKind } from "@polaris/core";
 import {
     getQuickTunnelStatus,
     startQuickTunnel,
@@ -800,12 +800,14 @@ export async function listVolumesAction(applicationId: string): Promise<VolumeVi
     return listVolumes(applicationId, user.id);
 }
 
-/** Host-mounted storage connections that can back a NAS volume, for the picker. */
+/** Host-mountable storage connections that can back a NAS volume, for the picker.
+ *  Only kinds Polaris kernel-mounts at `/mnt/polaris/<id>` (nfs, smb, unifi-unas)
+ *  expose a host path a bind can target. */
 export async function listNasConnectionsAction(): Promise<{ id: string; name: string; active: boolean }[]> {
     const user = await requirePermission("deploy.manage");
     const rows = await listConnections(user.id);
     return rows
-        .filter((row) => row.requiresHostd)
+        .filter((row) => canHostMount(row.kind as StorageProviderKind))
         .map((row) => ({ id: row.id, name: row.name, active: row.status === "active" }));
 }
 

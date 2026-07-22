@@ -104,3 +104,13 @@ export function requiresHostd(kind: StorageProviderKind): boolean {
 export function prefersHostd(kind: StorageProviderKind): boolean {
     return HOSTD_PREFERRED_KINDS.includes(kind);
 }
+
+/** Kinds Polaris kernel-mounts under the host mount root (`/mnt/polaris/<id>`),
+ *  so a deploy volume can bind onto that path. Other kinds are userspace-only
+ *  (no host path to bind). unifi-unas resolves to an SMB mount under the hood. */
+export const HOST_MOUNTABLE_KINDS: readonly StorageProviderKind[] = ["nfs", "smb", "unifi-unas"];
+
+/** Whether a connection of this kind exposes a host path a bind mount can target. */
+export function canHostMount(kind: StorageProviderKind): boolean {
+    return HOST_MOUNTABLE_KINDS.includes(kind);
+}
