@@ -39,6 +39,7 @@ import {
     type ServiceView
 } from "./deploy-view";
 import { deleteApplicationAction, duplicateApplicationAction, saveLayoutAction } from "./actions";
+import { NewVolumeDialog } from "./volume-form";
 
 const NODE_W = 280;
 const NODE_H = 116;
@@ -206,6 +207,8 @@ export function DeployCanvas({
     const [deleteTarget, setDeleteTarget] = useState<ProjectApp | null>(null);
     const [acting, setActing] = useState(false);
     const [newService, setNewService] = useState<{ open: boolean; view: ServiceView }>({ open: false, view: "list" });
+    const [newVolumeOpen, setNewVolumeOpen] = useState(false);
+    const volumeServices = environment.applications.map((app) => ({ id: app.id, name: app.name }));
 
     function duplicate(app: ProjectApp) {
         setActing(true);
@@ -418,20 +421,35 @@ export function DeployCanvas({
                             ))}
                         </ContextMenuSubContent>
                     </ContextMenuSub>
+                    <ContextMenuSeparator />
+                    <ContextMenuItem
+                        disabled={environment.applications.length === 0}
+                        onSelect={() => setNewVolumeOpen(true)}
+                    >
+                        <HardDrive className="size-4" /> New volume
+                    </ContextMenuItem>
                 </ContextMenuContent>
             </ContextMenu>
         );
     };
 
     const dialog = (
-        <NewServiceDialog
-            environmentId={environment.id}
-            open={newService.open}
-            view={newService.view}
-            onOpenChange={(open) => setNewService((state) => ({ ...state, open }))}
-            onViewChange={(view) => setNewService((state) => ({ ...state, view }))}
-            onChanged={() => router.refresh()}
-        />
+        <>
+            <NewServiceDialog
+                environmentId={environment.id}
+                open={newService.open}
+                view={newService.view}
+                onOpenChange={(open) => setNewService((state) => ({ ...state, open }))}
+                onViewChange={(view) => setNewService((state) => ({ ...state, view }))}
+                onChanged={() => router.refresh()}
+            />
+            <NewVolumeDialog
+                open={newVolumeOpen}
+                services={volumeServices}
+                onOpenChange={setNewVolumeOpen}
+                onCreated={() => router.refresh()}
+            />
+        </>
     );
 
     if (nodes.length === 0) {
