@@ -419,15 +419,18 @@ export function DeployCanvas({
                                     {type.label}
                                 </ContextMenuItem>
                             ))}
+                            <ContextMenuSeparator />
+                            <ContextMenuItem
+                                disabled={environment.applications.length === 0}
+                                onSelect={() => setNewVolumeOpen(true)}
+                            >
+                                <span className="flex size-4 items-center justify-center [&_svg]:size-4">
+                                    <HardDrive className="size-5" />
+                                </span>
+                                Volume
+                            </ContextMenuItem>
                         </ContextMenuSubContent>
                     </ContextMenuSub>
-                    <ContextMenuSeparator />
-                    <ContextMenuItem
-                        disabled={environment.applications.length === 0}
-                        onSelect={() => setNewVolumeOpen(true)}
-                    >
-                        <HardDrive className="size-4" /> New volume
-                    </ContextMenuItem>
                 </ContextMenuContent>
             </ContextMenu>
         );
