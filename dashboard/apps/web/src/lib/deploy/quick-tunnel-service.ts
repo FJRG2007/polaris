@@ -15,7 +15,7 @@ import type { ComposeSpec } from "@polaris/deploy";
 import { shortHash } from "@polaris/deploy";
 import { HostdPorts } from "./ports-hostd";
 import { getPublicIp } from "../domain-service";
-import { hostPortForApp } from "../deploy-service";
+import { syncAppRoutes } from "../deploy-service";
 
 const PROXY_NETWORK = "polaris-proxy";
 const IMAGE = "cloudflare/cloudflared:latest";
@@ -34,9 +34,32 @@ function names(appId: string): { project: string; service: string } {
     return { project: `polaris-qtunnel-${hash}`, service: `qtunnel-${hash}` };
 }
 
+/** Prefix shared by every quick-tunnel URL setting, so live tunnels are listable. */
+const URL_KEY_PREFIX = "deploy.qtunnel.";
+
 /** Setting key caching the current public URL, so the UI shows it across requests. */
 function urlKey(appId: string): string {
-    return `deploy.qtunnel.${appId}`;
+    return `${URL_KEY_PREFIX}${appId}`;
+}
+
+/**
+ * Stable internal hostname the edge routes an app's quick tunnel through. cloudflared
+ * forwards to Traefik with this as the Host header (rather than dialing the app's port
+ * directly), so tunnel traffic is logged at the edge like every other request instead
+ * of bypassing it - the reason HTTP Logs stayed empty. Only cloudflared ever sends
+ * this header; it is never a public, resolvable name.
+ */
+export function tunnelHostForApp(appId: string): string {
+    return `${shortHash(appId, 8)}.qtunnel.polaris`;
+}
+
+/** App ids with a quick tunnel currently up - one URL setting exists per live tunnel. */
+export async function quickTunnelAppIds(): Promise<string[]> {
+    const rows = await prisma.setting.findMany({
+        where: { key: { startsWith: URL_KEY_PREFIX } },
+        select: { key: true }
+    });
+    return rows.map((row) => row.key.slice(URL_KEY_PREFIX.length)).filter(Boolean);
 }
 
 /** Load an app the caller owns, or throw. Quick tunnels run on the local host, so
@@ -52,8 +75,10 @@ async function requireLocalApp(appId: string, ownerId: string): Promise<void> {
     }
 }
 
-/** The cloudflared sidecar spec forwarding the edge to the app's published host port. */
-function tunnelSpec(project: string, service: string, origin: string): ComposeSpec {
+/** The cloudflared sidecar spec: forward the edge to Traefik with the app's internal
+ *  tunnel host, so every request traverses the edge (and its access log) instead of
+ *  hitting the container port directly. */
+function tunnelSpec(project: string, service: string, origin: string, hostHeader: string): ComposeSpec {
     return {
         project,
         services: [
@@ -65,8 +90,9 @@ function tunnelSpec(project: string, service: string, origin: string): ComposeSp
                 volumes: [],
                 labels: {},
                 // Quick tunnel: no token, no account - cloudflared mints a random
-                // trycloudflare.com hostname and forwards it to the local origin.
-                command: ["tunnel", "--no-autoupdate", "--url", origin],
+                // trycloudflare.com hostname and forwards it to Traefik, overriding the
+                // Host header so the edge routes it to this app (and logs the request).
+                command: ["tunnel", "--no-autoupdate", "--url", origin, "--http-host-header", hostHeader],
                 networks: [PROXY_NETWORK],
                 restart: "unless-stopped"
             }
@@ -103,14 +129,16 @@ export async function startQuickTunnel(appId: string, ownerId: string): Promise<
     const ip = await getPublicIp();
     if (!ip) throw new Error("Set this server's IP under Deploy settings first");
     const { project, service } = names(appId);
-    const origin = `http://${ip}:${hostPortForApp(appId)}`;
+    // Forward to Traefik (the edge), not the app's port, so tunnel requests are logged
+    // at the edge like any other. Traefik routes them to this app by the tunnel host.
+    const origin = `http://${ip}:80`;
 
     const ports = new HostdPorts();
     try {
         // Recreate cleanly so a restart always mints a fresh URL rather than reusing
         // a dead container's stale one.
         await ports.composeDown(project).catch(() => undefined);
-        await ports.composeUp(tunnelSpec(project, service, origin));
+        await ports.composeUp(tunnelSpec(project, service, origin, tunnelHostForApp(appId)));
 
         // cloudflared prints the trycloudflare.com URL ~10-15s after it starts, so
         // poll its logs for up to ~30s before giving up (the UI can refresh later).
@@ -120,6 +148,9 @@ export async function startQuickTunnel(appId: string, ownerId: string): Promise<
             url = await readUrlFromLogs(ports, service);
         }
         await setStoredUrl(appId, url);
+        // Publish the edge route for this tunnel's host so the first request is proxied
+        // (and logged) rather than 404'd by the edge for an unknown host.
+        await syncAppRoutes().catch(() => undefined);
         return { running: true, url };
     } finally {
         await ports.dispose();
@@ -137,6 +168,8 @@ export async function stopQuickTunnel(appId: string, ownerId: string): Promise<v
         await ports.dispose();
     }
     await setStoredUrl(appId, null);
+    // Drop the tunnel's edge route now that it is gone.
+    await syncAppRoutes().catch(() => undefined);
 }
 
 /** Whether the tunnel is up and its current public URL (refreshed from the live
@@ -162,6 +195,48 @@ export async function getQuickTunnelStatus(appId: string, ownerId: string): Prom
         return { running: false, url: await getStoredUrl(appId) };
     } finally {
         await ports.dispose();
+    }
+}
+
+/**
+ * Migrate/self-heal quick tunnels on boot: an older tunnel forwards straight to the
+ * app's port (bypassing the edge, so its traffic never reaches the access log). For
+ * each live tunnel whose sidecar does not already target the edge, recreate it through
+ * Traefik. A tunnel already on the edge is left untouched, so a routine restart neither
+ * churns its URL nor interrupts it. Best-effort and self-guarding.
+ */
+export async function reconcileQuickTunnels(): Promise<void> {
+    const appIds = await quickTunnelAppIds();
+    if (appIds.length === 0) return;
+    const ip = await getPublicIp();
+    if (!ip) return;
+    const expectedOrigin = `http://${ip}:80`;
+    for (const appId of appIds) {
+        const app = await prisma.application.findFirst({
+            where: { id: appId, target: { kind: "local" } },
+            select: { environment: { select: { project: { select: { ownerId: true } } } } }
+        });
+        const ownerId = app?.environment.project.ownerId;
+        if (!ownerId) continue;
+
+        const { service } = names(appId);
+        const ports = new HostdPorts();
+        let onEdge = false;
+        try {
+            const info = (await ports.inspect(service)) as {
+                State?: { Running?: boolean };
+                Config?: { Cmd?: string[] };
+            };
+            onEdge = Boolean(info?.State?.Running) && (info?.Config?.Cmd ?? []).includes(expectedOrigin);
+        } catch {
+            // Not running - startQuickTunnel below recreates it.
+        } finally {
+            await ports.dispose();
+        }
+        if (onEdge) continue;
+        await startQuickTunnel(appId, ownerId).catch((error) =>
+            console.error(`polaris: quick-tunnel reconcile failed for ${appId}:`, error)
+        );
     }
 }
 
