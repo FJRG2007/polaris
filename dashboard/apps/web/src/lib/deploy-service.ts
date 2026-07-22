@@ -23,7 +23,7 @@ import { ensureLocalCa } from "./local-ca-service";
 import { gitBuildContext, type GitSource } from "./git-build-service";
 import { getLatestCommit, githubCloneAuthHeader } from "./github-service";
 import { resolveRegistryLogin } from "./registry-credential-service";
-import { quickTunnelAppIds, tunnelHostForApp } from "./deploy/quick-tunnel-service";
+import { quickTunnelAppIds, tunnelHostForApp, stopQuickTunnel } from "./deploy/quick-tunnel-service";
 
 /** Directory the web process writes deploy log files to (tailed by the UI). */
 function logDir(): string {
@@ -614,6 +614,13 @@ export async function removeApplicationDeployment(applicationId: string, ownerId
         else await ports.composeDown(project);
     } finally {
         await ports.dispose();
+    }
+    // Tear down the app's quick tunnel alongside its deployment: the cloudflared sidecar
+    // now forwards to a container that is gone, so leaving it up leaks a live public URL
+    // and an orphan liveness record the boot reconcile keeps revisiting. Only apps with a
+    // tunnel carry a liveness record, so this is a no-op for the rest.
+    if ((await quickTunnelAppIds()).includes(applicationId)) {
+        await stopQuickTunnel(applicationId, ownerId).catch(() => undefined);
     }
     await prisma.deployment.updateMany({
         where: { deployableType: "application", deployableId: applicationId, status: { in: ["running", "stopped"] } },
