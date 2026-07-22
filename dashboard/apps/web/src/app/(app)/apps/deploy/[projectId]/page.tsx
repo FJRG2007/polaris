@@ -84,7 +84,8 @@ export default async function DeployProjectPage({ params }: { params: Promise<{ 
                     source: volume.source ?? volume.name,
                     mountPath: volume.mountPath,
                     connectionId: volume.connectionId,
-                    connectionName: volume.connection?.name ?? null
+                    connectionName: volume.connection?.name ?? null,
+                    sizeLimit: volume.sizeLimit
                 }))
             })),
             databases: environment.databases.map((database) => ({

@@ -39,9 +39,15 @@ import {
     type DeploymentSummary
 } from "@/lib/deploy-service";
 import { createDatabase, deployDatabase, type DbEngine } from "@/lib/database-service";
-import { listVolumes, createVolume, deleteVolume, type VolumeView } from "@/lib/deploy-volume-service";
+import { listVolumes, createVolume, updateVolume, deleteVolume, type VolumeView } from "@/lib/deploy-volume-service";
 import { listConnections, getDriver } from "@/lib/storage-service";
-import { canHostMount, normalizeRelPath, type DeployVolumeInput, type StorageProviderKind } from "@polaris/core";
+import {
+    canHostMount,
+    normalizeRelPath,
+    type DeployVolumeInput,
+    type DeployVolumeUpdateInput,
+    type StorageProviderKind
+} from "@polaris/core";
 import {
     getQuickTunnelStatus,
     startQuickTunnel,
@@ -840,6 +846,22 @@ export async function createVolumeAction(input: DeployVolumeInput): Promise<{ er
         return {};
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Could not add the volume" };
+    }
+}
+
+export async function updateVolumeAction(
+    input: DeployVolumeUpdateInput & { applicationId: string }
+): Promise<{ error?: string }> {
+    const user = await requirePermission("deploy.manage");
+    try {
+        const { applicationId, ...patch } = input;
+        await updateVolume(user.id, patch);
+        await recordAudit({ actorId: user.id, action: "deploy.volume.update", targetType: "application", targetId: applicationId });
+        void redeployForEnvScope("application", applicationId, user.id).catch(() => undefined);
+        revalidatePath(DEPLOY_PATH);
+        return {};
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not update the volume" };
     }
 }
 

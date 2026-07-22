@@ -9,10 +9,10 @@
 
 import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
-import { HardDrive, Plus, Server, Trash2 } from "lucide-react";
+import { HardDrive, Plus, Server, Settings2, Trash2 } from "lucide-react";
 import { Button } from "@polaris/ui";
 import { deleteVolumeAction, listVolumesAction } from "./actions";
-import { VolumeForm } from "./volume-form";
+import { VolumeForm, EditVolumeDialog, type EditVolume } from "./volume-form";
 import type { ProjectApp } from "./deploy-view";
 
 type Volume = Awaited<ReturnType<typeof listVolumesAction>>[number];
@@ -29,6 +29,7 @@ function volumeDriveHref(appId: string, volume: Volume): string {
 export function VolumesTab({ app }: { app: ProjectApp }) {
     const [items, setItems] = useState<Volume[] | null>(null);
     const [showAdd, setShowAdd] = useState(false);
+    const [editVolume, setEditVolume] = useState<EditVolume | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
 
@@ -59,9 +60,17 @@ export function VolumesTab({ app }: { app: ProjectApp }) {
 
             {showAdd && (
                 <div className="rounded-md border border-border/60 p-3">
-                    <VolumeForm applicationId={app.id} onCreated={() => { setShowAdd(false); reload(); }} onCancel={() => setShowAdd(false)} />
+                    <VolumeForm applicationId={app.id} onSaved={() => { setShowAdd(false); reload(); }} onCancel={() => setShowAdd(false)} />
                 </div>
             )}
+
+            <EditVolumeDialog
+                open={editVolume !== null}
+                applicationId={app.id}
+                volume={editVolume}
+                onOpenChange={(open) => !open && setEditVolume(null)}
+                onSaved={reload}
+            />
 
             {error && <p className="text-xs text-red-400">{error}</p>}
 
@@ -85,6 +94,9 @@ export function VolumesTab({ app }: { app: ProjectApp }) {
                             </div>
                         </div>
                         <div className="flex shrink-0 items-center gap-1">
+                            <Button variant="ghost" size="sm" onClick={() => setEditVolume(volume)} title="Volume options">
+                                <Settings2 className="size-4" />
+                            </Button>
                             <Button asChild variant="ghost" size="sm" title="View in Drive">
                                 <Link href={volumeDriveHref(app.id, volume)}>
                                     <HardDrive className="size-4" />

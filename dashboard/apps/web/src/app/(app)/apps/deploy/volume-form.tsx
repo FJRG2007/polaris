@@ -1,20 +1,31 @@
 "use client";
 
 /**
- * Reusable volume-creation form, shared by the per-service Volumes tab (fixed
- * service) and the canvas "New volume" dialog (service picker). Three confined
+ * Volume form, shared by the per-service Volumes tab, the canvas "New volume"
+ * dialog (service picker), and the "Volume options" edit dialog. Three confined
  * kinds - Docker volume, a folder on the service's server, or a folder on a
- * host-mounted NAS connection. The daemon re-confines every source.
+ * host-mounted NAS connection. The daemon re-confines every source. In edit mode
+ * the kind and service are fixed; only paths, size cap, and the connection change.
  */
 
 import { useEffect, useState, useTransition } from "react";
 import { FolderSearch } from "lucide-react";
 import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, Input } from "@polaris/ui";
-import { createVolumeAction, listNasConnectionsAction } from "./actions";
+import { createVolumeAction, updateVolumeAction, listNasConnectionsAction } from "./actions";
 import { FolderPicker } from "./folder-picker";
 
 type Kind = "volume" | "bind" | "nas";
 type NasConnection = Awaited<ReturnType<typeof listNasConnectionsAction>>[number];
+
+export interface EditVolume {
+    id: string;
+    name: string;
+    mountPath: string;
+    kind: Kind;
+    source: string;
+    connectionId: string | null;
+    sizeLimit: string | null;
+}
 
 const KIND_LABELS: Record<Kind, string> = {
     volume: "Docker volume",
@@ -34,27 +45,31 @@ const SELECT_CLASS =
 export function VolumeForm({
     applicationId,
     services,
-    onCreated,
+    volume,
+    onSaved,
     onCancel
 }: {
-    /** Fixed target service. Omit to render a service picker from `services`. */
+    /** Fixed target service (create in a tab, or edit). Omit for a service picker. */
     applicationId?: string;
-    /** Selectable services, when no fixed applicationId is given. */
+    /** Selectable services, when no fixed applicationId is given (create only). */
     services?: { id: string; name: string }[];
-    onCreated: () => void;
+    /** When set, the form edits this volume instead of creating a new one. */
+    volume?: EditVolume;
+    onSaved: () => void;
     onCancel?: () => void;
 }) {
+    const editing = Boolean(volume);
     const [serviceId, setServiceId] = useState(applicationId ?? services?.[0]?.id ?? "");
     const [connections, setConnections] = useState<NasConnection[]>([]);
-    const [kind, setKind] = useState<Kind>("bind");
-    const [name, setName] = useState("");
-    const [mountPath, setMountPath] = useState("");
-    const [sizeLimit, setSizeLimit] = useState("");
-    // Auto: Polaris generates a structured path under polaris/deploy/... Custom: the
-    // user types the subpath or picks it with the folder browser.
-    const [pathMode, setPathMode] = useState<"auto" | "custom">("auto");
-    const [source, setSource] = useState("");
-    const [connectionId, setConnectionId] = useState("");
+    const [kind, setKind] = useState<Kind>(volume?.kind ?? "bind");
+    const [name, setName] = useState(volume?.name ?? "");
+    const [mountPath, setMountPath] = useState(volume?.mountPath ?? "");
+    const [sizeLimit, setSizeLimit] = useState(volume?.sizeLimit ?? "");
+    // Auto: Polaris generates a structured path. Custom: typed/picked subpath. Edit
+    // always starts in custom with the existing path.
+    const [pathMode, setPathMode] = useState<"auto" | "custom">(editing ? "custom" : "auto");
+    const [source, setSource] = useState(volume?.source ?? "");
+    const [connectionId, setConnectionId] = useState(volume?.connectionId ?? "");
     const [pickerOpen, setPickerOpen] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
@@ -62,49 +77,66 @@ export function VolumeForm({
     useEffect(() => {
         void listNasConnectionsAction().then((rows) => {
             setConnections(rows);
-            // Pre-select when there's a single usable connection - no point making the
-            // user pick from a list of one.
-            const usable = rows.filter((row) => row.active);
-            const only = usable[0];
-            if (only && usable.length === 1) setConnectionId(only.id);
+            // Pre-select when there's a single usable connection (create only - edit
+            // keeps the volume's own connection).
+            if (!volume) {
+                const usable = rows.filter((row) => row.active);
+                const only = usable[0];
+                if (only && usable.length === 1) setConnectionId(only.id);
+            }
         });
-    }, []);
+    }, [volume]);
 
-    function add() {
+    function save() {
         setError(null);
         const targetId = applicationId ?? serviceId;
         if (!targetId) {
             setError("Pick a service for this volume");
             return;
         }
-        // Auto path and named volumes are generated server-side; custom sends the
-        // typed/picked subpath.
-        const resolvedSource = kind === "volume" || pathMode === "auto" ? undefined : source.trim() || undefined;
         startTransition(async () => {
-            const result = await createVolumeAction({
-                applicationId: targetId,
-                name: name.trim(),
-                mountPath: mountPath.trim(),
-                kind,
-                source: resolvedSource,
-                connectionId: kind === "nas" ? connectionId : undefined,
-                sizeLimit: sizeLimit.trim() || undefined
-            });
+            let result: { error?: string };
+            if (volume) {
+                result = await updateVolumeAction({
+                    id: volume.id,
+                    applicationId: targetId,
+                    name: name.trim(),
+                    mountPath: mountPath.trim(),
+                    source: kind === "volume" ? undefined : source.trim() || undefined,
+                    connectionId: kind === "nas" ? connectionId : undefined,
+                    // "" clears the cap; a value sets it.
+                    sizeLimit: sizeLimit.trim()
+                });
+            } else {
+                // Auto path and named volumes are generated server-side; custom sends
+                // the typed/picked subpath.
+                const resolvedSource = kind === "volume" || pathMode === "auto" ? undefined : source.trim() || undefined;
+                result = await createVolumeAction({
+                    applicationId: targetId,
+                    name: name.trim(),
+                    mountPath: mountPath.trim(),
+                    kind,
+                    source: resolvedSource,
+                    connectionId: kind === "nas" ? connectionId : undefined,
+                    sizeLimit: sizeLimit.trim() || undefined
+                });
+            }
             if (result.error) {
                 setError(result.error);
                 return;
             }
-            onCreated();
+            onSaved();
         });
     }
 
-    const needsService = !applicationId && (services?.length ?? 0) > 0;
-    const canAdd =
+    const needsService = !editing && !applicationId && (services?.length ?? 0) > 0;
+    const usesCustomPath = editing || pathMode === "custom";
+    const canSave =
         (applicationId || serviceId) &&
         name.trim() &&
         mountPath.trim() &&
         (kind !== "nas" || connectionId) &&
-        (kind === "volume" || pathMode === "auto" || source.trim());
+        (kind === "volume" || !usesCustomPath || source.trim());
 
     return (
         <div className="flex flex-col gap-3">
@@ -121,21 +153,27 @@ export function VolumeForm({
                 </label>
             )}
 
-            <div className="grid grid-cols-3 gap-1 rounded-md bg-muted p-1 text-sm">
-                {(Object.keys(KIND_LABELS) as Kind[]).map((value) => (
-                    <button
-                        key={value}
-                        type="button"
-                        onClick={() => setKind(value)}
-                        className={`rounded px-3 py-1.5 font-medium transition-colors ${
-                            kind === value ? "bg-surface text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
-                        }`}
-                    >
-                        {KIND_LABELS[value]}
-                    </button>
-                ))}
-            </div>
-            <p className="text-xs text-muted-foreground">{KIND_HELP[kind]}</p>
+            {editing ? (
+                <p className="text-xs text-muted-foreground">{KIND_LABELS[kind]} - {KIND_HELP[kind]}</p>
+            ) : (
+                <>
+                    <div className="grid grid-cols-3 gap-1 rounded-md bg-muted p-1 text-sm">
+                        {(Object.keys(KIND_LABELS) as Kind[]).map((value) => (
+                            <button
+                                key={value}
+                                type="button"
+                                onClick={() => setKind(value)}
+                                className={`rounded px-3 py-1.5 font-medium transition-colors ${
+                                    kind === value ? "bg-surface text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                                }`}
+                            >
+                                {KIND_LABELS[value]}
+                            </button>
+                        ))}
+                    </div>
+                    <p className="text-xs text-muted-foreground">{KIND_HELP[kind]}</p>
+                </>
+            )}
 
             <div className="grid gap-2 sm:grid-cols-2">
                 <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
@@ -174,21 +212,23 @@ export function VolumeForm({
 
             {kind !== "volume" && (
                 <div className="flex flex-col gap-2">
-                    <div className="grid grid-cols-2 gap-1 rounded-md bg-muted p-1 text-sm">
-                        {(["auto", "custom"] as const).map((value) => (
-                            <button
-                                key={value}
-                                type="button"
-                                onClick={() => setPathMode(value)}
-                                className={`rounded px-3 py-1.5 font-medium transition-colors ${
-                                    pathMode === value ? "bg-surface text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
-                                }`}
-                            >
-                                {value === "auto" ? "Auto" : "Choose folder"}
-                            </button>
-                        ))}
-                    </div>
-                    {pathMode === "auto" ? (
+                    {!editing && (
+                        <div className="grid grid-cols-2 gap-1 rounded-md bg-muted p-1 text-sm">
+                            {(["auto", "custom"] as const).map((value) => (
+                                <button
+                                    key={value}
+                                    type="button"
+                                    onClick={() => setPathMode(value)}
+                                    className={`rounded px-3 py-1.5 font-medium transition-colors ${
+                                        pathMode === value ? "bg-surface text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                                    }`}
+                                >
+                                    {value === "auto" ? "Auto" : "Choose folder"}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                    {!usesCustomPath ? (
                         <p className="text-[11px] text-muted-foreground">
                             Polaris creates and organizes it under <code className="text-foreground">polaris/deploy/&lt;project&gt;/&lt;service&gt;/{name.trim() || "name"}</code>.
                         </p>
@@ -220,7 +260,7 @@ export function VolumeForm({
                             onOpenChange={setPickerOpen}
                             onPick={(picked) => {
                                 setSource(picked);
-                                setPathMode("custom");
+                                if (!editing) setPathMode("custom");
                             }}
                         />
                     )}
@@ -234,8 +274,8 @@ export function VolumeForm({
                         Cancel
                     </Button>
                 )}
-                <Button size="sm" onClick={add} disabled={pending || !canAdd}>
-                    Add volume
+                <Button size="sm" onClick={save} disabled={pending || !canSave}>
+                    {editing ? "Save changes" : "Add volume"}
                 </Button>
             </div>
         </div>
@@ -265,9 +305,45 @@ export function NewVolumeDialog({
                 ) : (
                     <VolumeForm
                         services={services}
-                        onCreated={() => {
+                        onSaved={() => {
                             onOpenChange(false);
                             onCreated();
+                        }}
+                        onCancel={() => onOpenChange(false)}
+                    />
+                )}
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+/** "Volume options": edit an existing volume's paths, size cap, and connection. */
+export function EditVolumeDialog({
+    open,
+    applicationId,
+    volume,
+    onOpenChange,
+    onSaved
+}: {
+    open: boolean;
+    applicationId: string;
+    volume: EditVolume | null;
+    onOpenChange: (open: boolean) => void;
+    onSaved: () => void;
+}) {
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="max-w-md">
+                <DialogHeader>
+                    <DialogTitle>Volume options</DialogTitle>
+                </DialogHeader>
+                {volume && (
+                    <VolumeForm
+                        applicationId={applicationId}
+                        volume={volume}
+                        onSaved={() => {
+                            onOpenChange(false);
+                            onSaved();
                         }}
                         onCancel={() => onOpenChange(false)}
                     />

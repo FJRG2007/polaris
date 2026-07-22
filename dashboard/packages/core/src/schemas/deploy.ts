@@ -32,6 +32,9 @@ const containerMountPath = z
     .refine((path) => path.startsWith("/"), "Mount path must be absolute (start with /)")
     .refine((path) => !hasControlChar(path), "Mount path must not contain control characters");
 
+/** A human-readable size cap like "10G", "500M", "1.5T". */
+const SIZE_LIMIT_RE = /^\d+(\.\d+)?\s*(K|M|G|T)i?B?$/i;
+
 export const deployVolumeInputSchema = z
     .object({
         applicationId: z.string().uuid(),
@@ -48,7 +51,7 @@ export const deployVolumeInputSchema = z
         sizeLimit: z
             .string()
             .trim()
-            .regex(/^\d+(\.\d+)?\s*(K|M|G|T)i?B?$/i, "Use a size like 10G, 500M, or 1.5T")
+            .regex(SIZE_LIMIT_RE, "Use a size like 10G, 500M, or 1.5T")
             .optional()
             .or(z.literal("").transform(() => undefined))
     })
@@ -70,6 +73,21 @@ export const deployVolumeInputSchema = z
     });
 
 export type DeployVolumeInput = z.infer<typeof deployVolumeInputSchema>;
+
+/** Patch for an existing volume. Only provided fields change; `kind` is fixed at
+ *  create. An empty-string sizeLimit clears the cap; omitting it leaves it. */
+export const deployVolumeUpdateSchema = z.object({
+    id: z.string().uuid(),
+    name: z.string().trim().min(1).max(64).optional(),
+    mountPath: containerMountPath.optional(),
+    source: z.string().trim().min(1).max(1024).optional(),
+    connectionId: z.string().uuid().optional(),
+    sizeLimit: z
+        .union([z.string().trim().regex(SIZE_LIMIT_RE, "Use a size like 10G, 500M, or 1.5T"), z.literal("")])
+        .optional()
+});
+
+export type DeployVolumeUpdateInput = z.infer<typeof deployVolumeUpdateSchema>;
 
 /** A docker named-volume name: alphanumeric plus `_.-`, starting alphanumeric. */
 const VOLUME_NAME = /^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/;

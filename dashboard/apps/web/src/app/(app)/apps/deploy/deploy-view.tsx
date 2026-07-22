@@ -111,6 +111,7 @@ export interface ProjectSummary {
                 mountPath: string;
                 connectionId: string | null;
                 connectionName: string | null;
+                sizeLimit: string | null;
             }[];
         }[];
         databases: { id: string; name: string; engine: string; status: string }[];

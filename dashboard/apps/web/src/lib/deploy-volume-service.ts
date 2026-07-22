@@ -16,9 +16,11 @@ import { getDriver } from "./storage-service";
 import {
     canHostMount,
     deployVolumeInputSchema,
+    deployVolumeUpdateSchema,
     normalizeVolumeSource,
     UnsafePathError,
     type DeployVolumeInput,
+    type DeployVolumeUpdateInput,
     type StorageProviderKind
 } from "@polaris/core";
 
@@ -154,6 +156,83 @@ export async function createVolume(ownerId: string, input: DeployVolumeInput): P
         connectionId: created.connectionId,
         connectionName: created.connection?.name ?? null,
         sizeLimit: created.sizeLimit
+    };
+}
+
+/** Update an existing volume (paths, size cap, and for nas the backing connection).
+ *  `kind` is fixed at create. Ownership-checked via the target. Re-normalizes the
+ *  source and, for nas, ensures the (possibly new) folder exists on the connection. */
+export async function updateVolume(ownerId: string, input: DeployVolumeUpdateInput): Promise<VolumeView> {
+    const result = deployVolumeUpdateSchema.safeParse(input);
+    if (!result.success) throw new Error(result.error.issues[0]?.message ?? "Invalid volume");
+    const patch = result.data;
+
+    const existing = await prisma.volume.findFirst({
+        where: { id: patch.id, target: { ownerId } },
+        select: { id: true, kind: true, applicationId: true, source: true, connectionId: true, mountPath: true }
+    });
+    if (!existing) throw new Error("Volume not found");
+    const kind = existing.kind === "bind" ? "bind" : existing.kind === "nas" ? "nas" : "volume";
+
+    // Resolve the backing connection (nas only), validating it can be host-mounted.
+    const connectionId = kind === "nas" ? (patch.connectionId ?? existing.connectionId) : null;
+    if (kind === "nas") {
+        if (!connectionId) throw new Error("A storage connection is required for NAS volumes");
+        const connection = await prisma.storageConnection.findFirst({
+            where: { id: connectionId, ownerId },
+            select: { kind: true, status: true }
+        });
+        if (!connection) throw new Error("Storage connection not found");
+        if (!canHostMount(connection.kind as StorageProviderKind))
+            throw new Error("This storage connection cannot be host-mounted, so it cannot back a NAS volume");
+        if (connection.status !== "active") throw new Error("The storage connection is not active");
+    }
+
+    // Re-normalize the source when the path changed (named volumes track the name).
+    let source = existing.source ?? "";
+    if (patch.source !== undefined || (kind === "volume" && patch.name !== undefined)) {
+        const raw = kind === "volume" ? (patch.name ?? existing.source ?? "") : (patch.source ?? existing.source ?? "");
+        try {
+            source = normalizeVolumeSource(kind, raw);
+        } catch (error) {
+            if (error instanceof UnsafePathError) throw new Error("The volume source path is invalid");
+            throw error;
+        }
+    }
+
+    // A moved mount path must not collide with another volume on the same service.
+    if (patch.mountPath && patch.mountPath !== existing.mountPath) {
+        const clash = await prisma.volume.findFirst({
+            where: { applicationId: existing.applicationId, mountPath: patch.mountPath, id: { not: existing.id } },
+            select: { id: true }
+        });
+        if (clash) throw new Error("A volume is already mounted at that path");
+    }
+
+    const updated = await prisma.volume.update({
+        where: { id: existing.id },
+        data: {
+            name: patch.name ?? undefined,
+            mountPath: patch.mountPath ?? undefined,
+            source,
+            connectionId,
+            // "" clears the cap; a value sets it; undefined leaves it unchanged.
+            sizeLimit: patch.sizeLimit === undefined ? undefined : patch.sizeLimit === "" ? null : patch.sizeLimit
+        },
+        include: { connection: { select: { name: true } } }
+    });
+
+    if (kind === "nas" && connectionId) await ensureNasFolder(connectionId, source, ownerId);
+
+    return {
+        id: updated.id,
+        name: updated.name,
+        mountPath: updated.mountPath,
+        kind,
+        source,
+        connectionId: updated.connectionId,
+        connectionName: updated.connection?.name ?? null,
+        sizeLimit: updated.sizeLimit
     };
 }
 
