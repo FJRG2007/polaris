@@ -59,7 +59,14 @@ export function VolumeForm({
     const [pending, startTransition] = useTransition();
 
     useEffect(() => {
-        void listNasConnectionsAction().then(setConnections);
+        void listNasConnectionsAction().then((rows) => {
+            setConnections(rows);
+            // Pre-select when there's a single usable connection - no point making the
+            // user pick from a list of one.
+            const usable = rows.filter((row) => row.active);
+            const only = usable[0];
+            if (only && usable.length === 1) setConnectionId(only.id);
+        });
     }, []);
 
     function add() {
