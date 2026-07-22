@@ -49,6 +49,7 @@ export function VolumeForm({
     const [kind, setKind] = useState<Kind>("bind");
     const [name, setName] = useState("");
     const [mountPath, setMountPath] = useState("");
+    const [sizeLimit, setSizeLimit] = useState("");
     // Auto: Polaris generates a structured path under polaris/deploy/... Custom: the
     // user types the subpath or picks it with the folder browser.
     const [pathMode, setPathMode] = useState<"auto" | "custom">("auto");
@@ -86,7 +87,8 @@ export function VolumeForm({
                 mountPath: mountPath.trim(),
                 kind,
                 source: resolvedSource,
-                connectionId: kind === "nas" ? connectionId : undefined
+                connectionId: kind === "nas" ? connectionId : undefined,
+                sizeLimit: sizeLimit.trim() || undefined
             });
             if (result.error) {
                 setError(result.error);
@@ -143,6 +145,10 @@ export function VolumeForm({
                 <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
                     Mount path (in container)
                     <Input value={mountPath} onChange={(event) => setMountPath(event.target.value)} placeholder="/app/secrets" />
+                </label>
+                <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
+                    Size limit (optional)
+                    <Input value={sizeLimit} onChange={(event) => setSizeLimit(event.target.value)} placeholder="10G" />
                 </label>
             </div>
 

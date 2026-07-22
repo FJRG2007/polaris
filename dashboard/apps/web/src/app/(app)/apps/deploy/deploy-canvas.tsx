@@ -557,7 +557,7 @@ export function DeployCanvas({
                         const card = (
                             <div
                                 className={`group absolute flex select-none flex-col border bg-card shadow-sm transition-[border-color,box-shadow] hover:shadow-lg hover:shadow-black/25 ${
-                                    node.volume ? "rounded-t-2xl" : "rounded-2xl"
+                                    node.volume || node.volumes?.length ? "rounded-t-2xl" : "rounded-2xl"
                                 } ${dragId === node.id ? "border-primary ring-1 ring-primary/40" : TONE_BORDER[node.tone]} ${
                                     canManage ? "cursor-grab active:cursor-grabbing" : ""
                                 }`}
@@ -624,7 +624,9 @@ export function DeployCanvas({
                                                 type="button"
                                                 onClick={() => app && onOpenService?.(app)}
                                                 onContextMenu={(event) => event.stopPropagation()}
-                                                className="absolute flex items-center gap-2 rounded-b-2xl border border-t-0 border-border bg-card/60 px-4 py-2.5 text-left text-xs text-muted-foreground transition-colors hover:bg-card"
+                                                className={`absolute flex items-center gap-2 border border-t-0 border-border bg-card/60 px-4 py-2.5 text-left text-xs text-muted-foreground transition-colors hover:bg-card ${
+                                                    vi === (node.volumes?.length ?? 0) - 1 ? "rounded-b-2xl" : ""
+                                                }`}
                                                 style={{ left: p.x, top: p.y + NODE_H + vi * VOL_STRIP_H, width: NODE_W }}
                                             >
                                                 <HardDrive className={`size-3.5 shrink-0 ${vol.kind === "nas" ? "text-sky-400" : ""}`} />

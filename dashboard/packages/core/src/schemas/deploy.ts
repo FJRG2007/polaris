@@ -43,7 +43,14 @@ export const deployVolumeInputSchema = z
         // structured path under polaris/deploy/<project>/<app>/<name>.
         source: z.string().trim().min(1).max(1024).optional(),
         // Required for nas, forbidden otherwise (enforced below).
-        connectionId: z.string().uuid().optional()
+        connectionId: z.string().uuid().optional(),
+        // Optional size cap, human-readable like "10G", "500M", "1.5T".
+        sizeLimit: z
+            .string()
+            .trim()
+            .regex(/^\d+(\.\d+)?\s*(K|M|G|T)i?B?$/i, "Use a size like 10G, 500M, or 1.5T")
+            .optional()
+            .or(z.literal("").transform(() => undefined))
     })
     .superRefine((value, ctx) => {
         if (value.kind === "nas" && !value.connectionId) {

@@ -80,6 +80,7 @@ export function VolumesTab({ app }: { app: ProjectApp }) {
                                 <p className="truncate text-xs text-muted-foreground">
                                     {volume.kind === "nas" && volume.connectionName ? `${volume.connectionName}: ` : ""}
                                     {volume.source} {"->"} {volume.mountPath}
+                                    {volume.sizeLimit ? ` · ${volume.sizeLimit}` : ""}
                                 </p>
                             </div>
                         </div>

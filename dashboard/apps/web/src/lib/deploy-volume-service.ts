@@ -30,9 +30,24 @@ export interface VolumeView {
     source: string;
     connectionId: string | null;
     connectionName: string | null;
+    sizeLimit: string | null;
 }
 
-/** List an application's volumes, ownership-checked. */
+/** Create a nas volume's folder tree on its connection, so it exists and is
+ *  browsable in Drive. mkdir builds parents and is idempotent; a failure (NAS
+ *  unreachable) is swallowed - the caller must never depend on this succeeding. */
+async function ensureNasFolder(connectionId: string, source: string, ownerId: string): Promise<void> {
+    try {
+        const driver = await getDriver(connectionId, ownerId);
+        await driver.mkdir(source);
+    } catch (error) {
+        console.error(`volume: could not ensure NAS folder ${source} on ${connectionId}:`, error);
+    }
+}
+
+/** List an application's volumes, ownership-checked. Also self-heals: makes sure
+ *  every nas volume's folder exists on its connection (volumes created before the
+ *  folder was auto-generated, or a folder the user removed), so Drive can browse it. */
 export async function listVolumes(applicationId: string, ownerId: string): Promise<VolumeView[]> {
     const app = await prisma.application.findFirst({
         where: { id: applicationId, environment: { project: { ownerId } } },
@@ -44,6 +59,11 @@ export async function listVolumes(applicationId: string, ownerId: string): Promi
         orderBy: { createdAt: "asc" },
         include: { connection: { select: { name: true } } }
     });
+    await Promise.all(
+        rows
+            .filter((row) => row.kind === "nas" && row.connectionId && row.source)
+            .map((row) => ensureNasFolder(row.connectionId as string, row.source as string, ownerId))
+    );
     return rows.map((row) => ({
         id: row.id,
         name: row.name,
@@ -51,7 +71,8 @@ export async function listVolumes(applicationId: string, ownerId: string): Promi
         kind: row.kind === "bind" ? "bind" : row.kind === "nas" ? "nas" : "volume",
         source: row.source ?? row.name,
         connectionId: row.connectionId,
-        connectionName: row.connection?.name ?? null
+        connectionName: row.connection?.name ?? null,
+        sizeLimit: row.sizeLimit
     }));
 }
 
@@ -111,22 +132,17 @@ export async function createVolume(ownerId: string, input: DeployVolumeInput): P
             mountPath: parsed.mountPath,
             kind: parsed.kind,
             source,
-            connectionId: parsed.kind === "nas" ? parsed.connectionId : null
+            connectionId: parsed.kind === "nas" ? parsed.connectionId : null,
+            sizeLimit: parsed.sizeLimit ?? null
         },
         include: { connection: { select: { name: true } } }
     });
 
-    // For a nas volume, create the folder on the NAS now (via the userspace driver,
-    // which works even before the kernel mount is wired), so it exists and is
-    // browsable in Drive right away. mkdir builds parents and is idempotent; a
-    // failure (NAS unreachable) is non-fatal - the folder is also created at deploy.
+    // Create the folder on the NAS now (via the userspace driver, which works even
+    // before the kernel mount is wired), so it exists and is browsable in Drive
+    // right away - the same folder the container binds to at deploy.
     if (parsed.kind === "nas" && parsed.connectionId) {
-        try {
-            const driver = await getDriver(parsed.connectionId, ownerId);
-            await driver.mkdir(source);
-        } catch (error) {
-            console.error(`volume ${created.id}: could not pre-create NAS folder ${source}:`, error);
-        }
+        await ensureNasFolder(parsed.connectionId, source, ownerId);
     }
 
     return {
@@ -136,7 +152,8 @@ export async function createVolume(ownerId: string, input: DeployVolumeInput): P
         kind: parsed.kind,
         source,
         connectionId: created.connectionId,
-        connectionName: created.connection?.name ?? null
+        connectionName: created.connection?.name ?? null,
+        sizeLimit: created.sizeLimit
     };
 }
 

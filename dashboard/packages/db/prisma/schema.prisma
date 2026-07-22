@@ -969,6 +969,8 @@ model Volume {
     source        String?
     // Storage connection backing a "nas" volume; null for volume/bind.
     connectionId  String?  @db.Uuid
+    // Optional human-readable size cap (e.g. "10G"); null for unlimited.
+    sizeLimit     String?
     createdAt     DateTime @default(now())
 
     target      DeployTarget       @relation(fields: [targetId], references: [id], onDelete: Cascade)
