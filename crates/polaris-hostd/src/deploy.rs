@@ -926,7 +926,11 @@ mod tests {
         // Build the expected YAML scalar through the same yaml_quote path so the
         // check is platform-agnostic (Windows backslashes get escaped identically).
         let yaml = render_compose(&ok, &config);
-        let source = config.mount_root.join("conn-1/secrets").to_string_lossy().into_owned();
+        let source = config
+            .mount_root
+            .join("conn-1/secrets")
+            .to_string_lossy()
+            .into_owned();
         let expected = yaml_quote(&format!("{source}:/app/secrets"));
         assert!(yaml.contains(&expected));
     }
