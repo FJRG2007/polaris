@@ -10,20 +10,34 @@
 
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Copy, HardDrive, Loader2, ScrollText, Trash2 } from "lucide-react";
+import { Copy, HardDrive, Loader2, Plus, ScrollText, Trash2 } from "lucide-react";
 import {
     Button,
     ContextMenu,
     ContextMenuContent,
     ContextMenuItem,
     ContextMenuSeparator,
+    ContextMenuSub,
+    ContextMenuSubContent,
+    ContextMenuSubTrigger,
     ContextMenuTrigger,
     Dialog,
     DialogContent,
     DialogHeader,
     DialogTitle
 } from "@polaris/ui";
-import { ServiceIcon, dbTone, serviceKindOf, type ProjectApp, type ProjectSummary, type ServiceKind } from "./deploy-view";
+import {
+    NewServiceDialog,
+    SERVICE_TYPES,
+    ServiceIcon,
+    dbTone,
+    primaryDomain,
+    serviceKindOf,
+    type ProjectApp,
+    type ProjectSummary,
+    type ServiceKind,
+    type ServiceView
+} from "./deploy-view";
 import { deleteApplicationAction, duplicateApplicationAction, saveLayoutAction } from "./actions";
 
 const NODE_W = 280;
@@ -63,7 +77,7 @@ function nodesFromEnvironment(environment: ProjectSummary["environments"][number
         id: app.id,
         name: app.name,
         kind: serviceKindOf(app.sourceType),
-        subtitle: app.domains[0]?.hostname ?? (app.sourceType === "image" ? "Docker image" : "Git repository"),
+        subtitle: primaryDomain(app.domains)?.hostname ?? (app.sourceType === "image" ? "Docker image" : "Git repository"),
         tone: app.currentDeploymentId ? dbTone(app.deployStatus ?? "") : "idle",
         statusLabel: app.currentDeploymentId ? (app.deployStatus ?? "deployed") : "Not deployed"
     }));
@@ -191,6 +205,7 @@ export function DeployCanvas({
     const router = useRouter();
     const [deleteTarget, setDeleteTarget] = useState<ProjectApp | null>(null);
     const [acting, setActing] = useState(false);
+    const [newService, setNewService] = useState<{ open: boolean; view: ServiceView }>({ open: false, view: "list" });
 
     function duplicate(app: ProjectApp) {
         setActing(true);
@@ -238,6 +253,36 @@ export function DeployCanvas({
         const rect = boardRef.current?.getBoundingClientRect();
         return { x: clientX - (rect?.left ?? 0), y: clientY - (rect?.top ?? 0) };
     }, []);
+
+    // Where the board was last right-clicked, and where a service created from that
+    // menu should land (armed only when the user actually picks a type).
+    const menuSpawnRef = useRef<Point | null>(null);
+    const pendingSpawnRef = useRef<Point | null>(null);
+
+    // Seed a position for any node that appears without one - at the right-click
+    // point when a service was just created there, else near the existing cluster -
+    // so a new service never renders stacked at the origin.
+    useEffect(() => {
+        const missing = nodes.filter((node) => !posRef.current[node.id]);
+        if (missing.length === 0) return;
+        let next = { ...posRef.current };
+        for (const node of missing) {
+            const spawn = pendingSpawnRef.current;
+            if (spawn) {
+                pendingSpawnRef.current = null;
+                next[node.id] = { x: Math.max(0, Math.round(spawn.x / 8) * 8), y: Math.max(0, Math.round(spawn.y / 8) * 8) };
+            } else {
+                next = withSeededPositions([node], next);
+            }
+        }
+        setPos(next);
+        persist(next, links);
+    }, [nodes, links, persist]);
+
+    function openNewService(view: ServiceView) {
+        pendingSpawnRef.current = menuSpawnRef.current;
+        setNewService({ open: true, view });
+    }
 
     // --- node dragging ------------------------------------------------------
     const [dragId, setDragId] = useState<string | null>(null);
@@ -343,23 +388,76 @@ export function DeployCanvas({
         return { w, h };
     }, [pos]);
 
+    // Right-click anywhere on empty board space to add a service, placed where the
+    // menu was opened. Node cards stop propagation so their own menu wins instead.
+    const boardMenu = (board: React.ReactNode): React.ReactNode => {
+        if (!canManage) return board;
+        return (
+            <ContextMenu>
+                <ContextMenuTrigger
+                    asChild
+                    onContextMenu={(event) => {
+                        // Only meaningful once the board exists; the empty state has no
+                        // coordinate space, so a new service falls back to auto-placement.
+                        menuSpawnRef.current = boardRef.current ? toBoard(event.clientX, event.clientY) : null;
+                    }}
+                >
+                    {board}
+                </ContextMenuTrigger>
+                <ContextMenuContent>
+                    <ContextMenuSub>
+                        <ContextMenuSubTrigger>
+                            <Plus className="size-4" /> New service
+                        </ContextMenuSubTrigger>
+                        <ContextMenuSubContent>
+                            {SERVICE_TYPES.map((type) => (
+                                <ContextMenuItem key={type.id} onSelect={() => openNewService(type.id)}>
+                                    <span className="flex size-4 items-center justify-center [&_svg]:size-4">{type.icon}</span>
+                                    {type.label}
+                                </ContextMenuItem>
+                            ))}
+                        </ContextMenuSubContent>
+                    </ContextMenuSub>
+                </ContextMenuContent>
+            </ContextMenu>
+        );
+    };
+
+    const dialog = (
+        <NewServiceDialog
+            environmentId={environment.id}
+            open={newService.open}
+            view={newService.view}
+            onOpenChange={(open) => setNewService((state) => ({ ...state, open }))}
+            onViewChange={(view) => setNewService((state) => ({ ...state, view }))}
+            onChanged={() => router.refresh()}
+        />
+    );
+
     if (nodes.length === 0) {
         return (
-            <div
-                className="relative flex h-[calc(100vh-11rem)] min-h-[460px] flex-col items-center justify-center overflow-hidden rounded-lg border border-border/60"
-                style={DOT_BG}
-            >
-                <div className="pointer-events-none absolute inset-0" style={VIGNETTE} />
-                <div className="relative flex flex-col items-center gap-2 text-center">
-                    <span className="grid size-12 place-items-center rounded-xl border border-border bg-card text-muted-foreground">
-                        <HardDrive className="size-5" />
-                    </span>
-                    <p className="text-sm font-medium">Nothing deployed yet</p>
-                    <p className="max-w-xs text-xs text-muted-foreground">
-                        Add a service and it appears here as a node you can arrange and connect.
-                    </p>
-                </div>
-            </div>
+            <>
+                {boardMenu(
+                    <div
+                        className="relative flex h-[calc(100vh-11rem)] min-h-[460px] flex-col items-center justify-center overflow-hidden rounded-lg border border-border/60"
+                        style={DOT_BG}
+                    >
+                        <div className="pointer-events-none absolute inset-0" style={VIGNETTE} />
+                        <div className="relative flex flex-col items-center gap-2 text-center">
+                            <span className="grid size-12 place-items-center rounded-xl border border-border bg-card text-muted-foreground">
+                                <HardDrive className="size-5" />
+                            </span>
+                            <p className="text-sm font-medium">Nothing deployed yet</p>
+                            <p className="max-w-xs text-xs text-muted-foreground">
+                                {canManage
+                                    ? "Right-click the board or use New service to add one - it appears here as a node you can arrange and connect."
+                                    : "Add a service and it appears here as a node you can arrange and connect."}
+                            </p>
+                        </div>
+                    </div>
+                )}
+                {dialog}
+            </>
         );
     }
 
@@ -370,7 +468,8 @@ export function DeployCanvas({
                     <Loader2 className="size-3 animate-spin" /> Saving
                 </span>
             )}
-            <div className="relative h-[calc(100vh-11rem)] min-h-[460px] overflow-hidden rounded-lg border border-border/60">
+            {boardMenu(
+                <div className="relative h-[calc(100vh-11rem)] min-h-[460px] overflow-hidden rounded-lg border border-border/60">
                 <div ref={containerRef} className="absolute inset-0 overflow-auto" style={DOT_BG}>
                     <div ref={boardRef} className="relative" style={{ width: extent.w, height: extent.h }}>
                     <svg className="pointer-events-none absolute inset-0" width={extent.w} height={extent.h}>
@@ -427,6 +526,7 @@ export function DeployCanvas({
                                 }`}
                                 style={{ left: p.x, top: p.y, width: NODE_W, height: NODE_H }}
                                 onPointerDown={(event) => onNodePointerDown(event, node.id)}
+                                onContextMenu={(event) => event.stopPropagation()}
                             >
                                 <div className="flex flex-1 flex-col p-4">
                                     <div className="flex items-center gap-3">
@@ -486,11 +586,12 @@ export function DeployCanvas({
                     </div>
                 </div>
                 <div className="pointer-events-none absolute inset-0 rounded-lg" style={VIGNETTE} />
-            </div>
+                </div>
+            )}
             {canManage && (
                 <p className="mt-2 text-xs text-muted-foreground/70">
                     Drag nodes to arrange them. Drag from a node's right handle onto another service to link them.
-                    Right-click a service for more.
+                    Right-click the board to add a service, or a service for more.
                 </p>
             )}
 
@@ -512,6 +613,7 @@ export function DeployCanvas({
                     </div>
                 </DialogContent>
             </Dialog>
+            {dialog}
         </div>
     );
 }

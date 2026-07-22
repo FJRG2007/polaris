@@ -119,12 +119,15 @@ export function isLocalDomain(domain: AppDomain): boolean {
 }
 
 /** Rank a domain by how stable and reachable it is: the operator's own custom
- *  domain beats a free public subdomain, which beats a LAN-only name; a disabled
- *  domain never wins. Used to pick the one domain worth surfacing for a service. */
+ *  domain beats a public tunnel, which beats a free public subdomain, which beats a
+ *  LAN-only name; a disabled domain never wins. A tunnel is publicly reachable even
+ *  behind NAT, so it outranks an sslip.io/auto name that only resolves on the LAN.
+ *  Used to pick the one domain worth surfacing for a service. */
 function domainRank(domain: AppDomain): number {
     if (!domain.enabled) return -1;
     if (isLocalDomain(domain)) return 1;
     if (domain.kind === "auto" || domain.hostname.toLowerCase().endsWith(".sslip.io")) return 2;
+    if (domain.kind === "tunnel") return 3;
     if (domain.kind === "custom") return 4;
     return 3;
 }
@@ -405,13 +408,13 @@ function DatabaseCard({
     );
 }
 
-const SERVICE_TYPES = [
+export const SERVICE_TYPES = [
     { id: "github", label: "GitHub Repository", icon: <GitHubMark className="size-5" /> },
     { id: "docker", label: "Docker Image", icon: <DockerMark className="size-5" /> },
     { id: "database", label: "Database", icon: <Database className="size-5" /> }
 ] as const;
 
-type ServiceView = "list" | "github" | "docker" | "database";
+export type ServiceView = "list" | "github" | "docker" | "database";
 
 const SERVICE_TITLES: Record<Exclude<ServiceView, "list">, string> = {
     github: "GitHub Repository",
@@ -419,14 +422,63 @@ const SERVICE_TITLES: Record<Exclude<ServiceView, "list">, string> = {
     database: "Database"
 };
 
+/** The service-creation dialog as a controlled component, so any trigger (the header
+ *  button or the canvas context menu) can open it at a chosen step. */
+export function NewServiceDialog({
+    environmentId,
+    open,
+    view,
+    onOpenChange,
+    onViewChange,
+    onChanged
+}: {
+    environmentId: string;
+    open: boolean;
+    view: ServiceView;
+    onOpenChange: (open: boolean) => void;
+    onViewChange: (view: ServiceView) => void;
+    onChanged: () => void;
+}) {
+    function done() {
+        onOpenChange(false);
+        onChanged();
+    }
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="max-w-md">
+                <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2">
+                        {view !== "list" && (
+                            <button
+                                type="button"
+                                onClick={() => onViewChange("list")}
+                                className="-ml-1 rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                aria-label="Back"
+                            >
+                                <ArrowLeft className="size-4" />
+                            </button>
+                        )}
+                        {view === "list" ? "New service" : SERVICE_TITLES[view]}
+                    </DialogTitle>
+                </DialogHeader>
+                {view === "list" ? (
+                    <ServiceTypeList onPick={onViewChange} />
+                ) : view === "database" ? (
+                    <NewDatabaseForm environmentId={environmentId} onDone={done} />
+                ) : view === "github" ? (
+                    <NewGithubForm environmentId={environmentId} onDone={done} />
+                ) : (
+                    <NewImageForm environmentId={environmentId} onDone={done} />
+                )}
+            </DialogContent>
+        </Dialog>
+    );
+}
+
 export function NewServiceButton({ environmentId, onChanged }: { environmentId: string; onChanged: () => void }) {
     const [open, setOpen] = useState(false);
     const [view, setView] = useState<ServiceView>("list");
-
-    function done() {
-        setOpen(false);
-        onChanged();
-    }
 
     return (
         <>
@@ -440,34 +492,14 @@ export function NewServiceButton({ environmentId, onChanged }: { environmentId: 
             >
                 <Plus className="size-4" /> New service
             </Button>
-            <Dialog open={open} onOpenChange={setOpen}>
-                <DialogContent className="max-w-md">
-                    <DialogHeader>
-                        <DialogTitle className="flex items-center gap-2">
-                            {view !== "list" && (
-                                <button
-                                    type="button"
-                                    onClick={() => setView("list")}
-                                    className="-ml-1 rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                                    aria-label="Back"
-                                >
-                                    <ArrowLeft className="size-4" />
-                                </button>
-                            )}
-                            {view === "list" ? "New service" : SERVICE_TITLES[view]}
-                        </DialogTitle>
-                    </DialogHeader>
-                    {view === "list" ? (
-                        <ServiceTypeList onPick={setView} />
-                    ) : view === "database" ? (
-                        <NewDatabaseForm environmentId={environmentId} onDone={done} />
-                    ) : view === "github" ? (
-                        <NewGithubForm environmentId={environmentId} onDone={done} />
-                    ) : (
-                        <NewImageForm environmentId={environmentId} onDone={done} />
-                    )}
-                </DialogContent>
-            </Dialog>
+            <NewServiceDialog
+                environmentId={environmentId}
+                open={open}
+                view={view}
+                onOpenChange={setOpen}
+                onViewChange={setView}
+                onChanged={onChanged}
+            />
         </>
     );
 }
