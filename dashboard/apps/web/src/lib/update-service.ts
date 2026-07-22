@@ -29,6 +29,12 @@ export interface UpdateStatus {
 /** Update checks are cheap to be stale on; refresh at most every six hours. */
 const CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 
+/** Paths whose change rebuilds the web image (mirrors dashboard-publish.yml's `web`
+ *  path filter). A change to the publish workflow itself rebuilds every image. Used
+ *  to tell a real web update from a commit that only touches the daemon or docs. */
+const WEB_IMAGE_PATHS =
+    /^dashboard\/(apps|packages|cli)\/|^dashboard\/docker\/(Dockerfile|entrypoint\.sh)|^dashboard\/package(-lock)?\.json$|^\.github\/workflows\/dashboard-publish\.yml$/;
+
 let cache: { status: UpdateStatus; at: number } | null = null;
 let inflight: Promise<UpdateStatus> | null = null;
 
@@ -59,10 +65,22 @@ async function query(): Promise<UpdateStatus> {
     // With a known build commit, a compare gives both the branch head and the
     // exact number of commits we are behind it.
     if (build) {
-        const data = (await github(
-            `/repos/${repo}/compare/${build}...${branch}`
-        )) as { status?: string; ahead_by?: number; permalink_url?: string; html_url?: string };
-        const behindBy = typeof data.ahead_by === "number" ? data.ahead_by : null;
+        const data = (await github(`/repos/${repo}/compare/${build}...${branch}`)) as {
+            status?: string;
+            ahead_by?: number;
+            permalink_url?: string;
+            html_url?: string;
+            files?: { filename?: string }[];
+        };
+        const aheadBy = typeof data.ahead_by === "number" ? data.ahead_by : null;
+        // The running build is the published web image; the update pulls that image.
+        // A commit that changes only non-web sources (the Rust daemon, docs) advances
+        // the branch head but never rebuilds the web image, so its build SHA would sit
+        // "behind" forever and no update could clear it. Only treat the branch as ahead
+        // when a changed file would actually rebuild the web image - mirroring the
+        // dashboard-publish workflow's `web` path filter.
+        const webChanged = (data.files ?? []).some((file) => file.filename && WEB_IMAGE_PATHS.test(file.filename));
+        const behindBy = aheadBy === null ? null : webChanged ? aheadBy : 0;
         return {
             current: short(build),
             latest: null === behindBy ? null : behindBy === 0 ? short(build) : null,
