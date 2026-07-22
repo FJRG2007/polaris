@@ -215,11 +215,17 @@ export async function reconcileQuickTunnels(): Promise<void> {
     if (!ip) return;
     const expectedOrigin = `http://${ip}:80`;
     for (const appId of appIds) {
-        const app = await prisma.application.findFirst({
-            where: { id: appId, target: { kind: "local" } },
-            select: { environment: { select: { project: { select: { ownerId: true } } } } }
-        });
-        const ownerId = app?.environment.project.ownerId;
+        let ownerId: string | undefined;
+        try {
+            const app = await prisma.application.findFirst({
+                where: { id: appId, target: { kind: "local" } },
+                select: { environment: { select: { project: { select: { ownerId: true } } } } }
+            });
+            ownerId = app?.environment?.project?.ownerId;
+        } catch (error) {
+            console.error(`polaris: quick-tunnel reconcile lookup failed for ${appId}:`, error);
+            continue;
+        }
         if (!ownerId) continue;
 
         const { service } = names(appId);
