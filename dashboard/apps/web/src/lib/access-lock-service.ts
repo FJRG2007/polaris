@@ -16,6 +16,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { normalizeRelPath } from "@polaris/core";
 import { hashLinkPassword, verifyLinkPassword } from "@polaris/core/link-password";
 import { prisma } from "@polaris/db";
+import { isUuid } from "./uuid";
 
 /** A lock's identity and the path it guards. */
 export interface LockInfo {
@@ -25,6 +26,8 @@ export interface LockInfo {
 
 /** Every lock defined on a connection, for the management UI. */
 export async function listLocks(connectionId: string): Promise<LockInfo[]> {
+    // A non-UUID source (an ephemeral `container:<id>` connection) can hold no locks.
+    if (!isUuid(connectionId)) return [];
     return prisma.accessLock.findMany({
         where: { connectionId },
         orderBy: { path: "asc" },
@@ -38,6 +41,7 @@ export async function listLocks(connectionId: string): Promise<LockInfo[]> {
  * subfolder takes precedence over one on its parent.
  */
 export async function findLockForPath(connectionId: string, path: string): Promise<LockInfo | null> {
+    if (!isUuid(connectionId)) return null;
     const locks = await prisma.accessLock.findMany({
         where: { connectionId },
         select: { id: true, path: true }

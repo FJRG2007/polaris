@@ -7,15 +7,7 @@
  */
 
 import { prisma } from "@polaris/db";
-
-/** DriveItemMeta.connectionId is a UUID column, but some sources (a deployed app's
- *  container, browsed as an ephemeral `container:<id>` connection) have no persisted
- *  metadata and a non-UUID id, which the column cannot compare against. Guard every
- *  query with this so such a source is a clean no-op instead of a DB error. */
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-function isUuid(id: string): boolean {
-    return UUID_RE.test(id);
-}
+import { isUuid } from "./uuid";
 
 export interface ItemMeta {
     hidden: boolean;

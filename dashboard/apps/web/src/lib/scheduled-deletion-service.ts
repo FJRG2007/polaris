@@ -9,6 +9,7 @@
 
 import { baseName, normalizeRelPath } from "@polaris/core";
 import { prisma } from "@polaris/db";
+import { isUuid } from "@/lib/uuid";
 import { getDriver } from "@/lib/storage-service";
 import { moveToTrash } from "@/lib/trash-service";
 import { recordAudit } from "@/lib/audit-service";
@@ -52,6 +53,8 @@ export async function cancelScheduledDeletion(ownerId: string, id: string): Prom
  * a failed delete leaves the file in place - deletion fails safe toward keeping data.
  */
 export async function sweepDueDeletions(connectionId?: string): Promise<number> {
+    // A non-UUID source (an ephemeral `container:<id>` connection) schedules nothing.
+    if (connectionId && !isUuid(connectionId)) return 0;
     const due = await prisma.scheduledDeletion.findMany({
         where: { deleteAt: { lte: new Date() }, ...(connectionId ? { connectionId } : {}) },
         orderBy: { deleteAt: "asc" },
