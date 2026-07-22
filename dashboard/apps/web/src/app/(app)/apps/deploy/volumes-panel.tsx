@@ -12,7 +12,7 @@ import Link from "next/link";
 import { HardDrive, Plus, Server, Settings2, Trash2 } from "lucide-react";
 import { Button } from "@polaris/ui";
 import { deleteVolumeAction, listVolumesAction } from "./actions";
-import { VolumeForm, EditVolumeDialog, type EditVolume } from "./volume-form";
+import { VolumeForm, type EditVolume } from "./volume-form";
 import type { ProjectApp } from "./deploy-view";
 
 type Volume = Awaited<ReturnType<typeof listVolumesAction>>[number];
@@ -53,7 +53,7 @@ export function VolumesTab({ app }: { app: ProjectApp }) {
                 <span className="text-sm font-medium">
                     {items ? items.length : 0} volume{items && items.length === 1 ? "" : "s"}
                 </span>
-                <Button size="sm" onClick={() => setShowAdd((open) => !open)}>
+                <Button size="sm" onClick={() => { setEditVolume(null); setShowAdd((open) => !open); }}>
                     <Plus className="size-4" /> New Volume
                 </Button>
             </div>
@@ -64,13 +64,17 @@ export function VolumesTab({ app }: { app: ProjectApp }) {
                 </div>
             )}
 
-            <EditVolumeDialog
-                open={editVolume !== null}
-                applicationId={app.id}
-                volume={editVolume}
-                onOpenChange={(open) => !open && setEditVolume(null)}
-                onSaved={reload}
-            />
+            {editVolume && (
+                <div className="rounded-md border border-border/60 p-3">
+                    <p className="mb-2 text-xs font-medium text-muted-foreground">Editing {editVolume.name}</p>
+                    <VolumeForm
+                        applicationId={app.id}
+                        volume={editVolume}
+                        onSaved={() => { setEditVolume(null); reload(); }}
+                        onCancel={() => setEditVolume(null)}
+                    />
+                </div>
+            )}
 
             {error && <p className="text-xs text-red-400">{error}</p>}
 
@@ -94,7 +98,7 @@ export function VolumesTab({ app }: { app: ProjectApp }) {
                             </div>
                         </div>
                         <div className="flex shrink-0 items-center gap-1">
-                            <Button variant="ghost" size="sm" onClick={() => setEditVolume(volume)} title="Volume options">
+                            <Button variant="ghost" size="sm" onClick={() => { setShowAdd(false); setEditVolume(volume); }} title="Volume options">
                                 <Settings2 className="size-4" />
                             </Button>
                             <Button asChild variant="ghost" size="sm" title="View in Drive">
