@@ -400,7 +400,28 @@ export async function readAppRuntimeLog(applicationId: string, ownerId: string, 
     } finally {
         await ports.dispose();
     }
-    return Buffer.concat(chunks).toString("utf8");
+    return sortLogByTimestamp(Buffer.concat(chunks).toString("utf8"));
+}
+
+/** The RFC3339 timestamp docker prepends to each log line with `--timestamps`. */
+const LOG_TS_RE = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z)/;
+
+/**
+ * Order docker log lines by their own timestamp. Docker merges stdout and stderr
+ * as two streams, so a plain read can interleave them differently on each poll -
+ * which made the Deploy Logs view visibly reshuffle. A stable sort by the leading
+ * timestamp gives one deterministic order; lines without a timestamp keep their
+ * position. Same timestamp -> original order (stable).
+ */
+function sortLogByTimestamp(raw: string): string {
+    const lines = raw.split("\n");
+    const tagged = lines.map((line, index) => ({ line, index, ts: LOG_TS_RE.exec(line)?.[1] ?? null }));
+    if (!tagged.some((entry) => entry.ts)) return raw;
+    tagged.sort((a, b) => {
+        if (a.ts && b.ts) return a.ts < b.ts ? -1 : a.ts > b.ts ? 1 : a.index - b.index;
+        return a.index - b.index;
+    });
+    return tagged.map((entry) => entry.line).join("\n");
 }
 
 /** The edge's per-request access log (JSON), written by Traefik to a shared volume. */
@@ -455,7 +476,16 @@ async function readProxyAccessEntries(hosts: Set<string>, tail: number): Promise
  * image-layer cache making an unchanged build fast).
  */
 export async function restartApplication(applicationId: string, ownerId: string): Promise<void> {
-    await deployApplication(applicationId, ownerId, ownerId);
+    // A restart bounces the running container in place - it must NOT rebuild or
+    // create a new deployment (which would mislabel a manual restart as a fresh
+    // git build and leave the card stuck "deploying").
+    const { container, target } = await appRuntime(applicationId, ownerId);
+    const ports = await getPorts(target, ownerId);
+    try {
+        await ports.container(container, "restart");
+    } finally {
+        await ports.dispose();
+    }
 }
 
 /**

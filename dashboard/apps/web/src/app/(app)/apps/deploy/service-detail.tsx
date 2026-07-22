@@ -286,6 +286,16 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
     }
     useEffect(reload, [app.id]);
 
+    // Poll while a deployment is still in flight so the card reflects the real state
+    // without a manual page reload; stop once everything has reached a terminal state.
+    useEffect(() => {
+        const TERMINAL = new Set(["success", "failed", "cancelled", "rolled_back", "stopped"]);
+        if (!items?.some((item) => !TERMINAL.has(item.status))) return;
+        const timer = setInterval(reload, 3000);
+        return () => clearInterval(timer);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [items]);
+
     function deploy() {
         startTransition(async () => {
             try {
