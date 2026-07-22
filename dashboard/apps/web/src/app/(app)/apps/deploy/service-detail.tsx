@@ -573,8 +573,18 @@ function DetailsPanel({ app, deployment }: { app: ProjectApp; deployment: DepSum
     );
 }
 
+/** Small pulsing "Live" badge shown above a log stream that is actively polling. */
+function LivePill() {
+    return (
+        <span className="inline-flex w-fit items-center gap-1.5 text-xs text-muted-foreground">
+            <span className="size-1.5 animate-pulse rounded-full bg-emerald-500" /> Live
+        </span>
+    );
+}
+
 function LogStream({ deploymentId, onDone }: { deploymentId: string; onDone: () => void }) {
     const [log, setLog] = useState("");
+    const [live, setLive] = useState(true);
     const onDoneRef = useRef(onDone);
     onDoneRef.current = onDone;
 
@@ -582,17 +592,21 @@ function LogStream({ deploymentId, onDone }: { deploymentId: string; onDone: () 
         let active = true;
         let done = false;
         let timer: ReturnType<typeof setTimeout>;
+        setLive(true);
         async function poll(): Promise<void> {
             const res = await fetch(`/api/deploy/deployments/${deploymentId}/log`, { cache: "no-store" });
             if (!active) return;
             if (res.ok) {
                 const data = (await res.json()) as { status: string; log: string };
                 setLog(data.log);
+                // The build stream is terminal once the deployment leaves the build phase
+                // (running) or ends in failure; stop polling and drop the live indicator.
                 if (["running", "failed", "cancelled", "rolled_back"].includes(data.status)) {
                     if (!done) {
                         done = true;
                         onDoneRef.current();
                     }
+                    if (active) setLive(false);
                     return;
                 }
             }
@@ -605,7 +619,12 @@ function LogStream({ deploymentId, onDone }: { deploymentId: string; onDone: () 
         };
     }, [deploymentId]);
 
-    return <LogViewer log={log} name={deploymentId} searchable className="h-[26rem]" />;
+    return (
+        <div className="flex flex-col gap-2">
+            {live && <LivePill />}
+            <LogViewer log={log} name={deploymentId} searchable className="h-[26rem]" />
+        </div>
+    );
 }
 
 /** Live runtime stdout/stderr of the app's container - what the app prints while
@@ -650,7 +669,12 @@ function RuntimeLogView({ appId }: { appId: string }) {
     if (!log.trim()) {
         return <Empty text="No runtime logs yet. The container may have just started, or writes nothing to stdout." />;
     }
-    return <LogViewer log={log} name={`${appId}-runtime`} searchable className="h-[26rem]" />;
+    return (
+        <div className="flex flex-col gap-2">
+            <LivePill />
+            <LogViewer log={log} name={`${appId}-runtime`} searchable className="h-[26rem]" />
+        </div>
+    );
 }
 
 /** Color an HTTP status by its class: 2xx ok, 3xx redirect, 4xx client, 5xx server. */
@@ -781,6 +805,9 @@ function HttpLogsView({ appId, deploymentStart }: { appId: string; deploymentSta
 
     const shown = filtered.slice(0, visible);
     const scoped = scopeDeploy && deploymentStart && !from;
+    // True only when the user narrowed the set themselves. Distinguishes a genuine
+    // "no match" from the deployment-scope clamp silently hiding all history.
+    const hasUserFilter = method !== "all" || statusClass !== "all" || query !== "" || ipFilter !== null || Boolean(from) || Boolean(to);
 
     function exportCsv(): void {
         const header = ["time", "ip", "method", "path", "status", "host", "bytes", "referer", "user_agent", "duration_ms"];
@@ -862,9 +889,7 @@ function HttpLogsView({ appId, deploymentStart }: { appId: string; deploymentSta
 
             {entries !== null && !error && all.length > 0 && (
                 <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                    <span className="inline-flex items-center gap-1.5">
-                        <span className="size-1.5 animate-pulse rounded-full bg-emerald-500" /> Live
-                    </span>
+                    <LivePill />
                     <span>
                         {filtered.length} request{filtered.length === 1 ? "" : "s"}
                         {filtered.length !== all.length ? ` of ${all.length}` : ""}
@@ -888,13 +913,30 @@ function HttpLogsView({ appId, deploymentStart }: { appId: string; deploymentSta
             ) : error ? (
                 <Empty text={error} />
             ) : filtered.length === 0 ? (
-                <Empty
-                    text={
-                        all.length > 0
-                            ? "No requests match the filter."
-                            : "No HTTP requests yet. They appear here as soon as traffic reaches the running service."
-                    }
-                />
+                all.length > 0 && scoped && !hasUserFilter ? (
+                    // Every request in the log predates this deployment: the scope clamp,
+                    // not a user filter, is hiding them. Say so and offer the full history.
+                    <div className="flex h-40 flex-col items-center justify-center gap-2 text-center text-sm text-muted-foreground">
+                        <p>
+                            No requests since this deployment started
+                            {deploymentStart ? ` (${new Date(deploymentStart).toLocaleString()})` : ""}.
+                        </p>
+                        <p className="text-xs">
+                            {all.length} earlier request{all.length === 1 ? "" : "s"} in the log.
+                        </p>
+                        <Button type="button" variant="outline" size="sm" onClick={() => setScopeDeploy(false)}>
+                            Show all history
+                        </Button>
+                    </div>
+                ) : (
+                    <Empty
+                        text={
+                            all.length > 0
+                                ? "No requests match the filter."
+                                : "No HTTP requests yet. They appear here as soon as traffic reaches the running service."
+                        }
+                    />
+                )
             ) : (
                 <div className="max-h-[26rem] overflow-auto rounded-md border border-border/60">
                     <table className="w-full text-xs">
