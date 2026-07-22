@@ -57,6 +57,16 @@ export class ComposeRuntime implements RuntimeDriver {
 
         const effectivePlan = await this.refineContainerPort(plan, imageTag, ctx);
         const spec = appComposeSpec(effectivePlan, imageTag, ctx.target.proxyNetwork);
+        // Establish any NAS mounts the volumes bind onto, before the container comes
+        // up - so `<mount_root>/<id>/...` resolves onto the NAS, not an empty dir.
+        try {
+            for (const mount of plan.mounts ?? []) {
+                ctx.log(Buffer.from(`Mounting ${mount.kind.toUpperCase()} ${mount.source}...\n`));
+                await ctx.ports.ensureMount(mount);
+            }
+        } catch (error) {
+            return { ok: false, error: `could not mount a NAS volume: ${error instanceof Error ? error.message : "mount failed"}` };
+        }
         try {
             await ctx.ports.composeUp(spec, sink);
         } catch (error) {

@@ -158,6 +158,49 @@ async function buildDriver(row: ConnectionRow): Promise<StorageDriver> {
     return driver;
 }
 
+/** Build the NAS mount spec for a host-mountable connection (smb/unifi-unas/nfs),
+ *  so the deploy pipeline can kernel-mount it at `<mount_root>/<id>` and a bind
+ *  volume under it resolves onto the NAS. Returns null for kinds Polaris does not
+ *  kernel-mount. Owner-scoped via loadConnection; decrypts SMB credentials. */
+export async function resolveMountTarget(
+    connectionId: string,
+    ownerId: string
+): Promise<{ id: string; kind: "smb" | "nfs"; source: string; options?: string; username?: string; password?: string } | null> {
+    const row = await loadConnection(connectionId, ownerId);
+    const config = JSON.parse(row.config) as StorageConfig;
+    const credentials: StorageCredentials =
+        row.encryptedCredential && row.credentialNonce
+            ? decryptCredentials(
+                  {
+                      ciphertext: Buffer.from(row.encryptedCredential),
+                      nonce: Buffer.from(row.credentialNonce),
+                      keyId: row.credentialKeyId ?? ""
+                  },
+                  loadEnv().POLARIS_MASTER_KEY
+              )
+            : ({ kind: row.kind } as StorageCredentials);
+
+    // Permissive modes so a container (root or not) reads/writes the share like a
+    // normal docker volume; nobrl avoids byte-range-lock errors some apps trigger.
+    const SMB_OPTS = "vers=3.0,uid=0,gid=0,file_mode=0666,dir_mode=0777,nobrl";
+    if (row.kind === "unifi-unas") {
+        const cfg = config as Extract<StorageConfig, { kind: "unifi-unas" }>;
+        if (!cfg.smbShare) return null;
+        const creds = credentials as Extract<StorageCredentials, { kind: "unifi-unas" }>;
+        return { id: row.id, kind: "smb", source: `//${cfg.host}/${cfg.smbShare}`, options: SMB_OPTS, username: cfg.username, password: creds.password };
+    }
+    if (row.kind === "smb") {
+        const cfg = config as Extract<StorageConfig, { kind: "smb" }>;
+        const creds = credentials as Extract<StorageCredentials, { kind: "smb" }>;
+        return { id: row.id, kind: "smb", source: `//${cfg.host}/${cfg.share}`, options: SMB_OPTS, username: cfg.username, password: creds.password };
+    }
+    if (row.kind === "nfs") {
+        const cfg = config as Extract<StorageConfig, { kind: "nfs" }>;
+        return { id: row.id, kind: "nfs", source: `${cfg.host}:${cfg.exportPath}`, options: "nfsvers=4" };
+    }
+    return null;
+}
+
 /** Build a connected driver for a connection owned by the given user. A `host:`
  *  id resolves to a global Host browsed over SFTP; everything else is a stored
  *  storage connection. */

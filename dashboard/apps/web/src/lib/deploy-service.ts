@@ -13,6 +13,7 @@ import { loadEnv } from "@polaris/config";
 import { prisma } from "@polaris/db";
 import { bucketHttpMetrics, parseHttpLogs, serviceName, shortHash, slugify, type AppDeployPlan, type DeployResult, type HttpLogEntry, type HttpMetricPoint, type RuntimeContext, type RuntimeDriver } from "@polaris/deploy";
 import { decryptSecret } from "@polaris/storage";
+import { resolveMountTarget } from "./storage-service";
 import { getDriver, getPorts, toTargetInfo, type TargetRow } from "./deploy/runtime";
 import { LocalRouter, type AppRoute } from "./deploy/router";
 import { getOrCreateHostTarget, getOrCreateLocalTarget } from "./deploy-target-service";
@@ -638,8 +639,19 @@ async function buildAppPlan(
     const storedPort = typeof source.port === "number" ? source.port : undefined;
     const containerPort = storedPort ?? app.domains[0]?.targetPort ?? (app.sourceType === "image" ? 80 : 3000);
 
+    // NAS mounts the volumes bind onto: one per distinct storage connection a nas
+    // volume uses, so the deploy kernel-mounts each at `<mount_root>/<id>` before the
+    // container comes up - the bind `<mount_root>/<id>/<subpath>` then lands on the NAS.
+    const nasConnectionIds = [
+        ...new Set(app.volumes.filter((volume) => volume.kind === "nas" && volume.connectionId).map((volume) => volume.connectionId as string))
+    ];
+    const mounts = (await Promise.all(nasConnectionIds.map((id) => resolveMountTarget(id, ownerId).catch(() => null)))).filter(
+        (mount): mount is NonNullable<typeof mount> => mount !== null
+    );
+
     const plan: AppDeployPlan = {
         ref: { name: serviceName(project.slug, app.slug, app.id), project: composeProject },
+        mounts,
         expose: { host: hostPortForApp(app.id), container: containerPort },
         // When the user has not pinned a container port, the value above is a guess
         // (a domain's target port or a source default); let the runtime refine it from

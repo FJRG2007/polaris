@@ -39,9 +39,25 @@ export interface ServiceRef {
     readonly project: string;
 }
 
+/** A network filesystem the target must mount before the deploy, so a bind volume
+ *  under the mount root (`<mount_root>/<id>/...`) actually resolves onto the NAS.
+ *  One mount per storage connection serves every volume/service that binds under it. */
+export interface MountTarget {
+    /** Storage connection id; also the subdir under the mount root it mounts at. */
+    readonly id: string;
+    readonly kind: "smb" | "nfs";
+    /** `//host/share` for smb, `host:/export` for nfs. */
+    readonly source: string;
+    readonly options?: string;
+    readonly username?: string;
+    readonly password?: string;
+}
+
 export interface AppDeployPlan {
     readonly ref: ServiceRef;
     readonly build: BuildInput;
+    /** NAS mounts to establish on the target before bringing the service up. */
+    readonly mounts?: readonly MountTarget[];
     /** Runtime environment (already merged from EnvVars, secrets decrypted). */
     readonly env: Readonly<Record<string, string>>;
     readonly replicas: number;

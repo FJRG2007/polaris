@@ -7,7 +7,7 @@
  */
 
 import type { Client } from "ssh2";
-import { quoteArg, renderComposeYaml, type ComposeSpec, type ExecSpec, type ExecStream, type LogOptions, type OutputSink, type RuntimePorts } from "@polaris/deploy";
+import { quoteArg, renderComposeYaml, type ComposeSpec, type ExecSpec, type ExecStream, type LogOptions, type MountTarget, type OutputSink, type RuntimePorts } from "@polaris/deploy";
 import { execCommand, openShell, openSshClient, type SshAuth } from "@polaris/ssh";
 
 /** Where compose files and volume data live on a managed remote server. */
@@ -144,6 +144,27 @@ export class SshPorts implements RuntimePorts {
 
     public async container(ref: string, action: "restart" | "stop" | "start"): Promise<void> {
         await this.run(`docker ${action} ${quoteArg(ref)}`);
+    }
+
+    public async ensureMount(spec: MountTarget): Promise<void> {
+        const target = `${REMOTE_MOUNT_ROOT}/${spec.id}`;
+        const fstype = spec.kind === "smb" ? "cifs" : "nfs";
+        const staticOpts = spec.options ?? "";
+        const lines = ["set -e", `mkdir -p ${quoteArg(target)}`, `if mountpoint -q ${quoteArg(target)}; then exit 0; fi`];
+        // For CIFS credentials, write a 0600 credentials file so the password never
+        // reaches the mount argv; $creds expands in the mount `-o` value below.
+        let optionValue = staticOpts;
+        const useCreds = spec.kind === "smb" && spec.username && spec.password;
+        if (useCreds) {
+            lines.push('creds=$(mktemp)', 'chmod 600 "$creds"');
+            lines.push(`printf 'username=%s\\npassword=%s\\n' ${quoteArg(spec.username as string)} ${quoteArg(spec.password as string)} > "$creds"`);
+            optionValue = staticOpts ? `credentials=$creds,${staticOpts}` : "credentials=$creds";
+        }
+        // The source is quoted; the option value is our own controlled string plus the
+        // $creds shell var, so it is embedded in double quotes to let $creds expand.
+        lines.push(`mount -t ${fstype} ${quoteArg(spec.source)} ${quoteArg(target)}${optionValue ? ` -o "${optionValue}"` : ""}`);
+        if (useCreds) lines.push('rm -f "$creds"');
+        await this.run(lines.join("\n"));
     }
 
     public async logs(ref: string, onData: OutputSink, options?: LogOptions): Promise<void> {

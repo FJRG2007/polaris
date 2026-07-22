@@ -11,6 +11,7 @@
 
 import type { Duplex } from "node:stream";
 import type { ComposeSpec } from "./compose-spec.js";
+import type { MountTarget } from "./runtime/driver.js";
 
 export type OutputSink = (chunk: Buffer) => void;
 
@@ -74,6 +75,10 @@ export interface RuntimePorts {
     /** Lifecycle action on an existing container: restart it, or stop/start it to
      *  disable/enable a deployment without removing it. */
     container(ref: string, action: "restart" | "stop" | "start"): Promise<void>;
+    /** Ensure a NAS filesystem is mounted at `<mount_root>/<id>` on the target, so a
+     *  bind volume under it resolves onto the NAS. Idempotent (a no-op if already
+     *  mounted). Called before bringing a service with nas volumes up. */
+    ensureMount(spec: MountTarget): Promise<void>;
     logs(ref: string, onData: OutputSink, options?: LogOptions): Promise<void>;
     /** Open an interactive exec/attach stream. */
     exec(spec: ExecSpec): Promise<ExecStream>;

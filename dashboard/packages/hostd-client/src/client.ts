@@ -22,6 +22,9 @@ export interface MountSpec {
     readonly source: string;
     readonly target: string;
     readonly options?: string;
+    // CIFS credentials; the daemon writes them to a 0600 credentials file.
+    readonly username?: string;
+    readonly password?: string;
 }
 
 export interface MountResult {

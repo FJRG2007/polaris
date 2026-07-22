@@ -153,6 +153,14 @@ struct MountRequest {
     source: String,
     target: String,
     options: Option<String>,
+    // CIFS credentials. When present they are written to a 0600 credentials file
+    // and passed via `credentials=<file>`, never on the mount command line.
+    #[cfg_attr(not(unix), allow(dead_code))]
+    #[serde(default)]
+    username: Option<String>,
+    #[cfg_attr(not(unix), allow(dead_code))]
+    #[serde(default)]
+    password: Option<String>,
 }
 
 /// Route a request to its handler. `body` is a reader bounded to the request's
@@ -794,6 +802,19 @@ fn mount_create<R: Read>(state: &AppState, req: &Request, body: &mut R) -> Respo
             return Response::bad_request(&msg);
         }
     }
+    // Credentials go into a line-based credentials file, so a newline or NUL would
+    // let one field inject another. Everything else is allowed (passwords are
+    // arbitrary); they never reach an argument vector.
+    for (name, value) in [
+        ("username", &request.username),
+        ("password", &request.password),
+    ] {
+        if let Some(v) = value {
+            if v.contains('\n') || v.contains('\0') {
+                return Response::bad_request(&format!("{name} must not contain newlines or NUL"));
+            }
+        }
+    }
 
     // Confine the target under the mount root.
     let target = match security::resolve_within(&state.config.mount_root, &request.target) {
@@ -862,19 +883,75 @@ fn run_mount(request: &MountRequest, target: &std::path::Path) -> Result<(), Mou
     if std::fs::create_dir_all(target).is_err() {
         return Err(MountError::Failed);
     }
+    // Idempotent: a live mountpoint is already what the caller wants. Re-mounting
+    // would stack mounts (SMB) or fail; deploys call this on every redeploy.
+    if is_mountpoint(target) {
+        return Ok(());
+    }
     let fstype = match request.kind {
         MountKind::Smb => "cifs",
         MountKind::Nfs => "nfs",
     };
+    // For CIFS credentials, write a 0600 credentials file on the daemon's tmpfs and
+    // pass `credentials=<file>` - so the password never shows in `ps`/argv or the
+    // mount table. Removed right after the mount call (the kernel keeps the session).
+    let mut opts: Vec<String> = Vec::new();
+    let mut creds_file: Option<std::path::PathBuf> = None;
+    if let (MountKind::Smb, Some(user), Some(pass)) =
+        (&request.kind, &request.username, &request.password)
+    {
+        let path = std::path::Path::new("/run/polaris").join(format!("mount-creds-{}", request.id));
+        if write_creds_file(&path, user, pass).is_err() {
+            return Err(MountError::Failed);
+        }
+        opts.push(format!("credentials={}", path.to_string_lossy()));
+        creds_file = Some(path);
+    }
+    if let Some(extra) = &request.options {
+        if !extra.is_empty() {
+            opts.push(extra.clone());
+        }
+    }
     let mut cmd = Command::new("mount");
     cmd.arg("-t").arg(fstype).arg(&request.source).arg(target);
-    if let Some(opts) = &request.options {
-        cmd.arg("-o").arg(opts);
+    if !opts.is_empty() {
+        cmd.arg("-o").arg(opts.join(","));
     }
-    match cmd.status() {
+    let status = cmd.status();
+    if let Some(path) = creds_file {
+        let _ = std::fs::remove_file(path);
+    }
+    match status {
         Ok(status) if status.success() => Ok(()),
         _ => Err(MountError::Failed),
     }
+}
+
+/// True when `path` is a mount point (its device differs from its parent's).
+#[cfg(unix)]
+fn is_mountpoint(path: &std::path::Path) -> bool {
+    use std::os::unix::fs::MetadataExt;
+    match (
+        std::fs::metadata(path),
+        path.parent().map(std::fs::metadata),
+    ) {
+        (Ok(here), Some(Ok(parent))) => here.dev() != parent.dev(),
+        _ => false,
+    }
+}
+
+/// Write a CIFS credentials file readable only by the daemon (mode 0600).
+#[cfg(unix)]
+fn write_creds_file(path: &std::path::Path, user: &str, pass: &str) -> std::io::Result<()> {
+    use std::io::Write;
+    use std::os::unix::fs::OpenOptionsExt;
+    let mut file = std::fs::OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .mode(0o600)
+        .open(path)?;
+    write!(file, "username={user}\npassword={pass}\n")
 }
 
 #[cfg(not(unix))]

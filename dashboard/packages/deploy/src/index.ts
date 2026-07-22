@@ -36,7 +36,8 @@ export type {
     DbDeployPlan,
     DeployResult,
     RuntimeStatus,
-    HealthcheckSpec
+    HealthcheckSpec,
+    MountTarget
 } from "./runtime/driver.js";
 export {
     appComposeSpec,

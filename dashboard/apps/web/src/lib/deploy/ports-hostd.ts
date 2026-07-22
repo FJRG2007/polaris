@@ -6,7 +6,7 @@
  */
 
 import type { Readable } from "node:stream";
-import type { BuildRequest, ComposeSpec, ExecSpec, ExecStream, LogOptions, OutputSink, RuntimePorts } from "@polaris/deploy";
+import type { BuildRequest, ComposeSpec, ExecSpec, ExecStream, LogOptions, MountTarget, OutputSink, RuntimePorts } from "@polaris/deploy";
 import { HostdClient } from "@polaris/hostd-client";
 
 export class HostdPorts implements RuntimePorts {
@@ -63,6 +63,20 @@ export class HostdPorts implements RuntimePorts {
             throw new Error(`inspect ${ref} failed (${response.status})`);
         }
         return JSON.parse(response.body);
+    }
+
+    public async ensureMount(spec: MountTarget): Promise<void> {
+        // The daemon confines the target under its mount root, so we pass the bare
+        // connection id as the subdir. Idempotent: a live mount returns success.
+        await this.client.createMount({
+            id: spec.id,
+            kind: spec.kind,
+            source: spec.source,
+            target: spec.id,
+            options: spec.options,
+            username: spec.username,
+            password: spec.password
+        });
     }
 
     public async container(ref: string, action: "restart" | "stop" | "start"): Promise<void> {
