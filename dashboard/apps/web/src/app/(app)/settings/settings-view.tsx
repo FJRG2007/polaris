@@ -46,6 +46,7 @@ export function SettingsView({
     const [logExit, setLogExit] = useState<number | null>(null);
     const logRef = useRef<HTMLPreElement>(null);
     const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    const waitRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
     function onCheck() {
         startTransition(async () => {
@@ -73,7 +74,11 @@ export function SettingsView({
             setLogText("");
             setLogExit(null);
             pollLogs();
-            return; // stay in the updating state; the log's completion marker ends it
+            // Also watch health: the web restarts on the new build during the update,
+            // which reloads the page even if the log marker is missed - so the card
+            // never stays stuck on "Updating..." until a manual restart.
+            waitForUpdate();
+            return; // stay in the updating state; completion reloads via marker or health
         }
         setUpdating(false);
         if (result === "unavailable") {
@@ -91,16 +96,23 @@ export function SettingsView({
     // The web container restarts during an update; poll the cheap local health
     // endpoint (no GitHub calls), and once it has gone down and come back healthy
     // on the new build, reload. Keeps downtime visible and self-heals the page.
+    // Runs in parallel with the log tail as the reliable completion signal: the web
+    // container is recreated during an update, so once it has gone down and come
+    // back healthy on the new build the update is effectively done - reload so the
+    // page re-reads the fresh status. This fixes the stuck "Updating..." when the
+    // log's completion marker is missed or its file is lost on the recreate.
+    // Idempotent: only one health watcher runs at a time.
     function waitForUpdate(): void {
+        if (waitRef.current) return;
         let sawDown = false;
         let tries = 0;
-        const timer = setInterval(async () => {
+        waitRef.current = setInterval(async () => {
             tries += 1;
             try {
                 const res = await fetch("/api/health", { cache: "no-store" });
                 if (res.ok) {
                     if (sawDown) {
-                        clearInterval(timer);
+                        stopPolling();
                         setUpdateMsg("Updated - reloading...");
                         window.location.reload();
                     }
@@ -111,7 +123,7 @@ export function SettingsView({
                 sawDown = true;
             }
             if (tries >= 150) {
-                clearInterval(timer);
+                stopPolling();
                 setUpdating(false);
                 setUpdateMsg("Update is taking longer than expected. Refresh the page manually.");
             }
@@ -122,6 +134,10 @@ export function SettingsView({
         if (pollRef.current) {
             clearInterval(pollRef.current);
             pollRef.current = null;
+        }
+        if (waitRef.current) {
+            clearInterval(waitRef.current);
+            waitRef.current = null;
         }
     }
 
