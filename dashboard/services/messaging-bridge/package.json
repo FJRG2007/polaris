@@ -1,0 +1,23 @@
+{
+    "name": "@polaris/messaging-bridge",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "description": "Managed container running the channel adapters behind a bearer-authenticated HTTP API; forwards inbound messages to the Polaris web ingest route.",
+    "main": "./dist/index.js",
+    "scripts": {
+        "build": "tsup",
+        "start": "node dist/index.js",
+        "typecheck": "tsc --noEmit",
+        "test": "vitest run --passWithNoTests"
+    },
+    "dependencies": {
+        "@polaris/messaging": "0.1.0",
+        "discord.js": "14.16.3",
+        "qrcode": "1.5.4",
+        "whatsapp-web.js": "1.34.7"
+    },
+    "devDependencies": {
+        "@types/qrcode": "1.5.5"
+    }
+}

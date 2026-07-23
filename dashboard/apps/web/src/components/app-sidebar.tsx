@@ -26,6 +26,7 @@ import {
     Settings,
     ShieldCheck,
     Star,
+    Store,
     Trash2,
     Users,
     UsersRound,
@@ -51,12 +52,13 @@ const APP_SIDEBARS: Record<string, SidebarItem[]> = {
         { label: "Drop points", href: "/drive/drop-points", icon: Inbox },
         { label: "Trash", href: "/trash", icon: Trash2 }
     ],
-    deploy: [
-        { label: "Overview", href: "/apps/deploy", icon: Rocket },
+    apps: [
+        { label: "Marketplace", href: "/apps/marketplace", icon: Store },
+        { label: "Deploy", href: "/apps/deploy", icon: Rocket },
         { label: "Servers", href: "/apps/servers", icon: Server },
-        { label: "Containers", href: "/apps/containers", icon: Container }
+        { label: "Containers", href: "/apps/containers", icon: Container },
+        { label: "Backups", href: "/apps/backups", icon: Database }
     ],
-    backups: [{ label: "Databases", href: "/apps/backups", icon: Database }],
     admin: [
         { label: "Overview", href: "/admin", icon: LayoutDashboard },
         { label: "Users", href: "/admin/users", icon: Users },

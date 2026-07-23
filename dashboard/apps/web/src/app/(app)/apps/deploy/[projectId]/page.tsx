@@ -74,7 +74,15 @@ export default async function DeployProjectPage({ params }: { params: Promise<{ 
                 port: portOf(app.sourceConfig),
                 ipUrl: serverIp ? `http://${serverIp}:${hostPortForApp(app.id)}` : null,
                 domains: mergeTunnelDomains(
-                    app.domains.map((domain) => ({ id: domain.id, hostname: domain.hostname, kind: domain.kind, enabled: domain.enabled })),
+                    app.domains.map((domain) => ({
+                        id: domain.id,
+                        hostname: domain.hostname,
+                        kind: domain.kind,
+                        enabled: domain.enabled,
+                        healthStatus: domain.healthStatus,
+                        healthCode: domain.healthCode,
+                        healthDetail: domain.healthDetail
+                    })),
                     tunnelDomains.get(app.id) ?? []
                 ),
                 volumes: app.volumes.map((volume) => ({

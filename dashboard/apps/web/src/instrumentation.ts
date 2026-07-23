@@ -58,4 +58,14 @@ export async function register(): Promise<void> {
     // dynamic-DNS wildcard base stays reachable as the ISP IP changes.
     const { startDuckDnsSync } = await import("./lib/domain-service");
     startDuckDnsSync();
+
+    // Probe each deployed-app domain so a subdomain that resolves but does not
+    // actually serve is flagged as down in the UI, instead of shown as a live link.
+    const { startDomainHealthPoller } = await import("./lib/watch/domain-health-poller");
+    startDomainHealthPoller();
+
+    // Evaluate Watch alarms (CPU/memory spikes, service/domain down) against recent
+    // metrics and health, firing notifications on state transitions.
+    const { startAlarmEvaluator } = await import("./lib/watch/alarm-evaluator");
+    startAlarmEvaluator();
 }
