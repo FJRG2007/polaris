@@ -317,7 +317,23 @@ function MessageBubble({ message }: { message: MessageView }) {
     );
 }
 
-type ChannelKind = "telegram" | "whatsapp-cloud" | "whatsapp-web";
+type ChannelKind = "telegram" | "whatsapp-cloud" | "whatsapp-web" | "discord" | "slack";
+
+const CHANNEL_PLATFORM: Record<ChannelKind, ChannelView["platform"]> = {
+    telegram: "telegram",
+    "whatsapp-cloud": "whatsapp",
+    "whatsapp-web": "whatsapp",
+    discord: "discord",
+    slack: "slack"
+};
+
+const CHANNEL_PROVIDER: Record<ChannelKind, string | null> = {
+    telegram: null,
+    "whatsapp-cloud": "whatsapp-cloud",
+    "whatsapp-web": "whatsapp-web",
+    discord: null,
+    slack: null
+};
 
 function ConnectChannelDialog({
     bridgeReady,
@@ -379,17 +395,22 @@ function ConnectChannelDialog({
 
     function submit() {
         setError(null);
-        const input = isCloud
-            ? {
-                  platform: "whatsapp" as const,
-                  provider: "whatsapp-cloud",
-                  name: name.trim(),
-                  token: token.trim(),
-                  config: { phoneNumberId: phoneNumberId.trim() }
-              }
-            : isWeb
-              ? { platform: "whatsapp" as const, provider: "whatsapp-web", name: name.trim() }
-              : { platform: "telegram" as const, name: name.trim(), token: token.trim() };
+        const input =
+            kind === "whatsapp-cloud"
+                ? {
+                      platform: "whatsapp" as const,
+                      provider: "whatsapp-cloud",
+                      name: name.trim(),
+                      token: token.trim(),
+                      config: { phoneNumberId: phoneNumberId.trim() }
+                  }
+                : kind === "whatsapp-web"
+                  ? { platform: "whatsapp" as const, provider: "whatsapp-web", name: name.trim() }
+                  : kind === "discord"
+                    ? { platform: "discord" as const, name: name.trim(), token: token.trim() }
+                    : kind === "slack"
+                      ? { platform: "slack" as const, name: name.trim(), token: token.trim() }
+                      : { platform: "telegram" as const, name: name.trim(), token: token.trim() };
         startTransition(async () => {
             const result = await connectChannelAction(input);
             if (result.error) {
@@ -403,8 +424,8 @@ function ConnectChannelDialog({
             }
             onConnected({
                 id: result.channelId ?? crypto.randomUUID(),
-                platform: isCloud ? "whatsapp" : "telegram",
-                provider: isCloud ? "whatsapp-cloud" : null,
+                platform: CHANNEL_PLATFORM[kind],
+                provider: CHANNEL_PROVIDER[kind],
                 name: name.trim(),
                 externalId: null,
                 status: "connected",
@@ -472,7 +493,9 @@ function ConnectChannelDialog({
                                     options={[
                                         { value: "telegram", label: "Telegram" },
                                         { value: "whatsapp-cloud", label: "WhatsApp (Cloud API)" },
-                                        { value: "whatsapp-web", label: "WhatsApp (QR, free)" }
+                                        { value: "whatsapp-web", label: "WhatsApp (QR, free)" },
+                                        { value: "discord", label: "Discord" },
+                                        { value: "slack", label: "Slack" }
                                     ]}
                                 />
                             </label>

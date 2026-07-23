@@ -6,6 +6,8 @@
 
 import type { AdapterContext, ChannelAdapter, InboundMessage } from "@polaris/messaging";
 import type { ConnectChannelRequest } from "@polaris/messaging";
+import { DiscordAdapter } from "./adapters/discord.js";
+import { SlackAdapter } from "./adapters/slack.js";
 import { TelegramAdapter } from "./adapters/telegram.js";
 import { WhatsAppCloudAdapter } from "./adapters/whatsapp-cloud.js";
 import { WhatsAppWebAdapter } from "./adapters/whatsapp-web.js";
@@ -32,6 +34,14 @@ export class AdapterRegistry {
                     return new WhatsAppCloudAdapter(request.token, phoneNumberId, context);
                 }
                 return new WhatsAppWebAdapter(request.channelId, context);
+            }
+            case "discord": {
+                if (!request.token) throw new Error("Discord needs a bot token");
+                return new DiscordAdapter(request.token, request.channelId, context);
+            }
+            case "slack": {
+                if (!request.token) throw new Error("Slack needs a bot token");
+                return new SlackAdapter(request.token, context);
             }
             default:
                 throw new Error(`The ${request.platform} adapter is not available yet`);

@@ -295,6 +295,13 @@ export async function findCloudChannelByPhoneNumberId(phoneNumberId: string): Pr
     return null;
 }
 
+/** Resolve a channel by its platform + platform-side id (e.g. Slack team id), for
+ *  webhook routing. */
+export async function findChannelByExternalId(platform: string, externalId: string): Promise<string | null> {
+    const channel = await prisma.channel.findFirst({ where: { platform, externalId }, select: { id: true } });
+    return channel?.id ?? null;
+}
+
 export interface ChannelLiveState {
     status: string;
     qr?: string;
