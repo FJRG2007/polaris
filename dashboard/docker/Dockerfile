@@ -35,6 +35,10 @@ COPY packages/hostd-client/package.json ./packages/hostd-client/
 COPY packages/ssh/package.json ./packages/ssh/
 COPY packages/storage/package.json ./packages/storage/
 COPY packages/ui/package.json ./packages/ui/
+# Build-only sidecar workspace (services/*). Its manifest must be present or `npm
+# ci` fails the lockfile-consistency check, even though the web image never builds
+# it - it ships as its own image.
+COPY services/edge-guard/package.json ./services/edge-guard/
 
 # `npm ci` installs the whole workspace from the committed lockfile.
 RUN --mount=type=cache,target=/root/.npm npm ci

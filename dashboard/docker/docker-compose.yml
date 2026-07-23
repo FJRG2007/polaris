@@ -251,10 +251,15 @@ services:
   # header Traefik stamps on) and verifies login tokens offline, so it keeps
   # enforcing if the Polaris control plane is down. On the proxy network (aliased to
   # the name the generated forwardAuth address uses) so deployed apps' routers reach
-  # it by name; never published to the host. Built locally until a release image
-  # ships. Idle when no app has a denylist/require-login rule.
+  # it by name; never published to the host. Idle when no app has a denylist/
+  # require-login rule.
+  #
+  # Build-only, exactly like the mdns sidecar: with no `image`, `docker compose pull`
+  # skips it instead of trying - and failing - to fetch an unpublished image, which
+  # would otherwise flip the whole update onto the slow (and failure-prone) build-
+  # from-source path. It is built once on first `up`; a later release that changes it
+  # will ship a published image so updates pull it (see the WAF follow-up notes).
   edge-guard:
-    image: polaris-edge-guard:local
     build:
       context: ..
       dockerfile: services/edge-guard/Dockerfile
