@@ -559,14 +559,26 @@ main() {
     $compose exec -T caddy caddy reload --config /etc/caddy/Caddyfile >/dev/null 2>&1 \
         || $compose up -d --force-recreate caddy >/dev/null 2>&1 || true
 
-    # Reclaim what this update superseded. Pulling a new `:latest` leaves the
-    # previous image untagged (dangling); over many updates these pile up until the
-    # disk fills and the whole stack falls over (a full disk is exactly what took
-    # the dashboard down). Prune only dangling images and stale build cache - tagged
-    # images, including those of deployed apps, and all volumes are left untouched.
-    # Best-effort: cleanup must never fail an otherwise-successful update.
+    # Reclaim what this update superseded, automatically, so the disk cannot creep
+    # to full over many updates (a full disk is exactly what took the dashboard
+    # down). Everything here is conservative and best-effort - cleanup must never
+    # fail an otherwise-successful update, and must never touch data:
+    #   - dangling images: the previous `:latest` each pull leaves untagged
+    #   - build cache: stale layers from source builds
+    #   - unused networks: prune keeps any network that still has a container
+    # Tagged images (including deployed apps') are all kept.
     docker image prune -f >/dev/null 2>&1 || true
     docker builder prune -f >/dev/null 2>&1 || true
+    docker network prune -f >/dev/null 2>&1 || true
+    # Orphan (anonymous) volumes only, and only on Docker >= 23 where `volume prune`
+    # defaults to anonymous-only - named volumes (how Polaris names every app/data
+    # volume) are NOT removed. On older Docker `volume prune` would also take named
+    # volumes, so skip it there rather than risk deleting an app's data.
+    dver="$(docker version --format '{{.Server.Version}}' 2>/dev/null | cut -d. -f1)"
+    case "$dver" in
+        ''|*[!0-9]*) : ;;
+        *) [ "$dver" -ge 23 ] && docker volume prune -f >/dev/null 2>&1 || true ;;
+    esac
 
     url=$(sed -n 's#^POLARIS_APP_URL=##p' .env | head -n1)
 

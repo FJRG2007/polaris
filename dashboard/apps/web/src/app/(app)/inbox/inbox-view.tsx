@@ -9,6 +9,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import type { ReactElement } from "react";
 import { Loader2, MessagesSquare, Plus, Send, Trash2 } from "lucide-react";
 import {
     Badge,
@@ -35,6 +36,7 @@ import {
     sendMessageAction
 } from "./actions";
 import type { AgentView, ChannelView, ConversationView, MessageView } from "@/lib/messaging-service";
+import { DiscordLogo, SlackLogo, TelegramLogo, WhatsAppLogo } from "./channel-logos";
 
 export function InboxView({
     initialChannels,
@@ -384,6 +386,83 @@ const CHANNEL_PROVIDER: Record<ChannelKind, string | null> = {
     slack: null
 };
 
+interface ChannelKindMeta {
+    kind: ChannelKind;
+    name: string;
+    tagline: string;
+    /** Brand color for the logo tile; also tints the logo (currentColor). */
+    color: string;
+    Logo: (props: { className?: string }) => ReactElement;
+    badge?: string;
+    /** Label for the token field; omit for channels that need no upfront token (QR). */
+    tokenLabel?: string;
+    tokenPlaceholder?: string;
+    /** WhatsApp Cloud also needs a phone-number id. */
+    needsPhoneNumberId?: boolean;
+    /** One line shown under the form explaining where to get the credentials. */
+    help: string;
+}
+
+// The channel marketplace: the picker renders one card per entry, so new channels
+// are added here without touching the dialog. Order is the display order.
+const CHANNEL_CATALOG: ChannelKindMeta[] = [
+    {
+        kind: "whatsapp-web",
+        name: "WhatsApp (QR)",
+        tagline: "Free. Links your phone by QR - unofficial, carries a ban risk.",
+        color: "#25D366",
+        Logo: WhatsAppLogo,
+        badge: "Free",
+        help: "Scan a QR with your phone to link it. Free but unofficial - use a spare number, not your main one."
+    },
+    {
+        kind: "whatsapp-cloud",
+        name: "WhatsApp Cloud",
+        tagline: "Official Meta API. Native buttons and templates, paid.",
+        color: "#25D366",
+        Logo: WhatsAppLogo,
+        badge: "Official",
+        tokenLabel: "Access token",
+        tokenPlaceholder: "EAAG...",
+        needsPhoneNumberId: true,
+        help: "Meta access token + phone-number id from the WhatsApp API setup page. Point its webhook at this Polaris."
+    },
+    {
+        kind: "telegram",
+        name: "Telegram",
+        tagline: "A @BotFather bot. Buttons and inline menus.",
+        color: "#229ED9",
+        Logo: TelegramLogo,
+        tokenLabel: "Bot token",
+        tokenPlaceholder: "123456:ABC-DEF...",
+        help: "Create a bot with @BotFather in Telegram and paste the token it gives you."
+    },
+    {
+        kind: "discord",
+        name: "Discord",
+        tagline: "A bot application. Buttons and select menus.",
+        color: "#5865F2",
+        Logo: DiscordLogo,
+        tokenLabel: "Bot token",
+        tokenPlaceholder: "Bot token from the Developer Portal",
+        help: "Create an app and bot in the Discord Developer Portal and paste the bot token."
+    },
+    {
+        kind: "slack",
+        name: "Slack",
+        tagline: "A workspace app. Blocks and interactive actions.",
+        color: "#E01E5A",
+        Logo: SlackLogo,
+        tokenLabel: "Bot token",
+        tokenPlaceholder: "xoxb-...",
+        help: "Install a Slack app to your workspace and paste its Bot User OAuth token (starts with xoxb-)."
+    }
+];
+
+const CHANNEL_META: Record<ChannelKind, ChannelKindMeta> = Object.fromEntries(
+    CHANNEL_CATALOG.map((meta) => [meta.kind, meta])
+) as Record<ChannelKind, ChannelKindMeta>;
+
 function ConnectChannelDialog({
     bridgeReady,
     onClose,
@@ -393,7 +472,7 @@ function ConnectChannelDialog({
     onClose: () => void;
     onConnected: (channel: ChannelView) => void;
 }) {
-    const [phase, setPhase] = useState<"form" | "qr">("form");
+    const [phase, setPhase] = useState<"picker" | "form" | "qr">("picker");
     const [kind, setKind] = useState<ChannelKind>("telegram");
     const [name, setName] = useState("");
     const [token, setToken] = useState("");
@@ -404,14 +483,24 @@ function ConnectChannelDialog({
     const [qr, setQr] = useState<string | null>(null);
     const [qrStatus, setQrStatus] = useState("connecting");
 
-    const isCloud = kind === "whatsapp-cloud";
+    const meta = CHANNEL_META[kind];
     const isWeb = kind === "whatsapp-web";
-    const needsToken = !isWeb;
+    const needsToken = Boolean(meta.tokenLabel);
     const ready =
         bridgeReady &&
         name.trim() !== "" &&
         (!needsToken || token.trim() !== "") &&
-        (!isCloud || phoneNumberId.trim() !== "");
+        (!meta.needsPhoneNumberId || phoneNumberId.trim() !== "");
+
+    // Pick a channel from the marketplace grid: seed the name and clear prior input.
+    function pick(next: ChannelKind) {
+        setKind(next);
+        setName(CHANNEL_META[next].name);
+        setToken("");
+        setPhoneNumberId("");
+        setError(null);
+        setPhase("form");
+    }
 
     // While onboarding whatsapp-web, poll the bridge for the QR and connected state.
     useEffect(() => {
@@ -518,14 +607,12 @@ function ConnectChannelDialog({
                             </Button>
                         </div>
                     </>
-                ) : (
+                ) : phase === "picker" ? (
                     <>
                         <DialogHeader>
-                            <DialogTitle>Connect a channel</DialogTitle>
+                            <DialogTitle>Add a channel</DialogTitle>
                             <DialogDescription>
-                                Telegram uses a @BotFather token. WhatsApp Cloud uses a Meta token + phone-number id (with
-                                its webhook pointed here). WhatsApp (QR) is free but links your phone and carries a ban
-                                risk. Discord and Slack are on the way.
+                                Pick a platform to connect. Add as many as you like and handle them all from one inbox.
                             </DialogDescription>
                         </DialogHeader>
                         {!bridgeReady && (
@@ -537,21 +624,55 @@ function ConnectChannelDialog({
                                 to enable channels.
                             </p>
                         )}
+                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                            {CHANNEL_CATALOG.map((item) => {
+                                const Logo = item.Logo;
+                                return (
+                                    <button
+                                        key={item.kind}
+                                        type="button"
+                                        disabled={!bridgeReady}
+                                        onClick={() => pick(item.kind)}
+                                        className="flex items-start gap-3 rounded-md border border-border p-3 text-left transition-colors hover:border-foreground/30 disabled:cursor-not-allowed disabled:opacity-50"
+                                    >
+                                        <div
+                                            className="grid size-10 shrink-0 place-items-center rounded-md"
+                                            style={{ color: item.color, backgroundColor: `${item.color}1a` }}
+                                        >
+                                            <Logo className="size-5" />
+                                        </div>
+                                        <div className="min-w-0">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-sm font-medium">{item.name}</span>
+                                                {item.badge && <Badge>{item.badge}</Badge>}
+                                            </div>
+                                            <p className="text-xs text-muted-foreground">{item.tagline}</p>
+                                        </div>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                        <div className="flex justify-end">
+                            <Button variant="ghost" onClick={onClose}>
+                                Cancel
+                            </Button>
+                        </div>
+                    </>
+                ) : (
+                    <>
+                        <DialogHeader>
+                            <DialogTitle className="flex items-center gap-2">
+                                <span
+                                    className="grid size-7 shrink-0 place-items-center rounded"
+                                    style={{ color: meta.color, backgroundColor: `${meta.color}1a` }}
+                                >
+                                    <meta.Logo className="size-4" />
+                                </span>
+                                Connect {meta.name}
+                            </DialogTitle>
+                            <DialogDescription>{meta.help}</DialogDescription>
+                        </DialogHeader>
                         <div className="flex flex-col gap-3">
-                            <label className="flex flex-col gap-1 text-sm">
-                                <span className="font-medium">Channel</span>
-                                <Select
-                                    value={kind}
-                                    onValueChange={(value) => setKind(value as ChannelKind)}
-                                    options={[
-                                        { value: "telegram", label: "Telegram" },
-                                        { value: "whatsapp-cloud", label: "WhatsApp (Cloud API)" },
-                                        { value: "whatsapp-web", label: "WhatsApp (QR, free)" },
-                                        { value: "discord", label: "Discord" },
-                                        { value: "slack", label: "Slack" }
-                                    ]}
-                                />
-                            </label>
                             <label className="flex flex-col gap-1 text-sm">
                                 <span className="font-medium">Name</span>
                                 <Input
@@ -562,16 +683,16 @@ function ConnectChannelDialog({
                             </label>
                             {needsToken && (
                                 <label className="flex flex-col gap-1 text-sm">
-                                    <span className="font-medium">{isCloud ? "Access token" : "Bot token"}</span>
+                                    <span className="font-medium">{meta.tokenLabel}</span>
                                     <Input
                                         type="password"
                                         value={token}
                                         onChange={(event) => setToken(event.target.value)}
-                                        placeholder={isCloud ? "EAAG..." : "123456:ABC-DEF..."}
+                                        placeholder={meta.tokenPlaceholder}
                                     />
                                 </label>
                             )}
-                            {isCloud && (
+                            {meta.needsPhoneNumberId && (
                                 <label className="flex flex-col gap-1 text-sm">
                                     <span className="font-medium">Phone number id</span>
                                     <Input
@@ -582,9 +703,16 @@ function ConnectChannelDialog({
                                 </label>
                             )}
                             {error && <p className="text-sm text-danger">{error}</p>}
-                            <div className="flex justify-end gap-2">
-                                <Button variant="ghost" onClick={onClose} disabled={pending}>
-                                    Cancel
+                            <div className="flex items-center justify-between gap-2">
+                                <Button
+                                    variant="ghost"
+                                    onClick={() => {
+                                        setError(null);
+                                        setPhase("picker");
+                                    }}
+                                    disabled={pending}
+                                >
+                                    Back
                                 </Button>
                                 <Button onClick={submit} disabled={pending || !ready}>
                                     {pending && <Loader2 className="size-4 animate-spin" />}
