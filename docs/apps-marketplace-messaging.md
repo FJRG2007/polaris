@@ -5,8 +5,34 @@ manages external apps Polaris runs) and the unified messaging system (a
 multi-platform support inbox plus a channel-adapter abstraction reusable by AI
 assistants).
 
-Status: design agreed, Phase 0 in progress. This document is the source of
-truth; keep it current as phases land.
+Status: Phase 0 complete; Phase 1 (Telegram) code-complete and typechecked
+(runtime verification pending an operator bot token + a running bridge). This
+document is the source of truth; keep it current as phases land.
+
+## Progress
+
+- Phase 0 - DONE (commits 254a847, 76c920d, 0a9323a): app catalog, InstalledApp
+  model, umbrella "Apps" pillar, marketplace + install wizard (Deploy target +
+  storage picker), per-installed-app dashboard.
+- Phase 1 - CODE DONE (bf73eaf, 97ac322, 118b272): Channel/Conversation/Message
+  model; @polaris/messaging contracts; messaging-bridge service + Telegram
+  adapter; web bridge-client + messaging-service + /api/inbox/ingest + the Inbox
+  pillar (conversation list + thread + text/interactive composer, short-poll).
+  To run live, set MESSAGING_BRIDGE_URL, MESSAGING_BRIDGE_TOKEN,
+  MESSAGING_INGEST_KEY on the web and BRIDGE_TOKEN, WEB_INGEST_URL,
+  WEB_INGEST_KEY on the bridge, and connect a Telegram bot token.
+- Phases 2-4 - PENDING (see plan below); each needs operator credentials to
+  verify.
+
+## Known follow-ups (deferred, not silently dropped)
+
+- Bridge as a marketplace install: the bridge manifest is `build`-only, so it is
+  not yet installable via the image-only install path; it runs as an
+  env-configured service for now. Add build-context install to deploy it from the
+  marketplace.
+- Inbox realtime is short-poll; a WS push via the existing sidecar is the upgrade.
+- Inbox is gated by requireUser (per-owner); split out inbox.read/send/manage
+  permissions when the IAM catalog is next touched.
 
 ## Goals (from the operator)
 
