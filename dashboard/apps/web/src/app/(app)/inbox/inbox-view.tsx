@@ -10,7 +10,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import type { ReactElement } from "react";
-import { Loader2, MessagesSquare, Plus, Send, Trash2 } from "lucide-react";
+import { Loader2, MessagesSquare, Plus, Send, Trash2, Users } from "lucide-react";
 import {
     Badge,
     Button,
@@ -29,13 +29,18 @@ import {
     assignConversationAction,
     channelStateAction,
     connectChannelAction,
+    createContactAction,
     deleteChannelAction,
+    deleteContactAction,
     getMessagesAction,
     listAgentsAction,
+    listContactsAction,
     listConversationsAction,
-    sendMessageAction
+    sendMessageAction,
+    startConversationAction
 } from "./actions";
-import type { AgentView, ChannelView, ConversationView, MessageView } from "@/lib/messaging-service";
+import type { Platform } from "@polaris/messaging";
+import type { AgentView, ChannelView, ContactView, ConversationView, MessageView } from "@/lib/messaging-service";
 import { DiscordLogo, SlackLogo, TelegramLogo, WhatsAppLogo } from "./channel-logos";
 
 export function InboxView({
@@ -51,7 +56,11 @@ export function InboxView({
     const [conversations, setConversations] = useState(initialConversations);
     const [activeId, setActiveId] = useState<string | null>(initialConversations[0]?.id ?? null);
     const [connecting, setConnecting] = useState(false);
+    const [newChat, setNewChat] = useState(false);
+    const [contactsOpen, setContactsOpen] = useState(false);
     const [agents, setAgents] = useState<AgentView[]>([]);
+
+    const connectedChannels = useMemo(() => channels.filter((c) => c.status === "connected"), [channels]);
 
     // Load the assignable agents once, for the thread's assignment control.
     useEffect(() => {
@@ -80,9 +89,22 @@ export function InboxView({
         <div className="flex h-[calc(100vh-8rem)] flex-col gap-3">
             <div className="flex items-center justify-between">
                 <h1 className="text-lg font-semibold tracking-tight">Inbox</h1>
-                <Button size="sm" onClick={() => setConnecting(true)}>
-                    <Plus className="size-4" /> Connect channel
-                </Button>
+                <div className="flex items-center gap-2">
+                    <Button size="sm" variant="secondary" onClick={() => setContactsOpen(true)}>
+                        <Users className="size-4" /> Contacts
+                    </Button>
+                    <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => setNewChat(true)}
+                        disabled={connectedChannels.length === 0}
+                    >
+                        <Plus className="size-4" /> New chat
+                    </Button>
+                    <Button size="sm" onClick={() => setConnecting(true)}>
+                        <Plus className="size-4" /> Connect channel
+                    </Button>
+                </div>
             </div>
 
             {channels.length > 0 && (
@@ -104,9 +126,19 @@ export function InboxView({
                 <Card className="flex w-72 shrink-0 flex-col overflow-hidden">
                     <CardBody className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto p-2">
                         {conversations.length === 0 ? (
-                            <p className="p-3 text-sm text-muted-foreground">
-                                No conversations yet. Message your bot to start one.
-                            </p>
+                            <div className="flex flex-col items-start gap-2 p-3">
+                                <p className="text-sm text-muted-foreground">
+                                    No conversations yet. Start one, or wait for an incoming message.
+                                </p>
+                                <Button
+                                    size="sm"
+                                    variant="secondary"
+                                    onClick={() => setNewChat(true)}
+                                    disabled={connectedChannels.length === 0}
+                                >
+                                    <Plus className="size-4" /> New chat
+                                </Button>
+                            </div>
                         ) : (
                             conversations.map((conversation) => (
                                 <button
@@ -157,6 +189,18 @@ export function InboxView({
                     }}
                 />
             )}
+            {newChat && (
+                <NewChatDialog
+                    channels={connectedChannels}
+                    onClose={() => setNewChat(false)}
+                    onStarted={(conversationId) => {
+                        setNewChat(false);
+                        void refreshConversations();
+                        setActiveId(conversationId);
+                    }}
+                />
+            )}
+            {contactsOpen && <ContactsDialog onClose={() => setContactsOpen(false)} />}
         </div>
     );
 }
@@ -722,6 +766,264 @@ function ConnectChannelDialog({
                         </div>
                     </>
                 )}
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+const PLATFORM_LABEL: Record<string, string> = {
+    whatsapp: "WhatsApp",
+    telegram: "Telegram",
+    discord: "Discord",
+    slack: "Slack"
+};
+
+// Per-platform hint for the recipient id when starting a chat or saving a contact.
+const PEER_HINT: Record<string, string> = {
+    whatsapp: "Phone number with country code, e.g. 34600111222",
+    telegram: "Numeric chat id - they must have messaged the bot first",
+    discord: "User or channel id",
+    slack: "Channel or user id"
+};
+
+const PLATFORM_OPTIONS = [
+    { value: "whatsapp", label: "WhatsApp" },
+    { value: "telegram", label: "Telegram" },
+    { value: "discord", label: "Discord" },
+    { value: "slack", label: "Slack" }
+];
+
+// Start a new outbound conversation: pick a connected channel, a saved contact or
+// a raw recipient id, and the first message. WhatsApp accepts a plain phone number
+// (normalized server-side); Telegram/Discord/Slack take the platform-side id.
+function NewChatDialog({
+    channels,
+    onClose,
+    onStarted
+}: {
+    channels: ChannelView[];
+    onClose: () => void;
+    onStarted: (conversationId: string) => void;
+}) {
+    const [channelId, setChannelId] = useState(channels[0]?.id ?? "");
+    const [contacts, setContacts] = useState<ContactView[]>([]);
+    const [peerId, setPeerId] = useState("");
+    const [peerName, setPeerName] = useState("");
+    const [text, setText] = useState("");
+    const [save, setSave] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [pending, startTransition] = useTransition();
+
+    useEffect(() => {
+        void listContactsAction()
+            .then(setContacts)
+            .catch(() => undefined);
+    }, []);
+
+    const channel = channels.find((item) => item.id === channelId) ?? channels[0];
+    const platform = channel?.platform ?? "";
+    const platformContacts = contacts.filter((item) => item.platform === platform);
+    const ready = Boolean(channelId) && peerId.trim() !== "" && text.trim() !== "";
+
+    function submit() {
+        setError(null);
+        startTransition(async () => {
+            if (save && peerName.trim() && platform) {
+                await createContactAction({
+                    name: peerName.trim(),
+                    platform: platform as Platform,
+                    peerId: peerId.trim()
+                }).catch(() => undefined);
+            }
+            const result = await startConversationAction({
+                channelId,
+                peerId: peerId.trim(),
+                peerName: peerName.trim() || undefined,
+                text: text.trim()
+            });
+            if (result.error) {
+                setError(result.error);
+                return;
+            }
+            if (result.conversationId) onStarted(result.conversationId);
+        });
+    }
+
+    return (
+        <Dialog open onOpenChange={(open) => !open && onClose()}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>New chat</DialogTitle>
+                    <DialogDescription>Message someone on a connected channel to start a conversation.</DialogDescription>
+                </DialogHeader>
+                <div className="flex flex-col gap-3">
+                    <label className="flex flex-col gap-1 text-sm">
+                        <span className="font-medium">Channel</span>
+                        <Select
+                            value={channelId}
+                            onValueChange={setChannelId}
+                            options={channels.map((item) => ({
+                                value: item.id,
+                                label: `${item.name} - ${PLATFORM_LABEL[item.platform] ?? item.platform}`
+                            }))}
+                        />
+                    </label>
+                    {platformContacts.length > 0 && (
+                        <label className="flex flex-col gap-1 text-sm">
+                            <span className="font-medium">Contact</span>
+                            <Select
+                                value=""
+                                onValueChange={(id) => {
+                                    const found = platformContacts.find((item) => item.id === id);
+                                    if (found) {
+                                        setPeerId(found.peerId);
+                                        setPeerName(found.name);
+                                    }
+                                }}
+                                placeholder="Pick a saved contact (optional)"
+                                options={platformContacts.map((item) => ({ value: item.id, label: item.name }))}
+                            />
+                        </label>
+                    )}
+                    <label className="flex flex-col gap-1 text-sm">
+                        <span className="font-medium">To</span>
+                        <Input
+                            value={peerId}
+                            onChange={(event) => setPeerId(event.target.value)}
+                            placeholder={PEER_HINT[platform] ?? "Recipient id"}
+                        />
+                    </label>
+                    <label className="flex flex-col gap-1 text-sm">
+                        <span className="font-medium">Name (optional)</span>
+                        <Input value={peerName} onChange={(event) => setPeerName(event.target.value)} placeholder="Display name" />
+                    </label>
+                    <label className="flex flex-col gap-1 text-sm">
+                        <span className="font-medium">Message</span>
+                        <Input value={text} onChange={(event) => setText(event.target.value)} placeholder="First message" />
+                    </label>
+                    <label className="flex items-center gap-2 text-sm">
+                        <input type="checkbox" checked={save} onChange={(event) => setSave(event.target.checked)} />
+                        <span>Save as contact</span>
+                    </label>
+                    {error && <p className="text-sm text-danger">{error}</p>}
+                    <div className="flex justify-end gap-2">
+                        <Button variant="ghost" onClick={onClose} disabled={pending}>
+                            Cancel
+                        </Button>
+                        <Button onClick={submit} disabled={pending || !ready}>
+                            {pending && <Loader2 className="size-4 animate-spin" />}
+                            Send
+                        </Button>
+                    </div>
+                </div>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+// Manage saved contacts: list, add (name + platform + recipient id), remove.
+function ContactsDialog({ onClose }: { onClose: () => void }) {
+    const [contacts, setContacts] = useState<ContactView[] | null>(null);
+    const [name, setName] = useState("");
+    const [platform, setPlatform] = useState<Platform>("whatsapp");
+    const [peerId, setPeerId] = useState("");
+    const [error, setError] = useState<string | null>(null);
+    const [pending, startTransition] = useTransition();
+
+    const load = useCallback(
+        () =>
+            listContactsAction()
+                .then(setContacts)
+                .catch(() => setContacts([])),
+        []
+    );
+    useEffect(() => {
+        void load();
+    }, [load]);
+
+    const canAdd = name.trim() !== "" && peerId.trim() !== "";
+
+    function add() {
+        setError(null);
+        startTransition(async () => {
+            const result = await createContactAction({ name: name.trim(), platform, peerId: peerId.trim() });
+            if (result.error) {
+                setError(result.error);
+                return;
+            }
+            setName("");
+            setPeerId("");
+            await load();
+        });
+    }
+
+    function remove(id: string) {
+        startTransition(async () => {
+            await deleteContactAction(id);
+            await load();
+        });
+    }
+
+    return (
+        <Dialog open onOpenChange={(open) => !open && onClose()}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Contacts</DialogTitle>
+                    <DialogDescription>Save people you message often, then pick them when starting a chat.</DialogDescription>
+                </DialogHeader>
+                <div className="flex flex-col gap-3">
+                    <div className="flex max-h-56 flex-col divide-y divide-border overflow-y-auto">
+                        {contacts === null ? (
+                            <div className="flex items-center gap-2 py-4 text-sm text-muted-foreground">
+                                <Loader2 className="size-4 animate-spin" /> Loading...
+                            </div>
+                        ) : contacts.length === 0 ? (
+                            <p className="py-4 text-sm text-muted-foreground">No contacts yet.</p>
+                        ) : (
+                            contacts.map((item) => (
+                                <div key={item.id} className="flex items-center justify-between gap-2 py-2">
+                                    <div className="min-w-0">
+                                        <p className="truncate text-sm font-medium">{item.name}</p>
+                                        <p className="truncate text-xs text-muted-foreground">
+                                            {PLATFORM_LABEL[item.platform] ?? item.platform} - {item.peerId}
+                                        </p>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        aria-label="Remove contact"
+                                        className="text-muted-foreground hover:text-danger disabled:opacity-50"
+                                        disabled={pending}
+                                        onClick={() => remove(item.id)}
+                                    >
+                                        <Trash2 className="size-4" />
+                                    </button>
+                                </div>
+                            ))
+                        )}
+                    </div>
+                    <div className="flex flex-col gap-2 rounded-md border border-border p-3">
+                        <span className="text-sm font-medium">Add a contact</span>
+                        <Input value={name} onChange={(event) => setName(event.target.value)} placeholder="Name" />
+                        <Select value={platform} onValueChange={(value) => setPlatform(value as Platform)} options={PLATFORM_OPTIONS} />
+                        <Input
+                            value={peerId}
+                            onChange={(event) => setPeerId(event.target.value)}
+                            placeholder={PEER_HINT[platform] ?? "Recipient id"}
+                        />
+                        {error && <p className="text-sm text-danger">{error}</p>}
+                        <div className="flex justify-end">
+                            <Button size="sm" onClick={add} disabled={pending || !canAdd}>
+                                {pending && <Loader2 className="size-4 animate-spin" />}
+                                Add
+                            </Button>
+                        </div>
+                    </div>
+                    <div className="flex justify-end">
+                        <Button variant="ghost" onClick={onClose}>
+                            Close
+                        </Button>
+                    </div>
+                </div>
             </DialogContent>
         </Dialog>
     );

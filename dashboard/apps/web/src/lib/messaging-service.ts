@@ -85,6 +85,18 @@ export async function connectChannel(
     input: { platform: Platform; provider?: string; name: string; token?: string; config?: Record<string, string> }
 ): Promise<ChannelView> {
     const env = loadEnv();
+    // Clean up a prior failed/in-progress attempt with the same name on this
+    // platform, so retrying (e.g. after a QR that errored) does not leave a
+    // duplicate channel - one "error" next to the new "connected". Connected
+    // channels are never touched.
+    await prisma.channel.deleteMany({
+        where: {
+            ownerId,
+            platform: input.platform,
+            name: input.name,
+            status: { in: ["error", "connecting", "disconnected"] }
+        }
+    });
     // whatsapp-web logs in by QR and has no upfront token; others do.
     const trimmedToken = input.token?.trim();
     const blob = trimmedToken ? encryptSecret(trimmedToken, env.POLARIS_MASTER_KEY) : null;
@@ -286,6 +298,82 @@ export async function sendConversationMessage(
         senderId: message.senderId,
         createdAt: message.createdAt.toISOString()
     };
+}
+
+/** Normalize a peer id to what the platform's adapter expects. WhatsApp wants a
+ *  JID (<digits>@c.us) - a plain phone number is converted; other platforms take
+ *  the id as entered. */
+function normalizePeerId(platform: string, raw: string): string {
+    const value = raw.trim();
+    if (platform === "whatsapp" && value && !value.includes("@")) {
+        const digits = value.replace(/\D/g, "");
+        return digits ? `${digits}@c.us` : value;
+    }
+    return value;
+}
+
+/** Start a new outbound conversation: upsert the conversation for (channel, peer)
+ *  and send the first message through the bridge. Returns the conversation id so
+ *  the inbox can open it. */
+export async function startConversation(
+    ownerId: string,
+    senderId: string,
+    input: { channelId: string; peerId: string; peerName?: string; text: string }
+): Promise<{ conversationId: string }> {
+    const channel = await prisma.channel.findFirst({
+        where: { id: input.channelId, ownerId },
+        select: { id: true, platform: true, status: true }
+    });
+    if (!channel) throw new Error("Channel not found");
+    if (channel.status !== "connected") throw new Error("Connect the channel before starting a chat");
+    const peerId = normalizePeerId(channel.platform, input.peerId);
+    if (!peerId) throw new Error("Enter who to message");
+
+    const peerName = input.peerName?.trim() || null;
+    const conversation = await prisma.conversation.upsert({
+        where: { channelId_peerId: { channelId: channel.id, peerId } },
+        create: { channelId: channel.id, peerId, peerName, status: "open" },
+        update: peerName ? { peerName } : {}
+    });
+    await sendConversationMessage(ownerId, conversation.id, senderId, { text: input.text });
+    return { conversationId: conversation.id };
+}
+
+export interface ContactView {
+    id: string;
+    name: string;
+    platform: string;
+    peerId: string;
+    note: string | null;
+}
+
+/** The owner's saved contacts, alphabetical. */
+export async function listContacts(ownerId: string): Promise<ContactView[]> {
+    const rows = await prisma.contact.findMany({ where: { ownerId }, orderBy: { name: "asc" } });
+    return rows.map((row) => ({ id: row.id, name: row.name, platform: row.platform, peerId: row.peerId, note: row.note }));
+}
+
+/** Create or update a contact (unique per owner + platform + peer). */
+export async function createContact(
+    ownerId: string,
+    input: { name: string; platform: Platform; peerId: string; note?: string }
+): Promise<ContactView> {
+    const peerId = normalizePeerId(input.platform, input.peerId);
+    if (!peerId) throw new Error("Enter the contact's id or number");
+    const note = input.note?.trim() || null;
+    const row = await prisma.contact.upsert({
+        where: { ownerId_platform_peerId: { ownerId, platform: input.platform, peerId } },
+        create: { ownerId, name: input.name.trim(), platform: input.platform, peerId, note },
+        update: { name: input.name.trim(), note }
+    });
+    return { id: row.id, name: row.name, platform: row.platform, peerId: row.peerId, note: row.note };
+}
+
+/** Remove a saved contact. */
+export async function deleteContact(ownerId: string, id: string): Promise<void> {
+    const row = await prisma.contact.findFirst({ where: { id, ownerId }, select: { id: true } });
+    if (!row) throw new Error("Contact not found");
+    await prisma.contact.delete({ where: { id: row.id } });
 }
 
 /** Ingest a normalized inbound event from the bridge: upsert the conversation and
