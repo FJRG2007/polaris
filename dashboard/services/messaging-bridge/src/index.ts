@@ -39,6 +39,30 @@ const registry = new AdapterRegistry((message) => {
     void forwardInbound(message);
 });
 
-createBridgeServer({ registry, authToken }).listen(port, () => {
+const server = createBridgeServer({ registry, authToken });
+server.listen(port, () => {
     console.log(`messaging-bridge listening on :${port}`);
 });
+
+// Graceful shutdown: on stop/restart, close every adapter before exiting so
+// whatsapp-web's Chromium is destroyed cleanly (its LocalAuth session survives a
+// clean destroy but not an abrupt kill). Bounded well under Docker's ~10s stop
+// grace so we exit before SIGKILL.
+let shuttingDown = false;
+async function shutdown(signal: string): Promise<void> {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    console.log(`messaging-bridge: ${signal} received, closing adapters...`);
+    const hardExit = setTimeout(() => process.exit(0), 9000);
+    try {
+        await registry.disconnectAll();
+        server.close();
+    } catch (caught) {
+        console.error(`messaging-bridge: shutdown error: ${caught instanceof Error ? caught.message : caught}`);
+    } finally {
+        clearTimeout(hardExit);
+        process.exit(0);
+    }
+}
+process.on("SIGTERM", () => void shutdown("SIGTERM"));
+process.on("SIGINT", () => void shutdown("SIGINT"));

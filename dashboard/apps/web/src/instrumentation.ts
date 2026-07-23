@@ -68,4 +68,10 @@ export async function register(): Promise<void> {
     // metrics and health, firing notifications on state transitions.
     const { startAlarmEvaluator } = await import("./lib/watch/alarm-evaluator");
     startAlarmEvaluator();
+
+    // Re-establish messaging channels in the bridge after a bridge or web restart:
+    // the bridge holds adapters in memory, so without this a channel stays
+    // "connected" in the DB but dead at the bridge until manually reconnected.
+    const { startChannelReconcile } = await import("./lib/messaging-service");
+    startChannelReconcile();
 }
