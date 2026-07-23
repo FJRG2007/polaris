@@ -32,6 +32,15 @@ export interface ConversationView {
     status: string;
     unread: number;
     lastMessageAt: string | null;
+    /** Human agent handling it, if any. */
+    assigneeId: string | null;
+    /** AI assistant (an InstalledApp) handling it, if any. */
+    assistantId: string | null;
+}
+
+export interface AgentView {
+    id: string;
+    name: string;
 }
 
 export interface MessageView {
@@ -155,8 +164,42 @@ export async function listConversations(ownerId: string): Promise<ConversationVi
         peerName: row.peerName,
         status: row.status,
         unread: row.unread,
-        lastMessageAt: row.lastMessageAt?.toISOString() ?? null
+        lastMessageAt: row.lastMessageAt?.toISOString() ?? null,
+        assigneeId: row.assigneeId,
+        assistantId: row.assistantId
     }));
+}
+
+/** Workspace users who can be assigned a conversation. */
+export async function listAgents(): Promise<AgentView[]> {
+    const rows = await prisma.user.findMany({
+        where: { bannedAt: null },
+        select: { id: true, name: true },
+        orderBy: { name: "asc" }
+    });
+    return rows.map((row) => ({ id: row.id, name: row.name }));
+}
+
+/** Assign a conversation to a human agent or an AI assistant, and/or set its
+ *  status (open/closed/pending). Only the provided fields change. */
+export async function assignConversation(
+    ownerId: string,
+    conversationId: string,
+    patch: { assigneeId?: string | null; assistantId?: string | null; status?: string }
+): Promise<void> {
+    const conversation = await prisma.conversation.findFirst({
+        where: { id: conversationId, channel: { ownerId } },
+        select: { id: true }
+    });
+    if (!conversation) throw new Error("Conversation not found");
+    await prisma.conversation.update({
+        where: { id: conversationId },
+        data: {
+            ...(patch.assigneeId !== undefined ? { assigneeId: patch.assigneeId } : {}),
+            ...(patch.assistantId !== undefined ? { assistantId: patch.assistantId } : {}),
+            ...(patch.status !== undefined ? { status: patch.status } : {})
+        }
+    });
 }
 
 /** A conversation's messages, oldest first; marks it read. */

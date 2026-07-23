@@ -12,13 +12,16 @@ import { PLATFORMS, interactivePromptSchema } from "@polaris/messaging";
 import { requireUser } from "@/lib/session";
 import { bridgeConfigured } from "@/lib/messaging/bridge-client";
 import {
+    assignConversation,
     channelState,
     connectChannel,
     deleteChannel,
     getConversationMessages,
+    listAgents,
     listChannels,
     listConversations,
     sendConversationMessage,
+    type AgentView,
     type ChannelLiveState,
     type ChannelView,
     type ConversationView,
@@ -94,6 +97,34 @@ export async function listConversationsAction(): Promise<ConversationView[]> {
 export async function getMessagesAction(conversationId: string): Promise<MessageView[]> {
     const user = await requireUser();
     return getConversationMessages(user.id, conversationId);
+}
+
+/** Workspace users a conversation can be assigned to (support agents). */
+export async function listAgentsAction(): Promise<AgentView[]> {
+    await requireUser();
+    return listAgents();
+}
+
+const assignSchema = z.object({
+    conversationId: z.string().uuid(),
+    assigneeId: z.string().uuid().nullable().optional(),
+    status: z.enum(["open", "closed", "pending"]).optional()
+});
+
+/** Assign a conversation to an agent and/or set its status (multi-agent support). */
+export async function assignConversationAction(input: z.infer<typeof assignSchema>): Promise<{ error?: string }> {
+    const user = await requireUser();
+    const parsed = assignSchema.safeParse(input);
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid request" };
+    try {
+        await assignConversation(user.id, parsed.data.conversationId, {
+            assigneeId: parsed.data.assigneeId,
+            status: parsed.data.status
+        });
+        return {};
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not update the conversation" };
+    }
 }
 
 export async function sendMessageAction(input: z.infer<typeof sendSchema>): Promise<{ error?: string }> {

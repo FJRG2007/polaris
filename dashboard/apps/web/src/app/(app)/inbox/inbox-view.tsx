@@ -25,14 +25,16 @@ import {
     cn
 } from "@polaris/ui";
 import {
+    assignConversationAction,
     channelStateAction,
     connectChannelAction,
     deleteChannelAction,
     getMessagesAction,
+    listAgentsAction,
     listConversationsAction,
     sendMessageAction
 } from "./actions";
-import type { ChannelView, ConversationView, MessageView } from "@/lib/messaging-service";
+import type { AgentView, ChannelView, ConversationView, MessageView } from "@/lib/messaging-service";
 
 export function InboxView({
     initialChannels,
@@ -47,6 +49,14 @@ export function InboxView({
     const [conversations, setConversations] = useState(initialConversations);
     const [activeId, setActiveId] = useState<string | null>(initialConversations[0]?.id ?? null);
     const [connecting, setConnecting] = useState(false);
+    const [agents, setAgents] = useState<AgentView[]>([]);
+
+    // Load the assignable agents once, for the thread's assignment control.
+    useEffect(() => {
+        void listAgentsAction()
+            .then(setAgents)
+            .catch(() => undefined);
+    }, []);
 
     const refreshConversations = useCallback(async () => {
         try {
@@ -123,7 +133,7 @@ export function InboxView({
 
                 <Card className="flex min-w-0 flex-1 flex-col overflow-hidden">
                     {active ? (
-                        <Thread key={active.id} conversation={active} onSent={refreshConversations} />
+                        <Thread key={active.id} conversation={active} agents={agents} onSent={refreshConversations} />
                     ) : (
                         <CardBody className="grid flex-1 place-items-center text-sm text-muted-foreground">
                             <span className="flex flex-col items-center gap-2">
@@ -179,7 +189,15 @@ function ChannelChip({ channel, onRemoved }: { channel: ChannelView; onRemoved: 
     );
 }
 
-function Thread({ conversation, onSent }: { conversation: ConversationView; onSent: () => void }) {
+function Thread({
+    conversation,
+    agents,
+    onSent
+}: {
+    conversation: ConversationView;
+    agents: AgentView[];
+    onSent: () => void;
+}) {
     const [messages, setMessages] = useState<MessageView[]>([]);
     const [text, setText] = useState("");
     const [optionsMode, setOptionsMode] = useState(false);
@@ -244,9 +262,40 @@ function Thread({ conversation, onSent }: { conversation: ConversationView; onSe
 
     return (
         <div className="flex min-h-0 flex-1 flex-col">
-            <div className="border-b border-border p-3">
-                <p className="text-sm font-medium">{conversation.peerName ?? conversation.peerId}</p>
-                <p className="text-xs text-muted-foreground">{conversation.channelName}</p>
+            <div className="flex items-center justify-between gap-2 border-b border-border p-3">
+                <div className="min-w-0">
+                    <p className="truncate text-sm font-medium">{conversation.peerName ?? conversation.peerId}</p>
+                    <p className="truncate text-xs text-muted-foreground">{conversation.channelName}</p>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                    <Select
+                        value={conversation.assigneeId ?? "none"}
+                        onValueChange={(value) =>
+                            void assignConversationAction({
+                                conversationId: conversation.id,
+                                assigneeId: value === "none" ? null : value
+                            }).then(onSent)
+                        }
+                        options={[
+                            { value: "none", label: "Unassigned" },
+                            ...agents.map((agent) => ({ value: agent.id, label: agent.name }))
+                        ]}
+                        className="h-8 w-40"
+                        aria-label="Assign agent"
+                    />
+                    <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() =>
+                            void assignConversationAction({
+                                conversationId: conversation.id,
+                                status: conversation.status === "closed" ? "open" : "closed"
+                            }).then(onSent)
+                        }
+                    >
+                        {conversation.status === "closed" ? "Reopen" : "Close"}
+                    </Button>
+                </div>
             </div>
             <div ref={scrollRef} className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-3">
                 {messages.map((message) => (
