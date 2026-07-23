@@ -19,6 +19,7 @@ on:
       - "dashboard/cli/**"
       - "dashboard/docker/**"
       - "dashboard/mdns/**"
+      - "dashboard/services/messaging-bridge/**"
       - "dashboard/package.json"
       - "dashboard/package-lock.json"
       - "crates/polaris-hostd/**"
@@ -41,6 +42,7 @@ jobs:
       mdns: ${{ steps.filter.outputs.mdns }}
       hostd: ${{ steps.filter.outputs.hostd }}
       updater: ${{ steps.filter.outputs.updater }}
+      bridge: ${{ steps.filter.outputs.bridge }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -53,7 +55,7 @@ jobs:
         run: |
           set -euo pipefail
           out() { echo "$1=$2" >> "$GITHUB_OUTPUT"; }
-          all() { out web true; out mdns true; out hostd true; out updater true; }
+          all() { out web true; out mdns true; out hostd true; out updater true; out bridge true; }
           if [ "$EVENT" = "workflow_dispatch" ] || [ -z "${BEFORE:-}" ] \
              || [ "$BEFORE" = "0000000000000000000000000000000000000000" ] \
              || ! git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
@@ -67,6 +69,7 @@ jobs:
           has '^dashboard/mdns/' && out mdns true || out mdns false
           has '^crates/polaris-hostd/|^Cargo\.(toml|lock)$' && out hostd true || out hostd false
           has '^dashboard/docker/updater/' && out updater true || out updater false
+          has '^dashboard/services/messaging-bridge/|^dashboard/packages/messaging/|^dashboard/package(-lock)?\.json$' && out bridge true || out bridge false
 
   # Next.js dashboard. amd64 only (the runtime servers are x86). Layer caching in
   # the Dockerfile keeps `npm ci` cached across source-only changes.
@@ -203,3 +206,28 @@ jobs:
           tags: ghcr.io/fjrg2007/polaris-updater:latest
           cache-from: type=gha,scope=updater
           cache-to: type=gha,mode=max,scope=updater
+
+  # Messaging bridge sidecar. The marketplace installs this image as a managed
+  # Deploy app (it is not part of the web image), so it must be published for
+  # installs to pull. amd64 only, matching the runtime servers. Its build context
+  # is the dashboard root so the workspace and @polaris/messaging are available.
+  bridge:
+    needs: changes
+    if: ${{ needs.changes.outputs.bridge == 'true' || github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: dashboard
+          file: dashboard/services/messaging-bridge/Dockerfile
+          push: true
+          tags: ghcr.io/fjrg2007/polaris-messaging-bridge:latest
+          cache-from: type=gha,scope=bridge
+          cache-to: type=gha,mode=max,scope=bridge

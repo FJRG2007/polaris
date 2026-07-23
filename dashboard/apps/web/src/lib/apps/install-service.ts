@@ -6,13 +6,18 @@
  * built, deployed and managed by the same engine as any deployed app.
  */
 
+import { randomBytes } from "node:crypto";
+import { loadEnv } from "@polaris/config";
 import { prisma } from "@polaris/db";
+import { encryptSecret } from "@polaris/storage";
 import { getOrCreateHostTarget, getOrCreateLocalTarget } from "@/lib/deploy-target-service";
 import { listHosts } from "@/lib/host-service";
 import { createApplication, createProject, deleteApplication, deployApplication } from "@/lib/deploy-service";
 import { createVolume } from "@/lib/deploy-volume-service";
 import { setEnvVars } from "@/lib/env-var-service";
-import { findApp, isInstallable } from "@/lib/apps/catalog";
+import { appBaseUrl } from "@/lib/domain-service";
+import { invalidateBridgeCache } from "@/lib/messaging/bridge-endpoint";
+import { appHasCapability, findApp, isInstallable } from "@/lib/apps/catalog";
 import type { AppInstallInput } from "@/lib/apps/install-schema";
 
 /** All marketplace installs live under one project per owner, so the Deploy
@@ -56,6 +61,13 @@ export async function installApp(
     const template = app.template!;
     const image = template.image!;
 
+    // The messaging hub needs the web and the bridge to share two secrets: the API
+    // bearer and the inbound ingest key. Minted here, injected as the bridge's env,
+    // and stored (encrypted) on the install so the web can resolve them later.
+    const isHub = appHasCapability(app, "messaging-hub");
+    const bridgeToken = isHub ? randomBytes(32).toString("hex") : null;
+    const ingestKey = isHub ? randomBytes(32).toString("hex") : null;
+
     if (app.singleton) {
         const existing = await prisma.installedApp.findFirst({
             where: { ownerId, catalogId: app.id, status: { not: "removed" } }
@@ -96,6 +108,15 @@ export async function installApp(
         const declared = template.env?.find((item) => item.key === entry.key);
         envByKey.set(entry.key, { value: entry.value, isSecret: Boolean(declared?.secret) });
     }
+    // Hub wiring: the bridge reads these at startup (see services/messaging-bridge).
+    // WEB_INGEST_URL points inbound events at the dashboard's internal ingest route.
+    if (isHub && bridgeToken && ingestKey) {
+        const bridgePort = template.ports?.[0]?.container ?? 8787;
+        envByKey.set("BRIDGE_TOKEN", { value: bridgeToken, isSecret: true });
+        envByKey.set("WEB_INGEST_KEY", { value: ingestKey, isSecret: true });
+        envByKey.set("WEB_INGEST_URL", { value: `${await appBaseUrl()}/api/inbox/ingest`, isSecret: false });
+        envByKey.set("BRIDGE_PORT", { value: String(bridgePort), isSecret: false });
+    }
     const vars = [...envByKey.entries()].map(([key, meta]) => ({ key, value: meta.value, isSecret: meta.isSecret }));
     if (vars.length > 0) await setEnvVars("application", application.id, ownerId, vars);
 
@@ -113,6 +134,13 @@ export async function installApp(
         });
     }
 
+    // Persist the hub's shared secrets (encrypted) on the install, so the web can
+    // resolve the bridge's bearer + ingest key when it dials it later.
+    const secretBlob =
+        isHub && bridgeToken && ingestKey
+            ? encryptSecret(JSON.stringify({ token: bridgeToken, ingestKey }), loadEnv().POLARIS_MASTER_KEY)
+            : null;
+
     const installed = await prisma.installedApp.create({
         data: {
             catalogId: app.id,
@@ -121,7 +149,14 @@ export async function installApp(
             targetId: target.id,
             applicationId: application.id,
             status: "installing",
-            installedById: actorId
+            installedById: actorId,
+            ...(secretBlob
+                ? {
+                      encryptedSecret: secretBlob.ciphertext,
+                      secretNonce: secretBlob.nonce,
+                      secretKeyId: secretBlob.keyId
+                  }
+                : {})
         }
     });
 
@@ -130,6 +165,9 @@ export async function installApp(
     try {
         await deployApplication(application.id, ownerId, actorId);
         await prisma.installedApp.update({ where: { id: installed.id }, data: { status: "running" } });
+        // The inbox resolves the bridge from installs; drop the cache so it appears
+        // configured immediately after this hub install rather than after the TTL.
+        if (isHub) invalidateBridgeCache();
     } catch {
         await prisma.installedApp.update({ where: { id: installed.id }, data: { status: "failed" } });
     }
@@ -204,4 +242,6 @@ export async function uninstallApp(ownerId: string, id: string): Promise<void> {
         }
     }
     await prisma.installedApp.update({ where: { id: row.id }, data: { status: "removed" } });
+    // Forget any cached bridge endpoint so the inbox reflects the removal at once.
+    if (row.catalogId === "messaging-bridge") invalidateBridgeCache();
 }

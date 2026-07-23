@@ -1,17 +1,26 @@
 import { NextResponse } from "next/server";
 import { inboundEventSchema } from "@polaris/messaging";
 import { ingestInbound } from "@/lib/messaging-service";
+import { resolveBridge } from "@/lib/messaging/bridge-endpoint";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+/** The expected ingest key: the static env override, else the marketplace-installed
+ *  bridge's key. Kept in sync with what the bridge stamps on inbound events. */
+async function expectedIngestKey(): Promise<string> {
+    const fromEnv = (process.env.MESSAGING_INGEST_KEY ?? "").trim();
+    if (fromEnv) return fromEnv;
+    return (await resolveBridge())?.ingestKey ?? "";
+}
+
 /** Internal ingest for inbound messages the bridge forwards. Authenticated by a
  *  shared key on the internal network - never exposed publicly. The event is
  *  treated as untrusted and validated before it touches the database. */
-const INGEST_KEY = process.env.MESSAGING_INGEST_KEY ?? "";
-
 export async function POST(request: Request): Promise<Response> {
-    if (!INGEST_KEY || request.headers.get("x-internal-key") !== INGEST_KEY) {
+    const expected = await expectedIngestKey();
+    const presented = request.headers.get("x-internal-key");
+    if (!expected || presented !== expected) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     const parsed = inboundEventSchema.safeParse(await request.json().catch(() => null));
