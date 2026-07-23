@@ -812,6 +812,94 @@ model InstalledApp {
 }
 
 // ---------------------------------------------------------------------------
+// Messaging (unified inbox across WhatsApp / Telegram / Discord / Slack)
+// ---------------------------------------------------------------------------
+
+// A connected account on a messaging platform (a Telegram bot, a WhatsApp number
+// via a chosen provider, a Discord/Slack app). The live adapter runs in the
+// messaging bridge; this row is the control-plane record. Credentials are
+// envelope-encrypted with the same master key as integrations. owner/assignee/
+// assistant are bare uuids (no FK), per the InstalledApp precedent.
+model Channel {
+    id              String   @id @default(uuid(7)) @db.Uuid
+    ownerId         String   @db.Uuid
+    // telegram | whatsapp | discord | slack
+    platform        String
+    // Provider backend within a platform, e.g. WhatsApp: whatsapp-web | whatsapp-cloud.
+    provider        String?
+    // Human label, e.g. "Support bot".
+    name            String
+    // Platform-side identity once connected (bot username, phone number, ...).
+    externalId      String?
+    // disconnected | connecting | connected | error
+    status          String   @default("disconnected")
+    // Non-secret config as stringified JSON (capability snapshot, webhook ids, ...).
+    config          String   @default("{}")
+    // Envelope-encrypted credential (bot token / session); null until configured.
+    encryptedSecret Bytes?
+    secretNonce     Bytes?
+    secretKeyId     String?
+    createdAt       DateTime @default(now())
+    updatedAt       DateTime @updatedAt
+
+    conversations Conversation[]
+
+    @@index([ownerId])
+    @@index([platform])
+}
+
+// A conversation (thread) on a channel with one contact. Assignable to a human
+// agent (assigneeId) or handled by an AI assistant (assistantId, an InstalledApp).
+model Conversation {
+    id            String    @id @default(uuid(7)) @db.Uuid
+    channelId     String    @db.Uuid
+    // Platform-side chat/peer id, unique within the channel.
+    peerId        String
+    // Contact display name / handle.
+    peerName      String?
+    // open | closed | pending
+    status        String    @default("open")
+    assigneeId    String?   @db.Uuid
+    assistantId   String?   @db.Uuid
+    lastMessageAt DateTime?
+    unread        Int       @default(0)
+    createdAt     DateTime  @default(now())
+    updatedAt     DateTime  @updatedAt
+
+    channel  Channel   @relation(fields: [channelId], references: [id], onDelete: Cascade)
+    messages Message[]
+
+    @@unique([channelId, peerId])
+    @@index([channelId, status])
+    @@index([assigneeId])
+}
+
+// A single normalized message in a conversation.
+model Message {
+    id             String   @id @default(uuid(7)) @db.Uuid
+    conversationId String   @db.Uuid
+    // inbound | outbound
+    direction      String
+    // Platform-side message id, for acks and dedup.
+    externalId     String?
+    // text | image | file | audio | interactive | system
+    kind           String   @default("text")
+    body           String?
+    // Stringified JSON: media ref, interactive prompt/options, poll results, ...
+    payload        String?
+    // Outbound delivery ack: sent | delivered | read | failed.
+    ack            String?
+    // Who sent an outbound message: a User id, or null for inbound / AI-sent.
+    senderId       String?  @db.Uuid
+    createdAt      DateTime @default(now())
+
+    conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+    @@index([conversationId, createdAt])
+    @@index([externalId])
+}
+
+// ---------------------------------------------------------------------------
 // Deploy (Railway-style app/database orchestration)
 // ---------------------------------------------------------------------------
 
