@@ -102,17 +102,30 @@ function tunnelSpec(project: string, service: string, origin: string, hostHeader
     };
 }
 
-/** Read the sidecar's current logs and extract the trycloudflare.com URL, or null. */
+/** Read the sidecar's current logs and extract the trycloudflare.com URL, or null.
+ *  cloudflared prints the URL once at startup, so a generous tail keeps it readable
+ *  for a while after a (re)start before it scrolls past the window. */
 async function readUrlFromLogs(ports: HostdPorts, service: string): Promise<string | null> {
     let buffer = "";
     try {
         await ports.logs(service, (chunk) => {
             buffer += chunk.toString("utf8");
-        }, { tail: 200, follow: false });
+        }, { tail: 1000, follow: false });
     } catch {
         return null;
     }
     return buffer.match(URL_PATTERN)?.[0] ?? null;
+}
+
+/** The sidecar container's start time, used to detect a restart (which mints a new
+ *  URL). Null when it cannot be inspected. */
+async function readStartedAt(ports: HostdPorts, service: string): Promise<string | null> {
+    try {
+        const info = (await ports.inspect(service)) as { State?: { StartedAt?: string } };
+        return info?.State?.StartedAt ?? null;
+    } catch {
+        return null;
+    }
 }
 
 function delay(ms: number): Promise<void> {
@@ -149,8 +162,10 @@ export async function startQuickTunnel(appId: string, ownerId: string): Promise<
         }
         // Mark the tunnel live even when the URL has not printed yet: the edge route is
         // keyed on this record's existence (via quickTunnelAppIds), not on a known URL,
-        // so a slow-starting tunnel still gets routed instead of 404'ing.
-        await markTunnelLive(appId, url);
+        // so a slow-starting tunnel still gets routed instead of 404'ing. Record the
+        // container's start time so a later status check can tell this instance's URL is
+        // still current (vs. a silent restart that minted a new one).
+        await markTunnelLive(appId, url, await readStartedAt(ports, service));
         // Publish the edge route for this tunnel's host so the first request is proxied
         // (and logged) rather than 404'd by the edge for an unknown host.
         await syncAppRoutes().catch(() => undefined);
@@ -186,16 +201,27 @@ export async function getQuickTunnelStatus(appId: string, ownerId: string): Prom
     const { service } = names(appId);
     const ports = new HostdPorts();
     try {
-        const info = (await ports.inspect(service)) as { State?: { Running?: boolean } };
+        const info = (await ports.inspect(service)) as { State?: { Running?: boolean; StartedAt?: string } };
         if (!info?.State?.Running) {
             await forgetTunnel(appId);
             return { running: false, url: null };
         }
-        const url = (await readUrlFromLogs(ports, service)) ?? (await getStoredUrl(appId));
-        await markTunnelLive(appId, url);
+        const startedAt = info.State.StartedAt ?? null;
+        const stored = await getStored(appId);
+        // Same container instance as when we captured the URL: it cannot have changed,
+        // so trust the stored URL and skip the fragile log re-read entirely.
+        if (startedAt && stored.startedAt === startedAt && stored.url) {
+            return { running: true, url: stored.url };
+        }
+        // First status, or a restart minted a new URL (the old one is now dead). Re-read
+        // from the fresh logs and record this instance so subsequent checks are cheap. If
+        // the URL has already scrolled past the log window, report no URL (honest -
+        // prompting a restart) rather than the stale, dead one.
+        const url = await readUrlFromLogs(ports, service);
+        await markTunnelLive(appId, url, startedAt);
         return { running: true, url };
     } catch {
-        return { running: false, url: await getStoredUrl(appId) };
+        return { running: false, url: (await getStored(appId)).url };
     } finally {
         await ports.dispose();
     }
@@ -249,19 +275,43 @@ export async function reconcileQuickTunnels(): Promise<void> {
     }
 }
 
-async function getStoredUrl(appId: string): Promise<string | null> {
-    const row = await prisma.setting.findUnique({ where: { key: urlKey(appId) }, select: { value: true } });
-    // A live-but-URL-unknown tunnel stores an empty marker; report that as no URL yet.
-    return row?.value || null;
+/** The cached tunnel URL and the container start time it was captured on. */
+interface StoredTunnel {
+    url: string | null;
+    startedAt: string | null;
 }
 
-/** Record the tunnel as live and cache its URL if known. The record's existence (not its
- *  value) is what quickTunnelAppIds reports and what syncAppRoutes keys the edge route on,
- *  so it must be written the moment the sidecar is up - an empty value marks a live tunnel
- *  whose URL cloudflared has not printed yet. */
-async function markTunnelLive(appId: string, url: string | null): Promise<void> {
+/** Parse a stored tunnel value. New values are JSON `{url, startedAt}`; an older value
+ *  is a bare URL string (or an empty live-but-unknown marker), handled tolerantly. */
+function parseStored(value: string): StoredTunnel {
+    if (!value) return { url: null, startedAt: null };
+    try {
+        const parsed = JSON.parse(value) as { url?: unknown; startedAt?: unknown };
+        if (parsed && typeof parsed === "object" && ("url" in parsed || "startedAt" in parsed)) {
+            return {
+                url: typeof parsed.url === "string" && parsed.url ? parsed.url : null,
+                startedAt: typeof parsed.startedAt === "string" && parsed.startedAt ? parsed.startedAt : null
+            };
+        }
+    } catch {
+        // Not JSON: an older plain-URL value.
+    }
+    return { url: value, startedAt: null };
+}
+
+async function getStored(appId: string): Promise<StoredTunnel> {
+    const row = await prisma.setting.findUnique({ where: { key: urlKey(appId) }, select: { value: true } });
+    return row ? parseStored(row.value) : { url: null, startedAt: null };
+}
+
+/** Record the tunnel as live, caching its URL (if known) and the container start time it
+ *  was read on. The record's existence (not its value) is what quickTunnelAppIds reports
+ *  and what syncAppRoutes keys the edge route on, so it is written the moment the sidecar
+ *  is up - a null url marks a live tunnel whose URL cloudflared has not printed yet. The
+ *  startedAt lets a later status check tell this instance's URL is still current. */
+async function markTunnelLive(appId: string, url: string | null, startedAt: string | null): Promise<void> {
     const key = urlKey(appId);
-    const value = url ?? "";
+    const value = JSON.stringify({ url: url ?? null, startedAt: startedAt ?? null });
     await prisma.setting.upsert({
         where: { key },
         create: { key, value, scope: "global" },
