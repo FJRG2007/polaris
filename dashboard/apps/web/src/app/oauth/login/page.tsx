@@ -12,6 +12,14 @@ import { resolveIdentifier } from "./actions";
 const LAST_IDENTIFIER_KEY = "polaris:last-identifier";
 const GENERIC_ERROR = "Invalid email/username or password";
 
+/** Post-login destination: a same-origin `redirect` param (used by the edge login
+ *  handoff at /edge/authorize) if it is a safe relative path, else the drive. Read
+ *  from window.location to avoid a Suspense boundary for useSearchParams. */
+function postLoginTarget(): string {
+    const redirect = new URLSearchParams(window.location.search).get("redirect");
+    return redirect && redirect.startsWith("/") && !redirect.startsWith("//") ? redirect : "/drive";
+}
+
 export default function LoginPage() {
     const router = useRouter();
     const form = useZodForm(loginSchema);
@@ -51,7 +59,7 @@ export default function LoginPage() {
             return;
         }
         window.localStorage.setItem(LAST_IDENTIFIER_KEY, parsed.identifier);
-        router.push("/drive");
+        router.push(postLoginTarget());
         router.refresh();
     }
 

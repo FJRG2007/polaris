@@ -8,7 +8,7 @@
 export { slugify, shortHash, serviceName, imageTag } from "./naming.js";
 export { magicDomain, isMagicBase, DEFAULT_SUBDOMAIN_BASE } from "./subdomain.js";
 export { quoteArg, quoteArgv } from "./shell.js";
-export { traefikLabels, configHash, type TraefikDomain, type CertResolver, type TraefikServiceInput } from "./traefik.js";
+export { traefikLabels, configHash, type TraefikDomain, type CertResolver, type TraefikServiceInput, type TraefikWaf } from "./traefik.js";
 export {
     buildSpec,
     buildCommand,

@@ -55,7 +55,7 @@ export interface ComposeSpec {
 
 /** Build the structured spec for an application deployment. */
 export function appComposeSpec(plan: AppDeployPlan, imageTag: string, network: string): ComposeSpec {
-    const labels = traefikLabels({ serviceName: plan.ref.name, network, domains: plan.domains });
+    const labels = traefikLabels({ serviceName: plan.ref.name, network, domains: plan.domains, waf: plan.waf });
     const namedVolumes = plan.volumes.filter((volume) => volume.kind === "volume").map((volume) => volume.source);
     return {
         project: plan.ref.project,

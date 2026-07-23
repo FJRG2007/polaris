@@ -24,6 +24,7 @@ import { gitBuildContext, type GitSource } from "./git-build-service";
 import { getLatestCommit, githubCloneAuthHeader } from "./github-service";
 import { resolveRegistryLogin } from "./registry-credential-service";
 import { quickTunnelAppIds, tunnelHostForApp, stopQuickTunnel } from "./deploy/quick-tunnel-service";
+import { resolveWaf } from "./waf-service";
 
 /** Directory the web process writes deploy log files to (tailed by the UI). */
 function logDir(): string {
@@ -279,12 +280,16 @@ export async function syncAppRoutes(): Promise<void> {
     for (const domain of domains) {
         if (domain.application.target.kind === "local") {
             if (!localIp) continue;
+            const waf = await resolveWaf(domain.applicationId);
             localRoutes.push({
                 id: domain.id,
                 hostname: domain.hostname,
                 certResolver: domain.certResolver,
                 dialHost: localIp,
-                dialPort: hostPortForApp(domain.applicationId)
+                dialPort: hostPortForApp(domain.applicationId),
+                allowLists: waf.allowLists,
+                deny: waf.deny,
+                requireLogin: waf.requireLogin
             });
         } else {
             // Served by the remote server's own edge (per-server edge, phase 2).
@@ -302,12 +307,16 @@ export async function syncAppRoutes(): Promise<void> {
                 select: { id: true }
             });
             for (const app of localTunnelApps) {
+                const waf = await resolveWaf(app.id);
                 localRoutes.push({
                     id: `qtunnel-${shortHash(app.id, 8)}`,
                     hostname: tunnelHostForApp(app.id),
                     certResolver: "none",
                     dialHost: localIp,
-                    dialPort: hostPortForApp(app.id)
+                    dialPort: hostPortForApp(app.id),
+                    allowLists: waf.allowLists,
+                    deny: waf.deny,
+                    requireLogin: waf.requireLogin
                 });
             }
         }
@@ -718,6 +727,13 @@ async function buildAppPlan(
     const source = JSON.parse(app.sourceConfig) as Record<string, unknown>;
     const env = await mergedEnv(app.environmentId, app.id);
     const healthcheck = app.healthcheck ? (JSON.parse(app.healthcheck) as AppDeployPlan["healthcheck"]) : undefined;
+    // Resolved WAF rules for this service, materialized into edge labels on deploy so
+    // a remote server's own Traefik enforces them without the control plane.
+    const resolvedWaf = await resolveWaf(app.id);
+    const waf =
+        resolvedWaf.allowLists.length > 0 || resolvedWaf.deny.length > 0 || resolvedWaf.requireLogin
+            ? resolvedWaf
+            : undefined;
 
     // Publish the app on a stable host port so it is reachable over the host's IP
     // (intranet) with no proxy. The container port is the app's stored listening
@@ -755,6 +771,7 @@ async function buildAppPlan(
         },
         env,
         replicas: app.replicas,
+        waf,
         // Disabled domains keep their record but are left out of the plan so no route
         // labels are emitted for them until they are turned back on.
         domains: app.domains

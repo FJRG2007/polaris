@@ -1,0 +1,17 @@
+{
+    "name": "@polaris/edge-guard",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "description": "Co-located WAF sentinel: Traefik forwardAuth for the deploy denylist and require-login controls, enforced offline.",
+    "main": "./dist/index.js",
+    "scripts": {
+        "build": "tsup",
+        "start": "node dist/index.js",
+        "typecheck": "tsc --noEmit",
+        "test": "vitest run --passWithNoTests"
+    },
+    "dependencies": {
+        "@polaris/core": "0.1.0"
+    }
+}

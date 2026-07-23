@@ -1007,6 +1007,28 @@ model EnvVar {
     @@index([scopeType, scopeId])
 }
 
+// Web Application Firewall rules for Deploy. Polymorphic (no FK) scoping like
+// EnvVar so one table covers global, project, environment, and application scope,
+// resolved nearest-scope-wins. Materialized into each server's edge (Traefik) so
+// the rules keep enforcing when the Polaris control plane is down.
+model WafRule {
+    id           String   @id @default(uuid(7)) @db.Uuid
+    // global | project | environment | application
+    scopeType    String
+    // "" for global scope; otherwise the Project/Environment/Application id. Not a
+    // uuid column because the global row's scopeId is the empty string.
+    scopeId      String
+    // JSON string arrays of CIDR/IP, SQLite-portable like FileRequest.allowedCidrs.
+    ipAllowlist  String   @default("[]")
+    ipDenylist   String   @default("[]")
+    requireLogin Boolean  @default(false)
+    createdAt    DateTime @default(now())
+    updatedAt    DateTime @updatedAt
+
+    @@unique([scopeType, scopeId])
+    @@index([scopeType, scopeId])
+}
+
 model Volume {
     id            String   @id @default(uuid(7)) @db.Uuid
     targetId      String   @db.Uuid

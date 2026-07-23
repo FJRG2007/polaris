@@ -11,6 +11,7 @@
 
 import { z } from "zod";
 import { normalizeRelPath, UnsafePathError } from "../paths.js";
+import { cidrOrIp } from "./file-request.js";
 
 export const DEPLOY_VOLUME_KINDS = ["volume", "bind", "nas"] as const;
 export type DeployVolumeKind = (typeof DEPLOY_VOLUME_KINDS)[number];
@@ -106,4 +107,55 @@ export function normalizeVolumeSource(kind: DeployVolumeKind, source: string): s
     const rel = normalizeRelPath(source);
     if (!rel) throw new UnsafePathError(source);
     return rel;
+}
+
+/**
+ * WAF (Web Application Firewall) rules for a Deploy scope. A rule can restrict
+ * ingress to an IP allowlist, deny an IP denylist, and/or require a Polaris login.
+ * Rules exist at four scopes and are merged nearest-scope-wins by the service
+ * layer; each server's edge (Traefik) enforces the merged result, so the controls
+ * keep working when the Polaris control plane is down.
+ */
+export const WAF_SCOPE_TYPES = ["global", "project", "environment", "application"] as const;
+export type WafScopeType = (typeof WAF_SCOPE_TYPES)[number];
+
+/** Max entries per list, so one rule can never bloat the generated edge config. */
+export const WAF_LIST_MAX = 256;
+
+/** A list of IP/CIDR entries, each validated the same way as a drop-point allowlist. */
+const wafCidrList = z.array(cidrOrIp).max(WAF_LIST_MAX, `At most ${WAF_LIST_MAX} entries`);
+
+export const wafRuleInputSchema = z
+    .object({
+        ipAllowlist: wafCidrList.default([]),
+        ipDenylist: wafCidrList.default([]),
+        requireLogin: z.boolean().default(false)
+    })
+    .superRefine((value, ctx) => {
+        // A best-effort UX guard against contradictory rules (exact-string match, so
+        // "10.0.0.1" vs "10.0.0.1/32" is not caught) - the edge resolves allow before
+        // deny regardless, so this never widens access, it only warns the operator.
+        const deny = new Set(value.ipDenylist);
+        const overlap = value.ipAllowlist.find((entry) => deny.has(entry));
+        if (overlap) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ["ipDenylist"],
+                message: `"${overlap}" is in both the allow and deny lists`
+            });
+        }
+    });
+
+export type WafRuleInput = z.infer<typeof wafRuleInputSchema>;
+
+/** The merged WAF decision for one application, ready to materialize into the edge. */
+export interface ResolvedWaf {
+    /** One non-empty IP allowlist per scope that defines one. A request must satisfy
+     *  every list, so each becomes a chained Traefik `ipAllowList` middleware (they
+     *  AND): a child scope can only narrow a parent's allowlist, never widen it. */
+    readonly allowLists: readonly (readonly string[])[];
+    /** Union of every scope's denylist; a request is blocked if it matches any entry. */
+    readonly deny: readonly string[];
+    /** True if any scope requires a Polaris login. */
+    readonly requireLogin: boolean;
 }
