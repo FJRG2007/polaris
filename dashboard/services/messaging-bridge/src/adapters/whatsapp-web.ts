@@ -94,16 +94,44 @@ export class WhatsAppWebAdapter implements ChannelAdapter {
     }
 
     async send(message: OutboundMessage): Promise<SendResult> {
+        const chatId = await this.resolveChatId(message.peerId);
         if (message.interactive) {
             // No native buttons on whatsapp-web; a native Poll is the selector.
             const poll = new Poll(
                 message.interactive.text,
                 message.interactive.options.map((option) => option.label)
             );
-            const sent = await this.client.sendMessage(message.peerId, poll);
-            return { externalId: sent.id?._serialized };
+            return { externalId: await this.deliver(chatId, poll) };
         }
-        const sent = await this.client.sendMessage(message.peerId, message.text ?? "");
-        return { externalId: sent.id?._serialized };
+        return { externalId: await this.deliver(chatId, message.text ?? "") };
+    }
+
+    /** Resolve the recipient to a canonical chat id. A group or already-serialized
+     *  id passes through; a phone number is validated via getNumberId so the send
+     *  targets a real WhatsApp user and whatsapp-web.js can build its result model
+     *  (sending to an unresolved number is what triggers the post-send crash). */
+    private async resolveChatId(peerId: string): Promise<string> {
+        if (peerId.endsWith("@g.us")) return peerId;
+        const digits = peerId.replace(/\D/g, "");
+        if (!digits) return peerId;
+        const numberId = await this.client.getNumberId(digits);
+        if (!numberId) throw new Error("That number is not on WhatsApp");
+        return numberId._serialized;
+    }
+
+    /** Send and return the platform message id. whatsapp-web.js delivers the
+     *  message but can still throw while building its return Message model for a
+     *  fresh chat ("Cannot read properties of undefined (reading 'id')"); that
+     *  specific post-send error is not a delivery failure, so swallow it and report
+     *  the message as sent (without an id) rather than marking it failed. */
+    private async deliver(chatId: string, content: string | InstanceType<typeof Poll>): Promise<string | undefined> {
+        try {
+            const sent = await this.client.sendMessage(chatId, content);
+            return sent?.id?._serialized;
+        } catch (caught) {
+            const detail = caught instanceof Error ? caught.message : String(caught);
+            if (/reading '?(_serialized|id)'?|getMessageModel|serialize/i.test(detail)) return undefined;
+            throw caught;
+        }
     }
 }
