@@ -36,9 +36,22 @@ export class WhatsAppWebAdapter implements ChannelAdapter {
             authStrategy: new LocalAuth({ clientId: channelId, dataPath: SESSION_DIR }),
             puppeteer: {
                 headless: true,
-                args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"],
+                args: [
+                    "--no-sandbox",
+                    "--disable-setuid-sandbox",
+                    "--disable-dev-shm-usage",
+                    // Drop the automation fingerprint. This removes navigator.webdriver
+                    // (the main "this is a bot" signal WhatsApp Web checks for) and the
+                    // "controlled by automated software" infobar, so a normal linked
+                    // device is not flagged as scripted. No stealth-plugin dependency.
+                    "--disable-blink-features=AutomationControlled",
+                    "--disable-infobars"
+                ],
                 executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined
-            }
+            },
+            // Stop regenerating the QR forever when it is never scanned, so an idle
+            // onboarding does not keep re-requesting a device link.
+            qrMaxRetries: 3
         });
         this.wire();
     }

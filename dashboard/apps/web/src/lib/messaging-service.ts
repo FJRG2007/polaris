@@ -467,10 +467,14 @@ export async function reconcileChannels(): Promise<void> {
     const channels = await prisma.channel.findMany({ where: { status: { in: ["connected", "connecting"] } } });
     for (const channel of channels) {
         try {
-            const state = await bridgeChannelState(channel.id);
-            if (state.status === "connected" || state.status === "qr" || state.status === "connecting") continue;
+            await bridgeChannelState(channel.id);
+            // The bridge already runs an adapter for this channel (in any state), so
+            // leave it. Never re-initialize a live whatsapp-web client just because it
+            // reports an error - a fresh init re-links the device, which WhatsApp flags
+            // as suspicious. Only (re)establish a channel whose adapter is truly gone.
+            continue;
         } catch {
-            // Bridge has no adapter (404) or is unreachable; fall through and retry.
+            // Adapter absent (404) or bridge unreachable: (re)establish it below.
         }
         try {
             const token =
