@@ -246,6 +246,28 @@ services:
       - default
       - polaris-proxy
 
+  # Co-located WAF sentinel. Traefik forwardAuths to it for the deploy denylist and
+  # require-login controls; it holds no rule state (rules arrive per request in a
+  # header Traefik stamps on) and verifies login tokens offline, so it keeps
+  # enforcing if the Polaris control plane is down. On the proxy network (aliased to
+  # the name the generated forwardAuth address uses) so deployed apps' routers reach
+  # it by name; never published to the host. Built locally until a release image
+  # ships. Idle when no app has a denylist/require-login rule.
+  edge-guard:
+    image: polaris-edge-guard:local
+    build:
+      context: ..
+      dockerfile: services/edge-guard/Dockerfile
+    restart: unless-stopped
+    environment:
+      POLARIS_AUTH_SECRET: ${POLARIS_AUTH_SECRET:?POLARIS_AUTH_SECRET is required}
+      # Where the guard sends visitors to sign in for require-login routes.
+      POLARIS_PUBLIC_URL: ${POLARIS_PUBLIC_URL:-https://polaris.local}
+    networks:
+      polaris-proxy:
+        aliases:
+          - polaris-edge-guard
+
 networks:
   # Shared network deployed apps and the edge join for name-based routing. hostd
   # creates it at startup, so it is external here - compose uses the existing

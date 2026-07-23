@@ -10,11 +10,12 @@
 import { useEffect, useState, useTransition, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import { List, Loader2, Plus, Trash2, Waypoints } from "lucide-react";
+import { List, Loader2, Plus, ShieldCheck, Trash2, Waypoints } from "lucide-react";
 import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, Input, Select } from "@polaris/ui";
 import { EnvironmentServices, NewServiceButton, type ProjectApp, type ProjectSummary } from "./deploy-view";
 import { DeployCanvas } from "./deploy-canvas";
 import { ServiceDetail } from "./service-detail";
+import { WafDialog } from "./waf-editor";
 import { createEnvironmentAction, createProjectAction, deleteEnvironmentAction, deleteProjectAction } from "./actions";
 
 // Sentinel option values: picking one opens a create dialog instead of switching.
@@ -45,6 +46,7 @@ export function ProjectDetail({
     const [detailApp, setDetailApp] = useState<ProjectApp | null>(null);
     const [showNewProject, setShowNewProject] = useState(false);
     const [showNewEnv, setShowNewEnv] = useState(false);
+    const [showFirewall, setShowFirewall] = useState(false);
     const [pending, startTransition] = useTransition();
 
     // Keep the open service panel in sync with refreshed data: after a change
@@ -107,6 +109,11 @@ export function ProjectDetail({
                 </div>
                 <div className="flex items-center gap-2">
                     {canManage && active && <NewServiceButton environmentId={active.id} onChanged={refresh} />}
+                    {canManage && (
+                        <Button variant="ghost" size="icon" title="Firewall rules" onClick={() => setShowFirewall(true)}>
+                            <ShieldCheck className="size-4" />
+                        </Button>
+                    )}
                     <div className="flex items-center gap-1 rounded-md border border-border p-0.5">
                         <button
                             type="button"
@@ -176,6 +183,30 @@ export function ProjectDetail({
                     onClose={() => setDetailApp(null)}
                 />
             )}
+
+            <WafDialog
+                open={showFirewall}
+                onOpenChange={setShowFirewall}
+                title="Firewall rules"
+                scopes={[
+                    {
+                        type: "project",
+                        id: project.id,
+                        label: "Project",
+                        description: "Applies to every service in this project. Stacks with each service's own rules."
+                    },
+                    ...(active
+                        ? [
+                              {
+                                  type: "environment" as const,
+                                  id: active.id,
+                                  label: "Environment",
+                                  description: `Applies to every service in the ${active.name} environment.`
+                              }
+                          ]
+                        : [])
+                ]}
+            />
 
             <NewProjectDialog open={showNewProject} onOpenChange={setShowNewProject} />
             <NewEnvironmentDialog

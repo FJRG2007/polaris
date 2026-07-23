@@ -24,6 +24,7 @@ import { gitBuildContext, type GitSource } from "./git-build-service";
 import { getLatestCommit, githubCloneAuthHeader } from "./github-service";
 import { resolveRegistryLogin } from "./registry-credential-service";
 import { quickTunnelAppIds, tunnelHostForApp, stopQuickTunnel } from "./deploy/quick-tunnel-service";
+import { resolveWaf, resolveWafBatch } from "./waf-service";
 
 /** Directory the web process writes deploy log files to (tailed by the UI). */
 function logDir(): string {
@@ -274,42 +275,57 @@ export async function syncAppRoutes(): Promise<void> {
         }
     });
     const localIp = await getPublicIp();
+    const localDomains = domains.filter((domain) => domain.application.target.kind === "local");
+    // Served by the remote server's own edge (per-server edge, phase 2).
+    const remotePending = domains
+        .filter((domain) => domain.application.target.kind !== "local")
+        .map((domain) => domain.hostname);
     const localRoutes: AppRoute[] = [];
-    const remotePending: string[] = [];
-    for (const domain of domains) {
-        if (domain.application.target.kind === "local") {
-            if (!localIp) continue;
+    if (localIp) {
+        // Quick-tunnel traffic must traverse the edge too, or its requests never reach
+        // the access log the HTTP Logs view reads. Route each live tunnel's internal host
+        // to the app over plain HTTP (TLS is terminated at Cloudflare's edge, ahead of the
+        // tunnel).
+        const tunnelAppIds = await quickTunnelAppIds();
+        const localTunnelApps =
+            tunnelAppIds.length > 0
+                ? await prisma.application.findMany({
+                      where: { id: { in: tunnelAppIds }, target: { kind: "local" } },
+                      select: { id: true }
+                  })
+                : [];
+        // Resolve every route's WAF decision in one batched pair of queries, not a serial
+        // round-trip per domain and per tunnel.
+        const waf = await resolveWafBatch([
+            ...localDomains.map((domain) => domain.applicationId),
+            ...localTunnelApps.map((app) => app.id)
+        ]);
+        const emptyWaf = { allowLists: [], deny: [], requireLogin: false };
+        for (const domain of localDomains) {
+            const rule = waf.get(domain.applicationId) ?? emptyWaf;
             localRoutes.push({
                 id: domain.id,
                 hostname: domain.hostname,
                 certResolver: domain.certResolver,
                 dialHost: localIp,
-                dialPort: hostPortForApp(domain.applicationId)
+                dialPort: hostPortForApp(domain.applicationId),
+                allowLists: rule.allowLists,
+                deny: rule.deny,
+                requireLogin: rule.requireLogin
             });
-        } else {
-            // Served by the remote server's own edge (per-server edge, phase 2).
-            remotePending.push(domain.hostname);
         }
-    }
-    // Quick-tunnel traffic must traverse the edge too, or its requests never reach the
-    // access log the HTTP Logs view reads. Route each live tunnel's internal host to the
-    // app over plain HTTP (TLS is terminated at Cloudflare's edge, ahead of the tunnel).
-    if (localIp) {
-        const tunnelAppIds = await quickTunnelAppIds();
-        if (tunnelAppIds.length > 0) {
-            const localTunnelApps = await prisma.application.findMany({
-                where: { id: { in: tunnelAppIds }, target: { kind: "local" } },
-                select: { id: true }
+        for (const app of localTunnelApps) {
+            const rule = waf.get(app.id) ?? emptyWaf;
+            localRoutes.push({
+                id: `qtunnel-${shortHash(app.id, 8)}`,
+                hostname: tunnelHostForApp(app.id),
+                certResolver: "none",
+                dialHost: localIp,
+                dialPort: hostPortForApp(app.id),
+                allowLists: rule.allowLists,
+                deny: rule.deny,
+                requireLogin: rule.requireLogin
             });
-            for (const app of localTunnelApps) {
-                localRoutes.push({
-                    id: `qtunnel-${shortHash(app.id, 8)}`,
-                    hostname: tunnelHostForApp(app.id),
-                    certResolver: "none",
-                    dialHost: localIp,
-                    dialPort: hostPortForApp(app.id)
-                });
-            }
         }
     }
     await new LocalRouter().sync(localRoutes);
@@ -318,6 +334,26 @@ export async function syncAppRoutes(): Promise<void> {
             `polaris: ${remotePending.length} remote-server domain(s) await a per-server edge and are not routed by the local edge: ${remotePending.join(", ")}`
         );
     }
+}
+
+/**
+ * Whether a hostname is one this instance actually routes: an enabled domain or a
+ * live quick-tunnel host. The edge login handoff mints a host-bound token, so the
+ * authorize endpoint checks this before signing and redirecting - a redirect target
+ * that is not a managed deploy host is refused, so the endpoint can never be turned
+ * into an open redirector or a token oracle for an arbitrary site.
+ */
+export async function isManagedDeployHost(host: string): Promise<boolean> {
+    const trimmed = host.trim();
+    if (!trimmed) return false;
+    const domain = await prisma.domain.findFirst({
+        where: { enabled: true, hostname: { in: [trimmed, trimmed.toLowerCase()] } },
+        select: { id: true }
+    });
+    if (domain) return true;
+    const needle = trimmed.toLowerCase();
+    const tunnelAppIds = await quickTunnelAppIds();
+    return tunnelAppIds.some((appId) => tunnelHostForApp(appId).toLowerCase() === needle);
 }
 
 /**
@@ -718,6 +754,13 @@ async function buildAppPlan(
     const source = JSON.parse(app.sourceConfig) as Record<string, unknown>;
     const env = await mergedEnv(app.environmentId, app.id);
     const healthcheck = app.healthcheck ? (JSON.parse(app.healthcheck) as AppDeployPlan["healthcheck"]) : undefined;
+    // Resolved WAF rules for this service, materialized into edge labels on deploy so
+    // a remote server's own Traefik enforces them without the control plane.
+    const resolvedWaf = await resolveWaf(app.id);
+    const waf =
+        resolvedWaf.allowLists.length > 0 || resolvedWaf.deny.length > 0 || resolvedWaf.requireLogin
+            ? resolvedWaf
+            : undefined;
 
     // Publish the app on a stable host port so it is reachable over the host's IP
     // (intranet) with no proxy. The container port is the app's stored listening
@@ -755,6 +798,7 @@ async function buildAppPlan(
         },
         env,
         replicas: app.replicas,
+        waf,
         // Disabled domains keep their record but are left out of the plan so no route
         // labels are emitted for them until they are turned back on.
         domains: app.domains

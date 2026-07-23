@@ -54,6 +54,7 @@ import type { HttpLogEntry } from "@polaris/deploy";
 import { TerminalPanel } from "./terminal-panel";
 import { FilesPanel } from "./files-panel";
 import { VolumesTab } from "./volumes-panel";
+import { WafEditor } from "./waf-editor";
 import {
     addDomainAction,
     autoExposeAction,
@@ -88,7 +89,7 @@ import {
     stopNgrokTunnelAction
 } from "./actions";
 
-const TABS = ["Deployments", "Variables", "Metrics", "Console", "Files", "Volumes", "Settings"] as const;
+const TABS = ["Deployments", "Variables", "Metrics", "Console", "Files", "Volumes", "Security", "Settings"] as const;
 type Tab = (typeof TABS)[number];
 
 export function ServiceDetail({ app, onChanged, onClose }: { app: ProjectApp; onChanged: () => void; onClose: () => void }) {
@@ -146,6 +147,13 @@ export function ServiceDetail({ app, onChanged, onClose }: { app: ProjectApp; on
                     )}
                     {tab === "Files" && <FilesPanel applicationId={app.id} />}
                     {tab === "Volumes" && <VolumesTab app={app} />}
+                    {tab === "Security" && (
+                        <WafEditor
+                            scopeType="application"
+                            scopeId={app.id}
+                            description="Restrict who can reach this service. Rules are enforced at the server's own edge, so they keep working even if the Polaris control plane goes down."
+                        />
+                    )}
                     {tab === "Settings" && <SettingsTab app={app} isGit={isGit} onChanged={onChanged} />}
                 </div>
             </DialogContent>

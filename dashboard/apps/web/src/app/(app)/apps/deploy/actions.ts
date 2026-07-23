@@ -35,9 +35,12 @@ import {
     setApplicationServer,
     setApplicationRunning,
     saveEnvironmentLayout,
+    syncAppRoutes,
     updateAutoDeploy,
     type DeploymentSummary
 } from "@/lib/deploy-service";
+import { getWafRule, setWafRule, type WafRuleView } from "@/lib/waf-service";
+import type { WafScopeType } from "@polaris/core";
 import { createDatabase, deployDatabase, type DbEngine } from "@/lib/database-service";
 import { listVolumes, createVolume, updateVolume, deleteVolume, type VolumeView } from "@/lib/deploy-volume-service";
 import { listConnections, getDriver } from "@/lib/storage-service";
@@ -831,6 +834,45 @@ export async function listNasFoldersAction(
         return { folders };
     } catch (caught) {
         return { folders: [], error: caught instanceof Error ? caught.message : "Could not list folders" };
+    }
+}
+
+export async function getWafRuleAction(input: {
+    scopeType: WafScopeType;
+    scopeId: string;
+}): Promise<{ rule?: WafRuleView; error?: string }> {
+    const user = await requirePermission("deploy.manage");
+    // The global rule is instance-wide and applies to every owner's services, so it
+    // is an operator control - deploy.manage alone (which the default member holds)
+    // must not read or write it, only system.manage / admin.
+    if (input.scopeType === "global") await requirePermission("system.manage");
+    try {
+        return { rule: await getWafRule(user.id, input.scopeType, input.scopeId) };
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not load the firewall rule" };
+    }
+}
+
+export async function setWafRuleAction(input: {
+    scopeType: WafScopeType;
+    scopeId: string;
+    ipAllowlist: string[];
+    ipDenylist: string[];
+    requireLogin: boolean;
+}): Promise<{ error?: string }> {
+    const user = await requirePermission("deploy.manage");
+    if (input.scopeType === "global") await requirePermission("system.manage");
+    try {
+        const { scopeType, scopeId, ...rule } = input;
+        await setWafRule(user.id, scopeType, scopeId, rule);
+        await recordAudit({ actorId: user.id, action: "deploy.waf.set", targetType: scopeType, targetId: scopeId || "global" });
+        // The local edge applies instantly via the file provider; remote-server apps
+        // pick up the change on their next deploy (their rules ride on container labels).
+        await syncAppRoutes().catch(() => undefined);
+        revalidatePath(DEPLOY_PATH);
+        return {};
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not save the firewall rule" };
     }
 }
 

@@ -7,7 +7,7 @@
  */
 
 import type { RuntimePorts, OutputSink } from "../ports.js";
-import type { TraefikDomain } from "../traefik.js";
+import type { TraefikDomain, TraefikWaf } from "../traefik.js";
 import type { BuildInput } from "../builders/types.js";
 
 export type RuntimeEngine = "compose" | "swarm";
@@ -62,6 +62,9 @@ export interface AppDeployPlan {
     readonly env: Readonly<Record<string, string>>;
     readonly replicas: number;
     readonly domains: readonly TraefikDomain[];
+    /** Resolved WAF rules to materialize into this service's edge labels (allowlist
+     *  + denylist + require-login). Omitted when the service has no WAF rules. */
+    readonly waf?: TraefikWaf;
     /** Host port to publish so the app is reachable directly over the host's IP
      *  (LAN/intranet), independent of any reverse proxy. `container` is the port
      *  the app listens on inside the container. */
