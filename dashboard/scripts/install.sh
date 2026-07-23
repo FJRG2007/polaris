@@ -559,6 +559,15 @@ main() {
     $compose exec -T caddy caddy reload --config /etc/caddy/Caddyfile >/dev/null 2>&1 \
         || $compose up -d --force-recreate caddy >/dev/null 2>&1 || true
 
+    # Reclaim what this update superseded. Pulling a new `:latest` leaves the
+    # previous image untagged (dangling); over many updates these pile up until the
+    # disk fills and the whole stack falls over (a full disk is exactly what took
+    # the dashboard down). Prune only dangling images and stale build cache - tagged
+    # images, including those of deployed apps, and all volumes are left untouched.
+    # Best-effort: cleanup must never fail an otherwise-successful update.
+    docker image prune -f >/dev/null 2>&1 || true
+    docker builder prune -f >/dev/null 2>&1 || true
+
     url=$(sed -n 's#^POLARIS_APP_URL=##p' .env | head -n1)
 
     # Verify the deploy actually came up rather than reporting success blindly.
