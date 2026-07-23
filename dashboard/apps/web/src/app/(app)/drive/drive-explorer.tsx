@@ -97,7 +97,10 @@ export function DriveExplorer({
     const [newFileName, setNewFileName] = useState("Untitled.txt");
     const [deleteTargets, setDeleteTargets] = useState<DriveEntry[] | null>(null);
     const [permanentTargets, setPermanentTargets] = useState<DriveEntry[] | null>(null);
-    const [emptyTarget, setEmptyTarget] = useState<DriveEntry | null>(null);
+    const [emptyTarget, setEmptyTarget] = useState<{
+        entry: DriveEntry;
+        permanent: boolean;
+    } | null>(null);
     const [scheduleTargets, setScheduleTargets] = useState<DriveEntry[] | null>(null);
     const [deleteConn, setDeleteConn] = useState<ConnectionSummary | null>(null);
     const [editConn, setEditConn] = useState<ConnectionSummary | null>(null);
@@ -118,7 +121,9 @@ export function DriveExplorer({
                 const result = await fn();
                 if (result && typeof result === "object" && result.error) setOpError(result.error);
             } catch (caught) {
-                setOpError(caught instanceof Error && caught.message ? caught.message : `${label} failed`);
+                setOpError(
+                    caught instanceof Error && caught.message ? caught.message : `${label} failed`
+                );
             } finally {
                 setOps((prev) => prev.filter((op) => op.id !== id));
                 void load();
@@ -127,7 +132,8 @@ export function DriveExplorer({
     }
 
     const segments = path ? path.split("/") : [];
-    const selectedConnection = connections.find((connection) => connection.id === connectionId) ?? null;
+    const selectedConnection =
+        connections.find((connection) => connection.id === connectionId) ?? null;
 
     const load = useCallback(
         async (signal?: AbortSignal) => {
@@ -207,7 +213,9 @@ export function DriveExplorer({
         const parent = parentOf(entry.path);
         const to = parent ? `${parent}/${nextName}` : nextName;
         setEntries((prev) =>
-            prev.map((row) => (row.path === entry.path ? { ...row, name: nextName, path: to } : row))
+            prev.map((row) =>
+                row.path === entry.path ? { ...row, name: nextName, path: to } : row
+            )
         );
         setOpError(null);
         startTransition(async () => {
@@ -220,7 +228,9 @@ export function DriveExplorer({
     function onToggleHidden(entry: DriveEntry) {
         if (!connectionId) return;
         const next = !entry.hidden;
-        setEntries((prev) => prev.map((row) => (row.path === entry.path ? { ...row, hidden: next } : row)));
+        setEntries((prev) =>
+            prev.map((row) => (row.path === entry.path ? { ...row, hidden: next } : row))
+        );
         startTransition(async () => {
             await setItemHiddenAction(connectionId, entry.path, next);
             void load();
@@ -229,7 +239,9 @@ export function DriveExplorer({
 
     function onSetFavorite(entry: DriveEntry, favorite: boolean) {
         if (!connectionId) return;
-        setEntries((prev) => prev.map((row) => (row.path === entry.path ? { ...row, favorite } : row)));
+        setEntries((prev) =>
+            prev.map((row) => (row.path === entry.path ? { ...row, favorite } : row))
+        );
         startTransition(async () => {
             await setItemFavoriteAction(connectionId, entry.path, favorite);
             void load();
@@ -316,9 +328,10 @@ export function DriveExplorer({
 
     function confirmEmpty() {
         if (!connectionId || !emptyTarget) return;
-        const target = emptyTarget;
+        const { entry, permanent } = emptyTarget;
         setEmptyTarget(null);
-        runOp(`Emptying ${target.name}`, () => emptyFolderAction(connectionId, target.path));
+        const label = permanent ? `Emptying ${entry.name}` : `Emptying ${entry.name} to Trash`;
+        runOp(label, () => emptyFolderAction(connectionId, entry.path, permanent));
     }
 
     function confirmDeleteConnection() {
@@ -360,8 +373,12 @@ export function DriveExplorer({
                                             key changed
                                         </Badge>
                                     ) : null}
-                                    {connection.shared ? <Badge variant="neutral">shared</Badge> : null}
-                                    {connection.requiresHostd ? <Badge variant="neutral">host</Badge> : null}
+                                    {connection.shared ? (
+                                        <Badge variant="neutral">shared</Badge>
+                                    ) : null}
+                                    {connection.requiresHostd ? (
+                                        <Badge variant="neutral">host</Badge>
+                                    ) : null}
                                 </Link>
                                 {connection.canManageAccess && connection.needsRekey ? (
                                     <button
@@ -410,11 +427,14 @@ export function DriveExplorer({
                         <div className="flex items-start gap-3">
                             <AlertTriangle className="mt-0.5 size-5 shrink-0 text-warning" />
                             <div className="flex flex-col gap-2">
-                                <h3 className="text-sm font-medium">Saved credentials need updating</h3>
+                                <h3 className="text-sm font-medium">
+                                    Saved credentials need updating
+                                </h3>
                                 <p className="text-sm text-muted-foreground">
-                                    This connection&apos;s credentials were encrypted with a different master key and
-                                    can no longer be read. Enter the password (or key) again to restore access - your
-                                    files, shares, ACLs, and settings are all kept.
+                                    This connection&apos;s credentials were encrypted with a
+                                    different master key and can no longer be read. Enter the
+                                    password (or key) again to restore access - your files, shares,
+                                    ACLs, and settings are all kept.
                                 </p>
                                 {selectedConnection.canManageAccess ? (
                                     <div>
@@ -461,7 +481,7 @@ export function DriveExplorer({
                         onUpload={onUpload}
                         onDelete={(items) => setDeleteTargets(items)}
                         onDeletePermanent={(items) => setPermanentTargets(items)}
-                        onEmptyFolder={(entry) => setEmptyTarget(entry)}
+                        onEmptyFolder={(entry, permanent) => setEmptyTarget({ entry, permanent })}
                         onScheduleDelete={(items) => setScheduleTargets(items)}
                         onRename={onRename}
                         onShare={(entry) =>
@@ -484,11 +504,16 @@ export function DriveExplorer({
                         onManageAccess={
                             selectedConnection?.canManageAccess
                                 ? (entry) =>
-                                      setAccessTarget({ connectionId, path: entry.path, name: entry.name })
+                                      setAccessTarget({
+                                          connectionId,
+                                          path: entry.path,
+                                          name: entry.name
+                                      })
                                 : undefined
                         }
                         headerActions={
-                            selectedConnection?.canManageAccess || selectedConnection?.kind === "unifi-unas" ? (
+                            selectedConnection?.canManageAccess ||
+                            selectedConnection?.kind === "unifi-unas" ? (
                                 <>
                                     {selectedConnection?.canManageAccess ? (
                                         <Button
@@ -521,7 +546,9 @@ export function DriveExplorer({
 
             {ops.length > 0 ? (
                 <div className="fixed bottom-4 right-4 z-50 flex w-72 flex-col gap-2 rounded-lg border border-border bg-card p-3 shadow-lg">
-                    <p className="text-xs font-medium text-muted-foreground">Working in the background</p>
+                    <p className="text-xs font-medium text-muted-foreground">
+                        Working in the background
+                    </p>
                     {ops.map((op) => (
                         <div key={op.id} className="flex items-center gap-2 text-sm">
                             <Loader2 className="size-4 shrink-0 animate-spin text-primary" />
@@ -546,8 +573,14 @@ export function DriveExplorer({
                 </div>
             ) : null}
 
-            <ShareDialog target={shareTarget} onOpenChange={(open) => !open && setShareTarget(null)} />
-            <RequestDialog target={requestTarget} onOpenChange={(open) => !open && setRequestTarget(null)} />
+            <ShareDialog
+                target={shareTarget}
+                onOpenChange={(open) => !open && setShareTarget(null)}
+            />
+            <RequestDialog
+                target={requestTarget}
+                onOpenChange={(open) => !open && setRequestTarget(null)}
+            />
             <AccessDialog
                 target={accessTarget}
                 onOpenChange={(open) => !open && setAccessTarget(null)}
@@ -563,7 +596,9 @@ export function DriveExplorer({
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>New folder</DialogTitle>
-                        <DialogDescription>Create a folder in the current location.</DialogDescription>
+                        <DialogDescription>
+                            Create a folder in the current location.
+                        </DialogDescription>
                     </DialogHeader>
                     <form onSubmit={submitNewFolder} className="flex flex-col gap-3">
                         <Input
@@ -615,11 +650,17 @@ export function DriveExplorer({
                 </DialogContent>
             </Dialog>
 
-            <Dialog open={deleteTargets !== null} onOpenChange={(open) => !open && setDeleteTargets(null)}>
+            <Dialog
+                open={deleteTargets !== null}
+                onOpenChange={(open) => !open && setDeleteTargets(null)}
+            >
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>
-                            Move {deleteTargets && deleteTargets.length > 1 ? `${deleteTargets.length} items` : "item"}{" "}
+                            Move{" "}
+                            {deleteTargets && deleteTargets.length > 1
+                                ? `${deleteTargets.length} items`
+                                : "item"}{" "}
                             to Trash
                         </DialogTitle>
                         <DialogDescription className="truncate">
@@ -629,7 +670,11 @@ export function DriveExplorer({
                         </DialogDescription>
                     </DialogHeader>
                     <div className="flex justify-end gap-2">
-                        <Button type="button" variant="ghost" onClick={() => setDeleteTargets(null)}>
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            onClick={() => setDeleteTargets(null)}
+                        >
                             Cancel
                         </Button>
                         <Button type="button" variant="danger" onClick={confirmDelete}>
@@ -639,13 +684,22 @@ export function DriveExplorer({
                 </DialogContent>
             </Dialog>
 
-            <Dialog open={emptyTarget !== null} onOpenChange={(open) => !open && setEmptyTarget(null)}>
+            <Dialog
+                open={emptyTarget !== null}
+                onOpenChange={(open) => !open && setEmptyTarget(null)}
+            >
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>Empty folder</DialogTitle>
+                        <DialogTitle>
+                            {emptyTarget?.permanent
+                                ? "Empty folder permanently"
+                                : "Empty folder to Trash"}
+                        </DialogTitle>
                         <DialogDescription className="truncate">
                             {emptyTarget
-                                ? `Everything inside ${emptyTarget.name} will be permanently deleted. The folder itself is kept. This cannot be undone.`
+                                ? emptyTarget.permanent
+                                    ? `Everything inside ${emptyTarget.entry.name} will be permanently deleted. The folder itself is kept. This cannot be undone.`
+                                    : `Everything inside ${emptyTarget.entry.name} will be moved to the recycle bin. The folder itself is kept. You can restore items from Trash.`
                                 : ""}
                         </DialogDescription>
                     </DialogHeader>
@@ -654,13 +708,16 @@ export function DriveExplorer({
                             Cancel
                         </Button>
                         <Button type="button" variant="danger" onClick={confirmEmpty}>
-                            Empty folder
+                            {emptyTarget?.permanent ? "Empty permanently" : "Empty to Trash"}
                         </Button>
                     </div>
                 </DialogContent>
             </Dialog>
 
-            <Dialog open={permanentTargets !== null} onOpenChange={(open) => !open && setPermanentTargets(null)}>
+            <Dialog
+                open={permanentTargets !== null}
+                onOpenChange={(open) => !open && setPermanentTargets(null)}
+            >
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>
@@ -677,7 +734,11 @@ export function DriveExplorer({
                         </DialogDescription>
                     </DialogHeader>
                     <div className="flex justify-end gap-2">
-                        <Button type="button" variant="ghost" onClick={() => setPermanentTargets(null)}>
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            onClick={() => setPermanentTargets(null)}
+                        >
                             Cancel
                         </Button>
                         <Button type="button" variant="danger" onClick={confirmDeletePermanent}>
@@ -700,13 +761,16 @@ export function DriveExplorer({
                 />
             ) : null}
 
-            <Dialog open={deleteConn !== null} onOpenChange={(open) => !open && setDeleteConn(null)}>
+            <Dialog
+                open={deleteConn !== null}
+                onOpenChange={(open) => !open && setDeleteConn(null)}
+            >
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>Remove connection</DialogTitle>
                         <DialogDescription>
-                            {deleteConn?.name} will be removed from Polaris. The device itself and its data are not
-                            touched - you can add it again anytime.
+                            {deleteConn?.name} will be removed from Polaris. The device itself and
+                            its data are not touched - you can add it again anytime.
                         </DialogDescription>
                     </DialogHeader>
                     <div className="flex justify-end gap-2">
@@ -789,7 +853,8 @@ function ScheduleDeleteDialog({
                 <DialogHeader>
                     <DialogTitle>Schedule deletion</DialogTitle>
                     <DialogDescription className="truncate">
-                        {count === 1 ? targets?.[0]?.name : `${count} items`} will be deleted at the time you choose.
+                        {count === 1 ? targets?.[0]?.name : `${count} items`} will be deleted at the
+                        time you choose.
                     </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={onSubmit} className="flex flex-col gap-3">
@@ -812,8 +877,8 @@ function ScheduleDeleteDialog({
                         Delete permanently (skip the recycle bin)
                     </label>
                     <p className="text-xs text-muted-foreground">
-                        Runs the next time this connection is browsed after that moment, or exactly on time if the
-                        deletion cron is configured.
+                        Runs the next time this connection is browsed after that moment, or exactly
+                        on time if the deletion cron is configured.
                     </p>
                     {error ? <p className="text-sm text-danger">{error}</p> : null}
                     <div className="flex justify-end gap-2">
@@ -822,7 +887,11 @@ function ScheduleDeleteDialog({
                                 Cancel
                             </Button>
                         </DialogClose>
-                        <Button type="submit" variant={permanent ? "danger" : undefined} disabled={pending}>
+                        <Button
+                            type="submit"
+                            variant={permanent ? "danger" : undefined}
+                            disabled={pending}
+                        >
                             {pending ? "Scheduling..." : "Schedule"}
                         </Button>
                     </div>
@@ -880,8 +949,8 @@ function UnasSmbSetup({ connectionId, onSaved }: { connectionId: string; onSaved
                     <div className="flex flex-col gap-1">
                         <span className="font-medium">Browse UNAS files over SMB</span>
                         <span className="text-muted-foreground">
-                            Files are served from the device&apos;s SMB share, using the same UniFi account you
-                            already entered. Pick the share to open.
+                            Files are served from the device&apos;s SMB share, using the same UniFi
+                            account you already entered. Pick the share to open.
                         </span>
                     </div>
                 </div>
@@ -909,8 +978,8 @@ function UnasSmbSetup({ connectionId, onSaved }: { connectionId: string; onSaved
                     </div>
                 ) : (
                     <p className="text-sm text-muted-foreground">
-                        No shares were detected automatically. Enter the share name below (enable SMB on the UNAS if
-                        it is off).
+                        No shares were detected automatically. Enter the share name below (enable
+                        SMB on the UNAS if it is off).
                     </p>
                 )}
 

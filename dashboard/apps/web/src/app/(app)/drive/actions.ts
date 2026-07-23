@@ -17,7 +17,12 @@ import {
     storageCredentialsSchema
 } from "@polaris/core";
 import { requirePermission, requireUser } from "@/lib/session";
-import { authorizeDrive, requireDriveDriver, DriveAccessError, DriveLockedError } from "@/lib/drive-authz";
+import {
+    authorizeDrive,
+    requireDriveDriver,
+    DriveAccessError,
+    DriveLockedError
+} from "@/lib/drive-authz";
 import {
     createConnection,
     deleteConnection,
@@ -30,8 +35,20 @@ import { detectHost, type NasDetection } from "@/lib/nas-detect";
 import { fetchUnasMetrics } from "@/lib/unifi-unas";
 import { listLocks } from "@/lib/access-lock-service";
 import { writeArchiveToDriver, zipSourcesFor } from "@/lib/drive-archive";
-import { archiveFormatOf, extractArchiveTo, listArchiveEntries, type ArchiveEntry } from "@/lib/drive-archive-read";
-import { moveItemMeta, recordItemCreator, setItemFavorite, setItemHidden, setItemIcon, setItemNote } from "@/lib/drive-meta-service";
+import {
+    archiveFormatOf,
+    extractArchiveTo,
+    listArchiveEntries,
+    type ArchiveEntry
+} from "@/lib/drive-archive-read";
+import {
+    moveItemMeta,
+    recordItemCreator,
+    setItemFavorite,
+    setItemHidden,
+    setItemIcon,
+    setItemNote
+} from "@/lib/drive-meta-service";
 import { deleteTrashForever, emptyTrash, moveToTrash, restoreTrash } from "@/lib/trash-service";
 import { createScheduledDeletion } from "@/lib/scheduled-deletion-service";
 import { recordAudit } from "@/lib/audit-service";
@@ -79,7 +96,8 @@ export async function testUnasConnectionAction(input: {
             bays: metrics.slotsPopulated
         };
     } catch (caught) {
-        const message = caught instanceof Error ? caught.message : "Could not reach the UNAS console";
+        const message =
+            caught instanceof Error ? caught.message : "Could not reach the UNAS console";
         return { ok: false, error: message };
     }
 }
@@ -131,7 +149,8 @@ export async function updateConnectionAction(
     if (!name) return { error: "Enter a connection name" };
 
     const config = storageConfigSchema.safeParse(input.config);
-    if (!config.success) return { error: config.error.issues[0]?.message ?? "Invalid connection settings" };
+    if (!config.success)
+        return { error: config.error.issues[0]?.message ?? "Invalid connection settings" };
 
     // Only validate/replace credentials when the form actually supplied some; a
     // payload of just { kind } means "keep the existing secret".
@@ -140,14 +159,17 @@ export async function updateConnectionAction(
     let credentials;
     if (hasSecret) {
         const parsed = storageCredentialsSchema.safeParse(rawCreds);
-        if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid credentials" };
+        if (!parsed.success)
+            return { error: parsed.error.issues[0]?.message ?? "Invalid credentials" };
         credentials = parsed.data;
     }
 
     try {
         await updateConnection(user.id, connectionId, { name, config: config.data, credentials });
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not update the connection" };
+        return {
+            error: caught instanceof Error ? caught.message : "Could not update the connection"
+        };
     }
     await recordAudit({
         actorId: user.id,
@@ -168,12 +190,17 @@ export async function discoverUnasSharesAction(
     try {
         return { shares: await discoverUnasShares(user.id, connectionId) };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not reach SMB on the device" };
+        return {
+            error: caught instanceof Error ? caught.message : "Could not reach SMB on the device"
+        };
     }
 }
 
 /** Save the SMB share for a UNAS connection so its Files tab can browse over SMB. */
-export async function setUnasShareAction(connectionId: string, share: string): Promise<{ error?: string }> {
+export async function setUnasShareAction(
+    connectionId: string,
+    share: string
+): Promise<{ error?: string }> {
     const user = await requirePermission("connections.manage");
     if (!share.trim()) return { error: "Enter the SMB share name" };
     try {
@@ -188,14 +215,23 @@ export async function setUnasShareAction(connectionId: string, share: string): P
 export async function deleteConnectionAction(connectionId: string): Promise<void> {
     const user = await requirePermission("connections.manage");
     await deleteConnection(user.id, connectionId);
-    await recordAudit({ actorId: user.id, action: "connection.delete", targetType: "connection", targetId: connectionId });
+    await recordAudit({
+        actorId: user.id,
+        action: "connection.delete",
+        targetType: "connection",
+        targetId: connectionId
+    });
     revalidatePath("/drive");
 }
 
 /** Create a folder. Returns a structured error (never throws) so an unsupported
  *  source - a container filesystem cannot make directories - surfaces a clear
  *  message instead of a raw server exception. */
-export async function mkdirAction(connectionId: string, path: string, name: string): Promise<{ error?: string }> {
+export async function mkdirAction(
+    connectionId: string,
+    path: string,
+    name: string
+): Promise<{ error?: string }> {
     const user = await requireUser();
     const target = normalizeRelPath(path ? `${path}/${name}` : name);
     let driver;
@@ -212,7 +248,13 @@ export async function mkdirAction(connectionId: string, path: string, name: stri
         await driver.dispose();
     }
     await recordItemCreator(connectionId, target, user.id);
-    await recordAudit({ actorId: user.id, action: "drive.mkdir", targetType: "connection", targetId: connectionId, metadata: { path: target } });
+    await recordAudit({
+        actorId: user.id,
+        action: "drive.mkdir",
+        targetType: "connection",
+        targetId: connectionId,
+        metadata: { path: target }
+    });
     revalidatePath("/drive");
     return {};
 }
@@ -220,7 +262,11 @@ export async function mkdirAction(connectionId: string, path: string, name: stri
 /** Create an empty file (any name/extension) in the given folder. Returns a
  *  structured error instead of throwing so a driver that refuses the write reports
  *  why rather than crashing the page. */
-export async function createFileAction(connectionId: string, path: string, name: string): Promise<{ error?: string }> {
+export async function createFileAction(
+    connectionId: string,
+    path: string,
+    name: string
+): Promise<{ error?: string }> {
     const user = await requireUser();
     const clean = name.trim();
     if (!clean) return { error: "Enter a file name" };
@@ -244,7 +290,13 @@ export async function createFileAction(connectionId: string, path: string, name:
         await driver.dispose();
     }
     await recordItemCreator(connectionId, target, user.id);
-    await recordAudit({ actorId: user.id, action: "drive.create", targetType: "connection", targetId: connectionId, metadata: { path: target } });
+    await recordAudit({
+        actorId: user.id,
+        action: "drive.create",
+        targetType: "connection",
+        targetId: connectionId,
+        metadata: { path: target }
+    });
     revalidatePath("/drive");
     return {};
 }
@@ -257,7 +309,13 @@ export async function deleteEntryAction(connectionId: string, path: string): Pro
     } finally {
         await driver.dispose();
     }
-    await recordAudit({ actorId: user.id, action: "drive.delete", targetType: "connection", targetId: connectionId, metadata: { path } });
+    await recordAudit({
+        actorId: user.id,
+        action: "drive.delete",
+        targetType: "connection",
+        targetId: connectionId,
+        metadata: { path }
+    });
     revalidatePath("/drive");
 }
 
@@ -276,7 +334,9 @@ export async function generateZipAction(
     password?: string
 ): Promise<{ path?: string; error?: string }> {
     const user = await requireUser();
-    const sourcePaths = paths.map((entry) => normalizeRelPath(entry)).filter((entry) => entry.length > 0);
+    const sourcePaths = paths
+        .map((entry) => normalizeRelPath(entry))
+        .filter((entry) => entry.length > 0);
     if (sourcePaths.length === 0) return { error: "Nothing selected" };
 
     try {
@@ -298,10 +358,17 @@ export async function generateZipAction(
     try {
         const parent = destPath.split("/").slice(0, -1).join("/");
         if (parent) await driver.mkdir(parent);
-        const lockedRoots = new Set((await listLocks(connectionId)).map((lock) => lock.path).filter(Boolean));
-        await writeArchiveToDriver(driver, destPath, zipSourcesFor(driver, sourcePaths, lockedRoots), {
-            password: password || undefined
-        });
+        const lockedRoots = new Set(
+            (await listLocks(connectionId)).map((lock) => lock.path).filter(Boolean)
+        );
+        await writeArchiveToDriver(
+            driver,
+            destPath,
+            zipSourcesFor(driver, sourcePaths, lockedRoots),
+            {
+                password: password || undefined
+            }
+        );
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Could not create the archive" };
     } finally {
@@ -394,25 +461,47 @@ export async function extractArchiveAction(
 }
 
 /**
- * Empty a folder: permanently delete everything inside it but keep the folder
- * itself. Authorized with "delete" on the folder (same right as deleting it),
- * then each direct child is removed recursively. This is a permanent delete, not
- * a move to Trash - matching deleteEntryAction.
+ * Empty a folder: remove everything inside it but keep the folder itself.
+ * Authorized with "delete" on the folder (same right as deleting it). When
+ * `permanent`, each direct child is deleted recursively for good; otherwise each
+ * child is moved to the recycle bin, restorable from Trash.
  */
-export async function emptyFolderAction(connectionId: string, path: string): Promise<void> {
+export async function emptyFolderAction(
+    connectionId: string,
+    path: string,
+    permanent: boolean
+): Promise<void> {
     const user = await requireUser();
     const driver = await requireDriveDriver(user.id, connectionId, path, "delete");
+    let children: string[];
     try {
         const rel = normalizeRelPath(path);
         const { entries } = await driver.list(rel);
-        for (const child of entries) {
-            await driver.delete(normalizeRelPath(child.path), { recursive: true });
+        children = entries.map((child) => normalizeRelPath(child.path));
+        if (permanent) {
+            for (const child of children) {
+                await driver.delete(child, { recursive: true });
+            }
         }
     } finally {
         await driver.dispose();
     }
-    await recordAudit({ actorId: user.id, action: "drive.empty", targetType: "connection", targetId: connectionId, metadata: { path } });
+    // moveToTrash opens its own driver per item, so it runs after the listing
+    // driver above is disposed.
+    if (!permanent) {
+        for (const child of children) {
+            await moveToTrash(user.id, connectionId, child);
+        }
+    }
+    await recordAudit({
+        actorId: user.id,
+        action: "drive.empty",
+        targetType: "connection",
+        targetId: connectionId,
+        metadata: { path, permanent }
+    });
     revalidatePath("/drive");
+    if (!permanent) revalidatePath("/trash");
 }
 
 /**
@@ -436,7 +525,13 @@ export async function scheduleDeleteAction(
     if (Number.isNaN(when.getTime())) return { error: "Pick a valid date and time." };
     if (when.getTime() <= Date.now()) return { error: "Pick a time in the future." };
 
-    await createScheduledDeletion({ ownerId: user.id, connectionId, path: normalizeRelPath(path), permanent, deleteAt: when });
+    await createScheduledDeletion({
+        ownerId: user.id,
+        connectionId,
+        path: normalizeRelPath(path),
+        permanent,
+        deleteAt: when
+    });
     await recordAudit({
         actorId: user.id,
         action: "drive.schedule_delete",
@@ -453,7 +548,13 @@ export async function moveToTrashAction(connectionId: string, path: string): Pro
     const user = await requireUser();
     await authorizeDrive(user.id, connectionId, path, "delete");
     await moveToTrash(user.id, connectionId, path);
-    await recordAudit({ actorId: user.id, action: "drive.trash", targetType: "connection", targetId: connectionId, metadata: { path } });
+    await recordAudit({
+        actorId: user.id,
+        action: "drive.trash",
+        targetType: "connection",
+        targetId: connectionId,
+        metadata: { path }
+    });
     revalidatePath("/drive");
     revalidatePath("/trash");
 }
@@ -492,7 +593,11 @@ function driveErrorMessage(caught: unknown, fallback: string): string {
  * browser can surface why a move/paste failed (permission, lock, driver error)
  * rather than silently doing nothing.
  */
-export async function renameAction(connectionId: string, from: string, to: string): Promise<{ error?: string }> {
+export async function renameAction(
+    connectionId: string,
+    from: string,
+    to: string
+): Promise<{ error?: string }> {
     const user = await requireUser();
     const normalizedFrom = normalizeRelPath(from);
     const normalizedTo = normalizeRelPath(to);
@@ -516,7 +621,9 @@ export async function renameAction(connectionId: string, from: string, to: strin
             destinationTaken = false;
         }
         if (destinationTaken) {
-            return { error: `An item named "${baseName(normalizedTo)}" already exists in that folder.` };
+            return {
+                error: `An item named "${baseName(normalizedTo)}" already exists in that folder.`
+            };
         }
         await driver.move(normalizedFrom, normalizedTo);
     } catch (caught) {
@@ -526,20 +633,34 @@ export async function renameAction(connectionId: string, from: string, to: strin
     }
     // Keep any custom icon / hidden flag attached to the item after it moves.
     await moveItemMeta(connectionId, normalizedFrom, normalizedTo);
-    await recordAudit({ actorId: user.id, action: "drive.move", targetType: "connection", targetId: connectionId, metadata: { from, to } });
+    await recordAudit({
+        actorId: user.id,
+        action: "drive.move",
+        targetType: "connection",
+        targetId: connectionId,
+        metadata: { from, to }
+    });
     revalidatePath("/drive");
     return {};
 }
 
 /** Hide or unhide an item in the browser (presentation only; the file is untouched). */
-export async function setItemHiddenAction(connectionId: string, path: string, hidden: boolean): Promise<void> {
+export async function setItemHiddenAction(
+    connectionId: string,
+    path: string,
+    hidden: boolean
+): Promise<void> {
     const user = await requirePermission("drive.write");
     await setItemHidden(user.id, connectionId, normalizeRelPath(path), hidden);
     revalidatePath("/drive");
 }
 
 /** Star or unstar an item (mark it a favorite). Presentation only. */
-export async function setItemFavoriteAction(connectionId: string, path: string, favorite: boolean): Promise<void> {
+export async function setItemFavoriteAction(
+    connectionId: string,
+    path: string,
+    favorite: boolean
+): Promise<void> {
     const user = await requirePermission("drive.write");
     await setItemFavorite(user.id, connectionId, normalizeRelPath(path), favorite);
     revalidatePath("/drive");
@@ -558,7 +679,11 @@ export async function setItemIconAction(
 }
 
 /** Set or clear a free-text note on an item. */
-export async function setItemNoteAction(connectionId: string, path: string, note: string | null): Promise<void> {
+export async function setItemNoteAction(
+    connectionId: string,
+    path: string,
+    note: string | null
+): Promise<void> {
     const user = await requirePermission("drive.write");
     await setItemNote(user.id, connectionId, normalizeRelPath(path), note);
     revalidatePath("/drive");
@@ -616,7 +741,11 @@ async function copyRecursive(driver: Driver, from: string, to: string): Promise<
  * has a native move but no copy, so this streams file bytes and walks folders.
  * Collisions get a " copy" suffix so pasting into the source folder is safe.
  */
-export async function copyAction(connectionId: string, from: string, destFolder: string): Promise<{ error?: string }> {
+export async function copyAction(
+    connectionId: string,
+    from: string,
+    destFolder: string
+): Promise<{ error?: string }> {
     const user = await requireUser();
     const source = normalizeRelPath(from);
     const base = baseName(source);
@@ -631,7 +760,10 @@ export async function copyAction(connectionId: string, from: string, destFolder:
     }
     let destination = "";
     try {
-        destination = await freeName(driver, normalizeRelPath(destFolder ? `${destFolder}/${base}` : base));
+        destination = await freeName(
+            driver,
+            normalizeRelPath(destFolder ? `${destFolder}/${base}` : base)
+        );
         await copyRecursive(driver, source, destination);
     } catch (caught) {
         return { error: driveErrorMessage(caught, "Could not copy the item.") };
