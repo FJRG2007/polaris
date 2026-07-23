@@ -18,13 +18,17 @@ import { getSession } from "@/lib/session";
 import { getDriverForConnection } from "@/lib/storage-service";
 import { recordItemCreator } from "@/lib/drive-meta-service";
 import {
+    bumpVisitUpload,
     countSubmissions,
     fileRequestIpAllowed,
     fileRequestUnlockCookie,
     fileRequestUsability,
+    fileRequestUserAllowed,
+    fileRequestVisitCookie,
     parseStringArray,
     recordSubmission,
     resolveFileRequestByToken,
+    signSubmissionDelete,
     verifyFileRequestUnlock
 } from "@/lib/file-request-service";
 import { clientIp, hashForLog } from "@/lib/request-context";
@@ -69,7 +73,10 @@ export async function PUT(
     if (!fileRequest) return new Response("Not found", { status: 404 });
 
     const usable = fileRequestUsability(fileRequest);
-    if (!usable.ok) return new Response(usable.reason, { status: 410 });
+    // A not-yet-started drop point is a 403 (temporary); revoked/expired is a 410.
+    if (!usable.ok) {
+        return new Response(usable.reason, { status: usable.reason === "scheduled" ? 403 : 410 });
+    }
 
     const ip = await clientIp();
     if (!fileRequestIpAllowed(fileRequest.allowedCidrs, ip)) {
@@ -98,8 +105,17 @@ export async function PUT(
     const session = await getSession();
     const userId = (session?.user as { id?: string } | undefined)?.id ?? null;
     if (fileRequest.requireLogin && !userId) return new Response("login_required", { status: 401 });
+    // Per-user allowlist: a non-empty list requires sign-in and a matching account.
+    if (!(await fileRequestUserAllowed(fileRequest.allowedUsers, userId))) {
+        return new Response(userId ? "user_not_allowed" : "login_required", {
+            status: userId ? 403 : 401
+        });
+    }
 
-    if (fileRequest.maxFiles !== null && (await countSubmissions(fileRequest.id)) >= fileRequest.maxFiles) {
+    if (
+        fileRequest.maxFiles !== null &&
+        (await countSubmissions(fileRequest.id)) >= fileRequest.maxFiles
+    ) {
         return new Response("full", { status: 409 });
     }
 
@@ -116,12 +132,16 @@ export async function PUT(
         mimeType: request.headers.get("content-type") ?? "application/octet-stream",
         size: declaredSize
     };
+    // The minimum is enforced authoritatively on the stored size below, not here,
+    // because content-length can be absent or wrong; this pass covers type and max.
     const check = checkUploadCandidate(candidate, {
         allowedExtensions: parseStringArray(fileRequest.allowedExtensions),
+        deniedExtensions: parseStringArray(fileRequest.deniedExtensions),
         allowedMimeTypes: parseStringArray(fileRequest.allowedMimeTypes),
         maxSizeBytes
     });
     if (!check.ok) return new Response(check.reason ?? "rejected", { status: 422 });
+    const minSizeBytes = fileRequest.minSizeBytes !== null ? Number(fileRequest.minSizeBytes) : 0;
 
     // Store under a random prefix so uploaders cannot overwrite each other's files
     // or guess a path; the original name is kept in the submission record for the
@@ -133,7 +153,17 @@ export async function PUT(
 
     const driver = await getDriverForConnection(fileRequest.destinationConnectionId);
     try {
-        const stat = await driver.writeStream(destination, limitSize(request.body, maxSizeBytes), {});
+        const stat = await driver.writeStream(
+            destination,
+            limitSize(request.body, maxSizeBytes),
+            {}
+        );
+        // Authoritative minimum-size gate on the bytes actually stored. A file below
+        // the floor is removed so nothing is kept or recorded.
+        if (minSizeBytes > 0 && Number(stat.size) < minSizeBytes) {
+            await driver.delete(destination).catch(() => undefined);
+            return new Response("too_small", { status: 422 });
+        }
         const submission = await recordSubmission({
             requestId: fileRequest.id,
             submittedByUserId: userId,
@@ -144,7 +174,11 @@ export async function PUT(
         });
         // Owner of record: the signed-in uploader, or the drop point's owner who
         // collected it when the upload was anonymous.
-        await recordItemCreator(fileRequest.destinationConnectionId, destination, userId ?? fileRequest.ownerId);
+        await recordItemCreator(
+            fileRequest.destinationConnectionId,
+            destination,
+            userId ?? fileRequest.ownerId
+        );
 
         // Security scan (VirusTotal, when enabled). Runs before acknowledging the
         // upload so the configured action - block by default - can be enforced on a
@@ -161,10 +195,19 @@ export async function PUT(
         });
         if (scan.blocked) return new Response("file_rejected", { status: 422 });
 
+        // Fold this upload into the browser's visitor session (the "uploaded?"
+        // column), and hand back a per-file delete token so the uploader can
+        // remove their own file later when the drop point allows it.
+        const visitorKey = (await cookies()).get(fileRequestVisitCookie(fileRequest.id))?.value;
+        if (visitorKey) await bumpVisitUpload(fileRequest.id, visitorKey);
+        const deleteToken = signSubmissionDelete(submission.id, loadEnv().POLARIS_AUTH_SECRET);
+
         return Response.json({
             ok: true,
+            id: submission.id,
             name: safeName,
             size: stat.size.toString(),
+            deleteToken,
             ...(scan.scanned ? { scan: scan.verdict } : {})
         });
     } catch (error) {

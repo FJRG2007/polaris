@@ -59,6 +59,8 @@ model User {
     shareInvites      ShareInvite[]
     fileRequests      FileRequest[]
     submissions       FileRequestSubmission[]
+    dropPointVisits   FileRequestVisit[]
+    dropPointTemplates DropPointTemplate[]
     uploads           UploadSession[]
     notifications     Notification[]
     deployTargets     DeployTarget[]
@@ -524,15 +526,28 @@ model FileRequest {
     // argon2 hash of an optional access PIN/password gating the upload page.
     passwordHash            String?
     maxSizeBytes            BigInt
+    // Optional per-file minimum size; null means no minimum.
+    minSizeBytes            BigInt?
     maxFiles                Int?
     // JSON string arrays validated by @polaris/core.
     allowedExtensions       String    @default("[]")
+    // Blocklist of extensions; takes precedence over allowedExtensions.
+    deniedExtensions        String    @default("[]")
     allowedMimeTypes        String    @default("[]")
     allowedCidrs            String    @default("[]")
+    // JSON string array of allowed uploader identities (email or username,
+    // lowercased, no leading "@"). Non-empty implies sign-in is required.
+    allowedUsers            String    @default("[]")
     // JSON string arrays of ISO country codes / continent codes; empty means no
     // geo restriction. Enforced server-side per upload after resolving the IP.
     allowedCountries        String    @default("[]")
     allowedContinents       String    @default("[]")
+    // When set, the drop point only starts accepting uploads at this time.
+    startsAt                DateTime?
+    // Whether an uploader may delete files they submitted, and (optionally) only
+    // within this many seconds of the upload. Null window means no time limit.
+    allowUploaderDelete     Boolean   @default(false)
+    uploaderDeleteWindowSeconds Int?
     expiresAt               DateTime?
     createdAt               DateTime  @default(now())
     revokedAt               DateTime?
@@ -540,6 +555,43 @@ model FileRequest {
     owner       User                    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
     destination StorageConnection       @relation(fields: [destinationConnectionId], references: [id], onDelete: Cascade)
     submissions FileRequestSubmission[]
+    visits      FileRequestVisit[]
+
+    @@index([ownerId])
+}
+
+// One visitor session on a public drop-point page. Grouped by an opaque cookie
+// key so heartbeats and uploads from the same browser fold into one row. The raw
+// IP is retained for the owner's Visitors view; ipHash mirrors the log format.
+model FileRequestVisit {
+    id          String   @id @default(uuid(7)) @db.Uuid
+    requestId   String   @db.Uuid
+    visitorKey  String
+    ip          String?
+    ipHash      String?
+    userId      String?  @db.Uuid
+    userAgent   String?
+    uploadCount Int      @default(0)
+    firstSeenAt DateTime @default(now())
+    lastSeenAt  DateTime @default(now())
+
+    request FileRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+    user    User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+    @@unique([requestId, visitorKey])
+    @@index([requestId])
+}
+
+// A saved, reusable set of drop-point guardrails owned by a user. `config` is a
+// JSON blob of the create-form fields (no destination/title/schedule).
+model DropPointTemplate {
+    id        String   @id @default(uuid(7)) @db.Uuid
+    ownerId   String   @db.Uuid
+    name      String
+    config    String
+    createdAt DateTime @default(now())
+
+    owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
 
     @@index([ownerId])
 }

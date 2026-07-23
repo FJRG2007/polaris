@@ -17,11 +17,13 @@ import {
     fileRequestIpAllowed,
     fileRequestUnlockCookie,
     fileRequestUsability,
+    fileRequestUserAllowed,
     parseStringArray,
     resolveFileRequestByToken,
     verifyFileRequestUnlock
 } from "@/lib/file-request-service";
 import { DropUploader } from "./upload-form";
+import { DropPresence } from "./presence";
 import { RequestPasswordForm } from "./request-password-form";
 
 export const runtime = "nodejs";
@@ -57,20 +59,41 @@ function Notice({ title, message }: { title: string; message: string }) {
 export default async function DropPointPage({ params }: { params: Promise<{ token: string }> }) {
     const { token } = await params;
     const request = await resolveFileRequestByToken(token);
-    if (!request) return <Notice title="Link unavailable" message="This drop point does not exist or was removed." />;
-
-    const usable = fileRequestUsability(request);
-    if (!usable.ok) {
+    if (!request)
         return (
             <Notice
                 title="Link unavailable"
-                message={usable.reason === "expired" ? "This drop point has expired." : "This drop point was closed."}
+                message="This drop point does not exist or was removed."
+            />
+        );
+
+    const usable = fileRequestUsability(request);
+    if (!usable.ok) {
+        if (usable.reason === "scheduled") {
+            const when = request.startsAt
+                ? new Date(request.startsAt).toLocaleString()
+                : "a later date";
+            return <Notice title="Not open yet" message={`This drop point opens on ${when}.`} />;
+        }
+        return (
+            <Notice
+                title="Link unavailable"
+                message={
+                    usable.reason === "expired"
+                        ? "This drop point has expired."
+                        : "This drop point was closed."
+                }
             />
         );
     }
 
     if (!fileRequestIpAllowed(request.allowedCidrs, await clientIp())) {
-        return <Notice title="Not available" message="This drop point is not available from your network." />;
+        return (
+            <Notice
+                title="Not available"
+                message="This drop point is not available from your network."
+            />
+        );
     }
 
     if (request.passwordHash) {
@@ -80,9 +103,12 @@ export default async function DropPointPage({ params }: { params: Promise<{ toke
         }
     }
 
-    if (request.requireLogin) {
+    // A per-user allowlist also forces sign-in, even when requireLogin is off.
+    const allowedUsers = parseStringArray(request.allowedUsers);
+    if (request.requireLogin || allowedUsers.length > 0) {
         const session = await getSession();
-        if (!session?.user) {
+        const userId = (session?.user as { id?: string } | undefined)?.id ?? null;
+        if (!userId) {
             return (
                 <Shell>
                     <Card>
@@ -90,7 +116,9 @@ export default async function DropPointPage({ params }: { params: Promise<{ toke
                             <CardTitle>{request.title}</CardTitle>
                         </CardHeader>
                         <CardBody className="flex flex-col gap-3 text-sm">
-                            <p className="text-muted-foreground">This drop point requires you to sign in first.</p>
+                            <p className="text-muted-foreground">
+                                This drop point requires you to sign in first.
+                            </p>
                             <Link
                                 href="/oauth/login"
                                 className="inline-flex w-fit items-center rounded-md bg-primary px-3 py-2 font-medium text-primary-foreground hover:bg-primary/90"
@@ -102,10 +130,20 @@ export default async function DropPointPage({ params }: { params: Promise<{ toke
                 </Shell>
             );
         }
+        if (!(await fileRequestUserAllowed(request.allowedUsers, userId))) {
+            return (
+                <Notice
+                    title="Not available"
+                    message="This drop point is limited to specific accounts, and yours is not one of them."
+                />
+            );
+        }
     }
 
     const allowedExtensions = parseStringArray(request.allowedExtensions);
+    const deniedExtensions = parseStringArray(request.deniedExtensions);
     const maxSizeBytes = Number(request.maxSizeBytes);
+    const minSizeBytes = request.minSizeBytes !== null ? Number(request.minSizeBytes) : 0;
 
     return (
         <Shell>
@@ -115,7 +153,9 @@ export default async function DropPointPage({ params }: { params: Promise<{ toke
                 </CardHeader>
                 <CardBody className="flex flex-col gap-4">
                     {request.instructions ? (
-                        <p className="whitespace-pre-line text-sm text-muted-foreground">{request.instructions}</p>
+                        <p className="whitespace-pre-line text-sm text-muted-foreground">
+                            {request.instructions}
+                        </p>
                     ) : null}
                     <div className="flex flex-wrap gap-2 text-xs">
                         <Badge variant="neutral">
@@ -123,15 +163,38 @@ export default async function DropPointPage({ params }: { params: Promise<{ toke
                                 ? "Any file type"
                                 : allowedExtensions.map((extension) => `.${extension}`).join(" ")}
                         </Badge>
-                        <Badge variant="neutral">Up to {formatBytes(BigInt(maxSizeBytes))} each</Badge>
-                        {request.maxFiles !== null ? <Badge variant="neutral">Max {request.maxFiles} files</Badge> : null}
+                        {deniedExtensions.length > 0 ? (
+                            <Badge variant="neutral">
+                                No {deniedExtensions.map((extension) => `.${extension}`).join(" ")}
+                            </Badge>
+                        ) : null}
+                        <Badge variant="neutral">
+                            Up to {formatBytes(BigInt(maxSizeBytes))} each
+                        </Badge>
+                        {minSizeBytes > 0 ? (
+                            <Badge variant="neutral">
+                                At least {formatBytes(BigInt(minSizeBytes))} each
+                            </Badge>
+                        ) : null}
+                        {request.maxFiles !== null ? (
+                            <Badge variant="neutral">Max {request.maxFiles} files</Badge>
+                        ) : null}
                         {request.expiresAt ? (
                             <Badge variant="neutral">
                                 Open until {new Date(request.expiresAt).toLocaleDateString()}
                             </Badge>
                         ) : null}
                     </div>
-                    <DropUploader token={token} allowedExtensions={allowedExtensions} maxSizeBytes={maxSizeBytes} />
+                    <DropPresence token={token} />
+                    <DropUploader
+                        token={token}
+                        allowedExtensions={allowedExtensions}
+                        deniedExtensions={deniedExtensions}
+                        maxSizeBytes={maxSizeBytes}
+                        minSizeBytes={minSizeBytes}
+                        allowUploaderDelete={request.allowUploaderDelete}
+                        deleteWindowSeconds={request.uploaderDeleteWindowSeconds}
+                    />
                 </CardBody>
             </Card>
         </Shell>

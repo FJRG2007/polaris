@@ -28,6 +28,7 @@ export default async function DropPointsPage() {
         requireLogin: request.requireLogin,
         maxFiles: request.maxFiles,
         submissionCount: request._count.submissions,
+        startsAt: request.startsAt ? request.startsAt.toISOString() : null,
         expiresAt: request.expiresAt ? request.expiresAt.toISOString() : null,
         revokedAt: request.revokedAt ? request.revokedAt.toISOString() : null,
         createdAt: request.createdAt.toISOString()
@@ -42,7 +43,9 @@ export default async function DropPointsPage() {
                         Links that collect uploads into your folders.
                     </p>
                 </div>
-                <NewDropPointButton connections={connections.map((row) => ({ id: row.id, name: row.name }))} />
+                <NewDropPointButton
+                    connections={connections.map((row) => ({ id: row.id, name: row.name }))}
+                />
             </div>
             <DropPointsView requests={rows} />
         </div>

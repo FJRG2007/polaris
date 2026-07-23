@@ -9,7 +9,15 @@
  * and does not re-hit the NAS on every keystroke.
  */
 
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
+import {
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+    type KeyboardEvent,
+    type MouseEvent,
+    type ReactNode
+} from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useVirtualizer } from "@tanstack/react-virtual";
@@ -81,7 +89,12 @@ import {
     Skeleton,
     cn
 } from "@polaris/ui";
-import { FILE_CATEGORIES, categoryOfExtension, extensionOf, type FileCategory } from "./file-categories";
+import {
+    FILE_CATEGORIES,
+    categoryOfExtension,
+    extensionOf,
+    type FileCategory
+} from "./file-categories";
 import { FileViewer, isViewable, type ViewerTarget } from "./file-viewer";
 import { ITEM_ICONS, ITEM_ICON_COLORS, iconColorClass, iconComponent } from "./item-icons";
 import { matchesStructured, parseSearch } from "./search-query";
@@ -167,7 +180,10 @@ function downloadSelection(connectionId: string, entries: DriveEntry[]) {
         return;
     }
     const anchor = document.createElement("a");
-    anchor.href = zipUrl(connectionId, entries.map((entry) => entry.path));
+    anchor.href = zipUrl(
+        connectionId,
+        entries.map((entry) => entry.path)
+    );
     document.body.appendChild(anchor);
     anchor.click();
     anchor.remove();
@@ -230,7 +246,7 @@ export function FilesView({
     onManageAccess?: (entry: DriveEntry) => void;
     /** Delete items for good, bypassing the recycle bin. */
     onDeletePermanent: (entries: DriveEntry[]) => void;
-    onEmptyFolder: (entry: DriveEntry) => void;
+    onEmptyFolder: (entry: DriveEntry, permanent: boolean) => void;
     /** Schedule items to be deleted at a future time. */
     onScheduleDelete: (entries: DriveEntry[]) => void;
     /** Connection-level actions (Access, Open console) rendered in the toolbar, left of the panel. */
@@ -270,7 +286,10 @@ export function FilesView({
     // Folder row/cell currently under a drag, highlighted as the drop target.
     const [dropFolder, setDropFolder] = useState<string | null>(null);
     // Folder picked for upload, awaiting an in-app confirmation (not the browser's).
-    const [pendingFolder, setPendingFolder] = useState<{ name: string; items: UploadItem[] } | null>(null);
+    const [pendingFolder, setPendingFolder] = useState<{
+        name: string;
+        items: UploadItem[];
+    } | null>(null);
     // Actor whose profile is open from the activity feed.
     const [profileUserId, setProfileUserId] = useState<string | null>(null);
     const [iconTarget, setIconTarget] = useState<DriveEntry | null>(null);
@@ -294,6 +313,11 @@ export function FilesView({
         return slash >= 0 ? target.slice(0, slash) : "";
     }
 
+    /** True when moving `itemPath` into `destFolder` would nest a folder in itself. */
+    function movesIntoSelf(itemPath: string, destFolder: string): boolean {
+        return destFolder === itemPath || destFolder.startsWith(`${itemPath}/`);
+    }
+
     /** Copy an item into its own folder (a duplicate gets a " copy" suffix). */
     function duplicate(entry: DriveEntry) {
         onCopy(entry, parentOf(entry.path));
@@ -312,7 +336,10 @@ export function FilesView({
         setMoveTargets(null);
     }
     const [dragUpload, setDragUpload] = useState(false);
-    const [clipboard, setClipboard] = useState<{ entries: DriveEntry[]; mode: "copy" | "cut" } | null>(null);
+    const [clipboard, setClipboard] = useState<{
+        entries: DriveEntry[];
+        mode: "copy" | "cut";
+    } | null>(null);
     const dragPath = useRef<string | null>(null);
     const folderInput = useRef<HTMLInputElement>(null);
     const router = useRouter();
@@ -321,6 +348,7 @@ export function FilesView({
     function paste() {
         if (!clipboard) return;
         for (const entry of clipboard.entries) {
+            if (movesIntoSelf(entry.path, path)) continue;
             if (clipboard.mode === "cut") onMove(entry, path);
             else onCopy(entry, path);
         }
@@ -337,9 +365,10 @@ export function FilesView({
         });
     }
 
-    /** Open an item: folders navigate, files preview (or download when no viewer). */
+    /** Open an item: folders navigate, archives browse, other files preview. */
     function openEntry(entry: DriveEntry) {
         if (entry.kind === "dir") router.push(href(connectionId, entry.path));
+        else if (/\.(zip|rar)$/i.test(entry.name)) setArchiveTarget(entry);
         else if (isViewable(entry.name)) openViewer(entry);
         else triggerDownload(connectionId, entry);
     }
@@ -441,8 +470,9 @@ export function FilesView({
      * do we fall back to the <input webkitdirectory> that shows the browser prompt.
      */
     async function pickFolder() {
-        const picker = (window as unknown as { showDirectoryPicker?: () => Promise<FsDirectoryHandle> })
-            .showDirectoryPicker;
+        const picker = (
+            window as unknown as { showDirectoryPicker?: () => Promise<FsDirectoryHandle> }
+        ).showDirectoryPicker;
         if (!picker) {
             folderInput.current?.click();
             return;
@@ -503,7 +533,9 @@ export function FilesView({
                 .then((res) => res.json())
                 .then((body) => {
                     if (controller.signal.aborted) return;
-                    setRemoteEntries(Array.isArray(body.entries) ? (body.entries as DriveEntry[]) : []);
+                    setRemoteEntries(
+                        Array.isArray(body.entries) ? (body.entries as DriveEntry[]) : []
+                    );
                     setSearchTruncated(Boolean(body.truncated));
                 })
                 .catch(() => {
@@ -524,7 +556,12 @@ export function FilesView({
     const source = searchScope === "recursive" && remoteEntries !== null ? remoteEntries : entries;
 
     const hasFilters =
-        categories.size > 0 || extFilter.trim() !== "" || minMb !== "" || maxMb !== "" || dateFrom !== "" || dateTo !== "";
+        categories.size > 0 ||
+        extFilter.trim() !== "" ||
+        minMb !== "" ||
+        maxMb !== "" ||
+        dateFrom !== "" ||
+        dateTo !== "";
 
     const visible = useMemo(() => {
         const min = minMb ? Number(minMb) * 1024 * 1024 : null;
@@ -576,14 +613,32 @@ export function FilesView({
             if (dirA !== dirB) return dirA - dirB;
             if (sortKey === "size") return (Number(a.size) - Number(b.size)) * direction;
             if (sortKey === "created") {
-                return (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()) * direction;
+                return (
+                    (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()) * direction
+                );
             }
             if (sortKey === "modified") {
-                return (new Date(a.modifiedAt).getTime() - new Date(b.modifiedAt).getTime()) * direction;
+                return (
+                    (new Date(a.modifiedAt).getTime() - new Date(b.modifiedAt).getTime()) *
+                    direction
+                );
             }
             return a.name.localeCompare(b.name) * direction;
         });
-    }, [source, categories, extFilter, minMb, maxMb, dateFrom, dateTo, query, sortKey, sortDir, showHidden, starredOnly]);
+    }, [
+        source,
+        categories,
+        extFilter,
+        minMb,
+        maxMb,
+        dateFrom,
+        dateTo,
+        query,
+        sortKey,
+        sortDir,
+        showHidden,
+        starredOnly
+    ]);
 
     const selectedEntries = visible.filter((entry) => selected.has(entry.path));
     const allSelected = visible.length > 0 && selectedEntries.length === visible.length;
@@ -592,7 +647,10 @@ export function FilesView({
     // Items marked for a cut are shown dimmed until pasted, the way a file
     // manager greys a cut selection so it is obvious what will move.
     const cutPaths = useMemo(
-        () => (clipboard?.mode === "cut" ? new Set(clipboard.entries.map((entry) => entry.path)) : null),
+        () =>
+            clipboard?.mode === "cut"
+                ? new Set(clipboard.entries.map((entry) => entry.path))
+                : null,
         [clipboard]
     );
 
@@ -606,10 +664,12 @@ export function FilesView({
         dragPath.current = null;
         setDropSegment(null);
         if (source === null) return;
-        const group = selected.has(source) ? selectedEntries : visible.filter((entry) => entry.path === source);
+        const group = selected.has(source)
+            ? selectedEntries
+            : visible.filter((entry) => entry.path === source);
         for (const item of group) {
             if (parentOf(item.path) === targetPath) continue;
-            if (item.path === targetPath || targetPath.startsWith(`${item.path}/`)) continue;
+            if (movesIntoSelf(item.path, targetPath)) continue;
             onMove(item, targetPath);
         }
     }
@@ -662,7 +722,10 @@ export function FilesView({
                 entry.kind === "dir"
                     ? () => setDropFolder((prev) => (prev === entry.path ? null : prev))
                     : undefined,
-            onDrop: entry.kind === "dir" ? (event: React.DragEvent) => onFolderDrop(event, entry) : undefined
+            onDrop:
+                entry.kind === "dir"
+                    ? (event: React.DragEvent) => onFolderDrop(event, entry)
+                    : undefined
         };
     }
 
@@ -687,14 +750,11 @@ export function FilesView({
                             <Inbox className="size-4" />
                             Request files here
                         </ContextMenuItem>
-                        <ContextMenuItem onSelect={() => onEmptyFolder(entry)}>
-                            <Eraser className="size-4" />
-                            Empty folder
-                        </ContextMenuItem>
                         {clipboard ? (
                             <ContextMenuItem
                                 onSelect={() => {
                                     for (const item of clipboard.entries) {
+                                        if (movesIntoSelf(item.path, entry.path)) continue;
                                         if (clipboard.mode === "cut") onMove(item, entry.path);
                                         else onCopy(item, entry.path);
                                     }
@@ -733,7 +793,10 @@ export function FilesView({
                 </ContextMenuItem>
                 <ContextMenuItem
                     onSelect={() =>
-                        setClipboard({ entries: selected.has(entry.path) ? selectedEntries : [entry], mode: "copy" })
+                        setClipboard({
+                            entries: selected.has(entry.path) ? selectedEntries : [entry],
+                            mode: "copy"
+                        })
                     }
                 >
                     <Copy className="size-4" />
@@ -742,7 +805,10 @@ export function FilesView({
                 </ContextMenuItem>
                 <ContextMenuItem
                     onSelect={() =>
-                        setClipboard({ entries: selected.has(entry.path) ? selectedEntries : [entry], mode: "cut" })
+                        setClipboard({
+                            entries: selected.has(entry.path) ? selectedEntries : [entry],
+                            mode: "cut"
+                        })
                     }
                 >
                     <Scissors className="size-4" />
@@ -753,7 +819,9 @@ export function FilesView({
                     <Files className="size-4" />
                     Duplicate
                 </ContextMenuItem>
-                <ContextMenuItem onSelect={() => openMove(selected.has(entry.path) ? selectedEntries : [entry])}>
+                <ContextMenuItem
+                    onSelect={() => openMove(selected.has(entry.path) ? selectedEntries : [entry])}
+                >
                     <FolderInput className="size-4" />
                     Move to...
                 </ContextMenuItem>
@@ -767,7 +835,9 @@ export function FilesView({
                 </ContextMenuItem>
                 <ContextMenuSeparator />
                 <ContextMenuItem onSelect={() => onSetFavorite(entry, !entry.favorite)}>
-                    <Star className={cn("size-4", entry.favorite && "fill-amber-400 text-amber-400")} />
+                    <Star
+                        className={cn("size-4", entry.favorite && "fill-amber-400 text-amber-400")}
+                    />
                     {entry.favorite ? "Remove from favorites" : "Add to favorites"}
                 </ContextMenuItem>
                 <ContextMenuItem onSelect={() => setIconTarget(entry)}>
@@ -800,7 +870,9 @@ export function FilesView({
                     </ContextMenuSubTrigger>
                     <ContextMenuSubContent>
                         <ContextMenuItem
-                            onSelect={() => onDelete(selected.has(entry.path) ? selectedEntries : [entry])}
+                            onSelect={() =>
+                                onDelete(selected.has(entry.path) ? selectedEntries : [entry])
+                            }
                         >
                             <Trash2 className="size-4" />
                             Move to Trash
@@ -808,14 +880,38 @@ export function FilesView({
                         </ContextMenuItem>
                         <ContextMenuItem
                             variant="danger"
-                            onSelect={() => onDeletePermanent(selected.has(entry.path) ? selectedEntries : [entry])}
+                            onSelect={() =>
+                                onDeletePermanent(
+                                    selected.has(entry.path) ? selectedEntries : [entry]
+                                )
+                            }
                         >
                             <Trash2 className="size-4" />
                             Delete permanently
                         </ContextMenuItem>
+                        {entry.kind === "dir" ? (
+                            <>
+                                <ContextMenuSeparator />
+                                <ContextMenuItem onSelect={() => onEmptyFolder(entry, false)}>
+                                    <Eraser className="size-4" />
+                                    Empty folder to Trash
+                                </ContextMenuItem>
+                                <ContextMenuItem
+                                    variant="danger"
+                                    onSelect={() => onEmptyFolder(entry, true)}
+                                >
+                                    <Eraser className="size-4" />
+                                    Empty folder permanently
+                                </ContextMenuItem>
+                            </>
+                        ) : null}
                         <ContextMenuSeparator />
                         <ContextMenuItem
-                            onSelect={() => onScheduleDelete(selected.has(entry.path) ? selectedEntries : [entry])}
+                            onSelect={() =>
+                                onScheduleDelete(
+                                    selected.has(entry.path) ? selectedEntries : [entry]
+                                )
+                            }
                         >
                             <CalendarClock className="size-4" />
                             Delete later...
@@ -827,7 +923,8 @@ export function FilesView({
     }
 
     // Load the activity feed for a single selected item (downloads, renames, ...).
-    const singleSelectedPath = selectedEntries.length === 1 ? (selectedEntries[0]?.path ?? null) : null;
+    const singleSelectedPath =
+        selectedEntries.length === 1 ? (selectedEntries[0]?.path ?? null) : null;
     useEffect(() => {
         if (!singleSelectedPath) {
             setActivity([]);
@@ -839,7 +936,8 @@ export function FilesView({
         fetch(`/api/drive/activity?${params.toString()}`, { signal: controller.signal })
             .then((res) => res.json())
             .then((body) => {
-                if (!controller.signal.aborted) setActivity(Array.isArray(body.items) ? body.items : []);
+                if (!controller.signal.aborted)
+                    setActivity(Array.isArray(body.items) ? body.items : []);
             })
             .catch(() => {
                 if (!controller.signal.aborted) setActivity([]);
@@ -988,7 +1086,9 @@ export function FilesView({
     /** Bring the keyboard cursor into view in whichever layout is active. */
     function scrollCursorIntoView(index: number) {
         if (viewMode === "grid") {
-            (gridRef.current?.children[index] as HTMLElement | undefined)?.scrollIntoView({ block: "nearest" });
+            (gridRef.current?.children[index] as HTMLElement | undefined)?.scrollIntoView({
+                block: "nearest"
+            });
         } else {
             rowVirtualizer.scrollToIndex(index, { align: "auto" });
         }
@@ -1005,7 +1105,12 @@ export function FilesView({
             cursorRef.current ??
             lastIndex.current ??
             (selectedEntries[0] ? visible.indexOf(selectedEntries[0]) : -1);
-        const next = start < 0 ? (delta > 0 ? 0 : visible.length - 1) : Math.max(0, Math.min(visible.length - 1, start + delta));
+        const next =
+            start < 0
+                ? delta > 0
+                    ? 0
+                    : visible.length - 1
+                : Math.max(0, Math.min(visible.length - 1, start + delta));
         cursorRef.current = next;
         if (extend) {
             setRangeSelection(lastIndex.current ?? next, next);
@@ -1063,650 +1168,880 @@ export function FilesView({
                     selectedEntries.length === 1 && "lg:pr-72"
                 )}
             >
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                <div className="flex min-w-0 items-center gap-1 text-sm text-muted-foreground">
-                    <Link
-                        href={href(connectionId, "")}
-                        {...segmentDropProps("")}
-                        className={cn(
-                            "rounded px-1 py-0.5 hover:text-foreground",
-                            dropSegment === "" && "bg-primary/15 text-primary ring-1 ring-primary/40"
-                        )}
-                    >
-                        Home
-                    </Link>
-                    {segments.map((segment, index) => {
-                        const target = segments.slice(0, index + 1).join("/");
-                        return (
-                            <span key={target} className="flex items-center gap-1">
-                                <ChevronRight className="size-3" />
-                                <Link
-                                    href={href(connectionId, target)}
-                                    {...segmentDropProps(target)}
-                                    className={cn(
-                                        "truncate rounded px-1 py-0.5 hover:text-foreground",
-                                        dropSegment === target && "bg-primary/15 text-primary ring-1 ring-primary/40"
-                                    )}
-                                >
-                                    {segment}
-                                </Link>
-                            </span>
-                        );
-                    })}
-                </div>
-                <div className="flex items-center gap-2">
-                    {headerActions}
-                    {clipboard ? (
-                        <Button size="sm" variant="ghost" onClick={paste} disabled={pending}>
-                            <ClipboardPaste className="size-4" />
-                            Paste ({clipboard.entries.length})
-                        </Button>
-                    ) : null}
-                    <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => onRequestFiles(path, segments[segments.length - 1] ?? "")}
-                        disabled={pending}
-                    >
-                        <Inbox className="size-4" />
-                        Request files
-                    </Button>
-                    <Button size="sm" variant="ghost" onClick={onNewFolder} disabled={pending}>
-                        <FolderPlus className="size-4" />
-                        New folder
-                    </Button>
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button size="sm" variant="secondary" disabled={uploading}>
-                                <Upload className="size-4" />
-                                {uploading ? "Uploading..." : "Upload"}
-                            </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                            <DropdownMenuItem onSelect={() => fileInput.current?.click()}>
-                                <Upload className="size-4" />
-                                Files
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onSelect={() => void pickFolder()}>
-                                <FolderUp className="size-4" />
-                                Folder
-                            </DropdownMenuItem>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
-                    <input
-                        ref={fileInput}
-                        type="file"
-                        multiple
-                        hidden
-                        onChange={(event) => {
-                            if (event.target.files) onUpload(filesToItems(event.target.files));
-                        }}
-                    />
-                    <input
-                        ref={(element) => {
-                            folderInput.current = element;
-                            // webkitdirectory is not a standard React prop; set it directly.
-                            if (element) element.setAttribute("webkitdirectory", "");
-                        }}
-                        type="file"
-                        hidden
-                        onChange={(event) => {
-                            if (event.target.files) onUpload(filesToItems(event.target.files));
-                            if (folderInput.current) folderInput.current.value = "";
-                        }}
-                    />
-                </div>
-            </div>
-
-            <div className="mb-3 flex flex-wrap items-center gap-2">
-                <div className="relative min-w-[12rem] flex-1">
-                    <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                        value={query}
-                        onChange={(event) => setQuery(event.target.value)}
-                        placeholder="Search - try *.pdf, ext:pptx,pdf, /regex/"
-                        title="Wildcards (*, ?), ext:pptx,pdf for extensions, /pattern/ for regex, or plain text for a fuzzy match"
-                        className={cn("pl-8 pr-9", searchError && "border-danger")}
-                    />
-                    <button
-                        type="button"
-                        onClick={() => setSearchScope((prev) => (prev === "current" ? "recursive" : "current"))}
-                        aria-label="Toggle search scope"
-                        title={
-                            searchScope === "recursive"
-                                ? "Searching this folder and all subfolders. Click to search only this folder."
-                                : "Searching only this folder. Click to search all subfolders too."
-                        }
-                        className={cn(
-                            "absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-1 transition-colors hover:bg-muted",
-                            searchScope === "recursive" ? "text-primary" : "text-muted-foreground"
-                        )}
-                    >
-                        {searchScope === "recursive" ? (
-                            <FolderTree className="size-4" />
-                        ) : (
-                            <Folder className="size-4" />
-                        )}
-                    </button>
-                </div>
-                <div className="flex items-center gap-1 rounded-md border border-border p-0.5">
-                    {(["name", "created", "modified", "size"] as const).map((key) => (
-                        <button
-                            key={key}
-                            type="button"
-                            onClick={() => setSortKey(key)}
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex min-w-0 items-center gap-1 text-sm text-muted-foreground">
+                        <Link
+                            href={href(connectionId, "")}
+                            {...segmentDropProps("")}
                             className={cn(
-                                "rounded px-2 py-1 text-xs capitalize transition-colors hover:bg-muted",
-                                sortKey === key && "bg-muted font-medium"
+                                "rounded px-1 py-0.5 hover:text-foreground",
+                                dropSegment === "" &&
+                                    "bg-primary/15 text-primary ring-1 ring-primary/40"
                             )}
                         >
-                            {key}
-                        </button>
-                    ))}
-                    <button
-                        type="button"
-                        onClick={() => setSortDir((prev) => (prev === "asc" ? "desc" : "asc"))}
-                        className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted"
-                        aria-label={`Sort ${sortDir === "asc" ? "descending" : "ascending"}`}
-                    >
-                        {sortDir === "asc" ? <ArrowDownAZ className="size-4" /> : <ArrowUpAZ className="size-4" />}
-                    </button>
-                </div>
-                <div className="flex items-center gap-1 rounded-md border border-border p-0.5">
-                    <button
-                        type="button"
-                        onClick={() => setViewMode("list")}
-                        aria-label="List view"
-                        title="List view"
-                        className={cn(
-                            "rounded p-1 transition-colors hover:bg-muted",
-                            viewMode === "list" ? "bg-muted text-foreground" : "text-muted-foreground"
-                        )}
-                    >
-                        <List className="size-4" />
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => setViewMode("grid")}
-                        aria-label="Grid view"
-                        title="Grid view"
-                        className={cn(
-                            "rounded p-1 transition-colors hover:bg-muted",
-                            viewMode === "grid" ? "bg-muted text-foreground" : "text-muted-foreground"
-                        )}
-                    >
-                        <LayoutGrid className="size-4" />
-                    </button>
-                </div>
-                <Button
-                    size="sm"
-                    variant={hasFilters ? "secondary" : "ghost"}
-                    onClick={() => setFiltersOpen((prev) => !prev)}
-                >
-                    <SlidersHorizontal className="size-4" />
-                    Filters
-                    {hasFilters ? <Badge variant="neutral">{categories.size + (extFilter ? 1 : 0)}</Badge> : null}
-                </Button>
-                <Button
-                    size="sm"
-                    variant={starredOnly ? "secondary" : "ghost"}
-                    onClick={() => setStarredOnly((prev) => !prev)}
-                    aria-label={starredOnly ? "Show all items" : "Show starred only"}
-                >
-                    <Star className={cn("size-4", starredOnly && "fill-amber-400 text-amber-400")} />
-                    Starred
-                </Button>
-                <Button
-                    size="sm"
-                    variant={showHidden ? "secondary" : "ghost"}
-                    onClick={() => setShowHidden((prev) => !prev)}
-                    aria-label={showHidden ? "Hide hidden items" : "Show hidden items"}
-                >
-                    {showHidden ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-                    Hidden
-                </Button>
-            </div>
-
-            {searchScope === "recursive" && query.trim() ? (
-                <p className="mb-3 -mt-1 text-xs text-muted-foreground">
-                    {searching
-                        ? "Searching this folder and all subfolders..."
-                        : `${visible.length} result${visible.length === 1 ? "" : "s"} across subfolders${
-                              searchTruncated ? " (first matches only - narrow your search)" : ""
-                          }`}
-                </p>
-            ) : null}
-
-            {filtersOpen ? (
-                <div className="mb-3 flex flex-col gap-3 rounded-lg border border-border bg-surface/40 p-3">
-                    <div className="flex flex-wrap gap-1.5">
-                        {FILE_CATEGORIES.map((category) => (
-                            <button
-                                key={category.id}
-                                type="button"
-                                onClick={() => toggleCategory(category.id)}
-                                className={cn(
-                                    "rounded-full border px-3 py-1 text-xs transition-colors",
-                                    categories.has(category.id)
-                                        ? "border-primary bg-primary/10 text-primary"
-                                        : "border-border text-muted-foreground hover:bg-muted"
-                                )}
-                            >
-                                {category.label}
-                            </button>
-                        ))}
+                            Home
+                        </Link>
+                        {segments.map((segment, index) => {
+                            const target = segments.slice(0, index + 1).join("/");
+                            return (
+                                <span key={target} className="flex items-center gap-1">
+                                    <ChevronRight className="size-3" />
+                                    <Link
+                                        href={href(connectionId, target)}
+                                        {...segmentDropProps(target)}
+                                        className={cn(
+                                            "truncate rounded px-1 py-0.5 hover:text-foreground",
+                                            dropSegment === target &&
+                                                "bg-primary/15 text-primary ring-1 ring-primary/40"
+                                        )}
+                                    >
+                                        {segment}
+                                    </Link>
+                                </span>
+                            );
+                        })}
                     </div>
-                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-                        <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-                            Extension
-                            <Input value={extFilter} onChange={(e) => setExtFilter(e.target.value)} placeholder="pdf" />
-                        </label>
-                        <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-                            Min size (MB)
-                            <Input value={minMb} onChange={(e) => setMinMb(e.target.value)} type="number" min="0" />
-                        </label>
-                        <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-                            Max size (MB)
-                            <Input value={maxMb} onChange={(e) => setMaxMb(e.target.value)} type="number" min="0" />
-                        </label>
-                        <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-                            Modified after
-                            <Input value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} type="date" />
-                        </label>
-                        <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-                            Modified before
-                            <Input value={dateTo} onChange={(e) => setDateTo(e.target.value)} type="date" />
-                        </label>
+                    <div className="flex items-center gap-2">
+                        {headerActions}
+                        {clipboard ? (
+                            <Button size="sm" variant="ghost" onClick={paste} disabled={pending}>
+                                <ClipboardPaste className="size-4" />
+                                Paste ({clipboard.entries.length})
+                            </Button>
+                        ) : null}
+                        <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() =>
+                                onRequestFiles(path, segments[segments.length - 1] ?? "")
+                            }
+                            disabled={pending}
+                        >
+                            <Inbox className="size-4" />
+                            Request files
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={onNewFolder} disabled={pending}>
+                            <FolderPlus className="size-4" />
+                            New folder
+                        </Button>
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button size="sm" variant="secondary" disabled={uploading}>
+                                    <Upload className="size-4" />
+                                    {uploading ? "Uploading..." : "Upload"}
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                                <DropdownMenuItem onSelect={() => fileInput.current?.click()}>
+                                    <Upload className="size-4" />
+                                    Files
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onSelect={() => void pickFolder()}>
+                                    <FolderUp className="size-4" />
+                                    Folder
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                        <input
+                            ref={fileInput}
+                            type="file"
+                            multiple
+                            hidden
+                            onChange={(event) => {
+                                if (event.target.files) onUpload(filesToItems(event.target.files));
+                            }}
+                        />
+                        <input
+                            ref={(element) => {
+                                folderInput.current = element;
+                                // webkitdirectory is not a standard React prop; set it directly.
+                                if (element) element.setAttribute("webkitdirectory", "");
+                            }}
+                            type="file"
+                            hidden
+                            onChange={(event) => {
+                                if (event.target.files) onUpload(filesToItems(event.target.files));
+                                if (folderInput.current) folderInput.current.value = "";
+                            }}
+                        />
                     </div>
-                    {hasFilters ? (
+                </div>
+
+                <div className="mb-3 flex flex-wrap items-center gap-2">
+                    <div className="relative min-w-[12rem] flex-1">
+                        <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                        <Input
+                            value={query}
+                            onChange={(event) => setQuery(event.target.value)}
+                            placeholder="Search - try *.pdf, ext:pptx,pdf, /regex/"
+                            title="Wildcards (*, ?), ext:pptx,pdf for extensions, /pattern/ for regex, or plain text for a fuzzy match"
+                            className={cn("pl-8 pr-9", searchError && "border-danger")}
+                        />
                         <button
                             type="button"
-                            onClick={() => {
-                                setCategories(new Set());
-                                setExtFilter("");
-                                setMinMb("");
-                                setMaxMb("");
-                                setDateFrom("");
-                                setDateTo("");
-                            }}
-                            className="self-start text-xs text-muted-foreground underline-offset-2 hover:underline"
+                            onClick={() =>
+                                setSearchScope((prev) =>
+                                    prev === "current" ? "recursive" : "current"
+                                )
+                            }
+                            aria-label="Toggle search scope"
+                            title={
+                                searchScope === "recursive"
+                                    ? "Searching this folder and all subfolders. Click to search only this folder."
+                                    : "Searching only this folder. Click to search all subfolders too."
+                            }
+                            className={cn(
+                                "absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-1 transition-colors hover:bg-muted",
+                                searchScope === "recursive"
+                                    ? "text-primary"
+                                    : "text-muted-foreground"
+                            )}
                         >
-                            Clear filters
+                            {searchScope === "recursive" ? (
+                                <FolderTree className="size-4" />
+                            ) : (
+                                <Folder className="size-4" />
+                            )}
                         </button>
-                    ) : null}
+                    </div>
+                    <div className="flex items-center gap-1 rounded-md border border-border p-0.5">
+                        {(["name", "created", "modified", "size"] as const).map((key) => (
+                            <button
+                                key={key}
+                                type="button"
+                                onClick={() => setSortKey(key)}
+                                className={cn(
+                                    "rounded px-2 py-1 text-xs capitalize transition-colors hover:bg-muted",
+                                    sortKey === key && "bg-muted font-medium"
+                                )}
+                            >
+                                {key}
+                            </button>
+                        ))}
+                        <button
+                            type="button"
+                            onClick={() => setSortDir((prev) => (prev === "asc" ? "desc" : "asc"))}
+                            className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted"
+                            aria-label={`Sort ${sortDir === "asc" ? "descending" : "ascending"}`}
+                        >
+                            {sortDir === "asc" ? (
+                                <ArrowDownAZ className="size-4" />
+                            ) : (
+                                <ArrowUpAZ className="size-4" />
+                            )}
+                        </button>
+                    </div>
+                    <div className="flex items-center gap-1 rounded-md border border-border p-0.5">
+                        <button
+                            type="button"
+                            onClick={() => setViewMode("list")}
+                            aria-label="List view"
+                            title="List view"
+                            className={cn(
+                                "rounded p-1 transition-colors hover:bg-muted",
+                                viewMode === "list"
+                                    ? "bg-muted text-foreground"
+                                    : "text-muted-foreground"
+                            )}
+                        >
+                            <List className="size-4" />
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setViewMode("grid")}
+                            aria-label="Grid view"
+                            title="Grid view"
+                            className={cn(
+                                "rounded p-1 transition-colors hover:bg-muted",
+                                viewMode === "grid"
+                                    ? "bg-muted text-foreground"
+                                    : "text-muted-foreground"
+                            )}
+                        >
+                            <LayoutGrid className="size-4" />
+                        </button>
+                    </div>
+                    <Button
+                        size="sm"
+                        variant={hasFilters ? "secondary" : "ghost"}
+                        onClick={() => setFiltersOpen((prev) => !prev)}
+                    >
+                        <SlidersHorizontal className="size-4" />
+                        Filters
+                        {hasFilters ? (
+                            <Badge variant="neutral">{categories.size + (extFilter ? 1 : 0)}</Badge>
+                        ) : null}
+                    </Button>
+                    <Button
+                        size="sm"
+                        variant={starredOnly ? "secondary" : "ghost"}
+                        onClick={() => setStarredOnly((prev) => !prev)}
+                        aria-label={starredOnly ? "Show all items" : "Show starred only"}
+                    >
+                        <Star
+                            className={cn("size-4", starredOnly && "fill-amber-400 text-amber-400")}
+                        />
+                        Starred
+                    </Button>
+                    <Button
+                        size="sm"
+                        variant={showHidden ? "secondary" : "ghost"}
+                        onClick={() => setShowHidden((prev) => !prev)}
+                        aria-label={showHidden ? "Hide hidden items" : "Show hidden items"}
+                    >
+                        {showHidden ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                        Hidden
+                    </Button>
                 </div>
-            ) : null}
 
-            {/* Always-present, fixed-height action row so beginning a selection
-                never reflows the list. Empty (a subtle hint) when nothing is
-                selected; actions appear in place when items are selected. */}
-            <div
-                className={cn(
-                    "mb-3 flex h-10 items-center gap-2 rounded-md border px-3 text-sm transition-colors",
-                    selectedEntries.length > 0
-                        ? "border-primary/40 bg-primary/5"
-                        : "border-transparent"
-                )}
-            >
-                {selectedEntries.length > 0 ? (
-                    <>
-                        <span className="font-medium">{selectedEntries.length} selected</span>
-                        <div className="ml-auto flex items-center gap-1">
-                            <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => downloadSelection(connectionId, selectedEntries)}
-                            >
-                                <Download className="size-4" />
-                                {selectedEntries.length > 1 || selectedEntries.some((entry) => entry.kind === "dir")
-                                    ? "Download ZIP"
-                                    : "Download"}
-                            </Button>
-                            <SelectionZipMenu
-                                connectionId={connectionId}
-                                entries={selectedEntries}
-                                currentPath={path}
-                            />
-                            <Button size="sm" variant="ghost" onClick={() => onDelete(selectedEntries)} disabled={pending}>
-                                <Trash2 className="size-4" />
-                                Delete
-                            </Button>
-                            <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>
-                                <X className="size-4" />
-                                Clear
-                            </Button>
-                        </div>
-                    </>
-                ) : (
-                    <span className="text-xs text-muted-foreground">
-                        Select files to download, zip, or delete them.
-                    </span>
-                )}
-            </div>
+                {searchScope === "recursive" && query.trim() ? (
+                    <p className="mb-3 -mt-1 text-xs text-muted-foreground">
+                        {searching
+                            ? "Searching this folder and all subfolders..."
+                            : `${visible.length} result${visible.length === 1 ? "" : "s"} across subfolders${
+                                  searchTruncated
+                                      ? " (first matches only - narrow your search)"
+                                      : ""
+                              }`}
+                    </p>
+                ) : null}
 
-            <ContextMenu>
-            <ContextMenuTrigger asChild>
-            <div
-                tabIndex={0}
-                onKeyDown={onListKeyDown}
-                className={cn(
-                    "relative min-w-0 flex-1 rounded-lg focus:outline-none",
-                    dragUpload && "ring-2 ring-primary ring-offset-2 ring-offset-background"
-                )}
-                onDragOver={onUploadDragOver}
-                onDragLeave={() => setDragUpload(false)}
-                onDrop={onUploadDrop}
-            >
-            {loading ? (
-                <ListingSkeleton />
-            ) : error ? (
-                <div className="rounded-md border border-danger/40 bg-danger/10 p-3 text-sm text-danger">{error}</div>
-            ) : (
-                <div>
-                    {viewMode === "list" ? (
-                        <div className="flex h-9 items-center border-b border-border text-left text-xs font-medium text-muted-foreground">
-                            <div className="flex w-9 shrink-0 items-center justify-center">
-                                <label className="flex cursor-pointer items-center">
-                                    <Checkbox
-                                        checked={allSelected}
-                                        indeterminate={!allSelected && selectedEntries.length > 0}
-                                        onChange={toggleAll}
-                                        aria-label="Select all"
-                                    />
-                                </label>
-                            </div>
-                            <div className="min-w-0 flex-1 px-1">Name</div>
-                            <div className="hidden w-44 shrink-0 px-2 lg:block">Created on</div>
-                            <div className="hidden w-44 shrink-0 px-2 sm:block">Last Modified</div>
-                            <div className="w-24 shrink-0 px-2">Size</div>
-                            <div className="w-12 shrink-0 px-2" />
+                {filtersOpen ? (
+                    <div className="mb-3 flex flex-col gap-3 rounded-lg border border-border bg-surface/40 p-3">
+                        <div className="flex flex-wrap gap-1.5">
+                            {FILE_CATEGORIES.map((category) => (
+                                <button
+                                    key={category.id}
+                                    type="button"
+                                    onClick={() => toggleCategory(category.id)}
+                                    className={cn(
+                                        "rounded-full border px-3 py-1 text-xs transition-colors",
+                                        categories.has(category.id)
+                                            ? "border-primary bg-primary/10 text-primary"
+                                            : "border-border text-muted-foreground hover:bg-muted"
+                                    )}
+                                >
+                                    {category.label}
+                                </button>
+                            ))}
                         </div>
-                    ) : null}
-                    {visible.length === 0 ? (
-                        <p className="px-3 py-8 text-center text-sm text-muted-foreground">
-                            {searchScope === "recursive" && query.trim()
-                                ? searching
-                                    ? "Searching..."
-                                    : "No matches in this folder or its subfolders."
-                                : source.length === 0
-                                  ? "This folder is empty."
-                                  : "Nothing matches your search or filters."}
-                        </p>
-                    ) : viewMode === "grid" ? (
-                        <div className="max-h-[65vh] overflow-auto p-1">
-                            <div
-                                ref={gridRef}
-                                className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6"
-                            >
-                                {visible.map((entry, index) => {
-                                    const isSelected = selected.has(entry.path);
-                                    const isRenaming = renaming === entry.path;
-                                    return (
-                                        <ContextMenu key={entry.path}>
-                                            <ContextMenuTrigger asChild>
-                                                <div
-                                                    data-drive-row
-                                                    onClick={(event) => rowClick(event, index, entry)}
-                                                    onDoubleClick={() => {
-                                                        if (!isRenaming) openEntry(entry);
-                                                    }}
-                                                    {...entryDragProps(entry, isRenaming)}
-                                                    className={cn(
-                                                        "group relative flex flex-col items-center gap-1.5 rounded-lg border p-3 text-center transition-colors",
-                                                        isSelected
-                                                            ? "border-primary/40 bg-primary/5"
-                                                            : "border-transparent hover:bg-card-hover",
-                                                        entry.hidden && "opacity-50",
-                                                        cutPaths?.has(entry.path) && "opacity-40",
-                                                        dropFolder === entry.path && "border-primary bg-primary/10 ring-2 ring-primary"
-                                                    )}
-                                                >
-                                                    <EntryIcon entry={entry} className="size-10" />
-                                                    {isRenaming ? (
-                                                        <Input
-                                                            autoFocus
-                                                            value={renameValue}
-                                                            onChange={(e) => setRenameValue(e.target.value)}
-                                                            onKeyDown={(e) => onRenameKey(e, entry)}
-                                                            onBlur={() => submitRename(entry)}
-                                                            onClick={(e) => e.stopPropagation()}
-                                                            className="h-7 w-full py-1 text-center text-xs"
-                                                        />
-                                                    ) : (
-                                                        <span
-                                                            className="w-full truncate text-xs"
-                                                            title={entry.name}
-                                                            onDoubleClick={(e) => nameDoubleClick(e, entry)}
-                                                        >
-                                                            {entry.name}
-                                                        </span>
-                                                    )}
-                                                    <span className="text-[11px] text-muted-foreground">
-                                                        {entry.kind === "dir" ? "Folder" : formatBytes(BigInt(entry.size))}
-                                                    </span>
-                                                    <div className="flex items-center gap-1">
-                                                        {entry.favorite ? (
-                                                            <Star className="size-3 fill-amber-400 text-amber-400" />
-                                                        ) : null}
-                                                        {entry.locked ? (
-                                                            <Lock className="size-3 text-muted-foreground" />
-                                                        ) : null}
-                                                        {entry.note ? (
-                                                            <StickyNote className="size-3 text-amber-500" />
-                                                        ) : null}
-                                                    </div>
-                                                </div>
-                                            </ContextMenuTrigger>
-                                            {entryMenu(entry)}
-                                        </ContextMenu>
-                                    );
-                                })}
-                            </div>
+                        <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+                            <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                                Extension
+                                <Input
+                                    value={extFilter}
+                                    onChange={(e) => setExtFilter(e.target.value)}
+                                    placeholder="pdf"
+                                />
+                            </label>
+                            <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                                Min size (MB)
+                                <Input
+                                    value={minMb}
+                                    onChange={(e) => setMinMb(e.target.value)}
+                                    type="number"
+                                    min="0"
+                                />
+                            </label>
+                            <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                                Max size (MB)
+                                <Input
+                                    value={maxMb}
+                                    onChange={(e) => setMaxMb(e.target.value)}
+                                    type="number"
+                                    min="0"
+                                />
+                            </label>
+                            <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                                Modified after
+                                <Input
+                                    value={dateFrom}
+                                    onChange={(e) => setDateFrom(e.target.value)}
+                                    type="date"
+                                />
+                            </label>
+                            <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                                Modified before
+                                <Input
+                                    value={dateTo}
+                                    onChange={(e) => setDateTo(e.target.value)}
+                                    type="date"
+                                />
+                            </label>
                         </div>
-                    ) : (
-                        <div ref={scrollRef} className="max-h-[65vh] overflow-auto" onMouseDown={onMarqueeDown}>
-                            <div
-                                style={{
-                                    height: `${rowVirtualizer.getTotalSize()}px`,
-                                    position: "relative",
-                                    width: "100%"
+                        {hasFilters ? (
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setCategories(new Set());
+                                    setExtFilter("");
+                                    setMinMb("");
+                                    setMaxMb("");
+                                    setDateFrom("");
+                                    setDateTo("");
                                 }}
+                                className="self-start text-xs text-muted-foreground underline-offset-2 hover:underline"
                             >
-                                {marqueeRect ? (
-                                    <div
-                                        className="pointer-events-none absolute left-0 right-0 z-10 rounded-sm border border-primary/60 bg-primary/10"
-                                        style={{ top: `${marqueeRect.top}px`, height: `${marqueeRect.height}px` }}
-                                    />
-                                ) : null}
-                                {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-                                    const index = virtualRow.index;
-                                    const entry = visible[index];
-                                    if (!entry) return null;
-                                    const isSelected = selected.has(entry.path);
-                                    const isRenaming = renaming === entry.path;
-                                    return (
-                                        <ContextMenu key={entry.path}>
-                                            <ContextMenuTrigger asChild>
-                                                <div
-                                                    data-drive-row
-                                                    style={{
-                                                        position: "absolute",
-                                                        top: 0,
-                                                        left: 0,
-                                                        width: "100%",
-                                                        height: `${virtualRow.size}px`,
-                                                        transform: `translateY(${virtualRow.start}px)`
-                                                    }}
-                                                    onClick={(event) => rowClick(event, index, entry)}
-                                                    onDoubleClick={() => {
-                                                        if (!isRenaming) openEntry(entry);
-                                                    }}
-                                                    {...entryDragProps(entry, isRenaming)}
-                                                    className={cn(
-                                                        "flex h-10 items-center text-sm transition-colors",
-                                                        isSelected ? "bg-primary/5" : "hover:bg-card-hover",
-                                                        entry.hidden && "opacity-50",
-                                                        cutPaths?.has(entry.path) && "opacity-40",
-                                                        dropFolder === entry.path &&
-                                                            "bg-primary/10 ring-2 ring-inset ring-primary"
-                                                    )}
-                                                >
-                                                    <div className="flex w-9 shrink-0 items-center justify-center">
-                                                        <label
-                                                            className="flex cursor-pointer items-center"
-                                                            onClick={(e) => e.stopPropagation()}
-                                                        >
-                                                            <Checkbox
-                                                                checked={isSelected}
-                                                                onClick={(e) => handleSelectClick(e, index, entry)}
-                                                                onChange={() => undefined}
-                                                                aria-label={`Select ${entry.name}`}
-                                                            />
-                                                        </label>
-                                                    </div>
-                                                    <div className="min-w-0 flex-1 truncate px-1">
-                                                        {isRenaming ? (
-                                                            <Input
-                                                                autoFocus
-                                                                value={renameValue}
-                                                                onChange={(e) => setRenameValue(e.target.value)}
-                                                                onKeyDown={(e) => onRenameKey(e, entry)}
-                                                                onBlur={() => submitRename(entry)}
-                                                                onClick={(e) => e.stopPropagation()}
-                                                                size={Math.max(renameValue.length + 1, 8)}
-                                                                className="h-7 !w-auto max-w-full py-1"
-                                                            />
-                                                        ) : entry.kind === "dir" ? (
-                                                            <Link
-                                                                href={href(connectionId, entry.path)}
-                                                                onClick={(e) => e.preventDefault()}
-                                                                onDoubleClick={(e) => nameDoubleClick(e, entry)}
-                                                                className="flex items-center gap-2 hover:text-primary"
-                                                            >
-                                                                <EntryIcon entry={entry} />
-                                                                {entry.name}
-                                                                {searchScope === "recursive" && entry.path.includes("/") ? (
-                                                                    <span className="shrink truncate text-xs text-muted-foreground">
-                                                                        in /{parentOf(entry.path)}
-                                                                    </span>
-                                                                ) : null}
-                                                                {entry.favorite ? (
-                                                                    <Star
-                                                                        className="size-3 shrink-0 fill-amber-400 text-amber-400"
-                                                                        aria-label="Favorite"
-                                                                    />
-                                                                ) : null}
-                                                                {entry.locked ? (
-                                                                    <Lock
-                                                                        className="size-3 shrink-0 text-muted-foreground"
-                                                                        aria-label="Access-gated"
-                                                                    />
-                                                                ) : null}
-                                                                {entry.note ? (
-                                                                    <StickyNote
-                                                                        className="size-3 shrink-0 text-amber-500"
-                                                                        aria-label="Has a note"
-                                                                    />
-                                                                ) : null}
-                                                            </Link>
-                                                        ) : (
-                                                            <a
-                                                                href={downloadUrl(connectionId, entry.path)}
-                                                                onClick={(e) => e.preventDefault()}
-                                                                onDoubleClick={(e) => nameDoubleClick(e, entry)}
-                                                                className="flex items-center gap-2 hover:text-primary"
-                                                            >
-                                                                <EntryIcon entry={entry} />
-                                                                {entry.name}
-                                                                {searchScope === "recursive" && entry.path.includes("/") ? (
-                                                                    <span className="shrink truncate text-xs text-muted-foreground">
-                                                                        in /{parentOf(entry.path)}
-                                                                    </span>
-                                                                ) : null}
-                                                                {entry.favorite ? (
-                                                                    <Star
-                                                                        className="size-3 shrink-0 fill-amber-400 text-amber-400"
-                                                                        aria-label="Favorite"
-                                                                    />
-                                                                ) : null}
-                                                                {entry.note ? (
-                                                                    <StickyNote
-                                                                        className="size-3 shrink-0 text-amber-500"
-                                                                        aria-label="Has a note"
-                                                                    />
-                                                                ) : null}
-                                                            </a>
-                                                        )}
-                                                    </div>
-                                                    <div className="hidden w-44 shrink-0 truncate px-2 text-muted-foreground lg:block">
-                                                        <RelativeTime iso={entry.createdAt} />
-                                                    </div>
-                                                    <div className="hidden w-44 shrink-0 truncate px-2 text-muted-foreground sm:block">
-                                                        <RelativeTime iso={entry.modifiedAt} />
-                                                    </div>
-                                                    <div className="w-24 shrink-0 px-2 text-muted-foreground">
-                                                        {entry.kind === "dir" ? "-" : formatBytes(BigInt(entry.size))}
-                                                    </div>
-                                                    <div className="flex w-12 shrink-0 justify-end px-2">
-                                                        <Button
-                                                            size="icon"
-                                                            variant="ghost"
-                                                            onClick={() => onShare(entry)}
-                                                            aria-label={`Share ${entry.name}`}
-                                                        >
-                                                            <Share2 className="size-4" />
-                                                        </Button>
-                                                    </div>
-                                                </div>
-                                            </ContextMenuTrigger>
-                                            {entryMenu(entry)}
-                                        </ContextMenu>
-                                    );
-                                })}
-                            </div>
-                        </div>
-                    )}
-                </div>
-            )}
-                {dragUpload ? (
-                    <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-lg bg-primary/5 text-sm font-medium text-primary">
-                        Drop files to upload here
+                                Clear filters
+                            </button>
+                        ) : null}
                     </div>
                 ) : null}
-            </div>
-            </ContextMenuTrigger>
-            <ContextMenuContent>
-                <ContextMenuItem onSelect={onNewFolder}>
-                    <FolderPlus className="size-4" />
-                    New folder
-                </ContextMenuItem>
-                <ContextMenuItem onSelect={onNewFile}>
-                    <FilePlus className="size-4" />
-                    New file
-                </ContextMenuItem>
-                <ContextMenuSeparator />
-                <ContextMenuItem onSelect={() => fileInput.current?.click()}>
-                    <Upload className="size-4" />
-                    Upload files
-                </ContextMenuItem>
-                <ContextMenuItem onSelect={() => void pickFolder()}>
-                    <FolderUp className="size-4" />
-                    Upload folder
-                </ContextMenuItem>
-                {clipboard ? (
-                    <ContextMenuItem onSelect={paste}>
-                        <ClipboardPaste className="size-4" />
-                        Paste
-                    </ContextMenuItem>
-                ) : null}
-            </ContextMenuContent>
-            </ContextMenu>
+
+                {/* Always-present, fixed-height action row so beginning a selection
+                never reflows the list. Empty (a subtle hint) when nothing is
+                selected; actions appear in place when items are selected. */}
+                <div
+                    className={cn(
+                        "mb-3 flex h-10 items-center gap-2 rounded-md border px-3 text-sm transition-colors",
+                        selectedEntries.length > 0
+                            ? "border-primary/40 bg-primary/5"
+                            : "border-transparent"
+                    )}
+                >
+                    {selectedEntries.length > 0 ? (
+                        <>
+                            <span className="font-medium">{selectedEntries.length} selected</span>
+                            <div className="ml-auto flex items-center gap-1">
+                                <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => downloadSelection(connectionId, selectedEntries)}
+                                >
+                                    <Download className="size-4" />
+                                    {selectedEntries.length > 1 ||
+                                    selectedEntries.some((entry) => entry.kind === "dir")
+                                        ? "Download ZIP"
+                                        : "Download"}
+                                </Button>
+                                <SelectionZipMenu
+                                    connectionId={connectionId}
+                                    entries={selectedEntries}
+                                    currentPath={path}
+                                />
+                                <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => onDelete(selectedEntries)}
+                                    disabled={pending}
+                                >
+                                    <Trash2 className="size-4" />
+                                    Delete
+                                </Button>
+                                <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => setSelected(new Set())}
+                                >
+                                    <X className="size-4" />
+                                    Clear
+                                </Button>
+                            </div>
+                        </>
+                    ) : (
+                        <span className="text-xs text-muted-foreground">
+                            Select files to download, zip, or delete them.
+                        </span>
+                    )}
+                </div>
+
+                <ContextMenu>
+                    <ContextMenuTrigger asChild>
+                        <div
+                            tabIndex={0}
+                            onKeyDown={onListKeyDown}
+                            className={cn(
+                                "relative min-w-0 flex-1 rounded-lg focus:outline-none",
+                                dragUpload &&
+                                    "ring-2 ring-primary ring-offset-2 ring-offset-background"
+                            )}
+                            onDragOver={onUploadDragOver}
+                            onDragLeave={() => setDragUpload(false)}
+                            onDrop={onUploadDrop}
+                        >
+                            {loading ? (
+                                <ListingSkeleton />
+                            ) : error ? (
+                                <div className="rounded-md border border-danger/40 bg-danger/10 p-3 text-sm text-danger">
+                                    {error}
+                                </div>
+                            ) : (
+                                <div>
+                                    {viewMode === "list" ? (
+                                        <div className="flex h-9 items-center border-b border-border text-left text-xs font-medium text-muted-foreground">
+                                            <div className="flex w-9 shrink-0 items-center justify-center">
+                                                <label className="flex cursor-pointer items-center">
+                                                    <Checkbox
+                                                        checked={allSelected}
+                                                        indeterminate={
+                                                            !allSelected &&
+                                                            selectedEntries.length > 0
+                                                        }
+                                                        onChange={toggleAll}
+                                                        aria-label="Select all"
+                                                    />
+                                                </label>
+                                            </div>
+                                            <div className="min-w-0 flex-1 px-1">Name</div>
+                                            <div className="hidden w-44 shrink-0 px-2 lg:block">
+                                                Created on
+                                            </div>
+                                            <div className="hidden w-44 shrink-0 px-2 sm:block">
+                                                Last Modified
+                                            </div>
+                                            <div className="w-24 shrink-0 px-2">Size</div>
+                                            <div className="w-12 shrink-0 px-2" />
+                                        </div>
+                                    ) : null}
+                                    {visible.length === 0 ? (
+                                        <p className="px-3 py-8 text-center text-sm text-muted-foreground">
+                                            {searchScope === "recursive" && query.trim()
+                                                ? searching
+                                                    ? "Searching..."
+                                                    : "No matches in this folder or its subfolders."
+                                                : source.length === 0
+                                                  ? "This folder is empty."
+                                                  : "Nothing matches your search or filters."}
+                                        </p>
+                                    ) : viewMode === "grid" ? (
+                                        <div className="max-h-[65vh] overflow-auto p-1">
+                                            <div
+                                                ref={gridRef}
+                                                className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6"
+                                            >
+                                                {visible.map((entry, index) => {
+                                                    const isSelected = selected.has(entry.path);
+                                                    const isRenaming = renaming === entry.path;
+                                                    return (
+                                                        <ContextMenu key={entry.path}>
+                                                            <ContextMenuTrigger asChild>
+                                                                <div
+                                                                    data-drive-row
+                                                                    onClick={(event) =>
+                                                                        rowClick(
+                                                                            event,
+                                                                            index,
+                                                                            entry
+                                                                        )
+                                                                    }
+                                                                    onDoubleClick={() => {
+                                                                        if (!isRenaming)
+                                                                            openEntry(entry);
+                                                                    }}
+                                                                    {...entryDragProps(
+                                                                        entry,
+                                                                        isRenaming
+                                                                    )}
+                                                                    className={cn(
+                                                                        "group relative flex flex-col items-center gap-1.5 rounded-lg border p-3 text-center transition-colors",
+                                                                        isSelected
+                                                                            ? "border-primary/40 bg-primary/5"
+                                                                            : "border-transparent hover:bg-card-hover",
+                                                                        entry.hidden &&
+                                                                            "opacity-50",
+                                                                        cutPaths?.has(entry.path) &&
+                                                                            "opacity-40",
+                                                                        dropFolder === entry.path &&
+                                                                            "border-primary bg-primary/10 ring-2 ring-primary"
+                                                                    )}
+                                                                >
+                                                                    <EntryIcon
+                                                                        entry={entry}
+                                                                        className="size-10"
+                                                                    />
+                                                                    {isRenaming ? (
+                                                                        <Input
+                                                                            autoFocus
+                                                                            value={renameValue}
+                                                                            onChange={(e) =>
+                                                                                setRenameValue(
+                                                                                    e.target.value
+                                                                                )
+                                                                            }
+                                                                            onKeyDown={(e) =>
+                                                                                onRenameKey(
+                                                                                    e,
+                                                                                    entry
+                                                                                )
+                                                                            }
+                                                                            onBlur={() =>
+                                                                                submitRename(entry)
+                                                                            }
+                                                                            onClick={(e) =>
+                                                                                e.stopPropagation()
+                                                                            }
+                                                                            className="h-7 w-full py-1 text-center text-xs"
+                                                                        />
+                                                                    ) : (
+                                                                        <span
+                                                                            className="w-full truncate text-xs"
+                                                                            title={entry.name}
+                                                                            onDoubleClick={(e) =>
+                                                                                nameDoubleClick(
+                                                                                    e,
+                                                                                    entry
+                                                                                )
+                                                                            }
+                                                                        >
+                                                                            {entry.name}
+                                                                        </span>
+                                                                    )}
+                                                                    <span className="text-[11px] text-muted-foreground">
+                                                                        {entry.kind === "dir"
+                                                                            ? "Folder"
+                                                                            : formatBytes(
+                                                                                  BigInt(entry.size)
+                                                                              )}
+                                                                    </span>
+                                                                    <div className="flex items-center gap-1">
+                                                                        {entry.favorite ? (
+                                                                            <Star className="size-3 fill-amber-400 text-amber-400" />
+                                                                        ) : null}
+                                                                        {entry.locked ? (
+                                                                            <Lock className="size-3 text-muted-foreground" />
+                                                                        ) : null}
+                                                                        {entry.note ? (
+                                                                            <StickyNote className="size-3 text-amber-500" />
+                                                                        ) : null}
+                                                                    </div>
+                                                                </div>
+                                                            </ContextMenuTrigger>
+                                                            {entryMenu(entry)}
+                                                        </ContextMenu>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div
+                                            ref={scrollRef}
+                                            className="max-h-[65vh] overflow-auto"
+                                            onMouseDown={onMarqueeDown}
+                                        >
+                                            <div
+                                                style={{
+                                                    height: `${rowVirtualizer.getTotalSize()}px`,
+                                                    position: "relative",
+                                                    width: "100%"
+                                                }}
+                                            >
+                                                {marqueeRect ? (
+                                                    <div
+                                                        className="pointer-events-none absolute left-0 right-0 z-10 rounded-sm border border-primary/60 bg-primary/10"
+                                                        style={{
+                                                            top: `${marqueeRect.top}px`,
+                                                            height: `${marqueeRect.height}px`
+                                                        }}
+                                                    />
+                                                ) : null}
+                                                {rowVirtualizer
+                                                    .getVirtualItems()
+                                                    .map((virtualRow) => {
+                                                        const index = virtualRow.index;
+                                                        const entry = visible[index];
+                                                        if (!entry) return null;
+                                                        const isSelected = selected.has(entry.path);
+                                                        const isRenaming = renaming === entry.path;
+                                                        return (
+                                                            <ContextMenu key={entry.path}>
+                                                                <ContextMenuTrigger asChild>
+                                                                    <div
+                                                                        data-drive-row
+                                                                        style={{
+                                                                            position: "absolute",
+                                                                            top: 0,
+                                                                            left: 0,
+                                                                            width: "100%",
+                                                                            height: `${virtualRow.size}px`,
+                                                                            transform: `translateY(${virtualRow.start}px)`
+                                                                        }}
+                                                                        onClick={(event) =>
+                                                                            rowClick(
+                                                                                event,
+                                                                                index,
+                                                                                entry
+                                                                            )
+                                                                        }
+                                                                        onDoubleClick={() => {
+                                                                            if (!isRenaming)
+                                                                                openEntry(entry);
+                                                                        }}
+                                                                        {...entryDragProps(
+                                                                            entry,
+                                                                            isRenaming
+                                                                        )}
+                                                                        className={cn(
+                                                                            "flex h-10 items-center text-sm transition-colors",
+                                                                            isSelected
+                                                                                ? "bg-primary/5"
+                                                                                : "hover:bg-card-hover",
+                                                                            entry.hidden &&
+                                                                                "opacity-50",
+                                                                            cutPaths?.has(
+                                                                                entry.path
+                                                                            ) && "opacity-40",
+                                                                            dropFolder ===
+                                                                                entry.path &&
+                                                                                "bg-primary/10 ring-2 ring-inset ring-primary"
+                                                                        )}
+                                                                    >
+                                                                        <div className="flex w-9 shrink-0 items-center justify-center">
+                                                                            <label
+                                                                                className="flex cursor-pointer items-center"
+                                                                                onClick={(e) =>
+                                                                                    e.stopPropagation()
+                                                                                }
+                                                                            >
+                                                                                <Checkbox
+                                                                                    checked={
+                                                                                        isSelected
+                                                                                    }
+                                                                                    onClick={(e) =>
+                                                                                        handleSelectClick(
+                                                                                            e,
+                                                                                            index,
+                                                                                            entry
+                                                                                        )
+                                                                                    }
+                                                                                    onChange={() =>
+                                                                                        undefined
+                                                                                    }
+                                                                                    aria-label={`Select ${entry.name}`}
+                                                                                />
+                                                                            </label>
+                                                                        </div>
+                                                                        <div className="min-w-0 flex-1 truncate px-1">
+                                                                            {isRenaming ? (
+                                                                                <Input
+                                                                                    autoFocus
+                                                                                    value={
+                                                                                        renameValue
+                                                                                    }
+                                                                                    onChange={(e) =>
+                                                                                        setRenameValue(
+                                                                                            e.target
+                                                                                                .value
+                                                                                        )
+                                                                                    }
+                                                                                    onKeyDown={(
+                                                                                        e
+                                                                                    ) =>
+                                                                                        onRenameKey(
+                                                                                            e,
+                                                                                            entry
+                                                                                        )
+                                                                                    }
+                                                                                    onBlur={() =>
+                                                                                        submitRename(
+                                                                                            entry
+                                                                                        )
+                                                                                    }
+                                                                                    onClick={(e) =>
+                                                                                        e.stopPropagation()
+                                                                                    }
+                                                                                    size={Math.max(
+                                                                                        renameValue.length +
+                                                                                            1,
+                                                                                        8
+                                                                                    )}
+                                                                                    className="h-7 !w-auto max-w-full py-1"
+                                                                                />
+                                                                            ) : entry.kind ===
+                                                                              "dir" ? (
+                                                                                <Link
+                                                                                    href={href(
+                                                                                        connectionId,
+                                                                                        entry.path
+                                                                                    )}
+                                                                                    onClick={(e) =>
+                                                                                        e.preventDefault()
+                                                                                    }
+                                                                                    onDoubleClick={(
+                                                                                        e
+                                                                                    ) =>
+                                                                                        nameDoubleClick(
+                                                                                            e,
+                                                                                            entry
+                                                                                        )
+                                                                                    }
+                                                                                    className="flex items-center gap-2 hover:text-primary"
+                                                                                >
+                                                                                    <EntryIcon
+                                                                                        entry={
+                                                                                            entry
+                                                                                        }
+                                                                                    />
+                                                                                    {entry.name}
+                                                                                    {searchScope ===
+                                                                                        "recursive" &&
+                                                                                    entry.path.includes(
+                                                                                        "/"
+                                                                                    ) ? (
+                                                                                        <span className="shrink truncate text-xs text-muted-foreground">
+                                                                                            in /
+                                                                                            {parentOf(
+                                                                                                entry.path
+                                                                                            )}
+                                                                                        </span>
+                                                                                    ) : null}
+                                                                                    {entry.favorite ? (
+                                                                                        <Star
+                                                                                            className="size-3 shrink-0 fill-amber-400 text-amber-400"
+                                                                                            aria-label="Favorite"
+                                                                                        />
+                                                                                    ) : null}
+                                                                                    {entry.locked ? (
+                                                                                        <Lock
+                                                                                            className="size-3 shrink-0 text-muted-foreground"
+                                                                                            aria-label="Access-gated"
+                                                                                        />
+                                                                                    ) : null}
+                                                                                    {entry.note ? (
+                                                                                        <StickyNote
+                                                                                            className="size-3 shrink-0 text-amber-500"
+                                                                                            aria-label="Has a note"
+                                                                                        />
+                                                                                    ) : null}
+                                                                                </Link>
+                                                                            ) : (
+                                                                                <a
+                                                                                    href={downloadUrl(
+                                                                                        connectionId,
+                                                                                        entry.path
+                                                                                    )}
+                                                                                    onClick={(e) =>
+                                                                                        e.preventDefault()
+                                                                                    }
+                                                                                    onDoubleClick={(
+                                                                                        e
+                                                                                    ) =>
+                                                                                        nameDoubleClick(
+                                                                                            e,
+                                                                                            entry
+                                                                                        )
+                                                                                    }
+                                                                                    className="flex items-center gap-2 hover:text-primary"
+                                                                                >
+                                                                                    <EntryIcon
+                                                                                        entry={
+                                                                                            entry
+                                                                                        }
+                                                                                    />
+                                                                                    {entry.name}
+                                                                                    {searchScope ===
+                                                                                        "recursive" &&
+                                                                                    entry.path.includes(
+                                                                                        "/"
+                                                                                    ) ? (
+                                                                                        <span className="shrink truncate text-xs text-muted-foreground">
+                                                                                            in /
+                                                                                            {parentOf(
+                                                                                                entry.path
+                                                                                            )}
+                                                                                        </span>
+                                                                                    ) : null}
+                                                                                    {entry.favorite ? (
+                                                                                        <Star
+                                                                                            className="size-3 shrink-0 fill-amber-400 text-amber-400"
+                                                                                            aria-label="Favorite"
+                                                                                        />
+                                                                                    ) : null}
+                                                                                    {entry.note ? (
+                                                                                        <StickyNote
+                                                                                            className="size-3 shrink-0 text-amber-500"
+                                                                                            aria-label="Has a note"
+                                                                                        />
+                                                                                    ) : null}
+                                                                                </a>
+                                                                            )}
+                                                                        </div>
+                                                                        <div className="hidden w-44 shrink-0 truncate px-2 text-muted-foreground lg:block">
+                                                                            <RelativeTime
+                                                                                iso={
+                                                                                    entry.createdAt
+                                                                                }
+                                                                            />
+                                                                        </div>
+                                                                        <div className="hidden w-44 shrink-0 truncate px-2 text-muted-foreground sm:block">
+                                                                            <RelativeTime
+                                                                                iso={
+                                                                                    entry.modifiedAt
+                                                                                }
+                                                                            />
+                                                                        </div>
+                                                                        <div className="w-24 shrink-0 px-2 text-muted-foreground">
+                                                                            {entry.kind === "dir"
+                                                                                ? "-"
+                                                                                : formatBytes(
+                                                                                      BigInt(
+                                                                                          entry.size
+                                                                                      )
+                                                                                  )}
+                                                                        </div>
+                                                                        <div className="flex w-12 shrink-0 justify-end px-2">
+                                                                            <Button
+                                                                                size="icon"
+                                                                                variant="ghost"
+                                                                                onClick={() =>
+                                                                                    onShare(entry)
+                                                                                }
+                                                                                aria-label={`Share ${entry.name}`}
+                                                                            >
+                                                                                <Share2 className="size-4" />
+                                                                            </Button>
+                                                                        </div>
+                                                                    </div>
+                                                                </ContextMenuTrigger>
+                                                                {entryMenu(entry)}
+                                                            </ContextMenu>
+                                                        );
+                                                    })}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                            {dragUpload ? (
+                                <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-lg bg-primary/5 text-sm font-medium text-primary">
+                                    Drop files to upload here
+                                </div>
+                            ) : null}
+                        </div>
+                    </ContextMenuTrigger>
+                    <ContextMenuContent>
+                        <ContextMenuItem onSelect={onNewFolder}>
+                            <FolderPlus className="size-4" />
+                            New folder
+                        </ContextMenuItem>
+                        <ContextMenuItem onSelect={onNewFile}>
+                            <FilePlus className="size-4" />
+                            New file
+                        </ContextMenuItem>
+                        <ContextMenuSeparator />
+                        <ContextMenuItem onSelect={() => fileInput.current?.click()}>
+                            <Upload className="size-4" />
+                            Upload files
+                        </ContextMenuItem>
+                        <ContextMenuItem onSelect={() => void pickFolder()}>
+                            <FolderUp className="size-4" />
+                            Upload folder
+                        </ContextMenuItem>
+                        {clipboard ? (
+                            <ContextMenuItem onSelect={paste}>
+                                <ClipboardPaste className="size-4" />
+                                Paste
+                            </ContextMenuItem>
+                        ) : null}
+                    </ContextMenuContent>
+                </ContextMenu>
             </div>
             {selectedEntries.length === 1 && selectedEntries[0] ? (
                 <aside className="fixed right-0 top-14 bottom-0 z-30 hidden w-72 flex-col gap-4 overflow-auto border-l border-border bg-surface/40 p-4 lg:flex">
                     <div className="flex flex-col items-center gap-2 text-center">
                         <EntryIcon entry={selectedEntries[0]} className="size-10" />
-                        <span className="break-all text-sm font-medium">{selectedEntries[0].name}</span>
+                        <span className="break-all text-sm font-medium">
+                            {selectedEntries[0].name}
+                        </span>
                     </div>
                     <dl className="flex flex-col gap-2 text-xs">
                         <div className="flex justify-between gap-2">
@@ -1729,11 +2064,15 @@ export function FilesView({
                         </div>
                         <div className="flex justify-between gap-2">
                             <dt className="text-muted-foreground">Owner</dt>
-                            <dd className="truncate text-right">{selectedEntries[0].owner ?? "Unknown"}</dd>
+                            <dd className="truncate text-right">
+                                {selectedEntries[0].owner ?? "Unknown"}
+                            </dd>
                         </div>
                         <div className="flex flex-col gap-0.5">
                             <dt className="text-muted-foreground">Location</dt>
-                            <dd className="break-all">/{selectedEntries[0].path.split("/").slice(0, -1).join("/")}</dd>
+                            <dd className="break-all">
+                                /{selectedEntries[0].path.split("/").slice(0, -1).join("/")}
+                            </dd>
                         </div>
                         <div className="flex flex-col gap-0.5">
                             <dt className="text-muted-foreground">Created on</dt>
@@ -1745,7 +2084,11 @@ export function FilesView({
                         </div>
                     </dl>
                     <div className="grid grid-cols-2 gap-2">
-                        <Button size="sm" variant="secondary" onClick={() => selectedEntries[0] && openEntry(selectedEntries[0])}>
+                        <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => selectedEntries[0] && openEntry(selectedEntries[0])}
+                        >
                             Open
                         </Button>
                         <Button
@@ -1767,7 +2110,10 @@ export function FilesView({
                         <Button
                             size="sm"
                             variant="ghost"
-                            onClick={() => selectedEntries[0] && void navigator.clipboard.writeText(selectedEntries[0].path)}
+                            onClick={() =>
+                                selectedEntries[0] &&
+                                void navigator.clipboard.writeText(selectedEntries[0].path)
+                            }
                         >
                             <ClipboardCopy className="size-4" />
                             Copy path
@@ -1794,13 +2140,18 @@ export function FilesView({
                         {activityLoading ? (
                             <p className="text-xs text-muted-foreground/60">Loading...</p>
                         ) : activity.length === 0 ? (
-                            <p className="text-xs text-muted-foreground/60">No recorded activity yet.</p>
+                            <p className="text-xs text-muted-foreground/60">
+                                No recorded activity yet.
+                            </p>
                         ) : (
                             <ul className="flex flex-col gap-1.5">
                                 {activity.map((item) => {
                                     const Icon = activityIcon(item.action);
                                     return (
-                                        <li key={item.id} className="flex items-start gap-2 text-xs">
+                                        <li
+                                            key={item.id}
+                                            className="flex items-start gap-2 text-xs"
+                                        >
                                             <span className="mt-0.5 grid size-5 shrink-0 place-items-center rounded-full bg-muted text-muted-foreground">
                                                 <Icon className="size-3" />
                                             </span>
@@ -1812,13 +2163,17 @@ export function FilesView({
                                                         item.actorId ? (
                                                             <button
                                                                 type="button"
-                                                                onClick={() => setProfileUserId(item.actorId)}
+                                                                onClick={() =>
+                                                                    setProfileUserId(item.actorId)
+                                                                }
                                                                 className="font-medium text-primary hover:underline"
                                                             >
                                                                 {item.actor}
                                                             </button>
                                                         ) : (
-                                                            <span className="font-medium">{item.actor}</span>
+                                                            <span className="font-medium">
+                                                                {item.actor}
+                                                            </span>
                                                         )
                                                     ) : null}
                                                 </span>
@@ -1844,7 +2199,9 @@ export function FilesView({
                             </button>
                         </div>
                         {selectedEntries[0].note ? (
-                            <p className="whitespace-pre-line text-xs text-muted-foreground">{selectedEntries[0].note}</p>
+                            <p className="whitespace-pre-line text-xs text-muted-foreground">
+                                {selectedEntries[0].note}
+                            </p>
                         ) : (
                             <p className="text-xs text-muted-foreground/60">No note</p>
                         )}
@@ -1867,7 +2224,10 @@ export function FilesView({
                 }
             />
 
-            <UserProfileDialog userId={profileUserId} onOpenChange={(open) => !open && setProfileUserId(null)} />
+            <UserProfileDialog
+                userId={profileUserId}
+                onOpenChange={(open) => !open && setProfileUserId(null)}
+            />
 
             <ArchiveDialog
                 key={archiveTarget?.path ?? "none"}
@@ -1877,7 +2237,10 @@ export function FilesView({
                 onOpenChange={(open) => !open && setArchiveTarget(null)}
             />
 
-            <Dialog open={pendingFolder !== null} onOpenChange={(open) => !open && setPendingFolder(null)}>
+            <Dialog
+                open={pendingFolder !== null}
+                onOpenChange={(open) => !open && setPendingFolder(null)}
+            >
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>Upload folder</DialogTitle>
@@ -1886,13 +2249,20 @@ export function FilesView({
                                 ? `Upload ${pendingFolder.items.length} file${
                                       pendingFolder.items.length === 1 ? "" : "s"
                                   } (${formatBytes(
-                                      pendingFolder.items.reduce((sum, item) => sum + BigInt(item.file.size), 0n)
+                                      pendingFolder.items.reduce(
+                                          (sum, item) => sum + BigInt(item.file.size),
+                                          0n
+                                      )
                                   )}) from "${pendingFolder.name}"?`
                                 : ""}
                         </DialogDescription>
                     </DialogHeader>
                     <div className="flex justify-end gap-2">
-                        <Button type="button" variant="ghost" onClick={() => setPendingFolder(null)}>
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            onClick={() => setPendingFolder(null)}
+                        >
                             Cancel
                         </Button>
                         <Button
@@ -1909,11 +2279,16 @@ export function FilesView({
                 </DialogContent>
             </Dialog>
 
-            <Dialog open={iconTarget !== null} onOpenChange={(open) => !open && setIconTarget(null)}>
+            <Dialog
+                open={iconTarget !== null}
+                onOpenChange={(open) => !open && setIconTarget(null)}
+            >
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>Change icon</DialogTitle>
-                        <DialogDescription className="truncate">{iconTarget?.name}</DialogDescription>
+                        <DialogDescription className="truncate">
+                            {iconTarget?.name}
+                        </DialogDescription>
                     </DialogHeader>
                     <div className="flex flex-col gap-4">
                         <div className="grid grid-cols-7 gap-1.5">
@@ -1923,15 +2298,26 @@ export function FilesView({
                                     type="button"
                                     onClick={() => {
                                         if (!iconTarget) return;
-                                        onSetIcon(iconTarget, name, iconTarget.iconColor ?? "primary");
+                                        onSetIcon(
+                                            iconTarget,
+                                            name,
+                                            iconTarget.iconColor ?? "primary"
+                                        );
                                         setIconTarget({ ...iconTarget, icon: name });
                                     }}
                                     className={cn(
                                         "flex items-center justify-center rounded-md border p-2 transition-colors hover:bg-muted",
-                                        iconTarget?.icon === name ? "border-primary" : "border-border"
+                                        iconTarget?.icon === name
+                                            ? "border-primary"
+                                            : "border-border"
                                     )}
                                 >
-                                    <Icon className={cn("size-5", iconColorClass(iconTarget?.iconColor))} />
+                                    <Icon
+                                        className={cn(
+                                            "size-5",
+                                            iconColorClass(iconTarget?.iconColor)
+                                        )}
+                                    />
                                 </button>
                             ))}
                         </div>
@@ -1943,15 +2329,27 @@ export function FilesView({
                                     aria-label={color.id}
                                     onClick={() => {
                                         if (!iconTarget) return;
-                                        onSetIcon(iconTarget, iconTarget.icon ?? "folder", color.id);
-                                        setIconTarget({ ...iconTarget, icon: iconTarget.icon ?? "folder", iconColor: color.id });
+                                        onSetIcon(
+                                            iconTarget,
+                                            iconTarget.icon ?? "folder",
+                                            color.id
+                                        );
+                                        setIconTarget({
+                                            ...iconTarget,
+                                            icon: iconTarget.icon ?? "folder",
+                                            iconColor: color.id
+                                        });
                                     }}
                                     className={cn(
                                         "size-6 rounded-full ring-offset-2 ring-offset-background transition",
-                                        iconTarget?.iconColor === color.id ? "ring-2 ring-primary" : ""
+                                        iconTarget?.iconColor === color.id
+                                            ? "ring-2 ring-primary"
+                                            : ""
                                     )}
                                 >
-                                    <span className={cn("block size-full rounded-full", color.swatch)} />
+                                    <span
+                                        className={cn("block size-full rounded-full", color.swatch)}
+                                    />
                                 </button>
                             ))}
                         </div>
@@ -1975,7 +2373,10 @@ export function FilesView({
                 </DialogContent>
             </Dialog>
 
-            <Dialog open={detailsTarget !== null} onOpenChange={(open) => !open && setDetailsTarget(null)}>
+            <Dialog
+                open={detailsTarget !== null}
+                onOpenChange={(open) => !open && setDetailsTarget(null)}
+            >
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>Details</DialogTitle>
@@ -2009,11 +2410,16 @@ export function FilesView({
                 </DialogContent>
             </Dialog>
 
-            <Dialog open={noteTarget !== null} onOpenChange={(open) => !open && setNoteTarget(null)}>
+            <Dialog
+                open={noteTarget !== null}
+                onOpenChange={(open) => !open && setNoteTarget(null)}
+            >
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>Note</DialogTitle>
-                        <DialogDescription className="truncate">{noteTarget?.name}</DialogDescription>
+                        <DialogDescription className="truncate">
+                            {noteTarget?.name}
+                        </DialogDescription>
                     </DialogHeader>
                     <form
                         onSubmit={(event) => {
@@ -2051,14 +2457,21 @@ export function FilesView({
                 </DialogContent>
             </Dialog>
 
-            <Dialog open={moveTargets !== null} onOpenChange={(open) => !open && setMoveTargets(null)}>
+            <Dialog
+                open={moveTargets !== null}
+                onOpenChange={(open) => !open && setMoveTargets(null)}
+            >
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>
-                            Move {moveTargets && moveTargets.length > 1 ? `${moveTargets.length} items` : "item"}
+                            Move{" "}
+                            {moveTargets && moveTargets.length > 1
+                                ? `${moveTargets.length} items`
+                                : "item"}
                         </DialogTitle>
                         <DialogDescription>
-                            Destination folder (relative to the connection root; empty means the root).
+                            Destination folder (relative to the connection root; empty means the
+                            root).
                         </DialogDescription>
                     </DialogHeader>
                     <form onSubmit={submitMove} className="flex flex-col gap-3">
@@ -2069,7 +2482,11 @@ export function FilesView({
                             placeholder="e.g. Documents/Archive"
                         />
                         <div className="flex justify-end gap-2">
-                            <Button type="button" variant="ghost" onClick={() => setMoveTargets(null)}>
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                onClick={() => setMoveTargets(null)}
+                            >
                                 Cancel
                             </Button>
                             <Button type="submit">Move</Button>
@@ -2106,17 +2523,22 @@ function filesToItems(fileList: FileList): UploadItem[] {
 }
 
 /** Read every batch from a directory reader (readEntries returns in chunks). */
-function readAllEntries(reader: { readEntries: (cb: (entries: unknown[]) => void, err: (e: unknown) => void) => void }): Promise<unknown[]> {
+function readAllEntries(reader: {
+    readEntries: (cb: (entries: unknown[]) => void, err: (e: unknown) => void) => void;
+}): Promise<unknown[]> {
     return new Promise((resolve) => {
         const all: unknown[] = [];
         const next = () => {
-            reader.readEntries((batch) => {
-                if (batch.length === 0) resolve(all);
-                else {
-                    all.push(...batch);
-                    next();
-                }
-            }, () => resolve(all));
+            reader.readEntries(
+                (batch) => {
+                    if (batch.length === 0) resolve(all);
+                    else {
+                        all.push(...batch);
+                        next();
+                    }
+                },
+                () => resolve(all)
+            );
         };
         next();
     });
@@ -2130,7 +2552,9 @@ function readAllEntries(reader: { readEntries: (cb: (entries: unknown[]) => void
 async function gatherDropItems(dataTransfer: DataTransfer): Promise<UploadItem[]> {
     const roots: unknown[] = [];
     for (let index = 0; index < dataTransfer.items.length; index++) {
-        const item = dataTransfer.items[index] as DataTransferItem & { webkitGetAsEntry?: () => unknown };
+        const item = dataTransfer.items[index] as DataTransferItem & {
+            webkitGetAsEntry?: () => unknown;
+        };
         const entry = item.webkitGetAsEntry?.();
         if (entry) roots.push(entry);
     }
@@ -2143,10 +2567,14 @@ async function gatherDropItems(dataTransfer: DataTransfer): Promise<UploadItem[]
             isDirectory?: boolean;
             name: string;
             file?: (cb: (file: File) => void, err: (e: unknown) => void) => void;
-            createReader?: () => { readEntries: (cb: (entries: unknown[]) => void, err: (e: unknown) => void) => void };
+            createReader?: () => {
+                readEntries: (cb: (entries: unknown[]) => void, err: (e: unknown) => void) => void;
+            };
         };
         if (node.isFile && node.file) {
-            const file = await new Promise<File | null>((resolve) => node.file!(resolve, () => resolve(null)));
+            const file = await new Promise<File | null>((resolve) =>
+                node.file!(resolve, () => resolve(null))
+            );
             if (file) out.push({ file, relPath: `${prefix}${node.name}` });
         } else if (node.isDirectory && node.createReader) {
             const children = await readAllEntries(node.createReader());

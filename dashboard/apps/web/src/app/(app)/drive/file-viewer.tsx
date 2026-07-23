@@ -4,7 +4,8 @@
  * In-dashboard file viewer. Opens a file in a modal and renders it inline by type
  * - images natively, audio/video through a Polaris-themed Plyr, PDFs in the
  * browser's native viewer (an inline iframe: crisp, selectable text, zoom), and
- * spreadsheets/CSV via SheetJS. Anything else offers a download. The heavy viewer
+ * spreadsheets/CSV via SheetJS. Anything else opens as editable plain text
+ * (Notepad-style), with binary or oversized files shown read-only. The heavy viewer
  * libraries are dynamically imported inside effects so they never run during SSR
  * and only load when a file of that type is actually opened. Bytes are streamed
  * from the drive route with an inline disposition (Range-enabled, so media
@@ -14,7 +15,7 @@
 
 import "plyr/dist/plyr.css";
 import { useEffect, useRef, useState, type CSSProperties } from "react";
-import { Download, FileQuestion, Loader2, Pencil, Share2 } from "lucide-react";
+import { Download, Loader2, Pencil, Share2 } from "lucide-react";
 import { formatBytes } from "@polaris/core";
 import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, cn } from "@polaris/ui";
 import { extensionOf } from "./file-categories";
@@ -28,7 +29,8 @@ export interface ViewerTarget {
     modifiedAt?: string;
 }
 
-type ViewerKind = "image" | "video" | "audio" | "pdf" | "sheet" | "doc" | "markdown" | "text" | "none";
+type ViewerKind =
+    "image" | "video" | "audio" | "pdf" | "sheet" | "doc" | "markdown" | "text" | "none";
 
 const IMAGE = new Set(["jpg", "jpeg", "png", "gif", "webp", "svg", "bmp", "avif", "ico"]);
 const VIDEO = new Set(["mp4", "webm", "mov", "m4v", "ogv"]);
@@ -36,9 +38,11 @@ const AUDIO = new Set(["mp3", "wav", "flac", "aac", "ogg", "oga", "m4a", "opus"]
 const SHEET = new Set(["xlsx", "xls", "csv", "ods", "tsv"]);
 const DOC = new Set(["docx"]);
 const MARKDOWN = new Set(["md", "markdown", "mdown", "mkd"]);
-const TEXT = new Set(["txt", "log", "json", "xml", "yaml", "yml", "ini", "conf", "csv"]);
 
-/** Which viewer, if any, can render a file by its extension. */
+/**
+ * Which viewer renders a file by its extension. Anything without a richer viewer
+ * falls back to "text" - the Notepad-style editor opens it as plain text.
+ */
 export function viewerKind(name: string): ViewerKind {
     const ext = extensionOf(name);
     if (IMAGE.has(ext)) return "image";
@@ -48,11 +52,10 @@ export function viewerKind(name: string): ViewerKind {
     if (SHEET.has(ext)) return "sheet";
     if (DOC.has(ext)) return "doc";
     if (MARKDOWN.has(ext)) return "markdown";
-    if (TEXT.has(ext)) return "text";
-    return "none";
+    return "text";
 }
 
-/** Whether a file can be opened in the viewer at all (drives the click behavior). */
+/** Whether a file can be opened in the viewer (drives the click behavior). */
 export function isViewable(name: string): boolean {
     return viewerKind(name) !== "none";
 }
@@ -118,12 +121,10 @@ export function FileViewer({
                                 <SheetView src={inlineSrc} />
                             ) : kind === "doc" ? (
                                 <DocView src={inlineSrc} />
-                            ) : kind === "markdown" && target ? (
+                            ) : kind === "markdown" ? (
                                 <MarkdownView src={inlineSrc} target={target} />
-                            ) : kind === "text" ? (
-                                <TextView src={inlineSrc} />
                             ) : (
-                                <Unsupported />
+                                <PlainTextEditor src={inlineSrc} target={target} />
                             )
                         ) : null}
                     </div>
@@ -134,7 +135,9 @@ export function FileViewer({
                             </p>
                             <div className="flex justify-between gap-2">
                                 <span className="text-muted-foreground">Type</span>
-                                <span>{extension ? `${extension.toUpperCase()} file` : "File"}</span>
+                                <span>
+                                    {extension ? `${extension.toUpperCase()} file` : "File"}
+                                </span>
                             </div>
                             {target.size !== undefined ? (
                                 <div className="flex justify-between gap-2">
@@ -150,22 +153,15 @@ export function FileViewer({
                             ) : null}
                             <div className="flex flex-col gap-0.5">
                                 <span className="text-muted-foreground">Location</span>
-                                <span className="break-all">/{target.path.split("/").slice(0, -1).join("/")}</span>
+                                <span className="break-all">
+                                    /{target.path.split("/").slice(0, -1).join("/")}
+                                </span>
                             </div>
                         </aside>
                     ) : null}
                 </div>
             </DialogContent>
         </Dialog>
-    );
-}
-
-function Unsupported() {
-    return (
-        <div className="flex flex-col items-center gap-2 p-12 text-center text-sm text-muted-foreground">
-            <FileQuestion className="size-8" />
-            <p>No inline preview for this file type. Use Download to open it.</p>
-        </div>
     );
 }
 
@@ -189,7 +185,15 @@ function MediaView({ src, kind }: { src: string; kind: "video" | "audio" }) {
             if (!active || !ref.current) return;
             const Plyr = module.default;
             player = new Plyr(ref.current, {
-                controls: ["play", "progress", "current-time", "mute", "volume", "settings", "fullscreen"]
+                controls: [
+                    "play",
+                    "progress",
+                    "current-time",
+                    "mute",
+                    "volume",
+                    "settings",
+                    "fullscreen"
+                ]
             });
         });
         return () => {
@@ -266,7 +270,12 @@ function SheetView({ src }: { src: string }) {
         };
     }, [src]);
 
-    if (error) return <p className="p-8 text-center text-sm text-danger">This spreadsheet could not be read.</p>;
+    if (error)
+        return (
+            <p className="p-8 text-center text-sm text-danger">
+                This spreadsheet could not be read.
+            </p>
+        );
     if (!sheets) return <Loading />;
 
     return (
@@ -331,7 +340,12 @@ function DocView({ src }: { src: string }) {
         };
     }, [src]);
 
-    if (error) return <p className="p-8 text-center text-sm text-danger">This document could not be rendered.</p>;
+    if (error)
+        return (
+            <p className="p-8 text-center text-sm text-danger">
+                This document could not be rendered.
+            </p>
+        );
     if (html === null) return <Loading />;
     return (
         <div className="mx-auto max-w-3xl p-6">
@@ -350,27 +364,235 @@ function DocView({ src }: { src: string }) {
     );
 }
 
-/** Fetch and show a small text file verbatim. */
-function TextView({ src }: { src: string }) {
+const TEXT_LIMIT = 500_000;
+
+/**
+ * Save file text back through the upload route (PUT). Returns a human-readable
+ * error message, or null on success. Shared by the Markdown and plain-text
+ * editors so both handle write access, locks, and failures identically.
+ */
+async function saveTextFile(target: ViewerTarget, body: string): Promise<string | null> {
+    const parent = target.path.split("/").slice(0, -1).join("/");
+    const query = new URLSearchParams({ c: target.connectionId, name: target.name });
+    if (parent) query.set("p", parent);
+    try {
+        const response = await fetch(`/api/drive/upload?${query.toString()}`, {
+            method: "PUT",
+            body
+        });
+        if (response.ok) return null;
+        if (response.status === 403) return "Could not save - you may not have write access here.";
+        if (response.status === 423) return "This file is locked.";
+        return "Could not save this file.";
+    } catch {
+        return "Could not save this file.";
+    }
+}
+
+/**
+ * Read at most `limit` bytes from a response body and report whether more
+ * remained. The stream is cancelled once the cap is hit, so opening a huge file
+ * as text never pulls the whole thing into memory.
+ */
+async function readCapped(
+    response: Response,
+    limit: number
+): Promise<{ bytes: Uint8Array; truncated: boolean }> {
+    const reader = response.body?.getReader();
+    if (!reader) {
+        const all = new Uint8Array(await response.arrayBuffer());
+        return { bytes: all.subarray(0, limit), truncated: all.byteLength > limit };
+    }
+    const chunks: Uint8Array[] = [];
+    let received = 0;
+    while (received < limit) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        if (value?.byteLength) {
+            chunks.push(value);
+            received += value.byteLength;
+        }
+    }
+    // Stopped at the cap: one more read tells us whether the file continues.
+    let truncated = received > limit;
+    if (!truncated && received >= limit) {
+        const next = await reader.read();
+        truncated = Boolean(!next.done && next.value?.byteLength);
+    }
+    await reader.cancel().catch(() => undefined);
+    const merged = new Uint8Array(received);
+    let offset = 0;
+    for (const chunk of chunks) {
+        merged.set(chunk, offset);
+        offset += chunk.byteLength;
+    }
+    return { bytes: merged.subarray(0, limit), truncated };
+}
+
+/** A NUL byte in the leading bytes is a reliable "this is not text" signal. */
+function looksBinary(bytes: Uint8Array): boolean {
+    const span = Math.min(bytes.length, 8192);
+    for (let index = 0; index < span; index++) {
+        if (bytes[index] === 0) return true;
+    }
+    return false;
+}
+
+/** Byte-for-byte equality of two buffers. */
+function bytesEqual(a: Uint8Array, b: Uint8Array): boolean {
+    if (a.byteLength !== b.byteLength) return false;
+    for (let index = 0; index < a.byteLength; index++) {
+        if (a[index] !== b[index]) return false;
+    }
+    return true;
+}
+
+/**
+ * Whether `bytes` is clean UTF-8 that survives a decode/re-encode round-trip.
+ * A single-byte encoding (latin-1, windows-1252) has no NUL so it slips past
+ * looksBinary, but its undecodable bytes become U+FFFD on decode and would be
+ * rewritten on save - corrupting the original. Such files must stay read-only.
+ */
+function isCleanUtf8(bytes: Uint8Array, decoded: string): boolean {
+    return bytesEqual(new TextEncoder().encode(decoded), bytes);
+}
+
+/**
+ * Notepad-style viewer/editor for any file without a richer viewer. Reads the
+ * first 500 KB, shows it verbatim, and edits save back through the upload route
+ * (guarded by write access). Binary content or a truncated read stays read-only
+ * so a save can never corrupt or truncate the file.
+ */
+function PlainTextEditor({ src, target }: { src: string; target: ViewerTarget }) {
     const [text, setText] = useState<string | null>(null);
     const [error, setError] = useState(false);
+    const [binary, setBinary] = useState(false);
+    const [truncated, setTruncated] = useState(false);
+    const [lossy, setLossy] = useState(false);
+    const [editing, setEditing] = useState(false);
+    const [draft, setDraft] = useState("");
+    const [saving, setSaving] = useState(false);
+    const [saveError, setSaveError] = useState<string | null>(null);
 
     useEffect(() => {
         let alive = true;
         setText(null);
         setError(false);
-        fetch(src)
-            .then((response) => response.text())
-            .then((body) => alive && setText(body.slice(0, 500_000)))
-            .catch(() => alive && setError(true));
+        setEditing(false);
+        setSaveError(null);
+        void (async () => {
+            try {
+                const response = await fetch(src);
+                if (!response.ok) throw new Error("read failed");
+                const { bytes, truncated: cut } = await readCapped(response, TEXT_LIMIT);
+                if (!alive) return;
+                const decoded = new TextDecoder().decode(bytes);
+                setBinary(looksBinary(bytes));
+                setTruncated(cut);
+                // A cut read can slice a multibyte character, so only judge the
+                // encoding when the whole file was read.
+                setLossy(!cut && !isCleanUtf8(bytes, decoded));
+                setText(decoded);
+            } catch {
+                if (alive) setError(true);
+            }
+        })();
         return () => {
             alive = false;
         };
     }, [src]);
 
-    if (error) return <p className="p-8 text-center text-sm text-danger">This file could not be read.</p>;
+    async function save() {
+        if (draft === text) {
+            setEditing(false);
+            return;
+        }
+        setSaving(true);
+        setSaveError(null);
+        const message = await saveTextFile(target, draft);
+        if (message) {
+            setSaveError(message);
+            setSaving(false);
+            return;
+        }
+        setText(draft);
+        setEditing(false);
+        setSaving(false);
+    }
+
+    if (error)
+        return <p className="p-8 text-center text-sm text-danger">This file could not be read.</p>;
     if (text === null) return <Loading />;
-    return <pre className="overflow-auto p-4 text-xs leading-relaxed">{text}</pre>;
+
+    const editable = !binary && !truncated && !lossy;
+    const label = binary
+        ? "Binary file"
+        : truncated
+          ? "Preview only (large file)"
+          : lossy
+            ? "Preview only (unsupported encoding)"
+            : "Plain text";
+
+    return (
+        <div className="flex max-h-[80vh] flex-col">
+            <div className="flex items-center gap-2 border-b border-border px-3 py-2">
+                {editing ? (
+                    <>
+                        <span className="text-xs font-medium text-muted-foreground">Editing</span>
+                        <div className="ml-auto flex items-center gap-2">
+                            {saveError ? (
+                                <span className="text-xs text-danger">{saveError}</span>
+                            ) : null}
+                            <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => {
+                                    setEditing(false);
+                                    setSaveError(null);
+                                }}
+                                disabled={saving}
+                            >
+                                Cancel
+                            </Button>
+                            <Button size="sm" onClick={save} disabled={saving}>
+                                {saving ? "Saving..." : "Save"}
+                            </Button>
+                        </div>
+                    </>
+                ) : (
+                    <>
+                        <span className="text-xs font-medium text-muted-foreground">{label}</span>
+                        {editable ? (
+                            <Button
+                                size="sm"
+                                variant="ghost"
+                                className="ml-auto"
+                                onClick={() => {
+                                    setDraft(text);
+                                    setEditing(true);
+                                }}
+                            >
+                                <Pencil className="size-4" />
+                                Edit
+                            </Button>
+                        ) : null}
+                    </>
+                )}
+            </div>
+            <div className="min-h-0 flex-1 overflow-auto">
+                {editing ? (
+                    <textarea
+                        value={draft}
+                        onChange={(event) => setDraft(event.target.value)}
+                        spellCheck={false}
+                        className="h-full min-h-[50vh] w-full resize-none border-0 bg-transparent p-4 font-mono text-xs leading-relaxed outline-none"
+                    />
+                ) : (
+                    <pre className="overflow-auto p-4 text-xs leading-relaxed">{text}</pre>
+                )}
+            </div>
+        </div>
+    );
 }
 
 // Register the link-hardening hook once (module-scoped): every anchor opens in a
@@ -437,6 +659,9 @@ const MARKDOWN_PROSE = cn(
 function MarkdownView({ src, target }: { src: string; target: ViewerTarget }) {
     const [text, setText] = useState<string | null>(null);
     const [error, setError] = useState(false);
+    const [binary, setBinary] = useState(false);
+    const [truncated, setTruncated] = useState(false);
+    const [lossy, setLossy] = useState(false);
     const [mode, setMode] = useState<"pretty" | "raw">("pretty");
     const [html, setHtml] = useState("");
     const [editing, setEditing] = useState(false);
@@ -449,10 +674,24 @@ function MarkdownView({ src, target }: { src: string; target: ViewerTarget }) {
         setText(null);
         setError(false);
         setEditing(false);
-        fetch(src)
-            .then((response) => response.text())
-            .then((body) => alive && setText(body.slice(0, 500_000)))
-            .catch(() => alive && setError(true));
+        setSaveError(null);
+        void (async () => {
+            try {
+                const response = await fetch(src);
+                if (!response.ok) throw new Error("read failed");
+                const { bytes, truncated: cut } = await readCapped(response, TEXT_LIMIT);
+                if (!alive) return;
+                const decoded = new TextDecoder().decode(bytes);
+                setBinary(looksBinary(bytes));
+                setTruncated(cut);
+                // A cut read can slice a multibyte character, so only judge the
+                // encoding when the whole file was read.
+                setLossy(!cut && !isCleanUtf8(bytes, decoded));
+                setText(decoded);
+            } catch {
+                if (alive) setError(true);
+            }
+        })();
         return () => {
             alive = false;
         };
@@ -470,28 +709,36 @@ function MarkdownView({ src, target }: { src: string; target: ViewerTarget }) {
     }, [text, editing, mode]);
 
     async function save() {
+        if (draft === text) {
+            setEditing(false);
+            return;
+        }
         setSaving(true);
         setSaveError(null);
-        const parent = target.path.split("/").slice(0, -1).join("/");
-        const query = new URLSearchParams({ c: target.connectionId, name: target.name });
-        if (parent) query.set("p", parent);
-        try {
-            const response = await fetch(`/api/drive/upload?${query.toString()}`, { method: "PUT", body: draft });
-            if (!response.ok) {
-                setSaveError("Could not save - you may not have write access here.");
-                setSaving(false);
-                return;
-            }
-            setText(draft);
-            setEditing(false);
-        } catch {
-            setSaveError("Could not save this file.");
+        const message = await saveTextFile(target, draft);
+        if (message) {
+            setSaveError(message);
+            setSaving(false);
+            return;
         }
+        setText(draft);
+        setEditing(false);
         setSaving(false);
     }
 
-    if (error) return <p className="p-8 text-center text-sm text-danger">This file could not be read.</p>;
+    if (error)
+        return <p className="p-8 text-center text-sm text-danger">This file could not be read.</p>;
     if (text === null) return <Loading />;
+
+    // Same guard as the plain-text editor: a truncated read, a lossy/non-UTF-8
+    // decode, or binary content stays read-only so a save can never corrupt or
+    // truncate the file. Viewing (pretty/raw) still works either way.
+    const editable = !binary && !truncated && !lossy;
+    const notEditableLabel = binary
+        ? "Binary file"
+        : truncated
+          ? "Preview only (large file)"
+          : "Preview only (unsupported encoding)";
 
     return (
         <div className="flex max-h-[80vh] flex-col">
@@ -500,7 +747,9 @@ function MarkdownView({ src, target }: { src: string; target: ViewerTarget }) {
                     <>
                         <span className="text-xs font-medium text-muted-foreground">Editing</span>
                         <div className="ml-auto flex items-center gap-2">
-                            {saveError ? <span className="text-xs text-danger">{saveError}</span> : null}
+                            {saveError ? (
+                                <span className="text-xs text-danger">{saveError}</span>
+                            ) : null}
                             <Button
                                 size="sm"
                                 variant="ghost"
@@ -525,7 +774,9 @@ function MarkdownView({ src, target }: { src: string; target: ViewerTarget }) {
                                 onClick={() => setMode("pretty")}
                                 className={cn(
                                     "rounded px-2 py-1 text-xs transition-colors hover:bg-muted",
-                                    mode === "pretty" ? "bg-muted font-medium" : "text-muted-foreground"
+                                    mode === "pretty"
+                                        ? "bg-muted font-medium"
+                                        : "text-muted-foreground"
                                 )}
                             >
                                 Pretty
@@ -535,24 +786,32 @@ function MarkdownView({ src, target }: { src: string; target: ViewerTarget }) {
                                 onClick={() => setMode("raw")}
                                 className={cn(
                                     "rounded px-2 py-1 text-xs transition-colors hover:bg-muted",
-                                    mode === "raw" ? "bg-muted font-medium" : "text-muted-foreground"
+                                    mode === "raw"
+                                        ? "bg-muted font-medium"
+                                        : "text-muted-foreground"
                                 )}
                             >
                                 Raw
                             </button>
                         </div>
-                        <Button
-                            size="sm"
-                            variant="ghost"
-                            className="ml-auto"
-                            onClick={() => {
-                                setDraft(text);
-                                setEditing(true);
-                            }}
-                        >
-                            <Pencil className="size-4" />
-                            Edit
-                        </Button>
+                        {editable ? (
+                            <Button
+                                size="sm"
+                                variant="ghost"
+                                className="ml-auto"
+                                onClick={() => {
+                                    setDraft(text);
+                                    setEditing(true);
+                                }}
+                            >
+                                <Pencil className="size-4" />
+                                Edit
+                            </Button>
+                        ) : (
+                            <span className="ml-auto text-xs text-muted-foreground">
+                                {notEditableLabel}
+                            </span>
+                        )}
                     </>
                 )}
             </div>

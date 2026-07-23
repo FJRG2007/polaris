@@ -3,7 +3,13 @@ import { ipAllowed, ipInCidr } from "../src/cidr.js";
 import { normalizeRelPath, UnsafePathError, extName, joinUnderRoot } from "../src/paths.js";
 import { generateToken, hashToken, tokenMatchesHash } from "../src/tokens.js";
 import { hasPermission, mergeRolePermissions, DEFAULT_ROLES } from "../src/permissions.js";
-import { checkUploadCandidate } from "../src/schemas/file-request.js";
+import {
+    checkUploadCandidate,
+    createFileRequestSchema,
+    userAllowedForRequest,
+    uploaderDeleteAllowed,
+    randomDropPointName
+} from "../src/schemas/file-request.js";
 import {
     evaluateStatements,
     matchesGlob,
@@ -101,12 +107,91 @@ describe("authz engine", () => {
 });
 
 describe("upload constraints", () => {
-    const constraints = { allowedExtensions: ["png", "jpg"], allowedMimeTypes: ["image/png"], maxSizeBytes: 100 };
+    const constraints = {
+        allowedExtensions: ["png", "jpg"],
+        deniedExtensions: [],
+        allowedMimeTypes: ["image/png"],
+        maxSizeBytes: 100
+    };
 
     it("passes an allowed file and rejects by size, extension, and mime", () => {
         expect(checkUploadCandidate({ extension: "png", mimeType: "image/png", size: 50 }, constraints).ok).toBe(true);
         expect(checkUploadCandidate({ extension: "png", mimeType: "image/png", size: 200 }, constraints).reason).toBe("size");
         expect(checkUploadCandidate({ extension: "exe", mimeType: "image/png", size: 10 }, constraints).reason).toBe("extension");
         expect(checkUploadCandidate({ extension: "jpg", mimeType: "image/gif", size: 10 }, constraints).reason).toBe("mime");
+    });
+
+    it("rejects a file under the minimum size", () => {
+        const withMin = { ...constraints, minSizeBytes: 20 };
+        expect(checkUploadCandidate({ extension: "png", mimeType: "image/png", size: 10 }, withMin).reason).toBe("too_small");
+        expect(checkUploadCandidate({ extension: "png", mimeType: "image/png", size: 20 }, withMin).ok).toBe(true);
+    });
+
+    it("blocks a denied extension even when it is also allowlisted", () => {
+        const denied = { ...constraints, allowedExtensions: ["png", "svg"], deniedExtensions: ["svg"] };
+        expect(checkUploadCandidate({ extension: "svg", mimeType: "image/png", size: 10 }, denied).reason).toBe("denied");
+        expect(checkUploadCandidate({ extension: "png", mimeType: "image/png", size: 10 }, denied).ok).toBe(true);
+    });
+});
+
+describe("drop-point create schema", () => {
+    const base = { destinationConnectionId: "conn-1", destinationPath: "inbox" };
+
+    it("accepts a blank title and normalizes extension lists", () => {
+        const parsed = createFileRequestSchema.parse({
+            ...base,
+            allowedExtensions: ["PNG", "png", "Jpg"],
+            deniedExtensions: ["EXE"],
+            allowedUsers: ["@Alice", "alice", "bob@example.com"]
+        });
+        expect(parsed.title).toBeUndefined();
+        expect(parsed.allowedExtensions).toEqual(["png", "jpg"]);
+        expect(parsed.deniedExtensions).toEqual(["exe"]);
+        expect(parsed.allowedUsers).toEqual(["alice", "bob@example.com"]);
+    });
+
+    it("rejects a minimum size larger than the maximum", () => {
+        const result = createFileRequestSchema.safeParse({ ...base, minSizeBytes: 500, maxSizeBytes: 100 });
+        expect(result.success).toBe(false);
+        expect(result.error?.issues[0]?.path).toEqual(["minSizeBytes"]);
+    });
+
+    it("rejects a start time that is not before the expiry time", () => {
+        const result = createFileRequestSchema.safeParse({
+            ...base,
+            startsAt: "2026-02-01T00:00:00Z",
+            expiresAt: "2026-01-01T00:00:00Z"
+        });
+        expect(result.success).toBe(false);
+        expect(result.error?.issues[0]?.path).toEqual(["startsAt"]);
+    });
+});
+
+describe("per-user allowlist", () => {
+    it("allows anyone when empty, and matches email or username case-insensitively", () => {
+        expect(userAllowedForRequest({ email: "x@y.com" }, [])).toBe(true);
+        expect(userAllowedForRequest({ email: "Alice@Example.com", username: null }, ["alice@example.com"])).toBe(true);
+        expect(userAllowedForRequest({ email: null, username: "Bob" }, ["@bob"])).toBe(true);
+        expect(userAllowedForRequest({ email: "eve@evil.com", username: "eve" }, ["alice", "bob"])).toBe(false);
+    });
+});
+
+describe("uploader self-delete policy", () => {
+    const uploadedAt = new Date("2026-01-01T00:00:00Z");
+
+    it("blocks when deletes are disabled and honors the time window", () => {
+        expect(uploaderDeleteAllowed({ allow: false, windowSeconds: null, uploadedAt })).toBe(false);
+        expect(uploaderDeleteAllowed({ allow: true, windowSeconds: null, uploadedAt })).toBe(true);
+        const within = new Date("2026-01-01T00:00:30Z");
+        const after = new Date("2026-01-01T00:02:00Z");
+        expect(uploaderDeleteAllowed({ allow: true, windowSeconds: 60, uploadedAt, now: within })).toBe(true);
+        expect(uploaderDeleteAllowed({ allow: true, windowSeconds: 60, uploadedAt, now: after })).toBe(false);
+    });
+});
+
+describe("random drop-point name", () => {
+    it("builds a readable capitalized name with a two-digit suffix", () => {
+        expect(randomDropPointName(() => 0)).toBe("Swift Harbor 10");
+        expect(randomDropPointName(() => 0.999999)).toMatch(/^[A-Z][a-z]+ [A-Z][a-z]+ 99$/);
     });
 });
