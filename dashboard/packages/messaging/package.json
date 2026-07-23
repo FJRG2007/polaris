@@ -1,0 +1,23 @@
+{
+    "name": "@polaris/messaging",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "description": "Shared messaging contracts: normalized message model, channel-adapter interface, per-platform capability matrix, and the bridge API schemas.",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        }
+    },
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "scripts": {
+        "build": "tsup src/index.ts --format esm --dts --clean",
+        "typecheck": "tsc --noEmit",
+        "test": "vitest run --passWithNoTests"
+    },
+    "dependencies": {
+        "zod": "3.24.1"
+    }
+}
