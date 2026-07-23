@@ -1108,6 +1108,15 @@ model Domain {
     certResolver  String   @default("le")
     pathPrefix    String?
     createdAt     DateTime @default(now())
+    // Reachability, set by the health probe: up | down | unknown. So a free
+    // subdomain that resolves but does not actually serve is flagged, not shown
+    // as if it works.
+    healthStatus  String   @default("unknown")
+    healthCheckedAt DateTime?
+    // Last observed HTTP status and round-trip, and a short reason when down.
+    healthCode    Int?
+    healthLatencyMs Int?
+    healthDetail  String?
 
     application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
 
@@ -1251,4 +1260,61 @@ model MetricRollup {
 
     @@id([subjectType, subjectId, bucket])
     @@index([bucket])
+}
+
+// ---------------------------------------------------------------------------
+// Watch (monitoring and alerting)
+// ---------------------------------------------------------------------------
+
+// A CloudWatch-style alarm: a condition over a target's metric or reachability
+// that fires events (and notifications) on state transitions. owner/target are
+// bare uuids (no FK), so an alarm can watch any subject without coupling.
+model Alarm {
+    id              String    @id @default(uuid(7)) @db.Uuid
+    ownerId         String    @db.Uuid
+    name            String
+    // application | domain | host
+    targetType      String
+    targetId        String    @db.Uuid
+    // cpu | memory | http | service - http/service are reachability (no threshold).
+    metric          String
+    // gt | lt, for threshold metrics.
+    operator        String    @default("gt")
+    // Threshold as a percent for cpu/memory; null for reachability alarms.
+    threshold       Float?
+    // Consecutive breaching evaluations before firing, to ride out blips.
+    forPeriods      Int       @default(2)
+    enabled         Boolean   @default(true)
+    // ok | alarm | insufficient
+    state           String    @default("insufficient")
+    // Breaches counted so far toward forPeriods.
+    breachStreak    Int       @default(0)
+    lastEvaluatedAt DateTime?
+    // Optional messaging channel + peer to also notify when the alarm fires.
+    notifyChannelId String?   @db.Uuid
+    notifyPeerId    String?
+    createdAt       DateTime  @default(now())
+    updatedAt       DateTime  @updatedAt
+
+    events AlarmEvent[]
+
+    @@index([ownerId])
+    @@index([enabled])
+    @@index([targetType, targetId])
+}
+
+// A state transition of an alarm - the event log Watch generates (fired/cleared).
+model AlarmEvent {
+    id        String   @id @default(uuid(7)) @db.Uuid
+    alarmId   String   @db.Uuid
+    // triggered | resolved
+    kind      String
+    // The value that caused it (percent) for a metric alarm.
+    value     Float?
+    detail    String?
+    createdAt DateTime @default(now())
+
+    alarm Alarm @relation(fields: [alarmId], references: [id], onDelete: Cascade)
+
+    @@index([alarmId, createdAt])
 }
