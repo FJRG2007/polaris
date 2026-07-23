@@ -79,6 +79,59 @@ export async function resolveWaf(applicationId: string): Promise<ResolvedWaf> {
     return mergeRules(rows);
 }
 
+/**
+ * Resolve the effective WAF decision for many applications at once, in two queries
+ * total (apps + rules) rather than the per-app pair resolveWaf runs. Callers that
+ * materialize every route (syncAppRoutes) use this to avoid a serial 2N round-trip
+ * on instances with many domains. Every id in the input maps to a decision - an
+ * unknown id gets the empty decision, so lookups never miss.
+ */
+export async function resolveWafBatch(applicationIds: readonly string[]): Promise<Map<string, ResolvedWaf>> {
+    const ids = [...new Set(applicationIds)];
+    const result = new Map<string, ResolvedWaf>(ids.map((id): [string, ResolvedWaf] => [id, EMPTY_WAF]));
+    if (ids.length === 0) return result;
+    const apps = await prisma.application.findMany({
+        where: { id: { in: ids } },
+        select: { id: true, environmentId: true, environment: { select: { projectId: true } } }
+    });
+    const projectIds = new Set<string>();
+    const environmentIds = new Set<string>();
+    for (const app of apps) {
+        environmentIds.add(app.environmentId);
+        projectIds.add(app.environment.projectId);
+    }
+    const rows = await prisma.wafRule.findMany({
+        where: {
+            OR: [
+                { scopeType: "global", scopeId: "" },
+                { scopeType: "project", scopeId: { in: [...projectIds] } },
+                { scopeType: "environment", scopeId: { in: [...environmentIds] } },
+                { scopeType: "application", scopeId: { in: ids } }
+            ]
+        },
+        select: { scopeType: true, scopeId: true, ipAllowlist: true, ipDenylist: true, requireLogin: true }
+    });
+    const globalRows = rows.filter((row) => row.scopeType === "global");
+    const byScope = new Map<string, RuleRow[]>();
+    for (const row of rows) {
+        if (row.scopeType === "global") continue;
+        const key = `${row.scopeType}:${row.scopeId}`;
+        const list = byScope.get(key);
+        if (list) list.push(row);
+        else byScope.set(key, [row]);
+    }
+    for (const app of apps) {
+        const applicable = [
+            ...globalRows,
+            ...(byScope.get(`project:${app.environment.projectId}`) ?? []),
+            ...(byScope.get(`environment:${app.environmentId}`) ?? []),
+            ...(byScope.get(`application:${app.id}`) ?? [])
+        ];
+        result.set(app.id, applicable.length === 0 ? EMPTY_WAF : mergeRules(applicable));
+    }
+    return result;
+}
+
 /** The stored WAF rule for one scope, as the editor consumes it. */
 export interface WafRuleView {
     readonly ipAllowlist: string[];
@@ -88,8 +141,9 @@ export interface WafRuleView {
 
 /**
  * Verify the caller owns the scope, so a rule is only readable/writable by the
- * owner of the underlying project/service. Global scope carries no owner - the
- * server action gates it on the `deploy.manage` permission - so it always passes.
+ * owner of the underlying project/service. Global scope carries no owner - it is an
+ * instance-wide operator control the server action gates on `system.manage` (not the
+ * member-held `deploy.manage`) - so ownership always passes here.
  */
 async function assertScopeOwner(ownerId: string, scopeType: WafScopeType, scopeId: string): Promise<void> {
     if (scopeType === "global") return;

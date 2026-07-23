@@ -57,6 +57,11 @@ describe("edge token", () => {
         expect(verifyEdgeToken(undefined, SECRET, NOW)).toBeNull();
         expect(verifyEdgeToken("no-dot", SECRET, NOW)).toBeNull();
     });
+
+    it("rejects any token when the secret is empty (an empty HMAC key is forgeable)", () => {
+        const token = signEdgeToken({ sub: "u1", aud: HOST, exp: NOW + 60 }, "");
+        expect(verifyEdgeToken(token, "", NOW, HOST)).toBeNull();
+    });
 });
 
 describe("wafRuleInputSchema", () => {

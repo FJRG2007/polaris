@@ -842,6 +842,10 @@ export async function getWafRuleAction(input: {
     scopeId: string;
 }): Promise<{ rule?: WafRuleView; error?: string }> {
     const user = await requirePermission("deploy.manage");
+    // The global rule is instance-wide and applies to every owner's services, so it
+    // is an operator control - deploy.manage alone (which the default member holds)
+    // must not read or write it, only system.manage / admin.
+    if (input.scopeType === "global") await requirePermission("system.manage");
     try {
         return { rule: await getWafRule(user.id, input.scopeType, input.scopeId) };
     } catch (caught) {
@@ -857,6 +861,7 @@ export async function setWafRuleAction(input: {
     requireLogin: boolean;
 }): Promise<{ error?: string }> {
     const user = await requirePermission("deploy.manage");
+    if (input.scopeType === "global") await requirePermission("system.manage");
     try {
         const { scopeType, scopeId, ...rule } = input;
         await setWafRule(user.id, scopeType, scopeId, rule);

@@ -29,10 +29,12 @@ export interface ProjectCardData {
 export function ProjectsGrid({
     projects,
     canManage,
+    canManageGlobal,
     localReady
 }: {
     projects: ProjectCardData[];
     canManage: boolean;
+    canManageGlobal: boolean;
     localReady: boolean;
 }) {
     const [layout, setLayout] = useState<"grid" | "list">("grid");
@@ -48,9 +50,11 @@ export function ProjectsGrid({
                 <h1 className="text-2xl font-semibold">Projects</h1>
                 {canManage && (
                     <div className="flex items-center gap-2">
-                        <Button variant="ghost" size="icon" title="Global firewall rules" onClick={() => setShowFirewall(true)}>
-                            <ShieldCheck className="size-4" />
-                        </Button>
+                        {canManageGlobal && (
+                            <Button variant="ghost" size="icon" title="Global firewall rules" onClick={() => setShowFirewall(true)}>
+                                <ShieldCheck className="size-4" />
+                            </Button>
+                        )}
                         <RegistryCredentialsButton />
                         <CreateProjectButton />
                     </div>

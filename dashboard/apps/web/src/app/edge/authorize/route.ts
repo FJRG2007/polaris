@@ -11,6 +11,7 @@
 
 import { loadEnv } from "@polaris/config";
 import { signEdgeToken } from "@polaris/core/waf";
+import { isManagedDeployHost } from "@/lib/deploy-service";
 import { getSession } from "@/lib/session";
 
 export const runtime = "nodejs";
@@ -23,8 +24,9 @@ const EDGE_TOKEN_TTL_SECONDS = 8 * 60 * 60;
 export async function GET(request: Request): Promise<Response> {
     const url = new URL(request.url);
     const target = url.searchParams.get("redirect");
-    // The target must be an absolute http(s) app URL; reject anything else so this
-    // endpoint can never be turned into an open redirector or token oracle.
+    // The target must be an absolute http(s) URL for a host this instance actually
+    // routes; reject anything else so this endpoint can never be turned into an open
+    // redirector or a token oracle that leaks a signed token to an arbitrary site.
     let appOrigin: URL;
     try {
         appOrigin = new URL(target ?? "");
@@ -32,6 +34,9 @@ export async function GET(request: Request): Promise<Response> {
             throw new Error("unsupported scheme");
         }
     } catch {
+        return new Response("Invalid redirect", { status: 400 });
+    }
+    if (!(await isManagedDeployHost(appOrigin.host))) {
         return new Response("Invalid redirect", { status: 400 });
     }
 

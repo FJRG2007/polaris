@@ -72,7 +72,9 @@ export function signEdgeToken(token: EdgeToken, secret: string): string {
  * Verify an edge token constant-time, check its expiry against `now` (unix seconds),
  * and (when `audience` is given) that its `aud` matches the requesting host. Returns
  * the token on success, or null if it is missing, malformed, tampered, expired, or
- * bound to a different host. Never throws.
+ * bound to a different host. An empty secret is rejected outright - an empty HMAC key
+ * makes the MAC publicly computable, so any token would forge, so a guard with no
+ * secret configured must trust nothing and fail closed. Never throws.
  */
 export function verifyEdgeToken(
     value: string | undefined | null,
@@ -80,7 +82,7 @@ export function verifyEdgeToken(
     now: number,
     audience?: string
 ): EdgeToken | null {
-    if (!value) return null;
+    if (!value || !secret) return null;
     const dot = value.indexOf(".");
     if (dot <= 0 || dot === value.length - 1) return null;
     const payload = value.slice(0, dot);

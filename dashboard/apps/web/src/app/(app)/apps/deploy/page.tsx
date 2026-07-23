@@ -12,6 +12,7 @@ const ONLINE_DB_STATES = new Set(["running", "active", "healthy", "ready"]);
 export default async function DeployPage() {
     const user = await requirePermission("deploy.read");
     const canManage = await userHasManage(user, "deploy.manage");
+    const canManageGlobal = await userHasManage(user, "system.manage");
 
     // Seed the local target so the first deploy needs no server setup, and report
     // whether the local host can actually build/deploy (full edition + daemon).
@@ -41,5 +42,12 @@ export default async function DeployPage() {
         };
     });
 
-    return <ProjectsGrid projects={cards} canManage={canManage} localReady={localReady} />;
+    return (
+        <ProjectsGrid
+            projects={cards}
+            canManage={canManage}
+            canManageGlobal={canManageGlobal}
+            localReady={localReady}
+        />
+    );
 }
