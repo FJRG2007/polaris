@@ -21,8 +21,21 @@ document is the source of truth; keep it current as phases land.
   To run live, set MESSAGING_BRIDGE_URL, MESSAGING_BRIDGE_TOKEN,
   MESSAGING_INGEST_KEY on the web and BRIDGE_TOKEN, WEB_INGEST_URL,
   WEB_INGEST_KEY on the bridge, and connect a Telegram bot token.
-- Phases 2-4 - PENDING (see plan below); each needs operator credentials to
-  verify.
+- Phase 2 - DONE (2e759e2, ab478fb): WhatsApp Cloud API (native buttons/lists,
+  signed Meta webhook) and WhatsApp Web (whatsapp-web.js + Puppeteer, QR login,
+  session on a volume, Poll selector). Operator picks the provider per channel.
+- Phase 3 - DONE (d796002): Discord (discord.js gateway, native buttons) and
+  Slack (Web API + Block Kit, signed Events webhook).
+- Phase 4 - PARTIAL (e119cfe): conversation assignment to a human agent + status
+  (multi-agent support) is done. The AI-assistant auto-reply loop (OpenClaw/
+  Hermes runtime + an LLM) is the remaining external piece - the substrate is
+  ready (assistantId field + the bridge send/receive API any assistant reuses).
+
+To verify each channel live: Telegram bot token; WhatsApp Cloud (Meta app +
+phone-number id + MESSAGING_WA_VERIFY_TOKEN/APP_SECRET + webhook); WhatsApp Web
+(scan a QR); Discord bot token; Slack bot token + MESSAGING_SLACK_SIGNING_SECRET
++ Events webhook. All channels also need the bridge running (MESSAGING_BRIDGE_URL/
+TOKEN, MESSAGING_INGEST_KEY) and the migrations applied.
 
 ## Known follow-ups (deferred, not silently dropped)
 
