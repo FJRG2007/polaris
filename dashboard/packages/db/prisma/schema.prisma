@@ -771,6 +771,46 @@ model FileScan {
     @@index([sha256])
 }
 
+// An installed marketplace app. The catalog of apps lives in code
+// (lib/apps/catalog.ts); this table records each install: which manifest, the
+// server it runs on, and the Deploy Application backing a compose-template
+// install. Following the Integration precedent, owner/target/application are
+// stored as bare uuids (no FK), so installs never couple the shared User /
+// DeployTarget / Application models; lifecycle cleanup is done in app code.
+// Secret material is envelope-encrypted with the same AES-256-GCM master key as
+// storage credentials and integrations.
+model InstalledApp {
+    id              String   @id @default(uuid(7)) @db.Uuid
+    // Catalog manifest id, e.g. "minecraft". Not unique - several instances of
+    // the same app may be installed; `singleton` apps are enforced in code.
+    catalogId       String
+    // Owner who installed it.
+    ownerId         String   @db.Uuid
+    // Human instance name, e.g. "Survival server".
+    name            String
+    // DeployTarget the app runs on; null for `builtin` apps with no container.
+    targetId        String?  @db.Uuid
+    // The Deploy Application backing a `compose-template` install; null until the
+    // stack is created, or for non-container apps.
+    applicationId   String?  @db.Uuid
+    // Non-secret config as a stringified JSON object (SQLite-portable).
+    config          String   @default("{}")
+    // Envelope-encrypted secret (e.g. an app token); null until configured.
+    encryptedSecret Bytes?
+    secretNonce     Bytes?
+    secretKeyId     String?
+    // installing | running | stopped | failed | removed
+    status          String   @default("installing")
+    installedById   String?  @db.Uuid
+    createdAt       DateTime @default(now())
+    updatedAt       DateTime @updatedAt
+
+    @@index([ownerId])
+    @@index([catalogId])
+    @@index([targetId])
+    @@index([applicationId])
+}
+
 // ---------------------------------------------------------------------------
 // Deploy (Railway-style app/database orchestration)
 // ---------------------------------------------------------------------------
