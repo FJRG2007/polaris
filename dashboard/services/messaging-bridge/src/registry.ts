@@ -67,6 +67,14 @@ export class AdapterRegistry {
         await adapter.disconnect();
     }
 
+    /** Tear down every live adapter. Used on graceful shutdown so heavy adapters
+     *  (whatsapp-web's Chromium) close cleanly and flush their session, instead of
+     *  being killed mid-write - which would force a QR re-scan on the next start. */
+    async disconnectAll(): Promise<void> {
+        const ids = [...this.adapters.keys()];
+        await Promise.all(ids.map((id) => this.disconnect(id)));
+    }
+
     get(channelId: string): ChannelAdapter | undefined {
         return this.adapters.get(channelId);
     }

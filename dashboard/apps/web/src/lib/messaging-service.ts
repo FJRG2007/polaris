@@ -8,7 +8,7 @@
 
 import { loadEnv } from "@polaris/config";
 import { prisma } from "@polaris/db";
-import { encryptSecret } from "@polaris/storage";
+import { decryptSecret, encryptSecret } from "@polaris/storage";
 import { capabilitiesFor } from "@polaris/messaging";
 import type { ChannelCapabilities, InteractivePrompt, InboundEvent, Platform } from "@polaris/messaging";
 import { bridgeChannelState, bridgeConnectChannel, bridgeDisconnectChannel, bridgeSend } from "./messaging/bridge-client";
@@ -454,4 +454,63 @@ export async function channelState(ownerId: string, channelId: string): Promise<
         await prisma.channel.update({ where: { id: channelId }, data: { status: state.status } });
     }
     return { status: state.status, qr: state.qr, externalId: state.externalId };
+}
+
+/** Re-establish live adapters in the bridge for channels the DB considers up. The
+ *  bridge holds adapters in memory, so a bridge (or web) restart leaves a channel
+ *  "connected" in the DB but dead at the bridge; this reconnects any whose bridge
+ *  state is missing. whatsapp-web restores from its LocalAuth session without a new
+ *  QR when the session is still valid. Best-effort and idempotent - channels the
+ *  bridge already runs are left alone, so it never churns a healthy adapter. */
+export async function reconcileChannels(): Promise<void> {
+    const env = loadEnv();
+    const channels = await prisma.channel.findMany({ where: { status: { in: ["connected", "connecting"] } } });
+    for (const channel of channels) {
+        try {
+            const state = await bridgeChannelState(channel.id);
+            if (state.status === "connected" || state.status === "qr" || state.status === "connecting") continue;
+        } catch {
+            // Bridge has no adapter (404) or is unreachable; fall through and retry.
+        }
+        try {
+            const token =
+                channel.encryptedSecret && channel.secretNonce && channel.secretKeyId
+                    ? decryptSecret(
+                          {
+                              ciphertext: Buffer.from(channel.encryptedSecret),
+                              nonce: Buffer.from(channel.secretNonce),
+                              keyId: channel.secretKeyId
+                          },
+                          env.POLARIS_MASTER_KEY
+                      )
+                    : undefined;
+            let providerConfig: Record<string, string> | undefined;
+            try {
+                providerConfig = (JSON.parse(channel.config) as { providerConfig?: Record<string, string> }).providerConfig;
+            } catch {
+                providerConfig = undefined;
+            }
+            await bridgeConnectChannel({
+                channelId: channel.id,
+                platform: channel.platform as Platform,
+                provider: channel.provider ?? undefined,
+                token,
+                config: providerConfig
+            });
+        } catch (caught) {
+            console.error(
+                `reconcileChannels: could not re-establish ${channel.id}:`,
+                caught instanceof Error ? caught.message : caught
+            );
+        }
+    }
+}
+
+/** Run channel reconcile at startup and on an interval, so channels self-heal
+ *  after a bridge or web restart without any manual reconnection. */
+export function startChannelReconcile(): void {
+    const tick = () =>
+        void reconcileChannels().catch((error) => console.error("polaris: channel reconcile failed:", error));
+    tick();
+    setInterval(tick, 60_000);
 }

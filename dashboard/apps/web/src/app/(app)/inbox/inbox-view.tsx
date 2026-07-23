@@ -207,6 +207,8 @@ export function InboxView({
 
 function ChannelChip({ channel, onRemoved }: { channel: ChannelView; onRemoved: (id: string) => void }) {
     const [pending, startTransition] = useTransition();
+    const [confirming, setConfirming] = useState(false);
+    const [error, setError] = useState<string | null>(null);
     const tone =
         channel.status === "connected"
             ? "border-success/40 text-success"
@@ -214,24 +216,58 @@ function ChannelChip({ channel, onRemoved }: { channel: ChannelView; onRemoved: 
               ? "border-danger/40 text-danger"
               : undefined;
     return (
-        <span className="flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs">
-            <span className="font-medium">{channel.name}</span>
-            <Badge className={cn(tone)}>{channel.status}</Badge>
-            <button
-                type="button"
-                aria-label="Remove channel"
-                className="text-muted-foreground hover:text-danger disabled:opacity-50"
-                disabled={pending}
-                onClick={() =>
-                    startTransition(async () => {
-                        const result = await deleteChannelAction(channel.id);
-                        if (!result.error) onRemoved(channel.id);
-                    })
-                }
-            >
-                <Trash2 className="size-3.5" />
-            </button>
-        </span>
+        <>
+            <span className="flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs">
+                <span className="font-medium">{channel.name}</span>
+                <Badge className={cn(tone)}>{channel.status}</Badge>
+                <button
+                    type="button"
+                    aria-label="Remove channel"
+                    className="text-muted-foreground hover:text-danger disabled:opacity-50"
+                    disabled={pending}
+                    onClick={() => {
+                        setError(null);
+                        setConfirming(true);
+                    }}
+                >
+                    <Trash2 className="size-3.5" />
+                </button>
+            </span>
+            <Dialog open={confirming} onOpenChange={(open) => !pending && setConfirming(open)}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Remove {channel.name}?</DialogTitle>
+                        <DialogDescription>
+                            This disconnects the channel and deletes its conversations and messages. It cannot be undone.
+                        </DialogDescription>
+                    </DialogHeader>
+                    {error && <p className="text-sm text-danger">{error}</p>}
+                    <div className="flex justify-end gap-2">
+                        <Button variant="ghost" onClick={() => setConfirming(false)} disabled={pending}>
+                            Cancel
+                        </Button>
+                        <Button
+                            variant="danger"
+                            disabled={pending}
+                            onClick={() =>
+                                startTransition(async () => {
+                                    const result = await deleteChannelAction(channel.id);
+                                    if (result.error) {
+                                        setError(result.error);
+                                        return;
+                                    }
+                                    setConfirming(false);
+                                    onRemoved(channel.id);
+                                })
+                            }
+                        >
+                            {pending && <Loader2 className="size-4 animate-spin" />}
+                            Remove
+                        </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
+        </>
     );
 }
 
