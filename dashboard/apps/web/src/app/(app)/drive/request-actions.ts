@@ -13,7 +13,7 @@ import { z } from "zod";
 import { loadEnv } from "@polaris/config";
 import { sharingBaseUrl } from "@/lib/domain-service";
 import { ensureShareReachability } from "@/lib/public-reach";
-import { createFileRequestSchema, normalizeRelPath, randomDropPointName } from "@polaris/core";
+import { cidrOrIp, createFileRequestSchema, normalizeRelPath, randomDropPointName } from "@polaris/core";
 import type { StorageDriver } from "@polaris/storage";
 import { requirePermission } from "@/lib/session";
 import { authorizeDrive, DriveAccessError, DriveLockedError } from "@/lib/drive-authz";
@@ -167,7 +167,7 @@ const updateDropPointSchema = z.object({
     allowedExtensions: z.array(z.string().trim().toLowerCase()).optional(),
     deniedExtensions: z.array(z.string().trim().toLowerCase()).optional(),
     allowedMimeTypes: z.array(z.string().trim()).optional(),
-    allowedCidrs: z.array(z.string().trim().min(1)).optional(),
+    allowedCidrs: z.array(cidrOrIp).optional(),
     allowedCountries: z
         .array(
             z
@@ -177,7 +177,15 @@ const updateDropPointSchema = z.object({
                 .regex(/^[A-Z]{2}$/)
         )
         .optional(),
-    allowedContinents: z.array(z.string().trim().toUpperCase()).optional(),
+    allowedContinents: z
+        .array(
+            z
+                .string()
+                .trim()
+                .toUpperCase()
+                .regex(/^[A-Z]{2}$/)
+        )
+        .optional(),
     allowedUsers: z
         .array(z.string().trim().toLowerCase())
         .transform((values) =>
@@ -329,9 +337,9 @@ const templateConfigSchema = z
         maxFiles: z.number().int().positive().optional(),
         requireLogin: z.boolean().optional(),
         allowedUsers: z.array(z.string()).optional(),
-        allowedCidrs: z.array(z.string()).optional(),
-        allowedCountries: z.array(z.string()).optional(),
-        allowedContinents: z.array(z.string()).optional(),
+        allowedCidrs: z.array(cidrOrIp).optional(),
+        allowedCountries: z.array(z.string().trim().toUpperCase().regex(/^[A-Z]{2}$/)).optional(),
+        allowedContinents: z.array(z.string().trim().toUpperCase().regex(/^[A-Z]{2}$/)).optional(),
         allowUploaderDelete: z.boolean().optional(),
         uploaderDeleteWindowSeconds: z.number().int().nonnegative().nullable().optional()
     })

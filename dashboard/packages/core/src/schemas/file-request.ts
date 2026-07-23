@@ -12,7 +12,11 @@ import { isCidr, isIpAddress } from "../cidr.js";
 /** One gibibyte, the default per-upload ceiling. */
 const DEFAULT_MAX_SIZE = 1024 * 1024 * 1024;
 
-const cidrOrIp = z
+/** An IP address or CIDR range. Shared by every drop-point schema (create,
+ *  update, and templates) so an allowlist entry is validated the same way
+ *  everywhere - a malformed rule that slips through fails closed and locks out
+ *  every uploader, so all three paths must reject it at save time. */
+export const cidrOrIp = z
     .string()
     .trim()
     .refine((value) => isCidr(value) || isIpAddress(value), {

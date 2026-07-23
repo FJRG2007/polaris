@@ -192,9 +192,25 @@ export function DropPointDetail({
             }))
         )
             return;
+        // Optimistically remove, remembering the row's place so a failed delete
+        // can restore it exactly where it was instead of leaving a false "gone".
+        const index = files.findIndex((item) => item.id === row.id);
         setFiles((prev) => prev.filter((item) => item.id !== row.id));
         startTransition(async () => {
-            await deleteSubmissionAction(config.id, row.id);
+            const result = await deleteSubmissionAction(config.id, row.id);
+            if (result?.error) {
+                setFiles((prev) => {
+                    if (prev.some((item) => item.id === row.id)) return prev;
+                    const next = [...prev];
+                    next.splice(index < 0 ? next.length : index, 0, row);
+                    return next;
+                });
+                await confirm({
+                    title: "Couldn't delete file",
+                    description: result.error,
+                    alert: true
+                });
+            }
         });
     }
 

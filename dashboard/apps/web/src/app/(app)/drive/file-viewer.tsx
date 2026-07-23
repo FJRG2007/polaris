@@ -659,6 +659,9 @@ const MARKDOWN_PROSE = cn(
 function MarkdownView({ src, target }: { src: string; target: ViewerTarget }) {
     const [text, setText] = useState<string | null>(null);
     const [error, setError] = useState(false);
+    const [binary, setBinary] = useState(false);
+    const [truncated, setTruncated] = useState(false);
+    const [lossy, setLossy] = useState(false);
     const [mode, setMode] = useState<"pretty" | "raw">("pretty");
     const [html, setHtml] = useState("");
     const [editing, setEditing] = useState(false);
@@ -671,10 +674,24 @@ function MarkdownView({ src, target }: { src: string; target: ViewerTarget }) {
         setText(null);
         setError(false);
         setEditing(false);
-        fetch(src)
-            .then((response) => response.text())
-            .then((body) => alive && setText(body.slice(0, 500_000)))
-            .catch(() => alive && setError(true));
+        setSaveError(null);
+        void (async () => {
+            try {
+                const response = await fetch(src);
+                if (!response.ok) throw new Error("read failed");
+                const { bytes, truncated: cut } = await readCapped(response, TEXT_LIMIT);
+                if (!alive) return;
+                const decoded = new TextDecoder().decode(bytes);
+                setBinary(looksBinary(bytes));
+                setTruncated(cut);
+                // A cut read can slice a multibyte character, so only judge the
+                // encoding when the whole file was read.
+                setLossy(!cut && !isCleanUtf8(bytes, decoded));
+                setText(decoded);
+            } catch {
+                if (alive) setError(true);
+            }
+        })();
         return () => {
             alive = false;
         };
@@ -712,6 +729,16 @@ function MarkdownView({ src, target }: { src: string; target: ViewerTarget }) {
     if (error)
         return <p className="p-8 text-center text-sm text-danger">This file could not be read.</p>;
     if (text === null) return <Loading />;
+
+    // Same guard as the plain-text editor: a truncated read, a lossy/non-UTF-8
+    // decode, or binary content stays read-only so a save can never corrupt or
+    // truncate the file. Viewing (pretty/raw) still works either way.
+    const editable = !binary && !truncated && !lossy;
+    const notEditableLabel = binary
+        ? "Binary file"
+        : truncated
+          ? "Preview only (large file)"
+          : "Preview only (unsupported encoding)";
 
     return (
         <div className="flex max-h-[80vh] flex-col">
@@ -767,18 +794,24 @@ function MarkdownView({ src, target }: { src: string; target: ViewerTarget }) {
                                 Raw
                             </button>
                         </div>
-                        <Button
-                            size="sm"
-                            variant="ghost"
-                            className="ml-auto"
-                            onClick={() => {
-                                setDraft(text);
-                                setEditing(true);
-                            }}
-                        >
-                            <Pencil className="size-4" />
-                            Edit
-                        </Button>
+                        {editable ? (
+                            <Button
+                                size="sm"
+                                variant="ghost"
+                                className="ml-auto"
+                                onClick={() => {
+                                    setDraft(text);
+                                    setEditing(true);
+                                }}
+                            >
+                                <Pencil className="size-4" />
+                                Edit
+                            </Button>
+                        ) : (
+                            <span className="ml-auto text-xs text-muted-foreground">
+                                {notEditableLabel}
+                            </span>
+                        )}
                     </>
                 )}
             </div>
