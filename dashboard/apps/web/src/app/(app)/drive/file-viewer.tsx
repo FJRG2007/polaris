@@ -30,15 +30,7 @@ export interface ViewerTarget {
 }
 
 type ViewerKind =
-    | "image"
-    | "video"
-    | "audio"
-    | "pdf"
-    | "sheet"
-    | "doc"
-    | "markdown"
-    | "text"
-    | "none";
+    "image" | "video" | "audio" | "pdf" | "sheet" | "doc" | "markdown" | "text" | "none";
 
 const IMAGE = new Set(["jpg", "jpeg", "png", "gif", "webp", "svg", "bmp", "avif", "ico"]);
 const VIDEO = new Set(["mp4", "webm", "mov", "m4v", "ogv"]);
@@ -446,6 +438,25 @@ function looksBinary(bytes: Uint8Array): boolean {
     return false;
 }
 
+/** Byte-for-byte equality of two buffers. */
+function bytesEqual(a: Uint8Array, b: Uint8Array): boolean {
+    if (a.byteLength !== b.byteLength) return false;
+    for (let index = 0; index < a.byteLength; index++) {
+        if (a[index] !== b[index]) return false;
+    }
+    return true;
+}
+
+/**
+ * Whether `bytes` is clean UTF-8 that survives a decode/re-encode round-trip.
+ * A single-byte encoding (latin-1, windows-1252) has no NUL so it slips past
+ * looksBinary, but its undecodable bytes become U+FFFD on decode and would be
+ * rewritten on save - corrupting the original. Such files must stay read-only.
+ */
+function isCleanUtf8(bytes: Uint8Array, decoded: string): boolean {
+    return bytesEqual(new TextEncoder().encode(decoded), bytes);
+}
+
 /**
  * Notepad-style viewer/editor for any file without a richer viewer. Reads the
  * first 500 KB, shows it verbatim, and edits save back through the upload route
@@ -457,6 +468,7 @@ function PlainTextEditor({ src, target }: { src: string; target: ViewerTarget })
     const [error, setError] = useState(false);
     const [binary, setBinary] = useState(false);
     const [truncated, setTruncated] = useState(false);
+    const [lossy, setLossy] = useState(false);
     const [editing, setEditing] = useState(false);
     const [draft, setDraft] = useState("");
     const [saving, setSaving] = useState(false);
@@ -474,9 +486,13 @@ function PlainTextEditor({ src, target }: { src: string; target: ViewerTarget })
                 if (!response.ok) throw new Error("read failed");
                 const { bytes, truncated: cut } = await readCapped(response, TEXT_LIMIT);
                 if (!alive) return;
+                const decoded = new TextDecoder().decode(bytes);
                 setBinary(looksBinary(bytes));
                 setTruncated(cut);
-                setText(new TextDecoder().decode(bytes));
+                // A cut read can slice a multibyte character, so only judge the
+                // encoding when the whole file was read.
+                setLossy(!cut && !isCleanUtf8(bytes, decoded));
+                setText(decoded);
             } catch {
                 if (alive) setError(true);
             }
@@ -508,8 +524,14 @@ function PlainTextEditor({ src, target }: { src: string; target: ViewerTarget })
         return <p className="p-8 text-center text-sm text-danger">This file could not be read.</p>;
     if (text === null) return <Loading />;
 
-    const editable = !binary && !truncated;
-    const label = binary ? "Binary file" : truncated ? "Preview only (large file)" : "Plain text";
+    const editable = !binary && !truncated && !lossy;
+    const label = binary
+        ? "Binary file"
+        : truncated
+          ? "Preview only (large file)"
+          : lossy
+            ? "Preview only (unsupported encoding)"
+            : "Plain text";
 
     return (
         <div className="flex max-h-[80vh] flex-col">

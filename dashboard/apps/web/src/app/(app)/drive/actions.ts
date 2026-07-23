@@ -610,6 +610,11 @@ export async function renameAction(
     try {
         // Moving an item onto its own path is a no-op, not an error.
         if (normalizedFrom === normalizedTo) return {};
+        // Refuse to move a folder into itself or one of its own descendants: the
+        // driver would bury the folder inside its own subtree (or loop).
+        if (normalizedTo.startsWith(`${normalizedFrom}/`)) {
+            return { error: "You cannot move a folder into itself." };
+        }
         // Refuse to move onto an existing item: a native rename would either fail
         // with an opaque driver error or clobber the target. Reporting the clash
         // is why a folder can look "stuck" - the destination name is already taken.
@@ -749,6 +754,12 @@ export async function copyAction(
     const user = await requireUser();
     const source = normalizeRelPath(from);
     const base = baseName(source);
+    // Refuse to copy a folder into itself or a descendant: copyRecursive would walk
+    // into the copies it writes under the source and never terminate.
+    const destParent = normalizeRelPath(destFolder);
+    if (destParent === source || destParent.startsWith(`${source}/`)) {
+        return { error: "You cannot copy a folder into itself." };
+    }
     // Copy reads the source and writes into the destination folder; both ends must
     // be authorized.
     let driver;

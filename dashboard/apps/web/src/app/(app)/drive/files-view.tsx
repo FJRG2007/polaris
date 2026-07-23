@@ -313,6 +313,11 @@ export function FilesView({
         return slash >= 0 ? target.slice(0, slash) : "";
     }
 
+    /** True when moving `itemPath` into `destFolder` would nest a folder in itself. */
+    function movesIntoSelf(itemPath: string, destFolder: string): boolean {
+        return destFolder === itemPath || destFolder.startsWith(`${itemPath}/`);
+    }
+
     /** Copy an item into its own folder (a duplicate gets a " copy" suffix). */
     function duplicate(entry: DriveEntry) {
         onCopy(entry, parentOf(entry.path));
@@ -343,6 +348,7 @@ export function FilesView({
     function paste() {
         if (!clipboard) return;
         for (const entry of clipboard.entries) {
+            if (movesIntoSelf(entry.path, path)) continue;
             if (clipboard.mode === "cut") onMove(entry, path);
             else onCopy(entry, path);
         }
@@ -663,7 +669,7 @@ export function FilesView({
             : visible.filter((entry) => entry.path === source);
         for (const item of group) {
             if (parentOf(item.path) === targetPath) continue;
-            if (item.path === targetPath || targetPath.startsWith(`${item.path}/`)) continue;
+            if (movesIntoSelf(item.path, targetPath)) continue;
             onMove(item, targetPath);
         }
     }
@@ -748,6 +754,7 @@ export function FilesView({
                             <ContextMenuItem
                                 onSelect={() => {
                                     for (const item of clipboard.entries) {
+                                        if (movesIntoSelf(item.path, entry.path)) continue;
                                         if (clipboard.mode === "cut") onMove(item, entry.path);
                                         else onCopy(item, entry.path);
                                     }

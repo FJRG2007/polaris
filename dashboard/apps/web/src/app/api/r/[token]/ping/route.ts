@@ -11,7 +11,7 @@ import { randomBytes } from "node:crypto";
 import { cookies } from "next/headers";
 import { loadEnv } from "@polaris/config";
 import { getSession } from "@/lib/session";
-import { clientIp, clientUserAgent } from "@/lib/request-context";
+import { clientIp, clientUserAgent, hashForLog } from "@/lib/request-context";
 import {
     fileRequestUsability,
     fileRequestVisitCookie,
@@ -49,14 +49,19 @@ export async function POST(
         });
     }
 
-    // Backstop throttle so a chatty client cannot hammer the database.
-    if ((await rateLimit(`drop-ping:${fileRequest.id}:${visitorKey}`, 12, 60 * 1000)).ok) {
+    const ip = await clientIp();
+    // Backstop throttle so a chatty client cannot hammer the database. Keyed on the
+    // hashed client IP, not the visitor cookie: the cookie is client-issued and a
+    // caller that drops Set-Cookie would get a fresh key on every request and never
+    // be throttled, letting it flood FileRequestVisit with unbounded rows.
+    const limitKey = `drop-ping:${fileRequest.id}:${hashForLog(ip) ?? "unknown"}`;
+    if ((await rateLimit(limitKey, 12, 60 * 1000)).ok) {
         const session = await getSession();
         const userId = (session?.user as { id?: string } | undefined)?.id ?? null;
         await recordVisit({
             requestId: fileRequest.id,
             visitorKey,
-            ip: await clientIp(),
+            ip,
             userId,
             userAgent: await clientUserAgent()
         });
