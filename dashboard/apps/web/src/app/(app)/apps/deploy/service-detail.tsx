@@ -46,6 +46,7 @@ import {
     Switch,
     cn
 } from "@polaris/ui";
+import { isTunnelHostname } from "@polaris/core";
 import { CloudflareMark, NgrokMark } from "@/components/brand-icons";
 import { ServiceIcon, StatusPill, dbTone, isLocalDomain, primaryDomain, serviceKindOf, type ProjectApp } from "./deploy-view";
 import { MetricsHistory, percent, type MetricSpec } from "@/components/metrics-history";
@@ -1584,6 +1585,9 @@ function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
     const needsHostname = exposure === "le" || exposure === "proxy" || exposure === "cf-named";
     const labelSuffix = exposure === "local" ? ".plr.local" : exposure === "duckdns" && duckSub ? `.${duckSub}.duckdns.org` : "";
     const duckMissing = exposure === "duckdns" && !duckSub;
+    // A tunnel URL is already exposed by its tunnel; adding it as a domain only makes a
+    // duplicate, dead route. Flag it as the user types (the server rejects it too).
+    const hostnameIsTunnel = (exposure === "le" || exposure === "proxy") && isTunnelHostname(hostname.trim());
 
     // The target port the route stores: the Advanced override, else the app's known
     // port, else a sensible default. Routing serves on 80/443 regardless.
@@ -1651,6 +1655,7 @@ function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
     const submitDisabled =
         pending ||
         duckMissing ||
+        hostnameIsTunnel ||
         (needsHostname && !hostname.trim()) ||
         (exposure === "cf-named" && !cfConnected && !connectorToken.trim());
 
@@ -1770,7 +1775,14 @@ function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
                                 value={hostname}
                                 onChange={(event) => setHostname(event.target.value)}
                                 placeholder="app.example.com"
+                                aria-invalid={hostnameIsTunnel}
                             />
+                        )}
+                        {hostnameIsTunnel && (
+                            <p className="text-xs text-danger">
+                                That is a tunnel URL - it is already exposed by its tunnel, so it can&apos;t be added as
+                                a domain.
+                            </p>
                         )}
                         {exposure === "cf-named" && !cfConnected && (
                             <Input

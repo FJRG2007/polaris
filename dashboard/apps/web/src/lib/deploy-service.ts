@@ -10,6 +10,7 @@ import { createWriteStream } from "node:fs";
 import { mkdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { loadEnv } from "@polaris/config";
+import { isTunnelHostname } from "@polaris/core";
 import { prisma } from "@polaris/db";
 import { bucketHttpMetrics, parseHttpLogs, serviceName, shortHash, slugify, type AppDeployPlan, type DeployResult, type HttpLogEntry, type HttpMetricPoint, type RuntimeContext, type RuntimeDriver } from "@polaris/deploy";
 import { decryptSecret } from "@polaris/storage";
@@ -220,6 +221,15 @@ export async function addApplicationDomain(
         hostname = plan.hostname;
         kind = plan.kind;
         if (!opts.cert) certResolver = plan.cert;
+    }
+    // A tunnel URL (Cloudflare quick tunnel, ngrok) is already exposed by its own
+    // tunnel; adding it as a domain only creates an inert edge route (inbound traffic
+    // reaches the tunnel provider, not this edge) and, with Let's Encrypt, a failing
+    // ACME loop - and it shows up as a duplicate of the live tunnel link. Reject it.
+    if (isTunnelHostname(hostname)) {
+        throw new Error(
+            "That is a tunnel URL - it is already exposed by its tunnel, so it can't be added as a domain."
+        );
     }
     // Idempotent: re-adding the same domain to the same app is a no-op, not an error
     // (the auto free subdomain is deterministic, so "Add domain" would hit this).
