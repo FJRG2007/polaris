@@ -98,7 +98,15 @@ export const createFileRequestSchema = z.object({
     uploaderDeleteWindowSeconds: z.number().int().nonnegative().optional(),
     /** ISO timestamp after which the request stops accepting uploads. */
     expiresAt: z.coerce.date().optional()
-});
+})
+    .refine(
+        (value) => value.minSizeBytes === undefined || value.minSizeBytes <= value.maxSizeBytes,
+        { message: "Minimum size cannot exceed the maximum size", path: ["minSizeBytes"] }
+    )
+    .refine((value) => !value.startsAt || !value.expiresAt || value.startsAt < value.expiresAt, {
+        message: "Start time must be before the expiry time",
+        path: ["startsAt"]
+    });
 
 export type CreateFileRequestInput = z.infer<typeof createFileRequestSchema>;
 
