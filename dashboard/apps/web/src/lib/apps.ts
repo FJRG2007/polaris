@@ -5,7 +5,7 @@
  * Everything installable lives under Apps rather than sprawling the switcher.
  */
 
-import { HardDrive, LayoutGrid, SlidersHorizontal, type LucideIcon } from "lucide-react";
+import { HardDrive, LayoutGrid, MessagesSquare, SlidersHorizontal, type LucideIcon } from "lucide-react";
 
 export interface AppEntry {
     id: string;
@@ -33,6 +33,13 @@ export const POLARIS_APPS: AppEntry[] = [
         // Owns the whole /apps subtree: the marketplace, installed-app dashboards,
         // and the built-in Deploy / Servers / Containers / Backups rails.
         match: ["/apps"]
+    },
+    {
+        id: "inbox",
+        label: "Inbox",
+        description: "Customer conversations across every channel",
+        icon: MessagesSquare,
+        href: "/inbox"
     },
     {
         id: "admin",
