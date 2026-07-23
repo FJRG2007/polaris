@@ -73,10 +73,11 @@ export async function listChannels(ownerId: string): Promise<ChannelView[]> {
  *  operator can retry. */
 export async function connectChannel(
     ownerId: string,
-    input: { platform: Platform; provider?: string; name: string; token: string }
+    input: { platform: Platform; provider?: string; name: string; token: string; config?: Record<string, string> }
 ): Promise<ChannelView> {
     const env = loadEnv();
     const blob = encryptSecret(input.token.trim(), env.POLARIS_MASTER_KEY);
+    const providerConfig = input.config ?? {};
     const channel = await prisma.channel.create({
         data: {
             ownerId,
@@ -84,7 +85,7 @@ export async function connectChannel(
             provider: input.provider ?? null,
             name: input.name,
             status: "connecting",
-            config: JSON.stringify({ capabilities: capabilitiesFor(input.platform, input.provider) }),
+            config: JSON.stringify({ capabilities: capabilitiesFor(input.platform, input.provider), providerConfig }),
             encryptedSecret: blob.ciphertext,
             secretNonce: blob.nonce,
             secretKeyId: blob.keyId
@@ -95,14 +96,15 @@ export async function connectChannel(
             channelId: channel.id,
             platform: input.platform,
             provider: input.provider,
-            token: input.token.trim()
+            token: input.token.trim(),
+            config: input.config
         });
         const updated = await prisma.channel.update({
             where: { id: channel.id },
             data: {
                 status: "connected",
                 externalId: result.externalId ?? null,
-                config: JSON.stringify({ capabilities: result.capabilities })
+                config: JSON.stringify({ capabilities: result.capabilities, providerConfig })
             }
         });
         return {
@@ -268,4 +270,22 @@ export async function ingestInbound(event: InboundEvent): Promise<void> {
             payload: event.selection ? JSON.stringify({ selection: event.selection }) : null
         }
     });
+}
+
+/** Resolve the WhatsApp Cloud channel bound to a Meta phone-number id, for the
+ *  webhook. Provider config is stored as JSON, so match in memory (few channels). */
+export async function findCloudChannelByPhoneNumberId(phoneNumberId: string): Promise<string | null> {
+    const rows = await prisma.channel.findMany({
+        where: { platform: "whatsapp", provider: "whatsapp-cloud" },
+        select: { id: true, config: true }
+    });
+    for (const row of rows) {
+        try {
+            const parsed = JSON.parse(row.config) as { providerConfig?: { phoneNumberId?: string } };
+            if (parsed.providerConfig?.phoneNumberId === phoneNumberId) return row.id;
+        } catch {
+            // Skip a malformed config row.
+        }
+    }
+    return null;
 }

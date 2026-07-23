@@ -27,7 +27,8 @@ const connectChannelSchema = z.object({
     platform: z.enum(PLATFORMS),
     provider: z.string().trim().min(1).max(64).optional(),
     name: z.string().trim().min(1).max(64),
-    token: z.string().trim().min(1).max(8192)
+    token: z.string().trim().min(1).max(8192),
+    config: z.record(z.string(), z.string().max(256)).optional()
 });
 
 const sendSchema = z.object({

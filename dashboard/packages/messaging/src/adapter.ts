@@ -29,4 +29,7 @@ export interface ChannelAdapter {
 }
 
 /** Factory a platform module registers under its `Platform` key. */
-export type AdapterFactory = (options: { token: string; provider?: string }, context: AdapterContext) => ChannelAdapter;
+export type AdapterFactory = (
+    options: { token: string; provider?: string; config?: Record<string, string> },
+    context: AdapterContext
+) => ChannelAdapter;

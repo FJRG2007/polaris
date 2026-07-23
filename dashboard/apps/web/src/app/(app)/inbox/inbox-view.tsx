@@ -21,6 +21,7 @@ import {
     DialogHeader,
     DialogTitle,
     Input,
+    Select,
     cn
 } from "@polaris/ui";
 import {
@@ -315,6 +316,8 @@ function MessageBubble({ message }: { message: MessageView }) {
     );
 }
 
+type ChannelKind = "telegram" | "whatsapp-cloud";
+
 function ConnectChannelDialog({
     bridgeReady,
     onClose,
@@ -324,24 +327,37 @@ function ConnectChannelDialog({
     onClose: () => void;
     onConnected: (channel: ChannelView) => void;
 }) {
+    const [kind, setKind] = useState<ChannelKind>("telegram");
     const [name, setName] = useState("");
     const [token, setToken] = useState("");
+    const [phoneNumberId, setPhoneNumberId] = useState("");
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
 
+    const isCloud = kind === "whatsapp-cloud";
+    const ready = bridgeReady && name.trim() !== "" && token.trim() !== "" && (!isCloud || phoneNumberId.trim() !== "");
+
     function submit() {
         setError(null);
+        const input = isCloud
+            ? {
+                  platform: "whatsapp" as const,
+                  provider: "whatsapp-cloud",
+                  name: name.trim(),
+                  token: token.trim(),
+                  config: { phoneNumberId: phoneNumberId.trim() }
+              }
+            : { platform: "telegram" as const, name: name.trim(), token: token.trim() };
         startTransition(async () => {
-            const result = await connectChannelAction({ platform: "telegram", name: name.trim(), token: token.trim() });
+            const result = await connectChannelAction(input);
             if (result.error) {
                 setError(result.error);
                 return;
             }
-            // The action revalidates; reflect the new channel optimistically.
             onConnected({
                 id: crypto.randomUUID(),
-                platform: "telegram",
-                provider: null,
+                platform: isCloud ? "whatsapp" : "telegram",
+                provider: isCloud ? "whatsapp-cloud" : null,
                 name: name.trim(),
                 externalId: null,
                 status: "connected",
@@ -354,10 +370,10 @@ function ConnectChannelDialog({
         <Dialog open onOpenChange={(open) => !open && onClose()}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Connect a Telegram channel</DialogTitle>
+                    <DialogTitle>Connect a channel</DialogTitle>
                     <DialogDescription>
-                        Create a bot with @BotFather on Telegram and paste its token. WhatsApp, Discord and Slack are on
-                        the way.
+                        Telegram uses a @BotFather bot token. WhatsApp Cloud uses a Meta access token and phone-number
+                        id, and needs its webhook pointed at this server. Discord and Slack are on the way.
                     </DialogDescription>
                 </DialogHeader>
                 {!bridgeReady && (
@@ -367,24 +383,45 @@ function ConnectChannelDialog({
                 )}
                 <div className="flex flex-col gap-3">
                     <label className="flex flex-col gap-1 text-sm">
+                        <span className="font-medium">Channel</span>
+                        <Select
+                            value={kind}
+                            onValueChange={(value) => setKind(value as ChannelKind)}
+                            options={[
+                                { value: "telegram", label: "Telegram" },
+                                { value: "whatsapp-cloud", label: "WhatsApp (Cloud API)" }
+                            ]}
+                        />
+                    </label>
+                    <label className="flex flex-col gap-1 text-sm">
                         <span className="font-medium">Name</span>
                         <Input value={name} onChange={(event) => setName(event.target.value)} placeholder="Support bot" />
                     </label>
                     <label className="flex flex-col gap-1 text-sm">
-                        <span className="font-medium">Bot token</span>
+                        <span className="font-medium">{isCloud ? "Access token" : "Bot token"}</span>
                         <Input
                             type="password"
                             value={token}
                             onChange={(event) => setToken(event.target.value)}
-                            placeholder="123456:ABC-DEF..."
+                            placeholder={isCloud ? "EAAG..." : "123456:ABC-DEF..."}
                         />
                     </label>
+                    {isCloud && (
+                        <label className="flex flex-col gap-1 text-sm">
+                            <span className="font-medium">Phone number id</span>
+                            <Input
+                                value={phoneNumberId}
+                                onChange={(event) => setPhoneNumberId(event.target.value)}
+                                placeholder="From the WhatsApp > API setup page"
+                            />
+                        </label>
+                    )}
                     {error && <p className="text-sm text-danger">{error}</p>}
                     <div className="flex justify-end gap-2">
                         <Button variant="ghost" onClick={onClose} disabled={pending}>
                             Cancel
                         </Button>
-                        <Button onClick={submit} disabled={pending || !bridgeReady || !name.trim() || !token.trim()}>
+                        <Button onClick={submit} disabled={pending || !ready}>
                             {pending && <Loader2 className="size-4 animate-spin" />}
                             Connect
                         </Button>

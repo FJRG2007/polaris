@@ -16,7 +16,9 @@ export const connectChannelSchema = z.object({
     /** Provider backend, e.g. WhatsApp: whatsapp-web | whatsapp-cloud. */
     provider: z.string().trim().min(1).max(64).optional(),
     /** Bot token / credential the adapter authenticates with. */
-    token: z.string().trim().min(1).max(8192)
+    token: z.string().trim().min(1).max(8192),
+    /** Provider-specific non-secret config, e.g. WhatsApp Cloud phoneNumberId. */
+    config: z.record(z.string(), z.string().max(256)).optional()
 });
 
 export const interactiveOptionSchema = z.object({

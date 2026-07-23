@@ -31,6 +31,7 @@ export async function bridgeConnectChannel(input: {
     platform: Platform;
     provider?: string;
     token: string;
+    config?: Record<string, string>;
 }): Promise<{ externalId?: string; capabilities: ChannelCapabilities }> {
     return call("/channels", { method: "POST", body: JSON.stringify(input) });
 }
