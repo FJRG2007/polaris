@@ -27,7 +27,7 @@ import {
     Select,
     cn
 } from "@polaris/ui";
-import { appsByCategory, isInstallable, type AppCapability, type AppManifest } from "@/lib/apps/catalog";
+import { appsByCategory, findApp, isInstallable, type AppCapability, type AppManifest } from "@/lib/apps/catalog";
 import { appInstallInputSchema } from "@/lib/apps/install-schema";
 import {
     installAppAction,
@@ -98,23 +98,35 @@ function InstalledSection({ installed }: { installed: InstalledAppView[] }) {
         <section className="flex flex-col gap-3">
             <h2 className="text-sm font-medium text-muted-foreground">Installed</h2>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                {installed.map((item) => (
-                    <Link key={item.id} href={`/apps/installed/${item.id}`}>
-                        <Card className="transition-colors hover:border-border">
-                            <CardBody className="flex items-center justify-between gap-3 py-3">
-                                <span className="truncate text-sm font-medium">{item.name}</span>
-                                <Badge
-                                    className={cn(
-                                        item.status === "failed" && "border-danger/40 text-danger",
-                                        item.status === "running" && "border-success/40 text-success"
-                                    )}
-                                >
-                                    {STATUS_LABEL[item.status] ?? item.status}
-                                </Badge>
-                            </CardBody>
-                        </Card>
-                    </Link>
-                ))}
+                {installed.map((item) => {
+                    const manifest = findApp(item.catalogId);
+                    const Icon = manifest?.icon;
+                    return (
+                        <Link key={item.id} href={`/apps/installed/${item.id}`}>
+                            <Card className="transition-colors hover:border-border">
+                                <CardBody className="flex items-center gap-3 py-3">
+                                    <div className="grid size-9 shrink-0 place-items-center rounded-md border border-border bg-surface">
+                                        {Icon ? <Icon className="size-4" /> : null}
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                        <p className="truncate text-sm font-medium">{item.name}</p>
+                                        <p className="truncate text-xs text-muted-foreground">
+                                            {manifest?.category ?? item.catalogId}
+                                        </p>
+                                    </div>
+                                    <Badge
+                                        className={cn(
+                                            item.status === "failed" && "border-danger/40 text-danger",
+                                            item.status === "running" && "border-success/40 text-success"
+                                        )}
+                                    >
+                                        {STATUS_LABEL[item.status] ?? item.status}
+                                    </Badge>
+                                </CardBody>
+                            </Card>
+                        </Link>
+                    );
+                })}
             </div>
         </section>
     );

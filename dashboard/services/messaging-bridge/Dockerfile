@@ -41,12 +41,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         chromium ca-certificates fonts-liberation && \
     rm -rf /var/lib/apt/lists/*
 
-# The bundle inlines @polaris/* and zod; whatsapp-web.js, puppeteer and qrcode load
-# from node_modules here (Chromium can't be bundled). type=module so the ESM bundle
-# runs under `node index.js`.
+# The bundle inlines @polaris/* and zod; the rest of the adapters' npm deps
+# (discord.js, whatsapp-web.js + its Puppeteer/Chromium, qrcode) stay external and
+# load from node_modules here - Chromium and discord.js's dynamic requires do not
+# bundle. registry.ts imports every adapter eagerly, so a single missing package
+# crashes the whole bridge on start (the ERR_MODULE_NOT_FOUND crashloop); keep this
+# list in sync with the bridge's runtime dependencies. type=module so the ESM
+# bundle runs under `node index.js`.
 COPY --from=builder /build/services/messaging-bridge/dist/index.js ./index.js
 RUN echo '{"type":"module"}' > package.json && \
-    npm install --omit=dev whatsapp-web.js@1.34.7 qrcode@1.5.4 && \
+    npm install --omit=dev discord.js@14.16.3 whatsapp-web.js@1.34.7 qrcode@1.5.4 && \
     mkdir -p /app/.sessions && chown -R node:node /app
 
 USER node

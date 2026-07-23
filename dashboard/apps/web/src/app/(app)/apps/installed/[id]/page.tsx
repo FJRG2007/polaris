@@ -1,8 +1,8 @@
 /**
- * An installed app's adapted dashboard. For now every compose-template app gets
- * the generic dashboard (status, lifecycle controls, runtime logs) reused from
- * Deploy; app-specific panels (e.g. a Minecraft console) mount here later, keyed
- * by the manifest's dashboard kind.
+ * An installed app's adapted dashboard. The shell (status, lifecycle controls,
+ * runtime logs) is shared; app-specific panels mount inside it keyed by the
+ * catalog id (e.g. the Messaging bridge's channel panel). Apps without an adapted
+ * panel fall back to the shared log view.
  */
 
 import { notFound } from "next/navigation";
