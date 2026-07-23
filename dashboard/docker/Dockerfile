@@ -32,6 +32,7 @@ COPY packages/db/package.json ./packages/db/
 COPY packages/deploy/package.json ./packages/deploy/
 COPY packages/docker/package.json ./packages/docker/
 COPY packages/hostd-client/package.json ./packages/hostd-client/
+COPY packages/messaging/package.json ./packages/messaging/
 COPY packages/ssh/package.json ./packages/ssh/
 COPY packages/storage/package.json ./packages/storage/
 COPY packages/ui/package.json ./packages/ui/
