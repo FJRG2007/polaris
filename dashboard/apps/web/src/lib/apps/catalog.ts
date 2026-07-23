@@ -186,6 +186,13 @@ export function appHasCapability(app: AppManifest, capability: AppCapability): b
     return app.capabilities.includes(capability);
 }
 
+/** Whether an app can be installed today: a compose template with a runnable
+ *  image (build-only apps need their image published first) and not coming soon.
+ *  Pure and client-safe, so the marketplace UI and the install service agree. */
+export function isInstallable(app: AppManifest): boolean {
+    return !app.comingSoon && app.installMethod === "compose-template" && Boolean(app.template?.image);
+}
+
 const CATEGORY_ORDER: readonly AppCategory[] = ["Messaging", "AI", "Game servers", "Tools"];
 
 /** Marketplace grouping, in a stable display order. */

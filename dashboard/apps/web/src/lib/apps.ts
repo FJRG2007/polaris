@@ -1,19 +1,11 @@
 /**
- * The Polaris app registry - what appears in the top-left switcher. Drive is
- * live; the rest are declared but locked so the platform's direction is visible
- * from day one. Future phases unlock them (Docker/Kubernetes/servers/home) as
- * their apps land, most gated behind the full edition's host access.
+ * The Polaris app registry - what appears in the top-left switcher. Deliberately
+ * small so the dashboard stays legible as it grows: Drive, the umbrella Apps
+ * pillar (marketplace + everything Polaris installs and runs), and Management.
+ * Everything installable lives under Apps rather than sprawling the switcher.
  */
 
-import {
-    Boxes,
-    DatabaseBackup,
-    HardDrive,
-    Home,
-    Rocket,
-    SlidersHorizontal,
-    type LucideIcon
-} from "lucide-react";
+import { HardDrive, LayoutGrid, SlidersHorizontal, type LucideIcon } from "lucide-react";
 
 export interface AppEntry {
     id: string;
@@ -33,17 +25,15 @@ export interface AppEntry {
 export const POLARIS_APPS: AppEntry[] = [
     { id: "drive", label: "Drive", description: "Files across every NAS", icon: HardDrive, href: "/drive" },
     {
-        id: "deploy",
-        label: "Deploy",
-        description: "Apps, databases & servers",
-        icon: Rocket,
-        href: "/apps/deploy",
-        // Absorbs the former Containers and Servers apps, so their routes still
-        // resolve to Deploy in the switcher and sidebar during the transition.
-        match: ["/apps/containers", "/apps/servers"]
+        id: "apps",
+        label: "Apps",
+        description: "Install & run apps: deploys, servers, assistants",
+        icon: LayoutGrid,
+        href: "/apps/marketplace",
+        // Owns the whole /apps subtree: the marketplace, installed-app dashboards,
+        // and the built-in Deploy / Servers / Containers / Backups rails.
+        match: ["/apps"]
     },
-    { id: "backups", label: "Backups", description: "Databases, Polaris & NAS", icon: DatabaseBackup, href: "/apps/backups" },
-    { id: "kubernetes", label: "Kubernetes", description: "Clusters & workloads", icon: Boxes, href: "/apps/kubernetes", locked: true },
     {
         id: "admin",
         label: "Management",
@@ -54,8 +44,7 @@ export const POLARIS_APPS: AppEntry[] = [
         // Admin pages that historically live at the top level, so they still
         // resolve to the Management app in the switcher and sidebar.
         match: ["/integrations", "/settings"]
-    },
-    { id: "home", label: "Home", description: "Home Assistant", icon: Home, href: "/apps/home", locked: true }
+    }
 ];
 
 /** Whether a path belongs to an app: its own subtree, or one of its extra
