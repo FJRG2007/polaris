@@ -530,7 +530,11 @@ function ConnectChannelDialog({
                         </DialogHeader>
                         {!bridgeReady && (
                             <p className="text-sm text-danger">
-                                The messaging bridge is not configured yet. Set MESSAGING_BRIDGE_URL to enable channels.
+                                The messaging bridge is not installed yet. Install it from the{" "}
+                                <a className="underline" href="/apps/marketplace">
+                                    marketplace
+                                </a>{" "}
+                                to enable channels.
                             </p>
                         )}
                         <div className="flex flex-col gap-3">

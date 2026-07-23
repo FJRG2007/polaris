@@ -49,8 +49,12 @@ export async function inboxStateAction(): Promise<{
     conversations: ConversationView[];
 }> {
     const user = await requireUser();
-    const [channels, conversations] = await Promise.all([listChannels(user.id), listConversations(user.id)]);
-    return { bridgeConfigured: bridgeConfigured(), channels, conversations };
+    const [ready, channels, conversations] = await Promise.all([
+        bridgeConfigured(),
+        listChannels(user.id),
+        listConversations(user.id)
+    ]);
+    return { bridgeConfigured: ready, channels, conversations };
 }
 
 export async function connectChannelAction(

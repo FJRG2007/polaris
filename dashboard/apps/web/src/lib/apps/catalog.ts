@@ -114,7 +114,10 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
         dashboard: "builtin",
         singleton: true,
         template: {
-            build: "dashboard/services/messaging-bridge",
+            // Published by CI (.github/workflows/dashboard-publish.yml, `bridge` job)
+            // from dashboard/services/messaging-bridge; the marketplace installs it as
+            // a managed Deploy app rather than building from source on the host.
+            image: "ghcr.io/fjrg2007/polaris-messaging-bridge:latest",
             volumes: [
                 { name: "sessions", mountPath: "/app/.sessions", label: "Channel sessions" }
             ],

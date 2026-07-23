@@ -14,12 +14,16 @@ export const dynamic = "force-dynamic";
 
 export default async function InboxPage() {
     const user = await requireUser();
-    const [channels, conversations] = await Promise.all([listChannels(user.id), listConversations(user.id)]);
+    const [ready, channels, conversations] = await Promise.all([
+        bridgeConfigured(),
+        listChannels(user.id),
+        listConversations(user.id)
+    ]);
     return (
         <InboxView
             initialChannels={channels}
             initialConversations={conversations}
-            bridgeReady={bridgeConfigured()}
+            bridgeReady={ready}
         />
     );
 }
