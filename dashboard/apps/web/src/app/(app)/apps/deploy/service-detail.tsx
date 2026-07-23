@@ -1703,6 +1703,25 @@ function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
                 <ul className="flex flex-col gap-1">
                     {app.domains.map((domain) => (
                         <li key={domain.id} className="group flex items-center gap-2">
+                            {domain.enabled && (
+                                <span
+                                    title={
+                                        domain.healthStatus === "down"
+                                            ? `Not reachable${domain.healthDetail ? ` - ${domain.healthDetail}` : ""}`
+                                            : domain.healthStatus === "up"
+                                              ? `Reachable${domain.healthCode ? ` (HTTP ${domain.healthCode})` : ""}`
+                                              : "Not checked yet"
+                                    }
+                                    className={cn(
+                                        "size-2 shrink-0 rounded-full",
+                                        domain.healthStatus === "up" && "bg-success",
+                                        domain.healthStatus === "down" && "bg-danger",
+                                        domain.healthStatus !== "up" &&
+                                            domain.healthStatus !== "down" &&
+                                            "bg-muted-foreground/40"
+                                    )}
+                                />
+                            )}
                             {domain.enabled ? (
                                 <a
                                     href={`https://${domain.hostname}`}

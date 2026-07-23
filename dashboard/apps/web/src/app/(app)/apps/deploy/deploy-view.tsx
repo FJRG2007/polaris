@@ -102,7 +102,15 @@ export interface ProjectSummary {
             port: number | null;
             /** Direct LAN/intranet URL (host IP + published port), when a public IP is known. */
             ipUrl: string | null;
-            domains: { id: string; hostname: string; kind: string; enabled: boolean }[];
+            domains: {
+                id: string;
+                hostname: string;
+                kind: string;
+                enabled: boolean;
+                healthStatus?: string;
+                healthCode?: number | null;
+                healthDetail?: string | null;
+            }[];
             volumes: {
                 id: string;
                 name: string;
@@ -121,7 +129,15 @@ export interface ProjectSummary {
 export type ServiceKind = "github" | "image" | "database";
 
 /** A domain as carried on an app (the shape shared by the card and service detail). */
-export type AppDomain = { id: string; hostname: string; kind: string; enabled: boolean };
+export type AppDomain = {
+    id: string;
+    hostname: string;
+    kind: string;
+    enabled: boolean;
+    healthStatus?: string;
+    healthCode?: number | null;
+    healthDetail?: string | null;
+};
 
 /** Whether a domain resolves only on the local network (a LAN-only exposure). */
 export function isLocalDomain(domain: AppDomain): boolean {

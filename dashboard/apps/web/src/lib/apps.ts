@@ -5,7 +5,7 @@
  * Everything installable lives under Apps rather than sprawling the switcher.
  */
 
-import { HardDrive, LayoutGrid, MessagesSquare, SlidersHorizontal, type LucideIcon } from "lucide-react";
+import { Activity, HardDrive, LayoutGrid, MessagesSquare, SlidersHorizontal, type LucideIcon } from "lucide-react";
 
 export interface AppEntry {
     id: string;
@@ -40,6 +40,13 @@ export const POLARIS_APPS: AppEntry[] = [
         description: "Customer conversations across every channel",
         icon: MessagesSquare,
         href: "/inbox"
+    },
+    {
+        id: "watch",
+        label: "Watch",
+        description: "Alarms on app health, spikes and outages",
+        icon: Activity,
+        href: "/watch"
     },
     {
         id: "admin",
