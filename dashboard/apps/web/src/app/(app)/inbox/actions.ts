@@ -12,12 +12,14 @@ import { PLATFORMS, interactivePromptSchema } from "@polaris/messaging";
 import { requireUser } from "@/lib/session";
 import { bridgeConfigured } from "@/lib/messaging/bridge-client";
 import {
+    channelState,
     connectChannel,
     deleteChannel,
     getConversationMessages,
     listChannels,
     listConversations,
     sendConversationMessage,
+    type ChannelLiveState,
     type ChannelView,
     type ConversationView,
     type MessageView
@@ -27,7 +29,8 @@ const connectChannelSchema = z.object({
     platform: z.enum(PLATFORMS),
     provider: z.string().trim().min(1).max(64).optional(),
     name: z.string().trim().min(1).max(64),
-    token: z.string().trim().min(1).max(8192),
+    // Absent for whatsapp-web (QR login); required for token-based providers.
+    token: z.string().trim().min(1).max(8192).optional(),
     config: z.record(z.string(), z.string().max(256)).optional()
 });
 
@@ -47,16 +50,28 @@ export async function inboxStateAction(): Promise<{
     return { bridgeConfigured: bridgeConfigured(), channels, conversations };
 }
 
-export async function connectChannelAction(input: z.infer<typeof connectChannelSchema>): Promise<{ error?: string }> {
+export async function connectChannelAction(
+    input: z.infer<typeof connectChannelSchema>
+): Promise<{ error?: string; channelId?: string; status?: string }> {
     const user = await requireUser();
     const parsed = connectChannelSchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the form" };
     try {
-        await connectChannel(user.id, parsed.data);
+        const channel = await connectChannel(user.id, parsed.data);
         revalidatePath("/inbox");
-        return {};
+        return { channelId: channel.id, status: channel.status };
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Could not connect the channel" };
+    }
+}
+
+/** Poll a channel's live state (for the whatsapp-web QR onboarding). */
+export async function channelStateAction(channelId: string): Promise<ChannelLiveState & { error?: string }> {
+    const user = await requireUser();
+    try {
+        return await channelState(user.id, channelId);
+    } catch (caught) {
+        return { status: "error", error: caught instanceof Error ? caught.message : "Could not read channel state" };
     }
 }
 

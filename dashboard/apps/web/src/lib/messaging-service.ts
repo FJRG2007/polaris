@@ -11,7 +11,7 @@ import { prisma } from "@polaris/db";
 import { encryptSecret } from "@polaris/storage";
 import { capabilitiesFor } from "@polaris/messaging";
 import type { ChannelCapabilities, InteractivePrompt, InboundEvent, Platform } from "@polaris/messaging";
-import { bridgeConnectChannel, bridgeDisconnectChannel, bridgeSend } from "./messaging/bridge-client";
+import { bridgeChannelState, bridgeConnectChannel, bridgeDisconnectChannel, bridgeSend } from "./messaging/bridge-client";
 
 export interface ChannelView {
     id: string;
@@ -73,10 +73,12 @@ export async function listChannels(ownerId: string): Promise<ChannelView[]> {
  *  operator can retry. */
 export async function connectChannel(
     ownerId: string,
-    input: { platform: Platform; provider?: string; name: string; token: string; config?: Record<string, string> }
+    input: { platform: Platform; provider?: string; name: string; token?: string; config?: Record<string, string> }
 ): Promise<ChannelView> {
     const env = loadEnv();
-    const blob = encryptSecret(input.token.trim(), env.POLARIS_MASTER_KEY);
+    // whatsapp-web logs in by QR and has no upfront token; others do.
+    const trimmedToken = input.token?.trim();
+    const blob = trimmedToken ? encryptSecret(trimmedToken, env.POLARIS_MASTER_KEY) : null;
     const providerConfig = input.config ?? {};
     const channel = await prisma.channel.create({
         data: {
@@ -86,9 +88,9 @@ export async function connectChannel(
             name: input.name,
             status: "connecting",
             config: JSON.stringify({ capabilities: capabilitiesFor(input.platform, input.provider), providerConfig }),
-            encryptedSecret: blob.ciphertext,
-            secretNonce: blob.nonce,
-            secretKeyId: blob.keyId
+            encryptedSecret: blob?.ciphertext ?? null,
+            secretNonce: blob?.nonce ?? null,
+            secretKeyId: blob?.keyId ?? null
         }
     });
     try {
@@ -96,13 +98,16 @@ export async function connectChannel(
             channelId: channel.id,
             platform: input.platform,
             provider: input.provider,
-            token: input.token.trim(),
+            token: trimmedToken,
             config: input.config
         });
+        // An adapter that returns its identity is live now (telegram, cloud). One
+        // that logs in by QR (whatsapp-web) stays "connecting" until scanned - the
+        // UI polls channelState for the QR and the eventual connected status.
         const updated = await prisma.channel.update({
             where: { id: channel.id },
             data: {
-                status: "connected",
+                status: result.externalId ? "connected" : "connecting",
                 externalId: result.externalId ?? null,
                 config: JSON.stringify({ capabilities: result.capabilities, providerConfig })
             }
@@ -288,4 +293,27 @@ export async function findCloudChannelByPhoneNumberId(phoneNumberId: string): Pr
         }
     }
     return null;
+}
+
+export interface ChannelLiveState {
+    status: string;
+    qr?: string;
+    externalId?: string;
+}
+
+/** Poll the bridge for a channel's live state (QR / connected), persisting a
+ *  connected or errored result. Drives the whatsapp-web QR onboarding UI. */
+export async function channelState(ownerId: string, channelId: string): Promise<ChannelLiveState> {
+    const channel = await prisma.channel.findFirst({ where: { id: channelId, ownerId }, select: { id: true } });
+    if (!channel) throw new Error("Channel not found");
+    const state = await bridgeChannelState(channelId);
+    if (state.status === "connected") {
+        await prisma.channel.update({
+            where: { id: channelId },
+            data: { status: "connected", ...(state.externalId ? { externalId: state.externalId } : {}) }
+        });
+    } else if (state.status === "error" || state.status === "disconnected") {
+        await prisma.channel.update({ where: { id: channelId }, data: { status: state.status } });
+    }
+    return { status: state.status, qr: state.qr, externalId: state.externalId };
 }

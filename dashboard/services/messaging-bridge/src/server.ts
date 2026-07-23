@@ -52,6 +52,17 @@ export function createBridgeServer({ registry, authToken }: BridgeServerOptions)
                 return;
             }
 
+            const stateMatch = path.match(/^\/channels\/([^/]+)\/state$/);
+            if (req.method === "GET" && stateMatch) {
+                const adapter = registry.get(decodeURIComponent(stateMatch[1]!));
+                if (!adapter) {
+                    reply(res, 404, { error: "Channel not connected" });
+                    return;
+                }
+                reply(res, 200, adapter.getState ? adapter.getState() : { status: "connected" });
+                return;
+            }
+
             const sendMatch = path.match(/^\/channels\/([^/]+)\/send$/);
             if (req.method === "POST" && sendMatch) {
                 const adapter = registry.get(decodeURIComponent(sendMatch[1]!));

@@ -15,8 +15,9 @@ export const connectChannelSchema = z.object({
     platform: z.enum(PLATFORMS),
     /** Provider backend, e.g. WhatsApp: whatsapp-web | whatsapp-cloud. */
     provider: z.string().trim().min(1).max(64).optional(),
-    /** Bot token / credential the adapter authenticates with. */
-    token: z.string().trim().min(1).max(8192),
+    /** Bot token / credential the adapter authenticates with. Absent for
+     *  QR-login adapters (whatsapp-web), which have no upfront credential. */
+    token: z.string().trim().min(1).max(8192).optional(),
     /** Provider-specific non-secret config, e.g. WhatsApp Cloud phoneNumberId. */
     config: z.record(z.string(), z.string().max(256)).optional()
 });

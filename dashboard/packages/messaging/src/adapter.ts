@@ -19,17 +19,31 @@ export interface SendResult {
     externalId?: string;
 }
 
+/** Onboarding/connection state, for adapters that log in asynchronously (a QR to
+ *  scan, a pairing code). Synchronous adapters report "connected" from connect(). */
+export interface ChannelState {
+    status: "connecting" | "qr" | "connected" | "disconnected" | "error";
+    /** A QR image data URL to scan while status is "qr" (whatsapp-web). */
+    qr?: string;
+    externalId?: string;
+    detail?: string;
+}
+
 export interface ChannelAdapter {
     readonly capabilities: ChannelCapabilities;
-    /** Start receiving; resolves with the platform-side identity once connected. */
+    /** Start receiving; resolves with the platform-side identity once connected.
+     *  Async-login adapters (QR) resolve immediately and report progress via
+     *  getState(). */
     connect(): Promise<{ externalId?: string }>;
     /** Stop receiving and release resources. Must be idempotent. */
     disconnect(): Promise<void>;
     send(message: OutboundMessage): Promise<SendResult>;
+    /** Current state, for async-login adapters. Absent = "connected" once connect() resolved. */
+    getState?(): ChannelState;
 }
 
 /** Factory a platform module registers under its `Platform` key. */
 export type AdapterFactory = (
-    options: { token: string; provider?: string; config?: Record<string, string> },
+    options: { token?: string; provider?: string; config?: Record<string, string> },
     context: AdapterContext
 ) => ChannelAdapter;

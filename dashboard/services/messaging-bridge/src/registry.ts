@@ -8,6 +8,7 @@ import type { AdapterContext, ChannelAdapter, InboundMessage } from "@polaris/me
 import type { ConnectChannelRequest } from "@polaris/messaging";
 import { TelegramAdapter } from "./adapters/telegram.js";
 import { WhatsAppCloudAdapter } from "./adapters/whatsapp-cloud.js";
+import { WhatsAppWebAdapter } from "./adapters/whatsapp-web.js";
 
 export class AdapterRegistry {
     private readonly adapters = new Map<string, ChannelAdapter>();
@@ -19,15 +20,18 @@ export class AdapterRegistry {
 
     private build(request: ConnectChannelRequest, context: AdapterContext): ChannelAdapter {
         switch (request.platform) {
-            case "telegram":
+            case "telegram": {
+                if (!request.token) throw new Error("Telegram needs a bot token");
                 return new TelegramAdapter(request.token, context);
+            }
             case "whatsapp": {
                 if (request.provider === "whatsapp-cloud") {
+                    if (!request.token) throw new Error("WhatsApp Cloud needs an access token");
                     const phoneNumberId = request.config?.phoneNumberId;
                     if (!phoneNumberId) throw new Error("WhatsApp Cloud needs a phoneNumberId in config");
                     return new WhatsAppCloudAdapter(request.token, phoneNumberId, context);
                 }
-                throw new Error("The whatsapp-web provider is not available yet");
+                return new WhatsAppWebAdapter(request.channelId, context);
             }
             default:
                 throw new Error(`The ${request.platform} adapter is not available yet`);

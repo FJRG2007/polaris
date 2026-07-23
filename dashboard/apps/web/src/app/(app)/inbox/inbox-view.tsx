@@ -25,6 +25,7 @@ import {
     cn
 } from "@polaris/ui";
 import {
+    channelStateAction,
     connectChannelAction,
     deleteChannelAction,
     getMessagesAction,
@@ -316,7 +317,7 @@ function MessageBubble({ message }: { message: MessageView }) {
     );
 }
 
-type ChannelKind = "telegram" | "whatsapp-cloud";
+type ChannelKind = "telegram" | "whatsapp-cloud" | "whatsapp-web";
 
 function ConnectChannelDialog({
     bridgeReady,
@@ -327,15 +328,54 @@ function ConnectChannelDialog({
     onClose: () => void;
     onConnected: (channel: ChannelView) => void;
 }) {
+    const [phase, setPhase] = useState<"form" | "qr">("form");
     const [kind, setKind] = useState<ChannelKind>("telegram");
     const [name, setName] = useState("");
     const [token, setToken] = useState("");
     const [phoneNumberId, setPhoneNumberId] = useState("");
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
+    const [qrChannelId, setQrChannelId] = useState<string | null>(null);
+    const [qr, setQr] = useState<string | null>(null);
+    const [qrStatus, setQrStatus] = useState("connecting");
 
     const isCloud = kind === "whatsapp-cloud";
-    const ready = bridgeReady && name.trim() !== "" && token.trim() !== "" && (!isCloud || phoneNumberId.trim() !== "");
+    const isWeb = kind === "whatsapp-web";
+    const needsToken = !isWeb;
+    const ready =
+        bridgeReady &&
+        name.trim() !== "" &&
+        (!needsToken || token.trim() !== "") &&
+        (!isCloud || phoneNumberId.trim() !== "");
+
+    // While onboarding whatsapp-web, poll the bridge for the QR and connected state.
+    useEffect(() => {
+        if (phase !== "qr" || !qrChannelId) return;
+        let active = true;
+        const poll = async () => {
+            const state = await channelStateAction(qrChannelId);
+            if (!active) return;
+            setQrStatus(state.status);
+            if (state.qr) setQr(state.qr);
+            if (state.status === "connected") {
+                onConnected({
+                    id: qrChannelId,
+                    platform: "whatsapp",
+                    provider: "whatsapp-web",
+                    name: name.trim(),
+                    externalId: state.externalId ?? null,
+                    status: "connected",
+                    capabilities: null
+                });
+            }
+        };
+        void poll();
+        const timer = setInterval(() => void poll(), 2500);
+        return () => {
+            active = false;
+            clearInterval(timer);
+        };
+    }, [phase, qrChannelId, name, onConnected]);
 
     function submit() {
         setError(null);
@@ -347,15 +387,22 @@ function ConnectChannelDialog({
                   token: token.trim(),
                   config: { phoneNumberId: phoneNumberId.trim() }
               }
-            : { platform: "telegram" as const, name: name.trim(), token: token.trim() };
+            : isWeb
+              ? { platform: "whatsapp" as const, provider: "whatsapp-web", name: name.trim() }
+              : { platform: "telegram" as const, name: name.trim(), token: token.trim() };
         startTransition(async () => {
             const result = await connectChannelAction(input);
             if (result.error) {
                 setError(result.error);
                 return;
             }
+            if (isWeb && result.channelId) {
+                setQrChannelId(result.channelId);
+                setPhase("qr");
+                return;
+            }
             onConnected({
-                id: crypto.randomUUID(),
+                id: result.channelId ?? crypto.randomUUID(),
                 platform: isCloud ? "whatsapp" : "telegram",
                 provider: isCloud ? "whatsapp-cloud" : null,
                 name: name.trim(),
@@ -369,64 +416,108 @@ function ConnectChannelDialog({
     return (
         <Dialog open onOpenChange={(open) => !open && onClose()}>
             <DialogContent>
-                <DialogHeader>
-                    <DialogTitle>Connect a channel</DialogTitle>
-                    <DialogDescription>
-                        Telegram uses a @BotFather bot token. WhatsApp Cloud uses a Meta access token and phone-number
-                        id, and needs its webhook pointed at this server. Discord and Slack are on the way.
-                    </DialogDescription>
-                </DialogHeader>
-                {!bridgeReady && (
-                    <p className="text-sm text-danger">
-                        The messaging bridge is not configured yet. Set MESSAGING_BRIDGE_URL to enable channels.
-                    </p>
+                {phase === "qr" ? (
+                    <>
+                        <DialogHeader>
+                            <DialogTitle>Scan to link WhatsApp</DialogTitle>
+                            <DialogDescription>
+                                On your phone: WhatsApp {">"} Linked devices {">"} Link a device, then scan this code.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="flex flex-col items-center gap-3 py-2">
+                            {qr ? (
+                                // A data-URL QR; next/image does not handle these.
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={qr} alt="WhatsApp QR code" className="size-56 rounded-md border border-border" />
+                            ) : (
+                                <div className="flex size-56 items-center justify-center rounded-md border border-border">
+                                    <Loader2 className="size-6 animate-spin text-muted-foreground" />
+                                </div>
+                            )}
+                            <p className="text-xs text-muted-foreground">
+                                {qrStatus === "connected"
+                                    ? "Connected."
+                                    : qrStatus === "error"
+                                      ? "Connection failed - try again."
+                                      : "Waiting for the scan..."}
+                            </p>
+                        </div>
+                        <div className="flex justify-end">
+                            <Button variant="ghost" onClick={onClose}>
+                                {qrStatus === "connected" ? "Done" : "Close"}
+                            </Button>
+                        </div>
+                    </>
+                ) : (
+                    <>
+                        <DialogHeader>
+                            <DialogTitle>Connect a channel</DialogTitle>
+                            <DialogDescription>
+                                Telegram uses a @BotFather token. WhatsApp Cloud uses a Meta token + phone-number id (with
+                                its webhook pointed here). WhatsApp (QR) is free but links your phone and carries a ban
+                                risk. Discord and Slack are on the way.
+                            </DialogDescription>
+                        </DialogHeader>
+                        {!bridgeReady && (
+                            <p className="text-sm text-danger">
+                                The messaging bridge is not configured yet. Set MESSAGING_BRIDGE_URL to enable channels.
+                            </p>
+                        )}
+                        <div className="flex flex-col gap-3">
+                            <label className="flex flex-col gap-1 text-sm">
+                                <span className="font-medium">Channel</span>
+                                <Select
+                                    value={kind}
+                                    onValueChange={(value) => setKind(value as ChannelKind)}
+                                    options={[
+                                        { value: "telegram", label: "Telegram" },
+                                        { value: "whatsapp-cloud", label: "WhatsApp (Cloud API)" },
+                                        { value: "whatsapp-web", label: "WhatsApp (QR, free)" }
+                                    ]}
+                                />
+                            </label>
+                            <label className="flex flex-col gap-1 text-sm">
+                                <span className="font-medium">Name</span>
+                                <Input
+                                    value={name}
+                                    onChange={(event) => setName(event.target.value)}
+                                    placeholder="Support bot"
+                                />
+                            </label>
+                            {needsToken && (
+                                <label className="flex flex-col gap-1 text-sm">
+                                    <span className="font-medium">{isCloud ? "Access token" : "Bot token"}</span>
+                                    <Input
+                                        type="password"
+                                        value={token}
+                                        onChange={(event) => setToken(event.target.value)}
+                                        placeholder={isCloud ? "EAAG..." : "123456:ABC-DEF..."}
+                                    />
+                                </label>
+                            )}
+                            {isCloud && (
+                                <label className="flex flex-col gap-1 text-sm">
+                                    <span className="font-medium">Phone number id</span>
+                                    <Input
+                                        value={phoneNumberId}
+                                        onChange={(event) => setPhoneNumberId(event.target.value)}
+                                        placeholder="From the WhatsApp > API setup page"
+                                    />
+                                </label>
+                            )}
+                            {error && <p className="text-sm text-danger">{error}</p>}
+                            <div className="flex justify-end gap-2">
+                                <Button variant="ghost" onClick={onClose} disabled={pending}>
+                                    Cancel
+                                </Button>
+                                <Button onClick={submit} disabled={pending || !ready}>
+                                    {pending && <Loader2 className="size-4 animate-spin" />}
+                                    {isWeb ? "Show QR" : "Connect"}
+                                </Button>
+                            </div>
+                        </div>
+                    </>
                 )}
-                <div className="flex flex-col gap-3">
-                    <label className="flex flex-col gap-1 text-sm">
-                        <span className="font-medium">Channel</span>
-                        <Select
-                            value={kind}
-                            onValueChange={(value) => setKind(value as ChannelKind)}
-                            options={[
-                                { value: "telegram", label: "Telegram" },
-                                { value: "whatsapp-cloud", label: "WhatsApp (Cloud API)" }
-                            ]}
-                        />
-                    </label>
-                    <label className="flex flex-col gap-1 text-sm">
-                        <span className="font-medium">Name</span>
-                        <Input value={name} onChange={(event) => setName(event.target.value)} placeholder="Support bot" />
-                    </label>
-                    <label className="flex flex-col gap-1 text-sm">
-                        <span className="font-medium">{isCloud ? "Access token" : "Bot token"}</span>
-                        <Input
-                            type="password"
-                            value={token}
-                            onChange={(event) => setToken(event.target.value)}
-                            placeholder={isCloud ? "EAAG..." : "123456:ABC-DEF..."}
-                        />
-                    </label>
-                    {isCloud && (
-                        <label className="flex flex-col gap-1 text-sm">
-                            <span className="font-medium">Phone number id</span>
-                            <Input
-                                value={phoneNumberId}
-                                onChange={(event) => setPhoneNumberId(event.target.value)}
-                                placeholder="From the WhatsApp > API setup page"
-                            />
-                        </label>
-                    )}
-                    {error && <p className="text-sm text-danger">{error}</p>}
-                    <div className="flex justify-end gap-2">
-                        <Button variant="ghost" onClick={onClose} disabled={pending}>
-                            Cancel
-                        </Button>
-                        <Button onClick={submit} disabled={pending || !ready}>
-                            {pending && <Loader2 className="size-4 animate-spin" />}
-                            Connect
-                        </Button>
-                    </div>
-                </div>
             </DialogContent>
         </Dialog>
     );

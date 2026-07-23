@@ -5,7 +5,7 @@
  * the shared MESSAGING_BRIDGE_TOKEN bearer. Never called from the client.
  */
 
-import type { ChannelCapabilities, InteractivePrompt, Platform } from "@polaris/messaging";
+import type { ChannelCapabilities, ChannelState, InteractivePrompt, Platform } from "@polaris/messaging";
 
 const BRIDGE_URL = (process.env.MESSAGING_BRIDGE_URL ?? "").replace(/\/+$/, "");
 const BRIDGE_TOKEN = process.env.MESSAGING_BRIDGE_TOKEN ?? "";
@@ -30,7 +30,7 @@ export async function bridgeConnectChannel(input: {
     channelId: string;
     platform: Platform;
     provider?: string;
-    token: string;
+    token?: string;
     config?: Record<string, string>;
 }): Promise<{ externalId?: string; capabilities: ChannelCapabilities }> {
     return call("/channels", { method: "POST", body: JSON.stringify(input) });
@@ -38,6 +38,11 @@ export async function bridgeConnectChannel(input: {
 
 export async function bridgeDisconnectChannel(channelId: string): Promise<void> {
     await call(`/channels/${encodeURIComponent(channelId)}`, { method: "DELETE" });
+}
+
+/** Current onboarding/connection state (whatsapp-web reports its QR here). */
+export async function bridgeChannelState(channelId: string): Promise<ChannelState> {
+    return call(`/channels/${encodeURIComponent(channelId)}/state`, { method: "GET" });
 }
 
 export async function bridgeSend(
