@@ -1,15 +1,17 @@
 "use client";
 
 /**
- * Generic dashboard for an installed app: lifecycle controls plus the runtime
- * log, reusing Deploy's log endpoint and the shared LogViewer. App-specific
- * panels can branch on app.dashboardKind here later without changing this shell.
+ * Dashboard shell for an installed app: lifecycle controls, an app-specific panel
+ * keyed by the catalog id, and the runtime log (reusing Deploy's log endpoint and
+ * the shared LogViewer). Apps with an adapted panel lead with it and keep the raw
+ * log as a collapsible secondary section, so opening the app is not just a wall of
+ * logs; apps without one show the log directly.
  */
 
 import { useCallback, useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Loader2, Play, RefreshCw, Square, Trash2 } from "lucide-react";
+import { ArrowLeft, ChevronDown, ChevronRight, Loader2, Play, RefreshCw, Square, Trash2 } from "lucide-react";
 import {
     Badge,
     Button,
@@ -25,6 +27,7 @@ import {
 } from "@polaris/ui";
 import { LogViewer } from "@/components/log-viewer";
 import type { InstalledAppDetail } from "@/lib/apps/install-service";
+import { MessagingBridgePanel } from "./messaging-bridge-panel";
 import {
     redeployInstalledAppAction,
     setInstalledAppRunningAction,
@@ -47,6 +50,9 @@ export function InstalledAppDashboard({ app }: { app: InstalledAppDetail }) {
 
     const running = app.applicationStatus === "running";
     const applicationId = app.applicationId;
+    // Apps with an adapted panel lead with it and fold the raw log away by default.
+    const adaptedPanel = app.catalogId === "messaging-bridge" ? <MessagingBridgePanel /> : null;
+    const [showLogs, setShowLogs] = useState(adaptedPanel === null);
 
     const loadLog = useCallback(async () => {
         if (!applicationId) return;
@@ -60,13 +66,15 @@ export function InstalledAppDashboard({ app }: { app: InstalledAppDetail }) {
         }
     }, [applicationId]);
 
-    // Poll the runtime log while the app is running, like the Deploy logs tab.
+    // Poll the runtime log while the app is running and the log is visible, like the
+    // Deploy logs tab. Skipped when the log is collapsed so a healthy app is not
+    // polled for output nobody is looking at.
     useEffect(() => {
-        if (!applicationId || !running) return;
+        if (!applicationId || !running || !showLogs) return;
         void loadLog();
         const timer = setInterval(loadLog, 4000);
         return () => clearInterval(timer);
-    }, [applicationId, running, loadLog]);
+    }, [applicationId, running, showLogs, loadLog]);
 
     function run(action: () => Promise<{ error?: string }>) {
         setError(null);
@@ -133,21 +141,34 @@ export function InstalledAppDashboard({ app }: { app: InstalledAppDetail }) {
 
             {error && <p className="text-sm text-danger">{error}</p>}
 
+            {adaptedPanel}
+
             <Card>
                 <CardBody className="flex flex-col gap-2">
                     <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium">Logs</span>
-                        <Button size="sm" variant="ghost" onClick={() => void loadLog()} disabled={!applicationId}>
-                            <RefreshCw className="size-4" /> Refresh
-                        </Button>
+                        <button
+                            type="button"
+                            onClick={() => setShowLogs((value) => !value)}
+                            className="flex items-center gap-1 text-sm font-medium hover:text-foreground"
+                        >
+                            {showLogs ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
+                            Runtime logs
+                        </button>
+                        {showLogs && (
+                            <Button size="sm" variant="ghost" onClick={() => void loadLog()} disabled={!applicationId}>
+                                <RefreshCw className="size-4" /> Refresh
+                            </Button>
+                        )}
                     </div>
-                    <LogViewer
-                        log={log}
-                        name={app.name}
-                        searchable
-                        emptyText={running ? "Waiting for output..." : "The app is not running."}
-                        className="h-80"
-                    />
+                    {showLogs && (
+                        <LogViewer
+                            log={log}
+                            name={app.name}
+                            searchable
+                            emptyText={running ? "Waiting for output..." : "The app is not running."}
+                            className="h-80"
+                        />
+                    )}
                 </CardBody>
             </Card>
 
