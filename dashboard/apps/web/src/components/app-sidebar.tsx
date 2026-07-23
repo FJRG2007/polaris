@@ -25,6 +25,7 @@ import {
     Server,
     Settings,
     ShieldCheck,
+    Star,
     Trash2,
     Users,
     UsersRound,
@@ -44,6 +45,7 @@ const APP_SIDEBARS: Record<string, SidebarItem[]> = {
     drive: [
         { label: "Overview", href: "/overview", icon: LayoutDashboard },
         { label: "Files", href: "/drive", icon: FolderOpen },
+        { label: "Favorites", href: "/favorites", icon: Star },
         { label: "Recent", href: "/drive/recent", icon: Clock },
         { label: "Shared links", href: "/drive/shared-links", icon: Link2 },
         { label: "Drop points", href: "/drive/drop-points", icon: Inbox },

@@ -146,3 +146,24 @@ export async function moveItemMeta(connectionId: string, from: string, to: strin
     if (!isUuid(connectionId)) return;
     await prisma.driveItemMeta.updateMany({ where: { connectionId, path: from }, data: { path: to } });
 }
+
+/** A starred item, with the connection it lives on, for the Favorites view. */
+export interface FavoriteItem {
+    connectionId: string;
+    connectionName: string;
+    path: string;
+}
+
+/** Every item the user has starred, newest first, across all their connections. */
+export async function listFavorites(ownerId: string): Promise<FavoriteItem[]> {
+    const rows = await prisma.driveItemMeta.findMany({
+        where: { ownerId, favorite: true },
+        orderBy: { updatedAt: "desc" },
+        select: { connectionId: true, path: true, connection: { select: { name: true } } }
+    });
+    return rows.map((row) => ({
+        connectionId: row.connectionId,
+        connectionName: row.connection.name,
+        path: row.path
+    }));
+}
