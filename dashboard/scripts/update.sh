@@ -9,6 +9,13 @@
 # the image digest/provenance before deploying rather than trusting a moving tag.
 set -eu
 
+# Emit a completion marker with the exit code as the very last line, so the
+# dashboard's live update log can tell success from failure and stop tailing. The
+# trap fires on any exit, including a `set -e` abort. This script's stdout is
+# captured by the redirect in POLARIS_HOSTD_UPDATE_CMD, so the marker lands in the
+# shared log file the dashboard reads.
+trap 'echo "POLARIS_UPDATE_EXIT=$?"' EXIT
+
 # This script lives in dashboard/scripts/; the dashboard dir is its parent.
 dash_dir=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 

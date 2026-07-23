@@ -6,7 +6,7 @@
  * demand; the refresh forces a fresh GitHub comparison via the server action.
  */
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { CheckCircle2, DownloadCloud, RefreshCw, TriangleAlert } from "lucide-react";
 import { Button, Card, CardBody, CardHeader, CardTitle } from "@polaris/ui";
 import type { UpdateStatus } from "@/lib/update-service";
@@ -41,6 +41,11 @@ export function SettingsView({
     const [updating, setUpdating] = useState(false);
     const [updateMsg, setUpdateMsg] = useState<string | null>(null);
     const [showManual, setShowManual] = useState(false);
+    // Live update log, streamed from the shared file the updater writes.
+    const [logText, setLogText] = useState("");
+    const [logExit, setLogExit] = useState<number | null>(null);
+    const logRef = useRef<HTMLPreElement>(null);
+    const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
     function onCheck() {
         startTransition(async () => {
@@ -64,9 +69,11 @@ export function SettingsView({
         setShowManual(false);
         const { status: result } = await triggerHostUpdateAction();
         if (result === "started") {
-            setUpdateMsg("Pulling the new image and restarting - this page reconnects automatically when Polaris is back.");
-            waitForUpdate();
-            return; // stay in the updating state; the reload ends it
+            setUpdateMsg("Update started - streaming the log below. This page reconnects automatically when Polaris is back.");
+            setLogText("");
+            setLogExit(null);
+            pollLogs();
+            return; // stay in the updating state; the log's completion marker ends it
         }
         setUpdating(false);
         if (result === "unavailable") {
@@ -110,6 +117,74 @@ export function SettingsView({
             }
         }, 2000);
     }
+
+    function stopPolling(): void {
+        if (pollRef.current) {
+            clearInterval(pollRef.current);
+            pollRef.current = null;
+        }
+    }
+
+    // Tail the shared update log by byte offset, so progress streams live and the
+    // poll simply resumes after the web container is recreated mid-update. Stops on
+    // the completion marker (reloads on success, shows the log on failure). If no
+    // shared log exists yet - the case on the first update after this ships, before
+    // the log redirect is in .env - fall back to the health-based reload.
+    function pollLogs(): void {
+        let offset = 0;
+        let missing = 0;
+        let sawContent = false;
+        stopPolling();
+        pollRef.current = setInterval(async () => {
+            try {
+                const res = await fetch(`/api/updates/logs?offset=${offset}`, { cache: "no-store" });
+                if (!res.ok) return; // transient (or web restarting); keep trying
+                const data = (await res.json()) as {
+                    exists: boolean;
+                    content: string;
+                    nextOffset: number;
+                    done: boolean;
+                    exitCode: number | null;
+                };
+                if (!data.exists) {
+                    missing += 1;
+                    if (missing >= 4 && !sawContent) {
+                        stopPolling();
+                        setUpdateMsg("Updating - live logs will show from the next update. Reconnecting when Polaris is back...");
+                        waitForUpdate();
+                    }
+                    return;
+                }
+                offset = data.nextOffset;
+                if (data.content) {
+                    sawContent = true;
+                    const clean = data.content.replace(/POLARIS_UPDATE_EXIT=-?\d+\s*/g, "");
+                    if (clean) setLogText((prev) => prev + clean);
+                }
+                if (data.done) {
+                    stopPolling();
+                    setLogExit(data.exitCode);
+                    if (data.exitCode === 0) {
+                        setUpdateMsg("Update complete - reloading...");
+                        setTimeout(() => window.location.reload(), 1200);
+                    } else {
+                        setUpdating(false);
+                        setUpdateMsg(`Update failed (exit code ${data.exitCode ?? "unknown"}). See the log below.`);
+                    }
+                }
+            } catch {
+                // Web is restarting mid-update; keep polling until it returns.
+            }
+        }, 1200);
+    }
+
+    // Keep the log view scrolled to the newest line as it streams.
+    useEffect(() => {
+        if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
+    }, [logText]);
+
+    // Stop the interval if the page unmounts mid-update.
+    useEffect(() => stopPolling, []);
 
     const behind = typeof status.behindBy === "number" && status.behindBy > 0;
 
@@ -187,6 +262,27 @@ export function SettingsView({
                                     Run <code className="text-foreground">polaris update</code> on the host to pull the
                                     latest image and redeploy.
                                 </p>
+                            ) : null}
+                            {updating || logText ? (
+                                <div className="flex flex-col gap-1">
+                                    <div className="flex items-center gap-2">
+                                        <span className="font-medium text-foreground">Update log</span>
+                                        {updating && logExit === null ? (
+                                            <RefreshCw className="size-3 animate-spin text-muted-foreground" />
+                                        ) : null}
+                                        {logExit !== null ? (
+                                            <span className={logExit === 0 ? "text-success" : "text-danger"}>
+                                                {logExit === 0 ? "success" : `failed (exit ${logExit})`}
+                                            </span>
+                                        ) : null}
+                                    </div>
+                                    <pre
+                                        ref={logRef}
+                                        className="max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-md border border-border bg-foreground/[0.04] p-2 font-mono text-[11px] leading-relaxed text-foreground"
+                                    >
+                                        {logText || "Waiting for the updater to start..."}
+                                    </pre>
+                                </div>
                             ) : null}
                         </div>
                     ) : null}

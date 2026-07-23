@@ -301,7 +301,14 @@ configure_edition() {
         # unset and the working tree is correct.
         host_repo="${POLARIS_HOST_REPO:-$(cd ../.. && pwd)}"
         set_env_var "$env_file" "COMPOSE_PROFILES" "full"
-        update_cmd="docker rm -f polaris-updater >/dev/null 2>&1; docker run --name polaris-updater --rm -e POLARIS_HOST_REPO=${host_repo} -v /var/run/docker.sock:/var/run/docker.sock -v ${host_repo}:/polaris -w /polaris/dashboard ghcr.io/fjrg2007/polaris-updater:latest sh scripts/update.sh"
+        # The updater runs in the foreground, so redirecting the `docker run` output
+        # to the shared polaris-run volume (mounted in both hostd and web at
+        # /run/polaris) streams the whole update - git pull, image pull, migrations,
+        # redeploy, verify - to a file the dashboard tails live, and survives the web
+        # container being recreated mid-update. `>` truncates it, so each run starts
+        # clean; update.sh appends a POLARIS_UPDATE_EXIT=<code> marker on exit. No `$`
+        # in this value, so Compose never tries to interpolate it.
+        update_cmd="docker rm -f polaris-updater >/dev/null 2>&1; docker run --name polaris-updater --rm -e POLARIS_HOST_REPO=${host_repo} -v /var/run/docker.sock:/var/run/docker.sock -v ${host_repo}:/polaris -w /polaris/dashboard ghcr.io/fjrg2007/polaris-updater:latest sh scripts/update.sh > /run/polaris/update.log 2>&1"
         set_env_var "$env_file" "POLARIS_HOSTD_UPDATE_CMD" "$update_cmd"
         log "full edition (privileged host daemon, in-band updates, local Docker host)"
     else
