@@ -10,6 +10,7 @@
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Loader2 } from "lucide-react";
 import {
     Badge,
@@ -98,19 +99,21 @@ function InstalledSection({ installed }: { installed: InstalledAppView[] }) {
             <h2 className="text-sm font-medium text-muted-foreground">Installed</h2>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
                 {installed.map((item) => (
-                    <Card key={item.id}>
-                        <CardBody className="flex items-center justify-between gap-3 py-3">
-                            <span className="truncate text-sm font-medium">{item.name}</span>
-                            <Badge
-                                className={cn(
-                                    item.status === "failed" && "border-danger/40 text-danger",
-                                    item.status === "running" && "border-success/40 text-success"
-                                )}
-                            >
-                                {STATUS_LABEL[item.status] ?? item.status}
-                            </Badge>
-                        </CardBody>
-                    </Card>
+                    <Link key={item.id} href={`/apps/installed/${item.id}`}>
+                        <Card className="transition-colors hover:border-border">
+                            <CardBody className="flex items-center justify-between gap-3 py-3">
+                                <span className="truncate text-sm font-medium">{item.name}</span>
+                                <Badge
+                                    className={cn(
+                                        item.status === "failed" && "border-danger/40 text-danger",
+                                        item.status === "running" && "border-success/40 text-success"
+                                    )}
+                                >
+                                    {STATUS_LABEL[item.status] ?? item.status}
+                                </Badge>
+                            </CardBody>
+                        </Card>
+                    </Link>
                 ))}
             </div>
         </section>

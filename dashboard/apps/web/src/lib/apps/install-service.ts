@@ -9,7 +9,7 @@
 import { prisma } from "@polaris/db";
 import { getOrCreateHostTarget, getOrCreateLocalTarget } from "@/lib/deploy-target-service";
 import { listHosts } from "@/lib/host-service";
-import { createApplication, createProject, deployApplication } from "@/lib/deploy-service";
+import { createApplication, createProject, deleteApplication, deployApplication } from "@/lib/deploy-service";
 import { createVolume } from "@/lib/deploy-volume-service";
 import { setEnvVars } from "@/lib/env-var-service";
 import { findApp, isInstallable } from "@/lib/apps/catalog";
@@ -152,4 +152,56 @@ export async function listInstalledApps(ownerId: string): Promise<InstalledAppVi
         targetId: row.targetId,
         createdAt: row.createdAt.toISOString()
     }));
+}
+
+export interface InstalledAppDetail extends InstalledAppView {
+    /** Catalog display name and how its dashboard is rendered. */
+    catalogName: string;
+    dashboardKind: string;
+    /** The backing Deploy Application's live state (running | stopped | ...). */
+    applicationStatus: string | null;
+    /** The server it runs on. */
+    serverName: string | null;
+}
+
+/** One installed app with its backing application state, or null if not the
+ *  owner's. Application/target are looked up by id (no FK, per the model). */
+export async function getInstalledApp(ownerId: string, id: string): Promise<InstalledAppDetail | null> {
+    const row = await prisma.installedApp.findFirst({ where: { id, ownerId } });
+    if (!row) return null;
+    const manifest = findApp(row.catalogId);
+    const application = row.applicationId
+        ? await prisma.application.findFirst({ where: { id: row.applicationId }, select: { desiredState: true } })
+        : null;
+    const target = row.targetId
+        ? await prisma.deployTarget.findFirst({ where: { id: row.targetId }, select: { name: true } })
+        : null;
+    return {
+        id: row.id,
+        catalogId: row.catalogId,
+        name: row.name,
+        status: row.status,
+        applicationId: row.applicationId,
+        targetId: row.targetId,
+        createdAt: row.createdAt.toISOString(),
+        catalogName: manifest?.name ?? row.catalogId,
+        dashboardKind: manifest?.dashboard ?? "generic",
+        applicationStatus: application?.desiredState ?? null,
+        serverName: target?.name ?? null
+    };
+}
+
+/** Remove an installed app: tear down its Deploy application (best effort, it may
+ *  already be gone) and mark the install removed so it drops out of the lists. */
+export async function uninstallApp(ownerId: string, id: string): Promise<void> {
+    const row = await prisma.installedApp.findFirst({ where: { id, ownerId } });
+    if (!row) throw new Error("Installed app not found");
+    if (row.applicationId) {
+        try {
+            await deleteApplication(row.applicationId, ownerId);
+        } catch {
+            // The application may already have been removed in Deploy; proceed.
+        }
+    }
+    await prisma.installedApp.update({ where: { id: row.id }, data: { status: "removed" } });
 }
