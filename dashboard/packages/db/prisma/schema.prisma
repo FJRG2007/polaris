@@ -899,6 +899,24 @@ model Message {
     @@index([externalId])
 }
 
+// A saved contact for starting outbound conversations from the Inbox, per owner.
+// Bound to a platform + platform-side peer id (a WhatsApp number/JID, a Telegram
+// chat id, ...); the same person on two platforms is two rows. No FK to Channel -
+// a contact is reachable on any channel of its platform.
+model Contact {
+    id        String   @id @default(uuid(7)) @db.Uuid
+    ownerId   String   @db.Uuid
+    name      String
+    platform  String
+    peerId    String
+    note      String?
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@unique([ownerId, platform, peerId])
+    @@index([ownerId])
+}
+
 // ---------------------------------------------------------------------------
 // Deploy (Railway-style app/database orchestration)
 // ---------------------------------------------------------------------------

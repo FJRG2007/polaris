@@ -15,15 +15,20 @@ import {
     assignConversation,
     channelState,
     connectChannel,
+    createContact,
     deleteChannel,
+    deleteContact,
     getConversationMessages,
     listAgents,
     listChannels,
+    listContacts,
     listConversations,
     sendConversationMessage,
+    startConversation,
     type AgentView,
     type ChannelLiveState,
     type ChannelView,
+    type ContactView,
     type ConversationView,
     type MessageView
 } from "@/lib/messaging-service";
@@ -144,5 +149,64 @@ export async function sendMessageAction(input: z.infer<typeof sendSchema>): Prom
         return {};
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Could not send the message" };
+    }
+}
+
+const startConversationSchema = z.object({
+    channelId: z.string().uuid(),
+    peerId: z.string().trim().min(1).max(256),
+    peerName: z.string().trim().max(120).optional(),
+    text: z.string().trim().min(1).max(8192)
+});
+
+/** Start a new outbound conversation and send its first message. */
+export async function startConversationAction(
+    input: z.infer<typeof startConversationSchema>
+): Promise<{ error?: string; conversationId?: string }> {
+    const user = await requireUser();
+    const parsed = startConversationSchema.safeParse(input);
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the form" };
+    try {
+        const { conversationId } = await startConversation(user.id, user.id, parsed.data);
+        revalidatePath("/inbox");
+        return { conversationId };
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not start the chat" };
+    }
+}
+
+export async function listContactsAction(): Promise<ContactView[]> {
+    const user = await requireUser();
+    return listContacts(user.id);
+}
+
+const createContactSchema = z.object({
+    name: z.string().trim().min(1).max(120),
+    platform: z.enum(PLATFORMS),
+    peerId: z.string().trim().min(1).max(256),
+    note: z.string().trim().max(500).optional()
+});
+
+/** Save (or update) a contact for starting chats. */
+export async function createContactAction(
+    input: z.infer<typeof createContactSchema>
+): Promise<{ error?: string; contact?: ContactView }> {
+    const user = await requireUser();
+    const parsed = createContactSchema.safeParse(input);
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the form" };
+    try {
+        return { contact: await createContact(user.id, parsed.data) };
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not save the contact" };
+    }
+}
+
+export async function deleteContactAction(id: string): Promise<{ error?: string }> {
+    const user = await requireUser();
+    try {
+        await deleteContact(user.id, id);
+        return {};
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not remove the contact" };
     }
 }
