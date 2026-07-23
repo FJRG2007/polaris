@@ -23,6 +23,7 @@ import { ensureLocalCa } from "./local-ca-service";
 import { gitBuildContext, type GitSource } from "./git-build-service";
 import { getLatestCommit, githubCloneAuthHeader } from "./github-service";
 import { resolveRegistryLogin } from "./registry-credential-service";
+import { quickTunnelAppIds, tunnelHostForApp, stopQuickTunnel } from "./deploy/quick-tunnel-service";
 
 /** Directory the web process writes deploy log files to (tailed by the UI). */
 function logDir(): string {
@@ -290,6 +291,27 @@ export async function syncAppRoutes(): Promise<void> {
             remotePending.push(domain.hostname);
         }
     }
+    // Quick-tunnel traffic must traverse the edge too, or its requests never reach the
+    // access log the HTTP Logs view reads. Route each live tunnel's internal host to the
+    // app over plain HTTP (TLS is terminated at Cloudflare's edge, ahead of the tunnel).
+    if (localIp) {
+        const tunnelAppIds = await quickTunnelAppIds();
+        if (tunnelAppIds.length > 0) {
+            const localTunnelApps = await prisma.application.findMany({
+                where: { id: { in: tunnelAppIds }, target: { kind: "local" } },
+                select: { id: true }
+            });
+            for (const app of localTunnelApps) {
+                localRoutes.push({
+                    id: `qtunnel-${shortHash(app.id, 8)}`,
+                    hostname: tunnelHostForApp(app.id),
+                    certResolver: "none",
+                    dialHost: localIp,
+                    dialPort: hostPortForApp(app.id)
+                });
+            }
+        }
+    }
     await new LocalRouter().sync(localRoutes);
     if (remotePending.length > 0) {
         console.warn(
@@ -495,6 +517,9 @@ async function readAppHttpEntries(applicationId: string, ownerId: string, tail: 
     const { container, target } = await appRuntime(applicationId, ownerId);
     const domains = await prisma.domain.findMany({ where: { applicationId }, select: { hostname: true } });
     const hosts = new Set(domains.map((domain) => domain.hostname.toLowerCase()));
+    // The quick tunnel routes through the edge under this internal host, so its requests
+    // are logged there under it - include it so tunnel traffic shows in the HTTP Logs.
+    hosts.add(tunnelHostForApp(applicationId).toLowerCase());
 
     const fromEdge = await readProxyAccessEntries(hosts, tail);
     if (fromEdge.length > 0) return fromEdge;
@@ -589,6 +614,13 @@ export async function removeApplicationDeployment(applicationId: string, ownerId
         else await ports.composeDown(project);
     } finally {
         await ports.dispose();
+    }
+    // Tear down the app's quick tunnel alongside its deployment: the cloudflared sidecar
+    // now forwards to a container that is gone, so leaving it up leaks a live public URL
+    // and an orphan liveness record the boot reconcile keeps revisiting. Only apps with a
+    // tunnel carry a liveness record, so this is a no-op for the rest.
+    if ((await quickTunnelAppIds()).includes(applicationId)) {
+        await stopQuickTunnel(applicationId, ownerId).catch(() => undefined);
     }
     await prisma.deployment.updateMany({
         where: { deployableType: "application", deployableId: applicationId, status: { in: ["running", "stopped"] } },

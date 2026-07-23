@@ -32,6 +32,11 @@ export async function register(): Promise<void> {
     const { syncAppRoutes, reconcileNasMounts } = await import("./lib/deploy-service");
     void syncAppRoutes().catch((error) => console.error("polaris: initial route sync failed:", error));
 
+    // Migrate any quick tunnel still forwarding straight to an app's port onto the edge,
+    // so its traffic is logged (and future restarts leave an edge tunnel untouched).
+    const { reconcileQuickTunnels } = await import("./lib/deploy/quick-tunnel-service");
+    void reconcileQuickTunnels().catch((error) => console.error("polaris: quick-tunnel reconcile failed:", error));
+
     // Re-establish NAS volume mounts a host reboot dropped, restarting any app whose
     // mount had to be re-created - so a NAS-backed volume survives reboots like a real
     // docker volume. Best-effort; a routine restart keeps live mounts and is a no-op.
