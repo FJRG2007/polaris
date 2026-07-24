@@ -23,6 +23,8 @@ import {
     listChannels,
     listContacts,
     listConversations,
+    reconnectChannel,
+    renameChannel,
     sendConversationMessage,
     startConversation,
     type AgentView,
@@ -95,6 +97,34 @@ export async function deleteChannelAction(channelId: string): Promise<{ error?: 
         return {};
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Could not remove the channel" };
+    }
+}
+
+const renameChannelSchema = z.object({ channelId: z.string().uuid(), name: z.string().trim().min(1).max(64) });
+
+/** Rename a channel's display name. */
+export async function renameChannelAction(input: z.infer<typeof renameChannelSchema>): Promise<{ error?: string }> {
+    const user = await requireUser();
+    const parsed = renameChannelSchema.safeParse(input);
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Enter a name" };
+    try {
+        await renameChannel(user.id, parsed.data.channelId, parsed.data.name);
+        revalidatePath("/inbox");
+        return {};
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not rename the channel" };
+    }
+}
+
+/** Re-establish a channel's adapter, reusing its stored credentials. */
+export async function reconnectChannelAction(channelId: string): Promise<{ error?: string; status?: string }> {
+    const user = await requireUser();
+    try {
+        const { status } = await reconnectChannel(user.id, channelId);
+        revalidatePath("/inbox");
+        return { status };
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not reconnect the channel" };
     }
 }
 

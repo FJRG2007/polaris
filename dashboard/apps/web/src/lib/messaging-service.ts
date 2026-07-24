@@ -148,6 +148,54 @@ export async function connectChannel(
     }
 }
 
+/** Rename a channel (display name only). */
+export async function renameChannel(ownerId: string, channelId: string, name: string): Promise<void> {
+    const channel = await prisma.channel.findFirst({ where: { id: channelId, ownerId }, select: { id: true } });
+    if (!channel) throw new Error("Channel not found");
+    const trimmed = name.trim();
+    if (!trimmed) throw new Error("Enter a name");
+    await prisma.channel.update({ where: { id: channel.id }, data: { name: trimmed } });
+}
+
+/** Re-establish a channel's live adapter in the bridge, reusing its stored
+ *  credentials (no need to re-enter a token). For token channels this fixes an
+ *  errored connection in place; whatsapp-web restores from its session when valid. */
+export async function reconnectChannel(ownerId: string, channelId: string): Promise<{ status: string }> {
+    const env = loadEnv();
+    const channel = await prisma.channel.findFirst({ where: { id: channelId, ownerId } });
+    if (!channel) throw new Error("Channel not found");
+    const token =
+        channel.encryptedSecret && channel.secretNonce && channel.secretKeyId
+            ? decryptSecret(
+                  {
+                      ciphertext: Buffer.from(channel.encryptedSecret),
+                      nonce: Buffer.from(channel.secretNonce),
+                      keyId: channel.secretKeyId
+                  },
+                  env.POLARIS_MASTER_KEY
+              )
+            : undefined;
+    let providerConfig: Record<string, string> | undefined;
+    try {
+        providerConfig = (JSON.parse(channel.config) as { providerConfig?: Record<string, string> }).providerConfig;
+    } catch {
+        providerConfig = undefined;
+    }
+    const result = await bridgeConnectChannel({
+        channelId: channel.id,
+        platform: channel.platform as Platform,
+        provider: channel.provider ?? undefined,
+        token,
+        config: providerConfig
+    });
+    const status = result.externalId ? "connected" : "connecting";
+    await prisma.channel.update({
+        where: { id: channel.id },
+        data: { status, ...(result.externalId ? { externalId: result.externalId } : {}) }
+    });
+    return { status };
+}
+
 /** Disconnect and forget a channel (and its conversations, by cascade). */
 export async function deleteChannel(ownerId: string, channelId: string): Promise<void> {
     const channel = await prisma.channel.findFirst({ where: { id: channelId, ownerId } });

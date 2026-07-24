@@ -10,7 +10,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import type { ReactElement } from "react";
-import { Loader2, MessagesSquare, Plus, Send, Trash2, Users } from "lucide-react";
+import { Check, Loader2, MessagesSquare, Pencil, Plus, RefreshCw, Send, Trash2, Users, X } from "lucide-react";
 import {
     Badge,
     Button,
@@ -36,6 +36,8 @@ import {
     listAgentsAction,
     listContactsAction,
     listConversationsAction,
+    reconnectChannelAction,
+    renameChannelAction,
     sendMessageAction,
     startConversationAction
 } from "./actions";
@@ -110,9 +112,14 @@ export function InboxView({
             {channels.length > 0 && (
                 <div className="flex flex-wrap gap-2">
                     {channels.map((channel) => (
-                        <ChannelChip
+                        <ChannelCard
                             key={channel.id}
                             channel={channel}
+                            onUpdated={(id, patch) =>
+                                setChannels((current) =>
+                                    current.map((item) => (item.id === id ? { ...item, ...patch } : item))
+                                )
+                            }
                             onRemoved={(id) => {
                                 setChannels((current) => current.filter((item) => item.id !== id));
                                 void refreshConversations();
@@ -205,34 +212,130 @@ export function InboxView({
     );
 }
 
-function ChannelChip({ channel, onRemoved }: { channel: ChannelView; onRemoved: (id: string) => void }) {
+function ChannelCard({
+    channel,
+    onUpdated,
+    onRemoved
+}: {
+    channel: ChannelView;
+    onUpdated: (id: string, patch: Partial<ChannelView>) => void;
+    onRemoved: (id: string) => void;
+}) {
     const [pending, startTransition] = useTransition();
     const [confirming, setConfirming] = useState(false);
+    const [editing, setEditing] = useState(false);
+    const [name, setName] = useState(channel.name);
     const [error, setError] = useState<string | null>(null);
-    const tone =
-        channel.status === "connected"
-            ? "border-success/40 text-success"
-            : channel.status === "error"
-              ? "border-danger/40 text-danger"
-              : undefined;
+
+    const meta = PLATFORM_LOGO[channel.platform];
+    const Logo = meta?.Logo;
+    const connected = channel.status === "connected";
+
+    function saveName() {
+        const trimmed = name.trim();
+        if (!trimmed || trimmed === channel.name) {
+            setEditing(false);
+            setName(channel.name);
+            return;
+        }
+        startTransition(async () => {
+            const result = await renameChannelAction({ channelId: channel.id, name: trimmed });
+            if (result.error) {
+                setError(result.error);
+                return;
+            }
+            onUpdated(channel.id, { name: trimmed });
+            setEditing(false);
+        });
+    }
+
+    function reconnect() {
+        setError(null);
+        startTransition(async () => {
+            const result = await reconnectChannelAction(channel.id);
+            if (result.error) {
+                setError(result.error);
+                return;
+            }
+            if (result.status) onUpdated(channel.id, { status: result.status });
+        });
+    }
+
     return (
         <>
-            <span className="flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs">
-                <span className="font-medium">{channel.name}</span>
-                <Badge className={cn(tone)}>{channel.status}</Badge>
-                <button
-                    type="button"
-                    aria-label="Remove channel"
-                    className="text-muted-foreground hover:text-danger disabled:opacity-50"
-                    disabled={pending}
-                    onClick={() => {
-                        setError(null);
-                        setConfirming(true);
-                    }}
+            <div className="flex items-center gap-2 rounded-md border border-border bg-surface/40 px-2.5 py-1.5">
+                <div
+                    className="grid size-7 shrink-0 place-items-center rounded"
+                    style={{ color: meta?.color, backgroundColor: meta ? `${meta.color}1a` : undefined }}
                 >
-                    <Trash2 className="size-3.5" />
-                </button>
-            </span>
+                    {Logo ? <Logo className="size-4" /> : <MessagesSquare className="size-4" />}
+                </div>
+                {editing ? (
+                    <>
+                        <Input
+                            value={name}
+                            autoFocus
+                            onChange={(event) => setName(event.target.value)}
+                            onKeyDown={(event) => {
+                                if (event.key === "Enter") saveName();
+                                if (event.key === "Escape") {
+                                    setEditing(false);
+                                    setName(channel.name);
+                                }
+                            }}
+                            className="h-7 w-36 text-xs"
+                        />
+                        <button type="button" aria-label="Save" className="text-success disabled:opacity-50" disabled={pending} onClick={saveName}>
+                            <Check className="size-4" />
+                        </button>
+                        <button
+                            type="button"
+                            aria-label="Cancel"
+                            className="text-muted-foreground hover:text-foreground"
+                            onClick={() => {
+                                setEditing(false);
+                                setName(channel.name);
+                            }}
+                        >
+                            <X className="size-4" />
+                        </button>
+                    </>
+                ) : (
+                    <>
+                        <div className="flex min-w-0 flex-col leading-tight">
+                            <span className="truncate text-xs font-medium">{channel.name}</span>
+                            <span className="text-[10px] text-muted-foreground">
+                                {PLATFORM_LABEL[channel.platform] ?? channel.platform}
+                                {channel.provider === "whatsapp-cloud" ? " Cloud" : ""}
+                            </span>
+                        </div>
+                        <Badge className={cn(CHANNEL_STATUS_TONE[channel.status])}>{channel.status}</Badge>
+                        <div className="flex items-center gap-1 text-muted-foreground">
+                            <button type="button" aria-label="Rename" className="hover:text-foreground disabled:opacity-50" disabled={pending} onClick={() => setEditing(true)}>
+                                <Pencil className="size-3.5" />
+                            </button>
+                            {!connected && (
+                                <button type="button" aria-label="Reconnect" className="hover:text-foreground disabled:opacity-50" disabled={pending} onClick={reconnect}>
+                                    <RefreshCw className={cn("size-3.5", pending && "animate-spin")} />
+                                </button>
+                            )}
+                            <button
+                                type="button"
+                                aria-label="Remove channel"
+                                className="hover:text-danger disabled:opacity-50"
+                                disabled={pending}
+                                onClick={() => {
+                                    setError(null);
+                                    setConfirming(true);
+                                }}
+                            >
+                                <Trash2 className="size-3.5" />
+                            </button>
+                        </div>
+                    </>
+                )}
+            </div>
+            {error && !editing && <span className="sr-only">{error}</span>}
             <Dialog open={confirming} onOpenChange={(open) => !pending && setConfirming(open)}>
                 <DialogContent>
                     <DialogHeader>
@@ -814,12 +917,28 @@ const PLATFORM_LABEL: Record<string, string> = {
     slack: "Slack"
 };
 
+/** Brand logo + color per platform, for distinguishing channels at a glance. */
+const PLATFORM_LOGO: Record<string, { Logo: (props: { className?: string }) => ReactElement; color: string }> = {
+    whatsapp: { Logo: WhatsAppLogo, color: "#25D366" },
+    telegram: { Logo: TelegramLogo, color: "#229ED9" },
+    discord: { Logo: DiscordLogo, color: "#5865F2" },
+    slack: { Logo: SlackLogo, color: "#E01E5A" }
+};
+
+const CHANNEL_STATUS_TONE: Record<string, string> = {
+    connected: "border-success/40 text-success",
+    connecting: "border-warning/40 text-warning",
+    qr: "border-warning/40 text-warning",
+    error: "border-danger/40 text-danger",
+    disconnected: "border-danger/40 text-danger"
+};
+
 // Per-platform hint for the recipient id when starting a chat or saving a contact.
 const PEER_HINT: Record<string, string> = {
     whatsapp: "Phone number with country code, e.g. 34600111222",
-    telegram: "Numeric chat id - they must have messaged the bot first",
-    discord: "User or channel id",
-    slack: "Channel or user id"
+    telegram: "Numeric chat id, not a @username. The person must have messaged the bot first (Telegram bots can't start a chat).",
+    discord: "A channel id the bot can post to",
+    slack: "A channel or user id"
 };
 
 const PLATFORM_OPTIONS = [
@@ -926,8 +1045,9 @@ function NewChatDialog({
                         <Input
                             value={peerId}
                             onChange={(event) => setPeerId(event.target.value)}
-                            placeholder={PEER_HINT[platform] ?? "Recipient id"}
+                            placeholder={platform === "whatsapp" ? "34600111222" : "Recipient id"}
                         />
+                        {PEER_HINT[platform] && <span className="text-xs text-muted-foreground">{PEER_HINT[platform]}</span>}
                     </label>
                     <label className="flex flex-col gap-1 text-sm">
                         <span className="font-medium">Name (optional)</span>
