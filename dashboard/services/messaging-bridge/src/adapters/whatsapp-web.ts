@@ -170,7 +170,7 @@ export class WhatsAppWebAdapter implements ChannelAdapter {
             // A detached frame / closed target means the WhatsApp Web page died and the
             // linked session is gone. Reflect it as disconnected so the UI can prompt a
             // re-link (QR) instead of showing a stale "connected" while every send fails.
-            if (/detached frame|target closed|session closed|execution context was destroyed/i.test(detail)) {
+            if (/detached frame|frame (was )?detached|target closed|session closed|execution context was destroyed/i.test(detail)) {
                 this.state = {
                     status: "disconnected",
                     detail: "WhatsApp Web session lost - reconnect to re-link the device"

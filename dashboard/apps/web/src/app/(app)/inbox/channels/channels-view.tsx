@@ -270,6 +270,13 @@ function ChannelManageDialog({
             if (state.status === "connected") {
                 onUpdated(channel.id, { status: "connected" });
                 setLinking(false);
+            } else if (state.status === "error" || state.status === "disconnected") {
+                // Terminal failure (e.g. QR retries exhausted): stop polling so we stop
+                // hammering the bridge and re-persisting the dead status every 2.5s, and
+                // re-enable the Re-link button so "try Re-link again" is actionable.
+                setQr(null);
+                onUpdated(channel.id, { status: state.status });
+                setLinking(false);
             }
         };
         void poll();
@@ -340,6 +347,7 @@ function ChannelManageDialog({
     }
 
     const busy = saving || reconnecting || removing;
+    const linkFailed = isWeb && (qrStatus === "error" || qrStatus === "disconnected");
 
     return (
         <Dialog open onOpenChange={(open) => !open && !busy && onClose()}>
@@ -390,9 +398,9 @@ function ChannelManageDialog({
                         </Button>
                     </div>
 
-                    {isWeb && linking && (
+                    {isWeb && (linking || linkFailed) && (
                         <div className="flex flex-col items-center gap-3 rounded-md border border-border p-3">
-                            {qr ? (
+                            {linkFailed ? null : qr ? (
                                 // A data-URL QR; next/image does not handle these.
                                 // eslint-disable-next-line @next/next/no-img-element
                                 <img
@@ -406,11 +414,9 @@ function ChannelManageDialog({
                                 </div>
                             )}
                             <p className="text-center text-xs text-muted-foreground">
-                                {qrStatus === "connected"
-                                    ? "Connected."
-                                    : qrStatus === "error"
-                                      ? "Connection failed - try Re-link again."
-                                      : "On your phone: WhatsApp > Linked devices > Link a device, then scan this code."}
+                                {linkFailed
+                                    ? "Connection failed - try Re-link again."
+                                    : "On your phone: WhatsApp > Linked devices > Link a device, then scan this code."}
                             </p>
                         </div>
                     )}
