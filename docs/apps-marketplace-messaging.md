@@ -130,6 +130,12 @@ derived from installed capabilities.
   platform message id.
 - `InteractivePrompt` - normalized "offer these options"; rendered per
   capability (native buttons/selects, or a WhatsApp Poll / numbered menu).
+- `Contact` - a saved person for starting outbound chats, per owner (name +
+  optional note), independent of platform.
+- `ContactIdentity` - one of a contact's messaging handles on a single platform
+  (a WhatsApp number, a Telegram chat id, ...), unique per owner + platform +
+  peer id. The same person on WhatsApp and Telegram is one `Contact` with two
+  identities.
 
 ### Channel adapter (the abstraction)
 

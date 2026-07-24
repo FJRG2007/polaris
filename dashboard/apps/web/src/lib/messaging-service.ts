@@ -10,8 +10,18 @@ import { loadEnv } from "@polaris/config";
 import { prisma } from "@polaris/db";
 import { decryptSecret, encryptSecret } from "@polaris/storage";
 import { capabilitiesFor } from "@polaris/messaging";
-import type { ChannelCapabilities, InteractivePrompt, InboundEvent, Platform } from "@polaris/messaging";
-import { bridgeChannelState, bridgeConnectChannel, bridgeDisconnectChannel, bridgeSend } from "./messaging/bridge-client";
+import type {
+    ChannelCapabilities,
+    InteractivePrompt,
+    InboundEvent,
+    Platform
+} from "@polaris/messaging";
+import {
+    bridgeChannelState,
+    bridgeConnectChannel,
+    bridgeDisconnectChannel,
+    bridgeSend
+} from "./messaging/bridge-client";
 
 export interface ChannelView {
     id: string;
@@ -68,7 +78,10 @@ function parseCapabilities(config: string): ChannelCapabilities | null {
 
 /** The owner's channels. */
 export async function listChannels(ownerId: string): Promise<ChannelView[]> {
-    const rows = await prisma.channel.findMany({ where: { ownerId }, orderBy: { createdAt: "asc" } });
+    const rows = await prisma.channel.findMany({
+        where: { ownerId },
+        orderBy: { createdAt: "asc" }
+    });
     return rows.map((row) => ({
         id: row.id,
         platform: row.platform,
@@ -85,7 +98,13 @@ export async function listChannels(ownerId: string): Promise<ChannelView[]> {
  *  operator can retry. */
 export async function connectChannel(
     ownerId: string,
-    input: { platform: Platform; provider?: string; name: string; token?: string; config?: Record<string, string> }
+    input: {
+        platform: Platform;
+        provider?: string;
+        name: string;
+        token?: string;
+        config?: Record<string, string>;
+    }
 ): Promise<ChannelView> {
     const env = loadEnv();
     // Clean up a prior failed/in-progress attempt with the same name on this
@@ -111,7 +130,10 @@ export async function connectChannel(
             provider: input.provider ?? null,
             name: input.name,
             status: "connecting",
-            config: JSON.stringify({ capabilities: capabilitiesFor(input.platform, input.provider), providerConfig }),
+            config: JSON.stringify({
+                capabilities: capabilitiesFor(input.platform, input.provider),
+                providerConfig
+            }),
             encryptedSecret: blob?.ciphertext ?? null,
             secretNonce: blob?.nonce ?? null,
             secretKeyId: blob?.keyId ?? null
@@ -152,8 +174,15 @@ export async function connectChannel(
 }
 
 /** Rename a channel (display name only). */
-export async function renameChannel(ownerId: string, channelId: string, name: string): Promise<void> {
-    const channel = await prisma.channel.findFirst({ where: { id: channelId, ownerId }, select: { id: true } });
+export async function renameChannel(
+    ownerId: string,
+    channelId: string,
+    name: string
+): Promise<void> {
+    const channel = await prisma.channel.findFirst({
+        where: { id: channelId, ownerId },
+        select: { id: true }
+    });
     if (!channel) throw new Error("Channel not found");
     const trimmed = name.trim();
     if (!trimmed) throw new Error("Enter a name");
@@ -163,7 +192,10 @@ export async function renameChannel(ownerId: string, channelId: string, name: st
 /** Re-establish a channel's live adapter in the bridge, reusing its stored
  *  credentials (no need to re-enter a token). For token channels this fixes an
  *  errored connection in place; whatsapp-web restores from its session when valid. */
-export async function reconnectChannel(ownerId: string, channelId: string): Promise<{ status: string }> {
+export async function reconnectChannel(
+    ownerId: string,
+    channelId: string
+): Promise<{ status: string }> {
     const env = loadEnv();
     const channel = await prisma.channel.findFirst({ where: { id: channelId, ownerId } });
     if (!channel) throw new Error("Channel not found");
@@ -180,7 +212,8 @@ export async function reconnectChannel(ownerId: string, channelId: string): Prom
             : undefined;
     let providerConfig: Record<string, string> | undefined;
     try {
-        providerConfig = (JSON.parse(channel.config) as { providerConfig?: Record<string, string> }).providerConfig;
+        providerConfig = (JSON.parse(channel.config) as { providerConfig?: Record<string, string> })
+            .providerConfig;
     } catch {
         providerConfig = undefined;
     }
@@ -268,7 +301,10 @@ export async function assignConversation(
 }
 
 /** A conversation's messages, oldest first; marks it read. */
-export async function getConversationMessages(ownerId: string, conversationId: string): Promise<MessageView[]> {
+export async function getConversationMessages(
+    ownerId: string,
+    conversationId: string
+): Promise<MessageView[]> {
     const conversation = await prisma.conversation.findFirst({
         where: { id: conversationId, channel: { ownerId } },
         select: { id: true }
@@ -279,7 +315,8 @@ export async function getConversationMessages(ownerId: string, conversationId: s
         orderBy: { createdAt: "asc" },
         take: 500
     });
-    if (rows.length > 0) await prisma.conversation.update({ where: { id: conversationId }, data: { unread: 0 } });
+    if (rows.length > 0)
+        await prisma.conversation.update({ where: { id: conversationId }, data: { unread: 0 } });
     return rows.map((row) => ({
         id: row.id,
         direction: row.direction,
@@ -320,12 +357,17 @@ export async function sendConversationMessage(
             direction: "outbound",
             kind: content.interactive ? "interactive" : "text",
             body: content.text ?? content.interactive?.text ?? null,
-            payload: content.interactive ? JSON.stringify({ interactive: content.interactive }) : null,
+            payload: content.interactive
+                ? JSON.stringify({ interactive: content.interactive })
+                : null,
             ack: "sent",
             senderId
         }
     });
-    await prisma.conversation.update({ where: { id: conversationId }, data: { lastMessageAt: new Date() } });
+    await prisma.conversation.update({
+        where: { id: conversationId },
+        data: { lastMessageAt: new Date() }
+    });
 
     try {
         const result = await bridgeSend(conversation.channel.id, {
@@ -334,7 +376,10 @@ export async function sendConversationMessage(
             interactive: content.interactive
         });
         if (result.externalId) {
-            await prisma.message.update({ where: { id: message.id }, data: { externalId: result.externalId } });
+            await prisma.message.update({
+                where: { id: message.id },
+                data: { externalId: result.externalId }
+            });
         }
     } catch (caught) {
         await prisma.message.update({ where: { id: message.id }, data: { ack: "failed" } });
@@ -378,7 +423,8 @@ export async function startConversation(
         select: { id: true, platform: true, status: true }
     });
     if (!channel) throw new Error("Channel not found");
-    if (channel.status !== "connected") throw new Error("Connect the channel before starting a chat");
+    if (channel.status !== "connected")
+        throw new Error("Connect the channel before starting a chat");
     const peerId = normalizePeerId(channel.platform, input.peerId);
     if (!peerId) throw new Error("Enter who to message");
 
@@ -392,37 +438,196 @@ export async function startConversation(
     return { conversationId: conversation.id };
 }
 
+export interface ContactIdentityView {
+    id: string;
+    platform: string;
+    peerId: string;
+}
+
 export interface ContactView {
     id: string;
     name: string;
-    platform: string;
-    peerId: string;
     note: string | null;
+    /** The person's messaging handles across platforms. */
+    identities: ContactIdentityView[];
 }
 
-/** The owner's saved contacts, alphabetical. */
+interface ContactRow {
+    id: string;
+    name: string;
+    note: string | null;
+    identities: { id: string; platform: string; peerId: string }[];
+}
+
+function toContactView(row: ContactRow): ContactView {
+    return {
+        id: row.id,
+        name: row.name,
+        note: row.note,
+        identities: row.identities.map((identity) => ({
+            id: identity.id,
+            platform: identity.platform,
+            peerId: identity.peerId
+        }))
+    };
+}
+
+/** Whether a thrown Prisma error is a unique-constraint violation (P2002) - a
+ *  handle already bound to a contact for this owner. */
+function isUniqueViolation(caught: unknown): boolean {
+    return (
+        typeof caught === "object" &&
+        caught !== null &&
+        (caught as { code?: string }).code === "P2002"
+    );
+}
+
+const CONTACT_INCLUDE = { identities: { orderBy: { createdAt: "asc" as const } } };
+
+/** One contact (person) with its handles, scoped to the owner. */
+async function getContact(ownerId: string, id: string): Promise<ContactView> {
+    const row = await prisma.contact.findFirst({
+        where: { id, ownerId },
+        include: CONTACT_INCLUDE
+    });
+    if (!row) throw new Error("Contact not found");
+    return toContactView(row);
+}
+
+/** The owner's contacts (people), each with their platform handles, alphabetical. */
 export async function listContacts(ownerId: string): Promise<ContactView[]> {
-    const rows = await prisma.contact.findMany({ where: { ownerId }, orderBy: { name: "asc" } });
-    return rows.map((row) => ({ id: row.id, name: row.name, platform: row.platform, peerId: row.peerId, note: row.note }));
+    const rows = await prisma.contact.findMany({
+        where: { ownerId },
+        orderBy: { name: "asc" },
+        include: CONTACT_INCLUDE
+    });
+    return rows.map(toContactView);
 }
 
-/** Create or update a contact (unique per owner + platform + peer). */
+/** Create a contact (person), optionally with a first messaging handle. */
 export async function createContact(
     ownerId: string,
-    input: { name: string; platform: Platform; peerId: string; note?: string }
+    input: { name: string; note?: string; platform?: Platform; peerId?: string }
 ): Promise<ContactView> {
-    const peerId = normalizePeerId(input.platform, input.peerId);
-    if (!peerId) throw new Error("Enter the contact's id or number");
-    const note = input.note?.trim() || null;
-    const row = await prisma.contact.upsert({
-        where: { ownerId_platform_peerId: { ownerId, platform: input.platform, peerId } },
-        create: { ownerId, name: input.name.trim(), platform: input.platform, peerId, note },
-        update: { name: input.name.trim(), note }
-    });
-    return { id: row.id, name: row.name, platform: row.platform, peerId: row.peerId, note: row.note };
+    const name = input.name.trim();
+    if (!name) throw new Error("Enter a name");
+    let identity: { platform: Platform; peerId: string } | undefined;
+    if (input.platform && input.peerId?.trim()) {
+        const peerId = normalizePeerId(input.platform, input.peerId);
+        if (!peerId) throw new Error("Enter the contact's id or number");
+        identity = { platform: input.platform, peerId };
+    }
+    try {
+        const row = await prisma.contact.create({
+            data: {
+                ownerId,
+                name,
+                note: input.note?.trim() || null,
+                identities: identity
+                    ? { create: { ownerId, platform: identity.platform, peerId: identity.peerId } }
+                    : undefined
+            },
+            include: CONTACT_INCLUDE
+        });
+        return toContactView(row);
+    } catch (caught) {
+        if (isUniqueViolation(caught))
+            throw new Error("That handle already belongs to another contact");
+        throw caught;
+    }
 }
 
-/** Remove a saved contact. */
+/** Update a contact's name and/or note. */
+export async function updateContact(
+    ownerId: string,
+    id: string,
+    patch: { name?: string; note?: string | null }
+): Promise<ContactView> {
+    const contact = await prisma.contact.findFirst({
+        where: { id, ownerId },
+        select: { id: true }
+    });
+    if (!contact) throw new Error("Contact not found");
+    const data: { name?: string; note?: string | null } = {};
+    if (patch.name !== undefined) {
+        const name = patch.name.trim();
+        if (!name) throw new Error("Enter a name");
+        data.name = name;
+    }
+    if (patch.note !== undefined) data.note = patch.note?.trim() || null;
+    const row = await prisma.contact.update({
+        where: { id: contact.id },
+        data,
+        include: CONTACT_INCLUDE
+    });
+    return toContactView(row);
+}
+
+/** Add a messaging handle to a contact. */
+export async function addContactIdentity(
+    ownerId: string,
+    contactId: string,
+    input: { platform: Platform; peerId: string }
+): Promise<ContactView> {
+    const contact = await prisma.contact.findFirst({
+        where: { id: contactId, ownerId },
+        select: { id: true }
+    });
+    if (!contact) throw new Error("Contact not found");
+    const peerId = normalizePeerId(input.platform, input.peerId);
+    if (!peerId) throw new Error("Enter the contact's id or number");
+    try {
+        await prisma.contactIdentity.create({
+            data: { ownerId, contactId: contact.id, platform: input.platform, peerId }
+        });
+    } catch (caught) {
+        if (isUniqueViolation(caught)) throw new Error("That handle already belongs to a contact");
+        throw caught;
+    }
+    return getContact(ownerId, contact.id);
+}
+
+/** Change a handle's platform and/or peer id (e.g. fix a wrong number). */
+export async function updateContactIdentity(
+    ownerId: string,
+    identityId: string,
+    patch: { platform?: Platform; peerId?: string }
+): Promise<ContactView> {
+    const identity = await prisma.contactIdentity.findFirst({
+        where: { id: identityId, ownerId },
+        select: { id: true, contactId: true, platform: true, peerId: true }
+    });
+    if (!identity) throw new Error("Handle not found");
+    const platform = (patch.platform ?? identity.platform) as Platform;
+    const peerId = normalizePeerId(platform, patch.peerId ?? identity.peerId);
+    if (!peerId) throw new Error("Enter the contact's id or number");
+    try {
+        await prisma.contactIdentity.update({
+            where: { id: identity.id },
+            data: { platform, peerId }
+        });
+    } catch (caught) {
+        if (isUniqueViolation(caught)) throw new Error("That handle already belongs to a contact");
+        throw caught;
+    }
+    return getContact(ownerId, identity.contactId);
+}
+
+/** Remove one of a contact's handles; returns the contact without it. */
+export async function deleteContactIdentity(
+    ownerId: string,
+    identityId: string
+): Promise<ContactView> {
+    const identity = await prisma.contactIdentity.findFirst({
+        where: { id: identityId, ownerId },
+        select: { id: true, contactId: true }
+    });
+    if (!identity) throw new Error("Handle not found");
+    await prisma.contactIdentity.delete({ where: { id: identity.id } });
+    return getContact(ownerId, identity.contactId);
+}
+
+/** Remove a contact (person) and all of their handles (by cascade). */
 export async function deleteContact(ownerId: string, id: string): Promise<void> {
     const row = await prisma.contact.findFirst({ where: { id, ownerId }, select: { id: true } });
     if (!row) throw new Error("Contact not found");
@@ -432,7 +637,10 @@ export async function deleteContact(ownerId: string, id: string): Promise<void> 
 /** Ingest a normalized inbound event from the bridge: upsert the conversation and
  *  persist the message. Called only by the internal ingest route. */
 export async function ingestInbound(event: InboundEvent): Promise<void> {
-    const channel = await prisma.channel.findFirst({ where: { id: event.channelId }, select: { id: true } });
+    const channel = await prisma.channel.findFirst({
+        where: { id: event.channelId },
+        select: { id: true }
+    });
     if (!channel) return;
     const conversation = await prisma.conversation.upsert({
         where: { channelId_peerId: { channelId: channel.id, peerId: event.peerId } },
@@ -463,14 +671,18 @@ export async function ingestInbound(event: InboundEvent): Promise<void> {
 
 /** Resolve the WhatsApp Cloud channel bound to a Meta phone-number id, for the
  *  webhook. Provider config is stored as JSON, so match in memory (few channels). */
-export async function findCloudChannelByPhoneNumberId(phoneNumberId: string): Promise<string | null> {
+export async function findCloudChannelByPhoneNumberId(
+    phoneNumberId: string
+): Promise<string | null> {
     const rows = await prisma.channel.findMany({
         where: { platform: "whatsapp", provider: "whatsapp-cloud" },
         select: { id: true, config: true }
     });
     for (const row of rows) {
         try {
-            const parsed = JSON.parse(row.config) as { providerConfig?: { phoneNumberId?: string } };
+            const parsed = JSON.parse(row.config) as {
+                providerConfig?: { phoneNumberId?: string };
+            };
             if (parsed.providerConfig?.phoneNumberId === phoneNumberId) return row.id;
         } catch {
             // Skip a malformed config row.
@@ -481,8 +693,14 @@ export async function findCloudChannelByPhoneNumberId(phoneNumberId: string): Pr
 
 /** Resolve a channel by its platform + platform-side id (e.g. Slack team id), for
  *  webhook routing. */
-export async function findChannelByExternalId(platform: string, externalId: string): Promise<string | null> {
-    const channel = await prisma.channel.findFirst({ where: { platform, externalId }, select: { id: true } });
+export async function findChannelByExternalId(
+    platform: string,
+    externalId: string
+): Promise<string | null> {
+    const channel = await prisma.channel.findFirst({
+        where: { platform, externalId },
+        select: { id: true }
+    });
     return channel?.id ?? null;
 }
 
@@ -495,13 +713,19 @@ export interface ChannelLiveState {
 /** Poll the bridge for a channel's live state (QR / connected), persisting a
  *  connected or errored result. Drives the whatsapp-web QR onboarding UI. */
 export async function channelState(ownerId: string, channelId: string): Promise<ChannelLiveState> {
-    const channel = await prisma.channel.findFirst({ where: { id: channelId, ownerId }, select: { id: true } });
+    const channel = await prisma.channel.findFirst({
+        where: { id: channelId, ownerId },
+        select: { id: true }
+    });
     if (!channel) throw new Error("Channel not found");
     const state = await bridgeChannelState(channelId);
     if (state.status === "connected") {
         await prisma.channel.update({
             where: { id: channelId },
-            data: { status: "connected", ...(state.externalId ? { externalId: state.externalId } : {}) }
+            data: {
+                status: "connected",
+                ...(state.externalId ? { externalId: state.externalId } : {})
+            }
         });
     } else if (state.status === "error" || state.status === "disconnected") {
         await prisma.channel.update({ where: { id: channelId }, data: { status: state.status } });
@@ -517,7 +741,9 @@ export async function channelState(ownerId: string, channelId: string): Promise<
  *  bridge already runs are left alone, so it never churns a healthy adapter. */
 export async function reconcileChannels(): Promise<void> {
     const env = loadEnv();
-    const channels = await prisma.channel.findMany({ where: { status: { in: ["connected", "connecting"] } } });
+    const channels = await prisma.channel.findMany({
+        where: { status: { in: ["connected", "connecting"] } }
+    });
     for (const channel of channels) {
         try {
             await bridgeChannelState(channel.id);
@@ -543,7 +769,9 @@ export async function reconcileChannels(): Promise<void> {
                     : undefined;
             let providerConfig: Record<string, string> | undefined;
             try {
-                providerConfig = (JSON.parse(channel.config) as { providerConfig?: Record<string, string> }).providerConfig;
+                providerConfig = (
+                    JSON.parse(channel.config) as { providerConfig?: Record<string, string> }
+                ).providerConfig;
             } catch {
                 providerConfig = undefined;
             }
@@ -567,7 +795,9 @@ export async function reconcileChannels(): Promise<void> {
  *  after a bridge or web restart without any manual reconnection. */
 export function startChannelReconcile(): void {
     const tick = () =>
-        void reconcileChannels().catch((error) => console.error("polaris: channel reconcile failed:", error));
+        void reconcileChannels().catch((error) =>
+            console.error("polaris: channel reconcile failed:", error)
+        );
     tick();
     setInterval(tick, 60_000);
 }

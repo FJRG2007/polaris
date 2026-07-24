@@ -900,20 +900,36 @@ model Message {
 }
 
 // A saved contact for starting outbound conversations from the Inbox, per owner.
-// Bound to a platform + platform-side peer id (a WhatsApp number/JID, a Telegram
-// chat id, ...); the same person on two platforms is two rows. No FK to Channel -
-// a contact is reachable on any channel of its platform.
+// A contact is a person, independent of platform. Their messaging handles live in
+// ContactIdentity, so the same person can be reached on WhatsApp, Telegram, etc.
+// under one entry. owner is a bare uuid (no FK).
 model Contact {
     id        String   @id @default(uuid(7)) @db.Uuid
     ownerId   String   @db.Uuid
     name      String
-    platform  String
-    peerId    String
     note      String?
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
 
+    identities ContactIdentity[]
+
+    @@index([ownerId])
+}
+
+// One messaging handle of a contact on a single platform (a WhatsApp number, a
+// Telegram chat id, ...). A given handle belongs to at most one contact per owner.
+model ContactIdentity {
+    id        String   @id @default(uuid(7)) @db.Uuid
+    ownerId   String   @db.Uuid
+    contactId String   @db.Uuid
+    platform  String
+    peerId    String
+    createdAt DateTime @default(now())
+
+    contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
     @@unique([ownerId, platform, peerId])
+    @@index([contactId])
     @@index([ownerId])
 }
 
