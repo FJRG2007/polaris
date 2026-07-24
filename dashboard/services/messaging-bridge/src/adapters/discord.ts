@@ -135,7 +135,9 @@ export class DiscordAdapter implements ChannelAdapter {
         // privileged intent means one of the requested toggles is off in the portal:
         // destroy the client and retry the next, less-privileged tier.
         for (let tier = 0; tier < INTENT_TIERS.length; tier++) {
-            const { intents, note } = INTENT_TIERS[tier];
+            const config = INTENT_TIERS[tier];
+            if (!config) continue;
+            const { intents, note } = config;
             if (tier > 0) {
                 await this.client.destroy().catch(() => undefined);
                 this.client = this.build(intents);
