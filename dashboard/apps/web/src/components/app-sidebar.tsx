@@ -21,7 +21,10 @@ import {
     Inbox,
     LayoutDashboard,
     Link2,
+    MessagesSquare,
+    Radio,
     Rocket,
+    ScrollText,
     Server,
     Settings,
     ShieldCheck,
@@ -59,6 +62,11 @@ const APP_SIDEBARS: Record<string, SidebarItem[]> = {
         { label: "Containers", href: "/apps/containers", icon: Container },
         { label: "Backups", href: "/apps/backups", icon: Database }
     ],
+    inbox: [
+        { label: "Conversations", href: "/inbox", icon: MessagesSquare },
+        { label: "Channels", href: "/inbox/channels", icon: Radio },
+        { label: "Logs", href: "/inbox/logs", icon: ScrollText }
+    ],
     admin: [
         { label: "Overview", href: "/admin", icon: LayoutDashboard },
         { label: "Users", href: "/admin/users", icon: Users },
@@ -73,7 +81,7 @@ const APP_SIDEBARS: Record<string, SidebarItem[]> = {
 
 /** Section roots that must match their own path exactly, so they do not stay
  *  highlighted while a sibling sub-route is open. */
-const EXACT_MATCH = new Set(["/drive", "/admin"]);
+const EXACT_MATCH = new Set(["/drive", "/admin", "/inbox"]);
 
 export function AppSidebar() {
     const pathname = usePathname();

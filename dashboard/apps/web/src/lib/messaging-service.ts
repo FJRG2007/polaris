@@ -311,6 +311,44 @@ export async function deleteConversation(ownerId: string, conversationId: string
     await prisma.conversation.delete({ where: { id: conversation.id } });
 }
 
+export interface ActivityView {
+    id: string;
+    direction: string;
+    ack: string | null;
+    body: string | null;
+    selection: string | null;
+    channelName: string;
+    platform: string;
+    peer: string;
+    createdAt: string;
+}
+
+/** Recent message events across the owner's channels, newest first - a messaging
+ *  activity log for the Logs view (inbound and outbound, with delivery state). */
+export async function listMessagingActivity(ownerId: string, limit = 150): Promise<ActivityView[]> {
+    const rows = await prisma.message.findMany({
+        where: { conversation: { channel: { ownerId } } },
+        orderBy: { createdAt: "desc" },
+        take: Math.min(Math.max(limit, 1), 500),
+        include: {
+            conversation: {
+                select: { peerId: true, peerName: true, channel: { select: { name: true, platform: true } } }
+            }
+        }
+    });
+    return rows.map((row) => ({
+        id: row.id,
+        direction: row.direction,
+        ack: row.ack,
+        body: row.body,
+        selection: readSelection(row.payload),
+        channelName: row.conversation.channel.name,
+        platform: row.conversation.channel.platform,
+        peer: row.conversation.peerName ?? row.conversation.peerId,
+        createdAt: row.createdAt.toISOString()
+    }));
+}
+
 /** A conversation's messages, oldest first; marks it read. */
 export async function getConversationMessages(
     ownerId: string,
