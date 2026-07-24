@@ -193,11 +193,16 @@ install_cli() {
     tmp=$(mktemp)
     sed "s|__POLARIS_INSTALL_DIR__|${root}|" "$src" > "$tmp"
     dest="/usr/local/bin"
+    # 0755 explicitly, NOT `chmod +x`: the installer usually runs as root (directly or
+    # via the in-band updater container), and under a restrictive root umask (077) the
+    # copied file is 0600 and `+x` only makes it 0700 - a root-only CLI the login user
+    # cannot even read ("cannot open .../polaris: Permission denied"). A management CLI
+    # must be runnable by the operator, so force world read+execute.
     if [ -w "$dest" ]; then
-        cp "$tmp" "$dest/polaris" && chmod +x "$dest/polaris" && ln -sf "$dest/polaris" "$dest/plr" \
+        cp "$tmp" "$dest/polaris" && chmod 755 "$dest/polaris" && ln -sf "$dest/polaris" "$dest/plr" \
             && log "installed the 'polaris' (and 'plr') command"
     elif command -v sudo >/dev/null 2>&1; then
-        sudo cp "$tmp" "$dest/polaris" && sudo chmod +x "$dest/polaris" && sudo ln -sf "$dest/polaris" "$dest/plr" \
+        sudo cp "$tmp" "$dest/polaris" && sudo chmod 755 "$dest/polaris" && sudo ln -sf "$dest/polaris" "$dest/plr" \
             && log "installed the 'polaris' (and 'plr') command"
     else
         err "could not install the polaris CLI to $dest (need root); copy $src there by hand"
