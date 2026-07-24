@@ -232,6 +232,55 @@ export async function reconnectChannel(
     return { status };
 }
 
+/** Update a channel's editable settings: its display name, its credential
+ *  (bot token), and/or its provider config. Changing the credential or config
+ *  re-encrypts it and reconnects the adapter so the change takes effect at once;
+ *  a name-only change does not disturb the live connection. */
+export async function updateChannelCredentials(
+    ownerId: string,
+    channelId: string,
+    patch: { name?: string; token?: string; config?: Record<string, string> }
+): Promise<{ status: string }> {
+    const env = loadEnv();
+    const channel = await prisma.channel.findFirst({ where: { id: channelId, ownerId } });
+    if (!channel) throw new Error("Channel not found");
+
+    const trimmedName = patch.name?.trim();
+    const trimmedToken = patch.token?.trim();
+    const changingToken = Boolean(trimmedToken);
+    const changingConfig = patch.config !== undefined;
+    const blob = changingToken ? encryptSecret(trimmedToken!, env.POLARIS_MASTER_KEY) : null;
+
+    // Merge the new provider config into the stored blob, preserving capabilities.
+    let configJson: string | undefined;
+    if (changingConfig) {
+        let capabilities: ChannelCapabilities;
+        try {
+            capabilities =
+                (JSON.parse(channel.config) as { capabilities?: ChannelCapabilities }).capabilities ??
+                capabilitiesFor(channel.platform as Platform, channel.provider ?? undefined);
+        } catch {
+            capabilities = capabilitiesFor(channel.platform as Platform, channel.provider ?? undefined);
+        }
+        configJson = JSON.stringify({ capabilities, providerConfig: patch.config });
+    }
+
+    await prisma.channel.update({
+        where: { id: channel.id },
+        data: {
+            ...(trimmedName ? { name: trimmedName } : {}),
+            ...(blob
+                ? { encryptedSecret: blob.ciphertext, secretNonce: blob.nonce, secretKeyId: blob.keyId }
+                : {}),
+            ...(configJson ? { config: configJson } : {})
+        }
+    });
+
+    // Credentials or config changed - reconnect so the live adapter uses them now.
+    if (changingToken || changingConfig) return reconnectChannel(ownerId, channelId);
+    return { status: channel.status };
+}
+
 /** Disconnect and forget a channel (and its conversations, by cascade). */
 export async function deleteChannel(ownerId: string, channelId: string): Promise<void> {
     const channel = await prisma.channel.findFirst({ where: { id: channelId, ownerId } });

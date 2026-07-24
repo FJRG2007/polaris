@@ -31,6 +31,7 @@ import {
     renameChannel,
     sendConversationMessage,
     startConversation,
+    updateChannelCredentials,
     updateContact,
     updateContactIdentity,
     type ActivityView,
@@ -132,6 +133,34 @@ export async function renameChannelAction(
         return {};
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Could not rename the channel" };
+    }
+}
+
+const updateChannelSchema = z.object({
+    channelId: z.string().uuid(),
+    name: z.string().trim().min(1).max(64).optional(),
+    // A new credential (bot token / access token) to replace the stored one.
+    token: z.string().trim().min(1).max(8192).optional(),
+    // Provider-specific config (e.g. WhatsApp Cloud phoneNumberId).
+    config: z.record(z.string(), z.string().max(256)).optional()
+});
+
+/** Edit a channel's name, credential, and/or provider config, reconnecting when
+ *  the credential or config changed so the live adapter picks it up. */
+export async function updateChannelAction(
+    input: z.infer<typeof updateChannelSchema>
+): Promise<{ error?: string; status?: string }> {
+    const user = await requireUser();
+    const parsed = updateChannelSchema.safeParse(input);
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the form" };
+    const { channelId, ...patch } = parsed.data;
+    if (!patch.name && !patch.token && !patch.config) return { error: "Nothing to update" };
+    try {
+        const { status } = await updateChannelCredentials(user.id, channelId, patch);
+        revalidatePath("/inbox");
+        return { status };
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not update the channel" };
     }
 }
 
