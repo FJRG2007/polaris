@@ -1076,6 +1076,18 @@ const PLATFORM_OPTIONS = [
     { value: "slack", label: "Slack" }
 ];
 
+/** A stored handle in human form for display and editing: a WhatsApp JID
+ *  (34657580303@c.us) reads as the phone number (+34657580303); other platforms show
+ *  the id unchanged. The server re-normalizes on save, so a number typed with or
+ *  without the leading + and country code round-trips to the same stored value. */
+function humanPeerId(platform: string, peerId: string): string {
+    if (platform === "whatsapp" && peerId.endsWith("@c.us")) {
+        const digits = peerId.slice(0, -"@c.us".length);
+        return /^\d+$/.test(digits) ? `+${digits}` : digits;
+    }
+    return peerId;
+}
+
 // Start a new outbound conversation: pick a saved contact (person) and one of their
 // handles, or type a raw recipient id, then the channel and first message. Picking a
 // handle auto-selects a channel of its platform. WhatsApp accepts a plain phone
@@ -1219,7 +1231,7 @@ function NewChatDialog({
                                 }}
                                 options={selectedContact.identities.map((item) => ({
                                     value: item.id,
-                                    label: `${PLATFORM_LABEL[item.platform] ?? item.platform} - ${item.peerId}`
+                                    label: `${PLATFORM_LABEL[item.platform] ?? item.platform} - ${humanPeerId(item.platform, item.peerId)}`
                                 }))}
                             />
                         </label>
@@ -1508,7 +1520,7 @@ function IdentityChip({ identity }: { identity: ContactIdentityView }) {
             >
                 {Logo ? <Logo className="size-3" /> : <MessagesSquare className="size-3" />}
             </span>
-            <span className="truncate">{identity.peerId}</span>
+            <span className="truncate">{humanPeerId(identity.platform, identity.peerId)}</span>
         </span>
     );
 }
@@ -1670,12 +1682,13 @@ function IdentityEditor({
     onRemove: () => void;
 }) {
     const [platform, setPlatform] = useState<Platform>(identity.platform as Platform);
-    const [peerId, setPeerId] = useState(identity.peerId);
+    const [peerId, setPeerId] = useState(humanPeerId(identity.platform, identity.peerId));
     useEffect(() => {
         setPlatform(identity.platform as Platform);
-        setPeerId(identity.peerId);
+        setPeerId(humanPeerId(identity.platform, identity.peerId));
     }, [identity.platform, identity.peerId]);
-    const dirty = platform !== identity.platform || peerId.trim() !== identity.peerId;
+    const dirty =
+        platform !== identity.platform || peerId.trim() !== humanPeerId(identity.platform, identity.peerId);
     return (
         <div className="flex items-center gap-2">
             <div className="w-32 shrink-0">
