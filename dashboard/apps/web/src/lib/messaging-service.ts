@@ -257,14 +257,20 @@ export async function updateChannelCredentials(
     let configJson: string | undefined;
     if (changingConfig) {
         let capabilities: ChannelCapabilities;
+        let existingConfig: Record<string, string> = {};
         try {
+            const parsed = JSON.parse(channel.config) as {
+                capabilities?: ChannelCapabilities;
+                providerConfig?: Record<string, string>;
+            };
             capabilities =
-                (JSON.parse(channel.config) as { capabilities?: ChannelCapabilities }).capabilities ??
+                parsed.capabilities ??
                 capabilitiesFor(channel.platform as Platform, channel.provider ?? undefined);
+            existingConfig = parsed.providerConfig ?? {};
         } catch {
             capabilities = capabilitiesFor(channel.platform as Platform, channel.provider ?? undefined);
         }
-        configJson = JSON.stringify({ capabilities, providerConfig: patch.config });
+        configJson = JSON.stringify({ capabilities, providerConfig: { ...existingConfig, ...patch.config } });
     }
 
     await prisma.channel.update({

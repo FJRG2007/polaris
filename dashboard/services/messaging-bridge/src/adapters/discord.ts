@@ -66,7 +66,7 @@ export class DiscordAdapter implements ChannelAdapter {
             if (message.author.bot) return;
             this.ctx.onInbound({
                 channelId: this.channelId,
-                peerId: message.channelId,
+                peerId: message.guild ? message.channelId : `user:${message.author.id}`,
                 peerName: message.author.username,
                 externalId: message.id,
                 kind: "text",
@@ -79,7 +79,7 @@ export class DiscordAdapter implements ChannelAdapter {
             void interaction.deferUpdate().catch(() => undefined);
             this.ctx.onInbound({
                 channelId: this.channelId,
-                peerId: interaction.channelId ?? "",
+                peerId: interaction.guildId ? interaction.channelId ?? "" : `user:${interaction.user.id}`,
                 peerName: interaction.user.username,
                 kind: "interactive",
                 selection: interaction.customId,
