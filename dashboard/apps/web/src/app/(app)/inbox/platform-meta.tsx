@@ -81,3 +81,10 @@ export function humanPeerId(platform: string, peerId: string): string {
     }
     return peerId;
 }
+
+/** The editable/sendable form of a stored handle for a text input: a WhatsApp JID
+ *  reads as its phone number (which round-trips server-side); other platforms keep
+ *  the raw stored id, including Discord's user:/channel: encoding. */
+export function editablePeer(platform: string, peerId: string): string {
+    return platform === "whatsapp" ? humanPeerId(platform, peerId) : peerId;
+}

@@ -27,11 +27,9 @@ import {
     PLATFORM_LABEL,
     PLATFORM_LOGO,
     PLATFORM_OPTIONS,
-    encodeDiscordPeer,
-    humanPeerId,
-    parseDiscordPeer,
-    type DiscordTarget
+    editablePeer
 } from "../platform-meta";
+import { DiscordPeerFields } from "../discord-peer-fields";
 
 const AVATAR_TONES = [
     "#2563eb",
@@ -68,12 +66,6 @@ function Avatar({ name, className }: { name: string; className?: string }) {
             {initials(name)}
         </span>
     );
-}
-
-/** The editable seed for a handle's input: a WhatsApp JID reads as the phone
- *  number (round-trips server-side); Discord and the rest keep the raw stored id. */
-function editableSeed(platform: string, peerId: string): string {
-    return platform === "whatsapp" ? humanPeerId(platform, peerId) : peerId;
 }
 
 export function ContactsView({ initialContacts }: { initialContacts: ContactView[] }) {
@@ -387,34 +379,7 @@ function PeerFields({
     onDraft: (value: string) => void;
 }) {
     if (platform === "discord") {
-        const { target, id } = parseDiscordPeer(draft);
-        return (
-            <div className="flex flex-1 flex-col gap-1">
-                <div className="flex items-center gap-2">
-                    <div className="w-40 shrink-0">
-                        <Select
-                            value={target}
-                            onValueChange={(value) => onDraft(encodeDiscordPeer(value as DiscordTarget, id))}
-                            options={[
-                                { value: "channel", label: "Server channel" },
-                                { value: "user", label: "Direct message" }
-                            ]}
-                        />
-                    </div>
-                    <Input
-                        className="flex-1"
-                        value={id}
-                        onChange={(event) => onDraft(encodeDiscordPeer(target, event.target.value))}
-                        placeholder={target === "user" ? "User id to DM" : "Channel id"}
-                    />
-                </div>
-                <span className="text-xs text-muted-foreground">
-                    {target === "user"
-                        ? "The bot can DM a user by their id (right-click a user > Copy User ID, developer mode on)."
-                        : "A text channel id the bot can post to (right-click the channel > Copy Channel ID)."}
-                </span>
-            </div>
-        );
+        return <DiscordPeerFields draft={draft} onDraft={onDraft} />;
     }
     return (
         <div className="flex flex-1 flex-col gap-1">
@@ -439,14 +404,14 @@ function HandleRow({
     onRemove: () => void;
 }) {
     const [platform, setPlatform] = useState<Platform>(identity.platform as Platform);
-    const [draft, setDraft] = useState(editableSeed(identity.platform, identity.peerId));
+    const [draft, setDraft] = useState(editablePeer(identity.platform, identity.peerId));
 
     useEffect(() => {
         setPlatform(identity.platform as Platform);
-        setDraft(editableSeed(identity.platform, identity.peerId));
+        setDraft(editablePeer(identity.platform, identity.peerId));
     }, [identity.platform, identity.peerId]);
 
-    const dirty = platform !== identity.platform || draft.trim() !== editableSeed(identity.platform, identity.peerId);
+    const dirty = platform !== identity.platform || draft.trim() !== editablePeer(identity.platform, identity.peerId);
 
     return (
         <div className="flex items-start gap-2">

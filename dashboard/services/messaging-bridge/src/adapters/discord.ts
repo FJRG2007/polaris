@@ -6,6 +6,7 @@
 
 import {
     ButtonStyle,
+    ChannelType,
     Client,
     ComponentType,
     GatewayIntentBits,
@@ -14,7 +15,14 @@ import {
     type Message
 } from "discord.js";
 import { capabilitiesFor } from "@polaris/messaging";
-import type { AdapterContext, ChannelAdapter, InteractivePrompt, OutboundMessage, SendResult } from "@polaris/messaging";
+import type {
+    AdapterContext,
+    ChannelAdapter,
+    InteractivePrompt,
+    OutboundMessage,
+    SendResult,
+    TargetGroup
+} from "@polaris/messaging";
 
 /** Discord allows at most 5 buttons per row and 5 rows. */
 const MAX_BUTTONS = 25;
@@ -131,17 +139,45 @@ export class DiscordAdapter implements ChannelAdapter {
         return rows;
     }
 
+    /** Resolve a Discord recipient. `user:<id>` is a direct message to that user;
+     *  `channel:<id>` or a bare id is a server text channel (bare kept for
+     *  back-compat with handles stored before the DM/channel split). */
+    private resolvePeer(peerId: string): { dm: boolean; id: string } {
+        if (peerId.startsWith("user:")) return { dm: true, id: peerId.slice("user:".length) };
+        if (peerId.startsWith("channel:")) return { dm: false, id: peerId.slice("channel:".length) };
+        return { dm: false, id: peerId };
+    }
+
     async send(message: OutboundMessage): Promise<SendResult> {
-        const channel = await this.client.channels.fetch(message.peerId);
+        const { dm, id } = this.resolvePeer(message.peerId);
+        // For a DM, open (or reuse) the user's DM channel; otherwise fetch the server
+        // channel. Both end up as a text-based channel we can post to.
+        const channel = dm ? await (await this.client.users.fetch(id)).createDM() : await this.client.channels.fetch(id);
         if (!channel || !channel.isTextBased() || !("send" in channel)) {
-            throw new Error("The Discord channel is not a text channel");
+            throw new Error(dm ? "Could not open a DM with that user" : "The Discord channel is not a text channel");
         }
-        const sent = message.interactive
-            ? await channel.send({
-                  content: message.interactive.text,
-                  components: this.buttonRows(message.interactive)
-              })
-            : await channel.send({ content: message.text ?? "" });
+        const payload = message.interactive
+            ? { content: message.interactive.text, components: this.buttonRows(message.interactive) }
+            : { content: message.text ?? "" };
+        const sent = await channel.send(payload);
         return { externalId: sent.id };
+    }
+
+    /** The bot's servers and the text channels it can post to, for the recipient
+     *  picker. Read from the gateway cache (populated on ready by the Guilds intent),
+     *  so it needs no extra permission beyond being in the server. */
+    async listTargets(): Promise<TargetGroup[]> {
+        const groups: TargetGroup[] = [];
+        for (const guild of this.client.guilds.cache.values()) {
+            const channels = [...guild.channels.cache.values()]
+                .filter(
+                    (channel) =>
+                        channel.type === ChannelType.GuildText || channel.type === ChannelType.GuildAnnouncement
+                )
+                .map((channel) => ({ id: channel.id, name: `#${channel.name}` }))
+                .sort((a, b) => a.name.localeCompare(b.name));
+            if (channels.length > 0) groups.push({ id: guild.id, name: guild.name, targets: channels });
+        }
+        return groups.sort((a, b) => a.name.localeCompare(b.name));
     }
 }

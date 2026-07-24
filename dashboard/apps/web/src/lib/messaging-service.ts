@@ -14,12 +14,14 @@ import type {
     ChannelCapabilities,
     InteractivePrompt,
     InboundEvent,
-    Platform
+    Platform,
+    TargetGroup
 } from "@polaris/messaging";
 import {
     bridgeChannelState,
     bridgeConnectChannel,
     bridgeDisconnectChannel,
+    bridgeListTargets,
     bridgeSend
 } from "./messaging/bridge-client";
 
@@ -291,6 +293,19 @@ export async function deleteChannel(ownerId: string, channelId: string): Promise
         // The bridge may not know it (restarted); removing the record still proceeds.
     }
     await prisma.channel.delete({ where: { id: channel.id } });
+}
+
+/** Addressable send targets (server -> channels) for one of the owner's channels,
+ *  for the recipient picker. Empty for platforms that don't enumerate recipients
+ *  (WhatsApp, Telegram) or when the channel is not connected. */
+export async function listChannelTargets(ownerId: string, channelId: string): Promise<TargetGroup[]> {
+    const channel = await prisma.channel.findFirst({
+        where: { id: channelId, ownerId },
+        select: { id: true, status: true }
+    });
+    if (!channel) throw new Error("Channel not found");
+    if (channel.status !== "connected") return [];
+    return bridgeListTargets(channelId);
 }
 
 /** The owner's conversations, most-recently-active first. */

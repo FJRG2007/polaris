@@ -52,8 +52,10 @@ import {
     PEER_HINT,
     PLATFORM_LABEL,
     PLATFORM_LOGO,
+    editablePeer,
     humanPeerId
 } from "./platform-meta";
+import { DiscordPeerFields } from "./discord-peer-fields";
 
 export function InboxView({
     initialChannels,
@@ -919,7 +921,7 @@ function NewChatDialog({
     // Fill the recipient from a saved handle and switch to a channel of its platform,
     // so the send targets the right network without hand-matching them.
     function pickIdentity(identity: ContactIdentityView, name: string) {
-        setPeerId(humanPeerId(identity.platform, identity.peerId));
+        setPeerId(editablePeer(identity.platform, identity.peerId));
         setPeerName(name);
         setIdentityId(identity.id);
         setPickedPlatform(identity.platform);
@@ -1040,15 +1042,25 @@ function NewChatDialog({
                     </label>
                     <label className="flex flex-col gap-1 text-sm">
                         <span className="font-medium">To</span>
-                        <Input
-                            value={peerId}
-                            onChange={(event) => editPeerId(event.target.value)}
-                            placeholder={platform === "whatsapp" ? "34600111222" : "Recipient id"}
-                        />
-                        {PEER_HINT[platform] && (
-                            <span className="text-xs text-muted-foreground">
-                                {PEER_HINT[platform]}
-                            </span>
+                        {platform === "discord" ? (
+                            <DiscordPeerFields
+                                botChannelId={channelId}
+                                draft={peerId}
+                                onDraft={editPeerId}
+                            />
+                        ) : (
+                            <>
+                                <Input
+                                    value={peerId}
+                                    onChange={(event) => editPeerId(event.target.value)}
+                                    placeholder={platform === "whatsapp" ? "34600111222" : "Recipient id"}
+                                />
+                                {PEER_HINT[platform] && (
+                                    <span className="text-xs text-muted-foreground">
+                                        {PEER_HINT[platform]}
+                                    </span>
+                                )}
+                            </>
                         )}
                     </label>
                     {noChannelForPicked && (

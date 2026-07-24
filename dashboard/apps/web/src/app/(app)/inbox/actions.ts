@@ -9,6 +9,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { PLATFORMS, interactivePromptSchema } from "@polaris/messaging";
+import type { TargetGroup } from "@polaris/messaging";
 import { requireUser } from "@/lib/session";
 import { bridgeConfigured } from "@/lib/messaging/bridge-client";
 import {
@@ -23,6 +24,7 @@ import {
     deleteConversation,
     getConversationMessages,
     listAgents,
+    listChannelTargets,
     listChannels,
     listContacts,
     listConversations,
@@ -183,6 +185,27 @@ export async function reconnectChannelAction(
 export async function listConversationsAction(): Promise<ConversationView[]> {
     const user = await requireUser();
     return listConversations(user.id);
+}
+
+/** Send targets (servers -> channels) for a channel whose adapter enumerates them
+ *  (Discord), for the recipient picker. Empty for other platforms or an old bridge. */
+export async function listChannelTargetsAction(channelId: string): Promise<TargetGroup[]> {
+    const user = await requireUser();
+    if (!z.string().uuid().safeParse(channelId).success) return [];
+    try {
+        return await listChannelTargets(user.id, channelId);
+    } catch {
+        return [];
+    }
+}
+
+/** The owner's first connected Discord channel (bot), used to populate the server/
+ *  channel picker when a specific bot channel is not already in context (Contacts).
+ *  Null when no Discord bot is connected. */
+export async function firstDiscordChannelAction(): Promise<string | null> {
+    const user = await requireUser();
+    const channels = await listChannels(user.id);
+    return channels.find((c) => c.platform === "discord" && c.status === "connected")?.id ?? null;
 }
 
 /** Recent messaging activity across the owner's channels, for the Logs view. */
