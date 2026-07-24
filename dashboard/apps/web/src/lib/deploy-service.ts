@@ -808,6 +808,11 @@ async function buildAppPlan(
         },
         env,
         replicas: app.replicas,
+        // Extra external networks the service joins (set at install time, e.g. the
+        // messaging hub joining the control-plane web network to reach its ingest).
+        extraNetworks: Array.isArray(source.extraNetworks)
+            ? source.extraNetworks.filter((net): net is string => typeof net === "string")
+            : undefined,
         waf,
         // Disabled domains keep their record but are left out of the plan so no route
         // labels are emitted for them until they are turned back on.
