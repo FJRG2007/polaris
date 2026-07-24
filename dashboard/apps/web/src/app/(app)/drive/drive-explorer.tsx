@@ -71,6 +71,42 @@ function parentOf(path: string): string {
     return slash >= 0 ? path.slice(0, slash) : "";
 }
 
+/** Every rendered field of an entry, so an equal signature means an equal row. */
+function entrySignature(entry: DriveEntry): string {
+    return [
+        entry.kind,
+        entry.size,
+        entry.modifiedAt,
+        entry.createdAt,
+        entry.name,
+        entry.hidden ?? false,
+        entry.favorite ?? false,
+        entry.icon ?? "",
+        entry.iconColor ?? "",
+        entry.note ?? "",
+        entry.owner ?? "",
+        entry.locked ?? false
+    ].join("");
+}
+
+/**
+ * Whether two listings are identical (same items, same fields), order-insensitive -
+ * the visible order is derived client-side. Used to skip a no-op state update after a
+ * mutation: the optimistic list already matches what the server returns, so replacing
+ * the array (which re-renders every row) would just be a visible "reload" of unchanged
+ * data. Returning the same reference instead lets React bail out of the render.
+ */
+function listingsEqual(a: DriveEntry[], b: DriveEntry[]): boolean {
+    if (a.length !== b.length) return false;
+    const byPath = new Map<string, string>();
+    for (const entry of a) byPath.set(entry.path, entrySignature(entry));
+    for (const entry of b) {
+        const signature = byPath.get(entry.path);
+        if (signature === undefined || signature !== entrySignature(entry)) return false;
+    }
+    return true;
+}
+
 export function DriveExplorer({
     connections,
     connectionId,
@@ -165,7 +201,11 @@ export function DriveExplorer({
                     setEntries([]);
                     setError(body.error ?? "Unable to list this location");
                 } else {
-                    setEntries(body.entries as DriveEntry[]);
+                    // Keep the current array (no re-render) when nothing actually
+                    // changed - e.g. a background refresh after an optimistic rename
+                    // or delete that already brought the list to this exact state.
+                    const next = body.entries as DriveEntry[];
+                    setEntries((prev) => (listingsEqual(prev, next) ? prev : next));
                 }
             } catch {
                 if (!signal?.aborted) setError("Unable to list this location");
