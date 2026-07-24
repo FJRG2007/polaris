@@ -45,6 +45,7 @@ import {
     deleteChannelAction,
     deleteContactAction,
     deleteContactIdentityAction,
+    deleteConversationAction,
     getMessagesAction,
     listAgentsAction,
     listContactsAction,
@@ -213,7 +214,8 @@ export function InboxView({
                                         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                                             <span className="flex items-center justify-between gap-2">
                                                 <span className="truncate text-sm font-medium">
-                                                    {conversation.peerName ?? conversation.peerId}
+                                                    {conversation.peerName ??
+                                                        humanPeerId(conversation.platform, conversation.peerId)}
                                                 </span>
                                                 {conversation.unread > 0 && (
                                                     <Badge>{conversation.unread}</Badge>
@@ -237,6 +239,10 @@ export function InboxView({
                             conversation={active}
                             agents={agents}
                             onSent={refreshConversations}
+                            onDeleted={() => {
+                                setActiveId(null);
+                                refreshConversations();
+                            }}
                         />
                     ) : (
                         <CardBody className="grid flex-1 place-items-center text-sm text-muted-foreground">
@@ -470,17 +476,21 @@ function ChannelCard({
 function Thread({
     conversation,
     agents,
-    onSent
+    onSent,
+    onDeleted
 }: {
     conversation: ConversationView;
     agents: AgentView[];
     onSent: () => void;
+    onDeleted: () => void;
 }) {
     const [messages, setMessages] = useState<MessageView[]>([]);
     const [text, setText] = useState("");
     const [optionsMode, setOptionsMode] = useState(false);
     const [optionsText, setOptionsText] = useState("");
     const [error, setError] = useState<string | null>(null);
+    const [confirmDelete, setConfirmDelete] = useState(false);
+    const [deleting, setDeleting] = useState(false);
     const [pending, startTransition] = useTransition();
     const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -523,6 +533,24 @@ function Thread({
             setError("Type a message first");
             return;
         }
+        // Optimistic UI: show the message immediately with a "sending" state, clear the
+        // composer, then reconcile with the server. On failure the bubble is marked
+        // failed (rollback) instead of vanishing, so nothing is silently lost.
+        const optimisticId = `pending-${Date.now()}`;
+        const optimistic: MessageView = {
+            id: optimisticId,
+            direction: "outbound",
+            kind: interactive ? "interactive" : "text",
+            body: interactive ? interactive.text : body,
+            ack: "sending",
+            selection: null,
+            senderId: null,
+            createdAt: new Date().toISOString()
+        };
+        setMessages((prev) => [...prev, optimistic]);
+        setText("");
+        setOptionsText("");
+        setOptionsMode(false);
         startTransition(async () => {
             const result = await sendMessageAction({
                 conversationId: conversation.id,
@@ -530,12 +558,13 @@ function Thread({
                 interactive
             });
             if (result.error) {
+                setMessages((prev) =>
+                    prev.map((message) => (message.id === optimisticId ? { ...message, ack: "failed" } : message))
+                );
                 setError(result.error);
                 return;
             }
-            setText("");
-            setOptionsText("");
-            setOptionsMode(false);
+            // Replace the optimistic bubble with the server's persisted messages.
             await load();
             onSent();
         });
@@ -546,7 +575,7 @@ function Thread({
             <div className="flex items-center justify-between gap-2 border-b border-border p-3">
                 <div className="min-w-0">
                     <p className="truncate text-sm font-medium">
-                        {conversation.peerName ?? conversation.peerId}
+                        {conversation.peerName ?? humanPeerId(conversation.platform, conversation.peerId)}
                     </p>
                     <p className="truncate text-xs text-muted-foreground">
                         {conversation.channelName}
@@ -579,6 +608,15 @@ function Thread({
                         }
                     >
                         {conversation.status === "closed" ? "Reopen" : "Close"}
+                    </Button>
+                    <Button
+                        size="sm"
+                        variant="ghost"
+                        aria-label="Delete conversation"
+                        title="Delete conversation"
+                        onClick={() => setConfirmDelete(true)}
+                    >
+                        <Trash2 className="size-4" />
                     </Button>
                 </div>
             </div>
@@ -630,6 +668,42 @@ function Thread({
                     </Button>
                 </div>
             </div>
+            {confirmDelete && (
+                <Dialog open onOpenChange={(open) => !open && !deleting && setConfirmDelete(false)}>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Delete conversation</DialogTitle>
+                            <DialogDescription>
+                                This removes the conversation and its messages from Polaris. The chat on{" "}
+                                {PLATFORM_LABEL[conversation.platform] ?? conversation.platform} itself is not affected.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="flex justify-end gap-2">
+                            <Button variant="ghost" onClick={() => setConfirmDelete(false)} disabled={deleting}>
+                                Cancel
+                            </Button>
+                            <Button
+                                variant="danger"
+                                disabled={deleting}
+                                onClick={async () => {
+                                    setDeleting(true);
+                                    const result = await deleteConversationAction(conversation.id);
+                                    setDeleting(false);
+                                    if (result.error) {
+                                        setError(result.error);
+                                        setConfirmDelete(false);
+                                        return;
+                                    }
+                                    onDeleted();
+                                }}
+                            >
+                                {deleting && <Loader2 className="size-4 animate-spin" />}
+                                Delete
+                            </Button>
+                        </div>
+                    </DialogContent>
+                </Dialog>
+            )}
         </div>
     );
 }
@@ -648,6 +722,9 @@ function MessageBubble({ message }: { message: MessageView }) {
                     <span className="italic">chose: {message.selection}</span>
                 ) : (
                     <span className="whitespace-pre-wrap break-words">{message.body}</span>
+                )}
+                {outbound && message.ack === "sending" && (
+                    <span className="mt-1 block text-xs text-primary-foreground/70">sending...</span>
                 )}
                 {outbound && message.ack === "failed" && (
                     <span className="mt-1 block text-xs text-danger-foreground/80">
@@ -1128,7 +1205,7 @@ function NewChatDialog({
     // Fill the recipient from a saved handle and switch to a channel of its platform,
     // so the send targets the right network without hand-matching them.
     function pickIdentity(identity: ContactIdentityView, name: string) {
-        setPeerId(identity.peerId);
+        setPeerId(humanPeerId(identity.platform, identity.peerId));
         setPeerName(name);
         setIdentityId(identity.id);
         setPickedPlatform(identity.platform);

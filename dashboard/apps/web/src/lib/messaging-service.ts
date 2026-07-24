@@ -300,6 +300,17 @@ export async function assignConversation(
     });
 }
 
+/** Delete a conversation and its messages. Scoped to the owner's channels. */
+export async function deleteConversation(ownerId: string, conversationId: string): Promise<void> {
+    const conversation = await prisma.conversation.findFirst({
+        where: { id: conversationId, channel: { ownerId } },
+        select: { id: true }
+    });
+    if (!conversation) throw new Error("Conversation not found");
+    await prisma.message.deleteMany({ where: { conversationId: conversation.id } });
+    await prisma.conversation.delete({ where: { id: conversation.id } });
+}
+
 /** A conversation's messages, oldest first; marks it read. */
 export async function getConversationMessages(
     ownerId: string,
