@@ -150,6 +150,7 @@ export function SettingsView({
         let offset = 0;
         let missing = 0;
         let sawContent = false;
+        let acc = "";
         stopPolling();
         pollRef.current = setInterval(async () => {
             try {
@@ -174,6 +175,7 @@ export function SettingsView({
                 offset = data.nextOffset;
                 if (data.content) {
                     sawContent = true;
+                    acc += data.content;
                     const clean = data.content.replace(/POLARIS_UPDATE_EXIT=-?\d+\s*/g, "");
                     if (clean) setLogText((prev) => prev + clean);
                 }
@@ -187,6 +189,16 @@ export function SettingsView({
                         setUpdating(false);
                         setUpdateMsg(`Update failed (exit code ${data.exitCode ?? "unknown"}). See the log below.`);
                     }
+                    return;
+                }
+                // Fallback for when the exit marker never arrives (e.g. an older
+                // updater): the installer prints this line only on success. Detecting
+                // it means the update finished even if the web container never
+                // restarted, so the card does not stay stuck on "Updating...".
+                if (/Polaris is running at|POLARIS_UPDATE_EXIT=0/.test(acc)) {
+                    stopPolling();
+                    setUpdateMsg("Update complete - reloading...");
+                    setTimeout(() => window.location.reload(), 1500);
                 }
             } catch {
                 // Web is restarting mid-update; keep polling until it returns.
