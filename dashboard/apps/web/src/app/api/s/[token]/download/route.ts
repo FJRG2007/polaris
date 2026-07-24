@@ -7,24 +7,16 @@
  * Node runtime because Prisma and the drivers need it.
  */
 
-import { cookies, headers } from "next/headers";
-import { loadEnv } from "@polaris/config";
+import { headers } from "next/headers";
 import { baseName } from "@polaris/core";
 import { getDriverForConnection } from "@/lib/storage-service";
 import { mimeForName } from "@/lib/mime";
 import {
     logShareAccess,
     registerDownload,
-    resolveShareByToken,
-    resolveWithinShare,
-    shareGeoAllowed,
-    shareIpAllowed,
-    shareUnlockCookie,
-    shareUsability,
-    verifyShareUnlock
+    resolveWithinShare
 } from "@/lib/share-service";
-import { clientIp, clientUserAgent, hashForLog } from "@/lib/request-context";
-import { dymoIpAllowed } from "@/lib/dymo-service";
+import { gateShareRequest } from "@/lib/share-access";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -36,35 +28,14 @@ export async function GET(
     { params }: { params: Promise<{ token: string }> }
 ): Promise<Response> {
     const { token } = await params;
-    const share = await resolveShareByToken(token);
-    if (!share) return new Response("Not found", { status: 404 });
+    const gate = await gateShareRequest(token, "download");
+    if (!gate.ok) return new Response(gate.reason, { status: gate.status });
 
-    const ip = await clientIp();
-    const ipHash = hashForLog(ip);
-    const userAgentHash = hashForLog(await clientUserAgent());
+    const { share, ip, ipHash, userAgentHash } = gate;
     const deny = (status: number, reason: string) => {
         void logShareAccess({ shareId: share.id, action: "download", reason, ip, ipHash, userAgentHash });
         return new Response(reason, { status });
     };
-
-    const usable = shareUsability(share);
-    if (!usable.ok) return deny(410, usable.reason);
-
-    if (!shareIpAllowed(share.allowedCidrs, ip)) return deny(403, "ip_not_allowed");
-
-    if (!(await shareGeoAllowed(share.allowedCountries, share.allowedContinents, ip))) {
-        return deny(403, "country_not_allowed");
-    }
-
-    // Dymo IP-fraud gate (no-op unless the integration is enabled). Fails open.
-    if (!(await dymoIpAllowed(ip)).allowed) return deny(403, "ip_flagged");
-
-    if (share.passwordHash) {
-        const cookieValue = (await cookies()).get(shareUnlockCookie(share.id))?.value;
-        if (!verifyShareUnlock(share.id, cookieValue, loadEnv().POLARIS_AUTH_SECRET)) {
-            return deny(401, "password_required");
-        }
-    }
 
     // An inline request is a browser preview; an attachment request is a download.
     // Each is gated by its own permission so a share can allow one without the other.

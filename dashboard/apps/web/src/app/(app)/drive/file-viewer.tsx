@@ -21,13 +21,21 @@ import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, cn } from "@p
 import { extensionOf } from "./file-categories";
 
 export interface ViewerTarget {
-    connectionId: string;
+    /** Source connection. Optional: a public share previews bytes through its own
+     *  token route instead, supplying `urlFor` on the viewer rather than an id. */
+    connectionId?: string;
     path: string;
     name: string;
     /** Byte size (serialized) and modified time, for the properties sidebar. */
     size?: string;
     modifiedAt?: string;
+    /** Override for the sidebar "Location". A share passes a subtree-relative label
+     *  so the raw connection path (and any folder above the shared root) never leaks. */
+    locationLabel?: string;
 }
+
+/** Builds the byte URL for a target (inline preview or attachment download). */
+export type ViewerUrlFor = (target: ViewerTarget, inline: boolean) => string;
 
 type ViewerKind =
     "image" | "video" | "audio" | "pdf" | "sheet" | "doc" | "markdown" | "text" | "none";
@@ -60,8 +68,9 @@ export function isViewable(name: string): boolean {
     return viewerKind(name) !== "none";
 }
 
-function byteUrl(target: ViewerTarget, inline: boolean): string {
-    const query = new URLSearchParams({ c: target.connectionId, p: target.path });
+/** Default byte URL for a Drive-owned file (served by the session-scoped route). */
+function driveByteUrl(target: ViewerTarget, inline: boolean): string {
+    const query = new URLSearchParams({ c: target.connectionId ?? "", p: target.path });
     if (inline) query.set("disposition", "inline");
     return `/api/drive/download?${query.toString()}`;
 }
@@ -69,12 +78,19 @@ function byteUrl(target: ViewerTarget, inline: boolean): string {
 export function FileViewer({
     target,
     onOpenChange,
-    onShare
+    onShare,
+    urlFor,
+    readOnly = false
 }: {
     target: ViewerTarget | null;
     onOpenChange: (open: boolean) => void;
     onShare?: (target: ViewerTarget) => void;
+    /** Override the byte-URL source (a public share serves through its token route). */
+    urlFor?: ViewerUrlFor;
+    /** Read-only viewing: hide inline editing (a share visitor cannot write back). */
+    readOnly?: boolean;
 }) {
+    const byteUrl = urlFor ?? driveByteUrl;
     const kind = target ? viewerKind(target.name) : "none";
     const inlineSrc = target ? byteUrl(target, true) : "";
     const extension = target ? extensionOf(target.name) : "";
@@ -122,9 +138,9 @@ export function FileViewer({
                             ) : kind === "doc" ? (
                                 <DocView src={inlineSrc} />
                             ) : kind === "markdown" ? (
-                                <MarkdownView src={inlineSrc} target={target} />
+                                <MarkdownView src={inlineSrc} target={target} readOnly={readOnly} />
                             ) : (
-                                <PlainTextEditor src={inlineSrc} target={target} />
+                                <PlainTextEditor src={inlineSrc} target={target} readOnly={readOnly} />
                             )
                         ) : null}
                     </div>
@@ -154,7 +170,8 @@ export function FileViewer({
                             <div className="flex flex-col gap-0.5">
                                 <span className="text-muted-foreground">Location</span>
                                 <span className="break-all">
-                                    /{target.path.split("/").slice(0, -1).join("/")}
+                                    {target.locationLabel ??
+                                        `/${target.path.split("/").slice(0, -1).join("/")}`}
                                 </span>
                             </div>
                         </aside>
@@ -373,7 +390,7 @@ const TEXT_LIMIT = 500_000;
  */
 async function saveTextFile(target: ViewerTarget, body: string): Promise<string | null> {
     const parent = target.path.split("/").slice(0, -1).join("/");
-    const query = new URLSearchParams({ c: target.connectionId, name: target.name });
+    const query = new URLSearchParams({ c: target.connectionId ?? "", name: target.name });
     if (parent) query.set("p", parent);
     try {
         const response = await fetch(`/api/drive/upload?${query.toString()}`, {
@@ -463,7 +480,15 @@ function isCleanUtf8(bytes: Uint8Array, decoded: string): boolean {
  * (guarded by write access). Binary content or a truncated read stays read-only
  * so a save can never corrupt or truncate the file.
  */
-function PlainTextEditor({ src, target }: { src: string; target: ViewerTarget }) {
+function PlainTextEditor({
+    src,
+    target,
+    readOnly = false
+}: {
+    src: string;
+    target: ViewerTarget;
+    readOnly?: boolean;
+}) {
     const [text, setText] = useState<string | null>(null);
     const [error, setError] = useState(false);
     const [binary, setBinary] = useState(false);
@@ -524,7 +549,7 @@ function PlainTextEditor({ src, target }: { src: string; target: ViewerTarget })
         return <p className="p-8 text-center text-sm text-danger">This file could not be read.</p>;
     if (text === null) return <Loading />;
 
-    const editable = !binary && !truncated && !lossy;
+    const editable = !readOnly && !binary && !truncated && !lossy;
     const label = binary
         ? "Binary file"
         : truncated
@@ -656,7 +681,15 @@ const MARKDOWN_PROSE = cn(
  * Markdown viewer: sanitized rendered ("pretty") or raw source, and inline editing
  * that saves the file back through the upload route (guarded by write access).
  */
-function MarkdownView({ src, target }: { src: string; target: ViewerTarget }) {
+function MarkdownView({
+    src,
+    target,
+    readOnly = false
+}: {
+    src: string;
+    target: ViewerTarget;
+    readOnly?: boolean;
+}) {
     const [text, setText] = useState<string | null>(null);
     const [error, setError] = useState(false);
     const [binary, setBinary] = useState(false);
@@ -733,7 +766,7 @@ function MarkdownView({ src, target }: { src: string; target: ViewerTarget }) {
     // Same guard as the plain-text editor: a truncated read, a lossy/non-UTF-8
     // decode, or binary content stays read-only so a save can never corrupt or
     // truncate the file. Viewing (pretty/raw) still works either way.
-    const editable = !binary && !truncated && !lossy;
+    const editable = !readOnly && !binary && !truncated && !lossy;
     const notEditableLabel = binary
         ? "Binary file"
         : truncated
@@ -807,7 +840,7 @@ function MarkdownView({ src, target }: { src: string; target: ViewerTarget }) {
                                 <Pencil className="size-4" />
                                 Edit
                             </Button>
-                        ) : (
+                        ) : readOnly ? null : (
                             <span className="ml-auto text-xs text-muted-foreground">
                                 {notEditableLabel}
                             </span>
