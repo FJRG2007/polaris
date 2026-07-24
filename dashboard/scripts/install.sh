@@ -425,7 +425,8 @@ align_db_password() {
 # that touches the web image. The paths below mirror the web-image path filter in
 # .github/workflows/dashboard-publish.yml (and update-service.ts) exactly, so this
 # agrees with what actually rebuilds the image.
-WEB_IMAGE="ghcr.io/fjrg2007/polaris-dashboard:latest"
+WEB_IMAGE_REPO="ghcr.io/fjrg2007/polaris-dashboard"
+WEB_IMAGE="${WEB_IMAGE_REPO}:latest"
 WEB_IMAGE_PATHS='^dashboard/(apps|packages|cli)/|^dashboard/docker/(Dockerfile|entrypoint\.sh)|^dashboard/package(-lock)?\.json$|^\.github/workflows/dashboard-publish\.yml$'
 
 # The commit the locally-present web image was built from (baked in as
@@ -460,6 +461,17 @@ wait_for_web_image() {
     command -v git >/dev/null 2>&1 || return 0
     target=$(git rev-parse HEAD 2>/dev/null) || return 0
     [ -n "$target" ] || return 0
+
+    # Track the image compose actually deploys: image: <repo>:${POLARIS_IMAGE_TAG:-latest}.
+    # Only `latest` is the rolling tag that follows HEAD - any other value is a
+    # deliberate pin to a frozen release (a documented, provenance-motivated feature),
+    # so waiting for HEAD is wrong and pulling :latest would fetch an image the host
+    # intentionally pinned away from. Leave a pinned deployment untouched.
+    tag=$(sed -n 's/^POLARIS_IMAGE_TAG=//p' .env 2>/dev/null | head -n1)
+    tag=${tag:-latest}
+    [ "$tag" = "latest" ] || return 0
+    WEB_IMAGE="${WEB_IMAGE_REPO}:${tag}"
+
     # Only meaningful when a deployment is already running (i.e. this is an update);
     # a first install has no prior image that could be "behind".
     docker ps -q \
@@ -467,8 +479,21 @@ wait_for_web_image() {
         --filter "label=com.docker.compose.service=web" 2>/dev/null | grep -q . || return 0
 
     i=0
+    pull_failures=0
     while [ "$i" -lt 40 ]; do
-        docker pull "$WEB_IMAGE" >/dev/null 2>&1 || true
+        # A successful pull refreshes the local image (or confirms the old one is the
+        # newest published). A failing pull means the registry/network is unreachable,
+        # not "still building" - after 3 in a row, stop waiting and let the normal
+        # `$compose pull` / source-build fallback proceed immediately.
+        if docker pull "$WEB_IMAGE" >/dev/null 2>&1; then
+            pull_failures=0
+        else
+            pull_failures=$((pull_failures + 1))
+            if [ "$pull_failures" -ge 3 ]; then
+                err "could not reach the registry to check the web image; deploying now (the source-build fallback will produce a HEAD-correct image if needed)"
+                return 0
+            fi
+        fi
         web_image_stale "$target" || return 0
         [ "$i" -eq 0 ] && log "web image for $(printf '%s' "$target" | cut -c1-7) is still building on CI; waiting before deploying..."
         sleep 30
