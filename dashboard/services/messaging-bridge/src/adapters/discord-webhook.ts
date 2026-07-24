@@ -33,7 +33,7 @@ export class DiscordWebhookAdapter implements ChannelAdapter {
     async send(message: OutboundMessage): Promise<SendResult> {
         const content = message.interactive?.text ?? message.text ?? "";
         // wait=true so Discord returns the created message (and its id).
-        const response = await fetch(`${this.url}?wait=true`, {
+        const response = await fetch(`${this.url}${this.url.includes("?") ? "&" : "?"}wait=true`, {
             method: "POST",
             headers: { "content-type": "application/json" },
             body: JSON.stringify({ content })

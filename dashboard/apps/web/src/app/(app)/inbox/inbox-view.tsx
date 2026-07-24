@@ -729,11 +729,11 @@ export function ConnectChannelDialog({
     // show its variants to choose from.
     function pickPlatform(next: PlatformGroup) {
         setError(null);
+        setGroup(next);
         if (next.variants.length === 1) {
             pick(next.variants[0]!);
             return;
         }
-        setGroup(next);
         setPhase("variant");
     }
 
