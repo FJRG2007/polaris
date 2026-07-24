@@ -415,6 +415,69 @@ align_db_password() {
     err "could not align the database password automatically; run 'polaris doctor' if the web fails"
 }
 
+# The published web image lags the source it was built from: CI takes a few
+# minutes to build and push :latest after a commit lands on main. An update pulls
+# the freshly advanced checkout instantly but then pulls whatever :latest points
+# to RIGHT NOW - which, during that window, is still the PREVIOUS commit's image.
+# The deploy then reports success while the running build sits one commit behind
+# HEAD, so the dashboard shows "update available" until some later update happens
+# to run after CI caught up. That race is why an update "breaks" on every change
+# that touches the web image. The paths below mirror the web-image path filter in
+# .github/workflows/dashboard-publish.yml (and update-service.ts) exactly, so this
+# agrees with what actually rebuilds the image.
+WEB_IMAGE="ghcr.io/fjrg2007/polaris-dashboard:latest"
+WEB_IMAGE_PATHS='^dashboard/(apps|packages|cli)/|^dashboard/docker/(Dockerfile|entrypoint\.sh)|^dashboard/package(-lock)?\.json$|^\.github/workflows/dashboard-publish\.yml$'
+
+# The commit the locally-present web image was built from (baked in as
+# POLARIS_BUILD_SHA), or empty if the image or label is absent.
+web_image_sha() {
+    docker image inspect "$WEB_IMAGE" \
+        --format '{{range .Config.Env}}{{println .}}{{end}}' 2>/dev/null \
+        | sed -n 's/^POLARIS_BUILD_SHA=//p' | head -n1
+}
+
+# True (0) when the local web image is STALE for the target commit: a web-image
+# path changed between the image's commit and target, so CI has not yet published
+# target's image. False (1) when it is current, or when we cannot tell (unknown
+# commit, or a shallow history that does not contain the image's commit) - never
+# block on uncertainty.
+web_image_stale() {
+    target="$1"
+    sha=$(web_image_sha)
+    [ -n "$sha" ] || return 1
+    [ "$sha" = "$target" ] && return 1
+    git rev-parse --verify --quiet "${sha}^{commit}" >/dev/null 2>&1 || return 1
+    git diff --name-only "$sha" "$target" 2>/dev/null | grep -qE "$WEB_IMAGE_PATHS"
+}
+
+# Hold an UPDATE until the registry's web image is built from HEAD (or HEAD made no
+# web change at all), so the deploy lands the commit that was just pulled instead of
+# the previous one. Bounded at ~20 minutes: past the cap - a failed or absent CI run
+# - it deploys whatever is current and lets a later check pick up the newer build,
+# so a stuck CI can never wedge the update. A first install (no web container yet)
+# and a shallow clone with no local history both fall through immediately.
+wait_for_web_image() {
+    command -v git >/dev/null 2>&1 || return 0
+    target=$(git rev-parse HEAD 2>/dev/null) || return 0
+    [ -n "$target" ] || return 0
+    # Only meaningful when a deployment is already running (i.e. this is an update);
+    # a first install has no prior image that could be "behind".
+    docker ps -q \
+        --filter "label=com.docker.compose.project=polaris" \
+        --filter "label=com.docker.compose.service=web" 2>/dev/null | grep -q . || return 0
+
+    i=0
+    while [ "$i" -lt 40 ]; do
+        docker pull "$WEB_IMAGE" >/dev/null 2>&1 || true
+        web_image_stale "$target" || return 0
+        [ "$i" -eq 0 ] && log "web image for $(printf '%s' "$target" | cut -c1-7) is still building on CI; waiting before deploying..."
+        sleep 30
+        i=$((i + 1))
+    done
+    err "the published web image did not catch up to $(printf '%s' "$target" | cut -c1-7) within ~20 min; deploying the current image (a later update will pick up the newer build)"
+    return 0
+}
+
 main() {
     # Full edition (privileged host daemon) is the default: it is what unlocks
     # in-band updates and the local Docker host with no extra flags. `--limited`
@@ -520,6 +583,11 @@ main() {
     # limited edition, so the local Docker host never appears.
     COMPOSE_PROFILES=$(sed -n 's/^COMPOSE_PROFILES=//p' .env | head -n1)
     export COMPOSE_PROFILES
+
+    # On an update, do not deploy until the published web image matches the source
+    # just pulled - otherwise the running build sits a commit behind HEAD and the
+    # dashboard nags "update available" until a later run. No-op on a first install.
+    wait_for_web_image
 
     # Install and update are the same command: prefer the published `latest` image
     # (fast), falling back to building from source if the registry is unavailable.
