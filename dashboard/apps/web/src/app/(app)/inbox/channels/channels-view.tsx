@@ -96,7 +96,8 @@ export function ChannelsView({
                 <div>
                     <h1 className="text-lg font-semibold">Channels</h1>
                     <p className="text-sm text-muted-foreground">
-                        Messaging channels connected to Polaris. The Inbox and Watch alerts send through these.
+                        Messaging channels connected to Polaris. The Inbox and Watch alerts send
+                        through these.
                     </p>
                 </div>
                 <Button onClick={() => setConnecting(true)} disabled={!bridgeReady}>
@@ -119,7 +120,8 @@ export function ChannelsView({
             {channels.length === 0 ? (
                 <Card>
                     <CardBody className="text-sm text-muted-foreground">
-                        No channels connected yet. Connect one to start messaging and to target it from Watch alerts.
+                        No channels connected yet. Connect one to start messaging and to target it
+                        from Watch alerts.
                     </CardBody>
                 </Card>
             ) : (
@@ -136,22 +138,39 @@ export function ChannelsView({
                                             className="grid size-10 shrink-0 place-items-center rounded-md"
                                             style={{
                                                 color: meta?.color,
-                                                backgroundColor: meta ? `${meta.color}1a` : undefined
+                                                backgroundColor: meta
+                                                    ? `${meta.color}1a`
+                                                    : undefined
                                             }}
                                         >
-                                            {Logo ? <Logo className="size-6" /> : <MessagesSquare className="size-6" />}
+                                            {Logo ? (
+                                                <Logo className="size-6" />
+                                            ) : (
+                                                <MessagesSquare className="size-6" />
+                                            )}
                                         </div>
                                         <div className="min-w-0 flex-1">
                                             <div className="flex items-center gap-2">
-                                                <h2 className="truncate text-sm font-medium">{channel.name}</h2>
-                                                <Badge className={cn(CHANNEL_STATUS_TONE[channel.status])}>
+                                                <h2 className="truncate text-sm font-medium">
+                                                    {channel.name}
+                                                </h2>
+                                                <Badge
+                                                    className={cn(
+                                                        CHANNEL_STATUS_TONE[channel.status]
+                                                    )}
+                                                >
                                                     {channel.status}
                                                 </Badge>
                                             </div>
                                             <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                                                {PLATFORM_LABEL[channel.platform] ?? channel.platform}
-                                                {channel.provider === "whatsapp-cloud" ? " Cloud" : ""}
-                                                {channel.externalId ? ` - ${channel.externalId}` : ""}
+                                                {PLATFORM_LABEL[channel.platform] ??
+                                                    channel.platform}
+                                                {channel.provider === "whatsapp-cloud"
+                                                    ? " Cloud"
+                                                    : ""}
+                                                {channel.externalId
+                                                    ? ` - ${channel.externalId}`
+                                                    : ""}
                                             </p>
                                         </div>
                                     </div>
@@ -161,7 +180,11 @@ export function ChannelsView({
                                                 <CheckCircle2 className="size-3.5" /> Connected
                                             </span>
                                         )}
-                                        <Button size="sm" variant="secondary" onClick={() => setManaging(channel)}>
+                                        <Button
+                                            size="sm"
+                                            variant="secondary"
+                                            onClick={() => setManaging(channel)}
+                                        >
                                             <Settings2 className="size-4" /> Manage
                                         </Button>
                                     </div>
@@ -177,7 +200,10 @@ export function ChannelsView({
                     bridgeReady={bridgeReady}
                     onClose={() => setConnecting(false)}
                     onConnected={(channel) => {
-                        setChannels((prev) => [...prev.filter((item) => item.id !== channel.id), channel]);
+                        setChannels((prev) => [
+                            ...prev.filter((item) => item.id !== channel.id),
+                            channel
+                        ]);
                         setConnecting(false);
                     }}
                 />
@@ -277,9 +303,16 @@ function ChannelManageDialog({
                     <DialogTitle className="flex items-center gap-2">
                         <span
                             className="grid size-7 shrink-0 place-items-center rounded"
-                            style={{ color: meta?.color, backgroundColor: meta ? `${meta.color}1a` : undefined }}
+                            style={{
+                                color: meta?.color,
+                                backgroundColor: meta ? `${meta.color}1a` : undefined
+                            }}
                         >
-                            {meta?.Logo ? <meta.Logo className="size-4" /> : <MessagesSquare className="size-4" />}
+                            {meta?.Logo ? (
+                                <meta.Logo className="size-4" />
+                            ) : (
+                                <MessagesSquare className="size-4" />
+                            )}
                         </span>
                         Manage {channel.name}
                     </DialogTitle>
@@ -289,17 +322,34 @@ function ChannelManageDialog({
                 <div className="flex flex-col gap-4">
                     <div className="flex items-center justify-between gap-3 rounded-md border border-border p-2.5 text-sm">
                         <span className="text-muted-foreground">
-                            Status: <span className={cn(CHANNEL_STATUS_TONE[channel.status])}>{channel.status}</span>
+                            Status:{" "}
+                            <span className={cn(CHANNEL_STATUS_TONE[channel.status])}>
+                                {channel.status}
+                            </span>
                         </span>
-                        <Button type="button" variant="ghost" size="sm" onClick={reconnect} disabled={busy}>
-                            {reconnecting ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={reconnect}
+                            disabled={busy}
+                        >
+                            {reconnecting ? (
+                                <Loader2 className="size-4 animate-spin" />
+                            ) : (
+                                <RefreshCw className="size-4" />
+                            )}
                             Reconnect
                         </Button>
                     </div>
 
                     <label className="flex flex-col gap-1 text-sm">
                         <span className="font-medium">Name</span>
-                        <Input value={name} onChange={(event) => setName(event.target.value)} placeholder="Support bot" />
+                        <Input
+                            value={name}
+                            onChange={(event) => setName(event.target.value)}
+                            placeholder="Support bot"
+                        />
                     </label>
 
                     {spec.tokenLabel && (
@@ -312,7 +362,9 @@ function ChannelManageDialog({
                                 onChange={(event) => setToken(event.target.value)}
                                 placeholder={`Saved - enter a new token to replace it`}
                             />
-                            <span className="text-xs text-muted-foreground">{spec.tokenPlaceholder}</span>
+                            <span className="text-xs text-muted-foreground">
+                                {spec.tokenPlaceholder}
+                            </span>
                         </label>
                     )}
 
@@ -330,7 +382,12 @@ function ChannelManageDialog({
                     {error && <p className="text-sm text-danger">{error}</p>}
 
                     <div className="flex items-center justify-between gap-2">
-                        <Button type="button" variant="danger" onClick={() => setConfirming(true)} disabled={busy}>
+                        <Button
+                            type="button"
+                            variant="danger"
+                            onClick={() => setConfirming(true)}
+                            disabled={busy}
+                        >
                             Remove
                         </Button>
                         <div className="flex gap-2">
@@ -350,13 +407,17 @@ function ChannelManageDialog({
                         <DialogHeader>
                             <DialogTitle>Remove {channel.name}?</DialogTitle>
                             <DialogDescription>
-                                This disconnects the channel and deletes its conversations and messages. It cannot be
-                                undone.
+                                This disconnects the channel and deletes its conversations and
+                                messages. It cannot be undone.
                             </DialogDescription>
                         </DialogHeader>
                         {error && <p className="text-sm text-danger">{error}</p>}
                         <div className="flex justify-end gap-2">
-                            <Button variant="ghost" onClick={() => setConfirming(false)} disabled={removing}>
+                            <Button
+                                variant="ghost"
+                                onClick={() => setConfirming(false)}
+                                disabled={removing}
+                            >
                                 Cancel
                             </Button>
                             <Button variant="danger" onClick={remove} disabled={removing}>

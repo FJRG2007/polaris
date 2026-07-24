@@ -178,7 +178,10 @@ export function InboxView({
                                             <span className="flex items-center justify-between gap-2">
                                                 <span className="truncate text-sm font-medium">
                                                     {conversation.peerName ??
-                                                        humanPeerId(conversation.platform, conversation.peerId)}
+                                                        humanPeerId(
+                                                            conversation.platform,
+                                                            conversation.peerId
+                                                        )}
                                                 </span>
                                                 {conversation.unread > 0 && (
                                                     <Badge>{conversation.unread}</Badge>
@@ -329,7 +332,9 @@ function Thread({
             });
             if (result.error) {
                 setMessages((prev) =>
-                    prev.map((message) => (message.id === optimisticId ? { ...message, ack: "failed" } : message))
+                    prev.map((message) =>
+                        message.id === optimisticId ? { ...message, ack: "failed" } : message
+                    )
                 );
                 setError(result.error);
                 return;
@@ -345,7 +350,8 @@ function Thread({
             <div className="flex items-center justify-between gap-2 border-b border-border p-3">
                 <div className="min-w-0">
                     <p className="truncate text-sm font-medium">
-                        {conversation.peerName ?? humanPeerId(conversation.platform, conversation.peerId)}
+                        {conversation.peerName ??
+                            humanPeerId(conversation.platform, conversation.peerId)}
                     </p>
                     <p className="truncate text-xs text-muted-foreground">
                         {conversation.channelName}
@@ -444,12 +450,18 @@ function Thread({
                         <DialogHeader>
                             <DialogTitle>Delete conversation</DialogTitle>
                             <DialogDescription>
-                                This removes the conversation and its messages from Polaris. The chat on{" "}
-                                {PLATFORM_LABEL[conversation.platform] ?? conversation.platform} itself is not affected.
+                                This removes the conversation and its messages from Polaris. The
+                                chat on{" "}
+                                {PLATFORM_LABEL[conversation.platform] ?? conversation.platform}{" "}
+                                itself is not affected.
                             </DialogDescription>
                         </DialogHeader>
                         <div className="flex justify-end gap-2">
-                            <Button variant="ghost" onClick={() => setConfirmDelete(false)} disabled={deleting}>
+                            <Button
+                                variant="ghost"
+                                onClick={() => setConfirmDelete(false)}
+                                disabled={deleting}
+                            >
                                 Cancel
                             </Button>
                             <Button
@@ -494,7 +506,9 @@ function MessageBubble({ message }: { message: MessageView }) {
                     <span className="whitespace-pre-wrap break-words">{message.body}</span>
                 )}
                 {outbound && message.ack === "sending" && (
-                    <span className="mt-1 block text-xs text-primary-foreground/70">sending...</span>
+                    <span className="mt-1 block text-xs text-primary-foreground/70">
+                        sending...
+                    </span>
                 )}
                 {outbound && message.ack === "failed" && (
                     <span className="mt-1 block text-xs text-danger-foreground/80">
@@ -1053,7 +1067,9 @@ function NewChatDialog({
                                 <Input
                                     value={peerId}
                                     onChange={(event) => editPeerId(event.target.value)}
-                                    placeholder={platform === "whatsapp" ? "34600111222" : "Recipient id"}
+                                    placeholder={
+                                        platform === "whatsapp" ? "34600111222" : "Recipient id"
+                                    }
                                 />
                                 {PEER_HINT[platform] && (
                                     <span className="text-xs text-muted-foreground">

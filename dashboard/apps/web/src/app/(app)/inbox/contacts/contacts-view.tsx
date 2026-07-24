@@ -60,7 +60,10 @@ function Avatar({ name, className }: { name: string; className?: string }) {
     const tone = toneFor(name);
     return (
         <span
-            className={cn("grid size-9 shrink-0 place-items-center rounded-full text-xs font-semibold", className)}
+            className={cn(
+                "grid size-9 shrink-0 place-items-center rounded-full text-xs font-semibold",
+                className
+            )}
             style={{ color: tone, backgroundColor: `${tone}1f` }}
         >
             {initials(name)}
@@ -128,7 +131,8 @@ export function ContactsView({ initialContacts }: { initialContacts: ContactView
                 <div>
                     <h1 className="text-lg font-semibold">Contacts</h1>
                     <p className="text-sm text-muted-foreground">
-                        One entry per person, unified across every platform they use. Pick them when starting a chat.
+                        One entry per person, unified across every platform they use. Pick them when
+                        starting a chat.
                     </p>
                 </div>
                 <Button onClick={() => setCreating((value) => !value)}>
@@ -151,7 +155,11 @@ export function ContactsView({ initialContacts }: { initialContacts: ContactView
                             {pending && <Loader2 className="size-4 animate-spin" />}
                             Add
                         </Button>
-                        <Button variant="ghost" onClick={() => setCreating(false)} disabled={pending}>
+                        <Button
+                            variant="ghost"
+                            onClick={() => setCreating(false)}
+                            disabled={pending}
+                        >
                             Cancel
                         </Button>
                         {error && <p className="w-full text-sm text-danger">{error}</p>}
@@ -191,13 +199,20 @@ export function ContactsView({ initialContacts }: { initialContacts: ContactView
                                         >
                                             <Avatar name={contact.name} />
                                             <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                                                <span className="truncate text-sm font-medium">{contact.name}</span>
+                                                <span className="truncate text-sm font-medium">
+                                                    {contact.name}
+                                                </span>
                                                 <span className="flex flex-wrap items-center gap-1">
                                                     {contact.identities.length === 0 ? (
-                                                        <span className="text-xs text-muted-foreground">No handles</span>
+                                                        <span className="text-xs text-muted-foreground">
+                                                            No handles
+                                                        </span>
                                                     ) : (
                                                         contact.identities.map((identity) => (
-                                                            <PlatformDot key={identity.id} platform={identity.platform} />
+                                                            <PlatformDot
+                                                                key={identity.id}
+                                                                platform={identity.platform}
+                                                            />
                                                         ))
                                                     )}
                                                 </span>
@@ -277,7 +292,8 @@ function ContactDetail({
         });
     }
 
-    const detailsDirty = name.trim() !== contact.name || (note.trim() || "") !== (contact.note ?? "");
+    const detailsDirty =
+        name.trim() !== contact.name || (note.trim() || "") !== (contact.note ?? "");
 
     return (
         <Card>
@@ -287,7 +303,8 @@ function ContactDetail({
                     <div className="min-w-0 flex-1">
                         <h2 className="truncate text-base font-semibold">{contact.name}</h2>
                         <p className="text-xs text-muted-foreground">
-                            {contact.identities.length} handle{contact.identities.length === 1 ? "" : "s"}
+                            {contact.identities.length} handle
+                            {contact.identities.length === 1 ? "" : "s"}
                         </p>
                     </div>
                     <Button
@@ -314,7 +331,11 @@ function ContactDetail({
                     </label>
                     <label className="flex flex-col gap-1 text-sm">
                         <span className="font-medium">Note</span>
-                        <Input value={note} onChange={(event) => setNote(event.target.value)} placeholder="Optional" />
+                        <Input
+                            value={note}
+                            onChange={(event) => setNote(event.target.value)}
+                            placeholder="Optional"
+                        />
                     </label>
                 </div>
                 {detailsDirty && (
@@ -324,7 +345,11 @@ function ContactDetail({
                             disabled={pending || name.trim() === ""}
                             onClick={() =>
                                 run(() =>
-                                    updateContactAction({ id: contact.id, name: name.trim(), note: note.trim() || null })
+                                    updateContactAction({
+                                        id: contact.id,
+                                        name: name.trim(),
+                                        note: note.trim() || null
+                                    })
                                 )
                             }
                         >
@@ -336,7 +361,9 @@ function ContactDetail({
                 <div className="flex flex-col gap-2">
                     <span className="text-sm font-medium">Handles</span>
                     {contact.identities.length === 0 ? (
-                        <p className="text-xs text-muted-foreground">No handles yet. Add one below to start chats.</p>
+                        <p className="text-xs text-muted-foreground">
+                            No handles yet. Add one below to start chats.
+                        </p>
                     ) : (
                         contact.identities.map((identity) => (
                             <HandleRow
@@ -345,7 +372,11 @@ function ContactDetail({
                                 disabled={pending}
                                 onSave={(platform, peerId) =>
                                     run(() =>
-                                        updateContactIdentityAction({ identityId: identity.id, platform, peerId })
+                                        updateContactIdentityAction({
+                                            identityId: identity.id,
+                                            platform,
+                                            peerId
+                                        })
                                     )
                                 }
                                 onRemove={() => run(() => deleteContactIdentityAction(identity.id))}
@@ -355,7 +386,13 @@ function ContactDetail({
                     <AddHandle
                         disabled={pending}
                         onAdd={(platform, peerId) =>
-                            run(() => addContactIdentityAction({ contactId: contact.id, platform, peerId }))
+                            run(() =>
+                                addContactIdentityAction({
+                                    contactId: contact.id,
+                                    platform,
+                                    peerId
+                                })
+                            )
                         }
                     />
                 </div>
@@ -411,7 +448,9 @@ function HandleRow({
         setDraft(editablePeer(identity.platform, identity.peerId));
     }, [identity.platform, identity.peerId]);
 
-    const dirty = platform !== identity.platform || draft.trim() !== editablePeer(identity.platform, identity.peerId);
+    const dirty =
+        platform !== identity.platform ||
+        draft.trim() !== editablePeer(identity.platform, identity.peerId);
 
     return (
         <div className="flex items-start gap-2">

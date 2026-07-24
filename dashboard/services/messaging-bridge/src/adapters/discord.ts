@@ -39,7 +39,11 @@ const FULL_INTENTS = [
     GatewayIntentBits.MessageContent,
     GatewayIntentBits.DirectMessages
 ];
-const REDUCED_INTENTS = [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.DirectMessages];
+const REDUCED_INTENTS = [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.DirectMessages
+];
 
 export class DiscordAdapter implements ChannelAdapter {
     readonly capabilities = capabilitiesFor("discord");
@@ -80,7 +84,9 @@ export class DiscordAdapter implements ChannelAdapter {
             void interaction.deferUpdate().catch(() => undefined);
             this.ctx.onInbound({
                 channelId: this.channelId,
-                peerId: interaction.guildId ? interaction.channelId ?? "" : `user:${interaction.user.id}`,
+                peerId: interaction.guildId
+                    ? (interaction.channelId ?? "")
+                    : `user:${interaction.user.id}`,
                 peerName: interaction.user.username,
                 kind: "interactive",
                 selection: interaction.customId,
@@ -113,7 +119,9 @@ export class DiscordAdapter implements ChannelAdapter {
                 return this.login();
             }
             if (/token|unauthorized|invalid/i.test(detail)) {
-                throw new Error("Discord rejected the bot token. Check it in the Developer Portal (Bot > Token).");
+                throw new Error(
+                    "Discord rejected the bot token. Check it in the Developer Portal (Bot > Token)."
+                );
             }
             throw caught instanceof Error ? caught : new Error("Could not connect to Discord");
         }
@@ -123,7 +131,9 @@ export class DiscordAdapter implements ChannelAdapter {
         await this.client.destroy();
     }
 
-    private buttonRows(prompt: InteractivePrompt): APIActionRowComponent<APIMessageActionRowComponent>[] {
+    private buttonRows(
+        prompt: InteractivePrompt
+    ): APIActionRowComponent<APIMessageActionRowComponent>[] {
         const rows: APIActionRowComponent<APIMessageActionRowComponent>[] = [];
         const options = prompt.options.slice(0, MAX_BUTTONS);
         for (let i = 0; i < options.length; i += BUTTONS_PER_ROW) {
@@ -145,7 +155,8 @@ export class DiscordAdapter implements ChannelAdapter {
      *  back-compat with handles stored before the DM/channel split). */
     private resolvePeer(peerId: string): { dm: boolean; id: string } {
         if (peerId.startsWith("user:")) return { dm: true, id: peerId.slice("user:".length) };
-        if (peerId.startsWith("channel:")) return { dm: false, id: peerId.slice("channel:".length) };
+        if (peerId.startsWith("channel:"))
+            return { dm: false, id: peerId.slice("channel:".length) };
         return { dm: false, id: peerId };
     }
 
@@ -153,12 +164,21 @@ export class DiscordAdapter implements ChannelAdapter {
         const { dm, id } = this.resolvePeer(message.peerId);
         // For a DM, open (or reuse) the user's DM channel; otherwise fetch the server
         // channel. Both end up as a text-based channel we can post to.
-        const channel = dm ? await (await this.client.users.fetch(id)).createDM() : await this.client.channels.fetch(id);
+        const channel = dm
+            ? await (await this.client.users.fetch(id)).createDM()
+            : await this.client.channels.fetch(id);
         if (!channel || !channel.isTextBased() || !("send" in channel)) {
-            throw new Error(dm ? "Could not open a DM with that user" : "The Discord channel is not a text channel");
+            throw new Error(
+                dm
+                    ? "Could not open a DM with that user"
+                    : "The Discord channel is not a text channel"
+            );
         }
         const payload = message.interactive
-            ? { content: message.interactive.text, components: this.buttonRows(message.interactive) }
+            ? {
+                  content: message.interactive.text,
+                  components: this.buttonRows(message.interactive)
+              }
             : { content: message.text ?? "" };
         const sent = await channel.send(payload);
         return { externalId: sent.id };
@@ -173,11 +193,13 @@ export class DiscordAdapter implements ChannelAdapter {
             const channels = [...guild.channels.cache.values()]
                 .filter(
                     (channel) =>
-                        channel.type === ChannelType.GuildText || channel.type === ChannelType.GuildAnnouncement
+                        channel.type === ChannelType.GuildText ||
+                        channel.type === ChannelType.GuildAnnouncement
                 )
                 .map((channel) => ({ id: channel.id, name: `#${channel.name}` }))
                 .sort((a, b) => a.name.localeCompare(b.name));
-            if (channels.length > 0) groups.push({ id: guild.id, name: guild.name, targets: channels });
+            if (channels.length > 0)
+                groups.push({ id: guild.id, name: guild.name, targets: channels });
         }
         return groups.sort((a, b) => a.name.localeCompare(b.name));
     }

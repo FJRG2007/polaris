@@ -24,9 +24,9 @@ Cloud inbound arrives on the web's Meta webhook, not here.
 
 - `GET  /health` - liveness (unauthenticated).
 - `POST /channels` - connect a channel `{ channelId, platform, provider?, token?,
-  config? }`; returns `{ externalId, capabilities }`.
+config? }`; returns `{ externalId, capabilities }`.
 - `GET  /channels/:id/state` - onboarding/connection state `{ status, qr?,
-  externalId? }` (whatsapp-web reports its QR here).
+externalId? }` (whatsapp-web reports its QR here).
 - `GET  /channels/:id/targets` - addressable send targets grouped (server ->
   channels) for adapters that enumerate them (Discord); `{ groups }`, empty for
   platforms whose recipients are entered by hand.

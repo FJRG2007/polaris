@@ -25,7 +25,11 @@ async function call<T>(path: string, init: RequestInit): Promise<T> {
     if (!endpoint) throw new Error("The messaging bridge is not configured");
     const response = await fetch(`${endpoint.baseUrl}${path}`, {
         ...init,
-        headers: { "content-type": "application/json", authorization: `Bearer ${endpoint.token}`, ...init.headers }
+        headers: {
+            "content-type": "application/json",
+            authorization: `Bearer ${endpoint.token}`,
+            ...init.headers
+        }
     });
     const data = (await response.json().catch(() => ({}))) as { error?: string } & T;
     if (!response.ok) throw new Error(data.error ?? `Bridge request to ${path} failed`);
@@ -55,7 +59,10 @@ export async function bridgeSend(
     channelId: string,
     message: { peerId: string; text?: string; interactive?: InteractivePrompt }
 ): Promise<{ externalId?: string }> {
-    return call(`/channels/${encodeURIComponent(channelId)}/send`, { method: "POST", body: JSON.stringify(message) });
+    return call(`/channels/${encodeURIComponent(channelId)}/send`, {
+        method: "POST",
+        body: JSON.stringify(message)
+    });
 }
 
 /** Addressable send targets grouped (server -> channels) for a channel whose

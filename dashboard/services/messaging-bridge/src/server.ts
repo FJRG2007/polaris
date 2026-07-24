@@ -41,7 +41,9 @@ export function createBridgeServer({ registry, authToken }: BridgeServerOptions)
             if (req.method === "POST" && path === "/channels") {
                 const parsed = connectChannelSchema.safeParse(await readJson(req));
                 if (!parsed.success) {
-                    reply(res, 400, { error: parsed.error.issues[0]?.message ?? "Invalid request" });
+                    reply(res, 400, {
+                        error: parsed.error.issues[0]?.message ?? "Invalid request"
+                    });
                     return;
                 }
                 const result = await registry.connect(parsed.data);
@@ -84,7 +86,9 @@ export function createBridgeServer({ registry, authToken }: BridgeServerOptions)
                 }
                 const parsed = sendMessageSchema.safeParse(await readJson(req));
                 if (!parsed.success) {
-                    reply(res, 400, { error: parsed.error.issues[0]?.message ?? "Invalid request" });
+                    reply(res, 400, {
+                        error: parsed.error.issues[0]?.message ?? "Invalid request"
+                    });
                     return;
                 }
                 reply(res, 200, await adapter.send(parsed.data));

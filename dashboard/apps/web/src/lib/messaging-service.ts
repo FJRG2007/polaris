@@ -252,9 +252,15 @@ export async function updateChannelCredentials(
                 capabilitiesFor(channel.platform as Platform, channel.provider ?? undefined);
             existingConfig = parsed.providerConfig ?? {};
         } catch {
-            capabilities = capabilitiesFor(channel.platform as Platform, channel.provider ?? undefined);
+            capabilities = capabilitiesFor(
+                channel.platform as Platform,
+                channel.provider ?? undefined
+            );
         }
-        configJson = JSON.stringify({ capabilities, providerConfig: { ...existingConfig, ...patch.config } });
+        configJson = JSON.stringify({
+            capabilities,
+            providerConfig: { ...existingConfig, ...patch.config }
+        });
     }
 
     await prisma.channel.update({
@@ -262,7 +268,11 @@ export async function updateChannelCredentials(
         data: {
             ...(trimmedName ? { name: trimmedName } : {}),
             ...(blob
-                ? { encryptedSecret: blob.ciphertext, secretNonce: blob.nonce, secretKeyId: blob.keyId }
+                ? {
+                      encryptedSecret: blob.ciphertext,
+                      secretNonce: blob.nonce,
+                      secretKeyId: blob.keyId
+                  }
                 : {}),
             ...(configJson ? { config: configJson } : {})
         }
@@ -288,7 +298,10 @@ export async function deleteChannel(ownerId: string, channelId: string): Promise
 /** Addressable send targets (server -> channels) for one of the owner's channels,
  *  for the recipient picker. Empty for platforms that don't enumerate recipients
  *  (WhatsApp, Telegram) or when the channel is not connected. */
-export async function listChannelTargets(ownerId: string, channelId: string): Promise<TargetGroup[]> {
+export async function listChannelTargets(
+    ownerId: string,
+    channelId: string
+): Promise<TargetGroup[]> {
     const channel = await prisma.channel.findFirst({
         where: { id: channelId, ownerId },
         select: { id: true, status: true }
@@ -386,7 +399,11 @@ export async function listMessagingActivity(ownerId: string, limit = 150): Promi
         take: Math.min(Math.max(limit, 1), 500),
         include: {
             conversation: {
-                select: { peerId: true, peerName: true, channel: { select: { name: true, platform: true } } }
+                select: {
+                    peerId: true,
+                    peerName: true,
+                    channel: { select: { name: true, platform: true } }
+                }
             }
         }
     });

@@ -58,7 +58,8 @@ export type DiscordTarget = "channel" | "user";
 export function parseDiscordPeer(peerId: string): { target: DiscordTarget; id: string } {
     const value = peerId.trim();
     if (value.startsWith("user:")) return { target: "user", id: value.slice("user:".length) };
-    if (value.startsWith("channel:")) return { target: "channel", id: value.slice("channel:".length) };
+    if (value.startsWith("channel:"))
+        return { target: "channel", id: value.slice("channel:".length) };
     return { target: "channel", id: value };
 }
 

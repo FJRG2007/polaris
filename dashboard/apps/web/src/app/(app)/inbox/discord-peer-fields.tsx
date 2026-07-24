@@ -119,13 +119,18 @@ export function DiscordPeerFields({
                                     setGuildId(value);
                                     onDraft(encodeDiscordPeer("channel", ""));
                                 }}
-                                options={groups.map((group) => ({ value: group.id, label: group.name }))}
+                                options={groups.map((group) => ({
+                                    value: group.id,
+                                    label: group.name
+                                }))}
                             />
                         </div>
                         <div className="flex-1">
                             <Select
                                 value={id}
-                                onValueChange={(value) => onDraft(encodeDiscordPeer("channel", value))}
+                                onValueChange={(value) =>
+                                    onDraft(encodeDiscordPeer("channel", value))
+                                }
                                 placeholder="Pick a channel"
                                 options={(guild?.targets ?? []).map((item) => ({
                                     value: item.id,
@@ -137,7 +142,9 @@ export function DiscordPeerFields({
                 ) : (
                     <Input
                         value={id}
-                        onChange={(event) => onDraft(encodeDiscordPeer("channel", event.target.value))}
+                        onChange={(event) =>
+                            onDraft(encodeDiscordPeer("channel", event.target.value))
+                        }
                         placeholder="Channel id the bot can post to"
                     />
                 ))}

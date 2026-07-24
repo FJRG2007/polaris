@@ -198,7 +198,9 @@ export async function getMessagesAction(conversationId: string): Promise<Message
 }
 
 /** Delete a conversation and its messages. */
-export async function deleteConversationAction(conversationId: string): Promise<{ error?: string }> {
+export async function deleteConversationAction(
+    conversationId: string
+): Promise<{ error?: string }> {
     const user = await requireUser();
     if (!z.string().uuid().safeParse(conversationId).success) return { error: "Invalid request" };
     try {
@@ -206,7 +208,9 @@ export async function deleteConversationAction(conversationId: string): Promise<
         revalidatePath("/inbox");
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not delete the conversation" };
+        return {
+            error: caught instanceof Error ? caught.message : "Could not delete the conversation"
+        };
     }
 }
 
