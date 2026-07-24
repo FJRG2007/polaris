@@ -57,6 +57,11 @@ export interface ComposeSpec {
 export function appComposeSpec(plan: AppDeployPlan, imageTag: string, network: string): ComposeSpec {
     const labels = traefikLabels({ serviceName: plan.ref.name, network, domains: plan.domains, waf: plan.waf });
     const namedVolumes = plan.volumes.filter((volume) => volume.kind === "volume").map((volume) => volume.source);
+    // The proxy network plus any extra networks the plan requests (deduped, proxy
+    // first so edge routing is unchanged). Both the daemon and the remote YAML
+    // renderer emit every top-level network as external, so each must already exist
+    // on the target. Traefik still routes via the proxy network (labels reference it).
+    const networks = [network, ...(plan.extraNetworks ?? []).filter((net) => net && net !== network)];
     return {
         project: plan.ref.project,
         services: [
@@ -74,7 +79,7 @@ export function appComposeSpec(plan: AppDeployPlan, imageTag: string, network: s
                     kind: volume.kind
                 })),
                 labels,
-                networks: [network],
+                networks,
                 restart: "unless-stopped",
                 replicas: plan.replicas > 1 ? plan.replicas : undefined,
                 healthcheck: plan.healthcheck
@@ -88,7 +93,7 @@ export function appComposeSpec(plan: AppDeployPlan, imageTag: string, network: s
             }
         ],
         volumes: namedVolumes,
-        networks: [network]
+        networks
     };
 }
 

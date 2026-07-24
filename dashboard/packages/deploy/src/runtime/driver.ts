@@ -61,6 +61,11 @@ export interface AppDeployPlan {
     /** Runtime environment (already merged from EnvVars, secrets decrypted). */
     readonly env: Readonly<Record<string, string>>;
     readonly replicas: number;
+    /** External networks this service joins beyond the proxy network. The messaging
+     *  hub uses it to join the control-plane's default network so it can reach the
+     *  web's inbound ingest directly; empty for a normal app. Each must already
+     *  exist on the target (compose declares them external). */
+    readonly extraNetworks?: readonly string[];
     readonly domains: readonly TraefikDomain[];
     /** Resolved WAF rules to materialize into this service's edge labels (allowlist
      *  + denylist + require-login). Omitted when the service has no WAF rules. */
