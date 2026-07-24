@@ -168,19 +168,18 @@ export class DiscordAdapter implements ChannelAdapter {
      *  username (or @username) is looked up across the bot's servers by member
      *  search, which needs the Server Members privileged intent and a shared server. */
     private async resolveUserId(idOrName: string): Promise<string> {
-        if (/^\d+$/.test(idOrName)) return idOrName;
+        if (/^\d{17,}$/.test(idOrName)) return idOrName;
         const name = idOrName.replace(/^@/, "").trim().toLowerCase();
         if (!name) throw new Error("Enter a Discord user id or username to DM");
         for (const guild of this.client.guilds.cache.values()) {
             try {
                 const members = await guild.members.fetch({ query: name, limit: 5 });
-                const match =
-                    members.find(
-                        (member) =>
-                            member.user.username.toLowerCase() === name ||
-                            member.user.globalName?.toLowerCase() === name ||
-                            member.displayName.toLowerCase() === name
-                    ) ?? members.first();
+                const match = members.find(
+                    (member) =>
+                        member.user.username.toLowerCase() === name ||
+                        member.user.globalName?.toLowerCase() === name ||
+                        member.displayName.toLowerCase() === name
+                );
                 if (match) return match.id;
             } catch {
                 // Members intent off or no access in this guild; try the next one.
