@@ -88,6 +88,13 @@ Updating is the same one command as installing - re-run it and it pulls the
 latest source, adds any new settings to `.env` for you, rebuilds, and restarts
 (applying migrations). Nothing else to manage.
 
+On the rolling `latest` tag, an update first waits (bounded to ~20 min, then
+deploys anyway) for the registry's web image to be rebuilt from the source it
+just pulled - CI takes a few minutes to publish `:latest` after a change lands.
+This keeps the running build from landing a commit behind `HEAD`, which is what
+left the dashboard showing "update available" after an update. A first install
+and a pinned `POLARIS_IMAGE_TAG` both skip the wait.
+
 ```sh
 curl -fsSL https://raw.githubusercontent.com/FJRG2007/polaris/main/dashboard/scripts/install.sh | sh
 # or, from a checkout:
