@@ -30,7 +30,12 @@ export class SlackWebhookAdapter implements ChannelAdapter {
     }
 
     async send(message: OutboundMessage): Promise<SendResult> {
-        const text = message.interactive?.text ?? message.text ?? "";
+        const text = message.interactive
+            ? [
+                  message.interactive.text,
+                  ...message.interactive.options.map((option, index) => `${index + 1}. ${option.label}`)
+              ].join("\n")
+            : message.text ?? "";
         const response = await fetch(this.url, {
             method: "POST",
             headers: { "content-type": "application/json" },

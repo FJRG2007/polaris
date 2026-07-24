@@ -139,10 +139,11 @@ export class DiscordAdapter implements ChannelAdapter {
             if (tier > 0) {
                 await this.client.destroy().catch(() => undefined);
                 this.client = this.build(intents);
-                if (note) this.ctx.log(note);
             }
             try {
-                return await this.login();
+                const result = await this.login();
+                if (note) this.ctx.log(note);
+                return result;
             } catch (caught) {
                 lastError = caught;
                 const detail = caught instanceof Error ? caught.message : String(caught);
