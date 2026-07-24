@@ -26,12 +26,14 @@ import {
     listChannels,
     listContacts,
     listConversations,
+    listMessagingActivity,
     reconnectChannel,
     renameChannel,
     sendConversationMessage,
     startConversation,
     updateContact,
     updateContactIdentity,
+    type ActivityView,
     type AgentView,
     type ChannelLiveState,
     type ChannelView,
@@ -152,6 +154,12 @@ export async function reconnectChannelAction(
 export async function listConversationsAction(): Promise<ConversationView[]> {
     const user = await requireUser();
     return listConversations(user.id);
+}
+
+/** Recent messaging activity across the owner's channels, for the Logs view. */
+export async function listActivityAction(): Promise<ActivityView[]> {
+    const user = await requireUser();
+    return listMessagingActivity(user.id);
 }
 
 export async function getMessagesAction(conversationId: string): Promise<MessageView[]> {

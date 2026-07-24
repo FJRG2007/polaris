@@ -281,7 +281,7 @@ export function InboxView({
     );
 }
 
-function ChannelCard({
+export function ChannelCard({
     channel,
     onUpdated,
     onRemoved
@@ -831,7 +831,7 @@ const CHANNEL_META: Record<ChannelKind, ChannelKindMeta> = Object.fromEntries(
     CHANNEL_CATALOG.map((meta) => [meta.kind, meta])
 ) as Record<ChannelKind, ChannelKindMeta>;
 
-function ConnectChannelDialog({
+export function ConnectChannelDialog({
     bridgeReady,
     onClose,
     onConnected
