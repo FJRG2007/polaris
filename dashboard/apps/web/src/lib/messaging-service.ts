@@ -526,6 +526,14 @@ function normalizePeerId(platform: string, raw: string): string {
         const digits = value.replace(/\D/g, "");
         return digits ? `${digits}@c.us` : value;
     }
+    if (platform === "discord") {
+        const decoded = value.startsWith("user:")
+            ? value.slice("user:".length)
+            : value.startsWith("channel:")
+              ? value.slice("channel:".length)
+              : value;
+        if (!decoded.trim()) return "";
+    }
     return value;
 }
 

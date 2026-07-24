@@ -64,6 +64,7 @@ export function parseDiscordPeer(peerId: string): { target: DiscordTarget; id: s
 
 export function encodeDiscordPeer(target: DiscordTarget, id: string): string {
     const trimmed = id.trim();
+    if (!trimmed) return "";
     return target === "user" ? `user:${trimmed}` : trimmed;
 }
 

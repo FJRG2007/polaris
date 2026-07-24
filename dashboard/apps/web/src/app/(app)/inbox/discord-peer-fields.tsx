@@ -27,10 +27,21 @@ export function DiscordPeerFields({
     draft: string;
     onDraft: (value: string) => void;
 }) {
-    const { target, id } = parseDiscordPeer(draft);
+    const { id } = parseDiscordPeer(draft);
     const [bot, setBot] = useState<string | null>(botChannelId ?? null);
     const [groups, setGroups] = useState<TargetGroup[] | null>(null);
     const [guildId, setGuildId] = useState("");
+    // The chosen target type is tracked separately from the draft: an empty draft
+    // (no id yet, or a just-cleared channel) encodes to "" and carries no target,
+    // so deriving it from the draft alone would snap the picker back to "channel".
+    const [target, setTarget] = useState<DiscordTarget>(() => parseDiscordPeer(draft).target);
+
+    // Keep the target in sync when a non-empty draft arrives from the caller (e.g.
+    // filling the recipient from a saved handle); an empty draft leaves it untouched.
+    useEffect(() => {
+        if (draft.trim() === "") return;
+        setTarget(parseDiscordPeer(draft).target);
+    }, [draft]);
 
     // Resolve a bot channel to query when the caller did not supply one.
     useEffect(() => {
@@ -77,7 +88,11 @@ export function DiscordPeerFields({
                 <div className="w-40 shrink-0">
                     <Select
                         value={target}
-                        onValueChange={(value) => onDraft(encodeDiscordPeer(value as DiscordTarget, ""))}
+                        onValueChange={(value) => {
+                            const next = value as DiscordTarget;
+                            setTarget(next);
+                            onDraft(encodeDiscordPeer(next, ""));
+                        }}
                         options={[
                             { value: "channel", label: "Server channel" },
                             { value: "user", label: "Direct message" }
@@ -100,7 +115,10 @@ export function DiscordPeerFields({
                         <div className="w-40 shrink-0">
                             <Select
                                 value={guildId}
-                                onValueChange={setGuildId}
+                                onValueChange={(value) => {
+                                    setGuildId(value);
+                                    onDraft(encodeDiscordPeer("channel", ""));
+                                }}
                                 options={groups.map((group) => ({ value: group.id, label: group.name }))}
                             />
                         </div>
