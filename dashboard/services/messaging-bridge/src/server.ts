@@ -41,7 +41,9 @@ export function createBridgeServer({ registry, authToken }: BridgeServerOptions)
             if (req.method === "POST" && path === "/channels") {
                 const parsed = connectChannelSchema.safeParse(await readJson(req));
                 if (!parsed.success) {
-                    reply(res, 400, { error: parsed.error.issues[0]?.message ?? "Invalid request" });
+                    reply(res, 400, {
+                        error: parsed.error.issues[0]?.message ?? "Invalid request"
+                    });
                     return;
                 }
                 const result = await registry.connect(parsed.data);
@@ -63,6 +65,18 @@ export function createBridgeServer({ registry, authToken }: BridgeServerOptions)
                 return;
             }
 
+            const targetsMatch = path.match(/^\/channels\/([^/]+)\/targets$/);
+            if (req.method === "GET" && targetsMatch) {
+                const adapter = registry.get(decodeURIComponent(targetsMatch[1]!));
+                if (!adapter) {
+                    reply(res, 404, { error: "Channel not connected" });
+                    return;
+                }
+                const groups = adapter.listTargets ? await adapter.listTargets() : [];
+                reply(res, 200, { groups });
+                return;
+            }
+
             const sendMatch = path.match(/^\/channels\/([^/]+)\/send$/);
             if (req.method === "POST" && sendMatch) {
                 const adapter = registry.get(decodeURIComponent(sendMatch[1]!));
@@ -72,7 +86,9 @@ export function createBridgeServer({ registry, authToken }: BridgeServerOptions)
                 }
                 const parsed = sendMessageSchema.safeParse(await readJson(req));
                 if (!parsed.success) {
-                    reply(res, 400, { error: parsed.error.issues[0]?.message ?? "Invalid request" });
+                    reply(res, 400, {
+                        error: parsed.error.issues[0]?.message ?? "Invalid request"
+                    });
                     return;
                 }
                 reply(res, 200, await adapter.send(parsed.data));

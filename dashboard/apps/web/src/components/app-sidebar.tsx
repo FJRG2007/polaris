@@ -14,6 +14,7 @@ import {
     Activity,
     Blocks,
     Clock,
+    Contact,
     Container,
     Database,
     FolderOpen,
@@ -64,6 +65,7 @@ const APP_SIDEBARS: Record<string, SidebarItem[]> = {
     ],
     inbox: [
         { label: "Conversations", href: "/inbox", icon: MessagesSquare },
+        { label: "Contacts", href: "/inbox/contacts", icon: Contact },
         { label: "Channels", href: "/inbox/channels", icon: Radio },
         { label: "Logs", href: "/inbox/logs", icon: ScrollText }
     ],

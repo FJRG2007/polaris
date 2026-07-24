@@ -9,6 +9,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { PLATFORMS, interactivePromptSchema } from "@polaris/messaging";
+import type { TargetGroup } from "@polaris/messaging";
 import { requireUser } from "@/lib/session";
 import { bridgeConfigured } from "@/lib/messaging/bridge-client";
 import {
@@ -23,14 +24,15 @@ import {
     deleteConversation,
     getConversationMessages,
     listAgents,
+    listChannelTargets,
     listChannels,
     listContacts,
     listConversations,
     listMessagingActivity,
     reconnectChannel,
-    renameChannel,
     sendConversationMessage,
     startConversation,
+    updateChannelCredentials,
     updateContact,
     updateContactIdentity,
     type ActivityView,
@@ -114,24 +116,31 @@ export async function deleteChannelAction(channelId: string): Promise<{ error?: 
     }
 }
 
-const renameChannelSchema = z.object({
+const updateChannelSchema = z.object({
     channelId: z.string().uuid(),
-    name: z.string().trim().min(1).max(64)
+    name: z.string().trim().min(1).max(64).optional(),
+    // A new credential (bot token / access token) to replace the stored one.
+    token: z.string().trim().min(1).max(8192).optional(),
+    // Provider-specific config (e.g. WhatsApp Cloud phoneNumberId).
+    config: z.record(z.string(), z.string().max(256)).optional()
 });
 
-/** Rename a channel's display name. */
-export async function renameChannelAction(
-    input: z.infer<typeof renameChannelSchema>
-): Promise<{ error?: string }> {
+/** Edit a channel's name, credential, and/or provider config, reconnecting when
+ *  the credential or config changed so the live adapter picks it up. */
+export async function updateChannelAction(
+    input: z.infer<typeof updateChannelSchema>
+): Promise<{ error?: string; status?: string }> {
     const user = await requireUser();
-    const parsed = renameChannelSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Enter a name" };
+    const parsed = updateChannelSchema.safeParse(input);
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the form" };
+    const { channelId, ...patch } = parsed.data;
+    if (!patch.name && !patch.token && !patch.config) return { error: "Nothing to update" };
     try {
-        await renameChannel(user.id, parsed.data.channelId, parsed.data.name);
+        const { status } = await updateChannelCredentials(user.id, channelId, patch);
         revalidatePath("/inbox");
-        return {};
+        return { status };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not rename the channel" };
+        return { error: caught instanceof Error ? caught.message : "Could not update the channel" };
     }
 }
 
@@ -156,6 +165,27 @@ export async function listConversationsAction(): Promise<ConversationView[]> {
     return listConversations(user.id);
 }
 
+/** Send targets (servers -> channels) for a channel whose adapter enumerates them
+ *  (Discord), for the recipient picker. Empty for other platforms or an old bridge. */
+export async function listChannelTargetsAction(channelId: string): Promise<TargetGroup[]> {
+    const user = await requireUser();
+    if (!z.string().uuid().safeParse(channelId).success) return [];
+    try {
+        return await listChannelTargets(user.id, channelId);
+    } catch {
+        return [];
+    }
+}
+
+/** The owner's first connected Discord channel (bot), used to populate the server/
+ *  channel picker when a specific bot channel is not already in context (Contacts).
+ *  Null when no Discord bot is connected. */
+export async function firstDiscordChannelAction(): Promise<string | null> {
+    const user = await requireUser();
+    const channels = await listChannels(user.id);
+    return channels.find((c) => c.platform === "discord" && c.status === "connected")?.id ?? null;
+}
+
 /** Recent messaging activity across the owner's channels, for the Logs view. */
 export async function listActivityAction(): Promise<ActivityView[]> {
     const user = await requireUser();
@@ -168,7 +198,9 @@ export async function getMessagesAction(conversationId: string): Promise<Message
 }
 
 /** Delete a conversation and its messages. */
-export async function deleteConversationAction(conversationId: string): Promise<{ error?: string }> {
+export async function deleteConversationAction(
+    conversationId: string
+): Promise<{ error?: string }> {
     const user = await requireUser();
     if (!z.string().uuid().safeParse(conversationId).success) return { error: "Invalid request" };
     try {
@@ -176,7 +208,9 @@ export async function deleteConversationAction(conversationId: string): Promise<
         revalidatePath("/inbox");
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not delete the conversation" };
+        return {
+            error: caught instanceof Error ? caught.message : "Could not delete the conversation"
+        };
     }
 }
 

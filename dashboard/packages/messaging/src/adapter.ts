@@ -29,6 +29,16 @@ export interface ChannelState {
     detail?: string;
 }
 
+/** A group of addressable send targets a bot can reach, for a recipient picker in
+ *  the UI (e.g. a Discord server and its text channels). Recipients that are not
+ *  enumerable (a phone number, a user to DM) are entered by hand instead. */
+export interface TargetGroup {
+    /** Group id (e.g. Discord guild id); informational, not a send target. */
+    id: string;
+    name: string;
+    targets: { id: string; name: string }[];
+}
+
 export interface ChannelAdapter {
     readonly capabilities: ChannelCapabilities;
     /** Start receiving; resolves with the platform-side identity once connected.
@@ -40,6 +50,9 @@ export interface ChannelAdapter {
     send(message: OutboundMessage): Promise<SendResult>;
     /** Current state, for async-login adapters. Absent = "connected" once connect() resolved. */
     getState?(): ChannelState;
+    /** Enumerate addressable targets grouped (server -> channels), for platforms
+     *  whose recipients are discoverable (Discord). Absent where they are not. */
+    listTargets?(): Promise<TargetGroup[]>;
 }
 
 /** Factory a platform module registers under its `Platform` key. */

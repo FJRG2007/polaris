@@ -14,12 +14,14 @@ import type {
     ChannelCapabilities,
     InteractivePrompt,
     InboundEvent,
-    Platform
+    Platform,
+    TargetGroup
 } from "@polaris/messaging";
 import {
     bridgeChannelState,
     bridgeConnectChannel,
     bridgeDisconnectChannel,
+    bridgeListTargets,
     bridgeSend
 } from "./messaging/bridge-client";
 
@@ -173,22 +175,6 @@ export async function connectChannel(
     }
 }
 
-/** Rename a channel (display name only). */
-export async function renameChannel(
-    ownerId: string,
-    channelId: string,
-    name: string
-): Promise<void> {
-    const channel = await prisma.channel.findFirst({
-        where: { id: channelId, ownerId },
-        select: { id: true }
-    });
-    if (!channel) throw new Error("Channel not found");
-    const trimmed = name.trim();
-    if (!trimmed) throw new Error("Enter a name");
-    await prisma.channel.update({ where: { id: channel.id }, data: { name: trimmed } });
-}
-
 /** Re-establish a channel's live adapter in the bridge, reusing its stored
  *  credentials (no need to re-enter a token). For token channels this fixes an
  *  errored connection in place; whatsapp-web restores from its session when valid. */
@@ -232,6 +218,71 @@ export async function reconnectChannel(
     return { status };
 }
 
+/** Update a channel's editable settings: its display name, its credential
+ *  (bot token), and/or its provider config. Changing the credential or config
+ *  re-encrypts it and reconnects the adapter so the change takes effect at once;
+ *  a name-only change does not disturb the live connection. */
+export async function updateChannelCredentials(
+    ownerId: string,
+    channelId: string,
+    patch: { name?: string; token?: string; config?: Record<string, string> }
+): Promise<{ status: string }> {
+    const env = loadEnv();
+    const channel = await prisma.channel.findFirst({ where: { id: channelId, ownerId } });
+    if (!channel) throw new Error("Channel not found");
+
+    const trimmedName = patch.name?.trim();
+    const trimmedToken = patch.token?.trim();
+    const changingToken = Boolean(trimmedToken);
+    const changingConfig = patch.config !== undefined;
+    const blob = changingToken ? encryptSecret(trimmedToken!, env.POLARIS_MASTER_KEY) : null;
+
+    // Merge the new provider config into the stored blob, preserving capabilities.
+    let configJson: string | undefined;
+    if (changingConfig) {
+        let capabilities: ChannelCapabilities;
+        let existingConfig: Record<string, string> = {};
+        try {
+            const parsed = JSON.parse(channel.config) as {
+                capabilities?: ChannelCapabilities;
+                providerConfig?: Record<string, string>;
+            };
+            capabilities =
+                parsed.capabilities ??
+                capabilitiesFor(channel.platform as Platform, channel.provider ?? undefined);
+            existingConfig = parsed.providerConfig ?? {};
+        } catch {
+            capabilities = capabilitiesFor(
+                channel.platform as Platform,
+                channel.provider ?? undefined
+            );
+        }
+        configJson = JSON.stringify({
+            capabilities,
+            providerConfig: { ...existingConfig, ...patch.config }
+        });
+    }
+
+    await prisma.channel.update({
+        where: { id: channel.id },
+        data: {
+            ...(trimmedName ? { name: trimmedName } : {}),
+            ...(blob
+                ? {
+                      encryptedSecret: blob.ciphertext,
+                      secretNonce: blob.nonce,
+                      secretKeyId: blob.keyId
+                  }
+                : {}),
+            ...(configJson ? { config: configJson } : {})
+        }
+    });
+
+    // Credentials or config changed - reconnect so the live adapter uses them now.
+    if (changingToken || changingConfig) return reconnectChannel(ownerId, channelId);
+    return { status: channel.status };
+}
+
 /** Disconnect and forget a channel (and its conversations, by cascade). */
 export async function deleteChannel(ownerId: string, channelId: string): Promise<void> {
     const channel = await prisma.channel.findFirst({ where: { id: channelId, ownerId } });
@@ -242,6 +293,22 @@ export async function deleteChannel(ownerId: string, channelId: string): Promise
         // The bridge may not know it (restarted); removing the record still proceeds.
     }
     await prisma.channel.delete({ where: { id: channel.id } });
+}
+
+/** Addressable send targets (server -> channels) for one of the owner's channels,
+ *  for the recipient picker. Empty for platforms that don't enumerate recipients
+ *  (WhatsApp, Telegram) or when the channel is not connected. */
+export async function listChannelTargets(
+    ownerId: string,
+    channelId: string
+): Promise<TargetGroup[]> {
+    const channel = await prisma.channel.findFirst({
+        where: { id: channelId, ownerId },
+        select: { id: true, status: true }
+    });
+    if (!channel) throw new Error("Channel not found");
+    if (channel.status !== "connected") return [];
+    return bridgeListTargets(channelId);
 }
 
 /** The owner's conversations, most-recently-active first. */
@@ -332,7 +399,11 @@ export async function listMessagingActivity(ownerId: string, limit = 150): Promi
         take: Math.min(Math.max(limit, 1), 500),
         include: {
             conversation: {
-                select: { peerId: true, peerName: true, channel: { select: { name: true, platform: true } } }
+                select: {
+                    peerId: true,
+                    peerName: true,
+                    channel: { select: { name: true, platform: true } }
+                }
             }
         }
     });
@@ -455,6 +526,14 @@ function normalizePeerId(platform: string, raw: string): string {
     if (platform === "whatsapp" && value && !value.includes("@")) {
         const digits = value.replace(/\D/g, "");
         return digits ? `${digits}@c.us` : value;
+    }
+    if (platform === "discord") {
+        const decoded = value.startsWith("user:")
+            ? value.slice("user:".length)
+            : value.startsWith("channel:")
+              ? value.slice("channel:".length)
+              : value;
+        if (!decoded.trim()) return "";
     }
     return value;
 }
