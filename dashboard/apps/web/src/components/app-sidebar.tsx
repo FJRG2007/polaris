@@ -57,8 +57,8 @@ const APP_SIDEBARS: Record<string, SidebarItem[]> = {
         { label: "Trash", href: "/trash", icon: Trash2 }
     ],
     apps: [
-        { label: "Marketplace", href: "/apps/marketplace", icon: Store },
         { label: "Deploy", href: "/apps/deploy", icon: Rocket },
+        { label: "Marketplace", href: "/apps/marketplace", icon: Store },
         { label: "Servers", href: "/apps/servers", icon: Server },
         { label: "Containers", href: "/apps/containers", icon: Container },
         { label: "Backups", href: "/apps/backups", icon: Database }

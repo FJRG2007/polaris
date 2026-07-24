@@ -7,7 +7,9 @@
 import type { AdapterContext, ChannelAdapter, InboundMessage } from "@polaris/messaging";
 import type { ConnectChannelRequest } from "@polaris/messaging";
 import { DiscordAdapter } from "./adapters/discord.js";
+import { DiscordWebhookAdapter } from "./adapters/discord-webhook.js";
 import { SlackAdapter } from "./adapters/slack.js";
+import { SlackWebhookAdapter } from "./adapters/slack-webhook.js";
 import { TelegramAdapter } from "./adapters/telegram.js";
 import { WhatsAppCloudAdapter } from "./adapters/whatsapp-cloud.js";
 import { WhatsAppWebAdapter } from "./adapters/whatsapp-web.js";
@@ -30,16 +32,25 @@ export class AdapterRegistry {
                 if (request.provider === "whatsapp-cloud") {
                     if (!request.token) throw new Error("WhatsApp Cloud needs an access token");
                     const phoneNumberId = request.config?.phoneNumberId;
-                    if (!phoneNumberId) throw new Error("WhatsApp Cloud needs a phoneNumberId in config");
+                    if (!phoneNumberId)
+                        throw new Error("WhatsApp Cloud needs a phoneNumberId in config");
                     return new WhatsAppCloudAdapter(request.token, phoneNumberId, context);
                 }
                 return new WhatsAppWebAdapter(request.channelId, context);
             }
             case "discord": {
+                if (request.provider === "discord-webhook") {
+                    if (!request.token) throw new Error("A Discord webhook needs its URL");
+                    return new DiscordWebhookAdapter(request.token, context);
+                }
                 if (!request.token) throw new Error("Discord needs a bot token");
                 return new DiscordAdapter(request.token, request.channelId, context);
             }
             case "slack": {
+                if (request.provider === "slack-webhook") {
+                    if (!request.token) throw new Error("A Slack webhook needs its URL");
+                    return new SlackWebhookAdapter(request.token, context);
+                }
                 if (!request.token) throw new Error("Slack needs a bot token");
                 return new SlackAdapter(request.token, context);
             }

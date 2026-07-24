@@ -520,14 +520,23 @@ function MessageBubble({ message }: { message: MessageView }) {
     );
 }
 
-type ChannelKind = "telegram" | "whatsapp-cloud" | "whatsapp-web" | "discord" | "slack";
+type ChannelKind =
+    | "telegram"
+    | "whatsapp-cloud"
+    | "whatsapp-web"
+    | "discord"
+    | "discord-webhook"
+    | "slack"
+    | "slack-webhook";
 
-const CHANNEL_PLATFORM: Record<ChannelKind, ChannelView["platform"]> = {
+const CHANNEL_PLATFORM: Record<ChannelKind, Platform> = {
     telegram: "telegram",
     "whatsapp-cloud": "whatsapp",
     "whatsapp-web": "whatsapp",
     discord: "discord",
-    slack: "slack"
+    "discord-webhook": "discord",
+    slack: "slack",
+    "slack-webhook": "slack"
 };
 
 const CHANNEL_PROVIDER: Record<ChannelKind, string | null> = {
@@ -535,7 +544,9 @@ const CHANNEL_PROVIDER: Record<ChannelKind, string | null> = {
     "whatsapp-cloud": "whatsapp-cloud",
     "whatsapp-web": "whatsapp-web",
     discord: null,
-    slack: null
+    "discord-webhook": "discord-webhook",
+    slack: null,
+    "slack-webhook": "slack-webhook"
 };
 
 interface ChannelKindMeta {
@@ -600,6 +611,17 @@ const CHANNEL_CATALOG: ChannelKindMeta[] = [
         help: "Create an app and bot in the Discord Developer Portal and paste the bot token."
     },
     {
+        kind: "discord-webhook",
+        name: "Discord webhook",
+        tagline: "One-way alerts to a channel, no bot needed.",
+        color: "#5865F2",
+        Logo: DiscordLogo,
+        badge: "Send-only",
+        tokenLabel: "Webhook URL",
+        tokenPlaceholder: "https://discord.com/api/webhooks/...",
+        help: "In Discord: the channel's Edit > Integrations > Webhooks > New Webhook > Copy Webhook URL."
+    },
+    {
         kind: "slack",
         name: "Slack",
         tagline: "A workspace app. Blocks and interactive actions.",
@@ -608,12 +630,70 @@ const CHANNEL_CATALOG: ChannelKindMeta[] = [
         tokenLabel: "Bot token",
         tokenPlaceholder: "xoxb-...",
         help: "Install a Slack app to your workspace and paste its Bot User OAuth token (starts with xoxb-)."
+    },
+    {
+        kind: "slack-webhook",
+        name: "Slack webhook",
+        tagline: "One-way alerts to a channel, no app token.",
+        color: "#E01E5A",
+        Logo: SlackLogo,
+        badge: "Send-only",
+        tokenLabel: "Webhook URL",
+        tokenPlaceholder: "https://hooks.slack.com/services/...",
+        help: "Create an Incoming Webhook in your Slack app and paste its URL."
     }
 ];
 
 const CHANNEL_META: Record<ChannelKind, ChannelKindMeta> = Object.fromEntries(
     CHANNEL_CATALOG.map((meta) => [meta.kind, meta])
 ) as Record<ChannelKind, ChannelKindMeta>;
+
+interface PlatformGroup {
+    platform: Platform;
+    name: string;
+    tagline: string;
+    color: string;
+    Logo: (props: { className?: string }) => ReactElement;
+    /** The connectable variants for this platform, in display order. */
+    variants: ChannelKind[];
+}
+
+// The connect flow is two steps: pick a platform, then its variant (bot vs webhook,
+// QR vs the official API). Platforms with a single variant skip straight to the form.
+const PLATFORM_GROUPS: PlatformGroup[] = [
+    {
+        platform: "whatsapp",
+        name: "WhatsApp",
+        tagline: "Your number by QR, or the official Cloud API.",
+        color: "#25D366",
+        Logo: WhatsAppLogo,
+        variants: ["whatsapp-web", "whatsapp-cloud"]
+    },
+    {
+        platform: "telegram",
+        name: "Telegram",
+        tagline: "A @BotFather bot with buttons and menus.",
+        color: "#229ED9",
+        Logo: TelegramLogo,
+        variants: ["telegram"]
+    },
+    {
+        platform: "discord",
+        name: "Discord",
+        tagline: "A bot for two-way chat, or a webhook for alerts.",
+        color: "#5865F2",
+        Logo: DiscordLogo,
+        variants: ["discord", "discord-webhook"]
+    },
+    {
+        platform: "slack",
+        name: "Slack",
+        tagline: "A workspace bot, or a webhook for alerts.",
+        color: "#E01E5A",
+        Logo: SlackLogo,
+        variants: ["slack", "slack-webhook"]
+    }
+];
 
 export function ConnectChannelDialog({
     bridgeReady,
@@ -624,8 +704,9 @@ export function ConnectChannelDialog({
     onClose: () => void;
     onConnected: (channel: ChannelView) => void;
 }) {
-    const [phase, setPhase] = useState<"picker" | "form" | "qr">("picker");
+    const [phase, setPhase] = useState<"platform" | "variant" | "form" | "qr">("platform");
     const [kind, setKind] = useState<ChannelKind>("telegram");
+    const [group, setGroup] = useState<PlatformGroup | null>(null);
     const [name, setName] = useState("");
     const [token, setToken] = useState("");
     const [phoneNumberId, setPhoneNumberId] = useState("");
@@ -644,7 +725,19 @@ export function ConnectChannelDialog({
         (!needsToken || token.trim() !== "") &&
         (!meta.needsPhoneNumberId || phoneNumberId.trim() !== "");
 
-    // Pick a channel from the marketplace grid: seed the name and clear prior input.
+    // Pick a platform: go straight to the form when it has a single variant, else
+    // show its variants to choose from.
+    function pickPlatform(next: PlatformGroup) {
+        setError(null);
+        setGroup(next);
+        if (next.variants.length === 1) {
+            pick(next.variants[0]!);
+            return;
+        }
+        setPhase("variant");
+    }
+
+    // Pick a variant: seed the name and clear prior input, then show the form.
     function pick(next: ChannelKind) {
         setKind(next);
         setName(CHANNEL_META[next].name);
@@ -685,22 +778,14 @@ export function ConnectChannelDialog({
 
     function submit() {
         setError(null);
-        const input =
-            kind === "whatsapp-cloud"
-                ? {
-                      platform: "whatsapp" as const,
-                      provider: "whatsapp-cloud",
-                      name: name.trim(),
-                      token: token.trim(),
-                      config: { phoneNumberId: phoneNumberId.trim() }
-                  }
-                : kind === "whatsapp-web"
-                  ? { platform: "whatsapp" as const, provider: "whatsapp-web", name: name.trim() }
-                  : kind === "discord"
-                    ? { platform: "discord" as const, name: name.trim(), token: token.trim() }
-                    : kind === "slack"
-                      ? { platform: "slack" as const, name: name.trim(), token: token.trim() }
-                      : { platform: "telegram" as const, name: name.trim(), token: token.trim() };
+        const provider = CHANNEL_PROVIDER[kind];
+        const input = {
+            platform: CHANNEL_PLATFORM[kind],
+            ...(provider ? { provider } : {}),
+            name: name.trim(),
+            ...(needsToken ? { token: token.trim() } : {}),
+            ...(meta.needsPhoneNumberId ? { config: { phoneNumberId: phoneNumberId.trim() } } : {})
+        };
         startTransition(async () => {
             const result = await connectChannelAction(input);
             if (result.error) {
@@ -764,13 +849,13 @@ export function ConnectChannelDialog({
                             </Button>
                         </div>
                     </>
-                ) : phase === "picker" ? (
+                ) : phase === "platform" ? (
                     <>
                         <DialogHeader>
                             <DialogTitle>Add a channel</DialogTitle>
                             <DialogDescription>
-                                Pick a platform to connect. Add as many as you like and handle them
-                                all from one inbox.
+                                Pick a platform, then how to connect it. Add as many as you like and
+                                handle them all from one inbox.
                             </DialogDescription>
                         </DialogHeader>
                         {!bridgeReady && (
@@ -783,15 +868,72 @@ export function ConnectChannelDialog({
                             </p>
                         )}
                         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                            {CHANNEL_CATALOG.map((item) => {
+                            {PLATFORM_GROUPS.map((item) => {
+                                const Logo = item.Logo;
+                                return (
+                                    <button
+                                        key={item.platform}
+                                        type="button"
+                                        disabled={!bridgeReady}
+                                        onClick={() => pickPlatform(item)}
+                                        className="flex items-start gap-3 rounded-md border border-border p-3 text-left transition-colors hover:border-foreground/30 disabled:cursor-not-allowed disabled:opacity-50"
+                                    >
+                                        <div
+                                            className="grid size-10 shrink-0 place-items-center rounded-md"
+                                            style={{
+                                                color: item.color,
+                                                backgroundColor: `${item.color}1a`
+                                            }}
+                                        >
+                                            <Logo className="size-5" />
+                                        </div>
+                                        <div className="min-w-0">
+                                            <span className="text-sm font-medium">{item.name}</span>
+                                            <p className="text-xs text-muted-foreground">
+                                                {item.tagline}
+                                            </p>
+                                        </div>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                        <div className="flex justify-end">
+                            <Button variant="ghost" onClick={onClose}>
+                                Cancel
+                            </Button>
+                        </div>
+                    </>
+                ) : phase === "variant" ? (
+                    <>
+                        <DialogHeader>
+                            <DialogTitle className="flex items-center gap-2">
+                                {group && (
+                                    <span
+                                        className="grid size-7 shrink-0 place-items-center rounded"
+                                        style={{
+                                            color: group.color,
+                                            backgroundColor: `${group.color}1a`
+                                        }}
+                                    >
+                                        <group.Logo className="size-4" />
+                                    </span>
+                                )}
+                                Connect {group?.name}
+                            </DialogTitle>
+                            <DialogDescription>
+                                Pick how to connect {group?.name}.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                            {(group?.variants ?? []).map((variantKind) => {
+                                const item = CHANNEL_META[variantKind];
                                 const Logo = item.Logo;
                                 return (
                                     <button
                                         key={item.kind}
                                         type="button"
-                                        disabled={!bridgeReady}
                                         onClick={() => pick(item.kind)}
-                                        className="flex items-start gap-3 rounded-md border border-border p-3 text-left transition-colors hover:border-foreground/30 disabled:cursor-not-allowed disabled:opacity-50"
+                                        className="flex items-start gap-3 rounded-md border border-border p-3 text-left transition-colors hover:border-foreground/30"
                                     >
                                         <div
                                             className="grid size-10 shrink-0 place-items-center rounded-md"
@@ -817,9 +959,9 @@ export function ConnectChannelDialog({
                                 );
                             })}
                         </div>
-                        <div className="flex justify-end">
-                            <Button variant="ghost" onClick={onClose}>
-                                Cancel
+                        <div className="flex justify-start">
+                            <Button variant="ghost" onClick={() => setPhase("platform")}>
+                                Back
                             </Button>
                         </div>
                     </>
@@ -876,7 +1018,11 @@ export function ConnectChannelDialog({
                                     variant="ghost"
                                     onClick={() => {
                                         setError(null);
-                                        setPhase("picker");
+                                        setPhase(
+                                            group && group.variants.length > 1
+                                                ? "variant"
+                                                : "platform"
+                                        );
                                     }}
                                     disabled={pending}
                                 >
@@ -1056,7 +1202,22 @@ function NewChatDialog({
                     </label>
                     <label className="flex flex-col gap-1 text-sm">
                         <span className="font-medium">To</span>
-                        {platform === "discord" ? (
+                        {identityId ? (
+                            // A saved contact handle is chosen - use it as-is; no need to
+                            // retype a number or id (that is the point of saving the contact).
+                            <div className="flex items-center justify-between gap-2 rounded-md border border-border px-3 py-2">
+                                <span className="truncate">
+                                    {humanPeerId(pickedPlatform ?? platform, peerId)}
+                                </span>
+                                <button
+                                    type="button"
+                                    className="shrink-0 text-xs text-muted-foreground hover:text-foreground"
+                                    onClick={() => editPeerId(peerId)}
+                                >
+                                    Enter manually
+                                </button>
+                            </div>
+                        ) : platform === "discord" ? (
                             <DiscordPeerFields
                                 botChannelId={channelId}
                                 draft={peerId}

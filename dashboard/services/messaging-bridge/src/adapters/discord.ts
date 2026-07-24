@@ -29,11 +29,23 @@ import type {
 const MAX_BUTTONS = 25;
 const BUTTONS_PER_ROW = 5;
 
-// Message Content is a privileged intent; it must be enabled in the Discord
-// Developer Portal (Bot > Privileged Gateway Intents). Without it the bot can read
-// DMs and messages that mention it, but not other server-channel text. We try with
-// it and fall back without it so a bot whose portal switch is off still connects.
+// Message Content and Server Members are independent privileged intents, each
+// toggled in the Discord Developer Portal (Bot > Privileged Gateway Intents).
+// Discord rejects the whole login (code 4014, "Disallowed intents") if ANY
+// requested privileged intent is off, so we cannot request both and expect a
+// partial grant. Instead we try progressively less-privileged tiers, stopping at
+// the first that connects:
+//   FULL     - both on: server-channel text + DM by username.
+//   CONTENT  - Server Members off: server-channel text works, DM by username does not.
+//   REDUCED  - Message Content also off: server-channel text is empty.
 const FULL_INTENTS = [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent,
+    GatewayIntentBits.DirectMessages,
+    GatewayIntentBits.GuildMembers
+];
+const CONTENT_INTENTS = [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
@@ -43,6 +55,20 @@ const REDUCED_INTENTS = [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.DirectMessages
+];
+
+// Ordered most- to least-privileged. `note` describes what is degraded at a tier
+// and is logged when we fall back to it (the full tier has nothing degraded).
+const INTENT_TIERS: { intents: GatewayIntentBits[]; note?: string }[] = [
+    { intents: FULL_INTENTS },
+    {
+        intents: CONTENT_INTENTS,
+        note: "Discord: the Server Members intent is disabled in the Developer Portal, connecting without it - DM by username is disabled (use the numeric User ID); server-channel message text still works. Enable it under Bot > Privileged Gateway Intents."
+    },
+    {
+        intents: REDUCED_INTENTS,
+        note: "Discord: the Message Content intent is disabled in the Developer Portal, connecting with reduced intents - message text in server channels will be empty until you enable it (Bot > Privileged Gateway Intents)."
+    }
 ];
 
 export class DiscordAdapter implements ChannelAdapter {
@@ -103,28 +129,36 @@ export class DiscordAdapter implements ChannelAdapter {
     }
 
     async connect(): Promise<{ externalId?: string }> {
-        try {
-            return await this.login();
-        } catch (caught) {
-            const detail = caught instanceof Error ? caught.message : String(caught);
-            // The Message Content privileged intent is off in the Developer Portal:
-            // reconnect without it (DMs and mentions still carry text) rather than
-            // failing outright, and note that server-channel text needs it enabled.
-            if (/disallowed intents|privileged intent/i.test(detail)) {
-                this.ctx.log(
-                    "Discord: the Message Content intent is disabled in the Developer Portal, connecting with reduced intents - message text in server channels will be empty until you enable it (Bot > Privileged Gateway Intents)."
-                );
+        let lastError: unknown = new Error("Could not connect to Discord");
+        // Try each intent tier in order. The constructor already built the client on
+        // the first (full) tier, so we only rebuild when falling back. A disallowed
+        // privileged intent means one of the requested toggles is off in the portal:
+        // destroy the client and retry the next, less-privileged tier.
+        for (let tier = 0; tier < INTENT_TIERS.length; tier++) {
+            const config = INTENT_TIERS[tier];
+            if (!config) continue;
+            const { intents, note } = config;
+            if (tier > 0) {
                 await this.client.destroy().catch(() => undefined);
-                this.client = this.build(REDUCED_INTENTS);
-                return this.login();
+                this.client = this.build(intents);
             }
-            if (/token|unauthorized|invalid/i.test(detail)) {
-                throw new Error(
-                    "Discord rejected the bot token. Check it in the Developer Portal (Bot > Token)."
-                );
+            try {
+                const result = await this.login();
+                if (note) this.ctx.log(note);
+                return result;
+            } catch (caught) {
+                lastError = caught;
+                const detail = caught instanceof Error ? caught.message : String(caught);
+                if (/disallowed intents|privileged intent/i.test(detail)) continue;
+                if (/token|unauthorized|invalid/i.test(detail)) {
+                    throw new Error(
+                        "Discord rejected the bot token. Check it in the Developer Portal (Bot > Token)."
+                    );
+                }
+                throw caught instanceof Error ? caught : new Error("Could not connect to Discord");
             }
-            throw caught instanceof Error ? caught : new Error("Could not connect to Discord");
         }
+        throw lastError instanceof Error ? lastError : new Error("Could not connect to Discord");
     }
 
     async disconnect(): Promise<void> {
@@ -160,12 +194,38 @@ export class DiscordAdapter implements ChannelAdapter {
         return { dm: false, id: peerId };
     }
 
+    /** Resolve a DM recipient to a user snowflake. A numeric id is used directly; a
+     *  username (or @username) is looked up across the bot's servers by member
+     *  search, which needs the Server Members privileged intent and a shared server. */
+    private async resolveUserId(idOrName: string): Promise<string> {
+        if (/^\d{17,}$/.test(idOrName)) return idOrName;
+        const name = idOrName.replace(/^@/, "").trim().toLowerCase();
+        if (!name) throw new Error("Enter a Discord user id or username to DM");
+        for (const guild of this.client.guilds.cache.values()) {
+            try {
+                const members = await guild.members.fetch({ query: name, limit: 5 });
+                const match = members.find(
+                    (member) =>
+                        member.user.username.toLowerCase() === name ||
+                        member.user.globalName?.toLowerCase() === name ||
+                        member.displayName.toLowerCase() === name
+                );
+                if (match) return match.id;
+            } catch {
+                // Members intent off or no access in this guild; try the next one.
+            }
+        }
+        throw new Error(
+            `Could not find a Discord user "${idOrName}". Enable the Server Members intent (Bot > Privileged Gateway Intents), make sure the bot shares a server with them, or use their numeric User ID.`
+        );
+    }
+
     async send(message: OutboundMessage): Promise<SendResult> {
         const { dm, id } = this.resolvePeer(message.peerId);
         // For a DM, open (or reuse) the user's DM channel; otherwise fetch the server
         // channel. Both end up as a text-based channel we can post to.
         const channel = dm
-            ? await (await this.client.users.fetch(id)).createDM()
+            ? await (await this.client.users.fetch(await this.resolveUserId(id))).createDM()
             : await this.client.channels.fetch(id);
         if (!channel || !channel.isTextBased() || !("send" in channel)) {
             throw new Error(

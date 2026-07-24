@@ -1,7 +1,8 @@
 # messaging-bridge
 
-Runs the channel adapters (Telegram, WhatsApp Cloud, WhatsApp Web; Discord/Slack
-next) behind a small bearer-authenticated HTTP API. Polaris deploys it as a managed
+Runs the channel adapters (Telegram, WhatsApp Cloud, WhatsApp Web, Discord bot,
+Slack bot, and send-only Discord/Slack incoming-webhook adapters) behind a small
+bearer-authenticated HTTP API. Polaris deploys it as a managed
 container so the heavier WhatsApp Web backend (Puppeteer/Chromium) stays isolated
 from the web process.
 

@@ -6,7 +6,8 @@
 
 import type { ChannelCapabilities, Platform } from "./types.js";
 
-/** Capabilities for a platform and, for WhatsApp, its provider backend. */
+/** Capabilities for a platform and, where it has more than one backend, its
+ *  provider (WhatsApp web/cloud, and the send-only discord-webhook/slack-webhook). */
 export function capabilitiesFor(platform: Platform, provider?: string | null): ChannelCapabilities {
     switch (platform) {
         case "telegram":
@@ -21,27 +22,50 @@ export function capabilitiesFor(platform: Platform, provider?: string | null): C
                 onboarding: "token"
             };
         case "discord":
-            return {
-                nativeButtons: true,
-                nativeSelects: true,
-                polls: false,
-                media: true,
-                templates: false,
-                banRisk: false,
-                needsBrowser: false,
-                onboarding: "token"
-            };
+            // A webhook is send-only: no bot, no gateway, so no interactive/receive.
+            return provider === "discord-webhook"
+                ? {
+                      nativeButtons: false,
+                      nativeSelects: false,
+                      polls: false,
+                      media: false,
+                      templates: false,
+                      banRisk: false,
+                      needsBrowser: false,
+                      onboarding: "token"
+                  }
+                : {
+                      nativeButtons: true,
+                      nativeSelects: true,
+                      polls: false,
+                      media: true,
+                      templates: false,
+                      banRisk: false,
+                      needsBrowser: false,
+                      onboarding: "token"
+                  };
         case "slack":
-            return {
-                nativeButtons: true,
-                nativeSelects: true,
-                polls: false,
-                media: true,
-                templates: false,
-                banRisk: false,
-                needsBrowser: false,
-                onboarding: "oauth"
-            };
+            return provider === "slack-webhook"
+                ? {
+                      nativeButtons: false,
+                      nativeSelects: false,
+                      polls: false,
+                      media: false,
+                      templates: false,
+                      banRisk: false,
+                      needsBrowser: false,
+                      onboarding: "token"
+                  }
+                : {
+                      nativeButtons: true,
+                      nativeSelects: true,
+                      polls: false,
+                      media: true,
+                      templates: false,
+                      banRisk: false,
+                      needsBrowser: false,
+                      onboarding: "oauth"
+                  };
         case "whatsapp":
             // The official Cloud API has native interactive messages and templates;
             // the free whatsapp-web backend has neither (buttons were deprecated),

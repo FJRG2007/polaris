@@ -5,7 +5,14 @@
  * Everything installable lives under Apps rather than sprawling the switcher.
  */
 
-import { Activity, HardDrive, LayoutGrid, MessagesSquare, SlidersHorizontal, type LucideIcon } from "lucide-react";
+import {
+    Activity,
+    HardDrive,
+    LayoutGrid,
+    MessagesSquare,
+    SlidersHorizontal,
+    type LucideIcon
+} from "lucide-react";
 
 export interface AppEntry {
     id: string;
@@ -23,13 +30,21 @@ export interface AppEntry {
 }
 
 export const POLARIS_APPS: AppEntry[] = [
-    { id: "drive", label: "Drive", description: "Files across every NAS", icon: HardDrive, href: "/drive" },
+    {
+        id: "drive",
+        label: "Drive",
+        description: "Files across every NAS",
+        icon: HardDrive,
+        href: "/drive"
+    },
     {
         id: "apps",
         label: "Apps",
         description: "Install & run apps: deploys, servers, assistants",
         icon: LayoutGrid,
-        href: "/apps/marketplace",
+        // Deploy is the primary surface, so the app lands there rather than on the
+        // marketplace.
+        href: "/apps/deploy",
         // Owns the whole /apps subtree: the marketplace, installed-app dashboards,
         // and the built-in Deploy / Servers / Containers / Backups rails.
         match: ["/apps"]
