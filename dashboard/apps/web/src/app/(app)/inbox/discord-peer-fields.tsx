@@ -104,7 +104,7 @@ export function DiscordPeerFields({
                         className="flex-1"
                         value={id}
                         onChange={(event) => onDraft(encodeDiscordPeer("user", event.target.value))}
-                        placeholder="User id to DM"
+                        placeholder="User id or username to DM"
                     />
                 )}
             </div>
@@ -151,7 +151,7 @@ export function DiscordPeerFields({
 
             <span className="text-xs text-muted-foreground">
                 {target === "user"
-                    ? "DM a user by their id (developer mode on, right-click a user > Copy User ID)."
+                    ? "DM by numeric User ID (most reliable: developer mode on, right-click a user > Copy User ID), or a username if the bot shares a server and the Server Members intent is on."
                     : groups && groups.length > 0
                       ? "Pick a server and a channel the bot can post to."
                       : "A text channel id the bot can post to (right-click the channel > Copy Channel ID)."}

@@ -37,7 +37,11 @@ const FULL_INTENTS = [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
-    GatewayIntentBits.DirectMessages
+    GatewayIntentBits.DirectMessages,
+    // GuildMembers (privileged) lets us resolve a username to a user id for DMs. If
+    // it is off in the portal, login falls back to REDUCED_INTENTS and username DMs
+    // surface a clear "enable it / use the numeric id" error instead.
+    GatewayIntentBits.GuildMembers
 ];
 const REDUCED_INTENTS = [
     GatewayIntentBits.Guilds,
@@ -160,12 +164,39 @@ export class DiscordAdapter implements ChannelAdapter {
         return { dm: false, id: peerId };
     }
 
+    /** Resolve a DM recipient to a user snowflake. A numeric id is used directly; a
+     *  username (or @username) is looked up across the bot's servers by member
+     *  search, which needs the Server Members privileged intent and a shared server. */
+    private async resolveUserId(idOrName: string): Promise<string> {
+        if (/^\d+$/.test(idOrName)) return idOrName;
+        const name = idOrName.replace(/^@/, "").trim().toLowerCase();
+        if (!name) throw new Error("Enter a Discord user id or username to DM");
+        for (const guild of this.client.guilds.cache.values()) {
+            try {
+                const members = await guild.members.fetch({ query: name, limit: 5 });
+                const match =
+                    members.find(
+                        (member) =>
+                            member.user.username.toLowerCase() === name ||
+                            member.user.globalName?.toLowerCase() === name ||
+                            member.displayName.toLowerCase() === name
+                    ) ?? members.first();
+                if (match) return match.id;
+            } catch {
+                // Members intent off or no access in this guild; try the next one.
+            }
+        }
+        throw new Error(
+            `Could not find a Discord user "${idOrName}". Enable the Server Members intent (Bot > Privileged Gateway Intents), make sure the bot shares a server with them, or use their numeric User ID.`
+        );
+    }
+
     async send(message: OutboundMessage): Promise<SendResult> {
         const { dm, id } = this.resolvePeer(message.peerId);
         // For a DM, open (or reuse) the user's DM channel; otherwise fetch the server
         // channel. Both end up as a text-based channel we can post to.
         const channel = dm
-            ? await (await this.client.users.fetch(id)).createDM()
+            ? await (await this.client.users.fetch(await this.resolveUserId(id))).createDM()
             : await this.client.channels.fetch(id);
         if (!channel || !channel.isTextBased() || !("send" in channel)) {
             throw new Error(

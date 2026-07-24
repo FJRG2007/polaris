@@ -29,7 +29,9 @@ export const POLARIS_APPS: AppEntry[] = [
         label: "Apps",
         description: "Install & run apps: deploys, servers, assistants",
         icon: LayoutGrid,
-        href: "/apps/marketplace",
+        // Deploy is the primary surface, so the app lands there rather than on the
+        // marketplace.
+        href: "/apps/deploy",
         // Owns the whole /apps subtree: the marketplace, installed-app dashboards,
         // and the built-in Deploy / Servers / Containers / Backups rails.
         match: ["/apps"]
