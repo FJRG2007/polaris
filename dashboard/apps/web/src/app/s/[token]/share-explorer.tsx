@@ -177,6 +177,9 @@ export function ShareExplorer({
     const lastIndex = useRef<number | null>(null);
     const [viewerTarget, setViewerTarget] = useState<ViewerTarget | null>(null);
     const scrollRef = useRef<HTMLDivElement>(null);
+    // Last folder we finished loading, so a post-write refresh (same folder) can skip
+    // the skeleton flash while a real navigation still shows it.
+    const loadedPathRef = useRef<string | null>(null);
 
     // Write state (only reachable when the matching flag is set).
     const [opError, setOpError] = useState<string | null>(null);
@@ -219,7 +222,9 @@ export function ShareExplorer({
     // Load the current folder's listing. Re-gated server-side on every fetch.
     useEffect(() => {
         const controller = new AbortController();
-        setLoading(true);
+        // Show the skeleton only when opening a different folder; a post-write reload
+        // (reloadKey bump, same folder) refreshes in place without the flash.
+        if (loadedPathRef.current !== path) setLoading(true);
         setError(null);
         const search = new URLSearchParams();
         if (path && path !== rootPath) search.set("p", path);
@@ -238,7 +243,10 @@ export function ShareExplorer({
                 if (!controller.signal.aborted) setError("This folder could not be opened.");
             })
             .finally(() => {
-                if (!controller.signal.aborted) setLoading(false);
+                if (!controller.signal.aborted) {
+                    setLoading(false);
+                    loadedPathRef.current = path;
+                }
             });
         return () => controller.abort();
     }, [token, path, rootPath, reloadKey]);

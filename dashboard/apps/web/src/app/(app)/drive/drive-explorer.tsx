@@ -136,7 +136,11 @@ export function DriveExplorer({
         connections.find((connection) => connection.id === connectionId) ?? null;
 
     const load = useCallback(
-        async (signal?: AbortSignal) => {
+        // `showSkeleton` blanks the list to a skeleton while fetching - right for a
+        // navigation (new location), wrong for a background refresh after a mutation
+        // (rename/move/delete), where the optimistic list is already correct and a
+        // skeleton flash just looks like a needless reload. Refreshes pass it false.
+        async (signal?: AbortSignal, showSkeleton = false) => {
             setError(null);
             if (!connectionId) {
                 setEntries([]);
@@ -144,7 +148,7 @@ export function DriveExplorer({
             }
             setNeedsSmbShare(false);
             setLocked(null);
-            setLoading(true);
+            if (showSkeleton) setLoading(true);
             try {
                 const query = new URLSearchParams({ c: connectionId });
                 if (path) query.set("p", path);
@@ -166,7 +170,7 @@ export function DriveExplorer({
             } catch {
                 if (!signal?.aborted) setError("Unable to list this location");
             } finally {
-                if (!signal?.aborted) setLoading(false);
+                if (!signal?.aborted && showSkeleton) setLoading(false);
             }
         },
         [connectionId, path]
@@ -174,7 +178,8 @@ export function DriveExplorer({
 
     useEffect(() => {
         const controller = new AbortController();
-        void load(controller.signal);
+        // A location change shows the skeleton; background refreshes (mutations) do not.
+        void load(controller.signal, true);
         return () => controller.abort();
     }, [load]);
 

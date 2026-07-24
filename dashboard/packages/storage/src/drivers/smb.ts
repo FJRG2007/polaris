@@ -224,14 +224,16 @@ export class SmbDriver implements StorageDriver {
             }
             try {
                 await this.c().rmdir(this.smbPath(rel));
-            } catch {
-                throw new StorageError("io_error", "rmdir failed");
+            } catch (caught) {
+                const detail = caught instanceof Error && caught.message ? `: ${caught.message}` : "";
+                throw new StorageError("io_error", `Failed to delete ${rel}${detail}`);
             }
         } else {
             try {
                 await this.c().unlink(this.smbPath(rel));
-            } catch {
-                throw new StorageError("io_error", "delete failed");
+            } catch (caught) {
+                const detail = caught instanceof Error && caught.message ? `: ${caught.message}` : "";
+                throw new StorageError("io_error", `Failed to delete ${rel}${detail}`);
             }
         }
     }

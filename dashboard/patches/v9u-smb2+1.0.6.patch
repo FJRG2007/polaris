@@ -35,6 +35,36 @@ index 10f2823..71adfaf 100644
          },
          connection,
          function(err, file) {
+diff --git a/node_modules/v9u-smb2/lib/api/rmdir.js b/node_modules/v9u-smb2/lib/api/rmdir.js
+index 0dd2032..b2a2510 100644
+--- a/node_modules/v9u-smb2/lib/api/rmdir.js
++++ b/node_modules/v9u-smb2/lib/api/rmdir.js
+@@ -1,6 +1,16 @@
+ var SMB2Forge = require('../tools/smb2-forge');
+ var SMB2Request = SMB2Forge.request;
+ var BigInt = require('../tools/bigint');
++var constants = require('../structures/constants');
++
++// Polaris patch: open the directory with the MINIMAL access a deletion needs -
++// DELETE (mandatory for FileDispositionInformation) plus read-attributes and a
++// synchronous handle - not the library's broad default mask. Requesting rights the
++// account lacks (e.g. WRITE_DAC) made restricted NAS/Samba shares refuse the open
++// with STATUS_ACCESS_DENIED, so removing a folder failed even when the user could
++// delete it. Mirrors how rename/unlink open, and how Windows opens for delete.
++var RMDIR_ACCESS =
++  constants.DELETE | constants.FILE_READ_ATTRIBUTES | constants.SYNCHRONIZE;
+ 
+ /*
+  * rmdir
+@@ -19,7 +29,7 @@ module.exports = function rmdir(path, cb) {
+   var connection = this;
+ 
+   // SMB2 open file
+-  SMB2Request('open_folder', { path: path }, connection, function(err, file) {
++  SMB2Request('open_folder', { path: path, desiredAccess: RMDIR_ACCESS }, connection, function(err, file) {
+     if (err) cb && cb(err);
+     // SMB2 query directory
+     else
 diff --git a/node_modules/v9u-smb2/lib/api/unlink.js b/node_modules/v9u-smb2/lib/api/unlink.js
 index 965e7cb..c49c29a 100644
 --- a/node_modules/v9u-smb2/lib/api/unlink.js
