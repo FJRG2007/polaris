@@ -90,7 +90,7 @@ export async function connectChannelAction(
     }
 }
 
-/** Poll a channel's live state (for the whatsapp-web QR onboarding). */
+/** Poll a channel's live state (for the whatsapp-web QR onboarding and re-link). */
 export async function channelStateAction(
     channelId: string
 ): Promise<ChannelLiveState & { error?: string }> {
@@ -144,7 +144,8 @@ export async function updateChannelAction(
     }
 }
 
-/** Re-establish a channel's adapter, reusing its stored credentials. */
+/** Re-establish a channel's adapter. Token-based platforms reuse their stored
+ *  credentials; whatsapp-web re-inits and emits a fresh QR to re-link by scan. */
 export async function reconnectChannelAction(
     channelId: string
 ): Promise<{ error?: string; status?: string }> {

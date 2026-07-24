@@ -3,8 +3,9 @@
 /**
  * Channels page: every connected messaging channel as a card (the same shape as
  * the Integrations marketplace), each opening a Manage dialog to rename it, replace
- * its credentials or config, reconnect, or remove it. These channels are what the
- * Watch app targets for alerts and what the Inbox sends through. Connecting reuses
+ * its credentials or config, reconnect (or re-link WhatsApp Web by scanning a fresh
+ * QR in place), or remove it. These channels are what the Watch app targets for
+ * alerts and what the Inbox sends through. Connecting reuses
  * the Inbox's ConnectChannelDialog so the connect flow is identical everywhere.
  */
 
