@@ -20,30 +20,41 @@ import type { AdapterContext, ChannelAdapter, InteractivePrompt, OutboundMessage
 const MAX_BUTTONS = 25;
 const BUTTONS_PER_ROW = 5;
 
+// Message Content is a privileged intent; it must be enabled in the Discord
+// Developer Portal (Bot > Privileged Gateway Intents). Without it the bot can read
+// DMs and messages that mention it, but not other server-channel text. We try with
+// it and fall back without it so a bot whose portal switch is off still connects.
+const FULL_INTENTS = [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent,
+    GatewayIntentBits.DirectMessages
+];
+const REDUCED_INTENTS = [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.DirectMessages];
+
 export class DiscordAdapter implements ChannelAdapter {
     readonly capabilities = capabilitiesFor("discord");
     private readonly token: string;
     private readonly channelId: string;
     private readonly ctx: AdapterContext;
-    private readonly client: Client;
+    private client: Client;
 
     constructor(token: string, channelId: string, ctx: AdapterContext) {
         this.token = token;
         this.channelId = channelId;
         this.ctx = ctx;
-        this.client = new Client({
-            intents: [
-                GatewayIntentBits.Guilds,
-                GatewayIntentBits.GuildMessages,
-                GatewayIntentBits.MessageContent,
-                GatewayIntentBits.DirectMessages
-            ]
-        });
-        this.wire();
+        this.client = this.build(FULL_INTENTS);
     }
 
-    private wire(): void {
-        this.client.on("messageCreate", (message: Message) => {
+    /** Build a client with the given intents and wire its handlers. */
+    private build(intents: GatewayIntentBits[]): Client {
+        const client = new Client({ intents });
+        this.wire(client);
+        return client;
+    }
+
+    private wire(client: Client): void {
+        client.on("messageCreate", (message: Message) => {
             if (message.author.bot) return;
             this.ctx.onInbound({
                 channelId: this.channelId,
@@ -55,7 +66,7 @@ export class DiscordAdapter implements ChannelAdapter {
                 at: Date.now()
             });
         });
-        this.client.on("interactionCreate", (interaction) => {
+        client.on("interactionCreate", (interaction) => {
             if (!interaction.isButton()) return;
             void interaction.deferUpdate().catch(() => undefined);
             this.ctx.onInbound({
@@ -69,11 +80,34 @@ export class DiscordAdapter implements ChannelAdapter {
         });
     }
 
-    async connect(): Promise<{ externalId?: string }> {
+    private async login(): Promise<{ externalId?: string }> {
         const ready = new Promise<void>((resolve) => this.client.once("ready", () => resolve()));
         await this.client.login(this.token);
         await Promise.race([ready, new Promise<void>((resolve) => setTimeout(resolve, 8000))]);
         return { externalId: this.client.user?.tag };
+    }
+
+    async connect(): Promise<{ externalId?: string }> {
+        try {
+            return await this.login();
+        } catch (caught) {
+            const detail = caught instanceof Error ? caught.message : String(caught);
+            // The Message Content privileged intent is off in the Developer Portal:
+            // reconnect without it (DMs and mentions still carry text) rather than
+            // failing outright, and note that server-channel text needs it enabled.
+            if (/disallowed intents|privileged intent/i.test(detail)) {
+                this.ctx.log(
+                    "Discord: the Message Content intent is disabled in the Developer Portal, connecting with reduced intents - message text in server channels will be empty until you enable it (Bot > Privileged Gateway Intents)."
+                );
+                await this.client.destroy().catch(() => undefined);
+                this.client = this.build(REDUCED_INTENTS);
+                return this.login();
+            }
+            if (/token|unauthorized|invalid/i.test(detail)) {
+                throw new Error("Discord rejected the bot token. Check it in the Developer Portal (Bot > Token).");
+            }
+            throw caught instanceof Error ? caught : new Error("Could not connect to Discord");
+        }
     }
 
     async disconnect(): Promise<void> {
