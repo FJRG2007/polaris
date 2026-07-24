@@ -11,7 +11,15 @@
 
 import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
-import { CheckCircle2, Loader2, MessagesSquare, Plus, QrCode, RefreshCw, Settings2 } from "lucide-react";
+import {
+    CheckCircle2,
+    Loader2,
+    MessagesSquare,
+    Plus,
+    QrCode,
+    RefreshCw,
+    Settings2
+} from "lucide-react";
 import {
     Badge,
     Button,

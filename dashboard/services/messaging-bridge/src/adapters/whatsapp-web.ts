@@ -14,7 +14,13 @@
 import { createRequire } from "node:module";
 import QRCode from "qrcode";
 import { capabilitiesFor } from "@polaris/messaging";
-import type { AdapterContext, ChannelAdapter, ChannelState, OutboundMessage, SendResult } from "@polaris/messaging";
+import type {
+    AdapterContext,
+    ChannelAdapter,
+    ChannelState,
+    OutboundMessage,
+    SendResult
+} from "@polaris/messaging";
 
 const requireCjs = createRequire(import.meta.url);
 const WAWebJS = requireCjs("whatsapp-web.js") as typeof import("whatsapp-web.js");
@@ -112,7 +118,10 @@ export class WhatsAppWebAdapter implements ChannelAdapter {
 
     async connect(): Promise<{ externalId?: string }> {
         void this.client.initialize().catch((error: unknown) => {
-            this.state = { status: "error", detail: error instanceof Error ? error.message : "initialization failed" };
+            this.state = {
+                status: "error",
+                detail: error instanceof Error ? error.message : "initialization failed"
+            };
         });
         return {};
     }
@@ -160,17 +169,25 @@ export class WhatsAppWebAdapter implements ChannelAdapter {
      *  fresh chat ("Cannot read properties of undefined (reading 'id')"); that
      *  specific post-send error is not a delivery failure, so swallow it and report
      *  the message as sent (without an id) rather than marking it failed. */
-    private async deliver(chatId: string, content: string | InstanceType<typeof Poll>): Promise<string | undefined> {
+    private async deliver(
+        chatId: string,
+        content: string | InstanceType<typeof Poll>
+    ): Promise<string | undefined> {
         try {
             const sent = await this.client.sendMessage(chatId, content);
             return sent?.id?._serialized;
         } catch (caught) {
             const detail = caught instanceof Error ? caught.message : String(caught);
-            if (/reading '?(_serialized|id)'?|getMessageModel|serialize/i.test(detail)) return undefined;
+            if (/reading '?(_serialized|id)'?|getMessageModel|serialize/i.test(detail))
+                return undefined;
             // A detached frame / closed target means the WhatsApp Web page died and the
             // linked session is gone. Reflect it as disconnected so the UI can prompt a
             // re-link (QR) instead of showing a stale "connected" while every send fails.
-            if (/detached frame|frame (was )?detached|target closed|session closed|execution context was destroyed/i.test(detail)) {
+            if (
+                /detached frame|frame (was )?detached|target closed|session closed|execution context was destroyed/i.test(
+                    detail
+                )
+            ) {
                 this.state = {
                     status: "disconnected",
                     detail: "WhatsApp Web session lost - reconnect to re-link the device"
