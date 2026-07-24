@@ -24,15 +24,6 @@ import type { AppInstallInput } from "@/lib/apps/install-schema";
  *  canvas stays uncluttered and the apps share a default environment. */
 const MARKETPLACE_PROJECT = "Marketplace";
 
-/** The control-plane web's default compose network (project "polaris") and its
- *  in-cluster ingest address. A locally-installed messaging hub joins that network
- *  (extraNetworks below) so it POSTs inbound events straight to the web by service
- *  DNS - the public app URL (polaris.local) does not resolve from inside a deployed
- *  container, which left every inbound event failing with "fetch failed". A remote
- *  hub cannot join this network, so it keeps using the public URL. */
-const CONTROL_NETWORK = "polaris_default";
-const WEB_INTERNAL_INGEST_URL = "http://web:3000/api/inbox/ingest";
-
 export interface InstalledAppView {
     id: string;
     catalogId: string;
@@ -97,9 +88,6 @@ export async function installApp(
 
     const environmentId = await ensureMarketplaceEnvironment(ownerId);
     const primaryPort = template.ports?.[0]?.container;
-    // A locally-installed hub also joins the control-plane network so it can reach the
-    // web's ingest by service DNS (persisted in sourceConfig so redeploys keep it).
-    const joinsControlNetwork = isHub && input.serverId === "local";
     const application = await createApplication(ownerId, {
         environmentId,
         targetId: target.id,
@@ -107,8 +95,7 @@ export async function installApp(
         sourceType: "image",
         sourceConfig: {
             imageRef: image,
-            ...(primaryPort ? { port: primaryPort } : {}),
-            ...(joinsControlNetwork ? { extraNetworks: [CONTROL_NETWORK] } : {})
+            ...(primaryPort ? { port: primaryPort } : {})
         }
     });
 
@@ -125,15 +112,14 @@ export async function installApp(
         envByKey.set(entry.key, { value: entry.value, isSecret: Boolean(declared?.secret) });
     }
     // Hub wiring: the bridge reads these at startup (see services/messaging-bridge).
-    // WEB_INGEST_URL points inbound events at the dashboard's internal ingest route.
+    // WEB_INGEST_URL defaults to the public app URL; a locally-installed hub has it
+    // overridden to the web's internal ingest (service DNS) at deploy time, since the
+    // public URL does not resolve from inside a deployed container.
     if (isHub && bridgeToken && ingestKey) {
         const bridgePort = template.ports?.[0]?.container ?? 8787;
-        // A local hub reaches the web over the shared control network (service DNS); a
-        // remote hub is off that network, so it falls back to the public app URL.
-        const ingestUrl = joinsControlNetwork ? WEB_INTERNAL_INGEST_URL : `${await appBaseUrl()}/api/inbox/ingest`;
         envByKey.set("BRIDGE_TOKEN", { value: bridgeToken, isSecret: true });
         envByKey.set("WEB_INGEST_KEY", { value: ingestKey, isSecret: true });
-        envByKey.set("WEB_INGEST_URL", { value: ingestUrl, isSecret: false });
+        envByKey.set("WEB_INGEST_URL", { value: `${await appBaseUrl()}/api/inbox/ingest`, isSecret: false });
         envByKey.set("BRIDGE_PORT", { value: String(bridgePort), isSecret: false });
     }
     const vars = [...envByKey.entries()].map(([key, meta]) => ({ key, value: meta.value, isSecret: meta.isSecret }));

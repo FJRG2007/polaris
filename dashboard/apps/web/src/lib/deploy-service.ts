@@ -27,6 +27,16 @@ import { resolveRegistryLogin } from "./registry-credential-service";
 import { quickTunnelAppIds, tunnelHostForApp, stopQuickTunnel } from "./deploy/quick-tunnel-service";
 import { resolveWaf, resolveWafBatch } from "./waf-service";
 
+/** A locally-installed messaging hub (this catalog app) joins a dedicated web<->hub
+ *  network and POSTs inbound events to the web by service DNS - the public app URL
+ *  does not resolve from inside a deployed container. Both are computed at deploy
+ *  time from the install and the current target, never persisted, so an existing hub
+ *  adopts them on its next redeploy and a retarget to a remote server drops them
+ *  automatically; a remote hub keeps the public URL and no extra network. */
+const HUB_CATALOG_ID = "messaging-bridge";
+const HUB_NETWORK = "polaris-hub";
+const WEB_INTERNAL_INGEST_URL = "http://web:3000/api/inbox/ingest";
+
 /** Directory the web process writes deploy log files to (tailed by the UI). */
 function logDir(): string {
     return join(loadEnv().POLARIS_DATA_DIR, "deploy-logs");
@@ -763,6 +773,18 @@ async function buildAppPlan(
     const composeProject = `polaris-${shortHash(app.id, 8)}`;
     const source = JSON.parse(app.sourceConfig) as Record<string, unknown>;
     const env = await mergedEnv(app.environmentId, app.id);
+    // A locally-targeted messaging hub reaches the web's ingest over the dedicated
+    // hub network by service DNS; detected from the install + target here (not
+    // persisted), so a remote hub keeps the public URL from its stored env.
+    const isLocalHub =
+        app.target.kind === "local" &&
+        Boolean(
+            await prisma.installedApp.findFirst({
+                where: { catalogId: HUB_CATALOG_ID, applicationId, status: { not: "removed" } },
+                select: { id: true }
+            })
+        );
+    if (isLocalHub) env.WEB_INGEST_URL = WEB_INTERNAL_INGEST_URL;
     const healthcheck = app.healthcheck ? (JSON.parse(app.healthcheck) as AppDeployPlan["healthcheck"]) : undefined;
     // Resolved WAF rules for this service, materialized into edge labels on deploy so
     // a remote server's own Traefik enforces them without the control plane.
@@ -808,11 +830,9 @@ async function buildAppPlan(
         },
         env,
         replicas: app.replicas,
-        // Extra external networks the service joins (set at install time, e.g. the
-        // messaging hub joining the control-plane web network to reach its ingest).
-        extraNetworks: Array.isArray(source.extraNetworks)
-            ? source.extraNetworks.filter((net): net is string => typeof net === "string")
-            : undefined,
+        // Extra external networks the service joins: a locally-installed messaging
+        // hub joins the dedicated web<->hub network to reach the web's ingest by DNS.
+        extraNetworks: isLocalHub ? [HUB_NETWORK] : undefined,
         waf,
         // Disabled domains keep their record but are left out of the plan so no route
         // labels are emitted for them until they are turned back on.

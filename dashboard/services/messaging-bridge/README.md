@@ -15,7 +15,11 @@ Cloud inbound arrives on the web's Meta webhook, not here.
 
 - `BRIDGE_PORT` - HTTP port (default `8787`).
 - `BRIDGE_TOKEN` - bearer token the web presents on every API call.
-- `WEB_INGEST_URL` - the web's inbound ingest endpoint.
+- `WEB_INGEST_URL` - the web's inbound ingest endpoint. Polaris sets this per
+  install: a local install uses the web's internal service DNS
+  (`http://web:3000/api/inbox/ingest`) over the shared `polaris-hub` network,
+  since the public URL does not resolve from inside a container; a remote install
+  keeps the public app URL.
 - `WEB_INGEST_KEY` - shared key sent as `x-internal-key` when forwarding inbound.
 - `WA_SESSION_DIR` - where whatsapp-web sessions persist (default `/app/.sessions`,
   a mounted volume so a linked number survives restarts).
