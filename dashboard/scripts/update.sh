@@ -25,4 +25,10 @@ if git -C "$dash_dir" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
 fi
 
 cd "$dash_dir"
-exec sh scripts/install.sh "$@"
+# Run the installer as a child, NOT `exec`. `exec` would replace this shell, so the
+# EXIT trap above would never fire and the completion marker would never be written
+# - which left the dashboard stuck on "Updating..." when the web container did not
+# restart (its only other completion signal). With a child call the trap runs on
+# return and stamps POLARIS_UPDATE_EXIT with the installer's exit code (set -e
+# propagates a failure to this script, so the trap still reports it).
+sh scripts/install.sh "$@"
