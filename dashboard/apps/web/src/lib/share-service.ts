@@ -49,6 +49,9 @@ export async function createShare(
             maxDownloads: input.maxDownloads ?? null,
             expiresAt: input.expiresAt ?? null,
             allowUpload: input.allowUpload,
+            allowRename: input.allowRename,
+            allowDelete: input.allowDelete,
+            allowCreateFolder: input.allowCreateFolder,
             allowDownload: input.allowDownload,
             allowPreview: input.allowPreview,
             allowedCidrs: JSON.stringify(input.allowedCidrs),
@@ -75,6 +78,9 @@ export async function listSharesForOwner(ownerId: string) {
             kind: true,
             connectionId: true,
             allowUpload: true,
+            allowRename: true,
+            allowDelete: true,
+            allowCreateFolder: true,
             allowDownload: true,
             allowPreview: true,
             allowedCidrs: true,
@@ -118,6 +124,9 @@ export async function updateShare(
         allowDownload?: boolean;
         allowPreview?: boolean;
         allowUpload?: boolean;
+        allowRename?: boolean;
+        allowDelete?: boolean;
+        allowCreateFolder?: boolean;
         allowedCidrs?: string[];
     }
 ): Promise<void> {
@@ -130,6 +139,9 @@ export async function updateShare(
     if (input.allowDownload !== undefined) data.allowDownload = input.allowDownload;
     if (input.allowPreview !== undefined) data.allowPreview = input.allowPreview;
     if (input.allowUpload !== undefined) data.allowUpload = input.allowUpload;
+    if (input.allowRename !== undefined) data.allowRename = input.allowRename;
+    if (input.allowDelete !== undefined) data.allowDelete = input.allowDelete;
+    if (input.allowCreateFolder !== undefined) data.allowCreateFolder = input.allowCreateFolder;
     if (input.allowedCidrs !== undefined) data.allowedCidrs = JSON.stringify(input.allowedCidrs);
     await prisma.share.updateMany({ where: { id: shareId, ownerId }, data });
 }
@@ -168,6 +180,9 @@ export async function resolveShareByToken(token: string) {
             downloadCount: true,
             expiresAt: true,
             allowUpload: true,
+            allowRename: true,
+            allowDelete: true,
+            allowCreateFolder: true,
             allowDownload: true,
             allowPreview: true,
             allowedCidrs: true,

@@ -1,15 +1,16 @@
 "use client";
 
 /**
- * Public, read-only Drive explorer for a folder share. It mirrors the in-app Files
- * browser a signed-in user sees - breadcrumb, search (this folder or the whole
- * subtree), sort, list/grid, type/size/date filters, multi-select, inline preview,
- * and per-item or bundled ZIP download - but exposes only the actions a share
- * permits (browse always; preview and download per the share's flags) and never
- * any mutation. Every request is re-gated server-side by the token routes, so the
- * client is purely presentational. Navigation is URL-driven (?p=path) via the
- * History API so links are shareable and the back button works, without a full
- * server round-trip on each folder change.
+ * Public Drive explorer for a folder share. It mirrors the in-app Files browser a
+ * signed-in user sees - breadcrumb, search (this folder or the whole subtree),
+ * sort, list/grid, type/size/date filters, multi-select, inline preview, and
+ * per-item or bundled ZIP download - and exposes exactly the actions the share
+ * permits: browse always; preview/download per their flags; and, when the owner
+ * enabled them, write actions (upload/drop box, create folder, rename/move,
+ * delete). Every request is re-gated server-side by the token routes, so the
+ * client is purely presentational and a disabled action is also refused by the
+ * server. Navigation is URL-driven (?p=path) via the History API so links are
+ * shareable and the back button works, without a server round-trip per folder.
  */
 
 import {
@@ -33,11 +34,17 @@ import {
     File,
     Folder,
     FolderOpen,
+    FolderPlus,
     FolderTree,
+    Info,
     LayoutGrid,
     List,
+    Loader2,
+    Pencil,
     Search,
     SlidersHorizontal,
+    Trash2,
+    Upload,
     X
 } from "lucide-react";
 import { formatBytes } from "@polaris/core";
@@ -51,6 +58,12 @@ import {
     ContextMenuLabel,
     ContextMenuSeparator,
     ContextMenuTrigger,
+    Dialog,
+    DialogClose,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
     Input,
     Skeleton,
     cn
@@ -96,13 +109,34 @@ function openHref(href: string, downloadName?: string) {
     anchor.remove();
 }
 
+/** Parent folder path of a relative path ("a/b/c" -> "a/b"). */
+function parentOf(path: string): string {
+    const slash = path.lastIndexOf("/");
+    return slash >= 0 ? path.slice(0, slash) : "";
+}
+
+/** A short, non-leaky message for a failed write, from the route's status/reason. */
+function writeErrorMessage(status: number, reason: string): string {
+    if (reason.endsWith("_disabled") || status === 403) return "That action is not allowed on this link.";
+    if (reason === "cannot_rename_root" || reason === "cannot_delete_root") {
+        return "The shared folder itself cannot be changed.";
+    }
+    if (reason === "path_outside_share") return "That location is outside the shared folder.";
+    if (status === 410) return "This link is no longer available.";
+    return "The action could not be completed. The item may be in use or protected.";
+}
+
 export function ShareExplorer({
     token,
     rootName,
     rootPath,
     initialPath,
     allowDownload,
-    allowPreview
+    allowPreview,
+    allowUpload,
+    allowRename,
+    allowDelete,
+    allowCreateFolder
 }: {
     token: string;
     rootName: string;
@@ -110,11 +144,17 @@ export function ShareExplorer({
     initialPath: string;
     allowDownload: boolean;
     allowPreview: boolean;
+    allowUpload: boolean;
+    allowRename: boolean;
+    allowDelete: boolean;
+    allowCreateFolder: boolean;
 }) {
     const [path, setPath] = useState(initialPath);
     const [entries, setEntries] = useState<DriveEntry[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    // Bumped after a write to re-fetch the listing (and any active search).
+    const [reloadKey, setReloadKey] = useState(0);
 
     const [query, setQuery] = useState("");
     const [searchScope, setSearchScope] = useState<"current" | "recursive">("recursive");
@@ -138,6 +178,17 @@ export function ShareExplorer({
     const [viewerTarget, setViewerTarget] = useState<ViewerTarget | null>(null);
     const scrollRef = useRef<HTMLDivElement>(null);
 
+    // Write state (only reachable when the matching flag is set).
+    const [opError, setOpError] = useState<string | null>(null);
+    const [uploading, setUploading] = useState(false);
+    const [dragUpload, setDragUpload] = useState(false);
+    const fileInput = useRef<HTMLInputElement>(null);
+    const [newFolderOpen, setNewFolderOpen] = useState(false);
+    const [newFolderName, setNewFolderName] = useState("");
+    const [renameTarget, setRenameTarget] = useState<DriveEntry | null>(null);
+    const [renameValue, setRenameValue] = useState("");
+    const [deleteTargets, setDeleteTargets] = useState<DriveEntry[] | null>(null);
+
     /** Build the shareable URL for a path within the subtree (root omits `?p`). */
     const urlForPath = useCallback(
         (target: string) => (target && target !== rootPath ? `/s/${token}?p=${encodeURIComponent(target)}` : `/s/${token}`),
@@ -152,6 +203,8 @@ export function ShareExplorer({
         },
         [urlForPath]
     );
+
+    const reload = useCallback(() => setReloadKey((key) => key + 1), []);
 
     // Keep the view in sync with back/forward navigation.
     useEffect(() => {
@@ -188,7 +241,7 @@ export function ShareExplorer({
                 if (!controller.signal.aborted) setLoading(false);
             });
         return () => controller.abort();
-    }, [token, path, rootPath]);
+    }, [token, path, rootPath, reloadKey]);
 
     // Drop selection whenever the folder or the searched result set changes.
     useEffect(() => {
@@ -227,7 +280,7 @@ export function ShareExplorer({
             controller.abort();
             clearTimeout(timer);
         };
-    }, [searchScope, query, token, path, rootPath]);
+    }, [searchScope, query, token, path, rootPath, reloadKey]);
 
     const source = searchScope === "recursive" && remoteEntries !== null ? remoteEntries : entries;
 
@@ -309,7 +362,7 @@ export function ShareExplorer({
     function openViewer(entry: DriveEntry) {
         // Location shown relative to the shared root (never the connection path above
         // it), mirroring the breadcrumb the visitor can already see.
-        const parent = entry.path.split("/").slice(0, -1).join("/");
+        const parent = parentOf(entry.path);
         const parentRel = parent === rootPath ? "" : parent.slice(rootPath ? rootPath.length + 1 : 0);
         setViewerTarget({
             path: entry.path,
@@ -338,6 +391,110 @@ export function ShareExplorer({
             return;
         }
         openHref(zipUrl(token, items.map((entry) => entry.path)));
+    }
+
+    /** POST a JSON write to a token route; surface a friendly error, reload on success. */
+    async function writeJson(action: string, payload: Record<string, unknown>): Promise<boolean> {
+        setOpError(null);
+        try {
+            const res = await fetch(`/api/s/${token}/${action}`, {
+                method: "POST",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify(payload)
+            });
+            if (!res.ok) {
+                const reason = await res.text().catch(() => "");
+                setOpError(writeErrorMessage(res.status, reason.trim()));
+                return false;
+            }
+            return true;
+        } catch {
+            setOpError("The action could not be completed.");
+            return false;
+        }
+    }
+
+    /** Upload files into the current folder (drop box). relPath is name-relative. */
+    async function uploadFiles(items: { file: File; relPath: string }[]) {
+        if (!allowUpload || items.length === 0) return;
+        setUploading(true);
+        setOpError(null);
+        let failed = 0;
+        for (const { file, relPath } of items) {
+            const q = new URLSearchParams({ name: relPath });
+            if (path) q.set("p", path);
+            try {
+                const res = await fetch(`/api/s/${token}/upload?${q.toString()}`, {
+                    method: "PUT",
+                    body: file
+                });
+                if (!res.ok) failed++;
+            } catch {
+                failed++;
+            }
+        }
+        setUploading(false);
+        if (fileInput.current) fileInput.current.value = "";
+        if (failed > 0) setOpError(`${failed} file${failed === 1 ? "" : "s"} could not be uploaded.`);
+        reload();
+    }
+
+    async function submitNewFolder(event: React.FormEvent) {
+        event.preventDefault();
+        const name = newFolderName.trim();
+        if (!name) return;
+        setNewFolderOpen(false);
+        setNewFolderName("");
+        if (await writeJson("mkdir", { parent: path, name })) reload();
+    }
+
+    async function submitRename(event: React.FormEvent) {
+        event.preventDefault();
+        if (!renameTarget) return;
+        const name = renameValue.trim();
+        const target = renameTarget;
+        setRenameTarget(null);
+        if (!name || name === target.name) return;
+        const to = parentOf(target.path) ? `${parentOf(target.path)}/${name}` : name;
+        if (await writeJson("rename", { from: target.path, to })) reload();
+    }
+
+    async function confirmDelete() {
+        if (!deleteTargets) return;
+        const targets = deleteTargets;
+        setDeleteTargets(null);
+        setOpError(null);
+        let failed = 0;
+        for (const entry of targets) {
+            try {
+                const res = await fetch(`/api/s/${token}/delete`, {
+                    method: "POST",
+                    headers: { "content-type": "application/json" },
+                    body: JSON.stringify({ path: entry.path })
+                });
+                if (!res.ok) failed++;
+            } catch {
+                failed++;
+            }
+        }
+        setSelected(new Set());
+        if (failed > 0) setOpError(`${failed} item${failed === 1 ? "" : "s"} could not be deleted.`);
+        reload();
+    }
+
+    /** Drag files over the listing highlights it as a drop zone (upload shares only). */
+    function onUploadDragOver(event: React.DragEvent) {
+        if (!allowUpload || !event.dataTransfer.types.includes("Files")) return;
+        event.preventDefault();
+        setDragUpload(true);
+    }
+
+    function onUploadDrop(event: React.DragEvent) {
+        if (!allowUpload || !event.dataTransfer.types.includes("Files")) return;
+        event.preventDefault();
+        setDragUpload(false);
+        const files = Array.from(event.dataTransfer.files);
+        void uploadFiles(files.map((file) => ({ file, relPath: file.name })));
     }
 
     function toggleOne(key: string) {
@@ -381,6 +538,11 @@ export function ShareExplorer({
         setSelected(allSelected ? new Set() : new Set(visible.map((entry) => entry.path)));
     }
 
+    function startRename(entry: DriveEntry) {
+        setRenameValue(entry.name);
+        setRenameTarget(entry);
+    }
+
     function onListKeyDown(event: KeyboardEvent) {
         const mod = event.ctrlKey || event.metaKey;
         if (event.key === "Escape" && selectedEntries.length > 0) {
@@ -392,6 +554,12 @@ export function ShareExplorer({
         } else if (event.key === "Enter" && selectedEntries.length === 1 && selectedEntries[0]) {
             event.preventDefault();
             openEntry(selectedEntries[0]);
+        } else if (event.key === "F2" && allowRename && selectedEntries.length === 1 && selectedEntries[0]) {
+            event.preventDefault();
+            startRename(selectedEntries[0]);
+        } else if (event.key === "Delete" && allowDelete && selectedEntries.length > 0) {
+            event.preventDefault();
+            setDeleteTargets(selectedEntries);
         }
     }
 
@@ -459,17 +627,34 @@ export function ShareExplorer({
                     {entry.kind === "dir" ? "Download as ZIP" : "Download"}
                 </ContextMenuItem>
             ) : null}
-            <ContextMenuSeparator />
+            {allowRename ? (
+                <ContextMenuItem onSelect={() => startRename(entry)}>
+                    <Pencil className="size-4" />
+                    Rename
+                </ContextMenuItem>
+            ) : null}
             <ContextMenuItem onSelect={() => void navigator.clipboard.writeText(entry.name)}>
                 <ClipboardCopy className="size-4" />
                 Copy name
             </ContextMenuItem>
+            {allowDelete ? (
+                <>
+                    <ContextMenuSeparator />
+                    <ContextMenuItem
+                        variant="danger"
+                        onSelect={() => setDeleteTargets(selected.has(entry.path) ? selectedEntries : [entry])}
+                    >
+                        <Trash2 className="size-4" />
+                        Delete
+                    </ContextMenuItem>
+                </>
+            ) : null}
         </ContextMenuContent>
     );
 
     return (
         <div className="flex min-w-0 flex-1 flex-col">
-            {/* Breadcrumb + folder-level action */}
+            {/* Breadcrumb + folder-level actions */}
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                 <div className="flex min-w-0 items-center gap-1 text-sm text-muted-foreground">
                     <FolderOpen className="size-4 shrink-0" />
@@ -496,12 +681,38 @@ export function ShareExplorer({
                         );
                     })}
                 </div>
-                {allowDownload && visible.length > 0 && (path || rootPath) ? (
-                    <Button size="sm" variant="ghost" onClick={() => openHref(zipUrl(token, [path || rootPath]))}>
-                        <Download className="size-4" />
-                        Download all
-                    </Button>
-                ) : null}
+                <div className="flex items-center gap-2">
+                    {allowCreateFolder ? (
+                        <Button size="sm" variant="ghost" onClick={() => setNewFolderOpen(true)}>
+                            <FolderPlus className="size-4" />
+                            New folder
+                        </Button>
+                    ) : null}
+                    {allowUpload ? (
+                        <>
+                            <Button size="sm" variant="secondary" disabled={uploading} onClick={() => fileInput.current?.click()}>
+                                <Upload className="size-4" />
+                                {uploading ? "Uploading..." : "Upload"}
+                            </Button>
+                            <input
+                                ref={fileInput}
+                                type="file"
+                                multiple
+                                hidden
+                                onChange={(event) => {
+                                    const files = event.target.files ? Array.from(event.target.files) : [];
+                                    void uploadFiles(files.map((file) => ({ file, relPath: file.name })));
+                                }}
+                            />
+                        </>
+                    ) : null}
+                    {allowDownload && visible.length > 0 && (path || rootPath) ? (
+                        <Button size="sm" variant="ghost" onClick={() => openHref(zipUrl(token, [path || rootPath]))}>
+                            <Download className="size-4" />
+                            Download all
+                        </Button>
+                    ) : null}
+                </div>
             </div>
 
             {/* Search + sort + view + filters toolbar */}
@@ -689,6 +900,18 @@ export function ShareExplorer({
                                         : "Download"}
                                 </Button>
                             ) : null}
+                            {allowRename && selectedEntries.length === 1 && selectedEntries[0] ? (
+                                <Button size="sm" variant="ghost" onClick={() => startRename(selectedEntries[0]!)}>
+                                    <Pencil className="size-4" />
+                                    Rename
+                                </Button>
+                            ) : null}
+                            {allowDelete ? (
+                                <Button size="sm" variant="ghost" onClick={() => setDeleteTargets(selectedEntries)}>
+                                    <Trash2 className="size-4" />
+                                    Delete
+                                </Button>
+                            ) : null}
                             <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>
                                 <X className="size-4" />
                                 Clear
@@ -697,128 +920,252 @@ export function ShareExplorer({
                     </>
                 ) : (
                     <span className="text-xs text-muted-foreground">
-                        {allowDownload
-                            ? "Select items to download, or open one to preview."
-                            : "Open an item to preview it."}
+                        {allowUpload
+                            ? "Drop files here to upload, or open an item to preview."
+                            : allowDownload
+                              ? "Select items to download, or open one to preview."
+                              : "Open an item to preview it."}
                     </span>
                 )}
             </div>
 
-            {/* Listing */}
-            {loading ? (
-                <div className="flex flex-col gap-1">
-                    {Array.from({ length: 8 }).map((_, index) => (
-                        <Skeleton key={index} className="h-9 w-full" />
-                    ))}
-                </div>
-            ) : error ? (
-                <p className="rounded-md border border-border bg-card p-8 text-center text-sm text-muted-foreground">
-                    {error}
-                </p>
-            ) : visible.length === 0 ? (
-                <p className="rounded-md border border-border bg-card p-8 text-center text-sm text-muted-foreground">
-                    {query.trim() ? "No items match your search." : "This folder is empty."}
-                </p>
-            ) : viewMode === "grid" ? (
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
-                    {visible.map((entry, index) => (
-                        <ContextMenu key={entry.path}>
-                            <ContextMenuTrigger asChild>
-                                <button
-                                    type="button"
-                                    onClick={(event) => rowClick(event, index, entry)}
-                                    onDoubleClick={() => openEntry(entry)}
-                                    className={cn(
-                                        "group flex flex-col items-center gap-2 rounded-lg border p-3 text-center transition-colors",
-                                        selected.has(entry.path)
-                                            ? "border-primary/50 bg-primary/5"
-                                            : "border-border hover:bg-card-hover"
-                                    )}
-                                >
-                                    <EntryIcon entry={entry} className="size-10" />
-                                    <span className="line-clamp-2 w-full break-words text-xs">{entry.name}</span>
-                                    {entry.kind !== "dir" ? (
-                                        <span className="text-[10px] text-muted-foreground">
-                                            {formatBytes(BigInt(entry.size))}
-                                        </span>
-                                    ) : null}
-                                </button>
-                            </ContextMenuTrigger>
-                            {entryMenu(entry)}
-                        </ContextMenu>
-                    ))}
-                </div>
-            ) : (
-                <div
-                    tabIndex={0}
-                    onKeyDown={onListKeyDown}
-                    className="flex flex-col rounded-md border border-border outline-none"
-                >
-                    <div className="flex items-center gap-3 border-b border-border bg-surface/40 px-3 py-2 text-xs font-medium text-muted-foreground">
-                        <Checkbox
-                            checked={allSelected}
-                            indeterminate={!allSelected && selectedEntries.length > 0}
-                            onChange={toggleAll}
-                            aria-label="Select all"
-                        />
-                        <span className="flex-1">Name</span>
-                        <span className="hidden w-40 sm:block">Modified</span>
-                        <span className="w-20 text-right">Size</span>
-                        <span className="w-16" />
+            {/* Listing (also the upload drop zone when the share allows uploads). */}
+            <div
+                className="relative"
+                onDragOver={onUploadDragOver}
+                onDragLeave={() => setDragUpload(false)}
+                onDrop={onUploadDrop}
+            >
+                {dragUpload ? (
+                    <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-md border-2 border-dashed border-primary bg-primary/5 text-sm font-medium text-primary">
+                        <Upload className="mr-2 size-4" />
+                        Drop files to upload here
                     </div>
-                    <div ref={scrollRef} className="max-h-[60vh] overflow-auto">
-                        <div style={{ height: rowVirtualizer.getTotalSize(), position: "relative" }}>
-                            {rowVirtualizer.getVirtualItems().map((row) => {
-                                const entry = visible[row.index];
-                                if (!entry) return null;
-                                const isSelected = selected.has(entry.path);
-                                return (
-                                    <ContextMenu key={entry.path}>
-                                        <ContextMenuTrigger asChild>
-                                            <div
-                                                data-share-row
-                                                onClick={(event) => rowClick(event, row.index, entry)}
-                                                onDoubleClick={() => openEntry(entry)}
-                                                style={{
-                                                    position: "absolute",
-                                                    top: 0,
-                                                    left: 0,
-                                                    width: "100%",
-                                                    height: ROW_HEIGHT,
-                                                    transform: `translateY(${row.start}px)`
-                                                }}
-                                                className={cn(
-                                                    "group flex cursor-default items-center gap-3 border-b border-border px-3 text-sm transition-colors",
-                                                    isSelected ? "bg-primary/5" : "hover:bg-card-hover"
-                                                )}
-                                            >
-                                                <Checkbox
-                                                    checked={isSelected}
-                                                    onClick={(event) => event.stopPropagation()}
-                                                    onChange={() => toggleOne(entry.path)}
-                                                    aria-label={`Select ${entry.name}`}
-                                                />
-                                                <EntryIcon entry={entry} className="size-4 shrink-0" />
-                                                <span className="flex-1 truncate">{entry.name}</span>
-                                                <span className="hidden w-40 text-xs text-muted-foreground sm:block">
-                                                    <RelativeTime iso={entry.modifiedAt} />
-                                                </span>
-                                                <span className="w-20 text-right text-xs text-muted-foreground">
-                                                    {entry.kind === "dir" ? "-" : formatBytes(BigInt(entry.size))}
-                                                </span>
-                                                <span className="flex w-16 items-center justify-end gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
-                                                    {rowActions(entry)}
-                                                </span>
-                                            </div>
-                                        </ContextMenuTrigger>
-                                        {entryMenu(entry)}
-                                    </ContextMenu>
-                                );
-                            })}
+                ) : null}
+
+                {loading ? (
+                    <div className="flex flex-col gap-1">
+                        {Array.from({ length: 8 }).map((_, index) => (
+                            <Skeleton key={index} className="h-9 w-full" />
+                        ))}
+                    </div>
+                ) : error ? (
+                    <p className="rounded-md border border-border bg-card p-8 text-center text-sm text-muted-foreground">
+                        {error}
+                    </p>
+                ) : visible.length === 0 ? (
+                    <p className="rounded-md border border-border bg-card p-8 text-center text-sm text-muted-foreground">
+                        {query.trim()
+                            ? "No items match your search."
+                            : allowUpload
+                              ? "This folder is empty. Drop files here or use Upload to add some."
+                              : "This folder is empty."}
+                    </p>
+                ) : viewMode === "grid" ? (
+                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+                        {visible.map((entry, index) => (
+                            <ContextMenu key={entry.path}>
+                                <ContextMenuTrigger asChild>
+                                    <button
+                                        type="button"
+                                        onClick={(event) => rowClick(event, index, entry)}
+                                        onDoubleClick={() => openEntry(entry)}
+                                        className={cn(
+                                            "group flex flex-col items-center gap-2 rounded-lg border p-3 text-center transition-colors",
+                                            selected.has(entry.path)
+                                                ? "border-primary/50 bg-primary/5"
+                                                : "border-border hover:bg-card-hover"
+                                        )}
+                                    >
+                                        <EntryIcon entry={entry} className="size-10" />
+                                        <span className="line-clamp-2 w-full break-words text-xs">{entry.name}</span>
+                                        {entry.kind !== "dir" ? (
+                                            <span className="text-[10px] text-muted-foreground">
+                                                {formatBytes(BigInt(entry.size))}
+                                            </span>
+                                        ) : null}
+                                    </button>
+                                </ContextMenuTrigger>
+                                {entryMenu(entry)}
+                            </ContextMenu>
+                        ))}
+                    </div>
+                ) : (
+                    <div
+                        tabIndex={0}
+                        onKeyDown={onListKeyDown}
+                        className="flex flex-col rounded-md border border-border outline-none"
+                    >
+                        <div className="flex items-center gap-3 border-b border-border bg-surface/40 px-3 py-2 text-xs font-medium text-muted-foreground">
+                            <Checkbox
+                                checked={allSelected}
+                                indeterminate={!allSelected && selectedEntries.length > 0}
+                                onChange={toggleAll}
+                                aria-label="Select all"
+                            />
+                            <span className="flex-1">Name</span>
+                            <span className="hidden w-40 sm:block">Modified</span>
+                            <span className="w-20 text-right">Size</span>
+                            <span className="w-16" />
+                        </div>
+                        <div ref={scrollRef} className="max-h-[60vh] overflow-auto">
+                            <div style={{ height: rowVirtualizer.getTotalSize(), position: "relative" }}>
+                                {rowVirtualizer.getVirtualItems().map((row) => {
+                                    const entry = visible[row.index];
+                                    if (!entry) return null;
+                                    const isSelected = selected.has(entry.path);
+                                    return (
+                                        <ContextMenu key={entry.path}>
+                                            <ContextMenuTrigger asChild>
+                                                <div
+                                                    data-share-row
+                                                    onClick={(event) => rowClick(event, row.index, entry)}
+                                                    onDoubleClick={() => openEntry(entry)}
+                                                    style={{
+                                                        position: "absolute",
+                                                        top: 0,
+                                                        left: 0,
+                                                        width: "100%",
+                                                        height: ROW_HEIGHT,
+                                                        transform: `translateY(${row.start}px)`
+                                                    }}
+                                                    className={cn(
+                                                        "group flex cursor-default items-center gap-3 border-b border-border px-3 text-sm transition-colors",
+                                                        isSelected ? "bg-primary/5" : "hover:bg-card-hover"
+                                                    )}
+                                                >
+                                                    <Checkbox
+                                                        checked={isSelected}
+                                                        onClick={(event) => event.stopPropagation()}
+                                                        onChange={() => toggleOne(entry.path)}
+                                                        aria-label={`Select ${entry.name}`}
+                                                    />
+                                                    <EntryIcon entry={entry} className="size-4 shrink-0" />
+                                                    <span className="flex-1 truncate">{entry.name}</span>
+                                                    <span className="hidden w-40 text-xs text-muted-foreground sm:block">
+                                                        <RelativeTime iso={entry.modifiedAt} />
+                                                    </span>
+                                                    <span className="w-20 text-right text-xs text-muted-foreground">
+                                                        {entry.kind === "dir" ? "-" : formatBytes(BigInt(entry.size))}
+                                                    </span>
+                                                    <span className="flex w-16 items-center justify-end gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                                                        {rowActions(entry)}
+                                                    </span>
+                                                </div>
+                                            </ContextMenuTrigger>
+                                            {entryMenu(entry)}
+                                        </ContextMenu>
+                                    );
+                                })}
+                            </div>
                         </div>
                     </div>
+                )}
+            </div>
+
+            {/* New folder */}
+            <Dialog open={newFolderOpen} onOpenChange={setNewFolderOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>New folder</DialogTitle>
+                        <DialogDescription>Create a folder in the current location.</DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={submitNewFolder} className="flex flex-col gap-3">
+                        <Input
+                            autoFocus
+                            value={newFolderName}
+                            onChange={(event) => setNewFolderName(event.target.value)}
+                            placeholder="Folder name"
+                        />
+                        <div className="flex justify-end gap-2">
+                            <DialogClose asChild>
+                                <Button type="button" variant="ghost">
+                                    Cancel
+                                </Button>
+                            </DialogClose>
+                            <Button type="submit" disabled={!newFolderName.trim()}>
+                                Create
+                            </Button>
+                        </div>
+                    </form>
+                </DialogContent>
+            </Dialog>
+
+            {/* Rename */}
+            <Dialog open={renameTarget !== null} onOpenChange={(open) => !open && setRenameTarget(null)}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Rename</DialogTitle>
+                        <DialogDescription className="truncate">{renameTarget?.name}</DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={submitRename} className="flex flex-col gap-3">
+                        <Input
+                            autoFocus
+                            value={renameValue}
+                            onChange={(event) => setRenameValue(event.target.value)}
+                            placeholder="New name"
+                        />
+                        <div className="flex justify-end gap-2">
+                            <DialogClose asChild>
+                                <Button type="button" variant="ghost">
+                                    Cancel
+                                </Button>
+                            </DialogClose>
+                            <Button type="submit" disabled={!renameValue.trim()}>
+                                Rename
+                            </Button>
+                        </div>
+                    </form>
+                </DialogContent>
+            </Dialog>
+
+            {/* Delete confirm */}
+            <Dialog open={deleteTargets !== null} onOpenChange={(open) => !open && setDeleteTargets(null)}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>
+                            Delete {deleteTargets && deleteTargets.length > 1 ? `${deleteTargets.length} items` : "item"}
+                        </DialogTitle>
+                        <DialogDescription className="truncate">
+                            {deleteTargets && deleteTargets.length === 1
+                                ? `${deleteTargets[0]?.name} will be permanently deleted. This cannot be undone.`
+                                : "The selected items will be permanently deleted. This cannot be undone."}
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="flex justify-end gap-2">
+                        <Button type="button" variant="ghost" onClick={() => setDeleteTargets(null)}>
+                            Cancel
+                        </Button>
+                        <Button type="button" variant="danger" onClick={confirmDelete}>
+                            Delete
+                        </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
+            {/* Background upload indicator */}
+            {uploading ? (
+                <div className="fixed bottom-4 right-4 z-50 flex items-center gap-2 rounded-lg border border-border bg-card p-3 text-sm shadow-lg">
+                    <Loader2 className="size-4 animate-spin text-primary" />
+                    Uploading...
                 </div>
-            )}
+            ) : null}
+
+            {/* Error toast for a failed write */}
+            {opError ? (
+                <div className="fixed bottom-4 right-4 z-50 flex w-80 items-start gap-2 rounded-lg border border-danger/40 bg-danger/10 p-3 text-sm text-danger shadow-lg">
+                    <Info className="mt-0.5 size-4 shrink-0" />
+                    <span className="min-w-0 flex-1 break-words">{opError}</span>
+                    <button
+                        type="button"
+                        onClick={() => setOpError(null)}
+                        className="shrink-0 rounded p-0.5 hover:bg-danger/10"
+                        aria-label="Dismiss"
+                    >
+                        <X className="size-4" />
+                    </button>
+                </div>
+            ) : null}
 
             <FileViewer
                 target={viewerTarget}

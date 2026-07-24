@@ -31,6 +31,12 @@ export const createShareSchema = z
         expiresAt: z.coerce.date().optional(),
         /** Allow recipients to upload into a shared folder (drop box). */
         allowUpload: z.boolean().default(false),
+        /** Allow recipients to rename or move items within the shared subtree. */
+        allowRename: z.boolean().default(false),
+        /** Allow recipients to delete items within the shared subtree. */
+        allowDelete: z.boolean().default(false),
+        /** Allow recipients to create folders within the shared subtree. */
+        allowCreateFolder: z.boolean().default(false),
         /** Allow recipients to download the bytes (attachment). */
         allowDownload: z.boolean().default(true),
         /** Allow recipients to preview the file inline in the browser. */

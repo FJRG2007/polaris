@@ -189,6 +189,10 @@ export default async function SharePage({
                     initialPath={current}
                     allowDownload={share.allowDownload}
                     allowPreview={share.allowPreview}
+                    allowUpload={share.allowUpload}
+                    allowRename={share.allowRename}
+                    allowDelete={share.allowDelete}
+                    allowCreateFolder={share.allowCreateFolder}
                 />
             )}
         </Shell>

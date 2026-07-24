@@ -77,6 +77,9 @@ export function ShareDialog({
             maxDownloads: maxDownloads ? Number(maxDownloads) : undefined,
             expiresAt: expiresAt ? String(expiresAt) : undefined,
             allowUpload: form.get("allowUpload") === "on",
+            allowRename: form.get("allowRename") === "on",
+            allowDelete: form.get("allowDelete") === "on",
+            allowCreateFolder: form.get("allowCreateFolder") === "on",
             allowDownload: form.get("allowDownload") !== "off",
             allowPreview: form.get("allowPreview") !== "off",
             allowedCidrs,
@@ -165,10 +168,24 @@ export function ShareDialog({
                                 Allow previewing in the browser
                             </label>
                             {target?.isDir ? (
-                                <label className="flex items-center gap-2">
-                                    <input type="checkbox" name="allowUpload" className="size-4" />
-                                    Allow recipients to upload into this folder
-                                </label>
+                                <>
+                                    <label className="flex items-center gap-2">
+                                        <input type="checkbox" name="allowUpload" className="size-4" />
+                                        Allow uploading into this folder (drop box)
+                                    </label>
+                                    <label className="flex items-center gap-2">
+                                        <input type="checkbox" name="allowCreateFolder" className="size-4" />
+                                        Allow creating folders
+                                    </label>
+                                    <label className="flex items-center gap-2">
+                                        <input type="checkbox" name="allowRename" className="size-4" />
+                                        Allow renaming and moving items
+                                    </label>
+                                    <label className="flex items-center gap-2">
+                                        <input type="checkbox" name="allowDelete" className="size-4" />
+                                        Allow deleting items (permanent)
+                                    </label>
+                                </>
                             ) : null}
                         </div>
                         {error ? <p className="text-sm text-danger">{error}</p> : null}

@@ -39,6 +39,9 @@ export interface ShareRow {
     connectionId: string;
     connectionName: string;
     allowUpload: boolean;
+    allowRename: boolean;
+    allowDelete: boolean;
+    allowCreateFolder: boolean;
     allowDownload: boolean;
     allowPreview: boolean;
     allowedCidrs: string[];
@@ -253,6 +256,9 @@ function EditShareDialog({
             allowDownload: form.get("allowDownload") === "on",
             allowPreview: form.get("allowPreview") === "on",
             allowUpload: form.get("allowUpload") === "on",
+            allowRename: form.get("allowRename") === "on",
+            allowDelete: form.get("allowDelete") === "on",
+            allowCreateFolder: form.get("allowCreateFolder") === "on",
             allowedCidrs
         });
         setPending(false);
@@ -267,6 +273,9 @@ function EditShareDialog({
             allowDownload: form.get("allowDownload") === "on",
             allowPreview: form.get("allowPreview") === "on",
             allowUpload: form.get("allowUpload") === "on",
+            allowRename: form.get("allowRename") === "on",
+            allowDelete: form.get("allowDelete") === "on",
+            allowCreateFolder: form.get("allowCreateFolder") === "on",
             allowedCidrs
         });
     }
@@ -343,7 +352,34 @@ function EditShareDialog({
                                     defaultChecked={share.allowUpload}
                                     className="size-4"
                                 />
-                                Allow uploads into the folder
+                                Allow uploads into the folder (drop box)
+                            </label>
+                            <label className="flex items-center gap-2">
+                                <input
+                                    type="checkbox"
+                                    name="allowCreateFolder"
+                                    defaultChecked={share.allowCreateFolder}
+                                    className="size-4"
+                                />
+                                Allow creating folders
+                            </label>
+                            <label className="flex items-center gap-2">
+                                <input
+                                    type="checkbox"
+                                    name="allowRename"
+                                    defaultChecked={share.allowRename}
+                                    className="size-4"
+                                />
+                                Allow renaming and moving items
+                            </label>
+                            <label className="flex items-center gap-2">
+                                <input
+                                    type="checkbox"
+                                    name="allowDelete"
+                                    defaultChecked={share.allowDelete}
+                                    className="size-4"
+                                />
+                                Allow deleting items (permanent)
                             </label>
                         </div>
                         {error ? <p className="text-sm text-danger">{error}</p> : null}

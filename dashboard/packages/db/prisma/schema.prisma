@@ -457,7 +457,13 @@ model Share {
     maxDownloads  Int?
     downloadCount Int       @default(0)
     expiresAt     DateTime?
+    // Recipient write permissions, each independent so a link can act as a drop box
+    // and/or grant specific edits without the others (e.g. rename but not delete).
+    // All default false so a share is read-only until the owner opts in.
     allowUpload   Boolean   @default(false)
+    allowRename   Boolean   @default(false)
+    allowDelete   Boolean   @default(false)
+    allowCreateFolder Boolean @default(false)
     // Whether recipients may download the bytes / preview inline in the browser.
     allowDownload Boolean   @default(true)
     allowPreview  Boolean   @default(true)
