@@ -79,6 +79,13 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    # Default network (edge routing + database) plus the dedicated hub network, so a
+    # locally-installed messaging bridge - deployed as its own compose stack - can
+    # POST inbound events to the web by service DNS (http://web:3000). Edge labels
+    # still reference polaris_default, so routing is unchanged.
+    networks:
+      - default
+      - polaris-hub
     # Resolve the host from inside the container so the Docker-over-SSH connector
     # can reach the host Engine at host.docker.internal on Linux too.
     extra_hosts:
@@ -280,6 +287,13 @@ networks:
   polaris-proxy:
     external: true
     name: polaris-proxy
+  # Dedicated web<->hub network for a locally-installed messaging bridge. External
+  # (install.sh creates it before `up`, like polaris-proxy) so the hub, deployed as
+  # a separate compose stack, can join the same named network and reach the web by
+  # service DNS without sharing the control-plane default network with postgres.
+  polaris-hub:
+    external: true
+    name: polaris-hub
 
 volumes:
   polaris-postgres:

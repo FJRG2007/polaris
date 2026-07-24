@@ -624,6 +624,11 @@ main() {
         build_flag="--build"
     fi
 
+    # The dedicated web<->hub network a locally-installed messaging bridge joins to
+    # reach the web by service DNS. The web references it as an external network
+    # (like polaris-proxy), so it must exist before `up`; create it idempotently.
+    docker network create polaris-hub >/dev/null 2>&1 || true
+
     # Bring up the database first and align its password with .env BEFORE anything
     # connects. Postgres only reads POSTGRES_PASSWORD at first init, so a drifted
     # volume password would otherwise make the web fail auth on startup (P1000) and
