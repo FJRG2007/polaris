@@ -437,7 +437,7 @@ align_db_password() {
 # so "did the web image change" agrees exactly with what CI would rebuild.
 WEB_IMAGE_REPO="ghcr.io/fjrg2007/polaris-dashboard"
 WEB_IMAGE="${WEB_IMAGE_REPO}:latest"
-WEB_IMAGE_PATHS='^dashboard/(apps|packages|cli)/|^dashboard/docker/(Dockerfile|entrypoint\.sh)|^dashboard/package(-lock)?\.json$|^\.github/workflows/dashboard-publish\.yml$'
+WEB_IMAGE_PATHS='^dashboard/(apps|packages|cli|patches)/|^dashboard/docker/(Dockerfile|entrypoint\.sh)|^dashboard/package(-lock)?\.json$|^\.github/workflows/dashboard-publish\.yml$'
 
 # The commit an image was built from (baked in as POLARIS_BUILD_SHA), or empty.
 image_build_sha() {

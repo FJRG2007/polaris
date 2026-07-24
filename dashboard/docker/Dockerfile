@@ -41,7 +41,14 @@ COPY packages/ui/package.json ./packages/ui/
 # it - it ships as its own image.
 COPY services/edge-guard/package.json ./services/edge-guard/
 
-# `npm ci` installs the whole workspace from the committed lockfile.
+# Dependency patches (patch-package) must be present before install: the root
+# `postinstall` runs `patch-package`, which applies patches/*.patch to node_modules
+# (e.g. the SMB client's over-broad open access mask). Copied before `npm ci` so the
+# fix is baked into the installed dependencies the build then bundles.
+COPY patches ./patches
+
+# `npm ci` installs the whole workspace from the committed lockfile, then runs the
+# root postinstall (patch-package) to apply patches/.
 RUN --mount=type=cache,target=/root/.npm npm ci
 
 # The source tree follows (node_modules/.next/dist are .dockerignore'd, so this

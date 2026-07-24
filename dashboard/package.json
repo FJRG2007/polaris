@@ -15,6 +15,7 @@
         "services/*"
     ],
     "scripts": {
+        "postinstall": "patch-package",
         "build": "npm run build -w @polaris/config && npm run build -w @polaris/core && npm run build -w @polaris/db && npm run build -w @polaris/auth && npm run build -w @polaris/hostd-client && npm run build -w @polaris/ssh && npm run build -w @polaris/storage && npm run build -w @polaris/docker && npm run build -w @polaris/deploy && npm run build -w @polaris/messaging && npm run build -w @polaris/web",
         "typecheck": "npm run typecheck --workspaces --if-present",
         "lint": "npm run lint --workspaces --if-present",
@@ -28,6 +29,7 @@
     },
     "devDependencies": {
         "@types/node": "22.10.7",
+        "patch-package": "8.0.1",
         "prettier": "3.4.2",
         "tsup": "8.3.5",
         "typescript": "5.7.3",

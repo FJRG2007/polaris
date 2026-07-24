@@ -1,0 +1,140 @@
+diff --git a/node_modules/v9u-smb2/lib/api/rename.js b/node_modules/v9u-smb2/lib/api/rename.js
+index 10f2823..71adfaf 100644
+--- a/node_modules/v9u-smb2/lib/api/rename.js
++++ b/node_modules/v9u-smb2/lib/api/rename.js
+@@ -2,6 +2,15 @@ var BigInt = require('../tools/bigint');
+ var SMB2Request = require('../tools/smb2-forge').request;
+ var constants = require('../structures/constants');
+ 
++// Polaris patch: open the source with the MINIMAL access SMB2 rename requires -
++// DELETE (mandatory for FileRenameInformation, per MS-FSA), plus read-attributes and
++// a synchronous handle. Requesting the library's broad default mask made restricted
++// NAS/Samba shares refuse the open with STATUS_ACCESS_DENIED even when the account
++// could delete/rename its own file. This mirrors how Windows and the Linux cifs
++// client open a handle for rename.
++var RENAME_ACCESS =
++  constants.DELETE | constants.FILE_READ_ATTRIBUTES | constants.SYNCHRONIZE;
++
+ /*
+  * rename
+  * ======
+@@ -24,7 +33,7 @@ module.exports = function rename(oldPath, newPath, options, cb) {
+   var connection = this;
+ 
+   // SMB2 open the folder / file
+-  SMB2Request('open_folder', { path: oldPath }, connection, function(
++  SMB2Request('open_folder', { path: oldPath, desiredAccess: RENAME_ACCESS }, connection, function(
+     err,
+     file
+   ) {
+@@ -35,6 +44,7 @@ module.exports = function rename(oldPath, newPath, options, cb) {
+           path: oldPath,
+           createDisposition: constants.FILE_OPEN,
+           shareAccess: constants.FILE_SHARE_DELETE,
++          desiredAccess: RENAME_ACCESS,
+         },
+         connection,
+         function(err, file) {
+diff --git a/node_modules/v9u-smb2/lib/api/unlink.js b/node_modules/v9u-smb2/lib/api/unlink.js
+index 965e7cb..c49c29a 100644
+--- a/node_modules/v9u-smb2/lib/api/unlink.js
++++ b/node_modules/v9u-smb2/lib/api/unlink.js
+@@ -18,10 +18,18 @@ var constants = require('../structures/constants');
+ module.exports = function unlink(path, cb) {
+   var connection = this;
+ 
++  // Polaris patch: open with the minimal DELETE access a deletion needs (plus
++  // read-attributes and a synchronous handle), not the library's broad default mask,
++  // so a restricted share does not refuse the open with STATUS_ACCESS_DENIED.
+   // SMB2 open file
+   SMB2Request(
+     'create',
+-    { path: path, shareAccess: constants.FILE_SHARE_DELETE },
++    {
++      path: path,
++      shareAccess: constants.FILE_SHARE_DELETE,
++      desiredAccess:
++        constants.DELETE | constants.FILE_READ_ATTRIBUTES | constants.SYNCHRONIZE,
++    },
+     connection,
+     function(err, file) {
+       if (err) cb && cb(err);
+diff --git a/node_modules/v9u-smb2/lib/messages/create.js b/node_modules/v9u-smb2/lib/messages/create.js
+index f70af5e..3f99124 100644
+--- a/node_modules/v9u-smb2/lib/messages/create.js
++++ b/node_modules/v9u-smb2/lib/messages/create.js
+@@ -2,10 +2,16 @@ var SMB2Message = require('../tools/smb2-message');
+ var message = require('../tools/message');
+ var constants = require('../structures/constants');
+ 
++// Polaris patch: drop WRITE_DAC (write the object's ACL) and FILE_DELETE_CHILD from
++// the default open mask. Many NAS/Samba shares grant read/write/delete but not the
++// right to change ACLs, so requesting WRITE_DAC made the server refuse the whole
++// open with STATUS_ACCESS_DENIED for existing files (rename/overwrite/delete). The
++// driver never changes ACLs, so those bits are pure liability. Callers may also pass
++// an explicit `desiredAccess` for a minimal per-operation mask (e.g. rename/delete
++// open with DELETE only, matching how Windows and the Linux cifs client do it).
+ var desiredAccess =
+   constants.DELETE |
+   constants.FILE_APPEND_DATA |
+-  constants.FILE_DELETE_CHILD |
+   constants.FILE_READ_ATTRIBUTES |
+   constants.FILE_READ_DATA |
+   constants.FILE_READ_EA |
+@@ -13,8 +19,7 @@ var desiredAccess =
+   constants.FILE_WRITE_DATA |
+   constants.FILE_WRITE_EA |
+   constants.READ_CONTROL |
+-  constants.SYNCHRONIZE |
+-  constants.WRITE_DAC;
++  constants.SYNCHRONIZE;
+ 
+ module.exports = message({
+   generate: function(connection, params) {
+@@ -43,7 +48,7 @@ module.exports = message({
+       },
+       request: {
+         Buffer: buffer,
+-        DesiredAccess: desiredAccess,
++        DesiredAccess: params.desiredAccess != null ? params.desiredAccess : desiredAccess,
+         FileAttributes: 0x00000080,
+         ShareAccess: shareAccess,
+         CreateDisposition: createDisposition,
+diff --git a/node_modules/v9u-smb2/lib/messages/open_folder.js b/node_modules/v9u-smb2/lib/messages/open_folder.js
+index 8790949..04a43c2 100644
+--- a/node_modules/v9u-smb2/lib/messages/open_folder.js
++++ b/node_modules/v9u-smb2/lib/messages/open_folder.js
+@@ -2,10 +2,13 @@ var SMB2Message = require('../tools/smb2-message');
+ var message = require('../tools/message');
+ var constants = require('../structures/constants');
+ 
++// Polaris patch: see messages/create.js. Drop WRITE_DAC and FILE_DELETE_CHILD from
++// the default folder-open mask (never needed - the driver does not change ACLs) and
++// allow a caller-supplied minimal `desiredAccess` (rename of a directory opens it
++// with DELETE only), so a restricted share does not refuse the open outright.
+ var desiredAccess =
+   constants.DELETE |
+   constants.FILE_APPEND_DATA |
+-  constants.FILE_DELETE_CHILD |
+   constants.FILE_READ_ATTRIBUTES |
+   constants.FILE_READ_DATA |
+   constants.FILE_READ_EA |
+@@ -13,8 +16,7 @@ var desiredAccess =
+   constants.FILE_WRITE_DATA |
+   constants.FILE_WRITE_EA |
+   constants.READ_CONTROL |
+-  constants.SYNCHRONIZE |
+-  constants.WRITE_DAC;
++  constants.SYNCHRONIZE;
+ 
+ module.exports = message({
+   generate: function(connection, params) {
+@@ -29,7 +31,7 @@ module.exports = message({
+       },
+       request: {
+         Buffer: buffer,
+-        DesiredAccess: desiredAccess,
++        DesiredAccess: params.desiredAccess != null ? params.desiredAccess : desiredAccess,
+         FileAttributes: 0x00000000,
+         ShareAccess: 0x00000007,
+         CreateDisposition: constants.FILE_OPEN,

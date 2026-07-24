@@ -17,6 +17,7 @@ on:
       - "dashboard/apps/**"
       - "dashboard/packages/**"
       - "dashboard/cli/**"
+      - "dashboard/patches/**"
       - "dashboard/docker/**"
       - "dashboard/mdns/**"
       - "dashboard/services/messaging-bridge/**"
@@ -65,7 +66,7 @@ jobs:
           echo "Changed files:"; echo "$CHANGED"
           has() { echo "$CHANGED" | grep -qE "$1"; }
           if has '^\.github/workflows/dashboard-publish\.yml$'; then all; exit 0; fi
-          has '^dashboard/(apps|packages|cli)/|^dashboard/docker/(Dockerfile|entrypoint\.sh)|^dashboard/package(-lock)?\.json$' && out web true || out web false
+          has '^dashboard/(apps|packages|cli|patches)/|^dashboard/docker/(Dockerfile|entrypoint\.sh)|^dashboard/package(-lock)?\.json$' && out web true || out web false
           has '^dashboard/mdns/' && out mdns true || out mdns false
           has '^crates/polaris-hostd/|^Cargo\.(toml|lock)$' && out hostd true || out hostd false
           has '^dashboard/docker/updater/' && out updater true || out updater false

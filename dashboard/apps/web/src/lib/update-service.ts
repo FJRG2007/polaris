@@ -33,7 +33,7 @@ const CACHE_TTL_MS = 6 * 60 * 60 * 1000;
  *  path filter). A change to the publish workflow itself rebuilds every image. Used
  *  to tell a real web update from a commit that only touches the daemon or docs. */
 const WEB_IMAGE_PATHS =
-    /^dashboard\/(apps|packages|cli)\/|^dashboard\/docker\/(Dockerfile|entrypoint\.sh)|^dashboard\/package(-lock)?\.json$|^\.github\/workflows\/dashboard-publish\.yml$/;
+    /^dashboard\/(apps|packages|cli|patches)\/|^dashboard\/docker\/(Dockerfile|entrypoint\.sh)|^dashboard\/package(-lock)?\.json$|^\.github\/workflows\/dashboard-publish\.yml$/;
 
 let cache: { status: UpdateStatus; at: number } | null = null;
 let inflight: Promise<UpdateStatus> | null = null;
