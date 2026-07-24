@@ -10,6 +10,7 @@
  */
 
 import { Readable } from "node:stream";
+import { createRequire } from "node:module";
 import type { Writable } from "node:stream";
 import SMB2 from "v9u-smb2";
 import { baseName, normalizeRelPath } from "@polaris/core";
@@ -24,6 +25,65 @@ import {
     type StorageUsage,
     type WriteOptions
 } from "../driver.js";
+
+/**
+ * v9u-smb2 opens every file and directory (its generic CREATE, open_folder, and
+ * create_folder messages) with a very broad DesiredAccess that includes WRITE_DAC
+ * (rewrite the object's security descriptor/ACL) and FILE_DELETE_CHILD. Many NAS and
+ * Samba shares grant read/write/delete but NOT the right to change ACLs, so the
+ * server refuses the whole open with STATUS_ACCESS_DENIED - which breaks renaming,
+ * overwriting, and deleting EXISTING items even though the account owns them
+ * (creating a NEW file works, because there is no prior ACL to check). This driver
+ * never touches ACLs, so those two bits are pure liability: requesting fewer rights
+ * can only ever be granted in more cases, never fewer. Strip them from every open.
+ *
+ * The request forge builds its message table once from the cached message modules,
+ * and SMB2Message serializes its request lazily (in getBuffer, after generate
+ * returns), so wrapping each module's `generate` to clear the two bits on the
+ * produced message fixes every request. Idempotent and best-effort: if the library
+ * internals move in a future version, the affected message is left as-is rather than
+ * crashing the driver.
+ */
+const SMB_UNNEEDED_ACCESS = 0x00040000 /* WRITE_DAC */ | 0x00000040; /* FILE_DELETE_CHILD */
+let smbAccessMaskRelaxed = false;
+
+interface SmbCreateMessage {
+    generate: (connection: unknown, params: unknown) => { request?: { DesiredAccess?: number } };
+}
+
+function relaxSmbAccessMask(): void {
+    if (smbAccessMaskRelaxed) return;
+    smbAccessMaskRelaxed = true;
+    const req = createRequire(import.meta.url);
+    const patch = (module: SmbCreateMessage): void => {
+        const original = module.generate;
+        // The library's generate does not use `this`; call it plainly.
+        module.generate = (connection, params) => {
+            const message = original(connection, params);
+            if (message?.request && typeof message.request.DesiredAccess === "number") {
+                message.request.DesiredAccess &= ~SMB_UNNEEDED_ACCESS;
+            }
+            return message;
+        };
+    };
+    // Static specifiers so the bundler traces these files (they are already loaded by
+    // the client, so this only re-accesses the same cached modules the forge uses).
+    try {
+        patch(req("v9u-smb2/lib/messages/create") as SmbCreateMessage);
+    } catch {
+        /* internals moved; leave create as-is */
+    }
+    try {
+        patch(req("v9u-smb2/lib/messages/open_folder") as SmbCreateMessage);
+    } catch {
+        /* internals moved; leave open_folder as-is */
+    }
+    try {
+        patch(req("v9u-smb2/lib/messages/create_folder") as SmbCreateMessage);
+    } catch {
+        /* internals moved; leave create_folder as-is */
+    }
+}
 
 const SMB_CAPABILITIES: StorageDriverCapabilities = {
     // The pure-JS client streams whole files reliably; byte-range reads and offset
@@ -87,6 +147,10 @@ export class SmbDriver implements StorageDriver {
     }
 
     public async connect(): Promise<void> {
+        // Relax the library's over-broad open access mask before any request, so
+        // rename/overwrite/delete are not refused with ACCESS_DENIED on shares that
+        // do not grant ACL-write. Idempotent; the modules are already loaded.
+        relaxSmbAccessMask();
         const Ctor = SMB2 as unknown as new (options: Record<string, unknown>) => SmbClient;
         const client = new Ctor({
             share: `\\\\${this.options.host}\\${this.options.share}`,
