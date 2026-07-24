@@ -27,6 +27,9 @@ export interface ConversationView {
     id: string;
     channelId: string;
     channelName: string;
+    /** Channel platform (whatsapp/telegram/discord/slack), for the platform icon. */
+    platform: string;
+    provider: string | null;
     peerId: string;
     peerName: string | null;
     status: string;
@@ -213,13 +216,15 @@ export async function listConversations(ownerId: string): Promise<ConversationVi
     const rows = await prisma.conversation.findMany({
         where: { channel: { ownerId } },
         orderBy: [{ lastMessageAt: "desc" }, { createdAt: "desc" }],
-        include: { channel: { select: { name: true } } },
+        include: { channel: { select: { name: true, platform: true, provider: true } } },
         take: 200
     });
     return rows.map((row) => ({
         id: row.id,
         channelId: row.channelId,
         channelName: row.channel.name,
+        platform: row.channel.platform,
+        provider: row.channel.provider,
         peerId: row.peerId,
         peerName: row.peerName,
         status: row.status,

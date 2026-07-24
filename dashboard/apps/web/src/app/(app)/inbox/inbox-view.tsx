@@ -147,27 +147,40 @@ export function InboxView({
                                 </Button>
                             </div>
                         ) : (
-                            conversations.map((conversation) => (
-                                <button
-                                    key={conversation.id}
-                                    type="button"
-                                    onClick={() => setActiveId(conversation.id)}
-                                    className={cn(
-                                        "flex flex-col gap-0.5 rounded-md p-2 text-left transition-colors hover:bg-muted",
-                                        conversation.id === activeId && "bg-muted"
-                                    )}
-                                >
-                                    <span className="flex items-center justify-between gap-2">
-                                        <span className="truncate text-sm font-medium">
-                                            {conversation.peerName ?? conversation.peerId}
-                                        </span>
-                                        {conversation.unread > 0 && <Badge>{conversation.unread}</Badge>}
-                                    </span>
-                                    <span className="truncate text-xs text-muted-foreground">
-                                        {conversation.channelName}
-                                    </span>
-                                </button>
-                            ))
+                            conversations.map((conversation) => {
+                                const meta = PLATFORM_LOGO[conversation.platform];
+                                const Logo = meta?.Logo;
+                                return (
+                                    <button
+                                        key={conversation.id}
+                                        type="button"
+                                        onClick={() => setActiveId(conversation.id)}
+                                        className={cn(
+                                            "flex items-center gap-2 rounded-md p-2 text-left transition-colors hover:bg-muted",
+                                            conversation.id === activeId && "bg-muted"
+                                        )}
+                                    >
+                                        <div
+                                            className="grid size-8 shrink-0 place-items-center rounded-full"
+                                            style={{ color: meta?.color, backgroundColor: meta ? `${meta.color}1a` : undefined }}
+                                            title={PLATFORM_LABEL[conversation.platform] ?? conversation.platform}
+                                        >
+                                            {Logo ? <Logo className="size-4" /> : <MessagesSquare className="size-4" />}
+                                        </div>
+                                        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                                            <span className="flex items-center justify-between gap-2">
+                                                <span className="truncate text-sm font-medium">
+                                                    {conversation.peerName ?? conversation.peerId}
+                                                </span>
+                                                {conversation.unread > 0 && <Badge>{conversation.unread}</Badge>}
+                                            </span>
+                                            <span className="truncate text-xs text-muted-foreground">
+                                                {conversation.channelName}
+                                            </span>
+                                        </div>
+                                    </button>
+                                );
+                            })
                         )}
                     </CardBody>
                 </Card>
@@ -978,7 +991,10 @@ function NewChatDialog({
     const channel = channels.find((item) => item.id === channelId) ?? channels[0];
     const platform = channel?.platform ?? "";
     const platformContacts = contacts.filter((item) => item.platform === platform);
-    const ready = Boolean(channelId) && peerId.trim() !== "" && text.trim() !== "";
+    // Telegram bots can only message a numeric chat id (of someone who messaged the
+    // bot first); a @username never works, so guard it before the API rejects it.
+    const telegramInvalid = platform === "telegram" && peerId.trim() !== "" && !/^-?\d+$/.test(peerId.trim());
+    const ready = Boolean(channelId) && peerId.trim() !== "" && text.trim() !== "" && !telegramInvalid;
 
     function submit() {
         setError(null);
@@ -1049,6 +1065,15 @@ function NewChatDialog({
                         />
                         {PEER_HINT[platform] && <span className="text-xs text-muted-foreground">{PEER_HINT[platform]}</span>}
                     </label>
+                    {platform === "telegram" && (
+                        <p className="rounded-md border border-warning/40 bg-warning/10 p-2 text-xs text-foreground">
+                            Telegram bots can't start a chat. Ask the person to open your bot and send{" "}
+                            <code>/start</code> - the conversation appears in your inbox and you reply there.
+                        </p>
+                    )}
+                    {telegramInvalid && (
+                        <p className="text-xs text-danger">Enter a numeric chat id, not a @username.</p>
+                    )}
                     <label className="flex flex-col gap-1 text-sm">
                         <span className="font-medium">Name (optional)</span>
                         <Input value={peerName} onChange={(event) => setPeerName(event.target.value)} placeholder="Display name" />
@@ -1136,13 +1161,25 @@ function ContactsDialog({ onClose }: { onClose: () => void }) {
                         ) : contacts.length === 0 ? (
                             <p className="py-4 text-sm text-muted-foreground">No contacts yet.</p>
                         ) : (
-                            contacts.map((item) => (
+                            contacts.map((item) => {
+                                const meta = PLATFORM_LOGO[item.platform];
+                                const Logo = meta?.Logo;
+                                return (
                                 <div key={item.id} className="flex items-center justify-between gap-2 py-2">
-                                    <div className="min-w-0">
-                                        <p className="truncate text-sm font-medium">{item.name}</p>
-                                        <p className="truncate text-xs text-muted-foreground">
-                                            {PLATFORM_LABEL[item.platform] ?? item.platform} - {item.peerId}
-                                        </p>
+                                    <div className="flex min-w-0 items-center gap-2">
+                                        <div
+                                            className="grid size-7 shrink-0 place-items-center rounded"
+                                            style={{ color: meta?.color, backgroundColor: meta ? `${meta.color}1a` : undefined }}
+                                            title={PLATFORM_LABEL[item.platform] ?? item.platform}
+                                        >
+                                            {Logo ? <Logo className="size-3.5" /> : <MessagesSquare className="size-3.5" />}
+                                        </div>
+                                        <div className="min-w-0">
+                                            <p className="truncate text-sm font-medium">{item.name}</p>
+                                            <p className="truncate text-xs text-muted-foreground">
+                                                {PLATFORM_LABEL[item.platform] ?? item.platform} - {item.peerId}
+                                            </p>
+                                        </div>
                                     </div>
                                     <button
                                         type="button"
@@ -1154,7 +1191,8 @@ function ContactsDialog({ onClose }: { onClose: () => void }) {
                                         <Trash2 className="size-4" />
                                     </button>
                                 </div>
-                            ))
+                                );
+                            })
                         )}
                     </div>
                     <div className="flex flex-col gap-2 rounded-md border border-border p-3">
