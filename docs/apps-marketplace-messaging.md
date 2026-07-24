@@ -25,7 +25,11 @@ document is the source of truth; keep it current as phases land.
   signed Meta webhook) and WhatsApp Web (whatsapp-web.js + Puppeteer, QR login,
   session on a volume, Poll selector). Operator picks the provider per channel.
 - Phase 3 - DONE (d796002): Discord (discord.js gateway, native buttons) and
-  Slack (Web API + Block Kit, signed Events webhook).
+  Slack (Web API + Block Kit, signed Events webhook). Each also has a send-only
+  incoming-webhook provider (`discord-webhook`/`slack-webhook`, no bot) for
+  one-way alerts; the Discord bot resolves a DM username to a user id by server
+  member search (Server Members intent + a shared server), falling back to the
+  numeric User ID when either is missing.
 - Phase 4 - PARTIAL (e119cfe): conversation assignment to a human agent + status
   (multi-agent support) is done. The AI-assistant auto-reply loop (OpenClaw/
   Hermes runtime + an LLM) is the remaining external piece - the substrate is
@@ -122,7 +126,8 @@ derived from installed capabilities.
 ### Messaging domain model (normalized)
 
 - `Channel` - a connected account on a platform (a WhatsApp number via a chosen
-  provider, a Telegram bot, a Discord bot, a Slack app). Holds provider,
+  provider, a Telegram bot, a Discord bot, a Slack app, or a send-only Discord/
+  Slack webhook). Holds provider,
   capability flags, encrypted credentials/session ref, connection state.
 - `Conversation` - a thread with one contact; assignable to a human agent or to
   an AI assistant; status open/closed/pending.
@@ -148,7 +153,9 @@ bridge service (`services/messaging-bridge/src/adapters/`):
 - `listTargets()` (optional) - enumerate addressable send targets grouped
   (server -> channels) for platforms whose recipients are discoverable (Discord),
   powering the inbox recipient picker; absent where recipients are entered by
-  hand (a phone number, a Discord user to DM via `user:<id>`)
+  hand (a phone number, a Discord user to DM via `user:<id-or-username>` - a
+  username is resolved to a user id by server member search, which needs the
+  Server Members privileged intent and a shared server)
 - capability flags: `nativeButtons`, `nativeSelects`, `polls`, `media`,
   `templates`, `banRisk`, `needsBrowser`
 - emits normalized events: message, ack, reaction, vote (poll), connection-state
@@ -159,9 +166,15 @@ Capability matrix:
 | --- | --- | --- | --- | --- | --- |
 | Telegram (Bot API) | yes | yes | yes | no browser | free |
 | Discord (bot) | yes | yes | n/a | gateway | free |
+| Discord `discord-webhook` | no (-> numbered text) | no | n/a | send-only HTTP | free |
 | Slack (Block Kit) | yes | yes | n/a | Events API | free |
+| Slack `slack-webhook` | no (-> numbered text) | no | n/a | send-only HTTP | free |
 | WhatsApp `whatsapp-web` | no (-> Poll/menu) | no (-> Poll/menu) | yes | Puppeteer | free + number |
 | WhatsApp `whatsapp-cloud` | yes | yes (list) | n/a | webhook | paid + number |
+
+The `discord-webhook` and `slack-webhook` providers are send-only incoming-webhook
+adapters (no bot, no gateway/socket, so no receive) for one-way alerts to a channel
+(what the Watch app targets); an interactive prompt degrades to numbered text.
 
 WhatsApp is optional in the bridge build so a Telegram-only operator never pulls
 Chromium.

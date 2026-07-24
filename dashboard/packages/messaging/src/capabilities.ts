@@ -6,7 +6,8 @@
 
 import type { ChannelCapabilities, Platform } from "./types.js";
 
-/** Capabilities for a platform and, for WhatsApp, its provider backend. */
+/** Capabilities for a platform and, where it has more than one backend, its
+ *  provider (WhatsApp web/cloud, and the send-only discord-webhook/slack-webhook). */
 export function capabilitiesFor(platform: Platform, provider?: string | null): ChannelCapabilities {
     switch (platform) {
         case "telegram":
