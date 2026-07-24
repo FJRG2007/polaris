@@ -3,14 +3,23 @@
 /**
  * Channels page: every connected messaging channel as a card (the same shape as
  * the Integrations marketplace), each opening a Manage dialog to rename it, replace
- * its credentials or config, reconnect, or remove it. These channels are what the
- * Watch app targets for alerts and what the Inbox sends through. Connecting reuses
+ * its credentials or config, reconnect (or re-link WhatsApp Web by scanning a fresh
+ * QR in place), or remove it. These channels are what the Watch app targets for
+ * alerts and what the Inbox sends through. Connecting reuses
  * the Inbox's ConnectChannelDialog so the connect flow is identical everywhere.
  */
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
-import { CheckCircle2, Loader2, MessagesSquare, Plus, RefreshCw, Settings2 } from "lucide-react";
+import {
+    CheckCircle2,
+    Loader2,
+    MessagesSquare,
+    Plus,
+    QrCode,
+    RefreshCw,
+    Settings2
+} from "lucide-react";
 import {
     Badge,
     Button,
@@ -25,7 +34,12 @@ import {
     cn
 } from "@polaris/ui";
 import type { ChannelView } from "@/lib/messaging-service";
-import { deleteChannelAction, reconnectChannelAction, updateChannelAction } from "../actions";
+import {
+    channelStateAction,
+    deleteChannelAction,
+    reconnectChannelAction,
+    updateChannelAction
+} from "../actions";
 import { CHANNEL_STATUS_TONE, PLATFORM_LABEL, PLATFORM_LOGO } from "../platform-meta";
 import { ConnectChannelDialog } from "../inbox-view";
 
@@ -63,7 +77,7 @@ const EDIT_SPEC: Record<ChannelKind, EditSpec> = {
         help: "Meta access token and phone-number id. Leave a field blank to keep it."
     },
     "whatsapp-web": {
-        help: "Linked by QR. Reconnect restores the session; remove and re-add to link a different number."
+        help: "Linked by QR. Use Re-link to show a QR and scan again if the session dropped; remove and re-add to link a different number."
     }
 };
 
@@ -245,6 +259,45 @@ function ChannelManageDialog({
     const [reconnecting, startReconnect] = useTransition();
     const [removing, startRemove] = useTransition();
 
+    // whatsapp-web logs in by QR, so re-linking a dead session means scanning again.
+    const isWeb = channelKind(channel) === "whatsapp-web";
+    const [linking, setLinking] = useState(false);
+    const [qr, setQr] = useState<string | null>(null);
+    const [qrStatus, setQrStatus] = useState<string>("connecting");
+
+    // While re-linking whatsapp-web, poll the bridge for the QR and the eventual
+    // connected status - the same onboarding the connect flow uses, so a dead session
+    // is re-linked in place instead of removing and re-adding the channel.
+    useEffect(() => {
+        if (!linking) return;
+        let active = true;
+        const poll = async () => {
+            const state = await channelStateAction(channel.id);
+            if (!active) return;
+            setQrStatus(state.status);
+            if (state.qr) setQr(state.qr);
+            if (state.status === "connected") {
+                onUpdated(channel.id, { status: "connected" });
+                setLinking(false);
+            } else if (state.status === "error" || state.status === "disconnected") {
+                // Terminal failure (e.g. QR retries exhausted): stop polling so we stop
+                // hammering the bridge and re-persisting the dead status every 2.5s, and
+                // re-enable the Re-link button so "try Re-link again" is actionable.
+                setQr(null);
+                onUpdated(channel.id, { status: state.status });
+                setLinking(false);
+            }
+        };
+        void poll();
+        const timer = setInterval(() => void poll(), 2500);
+        return () => {
+            active = false;
+            clearInterval(timer);
+        };
+        // onUpdated is a fresh closure each render; re-subscribing would reset the poll.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [linking, channel.id]);
+
     const dirty =
         name.trim() !== channel.name || token.trim() !== "" || phoneNumberId.trim() !== "";
 
@@ -272,10 +325,18 @@ function ChannelManageDialog({
 
     function reconnect() {
         setError(null);
+        setQr(null);
         startReconnect(async () => {
             const result = await reconnectChannelAction(channel.id);
             if (result.error) {
                 setError(result.error);
+                return;
+            }
+            // whatsapp-web re-init emits a QR to re-link; show it and poll for connected.
+            // Other platforms reconnect from stored credentials with no scan.
+            if (isWeb) {
+                setQrStatus(result.status ?? "connecting");
+                setLinking(true);
                 return;
             }
             if (result.status) onUpdated(channel.id, { status: result.status });
@@ -295,6 +356,7 @@ function ChannelManageDialog({
     }
 
     const busy = saving || reconnecting || removing;
+    const linkFailed = isWeb && (qrStatus === "error" || qrStatus === "disconnected");
 
     return (
         <Dialog open onOpenChange={(open) => !open && !busy && onClose()}>
@@ -332,16 +394,41 @@ function ChannelManageDialog({
                             variant="ghost"
                             size="sm"
                             onClick={reconnect}
-                            disabled={busy}
+                            disabled={busy || linking}
                         >
                             {reconnecting ? (
                                 <Loader2 className="size-4 animate-spin" />
+                            ) : isWeb ? (
+                                <QrCode className="size-4" />
                             ) : (
                                 <RefreshCw className="size-4" />
                             )}
-                            Reconnect
+                            {isWeb ? "Re-link" : "Reconnect"}
                         </Button>
                     </div>
+
+                    {isWeb && (linking || linkFailed) && (
+                        <div className="flex flex-col items-center gap-3 rounded-md border border-border p-3">
+                            {linkFailed ? null : qr ? (
+                                // A data-URL QR; next/image does not handle these.
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img
+                                    src={qr}
+                                    alt="WhatsApp QR code"
+                                    className="size-56 rounded-md border border-border"
+                                />
+                            ) : (
+                                <div className="grid size-56 place-items-center rounded-md border border-border">
+                                    <Loader2 className="size-6 animate-spin text-muted-foreground" />
+                                </div>
+                            )}
+                            <p className="text-center text-xs text-muted-foreground">
+                                {linkFailed
+                                    ? "Connection failed - try Re-link again."
+                                    : "On your phone: WhatsApp > Linked devices > Link a device, then scan this code."}
+                            </p>
+                        </div>
+                    )}
 
                     <label className="flex flex-col gap-1 text-sm">
                         <span className="font-medium">Name</span>
