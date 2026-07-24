@@ -37,9 +37,16 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile
-    # Always re-pull the tag so `up`/`start` never runs a stale cached image; the
-    # tag tracks releases, so freshness matters more than an offline start.
-    pull_policy: always
+      args:
+        # Baked into the image as POLARIS_BUILD_SHA so the running build reports the
+        # exact commit it came from. The updater sets this when it builds from source
+        # at HEAD, so a local build clears "update available" just like a CI build.
+        POLARIS_BUILD_SHA: ${POLARIS_BUILD_SHA:-}
+    # Normally re-pull the tag so `up`/`start` never runs a stale cached image; the
+    # tag tracks releases, so freshness matters more than an offline start. The
+    # updater overrides this to `never` for a deterministic source build at HEAD, so
+    # `up` uses the image it just built instead of a registry `latest` that lags it.
+    pull_policy: ${POLARIS_WEB_PULL_POLICY:-always}
     restart: unless-stopped
     env_file:
       - .env

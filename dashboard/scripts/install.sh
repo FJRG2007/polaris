@@ -415,91 +415,65 @@ align_db_password() {
     err "could not align the database password automatically; run 'polaris doctor' if the web fails"
 }
 
-# The published web image lags the source it was built from: CI takes a few
-# minutes to build and push :latest after a commit lands on main. An update pulls
-# the freshly advanced checkout instantly but then pulls whatever :latest points
-# to RIGHT NOW - which, during that window, is still the PREVIOUS commit's image.
-# The deploy then reports success while the running build sits one commit behind
-# HEAD, so the dashboard shows "update available" until some later update happens
-# to run after CI caught up. That race is why an update "breaks" on every change
-# that touches the web image. The paths below mirror the web-image path filter in
-# .github/workflows/dashboard-publish.yml (and update-service.ts) exactly, so this
-# agrees with what actually rebuilds the image.
+# CI publishes the web image only as the moving `:latest` tag, and it lands a few
+# minutes AFTER the commit does. An updater that simply pulls `:latest` therefore
+# RACES CI: right after a push it pulls the PREVIOUS commit's image and deploys code
+# older than the checkout it just fast-forwarded to, so the dashboard sits on
+# "update available" until some unrelated later run happens to land after CI caught
+# up. That race - made worse by a shallow clone, where the old staleness check could
+# not compare commits and silently deployed the stale image - is why updates "failed
+# all the time" on any change that touches the web image.
+#
+# The fix is to stop trusting the moving tag as a proxy for HEAD. When the pulled
+# source needs a web image that `:latest` is not YET built from, build it from source
+# at HEAD instead of deploying an older image. The deploy then ALWAYS matches the
+# checked-out commit: no CI race, no stale deploy, and no open-ended waiting. The
+# path list mirrors the `web` filter in dashboard-publish.yml (and update-service.ts)
+# so "did the web image change" agrees exactly with what CI would rebuild.
 WEB_IMAGE_REPO="ghcr.io/fjrg2007/polaris-dashboard"
 WEB_IMAGE="${WEB_IMAGE_REPO}:latest"
 WEB_IMAGE_PATHS='^dashboard/(apps|packages|cli)/|^dashboard/docker/(Dockerfile|entrypoint\.sh)|^dashboard/package(-lock)?\.json$|^\.github/workflows/dashboard-publish\.yml$'
 
-# The commit the locally-present web image was built from (baked in as
-# POLARIS_BUILD_SHA), or empty if the image or label is absent.
-web_image_sha() {
-    docker image inspect "$WEB_IMAGE" \
+# The commit an image was built from (baked in as POLARIS_BUILD_SHA), or empty.
+image_build_sha() {
+    docker image inspect "$1" \
         --format '{{range .Config.Env}}{{println .}}{{end}}' 2>/dev/null \
         | sed -n 's/^POLARIS_BUILD_SHA=//p' | head -n1
 }
 
-# True (0) when the local web image is STALE for the target commit: a web-image
-# path changed between the image's commit and target, so CI has not yet published
-# target's image. False (1) when it is current, or when we cannot tell (unknown
-# commit, or a shallow history that does not contain the image's commit) - never
-# block on uncertainty.
-web_image_stale() {
-    target="$1"
-    sha=$(web_image_sha)
-    [ -n "$sha" ] || return 1
-    [ "$sha" = "$target" ] && return 1
-    git rev-parse --verify --quiet "${sha}^{commit}" >/dev/null 2>&1 || return 1
-    git diff --name-only "$sha" "$target" 2>/dev/null | grep -qE "$WEB_IMAGE_PATHS"
+# HEAD of the checkout (full sha), or empty when this is not a git checkout.
+head_sha() {
+    command -v git >/dev/null 2>&1 || return 0
+    git rev-parse HEAD 2>/dev/null || true
 }
 
-# Hold an UPDATE until the registry's web image is built from HEAD (or HEAD made no
-# web change at all), so the deploy lands the commit that was just pulled instead of
-# the previous one. Bounded at ~20 minutes: past the cap - a failed or absent CI run
-# - it deploys whatever is current and lets a later check pick up the newer build,
-# so a stuck CI can never wedge the update. A first install (no web container yet)
-# and a shallow clone with no local history both fall through immediately.
-wait_for_web_image() {
+# The installer clones with --depth 1, and a shallow history cannot diff the running
+# build's commit against HEAD - which is exactly what defeated the old check and let
+# it deploy stale code. Complete the history once so the comparison below is exact.
+# Best-effort: offline simply falls through to a (still HEAD-correct) source build.
+ensure_full_history() {
     command -v git >/dev/null 2>&1 || return 0
-    target=$(git rev-parse HEAD 2>/dev/null) || return 0
-    [ -n "$target" ] || return 0
+    [ "$(git rev-parse --is-shallow-repository 2>/dev/null)" = "true" ] || return 0
+    git fetch --unshallow --quiet >/dev/null 2>&1 || true
+}
 
-    # Track the image compose actually deploys: image: <repo>:${POLARIS_IMAGE_TAG:-latest}.
-    # Only `latest` is the rolling tag that follows HEAD - any other value is a
-    # deliberate pin to a frozen release (a documented, provenance-motivated feature),
-    # so waiting for HEAD is wrong and pulling :latest would fetch an image the host
-    # intentionally pinned away from. Leave a pinned deployment untouched.
-    tag=$(sed -n 's/^POLARIS_IMAGE_TAG=//p' .env 2>/dev/null | head -n1)
-    tag=${tag:-latest}
-    [ "$tag" = "latest" ] || return 0
-    WEB_IMAGE="${WEB_IMAGE_REPO}:${tag}"
-
-    # Only meaningful when a deployment is already running (i.e. this is an update);
-    # a first install has no prior image that could be "behind".
-    docker ps -q \
-        --filter "label=com.docker.compose.project=polaris" \
-        --filter "label=com.docker.compose.service=web" 2>/dev/null | grep -q . || return 0
-
-    i=0
-    pull_failures=0
-    while [ "$i" -lt 40 ]; do
-        # A successful pull refreshes the local image (or confirms the old one is the
-        # newest published). A failing pull means the registry/network is unreachable,
-        # not "still building" - after 3 in a row, stop waiting and let the normal
-        # `$compose pull` / source-build fallback proceed immediately.
-        if docker pull "$WEB_IMAGE" >/dev/null 2>&1; then
-            pull_failures=0
-        else
-            pull_failures=$((pull_failures + 1))
-            if [ "$pull_failures" -ge 3 ]; then
-                err "could not reach the registry to check the web image; deploying now (the source-build fallback will produce a HEAD-correct image if needed)"
-                return 0
-            fi
-        fi
-        web_image_stale "$target" || return 0
-        [ "$i" -eq 0 ] && log "web image for $(printf '%s' "$target" | cut -c1-7) is still building on CI; waiting before deploying..."
-        sleep 30
-        i=$((i + 1))
-    done
-    err "the published web image did not catch up to $(printf '%s' "$target" | cut -c1-7) within ~20 min; deploying the current image (a later update will pick up the newer build)"
+# Whether a web IMAGE already carries the web code of the target commit - i.e. it is
+# safe to deploy for `target` without rebuilding. True (0) when the image was built
+# from target itself, OR when nothing under the web path filter changed between the
+# image's commit and target (so its web code is identical - the very rule
+# update-service.ts uses to decide the dashboard is up to date). False (1) otherwise,
+# INCLUDING when the image has no build stamp or its commit cannot be compared to
+# target: never assume an image is current on uncertainty - that is exactly what let
+# a stale image be deployed. The caller then builds from source at target instead.
+image_web_current() {
+    img_sha=$(image_build_sha "$1")
+    target="$2"
+    [ -n "$img_sha" ] || return 1
+    [ "$img_sha" = "$target" ] && return 0
+    git rev-parse --verify --quiet "${img_sha}^{commit}" >/dev/null 2>&1 || return 1
+    if git diff --name-only "$img_sha" "$target" 2>/dev/null | grep -qE "$WEB_IMAGE_PATHS"; then
+        return 1
+    fi
     return 0
 }
 
@@ -609,19 +583,44 @@ main() {
     COMPOSE_PROFILES=$(sed -n 's/^COMPOSE_PROFILES=//p' .env | head -n1)
     export COMPOSE_PROFILES
 
-    # On an update, do not deploy until the published web image matches the source
-    # just pulled - otherwise the running build sits a commit behind HEAD and the
-    # dashboard nags "update available" until a later run. No-op on a first install.
-    wait_for_web_image
-
-    # Install and update are the same command: prefer the published `latest` image
-    # (fast), falling back to building from source if the registry is unavailable.
+    # Decide how to produce the web image for the checked-out commit. The deploy must
+    # match HEAD: use the published image ONLY when it already carries HEAD's web code;
+    # otherwise build from source at HEAD, so an update can never deploy older code
+    # than it just pulled - the root cause of "update available" never clearing.
+    # Only the rolling `latest` tag follows HEAD; a deliberate pin (a frozen release)
+    # and a non-git/source run just take the normal pull path unchanged.
+    ensure_full_history
+    target=$(head_sha)
+    tag=$(sed -n 's/^POLARIS_IMAGE_TAG=//p' .env 2>/dev/null | head -n1)
     build_flag=""
-    if $compose pull 2>/dev/null; then
-        log "starting from the published image (also applies database migrations)"
-    else
-        log "registry unavailable; building from source (also applies migrations)"
-        build_flag="--build"
+    if [ -n "$target" ] && [ "${tag:-latest}" = "latest" ]; then
+        # Refresh the local `latest` first so the check reflects what CI has published
+        # right now (best-effort: offline just checks the image already on disk).
+        docker pull "$WEB_IMAGE" >/dev/null 2>&1 || true
+        if image_web_current "$WEB_IMAGE" "$target"; then
+            log "the published web image already matches the current source; deploying it"
+        else
+            log "the published web image is not built from the current source yet; building from source at HEAD so the deploy always matches the update"
+            build_flag="--build"
+            POLARIS_BUILD_SHA="$target"; export POLARIS_BUILD_SHA
+            # Do not let compose's always-pull replace the image we just built with a
+            # registry `latest` that still lags this commit.
+            POLARIS_WEB_PULL_POLICY="never"; export POLARIS_WEB_PULL_POLICY
+        fi
+    fi
+
+    # Install and update are the same command: prefer the published images (fast),
+    # falling back to a source build if the registry is unavailable - which stays
+    # HEAD-correct and still applies migrations. Skipped if a build was already chosen.
+    if [ -z "$build_flag" ]; then
+        if $compose pull 2>/dev/null; then
+            log "starting from the published images (also applies database migrations)"
+        else
+            log "registry unavailable; building from source (also applies migrations)"
+            build_flag="--build"
+            [ -n "$target" ] && { POLARIS_BUILD_SHA="$target"; export POLARIS_BUILD_SHA; }
+            POLARIS_WEB_PULL_POLICY="never"; export POLARIS_WEB_PULL_POLICY
+        fi
     fi
 
     # Bring up the database first and align its password with .env BEFORE anything
