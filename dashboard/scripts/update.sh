@@ -9,15 +9,33 @@
 # the image digest/provenance before deploying rather than trusting a moving tag.
 set -eu
 
-# Emit a completion marker with the exit code as the very last line, so the
-# dashboard's live update log can tell success from failure and stop tailing. The
-# trap fires on any exit, including a `set -e` abort. This script's stdout is
-# captured by the redirect in POLARIS_HOSTD_UPDATE_CMD, so the marker lands in the
-# shared log file the dashboard reads.
-trap 'echo "POLARIS_UPDATE_EXIT=$?"' EXIT
-
-# This script lives in dashboard/scripts/; the dashboard dir is its parent.
+# This script lives in dashboard/scripts/; the dashboard dir is its parent, and the
+# repository root is the dashboard's parent (where .git lives).
 dash_dir=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+repo_root=$(CDPATH= cd -- "$dash_dir/.." && pwd)
+
+# On EXIT: hand the checkout back to whoever owns it, THEN emit a completion marker
+# with the exit code as the very last line, so the dashboard's live update log can
+# tell success from failure and stop tailing (the trap fires on any exit, including
+# a `set -e` abort). This script's stdout is captured by the redirect in
+# POLARIS_HOSTD_UPDATE_CMD, so the marker lands in the shared log file.
+#
+# The chown fixes a recurring "update keeps failing" cause: the in-band updater runs
+# as ROOT (a container), so the git objects and .env files it writes are root-owned.
+# A later NON-root update - a manual `polaris update` or `git pull` by the login
+# user - then aborts with "insufficient permission for adding an object to repository
+# database .git/objects" and no update can complete. Restoring the tree to its owning
+# user after a root run keeps every update path (root container or login user) able
+# to write it. Best-effort and only when root; a normal user run already owns its files.
+on_exit() {
+    rc=$?
+    if [ "$(id -u)" = "0" ]; then
+        owner=$(stat -c '%u:%g' "$repo_root" 2>/dev/null || true)
+        [ -n "${owner:-}" ] && chown -R "$owner" "$repo_root" 2>/dev/null || true
+    fi
+    echo "POLARIS_UPDATE_EXIT=$rc"
+}
+trap on_exit EXIT
 
 if git -C "$dash_dir" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     printf 'polaris: %s\n' "updating checkout"
@@ -26,9 +44,9 @@ fi
 
 cd "$dash_dir"
 # Run the installer as a child, NOT `exec`. `exec` would replace this shell, so the
-# EXIT trap above would never fire and the completion marker would never be written
-# - which left the dashboard stuck on "Updating..." when the web container did not
-# restart (its only other completion signal). With a child call the trap runs on
-# return and stamps POLARIS_UPDATE_EXIT with the installer's exit code (set -e
-# propagates a failure to this script, so the trap still reports it).
+# EXIT trap above would never fire and the completion marker (and the ownership fix)
+# would never run - which left the dashboard stuck on "Updating..." when the web
+# container did not restart (its only other completion signal). With a child call the
+# trap runs on return and stamps POLARIS_UPDATE_EXIT with the installer's exit code
+# (set -e propagates a failure to this script, so the trap still reports it).
 sh scripts/install.sh "$@"
