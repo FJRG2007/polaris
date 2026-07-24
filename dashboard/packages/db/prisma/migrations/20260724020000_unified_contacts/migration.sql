@@ -42,20 +42,32 @@ ORDER BY c."ownerId", c."platform", c."peerId", c."createdAt" ASC;
 
 -- 4. Fold each merge group's distinct non-empty notes onto its canonical person
 --    before the duplicates are dropped, so no note text is lost. Notes are ordered
---    oldest-first (canonical leads) and de-duplicated, newline-joined.
+--    oldest-first (canonical leads) and de-duplicated, newline-joined. Each source
+--    note was created under the same 500-char cap as updateContactSchema.note, so we
+--    append whole notes only while the newline-joined running length stays <= 500,
+--    keeping the merged note re-savable in the editor without cutting any note text.
 UPDATE "Contact" c
 SET "note" = merged.notes
 FROM (
     SELECT canon_id, string_agg(note_text, E'\n' ORDER BY first_seen, note_text) AS notes
     FROM (
-        SELECT canon."canon_id" AS canon_id,
-               trim(src."note") AS note_text,
-               min(src."createdAt") AS first_seen
-        FROM "Contact" src
-        JOIN "_contact_canon" canon ON canon."old_id" = src."id"
-        WHERE src."note" IS NOT NULL AND trim(src."note") <> ''
-        GROUP BY canon."canon_id", trim(src."note")
-    ) distinct_notes
+        SELECT canon_id, note_text, first_seen,
+               sum(char_length(note_text)) OVER w + (count(*) OVER w - 1) AS running_len
+        FROM (
+            SELECT canon."canon_id" AS canon_id,
+                   trim(src."note") AS note_text,
+                   min(src."createdAt") AS first_seen
+            FROM "Contact" src
+            JOIN "_contact_canon" canon ON canon."old_id" = src."id"
+            WHERE src."note" IS NOT NULL AND trim(src."note") <> ''
+            GROUP BY canon."canon_id", trim(src."note")
+        ) distinct_notes
+        WINDOW w AS (
+            PARTITION BY canon_id ORDER BY first_seen, note_text
+            ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+        )
+    ) ranked
+    WHERE running_len <= 500
     GROUP BY canon_id
 ) merged
 WHERE c."id" = merged.canon_id AND merged.notes IS DISTINCT FROM c."note";
