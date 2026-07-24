@@ -145,6 +145,10 @@ bridge service (`services/messaging-bridge/src/adapters/`):
 - `connect()` / `disconnect()`, onboarding mode (`qr` | `code` | `token` |
   `oauth`)
 - `sendMessage()`, `sendInteractive(prompt)`, `markRead()`
+- `listTargets()` (optional) - enumerate addressable send targets grouped
+  (server -> channels) for platforms whose recipients are discoverable (Discord),
+  powering the inbox recipient picker; absent where recipients are entered by
+  hand (a phone number, a Discord user to DM via `user:<id>`)
 - capability flags: `nativeButtons`, `nativeSelects`, `polls`, `media`,
   `templates`, `banRisk`, `needsBrowser`
 - emits normalized events: message, ack, reaction, vote (poll), connection-state
