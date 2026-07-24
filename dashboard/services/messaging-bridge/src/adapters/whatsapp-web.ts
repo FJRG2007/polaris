@@ -22,6 +22,39 @@ const { Client, LocalAuth, Poll } = WAWebJS;
 
 const SESSION_DIR = process.env.WA_SESSION_DIR ?? "/app/.sessions";
 
+// WhatsApp Web is a single multi-frame web app. Modern Chromium's site isolation
+// (site-per-process) detaches its frame under automation and surfaces as
+// "Attempted to use detached Frame" / "Navigating frame was detached" crash loops
+// on send. These args mirror @open-wa/wa-automate's battle-tested browser config
+// (references/repos/wa-automate-nodejs -> packages/core/src/transport/browserConfig.ts):
+// disable site isolation and background throttling to keep the frame model stable,
+// and drop the automation fingerprint so a normal linked device is not flagged as
+// scripted. NEVER add --single-process or --no-zygote here - OpenWA documents them
+// as the direct cause of the detached-frame crash on modern Chrome.
+const WHATSAPP_BROWSER_ARGS = [
+    "--no-sandbox",
+    "--disable-setuid-sandbox",
+    "--disable-dev-shm-usage",
+    "--log-level=3",
+    "--no-default-browser-check",
+    "--no-experiments",
+    "--disable-extensions",
+    "--disable-default-apps",
+    "--disable-gpu",
+    "--disable-webgl",
+    "--disable-infobars",
+    "--disable-session-crashed-bubble",
+    // Keep WhatsApp Web in a single-process frame model (the detached-frame fix).
+    "--disable-site-isolation-trials",
+    "--disable-features=site-per-process",
+    // Keep the tab fully awake so background throttling never stalls the WA frame.
+    "--disable-background-timer-throttling",
+    "--disable-backgrounding-occluded-windows",
+    "--disable-renderer-backgrounding",
+    // Remove navigator.webdriver and the "controlled by automated software" infobar.
+    "--disable-blink-features=AutomationControlled"
+];
+
 export class WhatsAppWebAdapter implements ChannelAdapter {
     readonly capabilities = capabilitiesFor("whatsapp", "whatsapp-web");
     private readonly channelId: string;
@@ -36,17 +69,7 @@ export class WhatsAppWebAdapter implements ChannelAdapter {
             authStrategy: new LocalAuth({ clientId: channelId, dataPath: SESSION_DIR }),
             puppeteer: {
                 headless: true,
-                args: [
-                    "--no-sandbox",
-                    "--disable-setuid-sandbox",
-                    "--disable-dev-shm-usage",
-                    // Drop the automation fingerprint. This removes navigator.webdriver
-                    // (the main "this is a bot" signal WhatsApp Web checks for) and the
-                    // "controlled by automated software" infobar, so a normal linked
-                    // device is not flagged as scripted. No stealth-plugin dependency.
-                    "--disable-blink-features=AutomationControlled",
-                    "--disable-infobars"
-                ],
+                args: WHATSAPP_BROWSER_ARGS,
                 executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined
             },
             // Stop regenerating the QR forever when it is never scanned, so an idle
@@ -144,6 +167,15 @@ export class WhatsAppWebAdapter implements ChannelAdapter {
         } catch (caught) {
             const detail = caught instanceof Error ? caught.message : String(caught);
             if (/reading '?(_serialized|id)'?|getMessageModel|serialize/i.test(detail)) return undefined;
+            // A detached frame / closed target means the WhatsApp Web page died and the
+            // linked session is gone. Reflect it as disconnected so the UI can prompt a
+            // re-link (QR) instead of showing a stale "connected" while every send fails.
+            if (/detached frame|target closed|session closed|execution context was destroyed/i.test(detail)) {
+                this.state = {
+                    status: "disconnected",
+                    detail: "WhatsApp Web session lost - reconnect to re-link the device"
+                };
+            }
             throw caught;
         }
     }
