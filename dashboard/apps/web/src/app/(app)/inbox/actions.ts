@@ -79,17 +79,24 @@ export async function connectChannelAction(
         revalidatePath("/inbox");
         return { channelId: channel.id, status: channel.status };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not connect the channel" };
+        return {
+            error: caught instanceof Error ? caught.message : "Could not connect the channel"
+        };
     }
 }
 
 /** Poll a channel's live state (for the whatsapp-web QR onboarding). */
-export async function channelStateAction(channelId: string): Promise<ChannelLiveState & { error?: string }> {
+export async function channelStateAction(
+    channelId: string
+): Promise<ChannelLiveState & { error?: string }> {
     const user = await requireUser();
     try {
         return await channelState(user.id, channelId);
     } catch (caught) {
-        return { status: "error", error: caught instanceof Error ? caught.message : "Could not read channel state" };
+        return {
+            status: "error",
+            error: caught instanceof Error ? caught.message : "Could not read channel state"
+        };
     }
 }
 
@@ -104,10 +111,15 @@ export async function deleteChannelAction(channelId: string): Promise<{ error?: 
     }
 }
 
-const renameChannelSchema = z.object({ channelId: z.string().uuid(), name: z.string().trim().min(1).max(64) });
+const renameChannelSchema = z.object({
+    channelId: z.string().uuid(),
+    name: z.string().trim().min(1).max(64)
+});
 
 /** Rename a channel's display name. */
-export async function renameChannelAction(input: z.infer<typeof renameChannelSchema>): Promise<{ error?: string }> {
+export async function renameChannelAction(
+    input: z.infer<typeof renameChannelSchema>
+): Promise<{ error?: string }> {
     const user = await requireUser();
     const parsed = renameChannelSchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Enter a name" };
@@ -121,14 +133,18 @@ export async function renameChannelAction(input: z.infer<typeof renameChannelSch
 }
 
 /** Re-establish a channel's adapter, reusing its stored credentials. */
-export async function reconnectChannelAction(channelId: string): Promise<{ error?: string; status?: string }> {
+export async function reconnectChannelAction(
+    channelId: string
+): Promise<{ error?: string; status?: string }> {
     const user = await requireUser();
     try {
         const { status } = await reconnectChannel(user.id, channelId);
         revalidatePath("/inbox");
         return { status };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not reconnect the channel" };
+        return {
+            error: caught instanceof Error ? caught.message : "Could not reconnect the channel"
+        };
     }
 }
 
@@ -155,7 +171,9 @@ const assignSchema = z.object({
 });
 
 /** Assign a conversation to an agent and/or set its status (multi-agent support). */
-export async function assignConversationAction(input: z.infer<typeof assignSchema>): Promise<{ error?: string }> {
+export async function assignConversationAction(
+    input: z.infer<typeof assignSchema>
+): Promise<{ error?: string }> {
     const user = await requireUser();
     const parsed = assignSchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid request" };
@@ -166,11 +184,15 @@ export async function assignConversationAction(input: z.infer<typeof assignSchem
         });
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not update the conversation" };
+        return {
+            error: caught instanceof Error ? caught.message : "Could not update the conversation"
+        };
     }
 }
 
-export async function sendMessageAction(input: z.infer<typeof sendSchema>): Promise<{ error?: string }> {
+export async function sendMessageAction(
+    input: z.infer<typeof sendSchema>
+): Promise<{ error?: string }> {
     const user = await requireUser();
     const parsed = sendSchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Nothing to send" };

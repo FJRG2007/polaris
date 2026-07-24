@@ -10,7 +10,18 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import type { ReactElement } from "react";
-import { Check, Loader2, MessagesSquare, Pencil, Plus, RefreshCw, Send, Trash2, Users, X } from "lucide-react";
+import {
+    Check,
+    Loader2,
+    MessagesSquare,
+    Pencil,
+    Plus,
+    RefreshCw,
+    Send,
+    Trash2,
+    Users,
+    X
+} from "lucide-react";
 import {
     Badge,
     Button,
@@ -73,7 +84,10 @@ export function InboxView({
     const [contactsOpen, setContactsOpen] = useState(false);
     const [agents, setAgents] = useState<AgentView[]>([]);
 
-    const connectedChannels = useMemo(() => channels.filter((c) => c.status === "connected"), [channels]);
+    const connectedChannels = useMemo(
+        () => channels.filter((c) => c.status === "connected"),
+        [channels]
+    );
 
     // Load the assignable agents once, for the thread's assignment control.
     useEffect(() => {
@@ -96,7 +110,10 @@ export function InboxView({
         return () => clearInterval(timer);
     }, [refreshConversations]);
 
-    const active = useMemo(() => conversations.find((item) => item.id === activeId) ?? null, [conversations, activeId]);
+    const active = useMemo(
+        () => conversations.find((item) => item.id === activeId) ?? null,
+        [conversations, activeId]
+    );
 
     return (
         <div className="flex h-[calc(100vh-8rem)] flex-col gap-3">
@@ -128,7 +145,9 @@ export function InboxView({
                             channel={channel}
                             onUpdated={(id, patch) =>
                                 setChannels((current) =>
-                                    current.map((item) => (item.id === id ? { ...item, ...patch } : item))
+                                    current.map((item) =>
+                                        item.id === id ? { ...item, ...patch } : item
+                                    )
                                 )
                             }
                             onRemoved={(id) => {
@@ -146,7 +165,8 @@ export function InboxView({
                         {conversations.length === 0 ? (
                             <div className="flex flex-col items-start gap-2 p-3">
                                 <p className="text-sm text-muted-foreground">
-                                    No conversations yet. Start one, or wait for an incoming message.
+                                    No conversations yet. Start one, or wait for an incoming
+                                    message.
                                 </p>
                                 <Button
                                     size="sm"
@@ -173,17 +193,31 @@ export function InboxView({
                                     >
                                         <div
                                             className="grid size-8 shrink-0 place-items-center rounded-full"
-                                            style={{ color: meta?.color, backgroundColor: meta ? `${meta.color}1a` : undefined }}
-                                            title={PLATFORM_LABEL[conversation.platform] ?? conversation.platform}
+                                            style={{
+                                                color: meta?.color,
+                                                backgroundColor: meta
+                                                    ? `${meta.color}1a`
+                                                    : undefined
+                                            }}
+                                            title={
+                                                PLATFORM_LABEL[conversation.platform] ??
+                                                conversation.platform
+                                            }
                                         >
-                                            {Logo ? <Logo className="size-4" /> : <MessagesSquare className="size-4" />}
+                                            {Logo ? (
+                                                <Logo className="size-4" />
+                                            ) : (
+                                                <MessagesSquare className="size-4" />
+                                            )}
                                         </div>
                                         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                                             <span className="flex items-center justify-between gap-2">
                                                 <span className="truncate text-sm font-medium">
                                                     {conversation.peerName ?? conversation.peerId}
                                                 </span>
-                                                {conversation.unread > 0 && <Badge>{conversation.unread}</Badge>}
+                                                {conversation.unread > 0 && (
+                                                    <Badge>{conversation.unread}</Badge>
+                                                )}
                                             </span>
                                             <span className="truncate text-xs text-muted-foreground">
                                                 {conversation.channelName}
@@ -198,7 +232,12 @@ export function InboxView({
 
                 <Card className="flex min-w-0 flex-1 flex-col overflow-hidden">
                     {active ? (
-                        <Thread key={active.id} conversation={active} agents={agents} onSent={refreshConversations} />
+                        <Thread
+                            key={active.id}
+                            conversation={active}
+                            agents={agents}
+                            onSent={refreshConversations}
+                        />
                     ) : (
                         <CardBody className="grid flex-1 place-items-center text-sm text-muted-foreground">
                             <span className="flex flex-col items-center gap-2">
@@ -290,7 +329,10 @@ function ChannelCard({
             <div className="flex items-center gap-2 rounded-md border border-border bg-surface/40 px-2.5 py-1.5">
                 <div
                     className="grid size-7 shrink-0 place-items-center rounded"
-                    style={{ color: meta?.color, backgroundColor: meta ? `${meta.color}1a` : undefined }}
+                    style={{
+                        color: meta?.color,
+                        backgroundColor: meta ? `${meta.color}1a` : undefined
+                    }}
                 >
                     {Logo ? <Logo className="size-4" /> : <MessagesSquare className="size-4" />}
                 </div>
@@ -309,7 +351,13 @@ function ChannelCard({
                             }}
                             className="h-7 w-36 text-xs"
                         />
-                        <button type="button" aria-label="Save" className="text-success disabled:opacity-50" disabled={pending} onClick={saveName}>
+                        <button
+                            type="button"
+                            aria-label="Save"
+                            className="text-success disabled:opacity-50"
+                            disabled={pending}
+                            onClick={saveName}
+                        >
                             <Check className="size-4" />
                         </button>
                         <button
@@ -333,14 +381,30 @@ function ChannelCard({
                                 {channel.provider === "whatsapp-cloud" ? " Cloud" : ""}
                             </span>
                         </div>
-                        <Badge className={cn(CHANNEL_STATUS_TONE[channel.status])}>{channel.status}</Badge>
+                        <Badge className={cn(CHANNEL_STATUS_TONE[channel.status])}>
+                            {channel.status}
+                        </Badge>
                         <div className="flex items-center gap-1 text-muted-foreground">
-                            <button type="button" aria-label="Rename" className="hover:text-foreground disabled:opacity-50" disabled={pending} onClick={() => setEditing(true)}>
+                            <button
+                                type="button"
+                                aria-label="Rename"
+                                className="hover:text-foreground disabled:opacity-50"
+                                disabled={pending}
+                                onClick={() => setEditing(true)}
+                            >
                                 <Pencil className="size-3.5" />
                             </button>
                             {!connected && (
-                                <button type="button" aria-label="Reconnect" className="hover:text-foreground disabled:opacity-50" disabled={pending} onClick={reconnect}>
-                                    <RefreshCw className={cn("size-3.5", pending && "animate-spin")} />
+                                <button
+                                    type="button"
+                                    aria-label="Reconnect"
+                                    className="hover:text-foreground disabled:opacity-50"
+                                    disabled={pending}
+                                    onClick={reconnect}
+                                >
+                                    <RefreshCw
+                                        className={cn("size-3.5", pending && "animate-spin")}
+                                    />
                                 </button>
                             )}
                             <button
@@ -365,12 +429,17 @@ function ChannelCard({
                     <DialogHeader>
                         <DialogTitle>Remove {channel.name}?</DialogTitle>
                         <DialogDescription>
-                            This disconnects the channel and deletes its conversations and messages. It cannot be undone.
+                            This disconnects the channel and deletes its conversations and messages.
+                            It cannot be undone.
                         </DialogDescription>
                     </DialogHeader>
                     {error && <p className="text-sm text-danger">{error}</p>}
                     <div className="flex justify-end gap-2">
-                        <Button variant="ghost" onClick={() => setConfirming(false)} disabled={pending}>
+                        <Button
+                            variant="ghost"
+                            onClick={() => setConfirming(false)}
+                            disabled={pending}
+                        >
                             Cancel
                         </Button>
                         <Button
@@ -444,7 +513,10 @@ function Thread({
             : [];
         const interactive =
             optionsMode && options.length > 0
-                ? { text: text.trim() || "Choose an option", options: options.map((label, index) => ({ id: `opt${index}`, label })) }
+                ? {
+                      text: text.trim() || "Choose an option",
+                      options: options.map((label, index) => ({ id: `opt${index}`, label }))
+                  }
                 : undefined;
         const body = text.trim();
         if (!body && !interactive) {
@@ -473,8 +545,12 @@ function Thread({
         <div className="flex min-h-0 flex-1 flex-col">
             <div className="flex items-center justify-between gap-2 border-b border-border p-3">
                 <div className="min-w-0">
-                    <p className="truncate text-sm font-medium">{conversation.peerName ?? conversation.peerId}</p>
-                    <p className="truncate text-xs text-muted-foreground">{conversation.channelName}</p>
+                    <p className="truncate text-sm font-medium">
+                        {conversation.peerName ?? conversation.peerId}
+                    </p>
+                    <p className="truncate text-xs text-muted-foreground">
+                        {conversation.channelName}
+                    </p>
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
                     <Select
@@ -532,7 +608,9 @@ function Thread({
                                 send();
                             }
                         }}
-                        placeholder={optionsMode ? "Prompt shown above the options" : "Type a message"}
+                        placeholder={
+                            optionsMode ? "Prompt shown above the options" : "Type a message"
+                        }
                     />
                     <Button
                         type="button"
@@ -544,7 +622,11 @@ function Thread({
                         Options
                     </Button>
                     <Button size="sm" onClick={send} disabled={pending}>
-                        {pending ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
+                        {pending ? (
+                            <Loader2 className="size-4 animate-spin" />
+                        ) : (
+                            <Send className="size-4" />
+                        )}
                     </Button>
                 </div>
             </div>
@@ -568,7 +650,9 @@ function MessageBubble({ message }: { message: MessageView }) {
                     <span className="whitespace-pre-wrap break-words">{message.body}</span>
                 )}
                 {outbound && message.ack === "failed" && (
-                    <span className="mt-1 block text-xs text-danger-foreground/80">failed to send</span>
+                    <span className="mt-1 block text-xs text-danger-foreground/80">
+                        failed to send
+                    </span>
                 )}
             </div>
         </div>
@@ -787,14 +871,19 @@ function ConnectChannelDialog({
                         <DialogHeader>
                             <DialogTitle>Scan to link WhatsApp</DialogTitle>
                             <DialogDescription>
-                                On your phone: WhatsApp {">"} Linked devices {">"} Link a device, then scan this code.
+                                On your phone: WhatsApp {">"} Linked devices {">"} Link a device,
+                                then scan this code.
                             </DialogDescription>
                         </DialogHeader>
                         <div className="flex flex-col items-center gap-3 py-2">
                             {qr ? (
                                 // A data-URL QR; next/image does not handle these.
                                 // eslint-disable-next-line @next/next/no-img-element
-                                <img src={qr} alt="WhatsApp QR code" className="size-56 rounded-md border border-border" />
+                                <img
+                                    src={qr}
+                                    alt="WhatsApp QR code"
+                                    className="size-56 rounded-md border border-border"
+                                />
                             ) : (
                                 <div className="flex size-56 items-center justify-center rounded-md border border-border">
                                     <Loader2 className="size-6 animate-spin text-muted-foreground" />
@@ -819,7 +908,8 @@ function ConnectChannelDialog({
                         <DialogHeader>
                             <DialogTitle>Add a channel</DialogTitle>
                             <DialogDescription>
-                                Pick a platform to connect. Add as many as you like and handle them all from one inbox.
+                                Pick a platform to connect. Add as many as you like and handle them
+                                all from one inbox.
                             </DialogDescription>
                         </DialogHeader>
                         {!bridgeReady && (
@@ -844,16 +934,23 @@ function ConnectChannelDialog({
                                     >
                                         <div
                                             className="grid size-10 shrink-0 place-items-center rounded-md"
-                                            style={{ color: item.color, backgroundColor: `${item.color}1a` }}
+                                            style={{
+                                                color: item.color,
+                                                backgroundColor: `${item.color}1a`
+                                            }}
                                         >
                                             <Logo className="size-5" />
                                         </div>
                                         <div className="min-w-0">
                                             <div className="flex items-center gap-2">
-                                                <span className="text-sm font-medium">{item.name}</span>
+                                                <span className="text-sm font-medium">
+                                                    {item.name}
+                                                </span>
                                                 {item.badge && <Badge>{item.badge}</Badge>}
                                             </div>
-                                            <p className="text-xs text-muted-foreground">{item.tagline}</p>
+                                            <p className="text-xs text-muted-foreground">
+                                                {item.tagline}
+                                            </p>
                                         </div>
                                     </button>
                                 );
@@ -871,7 +968,10 @@ function ConnectChannelDialog({
                             <DialogTitle className="flex items-center gap-2">
                                 <span
                                     className="grid size-7 shrink-0 place-items-center rounded"
-                                    style={{ color: meta.color, backgroundColor: `${meta.color}1a` }}
+                                    style={{
+                                        color: meta.color,
+                                        backgroundColor: `${meta.color}1a`
+                                    }}
                                 >
                                     <meta.Logo className="size-4" />
                                 </span>
@@ -942,7 +1042,10 @@ const PLATFORM_LABEL: Record<string, string> = {
 };
 
 /** Brand logo + color per platform, for distinguishing channels at a glance. */
-const PLATFORM_LOGO: Record<string, { Logo: (props: { className?: string }) => ReactElement; color: string }> = {
+const PLATFORM_LOGO: Record<
+    string,
+    { Logo: (props: { className?: string }) => ReactElement; color: string }
+> = {
     whatsapp: { Logo: WhatsAppLogo, color: "#25D366" },
     telegram: { Logo: TelegramLogo, color: "#229ED9" },
     discord: { Logo: DiscordLogo, color: "#5865F2" },
@@ -960,7 +1063,8 @@ const CHANNEL_STATUS_TONE: Record<string, string> = {
 // Per-platform hint for the recipient id when starting a chat or saving a contact.
 const PEER_HINT: Record<string, string> = {
     whatsapp: "Phone number with country code, e.g. 34600111222",
-    telegram: "Numeric chat id, not a @username. The person must have messaged the bot first (Telegram bots can't start a chat).",
+    telegram:
+        "Numeric chat id, not a @username. The person must have messaged the bot first (Telegram bots can't start a chat).",
     discord: "A channel id the bot can post to",
     slack: "A channel or user id"
 };
@@ -1036,15 +1140,23 @@ function NewChatDialog({
 
     // Telegram bots can only message a numeric chat id (of someone who messaged the
     // bot first); a @username never works, so guard it before the API rejects it.
-    const telegramInvalid = platform === "telegram" && peerId.trim() !== "" && !/^-?\d+$/.test(peerId.trim());
+    const telegramInvalid =
+        platform === "telegram" && peerId.trim() !== "" && !/^-?\d+$/.test(peerId.trim());
     // A saved handle must be sent over a channel of its own platform. If none is
     // connected, or the selected channel is on another platform, block the send so a
     // recipient is never delivered over a mismatched network.
-    const pickedPlatformLabel = pickedPlatform ? (PLATFORM_LABEL[pickedPlatform] ?? pickedPlatform) : "";
-    const noChannelForPicked = pickedPlatform !== null && !channels.some((item) => item.platform === pickedPlatform);
+    const pickedPlatformLabel = pickedPlatform
+        ? (PLATFORM_LABEL[pickedPlatform] ?? pickedPlatform)
+        : "";
+    const noChannelForPicked =
+        pickedPlatform !== null && !channels.some((item) => item.platform === pickedPlatform);
     const platformMismatch = pickedPlatform !== null && pickedPlatform !== platform;
     const ready =
-        Boolean(channelId) && peerId.trim() !== "" && text.trim() !== "" && !telegramInvalid && !platformMismatch;
+        Boolean(channelId) &&
+        peerId.trim() !== "" &&
+        text.trim() !== "" &&
+        !telegramInvalid &&
+        !platformMismatch;
 
     function submit() {
         setError(null);
@@ -1075,7 +1187,9 @@ function NewChatDialog({
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>New chat</DialogTitle>
-                    <DialogDescription>Message someone on a connected channel to start a conversation.</DialogDescription>
+                    <DialogDescription>
+                        Message someone on a connected channel to start a conversation.
+                    </DialogDescription>
                 </DialogHeader>
                 <div className="flex flex-col gap-3">
                     {usableContacts.length > 0 && (
@@ -1085,7 +1199,10 @@ function NewChatDialog({
                                 value={contactId}
                                 onValueChange={pickContact}
                                 placeholder="Pick a saved contact (optional)"
-                                options={usableContacts.map((item) => ({ value: item.id, label: item.name }))}
+                                options={usableContacts.map((item) => ({
+                                    value: item.id,
+                                    label: item.name
+                                }))}
                             />
                         </label>
                     )}
@@ -1095,7 +1212,9 @@ function NewChatDialog({
                             <Select
                                 value={identityId}
                                 onValueChange={(value) => {
-                                    const found = selectedContact.identities.find((item) => item.id === value);
+                                    const found = selectedContact.identities.find(
+                                        (item) => item.id === value
+                                    );
                                     if (found) pickIdentity(found, selectedContact.name);
                                 }}
                                 options={selectedContact.identities.map((item) => ({
@@ -1123,36 +1242,59 @@ function NewChatDialog({
                             onChange={(event) => editPeerId(event.target.value)}
                             placeholder={platform === "whatsapp" ? "34600111222" : "Recipient id"}
                         />
-                        {PEER_HINT[platform] && <span className="text-xs text-muted-foreground">{PEER_HINT[platform]}</span>}
+                        {PEER_HINT[platform] && (
+                            <span className="text-xs text-muted-foreground">
+                                {PEER_HINT[platform]}
+                            </span>
+                        )}
                     </label>
                     {noChannelForPicked && (
                         <p className="text-xs text-danger">
-                            No {pickedPlatformLabel} channel is connected. Connect one to message this handle.
+                            No {pickedPlatformLabel} channel is connected. Connect one to message
+                            this handle.
                         </p>
                     )}
                     {platformMismatch && !noChannelForPicked && (
                         <p className="text-xs text-danger">
-                            This handle is on {pickedPlatformLabel}. Pick a {pickedPlatformLabel} channel to send it.
+                            This handle is on {pickedPlatformLabel}. Pick a {pickedPlatformLabel}{" "}
+                            channel to send it.
                         </p>
                     )}
                     {platform === "telegram" && (
                         <p className="rounded-md border border-warning/40 bg-warning/10 p-2 text-xs text-foreground">
-                            Telegram bots can't start a chat. Ask the person to open your bot and send{" "}
-                            <code>/start</code> - the conversation appears in your inbox and you reply there.
+                            Telegram bots can't start a chat. Ask the person to open your bot and
+                            send <code>/start</code> - the conversation appears in your inbox and
+                            you reply there.
                         </p>
                     )}
-                    {telegramInvalid && <p className="text-xs text-danger">Enter a numeric chat id, not a @username.</p>}
+                    {telegramInvalid && (
+                        <p className="text-xs text-danger">
+                            Enter a numeric chat id, not a @username.
+                        </p>
+                    )}
                     <label className="flex flex-col gap-1 text-sm">
                         <span className="font-medium">Name (optional)</span>
-                        <Input value={peerName} onChange={(event) => setPeerName(event.target.value)} placeholder="Display name" />
+                        <Input
+                            value={peerName}
+                            onChange={(event) => setPeerName(event.target.value)}
+                            placeholder="Display name"
+                        />
                     </label>
                     <label className="flex flex-col gap-1 text-sm">
                         <span className="font-medium">Message</span>
-                        <Input value={text} onChange={(event) => setText(event.target.value)} placeholder="First message" />
+                        <Input
+                            value={text}
+                            onChange={(event) => setText(event.target.value)}
+                            placeholder="First message"
+                        />
                     </label>
                     {!selectedContact && (
                         <label className="flex items-center gap-2 text-sm">
-                            <input type="checkbox" checked={save} onChange={(event) => setSave(event.target.checked)} />
+                            <input
+                                type="checkbox"
+                                checked={save}
+                                onChange={(event) => setSave(event.target.checked)}
+                            />
                             <span>Save as contact</span>
                         </label>
                     )}
@@ -1237,7 +1379,12 @@ function ContactsDialog({ onClose }: { onClose: () => void }) {
                     <ContactEditor
                         contact={editing}
                         onChange={(updated) =>
-                            setContacts((prev) => prev?.map((item) => (item.id === updated.id ? updated : item)) ?? prev)
+                            setContacts(
+                                (prev) =>
+                                    prev?.map((item) =>
+                                        item.id === updated.id ? updated : item
+                                    ) ?? prev
+                            )
                         }
                         onBack={() => setEditingId(null)}
                     />
@@ -1249,22 +1396,34 @@ function ContactsDialog({ onClose }: { onClose: () => void }) {
                                     <Loader2 className="size-4 animate-spin" /> Loading...
                                 </div>
                             ) : contacts.length === 0 ? (
-                                <p className="py-4 text-sm text-muted-foreground">No contacts yet.</p>
+                                <p className="py-4 text-sm text-muted-foreground">
+                                    No contacts yet.
+                                </p>
                             ) : (
                                 contacts.map((item) => (
-                                    <div key={item.id} className="flex items-center justify-between gap-2 py-2">
+                                    <div
+                                        key={item.id}
+                                        className="flex items-center justify-between gap-2 py-2"
+                                    >
                                         <button
                                             type="button"
                                             className="flex min-w-0 flex-1 flex-col items-start gap-0.5 text-left"
                                             onClick={() => setEditingId(item.id)}
                                         >
-                                            <span className="truncate text-sm font-medium">{item.name}</span>
+                                            <span className="truncate text-sm font-medium">
+                                                {item.name}
+                                            </span>
                                             <span className="flex flex-wrap items-center gap-1">
                                                 {item.identities.length === 0 ? (
-                                                    <span className="text-xs text-muted-foreground">No handles</span>
+                                                    <span className="text-xs text-muted-foreground">
+                                                        No handles
+                                                    </span>
                                                 ) : (
                                                     item.identities.map((identity) => (
-                                                        <IdentityChip key={identity.id} identity={identity} />
+                                                        <IdentityChip
+                                                            key={identity.id}
+                                                            identity={identity}
+                                                        />
                                                     ))
                                                 )}
                                             </span>
@@ -1294,7 +1453,11 @@ function ContactsDialog({ onClose }: { onClose: () => void }) {
                         </div>
                         <div className="flex flex-col gap-2 rounded-md border border-border p-3">
                             <span className="text-sm font-medium">Add a contact</span>
-                            <Input value={name} onChange={(event) => setName(event.target.value)} placeholder="Name" />
+                            <Input
+                                value={name}
+                                onChange={(event) => setName(event.target.value)}
+                                placeholder="Name"
+                            />
                             <div className="flex gap-2">
                                 <div className="w-32 shrink-0">
                                     <Select
@@ -1339,7 +1502,10 @@ function IdentityChip({ identity }: { identity: ContactIdentityView }) {
             className="inline-flex max-w-[12rem] items-center gap-1 rounded bg-muted/60 px-1.5 py-0.5 text-xs text-muted-foreground"
             title={PLATFORM_LABEL[identity.platform] ?? identity.platform}
         >
-            <span className="grid size-3.5 shrink-0 place-items-center" style={{ color: meta?.color }}>
+            <span
+                className="grid size-3.5 shrink-0 place-items-center"
+                style={{ color: meta?.color }}
+            >
                 {Logo ? <Logo className="size-3" /> : <MessagesSquare className="size-3" />}
             </span>
             <span className="truncate">{identity.peerId}</span>
@@ -1384,7 +1550,8 @@ function ContactEditor({
         });
     }
 
-    const detailsDirty = name.trim() !== contact.name || (note.trim() || "") !== (contact.note ?? "");
+    const detailsDirty =
+        name.trim() !== contact.name || (note.trim() || "") !== (contact.note ?? "");
 
     return (
         <div className="flex flex-col gap-3">
@@ -1394,7 +1561,11 @@ function ContactEditor({
             </label>
             <label className="flex flex-col gap-1 text-sm">
                 <span className="font-medium">Note</span>
-                <Input value={note} onChange={(event) => setNote(event.target.value)} placeholder="Optional" />
+                <Input
+                    value={note}
+                    onChange={(event) => setNote(event.target.value)}
+                    placeholder="Optional"
+                />
             </label>
             {detailsDirty && (
                 <div className="flex justify-end">
@@ -1402,7 +1573,13 @@ function ContactEditor({
                         size="sm"
                         disabled={pending || name.trim() === ""}
                         onClick={() =>
-                            run(() => updateContactAction({ id: contact.id, name: name.trim(), note: note.trim() || null }))
+                            run(() =>
+                                updateContactAction({
+                                    id: contact.id,
+                                    name: name.trim(),
+                                    note: note.trim() || null
+                                })
+                            )
                         }
                     >
                         Save details
@@ -1413,7 +1590,9 @@ function ContactEditor({
             <div className="flex flex-col gap-2">
                 <span className="text-sm font-medium">Handles</span>
                 {contact.identities.length === 0 ? (
-                    <p className="text-xs text-muted-foreground">No handles yet. Add one below to start chats.</p>
+                    <p className="text-xs text-muted-foreground">
+                        No handles yet. Add one below to start chats.
+                    </p>
                 ) : (
                     contact.identities.map((identity) => (
                         <IdentityEditor
@@ -1500,9 +1679,17 @@ function IdentityEditor({
     return (
         <div className="flex items-center gap-2">
             <div className="w-32 shrink-0">
-                <Select value={platform} onValueChange={(value) => setPlatform(value as Platform)} options={PLATFORM_OPTIONS} />
+                <Select
+                    value={platform}
+                    onValueChange={(value) => setPlatform(value as Platform)}
+                    options={PLATFORM_OPTIONS}
+                />
             </div>
-            <Input className="flex-1" value={peerId} onChange={(event) => setPeerId(event.target.value)} />
+            <Input
+                className="flex-1"
+                value={peerId}
+                onChange={(event) => setPeerId(event.target.value)}
+            />
             {dirty && (
                 <Button
                     size="sm"
