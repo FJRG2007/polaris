@@ -30,7 +30,6 @@ import {
     listConversations,
     listMessagingActivity,
     reconnectChannel,
-    renameChannel,
     sendConversationMessage,
     startConversation,
     updateChannelCredentials,
@@ -114,27 +113,6 @@ export async function deleteChannelAction(channelId: string): Promise<{ error?: 
         return {};
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Could not remove the channel" };
-    }
-}
-
-const renameChannelSchema = z.object({
-    channelId: z.string().uuid(),
-    name: z.string().trim().min(1).max(64)
-});
-
-/** Rename a channel's display name. */
-export async function renameChannelAction(
-    input: z.infer<typeof renameChannelSchema>
-): Promise<{ error?: string }> {
-    const user = await requireUser();
-    const parsed = renameChannelSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Enter a name" };
-    try {
-        await renameChannel(user.id, parsed.data.channelId, parsed.data.name);
-        revalidatePath("/inbox");
-        return {};
-    } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not rename the channel" };
     }
 }
 

@@ -10,6 +10,7 @@ import {
     Client,
     ComponentType,
     GatewayIntentBits,
+    Partials,
     type APIActionRowComponent,
     type APIMessageActionRowComponent,
     type Message
@@ -56,7 +57,7 @@ export class DiscordAdapter implements ChannelAdapter {
 
     /** Build a client with the given intents and wire its handlers. */
     private build(intents: GatewayIntentBits[]): Client {
-        const client = new Client({ intents });
+        const client = new Client({ intents, partials: [Partials.Channel, Partials.Message] });
         this.wire(client);
         return client;
     }

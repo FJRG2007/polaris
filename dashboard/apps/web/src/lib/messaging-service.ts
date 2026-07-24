@@ -175,22 +175,6 @@ export async function connectChannel(
     }
 }
 
-/** Rename a channel (display name only). */
-export async function renameChannel(
-    ownerId: string,
-    channelId: string,
-    name: string
-): Promise<void> {
-    const channel = await prisma.channel.findFirst({
-        where: { id: channelId, ownerId },
-        select: { id: true }
-    });
-    if (!channel) throw new Error("Channel not found");
-    const trimmed = name.trim();
-    if (!trimmed) throw new Error("Enter a name");
-    await prisma.channel.update({ where: { id: channel.id }, data: { name: trimmed } });
-}
-
 /** Re-establish a channel's live adapter in the bridge, reusing its stored
  *  credentials (no need to re-enter a token). For token channels this fixes an
  *  errored connection in place; whatsapp-web restores from its session when valid. */
