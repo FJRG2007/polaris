@@ -12,12 +12,14 @@ import { PLATFORMS, interactivePromptSchema } from "@polaris/messaging";
 import { requireUser } from "@/lib/session";
 import { bridgeConfigured } from "@/lib/messaging/bridge-client";
 import {
+    addContactIdentity,
     assignConversation,
     channelState,
     connectChannel,
     createContact,
     deleteChannel,
     deleteContact,
+    deleteContactIdentity,
     getConversationMessages,
     listAgents,
     listChannels,
@@ -27,6 +29,8 @@ import {
     renameChannel,
     sendConversationMessage,
     startConversation,
+    updateContact,
+    updateContactIdentity,
     type AgentView,
     type ChannelLiveState,
     type ChannelView,
@@ -212,12 +216,13 @@ export async function listContactsAction(): Promise<ContactView[]> {
 
 const createContactSchema = z.object({
     name: z.string().trim().min(1).max(120),
-    platform: z.enum(PLATFORMS),
-    peerId: z.string().trim().min(1).max(256),
-    note: z.string().trim().max(500).optional()
+    note: z.string().trim().max(500).optional(),
+    // Optional first handle; more can be added from the contact's detail.
+    platform: z.enum(PLATFORMS).optional(),
+    peerId: z.string().trim().min(1).max(256).optional()
 });
 
-/** Save (or update) a contact for starting chats. */
+/** Create a contact (person), optionally with a first messaging handle. */
 export async function createContactAction(
     input: z.infer<typeof createContactSchema>
 ): Promise<{ error?: string; contact?: ContactView }> {
@@ -228,6 +233,82 @@ export async function createContactAction(
         return { contact: await createContact(user.id, parsed.data) };
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Could not save the contact" };
+    }
+}
+
+const updateContactSchema = z.object({
+    id: z.string().uuid(),
+    name: z.string().trim().min(1).max(120).optional(),
+    note: z.string().trim().max(500).nullable().optional()
+});
+
+/** Rename a contact or edit its note. */
+export async function updateContactAction(
+    input: z.infer<typeof updateContactSchema>
+): Promise<{ error?: string; contact?: ContactView }> {
+    const user = await requireUser();
+    const parsed = updateContactSchema.safeParse(input);
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the form" };
+    try {
+        const { id, ...patch } = parsed.data;
+        return { contact: await updateContact(user.id, id, patch) };
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not update the contact" };
+    }
+}
+
+const addIdentitySchema = z.object({
+    contactId: z.string().uuid(),
+    platform: z.enum(PLATFORMS),
+    peerId: z.string().trim().min(1).max(256)
+});
+
+/** Add a messaging handle (platform + number/id) to a contact. */
+export async function addContactIdentityAction(
+    input: z.infer<typeof addIdentitySchema>
+): Promise<{ error?: string; contact?: ContactView }> {
+    const user = await requireUser();
+    const parsed = addIdentitySchema.safeParse(input);
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the form" };
+    try {
+        const { contactId, ...identity } = parsed.data;
+        return { contact: await addContactIdentity(user.id, contactId, identity) };
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not add the handle" };
+    }
+}
+
+const updateIdentitySchema = z.object({
+    identityId: z.string().uuid(),
+    platform: z.enum(PLATFORMS).optional(),
+    peerId: z.string().trim().min(1).max(256).optional()
+});
+
+/** Edit a handle's platform or number/id (e.g. correct a wrong number). */
+export async function updateContactIdentityAction(
+    input: z.infer<typeof updateIdentitySchema>
+): Promise<{ error?: string; contact?: ContactView }> {
+    const user = await requireUser();
+    const parsed = updateIdentitySchema.safeParse(input);
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the form" };
+    try {
+        const { identityId, ...patch } = parsed.data;
+        return { contact: await updateContactIdentity(user.id, identityId, patch) };
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not update the handle" };
+    }
+}
+
+/** Remove one handle from a contact; returns the contact without it. */
+export async function deleteContactIdentityAction(
+    identityId: string
+): Promise<{ error?: string; contact?: ContactView }> {
+    const user = await requireUser();
+    if (!z.string().uuid().safeParse(identityId).success) return { error: "Invalid request" };
+    try {
+        return { contact: await deleteContactIdentity(user.id, identityId) };
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not remove the handle" };
     }
 }
 

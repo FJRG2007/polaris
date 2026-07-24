@@ -392,37 +392,170 @@ export async function startConversation(
     return { conversationId: conversation.id };
 }
 
+export interface ContactIdentityView {
+    id: string;
+    platform: string;
+    peerId: string;
+}
+
 export interface ContactView {
     id: string;
     name: string;
-    platform: string;
-    peerId: string;
     note: string | null;
+    /** The person's messaging handles across platforms. */
+    identities: ContactIdentityView[];
 }
 
-/** The owner's saved contacts, alphabetical. */
+interface ContactRow {
+    id: string;
+    name: string;
+    note: string | null;
+    identities: { id: string; platform: string; peerId: string }[];
+}
+
+function toContactView(row: ContactRow): ContactView {
+    return {
+        id: row.id,
+        name: row.name,
+        note: row.note,
+        identities: row.identities.map((identity) => ({
+            id: identity.id,
+            platform: identity.platform,
+            peerId: identity.peerId
+        }))
+    };
+}
+
+/** Whether a thrown Prisma error is a unique-constraint violation (P2002) - a
+ *  handle already bound to a contact for this owner. */
+function isUniqueViolation(caught: unknown): boolean {
+    return typeof caught === "object" && caught !== null && (caught as { code?: string }).code === "P2002";
+}
+
+const CONTACT_INCLUDE = { identities: { orderBy: { createdAt: "asc" as const } } };
+
+/** One contact (person) with its handles, scoped to the owner. */
+async function getContact(ownerId: string, id: string): Promise<ContactView> {
+    const row = await prisma.contact.findFirst({ where: { id, ownerId }, include: CONTACT_INCLUDE });
+    if (!row) throw new Error("Contact not found");
+    return toContactView(row);
+}
+
+/** The owner's contacts (people), each with their platform handles, alphabetical. */
 export async function listContacts(ownerId: string): Promise<ContactView[]> {
-    const rows = await prisma.contact.findMany({ where: { ownerId }, orderBy: { name: "asc" } });
-    return rows.map((row) => ({ id: row.id, name: row.name, platform: row.platform, peerId: row.peerId, note: row.note }));
+    const rows = await prisma.contact.findMany({
+        where: { ownerId },
+        orderBy: { name: "asc" },
+        include: CONTACT_INCLUDE
+    });
+    return rows.map(toContactView);
 }
 
-/** Create or update a contact (unique per owner + platform + peer). */
+/** Create a contact (person), optionally with a first messaging handle. */
 export async function createContact(
     ownerId: string,
-    input: { name: string; platform: Platform; peerId: string; note?: string }
+    input: { name: string; note?: string; platform?: Platform; peerId?: string }
 ): Promise<ContactView> {
-    const peerId = normalizePeerId(input.platform, input.peerId);
-    if (!peerId) throw new Error("Enter the contact's id or number");
-    const note = input.note?.trim() || null;
-    const row = await prisma.contact.upsert({
-        where: { ownerId_platform_peerId: { ownerId, platform: input.platform, peerId } },
-        create: { ownerId, name: input.name.trim(), platform: input.platform, peerId, note },
-        update: { name: input.name.trim(), note }
-    });
-    return { id: row.id, name: row.name, platform: row.platform, peerId: row.peerId, note: row.note };
+    const name = input.name.trim();
+    if (!name) throw new Error("Enter a name");
+    let identity: { platform: Platform; peerId: string } | undefined;
+    if (input.platform && input.peerId?.trim()) {
+        const peerId = normalizePeerId(input.platform, input.peerId);
+        if (!peerId) throw new Error("Enter the contact's id or number");
+        identity = { platform: input.platform, peerId };
+    }
+    try {
+        const row = await prisma.contact.create({
+            data: {
+                ownerId,
+                name,
+                note: input.note?.trim() || null,
+                identities: identity
+                    ? { create: { ownerId, platform: identity.platform, peerId: identity.peerId } }
+                    : undefined
+            },
+            include: CONTACT_INCLUDE
+        });
+        return toContactView(row);
+    } catch (caught) {
+        if (isUniqueViolation(caught)) throw new Error("That handle already belongs to another contact");
+        throw caught;
+    }
 }
 
-/** Remove a saved contact. */
+/** Update a contact's name and/or note. */
+export async function updateContact(
+    ownerId: string,
+    id: string,
+    patch: { name?: string; note?: string | null }
+): Promise<ContactView> {
+    const contact = await prisma.contact.findFirst({ where: { id, ownerId }, select: { id: true } });
+    if (!contact) throw new Error("Contact not found");
+    const data: { name?: string; note?: string | null } = {};
+    if (patch.name !== undefined) {
+        const name = patch.name.trim();
+        if (!name) throw new Error("Enter a name");
+        data.name = name;
+    }
+    if (patch.note !== undefined) data.note = patch.note?.trim() || null;
+    const row = await prisma.contact.update({ where: { id: contact.id }, data, include: CONTACT_INCLUDE });
+    return toContactView(row);
+}
+
+/** Add a messaging handle to a contact. */
+export async function addContactIdentity(
+    ownerId: string,
+    contactId: string,
+    input: { platform: Platform; peerId: string }
+): Promise<ContactView> {
+    const contact = await prisma.contact.findFirst({ where: { id: contactId, ownerId }, select: { id: true } });
+    if (!contact) throw new Error("Contact not found");
+    const peerId = normalizePeerId(input.platform, input.peerId);
+    if (!peerId) throw new Error("Enter the contact's id or number");
+    try {
+        await prisma.contactIdentity.create({ data: { ownerId, contactId: contact.id, platform: input.platform, peerId } });
+    } catch (caught) {
+        if (isUniqueViolation(caught)) throw new Error("That handle already belongs to a contact");
+        throw caught;
+    }
+    return getContact(ownerId, contact.id);
+}
+
+/** Change a handle's platform and/or peer id (e.g. fix a wrong number). */
+export async function updateContactIdentity(
+    ownerId: string,
+    identityId: string,
+    patch: { platform?: Platform; peerId?: string }
+): Promise<ContactView> {
+    const identity = await prisma.contactIdentity.findFirst({
+        where: { id: identityId, ownerId },
+        select: { id: true, contactId: true, platform: true, peerId: true }
+    });
+    if (!identity) throw new Error("Handle not found");
+    const platform = (patch.platform ?? identity.platform) as Platform;
+    const peerId = normalizePeerId(platform, patch.peerId ?? identity.peerId);
+    if (!peerId) throw new Error("Enter the contact's id or number");
+    try {
+        await prisma.contactIdentity.update({ where: { id: identity.id }, data: { platform, peerId } });
+    } catch (caught) {
+        if (isUniqueViolation(caught)) throw new Error("That handle already belongs to a contact");
+        throw caught;
+    }
+    return getContact(ownerId, identity.contactId);
+}
+
+/** Remove one of a contact's handles; returns the contact without it. */
+export async function deleteContactIdentity(ownerId: string, identityId: string): Promise<ContactView> {
+    const identity = await prisma.contactIdentity.findFirst({
+        where: { id: identityId, ownerId },
+        select: { id: true, contactId: true }
+    });
+    if (!identity) throw new Error("Handle not found");
+    await prisma.contactIdentity.delete({ where: { id: identity.id } });
+    return getContact(ownerId, identity.contactId);
+}
+
+/** Remove a contact (person) and all of their handles (by cascade). */
 export async function deleteContact(ownerId: string, id: string): Promise<void> {
     const row = await prisma.contact.findFirst({ where: { id, ownerId }, select: { id: true } });
     if (!row) throw new Error("Contact not found");
