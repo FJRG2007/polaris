@@ -3,6 +3,10 @@
 -- ContactIdentity. Existing contacts that share an owner and name are merged into
 -- one person, and every prior (platform, peer id) is preserved as an identity.
 
+-- 0. gen_random_uuid() below is built in on PG 13+ but lives in pgcrypto on older
+--    instances; ensure it resolves everywhere (fresh envs included).
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
 -- 1. New identity table. The person link (FK) is added after the merge trims Contact.
 CREATE TABLE "ContactIdentity" (
     "id" UUID NOT NULL,
@@ -36,19 +40,39 @@ FROM "Contact" c
 JOIN "_contact_canon" canon ON canon."old_id" = c."id"
 ORDER BY c."ownerId", c."platform", c."peerId", c."createdAt" ASC;
 
--- 4. Remove the now-redundant (non-canonical) person rows.
+-- 4. Fold each merge group's distinct non-empty notes onto its canonical person
+--    before the duplicates are dropped, so no note text is lost. Notes are ordered
+--    oldest-first (canonical leads) and de-duplicated, newline-joined.
+UPDATE "Contact" c
+SET "note" = merged.notes
+FROM (
+    SELECT canon_id, string_agg(note_text, E'\n' ORDER BY first_seen, note_text) AS notes
+    FROM (
+        SELECT canon."canon_id" AS canon_id,
+               trim(src."note") AS note_text,
+               min(src."createdAt") AS first_seen
+        FROM "Contact" src
+        JOIN "_contact_canon" canon ON canon."old_id" = src."id"
+        WHERE src."note" IS NOT NULL AND trim(src."note") <> ''
+        GROUP BY canon."canon_id", trim(src."note")
+    ) distinct_notes
+    GROUP BY canon_id
+) merged
+WHERE c."id" = merged.canon_id AND merged.notes IS DISTINCT FROM c."note";
+
+-- 5. Remove the now-redundant (non-canonical) person rows.
 DELETE FROM "Contact" c
 USING "_contact_canon" canon
 WHERE canon."old_id" = c."id" AND canon."canon_id" <> c."id";
 
 DROP TABLE "_contact_canon";
 
--- 5. Contact keeps only person fields now; the handle columns moved to identities.
+-- 6. Contact keeps only person fields now; the handle columns moved to identities.
 --    Dropping them also drops the old (ownerId, platform, peerId) unique index.
 ALTER TABLE "Contact" DROP COLUMN "platform";
 ALTER TABLE "Contact" DROP COLUMN "peerId";
 
--- 6. Identity constraints and the person link.
+-- 7. Identity constraints and the person link.
 CREATE UNIQUE INDEX "ContactIdentity_ownerId_platform_peerId_key" ON "ContactIdentity"("ownerId", "platform", "peerId");
 CREATE INDEX "ContactIdentity_contactId_idx" ON "ContactIdentity"("contactId");
 CREATE INDEX "ContactIdentity_ownerId_idx" ON "ContactIdentity"("ownerId");

@@ -988,6 +988,8 @@ function NewChatDialog({
     const [channelId, setChannelId] = useState(channels[0]?.id ?? "");
     const [contacts, setContacts] = useState<ContactView[]>([]);
     const [contactId, setContactId] = useState("");
+    const [identityId, setIdentityId] = useState("");
+    const [pickedPlatform, setPickedPlatform] = useState<string | null>(null);
     const [peerId, setPeerId] = useState("");
     const [peerName, setPeerName] = useState("");
     const [text, setText] = useState("");
@@ -1012,8 +1014,18 @@ function NewChatDialog({
     function pickIdentity(identity: ContactIdentityView, name: string) {
         setPeerId(identity.peerId);
         setPeerName(name);
+        setIdentityId(identity.id);
+        setPickedPlatform(identity.platform);
         const match = channels.find((item) => item.platform === identity.platform);
         if (match) setChannelId(match.id);
+    }
+
+    // Typing a raw recipient drops the saved-handle association, so the manual
+    // per-platform guards (e.g. the Telegram numeric check) apply instead.
+    function editPeerId(value: string) {
+        setPeerId(value);
+        setIdentityId("");
+        setPickedPlatform(null);
     }
 
     function pickContact(id: string) {
@@ -1025,7 +1037,14 @@ function NewChatDialog({
     // Telegram bots can only message a numeric chat id (of someone who messaged the
     // bot first); a @username never works, so guard it before the API rejects it.
     const telegramInvalid = platform === "telegram" && peerId.trim() !== "" && !/^-?\d+$/.test(peerId.trim());
-    const ready = Boolean(channelId) && peerId.trim() !== "" && text.trim() !== "" && !telegramInvalid;
+    // A saved handle must be sent over a channel of its own platform. If none is
+    // connected, or the selected channel is on another platform, block the send so a
+    // recipient is never delivered over a mismatched network.
+    const pickedPlatformLabel = pickedPlatform ? (PLATFORM_LABEL[pickedPlatform] ?? pickedPlatform) : "";
+    const noChannelForPicked = pickedPlatform !== null && !channels.some((item) => item.platform === pickedPlatform);
+    const platformMismatch = pickedPlatform !== null && pickedPlatform !== platform;
+    const ready =
+        Boolean(channelId) && peerId.trim() !== "" && text.trim() !== "" && !telegramInvalid && !platformMismatch;
 
     function submit() {
         setError(null);
@@ -1074,13 +1093,13 @@ function NewChatDialog({
                         <label className="flex flex-col gap-1 text-sm">
                             <span className="font-medium">Handle</span>
                             <Select
-                                value={peerId}
+                                value={identityId}
                                 onValueChange={(value) => {
-                                    const found = selectedContact.identities.find((item) => item.peerId === value);
+                                    const found = selectedContact.identities.find((item) => item.id === value);
                                     if (found) pickIdentity(found, selectedContact.name);
                                 }}
                                 options={selectedContact.identities.map((item) => ({
-                                    value: item.peerId,
+                                    value: item.id,
                                     label: `${PLATFORM_LABEL[item.platform] ?? item.platform} - ${item.peerId}`
                                 }))}
                             />
@@ -1101,11 +1120,21 @@ function NewChatDialog({
                         <span className="font-medium">To</span>
                         <Input
                             value={peerId}
-                            onChange={(event) => setPeerId(event.target.value)}
+                            onChange={(event) => editPeerId(event.target.value)}
                             placeholder={platform === "whatsapp" ? "34600111222" : "Recipient id"}
                         />
                         {PEER_HINT[platform] && <span className="text-xs text-muted-foreground">{PEER_HINT[platform]}</span>}
                     </label>
+                    {noChannelForPicked && (
+                        <p className="text-xs text-danger">
+                            No {pickedPlatformLabel} channel is connected. Connect one to message this handle.
+                        </p>
+                    )}
+                    {platformMismatch && !noChannelForPicked && (
+                        <p className="text-xs text-danger">
+                            This handle is on {pickedPlatformLabel}. Pick a {pickedPlatformLabel} channel to send it.
+                        </p>
+                    )}
                     {platform === "telegram" && (
                         <p className="rounded-md border border-warning/40 bg-warning/10 p-2 text-xs text-foreground">
                             Telegram bots can't start a chat. Ask the person to open your bot and send{" "}

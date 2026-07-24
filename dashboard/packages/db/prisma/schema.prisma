@@ -900,9 +900,6 @@ model Message {
 }
 
 // A saved contact for starting outbound conversations from the Inbox, per owner.
-// Bound to a platform + platform-side peer id (a WhatsApp number/JID, a Telegram
-// chat id, ...); the same person on two platforms is two rows. No FK to Channel -
-// a contact is reachable on any channel of its platform.
 // A contact is a person, independent of platform. Their messaging handles live in
 // ContactIdentity, so the same person can be reached on WhatsApp, Telegram, etc.
 // under one entry. owner is a bare uuid (no FK).
