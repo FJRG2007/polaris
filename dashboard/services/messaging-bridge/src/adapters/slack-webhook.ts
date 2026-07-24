@@ -6,7 +6,12 @@
  */
 
 import { capabilitiesFor } from "@polaris/messaging";
-import type { AdapterContext, ChannelAdapter, OutboundMessage, SendResult } from "@polaris/messaging";
+import type {
+    AdapterContext,
+    ChannelAdapter,
+    OutboundMessage,
+    SendResult
+} from "@polaris/messaging";
 
 const WEBHOOK_URL = /^https:\/\/hooks\.slack\.com\/services\//;
 
@@ -33,9 +38,11 @@ export class SlackWebhookAdapter implements ChannelAdapter {
         const text = message.interactive
             ? [
                   message.interactive.text,
-                  ...message.interactive.options.map((option, index) => `${index + 1}. ${option.label}`)
+                  ...message.interactive.options.map(
+                      (option, index) => `${index + 1}. ${option.label}`
+                  )
               ].join("\n")
-            : message.text ?? "";
+            : (message.text ?? "");
         const response = await fetch(this.url, {
             method: "POST",
             headers: { "content-type": "application/json" },

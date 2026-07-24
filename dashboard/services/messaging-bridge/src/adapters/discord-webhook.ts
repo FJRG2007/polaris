@@ -6,9 +6,15 @@
  */
 
 import { capabilitiesFor } from "@polaris/messaging";
-import type { AdapterContext, ChannelAdapter, OutboundMessage, SendResult } from "@polaris/messaging";
+import type {
+    AdapterContext,
+    ChannelAdapter,
+    OutboundMessage,
+    SendResult
+} from "@polaris/messaging";
 
-const WEBHOOK_URL = /^https:\/\/(discord\.com|discordapp\.com|ptb\.discord\.com|canary\.discord\.com)\/api\/(v\d+\/)?webhooks\/\d+\//;
+const WEBHOOK_URL =
+    /^https:\/\/(discord\.com|discordapp\.com|ptb\.discord\.com|canary\.discord\.com)\/api\/(v\d+\/)?webhooks\/\d+\//;
 
 export class DiscordWebhookAdapter implements ChannelAdapter {
     readonly capabilities = capabilitiesFor("discord", "discord-webhook");
@@ -34,9 +40,11 @@ export class DiscordWebhookAdapter implements ChannelAdapter {
         const content = message.interactive
             ? [
                   message.interactive.text,
-                  ...message.interactive.options.map((option, index) => `${index + 1}. ${option.label}`)
+                  ...message.interactive.options.map(
+                      (option, index) => `${index + 1}. ${option.label}`
+                  )
               ].join("\n")
-            : message.text ?? "";
+            : (message.text ?? "");
         // wait=true so Discord returns the created message (and its id).
         const response = await fetch(`${this.url}${this.url.includes("?") ? "&" : "?"}wait=true`, {
             method: "POST",

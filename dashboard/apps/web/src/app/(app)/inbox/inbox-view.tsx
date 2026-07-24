@@ -1018,7 +1018,11 @@ export function ConnectChannelDialog({
                                     variant="ghost"
                                     onClick={() => {
                                         setError(null);
-                                        setPhase(group && group.variants.length > 1 ? "variant" : "platform");
+                                        setPhase(
+                                            group && group.variants.length > 1
+                                                ? "variant"
+                                                : "platform"
+                                        );
                                     }}
                                     disabled={pending}
                                 >

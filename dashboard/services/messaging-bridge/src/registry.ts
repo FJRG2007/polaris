@@ -32,7 +32,8 @@ export class AdapterRegistry {
                 if (request.provider === "whatsapp-cloud") {
                     if (!request.token) throw new Error("WhatsApp Cloud needs an access token");
                     const phoneNumberId = request.config?.phoneNumberId;
-                    if (!phoneNumberId) throw new Error("WhatsApp Cloud needs a phoneNumberId in config");
+                    if (!phoneNumberId)
+                        throw new Error("WhatsApp Cloud needs a phoneNumberId in config");
                     return new WhatsAppCloudAdapter(request.token, phoneNumberId, context);
                 }
                 return new WhatsAppWebAdapter(request.channelId, context);

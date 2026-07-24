@@ -5,7 +5,14 @@
  * Everything installable lives under Apps rather than sprawling the switcher.
  */
 
-import { Activity, HardDrive, LayoutGrid, MessagesSquare, SlidersHorizontal, type LucideIcon } from "lucide-react";
+import {
+    Activity,
+    HardDrive,
+    LayoutGrid,
+    MessagesSquare,
+    SlidersHorizontal,
+    type LucideIcon
+} from "lucide-react";
 
 export interface AppEntry {
     id: string;
@@ -23,7 +30,13 @@ export interface AppEntry {
 }
 
 export const POLARIS_APPS: AppEntry[] = [
-    { id: "drive", label: "Drive", description: "Files across every NAS", icon: HardDrive, href: "/drive" },
+    {
+        id: "drive",
+        label: "Drive",
+        description: "Files across every NAS",
+        icon: HardDrive,
+        href: "/drive"
+    },
     {
         id: "apps",
         label: "Apps",
