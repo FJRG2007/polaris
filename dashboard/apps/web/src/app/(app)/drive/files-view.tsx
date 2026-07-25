@@ -217,6 +217,7 @@ export function FilesView({
     onDeletePermanent,
     onEmptyFolder,
     onScheduleDelete,
+    onSaved,
     headerActions
 }: {
     connectionId: string;
@@ -249,6 +250,8 @@ export function FilesView({
     onEmptyFolder: (entry: DriveEntry, permanent: boolean) => void;
     /** Schedule items to be deleted at a future time. */
     onScheduleDelete: (entries: DriveEntry[]) => void;
+    /** A file was written from the viewer's editors (the file itself or a copy). */
+    onSaved?: () => void;
     /** Connection-level actions (Access, Open console) rendered in the toolbar, left of the panel. */
     headerActions?: ReactNode;
 }) {
@@ -364,6 +367,19 @@ export function FilesView({
             modifiedAt: entry.modifiedAt
         });
     }
+
+    // Keep the open viewer's properties honest after a refresh: saving from one of
+    // its editors changes the file's size and modified time. The same object is
+    // returned when nothing moved, so this never re-renders on its own.
+    useEffect(() => {
+        setViewerTarget((current) => {
+            if (!current) return current;
+            const fresh = entries.find((entry) => entry.path === current.path);
+            if (!fresh || (fresh.size === current.size && fresh.modifiedAt === current.modifiedAt))
+                return current;
+            return { ...current, size: fresh.size, modifiedAt: fresh.modifiedAt };
+        });
+    }, [entries]);
 
     /** Open an item: folders navigate, archives browse, other files preview. */
     function openEntry(entry: DriveEntry) {
@@ -2212,6 +2228,7 @@ export function FilesView({
             <FileViewer
                 target={viewerTarget}
                 onOpenChange={(open) => !open && setViewerTarget(null)}
+                onSaved={onSaved}
                 onShare={(t) =>
                     onShare({
                         name: t.name,

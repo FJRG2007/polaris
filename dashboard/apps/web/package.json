@@ -5,9 +5,12 @@
     "type": "module",
     "description": "Polaris dashboard - the Next.js control-plane app.",
     "scripts": {
+        "predev": "node scripts/copy-pdfjs-assets.mjs",
         "dev": "next dev",
+        "prebuild": "node scripts/copy-pdfjs-assets.mjs",
         "build": "next build",
         "start": "next start",
+        "test": "vitest run --passWithNoTests",
         "typecheck": "tsc --noEmit"
     },
     "dependencies": {
@@ -38,12 +41,14 @@
         "next": "15.5.20",
         "node-stream-zip": "1.15.0",
         "node-unrar-js": "2.0.2",
+        "pdfjs-dist": "6.1.200",
         "plyr": "3.7.8",
         "react": "19.0.0",
         "react-dom": "19.0.0",
         "undici": "6.21.1",
         "ws": "8.18.0",
         "xlsx": "0.18.5",
+        "xlsx-populate": "1.21.0",
         "zod": "3.24.1"
     },
     "devDependencies": {

@@ -546,6 +546,7 @@ export function DriveExplorer({
                         onSetNote={onSetNote}
                         onMove={onMove}
                         onCopy={onCopy}
+                        onSaved={() => void load()}
                         onManageAccess={
                             selectedConnection?.canManageAccess
                                 ? (entry) =>
