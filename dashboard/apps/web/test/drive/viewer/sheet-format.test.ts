@@ -8,9 +8,13 @@
 import { describe, expect, it } from "vitest";
 import {
     cellValue,
+    editsDiffer,
     exportConvertedXlsx,
     exportDelimited,
-    readWorkbook
+    readWorkbook,
+    savedValues,
+    stageEdit,
+    type PendingEdit
 } from "../../../src/app/(app)/drive/viewer/sheet-format";
 
 function buffer(text: string): ArrayBuffer {
@@ -35,6 +39,47 @@ describe("cellValue", () => {
         expect(cellValue("1,5")).toBe("1,5");
         expect(cellValue("1.50")).toBe("1.50");
         expect(cellValue("+34 600 000 000")).toBe("+34 600 000 000");
+    });
+});
+
+describe("staging edits", () => {
+    const cell = { sheet: "Data", row: 1, column: 0 };
+
+    it("keeps a real change", () => {
+        const edits = new Map<string, PendingEdit>();
+        stageEdit(edits, { ...cell, value: "new" }, "old");
+        expect(edits.size).toBe(1);
+        expect(editsDiffer(edits, new Map())).toBe(true);
+    });
+
+    it("drops the edit when the original value is typed back", () => {
+        const edits = new Map<string, PendingEdit>();
+        stageEdit(edits, { ...cell, value: "new" }, "old");
+        stageEdit(edits, { ...cell, value: "newer" }, "new");
+        stageEdit(edits, { ...cell, value: "old" }, "newer");
+        expect(edits.size).toBe(0);
+        expect(editsDiffer(edits, new Map())).toBe(false);
+    });
+
+    it("counts a revert as a change once the file holds the edited value", () => {
+        const edits = new Map<string, PendingEdit>();
+        stageEdit(edits, { ...cell, value: "new" }, "old");
+        const saved = savedValues(edits);
+        expect(editsDiffer(edits, saved)).toBe(false);
+
+        stageEdit(edits, { ...cell, value: "old" }, "new");
+        expect(edits.size).toBe(0);
+        expect(editsDiffer(edits, saved)).toBe(true);
+    });
+
+    it("tracks each cell on its own", () => {
+        const edits = new Map<string, PendingEdit>();
+        stageEdit(edits, { sheet: "Data", row: 0, column: 0, value: "a" }, "");
+        stageEdit(edits, { sheet: "Data", row: 0, column: 1, value: "b" }, "");
+        stageEdit(edits, { sheet: "Other", row: 0, column: 0, value: "c" }, "");
+        expect(edits.size).toBe(3);
+        stageEdit(edits, { sheet: "Data", row: 0, column: 1, value: "" }, "b");
+        expect([...edits.keys()].length).toBe(2);
     });
 });
 

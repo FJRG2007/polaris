@@ -52,7 +52,21 @@ export default function PdfEditor({
     const modesRef = useRef<Record<EditorTool, number> | null>(null);
     const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
     const [tool, setTool] = useState<EditorTool>("none");
-    const [dirty, setDirty] = useState(false);
+    // pdf.js hashes the annotation and form values it would write; comparing that
+    // against the hash of what is stored is what makes an edit that was undone (or
+    // a field typed back to its original text) count as no change at all.
+    const savedHash = useRef("");
+    const [changed, setChanged] = useState(false);
+    const [strokePending, setStrokePending] = useState(false);
+    // A drawing is not stored until its tool is left, so while one is active an
+    // undoable edit counts as a change the export will commit.
+    const dirty = changed || (tool !== "none" && strokePending);
+
+    const syncChanged = useCallback(() => {
+        const pdf = documentRef.current;
+        if (!pdf) return;
+        setChanged((pdf.annotationStorage.serializable.hash ?? "") !== savedHash.current);
+    }, []);
 
     useEffect(() => {
         let alive = true;
@@ -87,11 +101,13 @@ export default function PdfEditor({
                 eventBus.on("pagesinit", () => {
                     viewer.currentScaleValue = "page-width";
                 });
-                // A drawing is only stored once the tool is left, so this is what
-                // makes Save light up while a stroke is still in progress.
                 eventBus.on("editingstateschanged", (event: { details?: unknown }) => {
                     const details = event.details as { hasSomethingToUndo?: boolean } | undefined;
-                    if (details?.hasSomethingToUndo) setDirty(true);
+                    setStrokePending(Boolean(details?.hasSomethingToUndo));
+                    syncChanged();
+                    // Committing an editor finishes over the next frames; re-check
+                    // once it has, so the stored state decides on its own.
+                    requestAnimationFrame(() => requestAnimationFrame(syncChanged));
                 });
                 task = pdfjs.getDocument({
                     url: src,
@@ -103,11 +119,17 @@ export default function PdfEditor({
                 });
                 const loaded = await task.promise;
                 if (!alive) return;
-                // Fires for both a stored annotation edit and a filled form field.
+                savedHash.current = loaded.annotationStorage.serializable.hash ?? "";
+                // Fires for both a stored annotation edit and a filled form field,
+                // but only for the first one until the modified flag is cleared -
+                // so clear it here to keep being told about every later change.
                 const storage = loaded.annotationStorage as unknown as {
                     onSetModified: (() => void) | null;
                 };
-                storage.onSetModified = () => setDirty(true);
+                storage.onSetModified = () => {
+                    loaded.annotationStorage.resetModified();
+                    syncChanged();
+                };
                 viewer.setDocument(loaded);
                 linkService.setDocument(loaded);
                 viewerRef.current = viewer;
@@ -125,7 +147,7 @@ export default function PdfEditor({
             // Destroying the loading task tears the document and its worker down.
             void task?.destroy();
         };
-    }, [src]);
+    }, [src, syncChanged]);
 
     function selectTool(next: EditorTool) {
         const viewer = viewerRef.current;
@@ -159,9 +181,12 @@ export default function PdfEditor({
 
     /** Overwriting makes the current state the stored one; a copy leaves it pending. */
     function afterSave(name: string) {
-        if (name === target.name) {
-            documentRef.current?.annotationStorage.resetModified();
-            setDirty(false);
+        const pdf = documentRef.current;
+        if (pdf && name === target.name) {
+            savedHash.current = pdf.annotationStorage.serializable.hash ?? "";
+            pdf.annotationStorage.resetModified();
+            setChanged(false);
+            setStrokePending(false);
         }
         onSaved?.(name);
     }

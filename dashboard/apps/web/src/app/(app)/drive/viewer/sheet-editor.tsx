@@ -14,12 +14,14 @@ import { cn } from "@polaris/ui";
 import { EditorActions } from "./editor-actions";
 import {
     EDITABLE_CELL_LIMIT,
-    editKey,
+    editsDiffer,
     exportConvertedXlsx,
     exportDelimited,
     exportPatchedXlsx,
     readWorkbook,
-    type CellEdit,
+    savedValues,
+    stageEdit,
+    type PendingEdit,
     type SheetGrid
 } from "./sheet-format";
 import { Loading, ViewerError } from "./status";
@@ -58,7 +60,10 @@ export function SheetEditor({
     // for a converted or delimited export) outlive re-renders untouched.
     const source = useRef<ArrayBuffer | null>(null);
     const workbook = useRef<Awaited<ReturnType<typeof readWorkbook>>["workbook"] | null>(null);
-    const edits = useRef(new Map<string, CellEdit>());
+    const edits = useRef(new Map<string, PendingEdit>());
+    // Cell values as of the last write, so typing a value and then putting the old
+    // one back leaves nothing to save.
+    const saved = useRef(new Map<string, string>());
     const scrollRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -68,6 +73,7 @@ export function SheetEditor({
         setDirty(false);
         setActive(0);
         edits.current = new Map();
+        saved.current = new Map();
         void (async () => {
             try {
                 const response = await fetch(src);
@@ -115,13 +121,12 @@ export function SheetEditor({
             next[active] = { ...grid, rows };
             return next;
         });
-        edits.current.set(editKey(grid.name, row, column), {
-            sheet: grid.name,
-            row,
-            column,
-            value
-        });
-        setDirty(true);
+        stageEdit(
+            edits.current,
+            { sheet: grid.name, row, column, value },
+            grid.rows[row]?.[column] ?? ""
+        );
+        setDirty(editsDiffer(edits.current, saved.current));
     }
 
     const exportAs = useCallback(
@@ -142,10 +147,14 @@ export function SheetEditor({
         [active, grids, sourceExtension]
     );
 
-    /** Overwriting the original clears the pending flag; the edits stay, since a
-     *  later save patches the same pristine bytes again. */
+    /** Overwriting the original makes the current edits the file's contents. They
+     *  stay in the map, since a later save patches the same pristine bytes again,
+     *  but from here on only a further change counts as unsaved. */
     function afterSave(name: string) {
-        if (name === target.name) setDirty(false);
+        if (name === target.name) {
+            saved.current = savedValues(edits.current);
+            setDirty(false);
+        }
         onSaved?.(name);
     }
 
