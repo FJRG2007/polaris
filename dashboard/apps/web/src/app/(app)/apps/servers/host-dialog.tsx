@@ -10,7 +10,12 @@
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
-import { SSH_AUTH_METHODS, type SshAuthMethod } from "@polaris/core";
+import {
+    environmentFromAddress,
+    SSH_AUTH_METHODS,
+    type ServerEnvironment,
+    type SshAuthMethod
+} from "@polaris/core";
 import {
     Button,
     Dialog,
@@ -24,16 +29,24 @@ import {
     Select
 } from "@polaris/ui";
 import { createHostAction } from "./actions";
+import { ENVIRONMENT_CHOICES, ENVIRONMENT_META } from "./environment-meta";
 
 const AUTH_LABELS: Record<SshAuthMethod, string> = {
     password: "Password",
     key: "Private key"
 };
 
+const ENVIRONMENT_OPTIONS = [
+    ...ENVIRONMENT_CHOICES.map((value) => ({ value, label: ENVIRONMENT_META[value].label })),
+    { value: "unknown", label: "Not sure yet" }
+];
+
 export function HostDialog() {
     const router = useRouter();
     const [open, setOpen] = useState(false);
     const [authMethod, setAuthMethod] = useState<SshAuthMethod>("password");
+    const [environment, setEnvironment] = useState<ServerEnvironment>("unknown");
+    const [environmentPicked, setEnvironmentPicked] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [pending, setPending] = useState(false);
 
@@ -51,7 +64,8 @@ export function HostDialog() {
             address: str("address"),
             port: Number(str("port") ?? 22),
             username: str("username"),
-            authMethod
+            authMethod,
+            environment
         };
         const credentials =
             authMethod === "password"
@@ -69,7 +83,19 @@ export function HostDialog() {
     }
 
     return (
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog
+            open={open}
+            onOpenChange={(next) => {
+                // The form fields unmount with the dialog, so clear the derived
+                // location too instead of carrying it into the next server.
+                if (next) {
+                    setEnvironment("unknown");
+                    setEnvironmentPicked(false);
+                    setError(null);
+                }
+                setOpen(next);
+            }}
+        >
             <DialogTrigger asChild>
                 <Button size="sm" variant="secondary">
                     <Plus className="size-4" />
@@ -90,7 +116,15 @@ export function HostDialog() {
                     </label>
                     <label className="flex flex-col gap-1 text-sm">
                         Address
-                        <Input name="address" required placeholder="192.168.1.10" />
+                        <Input
+                            name="address"
+                            required
+                            placeholder="192.168.1.10"
+                            onChange={(event) => {
+                                if (environmentPicked) return;
+                                setEnvironment(environmentFromAddress(event.target.value));
+                            }}
+                        />
                     </label>
                     <div className="grid grid-cols-2 gap-2">
                         <label className="flex flex-col gap-1 text-sm">
@@ -102,6 +136,20 @@ export function HostDialog() {
                             <Input name="username" required />
                         </label>
                     </div>
+                    <label className="flex flex-col gap-1 text-sm">
+                        Where it lives
+                        <Select
+                            value={environment}
+                            onValueChange={(value) => {
+                                setEnvironment(value as ServerEnvironment);
+                                setEnvironmentPicked(true);
+                            }}
+                            options={ENVIRONMENT_OPTIONS}
+                        />
+                        <span className="text-xs text-muted-foreground">
+                            {ENVIRONMENT_META[environment].routing}
+                        </span>
+                    </label>
                     <label className="flex flex-col gap-1 text-sm">
                         Authentication
                         <Select

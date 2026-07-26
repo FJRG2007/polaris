@@ -1,8 +1,8 @@
 /**
- * IP allowlist matching for file-request access control. Allowlists are a
- * security boundary, so parsing is delegated to ipaddr.js (a vetted, widely
- * deployed library) rather than hand-rolled bit math that could subtly admit an
- * address it should reject - especially for IPv6 and IPv4-mapped-IPv6 forms.
+ * IP parsing, classification, and allowlist matching. Allowlists are a security
+ * boundary, so parsing is delegated to ipaddr.js (a vetted, widely deployed
+ * library) rather than hand-rolled bit math that could subtly admit an address it
+ * should reject - especially for IPv6 and IPv4-mapped-IPv6 forms.
  */
 
 import ipaddr from "ipaddr.js";
@@ -17,6 +17,33 @@ export function isCidr(value: string): boolean {
     try {
         ipaddr.parseCIDR(value);
         return true;
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * True when an address is not publicly routable: RFC1918 private space, carrier
+ * NAT, link-local, loopback, multicast, or reserved. Anything that is not a valid
+ * address (a hostname, an empty string) counts as private, so a caller never
+ * treats an unresolved value as internet-reachable.
+ */
+export function isPrivateIp(value: string): boolean {
+    try {
+        return ipaddr.parse(value.trim()).range() !== "unicast";
+    } catch {
+        return true;
+    }
+}
+
+/**
+ * True when an address sits in carrier-grade NAT space (100.64.0.0/10): the ISP
+ * shares one public address across customers, so no port forward can ever expose
+ * a server on that line - only an outbound tunnel can.
+ */
+export function isCarrierGradeNat(value: string): boolean {
+    try {
+        return ipaddr.parse(value.trim()).range() === "carrierGradeNat";
     } catch {
         return false;
     }

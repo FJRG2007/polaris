@@ -384,6 +384,9 @@ model Host {
     username            String
     // password | key
     authMethod          String
+    // home-nat | home-cgnat | vps | cloud | unknown - where the server lives,
+    // which decides how a domain can be pointed at it (see @polaris/core).
+    environment         String   @default("unknown")
     // Server public key (base64) pinned on the trust-on-add test connect.
     hostKey             String?
     // Envelope-encrypted credentials (password, or private key + passphrase).

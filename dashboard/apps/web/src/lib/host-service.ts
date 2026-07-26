@@ -8,7 +8,7 @@
  */
 
 import { loadEnv } from "@polaris/config";
-import type { CreateHostInput, HostCredentials } from "@polaris/core";
+import type { CreateHostInput, HostCredentials, ServerEnvironment } from "@polaris/core";
 import { prisma } from "@polaris/db";
 import { testAndCaptureHostKey, type SshAuth } from "@polaris/ssh";
 import { decryptCredentials, encryptCredentials } from "@polaris/storage";
@@ -24,6 +24,7 @@ export async function listHosts(ownerId: string) {
             port: true,
             username: true,
             authMethod: true,
+            environment: true,
             status: true,
             createdAt: true
         },
@@ -89,6 +90,7 @@ export async function createHost(ownerId: string, input: CreateHostInput): Promi
             port: input.config.port,
             username: input.config.username,
             authMethod: input.config.authMethod,
+            environment: input.config.environment,
             hostKey,
             encryptedCredential: blob.ciphertext,
             credentialNonce: blob.nonce,
@@ -96,6 +98,16 @@ export async function createHost(ownerId: string, input: CreateHostInput): Promi
         },
         select: { id: true }
     });
+}
+
+/** Record where a host lives, which decides how a domain can be pointed at it.
+ *  Owner-scoped, so an unknown or foreign id is a silent no-op. */
+export async function setHostEnvironment(
+    ownerId: string,
+    hostId: string,
+    environment: ServerEnvironment
+): Promise<void> {
+    await prisma.host.updateMany({ where: { id: hostId, ownerId }, data: { environment } });
 }
 
 export async function deleteHost(ownerId: string, hostId: string): Promise<void> {

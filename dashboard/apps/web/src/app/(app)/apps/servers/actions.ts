@@ -8,10 +8,11 @@
  */
 
 import { revalidatePath } from "next/cache";
-import { createHostSchema } from "@polaris/core";
+import { createHostSchema, setServerEnvironmentSchema } from "@polaris/core";
 import { requirePermission } from "@/lib/session";
-import { createHost, deleteHost } from "@/lib/host-service";
 import { recordAudit } from "@/lib/audit-service";
+import { setLocalEnvironment } from "@/lib/network-service";
+import { createHost, deleteHost, setHostEnvironment } from "@/lib/host-service";
 
 const SERVERS_PATH = "/apps/servers";
 
@@ -31,6 +32,29 @@ export async function createHostAction(input: unknown): Promise<{ error?: string
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Could not connect to the host" };
     }
+    revalidatePath(SERVERS_PATH);
+    return {};
+}
+
+/**
+ * Record where a server lives. A null `hostId` means the box Polaris runs on,
+ * whose classification is global config rather than a Host row. The answer always
+ * wins over detection: no probe can see a router's port forwarding from inside.
+ */
+export async function setServerEnvironmentAction(input: unknown): Promise<{ error?: string }> {
+    const user = await requirePermission("system.manage");
+    const parsed = setServerEnvironmentSchema.safeParse(input);
+    if (!parsed.success) return { error: "Invalid server environment" };
+    const { hostId, environment } = parsed.data;
+    if (hostId) await setHostEnvironment(user.id, hostId, environment);
+    else await setLocalEnvironment(environment);
+    await recordAudit({
+        actorId: user.id,
+        action: "server.environment",
+        targetType: hostId ? "host" : "system",
+        targetId: hostId ?? "local",
+        metadata: { environment }
+    });
     revalidatePath(SERVERS_PATH);
     return {};
 }

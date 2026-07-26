@@ -13,9 +13,47 @@
  */
 
 import { z } from "zod";
+import { isCarrierGradeNat, isIpAddress, isPrivateIp } from "../cidr.js";
 
 export const SSH_AUTH_METHODS = ["password", "key"] as const;
 export type SshAuthMethod = (typeof SSH_AUTH_METHODS)[number];
+
+/**
+ * Where a server physically lives. This is not cosmetic: it decides how a domain
+ * can be pointed at the server and whether it can serve public traffic at all.
+ * - `home-nat`   : home/office LAN behind a router; inbound needs port forwarding.
+ * - `home-cgnat` : home line behind carrier NAT; no inbound port exists, so public
+ *                  access is only possible through an outbound tunnel.
+ * - `vps`        : VPS or dedicated server holding its own public address.
+ * - `cloud`      : cloud VM (AWS/GCP/Azure...); public address plus a firewall or
+ *                  security group that must allow 80/443.
+ * - `unknown`    : not detected and not answered yet.
+ */
+export const SERVER_ENVIRONMENTS = ["home-nat", "home-cgnat", "vps", "cloud", "unknown"] as const;
+export type ServerEnvironment = (typeof SERVER_ENVIRONMENTS)[number];
+export const serverEnvironmentSchema = z.enum(SERVER_ENVIRONMENTS);
+
+/** Coarse grouping of the environments, for copy and defaults that only care
+ *  whether a server sits on a home line or in a data centre. */
+export type ServerEnvironmentGroup = "home" | "datacenter" | "unknown";
+
+export function serverEnvironmentGroup(environment: ServerEnvironment): ServerEnvironmentGroup {
+    if (environment === "home-nat" || environment === "home-cgnat") return "home";
+    if (environment === "vps" || environment === "cloud") return "datacenter";
+    return "unknown";
+}
+
+/**
+ * Best guess from an address alone: carrier-NAT space is a home line with no
+ * inbound ports, any other private address a home/office LAN box, a public one a
+ * server that already holds its own address. A hostname says nothing, so it stays
+ * unknown and the operator is asked.
+ */
+export function environmentFromAddress(address: string): ServerEnvironment {
+    if (isCarrierGradeNat(address)) return "home-cgnat";
+    if (!isIpAddress(address.trim())) return "unknown";
+    return isPrivateIp(address) ? "home-nat" : "vps";
+}
 
 /** Non-secret host configuration, safe to store in the clear and show in the UI. */
 export const hostConfigSchema = z.object({
@@ -23,6 +61,7 @@ export const hostConfigSchema = z.object({
     port: z.number().int().positive().max(65535).default(22),
     username: z.string().min(1),
     authMethod: z.enum(SSH_AUTH_METHODS),
+    environment: serverEnvironmentSchema.default("unknown"),
     // Server public key (base64 of the raw key blob) pinned when the host was
     // added. Absent only transiently, before the first successful test connect.
     hostKey: z.string().optional()
@@ -51,3 +90,12 @@ export const createHostSchema = z.object({
 });
 
 export type CreateHostInput = z.infer<typeof createHostSchema>;
+
+/** Payload for (re)classifying where a server lives. A null `hostId` targets the
+ *  box Polaris itself runs on, which has no Host row. */
+export const setServerEnvironmentSchema = z.object({
+    hostId: z.string().uuid().nullable(),
+    environment: serverEnvironmentSchema
+});
+
+export type SetServerEnvironmentInput = z.infer<typeof setServerEnvironmentSchema>;

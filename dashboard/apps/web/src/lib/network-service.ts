@@ -1,15 +1,24 @@
 /**
- * Network topology and exposure strategy. Detects whether Polaris runs on a box
- * with a directly reachable public IP (a data centre / VPS) or behind NAT (a home
- * / office server), and derives how auto-generated domains should be exposed so an
- * app never gets a subdomain that silently does not work off the LAN.
+ * Network topology and exposure strategy. Classifies the box Polaris runs on -
+ * cloud VM, VPS, home LAN behind a router, or a carrier-NAT line (the
+ * `ServerEnvironment` taxonomy in @polaris/core, which registered SSH hosts share)
+ * - and derives how auto-generated domains should be exposed so an app never gets
+ * a subdomain that silently does not work off the LAN.
  *
- * The operator can override the detected mode and configure a wildcard domain they
- * point at their public IP. Config lives in the Setting table (no schema change).
+ * Detection is a starting point, not the truth: the operator can answer where the
+ * box lives and can override the exposure mode and wildcard domain. Config lives
+ * in the Setting table (no schema change).
  */
 
 import { prisma } from "@polaris/db";
 import { DEFAULT_SUBDOMAIN_BASE, magicDomain } from "@polaris/deploy";
+import {
+    isCarrierGradeNat,
+    isPrivateIp,
+    SERVER_ENVIRONMENTS,
+    serverEnvironmentGroup,
+    type ServerEnvironment
+} from "@polaris/core";
 import { deployBase, duckdnsConfigured, getPublicIp } from "./domain-service";
 
 /**
@@ -31,45 +40,99 @@ const KEYS = {
     wildcardDomain: "network.wildcardDomain",
     detectedIp: "network.detectedPublicIp",
     detectedAt: "network.detectedPublicIpAt",
-    placement: "network.placement"
+    environment: "network.environment",
+    detectedEnvironment: "network.detectedEnvironment",
+    detectedEnvironmentAt: "network.detectedEnvironmentAt"
 } as const;
 
 /** Where Polaris is hosted, inferred from cloud signals. */
 export type ServerPlacement = "cloud" | "home" | "unknown";
 
-/**
- * Classify the host as a cloud/data-centre box or a home/office server. The
- * strongest signal is a cloud metadata service on the 169.254.169.254 link-local
- * address (AWS/GCP/Azure IMDS answer there and nothing else does); a public server
- * IP also implies cloud, a private one a home/NAT box. Cached - placement is
- * stable for the life of the machine.
- */
-export async function detectPlacement(force = false): Promise<ServerPlacement> {
-    if (!force) {
-        const cached = await getSetting(KEYS.placement);
-        if (cached === "cloud" || cached === "home" || cached === "unknown") return cached;
-    }
-    let placement: ServerPlacement = "unknown";
+/** True when a cloud metadata service answers on the 169.254.169.254 link-local
+ *  address (200 on IMDSv1, 401 on IMDSv2, 403/404 elsewhere - any answer counts):
+ *  only a cloud network routes it, so this is the strongest "this is a VM" signal. */
+async function cloudMetadataReachable(): Promise<boolean> {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 1500);
     try {
-        const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), 1500);
-        // Any HTTP response from the metadata IP (200 IMDSv1, 401 IMDSv2, 403/404
-        // on other clouds) means a cloud VM; only cloud networks route this address.
-        const res = await fetch("http://169.254.169.254/latest/meta-data/", {
+        await fetch("http://169.254.169.254/latest/meta-data/", {
             cache: "no-store",
             signal: controller.signal,
             headers: { "Metadata-Flavor": "Google" }
         });
-        clearTimeout(timer);
-        void res;
-        placement = "cloud";
+        return true;
     } catch {
-        // No metadata endpoint: fall back to the public-IP shape.
-        const ip = await getPublicIp();
-        if (ip) placement = isPrivateIpv4(ip) ? "home" : "cloud";
+        return false;
+    } finally {
+        clearTimeout(timer);
     }
-    await setSetting(KEYS.placement, placement);
-    return placement;
+}
+
+/**
+ * Classify the box Polaris runs on. After the cloud-metadata probe the shape of
+ * the box's own address decides: a public address is a VPS/dedicated server,
+ * carrier-NAT space a home line with no inbound ports, a private address a
+ * home/office LAN box. A conclusive answer is cached for the life of the machine
+ * (it does not move); an inconclusive one only for the detection TTL, so an
+ * offline box retries later instead of probing the metadata address per request.
+ */
+export async function detectLocalEnvironment(force = false): Promise<ServerEnvironment> {
+    if (!force) {
+        const cached = await getSetting(KEYS.detectedEnvironment);
+        if (cached && SERVER_ENVIRONMENTS.includes(cached as ServerEnvironment)) {
+            if (cached !== "unknown") return cached as ServerEnvironment;
+            const at = Number(await getSetting(KEYS.detectedEnvironmentAt));
+            if (Number.isFinite(at) && Date.now() - at < DETECT_TTL_MS) return "unknown";
+        }
+    }
+    let environment: ServerEnvironment = "unknown";
+    if (await cloudMetadataReachable()) {
+        environment = "cloud";
+    } else {
+        const [ownIp, externalIp] = await Promise.all([getPublicIp(), detectPublicIp(force)]);
+        if (ownIp && isCarrierGradeNat(ownIp)) environment = "home-cgnat";
+        else if (ownIp && !isPrivateIp(ownIp)) environment = "vps";
+        else if (externalIp) environment = isCarrierGradeNat(externalIp) ? "home-cgnat" : "home-nat";
+    }
+    await setSetting(KEYS.detectedEnvironment, environment);
+    await setSetting(KEYS.detectedEnvironmentAt, String(Date.now()));
+    return environment;
+}
+
+export interface LocalEnvironment {
+    /** The classification to act on: the operator's answer, else the detection. */
+    environment: ServerEnvironment;
+    /** What Polaris detected on its own, offered as the default when asking. */
+    detected: ServerEnvironment;
+    /** True when the operator answered, so the value is not just a guess. */
+    confirmed: boolean;
+}
+
+/** Where the Polaris box lives, preferring the operator's answer over detection:
+ *  no probe can see a router's port forwarding or a CGNAT line from the inside. */
+export async function getLocalEnvironment(force = false): Promise<LocalEnvironment> {
+    const [stored, detected] = await Promise.all([
+        getSetting(KEYS.environment),
+        detectLocalEnvironment(force)
+    ]);
+    const answered =
+        stored && stored !== "unknown" && SERVER_ENVIRONMENTS.includes(stored as ServerEnvironment)
+            ? (stored as ServerEnvironment)
+            : null;
+    return { environment: answered ?? detected, detected, confirmed: Boolean(answered) };
+}
+
+/** Store the operator's answer for the local box ("unknown" clears it, so
+ *  detection takes over again). */
+export async function setLocalEnvironment(environment: ServerEnvironment): Promise<void> {
+    await setSetting(KEYS.environment, environment === "unknown" ? null : environment);
+}
+
+/** Coarse hosting group for the exposure guidance, derived from the environment. */
+export async function detectPlacement(force = false): Promise<ServerPlacement> {
+    const group = serverEnvironmentGroup((await getLocalEnvironment(force)).environment);
+    if (group === "datacenter") return "cloud";
+    return group === "home" ? "home" : "unknown";
 }
 
 /** Re-detect the public IP if the cached value is older than this. */
@@ -86,19 +149,6 @@ async function setSetting(key: string, value: string | null): Promise<void> {
         return;
     }
     await prisma.setting.upsert({ where: { key }, create: { key, value, scope: "global" }, update: { value } });
-}
-
-/** An IPv4 literal that is not publicly routable (RFC1918, CGNAT, link-local, loopback). */
-export function isPrivateIpv4(ip: string): boolean {
-    const match = ip.trim().match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
-    if (!match) return true;
-    const [a, b] = match.slice(1, 3).map(Number) as [number, number];
-    if (a === 10 || a === 127 || a === 0) return true;
-    if (a === 192 && b === 168) return true;
-    if (a === 172 && b >= 16 && b <= 31) return true;
-    if (a === 169 && b === 254) return true; // link-local
-    if (a === 100 && b >= 64 && b <= 127) return true; // CGNAT
-    return false;
 }
 
 /** Fetch the box's external public IP from an echo service, cached with a TTL. */
@@ -162,7 +212,7 @@ export async function getNetworkStatus(): Promise<NetworkStatus> {
         duckdnsConfigured()
     ]);
     const mode = MODES.includes(storedMode as NetworkMode) ? (storedMode as NetworkMode) : "auto";
-    const autoSubdomainsPublic = Boolean(subdomainIp) && !isPrivateIpv4(subdomainIp!);
+    const autoSubdomainsPublic = Boolean(subdomainIp) && !isPrivateIp(subdomainIp!);
     const natted = !autoSubdomainsPublic || (Boolean(publicIp) && publicIp !== subdomainIp);
     const effectiveMode: EffectiveMode = mode === "auto" ? (autoSubdomainsPublic ? "public" : "lan") : mode;
     return {
@@ -214,7 +264,7 @@ export async function resolveAutoDomain(name: string, override?: { ip: string })
     if (override) {
         const ip = override.ip.trim();
         if (!ip) return null;
-        const publicIp = !isPrivateIpv4(ip);
+        const publicIp = !isPrivateIp(ip);
         return {
             hostname: magicDomain(name, ip, DEFAULT_SUBDOMAIN_BASE),
             cert: publicIp ? "le" : "internal",
