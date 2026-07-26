@@ -50,6 +50,26 @@ export function isPrivateIp(value: string): boolean {
 }
 
 /**
+ * True when the value is an IPv4 literal (an IPv4-mapped IPv6 counts). Callers
+ * that encode an address into a DNS label - the magic subdomains, which replace
+ * dots - need this: an IPv6 address cannot survive into a hostname, so it can
+ * never back a subdomain however routable it is.
+ */
+export function isIpv4(value: string): boolean {
+    try {
+        return parseFolded(value).kind() === "ipv4";
+    } catch {
+        return false;
+    }
+}
+
+/** True when an address is an internet-routable IPv4, the combination a caller
+ *  needs before treating it as a publicly reachable subdomain address. */
+export function isPublicIpv4(value: string): boolean {
+    return isIpv4(value) && !isPrivateIp(value);
+}
+
+/**
  * True when an address sits in carrier-grade NAT space (100.64.0.0/10): the ISP
  * shares one public address across customers, so no port forward can ever expose
  * a server on that line - only an outbound tunnel can.

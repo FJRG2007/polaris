@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isCarrierGradeNat, isPrivateIp } from "../src/cidr.js";
+import { isCarrierGradeNat, isIpv4, isPrivateIp, isPublicIpv4 } from "../src/cidr.js";
 import { environmentFromAddress, serverEnvironmentGroup } from "../src/schemas/host.js";
 
 describe("isPrivateIp", () => {
@@ -23,6 +23,26 @@ describe("isPrivateIp", () => {
     it("classifies an IPv4-mapped IPv6 address by its IPv4 form", () => {
         expect(isPrivateIp("::ffff:8.8.8.8")).toBe(false);
         expect(isPrivateIp("::ffff:192.168.1.10")).toBe(true);
+    });
+});
+
+describe("isIpv4 / isPublicIpv4", () => {
+    it("accepts IPv4 literals and the IPv4-mapped form", () => {
+        expect(isIpv4("192.168.1.10")).toBe(true);
+        expect(isIpv4("::ffff:8.8.8.8")).toBe(true);
+    });
+
+    it("rejects IPv6 and hostnames, which cannot back a magic subdomain", () => {
+        expect(isIpv4("2606:4700::1111")).toBe(false);
+        expect(isIpv4("nas.local")).toBe(false);
+        expect(isIpv4("")).toBe(false);
+    });
+
+    it("calls only a routable IPv4 publicly usable", () => {
+        expect(isPublicIpv4("8.8.8.8")).toBe(true);
+        expect(isPublicIpv4("192.168.1.10")).toBe(false);
+        // Routable, but its colons cannot survive into a DNS label.
+        expect(isPublicIpv4("2606:4700::1111")).toBe(false);
     });
 });
 

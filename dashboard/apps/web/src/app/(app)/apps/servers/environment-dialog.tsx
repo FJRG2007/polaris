@@ -56,7 +56,17 @@ export function EnvironmentDialog({
             : null;
 
     return (
-        <Dialog open={Boolean(target)} onOpenChange={(open) => !open && onClose()}>
+        <Dialog
+            open={Boolean(target)}
+            onOpenChange={(open) => {
+                // Only the content unmounts, so a failed save would otherwise still
+                // be on screen the next time the dialog opens - on any server.
+                if (!open) {
+                    setError(null);
+                    onClose();
+                }
+            }}
+        >
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>Where does {target?.name} live?</DialogTitle>

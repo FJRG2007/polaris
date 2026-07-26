@@ -14,7 +14,9 @@ import { prisma } from "@polaris/db";
 import { DEFAULT_SUBDOMAIN_BASE, magicDomain } from "@polaris/deploy";
 import {
     isCarrierGradeNat,
+    isIpv4,
     isPrivateIp,
+    isPublicIpv4,
     SERVER_ENVIRONMENTS,
     serverEnvironmentGroup,
     type ServerEnvironment
@@ -149,9 +151,28 @@ export async function setLocalEnvironment(environment: ServerEnvironment): Promi
     await setSetting(KEYS.environment, environment === "unknown" ? null : environment);
 }
 
-/** Coarse hosting group for the exposure guidance, derived from the environment. */
+/**
+ * Coarse hosting group for the exposure guidance, derived from the environment.
+ * Never probes on its own: `getNetworkStatus` is awaited on request paths that
+ * must stay fast (share links, domain resolution), so this reads the operator's
+ * answer and the last detection and settles for "unknown" rather than blocking a
+ * request on the metadata and echo-service walks. Pass `force` from an explicit
+ * re-detect action to refresh it.
+ */
 export async function detectPlacement(force = false): Promise<ServerPlacement> {
-    const group = serverEnvironmentGroup((await getLocalEnvironment(force)).environment);
+    let environment: ServerEnvironment;
+    if (force) {
+        environment = (await getLocalEnvironment(true)).environment;
+    } else {
+        const answered = asEnvironment(await getSetting(KEYS.environment));
+        const detected = asEnvironment(await getSetting(KEYS.detectedEnvironment));
+        // Nothing known yet (a fresh install): warm the cache in the background so
+        // the next load is classified, rather than reporting "unknown" until
+        // someone opens Servers or hits re-detect.
+        if (!answered && !detected) void detectLocalEnvironment().catch(() => undefined);
+        environment = answered ?? detected ?? "unknown";
+    }
+    const group = serverEnvironmentGroup(environment);
     if (group === "datacenter") return "cloud";
     return group === "home" ? "home" : "unknown";
 }
@@ -233,7 +254,10 @@ export async function getNetworkStatus(): Promise<NetworkStatus> {
         duckdnsConfigured()
     ]);
     const mode = MODES.includes(storedMode as NetworkMode) ? (storedMode as NetworkMode) : "auto";
-    const autoSubdomainsPublic = Boolean(subdomainIp) && !isPrivateIp(subdomainIp!);
+    // IPv4 only: the free subdomain encodes the address in a DNS label, which a
+    // public IPv6 cannot survive - treating one as reachable would mint a hostname
+    // with colons in it and ask Let's Encrypt to certify it.
+    const autoSubdomainsPublic = Boolean(subdomainIp) && isPublicIpv4(subdomainIp!);
     const natted = !autoSubdomainsPublic || (Boolean(publicIp) && publicIp !== subdomainIp);
     const effectiveMode: EffectiveMode = mode === "auto" ? (autoSubdomainsPublic ? "public" : "lan") : mode;
     return {
@@ -284,7 +308,9 @@ export async function resolveAutoDomain(name: string, override?: { ip: string })
     // LAN-only internal name. The wildcard/mode logic below is for the local host.
     if (override) {
         const ip = override.ip.trim();
-        if (!ip) return null;
+        // The subdomain encodes the address in a DNS label, so a host reached by
+        // name or over IPv6 has no auto domain to offer - the caller falls back.
+        if (!isIpv4(ip)) return null;
         const publicIp = !isPrivateIp(ip);
         return {
             hostname: magicDomain(name, ip, DEFAULT_SUBDOMAIN_BASE),

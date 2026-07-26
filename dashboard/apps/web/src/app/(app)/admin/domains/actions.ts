@@ -16,6 +16,7 @@ import {
     type DomainConfig
 } from "@/lib/domain-service";
 import {
+    detectPlacement,
     detectPublicIp,
     getNetworkStatus,
     setNetworkConfig,
@@ -49,10 +50,15 @@ export async function syncDuckDnsAction(): Promise<{ ok: boolean; detail: string
     return syncDuckDns();
 }
 
-/** Current network topology + exposure mode (re-detecting the public IP if asked). */
+/** Current network topology + exposure mode. Re-detecting refreshes the public IP
+ *  and the hosting classification with it - a box that moved networks would keep
+ *  reporting the old placement otherwise, and this button is the only way to force it. */
 export async function networkStatusAction(redetect = false): Promise<NetworkStatus> {
     await requireAdmin();
-    if (redetect) await detectPublicIp(true);
+    if (redetect) {
+        await detectPublicIp(true);
+        await detectPlacement(true);
+    }
     return getNetworkStatus();
 }
 

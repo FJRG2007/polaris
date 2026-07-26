@@ -23,8 +23,11 @@ async function localMachineName(): Promise<string> {
     try {
         const driver = localDockerDriver();
         try {
+            // The losing info() promise is abandoned but still settles when dispose()
+            // tears the transport down; without its own catch that rejection lands
+            // unhandled (fatal in Node) every time the daemon is slow.
             const info = await Promise.race([
-                driver.info(),
+                driver.info().catch(() => null),
                 new Promise<null>((resolve) => setTimeout(() => resolve(null), NAME_TIMEOUT_MS))
             ]);
             return info?.name || hostname();
@@ -74,7 +77,9 @@ export default async function ServersPage() {
                 authMethod: host.authMethod,
                 environment,
                 suggested: environmentFromAddress(host.address),
-                // A host's stored environment only ever comes from the operator.
+                // The add-server form prefills this from the address, but shows the
+                // value and its routing note before submit - so a stored value was
+                // at least seen and accepted, unlike the local box's silent guess.
                 confirmed: environment !== "unknown"
             };
         })
