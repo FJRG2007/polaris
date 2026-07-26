@@ -9,6 +9,7 @@
  */
 
 import { prisma } from "@polaris/db";
+import { parseStoredTunnel } from "./quick-tunnel-store";
 
 /** A tunnel hostname shaped like an `AppDomain` row (kind "tunnel"). */
 export interface TunnelDomain {
@@ -53,8 +54,12 @@ export async function listActiveTunnelDomains(appIds: string[]): Promise<Map<str
 
     for (const appId of appIds) {
         const domains: TunnelDomain[] = [];
+        // The quick-tunnel record is JSON `{url, startedAt}` and exists as soon as the
+        // sidecar is up, so its URL is null until cloudflared prints one - there is no
+        // hostname to show yet.
         const quick = values.get(`deploy.qtunnel.${appId}`);
-        if (quick) domains.push({ id: `qtunnel:${appId}`, hostname: hostnameOf(quick), kind: "tunnel", enabled: true });
+        const quickUrl = quick ? parseStoredTunnel(quick).url : null;
+        if (quickUrl) domains.push({ id: `qtunnel:${appId}`, hostname: hostnameOf(quickUrl), kind: "tunnel", enabled: true });
         const ngrok = values.get(`deploy.ngrok.${appId}`);
         if (ngrok) domains.push({ id: `ngrok:${appId}`, hostname: hostnameOf(ngrok), kind: "tunnel", enabled: true });
         const named = values.get(`deploy.ntunnel.${appId}.hostname`);

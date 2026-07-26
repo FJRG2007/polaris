@@ -14,6 +14,7 @@ import { prisma } from "@polaris/db";
 import type { ComposeSpec } from "@polaris/deploy";
 import { shortHash } from "@polaris/deploy";
 import { HostdPorts } from "./ports-hostd";
+import { parseStoredTunnel, type StoredTunnel } from "./quick-tunnel-store";
 import { getPublicIp } from "../domain-service";
 import { syncAppRoutes } from "../deploy-service";
 
@@ -275,33 +276,9 @@ export async function reconcileQuickTunnels(): Promise<void> {
     }
 }
 
-/** The cached tunnel URL and the container start time it was captured on. */
-interface StoredTunnel {
-    url: string | null;
-    startedAt: string | null;
-}
-
-/** Parse a stored tunnel value. New values are JSON `{url, startedAt}`; an older value
- *  is a bare URL string (or an empty live-but-unknown marker), handled tolerantly. */
-function parseStored(value: string): StoredTunnel {
-    if (!value) return { url: null, startedAt: null };
-    try {
-        const parsed = JSON.parse(value) as { url?: unknown; startedAt?: unknown };
-        if (parsed && typeof parsed === "object" && ("url" in parsed || "startedAt" in parsed)) {
-            return {
-                url: typeof parsed.url === "string" && parsed.url ? parsed.url : null,
-                startedAt: typeof parsed.startedAt === "string" && parsed.startedAt ? parsed.startedAt : null
-            };
-        }
-    } catch {
-        // Not JSON: an older plain-URL value.
-    }
-    return { url: value, startedAt: null };
-}
-
 async function getStored(appId: string): Promise<StoredTunnel> {
     const row = await prisma.setting.findUnique({ where: { key: urlKey(appId) }, select: { value: true } });
-    return row ? parseStored(row.value) : { url: null, startedAt: null };
+    return row ? parseStoredTunnel(row.value) : { url: null, startedAt: null };
 }
 
 /** Record the tunnel as live, caching its URL (if known) and the container start time it
