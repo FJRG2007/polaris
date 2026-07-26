@@ -101,13 +101,15 @@ export async function createHost(ownerId: string, input: CreateHostInput): Promi
 }
 
 /** Record where a host lives, which decides how a domain can be pointed at it.
- *  Owner-scoped, so an unknown or foreign id is a silent no-op. */
+ *  Owner-scoped: false when no host of this owner matched, so a caller never
+ *  reports a change that did not happen. */
 export async function setHostEnvironment(
     ownerId: string,
     hostId: string,
     environment: ServerEnvironment
-): Promise<void> {
-    await prisma.host.updateMany({ where: { id: hostId, ownerId }, data: { environment } });
+): Promise<boolean> {
+    const { count } = await prisma.host.updateMany({ where: { id: hostId, ownerId }, data: { environment } });
+    return count > 0;
 }
 
 export async function deleteHost(ownerId: string, hostId: string): Promise<void> {

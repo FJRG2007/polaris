@@ -46,8 +46,11 @@ export async function setServerEnvironmentAction(input: unknown): Promise<{ erro
     const parsed = setServerEnvironmentSchema.safeParse(input);
     if (!parsed.success) return { error: "Invalid server environment" };
     const { hostId, environment } = parsed.data;
-    if (hostId) await setHostEnvironment(user.id, hostId, environment);
-    else await setLocalEnvironment(environment);
+    if (hostId) {
+        if (!(await setHostEnvironment(user.id, hostId, environment))) return { error: "Server not found" };
+    } else {
+        await setLocalEnvironment(environment);
+    }
     await recordAudit({
         actorId: user.id,
         action: "server.environment",

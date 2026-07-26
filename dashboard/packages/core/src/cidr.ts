@@ -23,6 +23,19 @@ export function isCidr(value: string): boolean {
 }
 
 /**
+ * Parse an address, folding an IPv4-mapped IPv6 form (::ffff:1.2.3.4) to its IPv4
+ * address first: ipaddr.js classifies the mapped form as its own `ipv4Mapped`
+ * range, which would hide the real address from every range check below.
+ */
+function parseFolded(value: string): ipaddr.IPv4 | ipaddr.IPv6 {
+    const addr = ipaddr.parse(value.trim());
+    if (addr.kind() === "ipv6" && (addr as ipaddr.IPv6).isIPv4MappedAddress()) {
+        return (addr as ipaddr.IPv6).toIPv4Address();
+    }
+    return addr;
+}
+
+/**
  * True when an address is not publicly routable: RFC1918 private space, carrier
  * NAT, link-local, loopback, multicast, or reserved. Anything that is not a valid
  * address (a hostname, an empty string) counts as private, so a caller never
@@ -30,7 +43,7 @@ export function isCidr(value: string): boolean {
  */
 export function isPrivateIp(value: string): boolean {
     try {
-        return ipaddr.parse(value.trim()).range() !== "unicast";
+        return parseFolded(value).range() !== "unicast";
     } catch {
         return true;
     }
@@ -43,7 +56,7 @@ export function isPrivateIp(value: string): boolean {
  */
 export function isCarrierGradeNat(value: string): boolean {
     try {
-        return ipaddr.parse(value.trim()).range() === "carrierGradeNat";
+        return parseFolded(value).range() === "carrierGradeNat";
     } catch {
         return false;
     }

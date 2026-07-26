@@ -19,6 +19,11 @@ describe("isPrivateIp", () => {
         expect(isPrivateIp("nas.local")).toBe(true);
         expect(isPrivateIp("")).toBe(true);
     });
+
+    it("classifies an IPv4-mapped IPv6 address by its IPv4 form", () => {
+        expect(isPrivateIp("::ffff:8.8.8.8")).toBe(false);
+        expect(isPrivateIp("::ffff:192.168.1.10")).toBe(true);
+    });
 });
 
 describe("isCarrierGradeNat", () => {
@@ -28,6 +33,7 @@ describe("isCarrierGradeNat", () => {
         expect(isCarrierGradeNat("100.128.0.1")).toBe(false);
         expect(isCarrierGradeNat("192.168.1.1")).toBe(false);
         expect(isCarrierGradeNat("nas.local")).toBe(false);
+        expect(isCarrierGradeNat("::ffff:100.70.3.4")).toBe(true);
     });
 });
 

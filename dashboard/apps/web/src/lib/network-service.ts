@@ -42,7 +42,8 @@ const KEYS = {
     detectedAt: "network.detectedPublicIpAt",
     environment: "network.environment",
     detectedEnvironment: "network.detectedEnvironment",
-    detectedEnvironmentAt: "network.detectedEnvironmentAt"
+    detectedEnvironmentAt: "network.detectedEnvironmentAt",
+    detectedEnvironmentIp: "network.detectedEnvironmentIp"
 } as const;
 
 /** Where Polaris is hosted, inferred from cloud signals. */
@@ -68,34 +69,52 @@ async function cloudMetadataReachable(): Promise<boolean> {
     }
 }
 
+/** A stored setting read back as an environment, or null when absent or from a
+ *  version that knew a value this one does not. */
+function asEnvironment(value: string | null): ServerEnvironment | null {
+    return value && SERVER_ENVIRONMENTS.includes(value as ServerEnvironment) ? (value as ServerEnvironment) : null;
+}
+
 /**
  * Classify the box Polaris runs on. After the cloud-metadata probe the shape of
  * the box's own address decides: a public address is a VPS/dedicated server,
  * carrier-NAT space a home line with no inbound ports, a private address a
- * home/office LAN box. A conclusive answer is cached for the life of the machine
- * (it does not move); an inconclusive one only for the detection TTL, so an
- * offline box retries later instead of probing the metadata address per request.
+ * home/office LAN box.
+ *
+ * Only the metadata probe is conclusive - it reads the network itself, and a VM
+ * does not move - so a `cloud` answer is cached for the life of the machine. The
+ * address-shape guesses read the operator-editable public IP, so they are cached
+ * only for the detection TTL and are dropped as soon as that IP changes:
+ * otherwise a home server whose ISP address gets configured stays misclassified
+ * as a VPS forever, and the exposure guidance with it.
  */
 export async function detectLocalEnvironment(force = false): Promise<ServerEnvironment> {
+    const ownIp = await getPublicIp();
     if (!force) {
-        const cached = await getSetting(KEYS.detectedEnvironment);
-        if (cached && SERVER_ENVIRONMENTS.includes(cached as ServerEnvironment)) {
-            if (cached !== "unknown") return cached as ServerEnvironment;
+        const cached = asEnvironment(await getSetting(KEYS.detectedEnvironment));
+        if (cached === "cloud") return cached;
+        if (cached) {
             const at = Number(await getSetting(KEYS.detectedEnvironmentAt));
-            if (Number.isFinite(at) && Date.now() - at < DETECT_TTL_MS) return "unknown";
+            const from = await getSetting(KEYS.detectedEnvironmentIp);
+            const fresh = Number.isFinite(at) && Date.now() - at < DETECT_TTL_MS;
+            if (fresh && from === (ownIp ?? "")) return cached;
         }
     }
     let environment: ServerEnvironment = "unknown";
     if (await cloudMetadataReachable()) {
         environment = "cloud";
+    } else if (ownIp && isCarrierGradeNat(ownIp)) {
+        environment = "home-cgnat";
+    } else if (ownIp && !isPrivateIp(ownIp)) {
+        environment = "vps";
     } else {
-        const [ownIp, externalIp] = await Promise.all([getPublicIp(), detectPublicIp(force)]);
-        if (ownIp && isCarrierGradeNat(ownIp)) environment = "home-cgnat";
-        else if (ownIp && !isPrivateIp(ownIp)) environment = "vps";
-        else if (externalIp) environment = isCarrierGradeNat(externalIp) ? "home-cgnat" : "home-nat";
+        // Only worth the echo-service walk when the box's own address says nothing.
+        const externalIp = await detectPublicIp(force);
+        if (externalIp) environment = isCarrierGradeNat(externalIp) ? "home-cgnat" : "home-nat";
     }
     await setSetting(KEYS.detectedEnvironment, environment);
     await setSetting(KEYS.detectedEnvironmentAt, String(Date.now()));
+    await setSetting(KEYS.detectedEnvironmentIp, ownIp ?? "");
     return environment;
 }
 
@@ -111,14 +130,16 @@ export interface LocalEnvironment {
 /** Where the Polaris box lives, preferring the operator's answer over detection:
  *  no probe can see a router's port forwarding or a CGNAT line from the inside. */
 export async function getLocalEnvironment(force = false): Promise<LocalEnvironment> {
-    const [stored, detected] = await Promise.all([
-        getSetting(KEYS.environment),
-        detectLocalEnvironment(force)
-    ]);
-    const answered =
-        stored && stored !== "unknown" && SERVER_ENVIRONMENTS.includes(stored as ServerEnvironment)
-            ? (stored as ServerEnvironment)
-            : null;
+    const stored = asEnvironment(await getSetting(KEYS.environment));
+    const answered = stored && stored !== "unknown" ? stored : null;
+    // An answered box never pays for the probes: the answer wins anyway and the
+    // suggestion is only offered while there is none. Report the last detection as
+    // it stands rather than running a fresh one behind a render.
+    if (answered && !force) {
+        const detected = asEnvironment(await getSetting(KEYS.detectedEnvironment)) ?? "unknown";
+        return { environment: answered, detected, confirmed: true };
+    }
+    const detected = await detectLocalEnvironment(force);
     return { environment: answered ?? detected, detected, confirmed: Boolean(answered) };
 }
 
