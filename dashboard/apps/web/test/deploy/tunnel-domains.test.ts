@@ -19,7 +19,7 @@ function settings(rows: Record<string, string>): void {
 }
 
 describe("listActiveTunnelDomains", () => {
-    beforeEach(() => findMany.mockReset());
+    beforeEach(() => { findMany.mockReset(); });
 
     it("reads the hostname out of a quick tunnel's JSON record", async () => {
         settings({
