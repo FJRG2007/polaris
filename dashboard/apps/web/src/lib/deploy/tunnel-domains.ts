@@ -42,7 +42,8 @@ function hostnameOf(value: string): string {
  * Read every app's active tunnel hostnames in one query, keyed by app id. Quick and
  * ngrok tunnels clear their Setting on teardown, so a cached URL means the tunnel
  * was up; a named tunnel keeps a stable hostname and is skipped only when explicitly
- * disabled. Apps with no active tunnel are absent from the map.
+ * disabled. Apps with no tunnel hostname to show are absent from the map - including
+ * one whose quick tunnel is live but has not printed its URL yet.
  */
 export async function listActiveTunnelDomains(appIds: string[]): Promise<Map<string, TunnelDomain[]>> {
     const result = new Map<string, TunnelDomain[]>();

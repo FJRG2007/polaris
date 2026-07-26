@@ -6,8 +6,9 @@
  * to the app's already-published host port (see hostPortForApp), so it reuses the
  * exact IP:port the app is reachable on locally. The public URL is ephemeral (a new
  * one each time the tunnel starts), so it is read back from the sidecar's logs and
- * cached in a Setting for the UI; a stable custom hostname needs the account-based
- * tunnel configured under Integrations instead.
+ * cached in a Setting for the UI as a `{url, startedAt}` record (shape and decoding
+ * in quick-tunnel-store, so other readers do not have to guess it); a stable custom
+ * hostname needs the account-based tunnel configured under Integrations instead.
  */
 
 import { prisma } from "@polaris/db";
@@ -38,7 +39,8 @@ function names(appId: string): { project: string; service: string } {
 /** Prefix shared by every quick-tunnel URL setting, so live tunnels are listable. */
 const URL_KEY_PREFIX = "deploy.qtunnel.";
 
-/** Setting key caching the current public URL, so the UI shows it across requests. */
+/** Setting key caching the tunnel's `{url, startedAt}` record, so the UI shows the
+ *  public URL across requests. */
 function urlKey(appId: string): string {
     return `${URL_KEY_PREFIX}${appId}`;
 }
