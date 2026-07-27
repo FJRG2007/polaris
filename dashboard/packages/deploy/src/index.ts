@@ -7,6 +7,22 @@
 
 export { slugify, shortHash, serviceName, imageTag } from "./naming.js";
 export { magicDomain, isMagicBase, DEFAULT_SUBDOMAIN_BASE } from "./subdomain.js";
+export {
+    defaultZones,
+    isBaseDomain,
+    isZoneLabel,
+    normalizeBaseDomain,
+    pickZone,
+    randomLabel,
+    randomZoneHostname,
+    zoneHost,
+    zoneHostname,
+    zoneWildcard,
+    DEPLOY_ZONE_LABEL,
+    POLARIS_ZONE_LABEL,
+    type DomainZone,
+    type ZoneScope
+} from "./zones.js";
 export { quoteArg, quoteArgv } from "./shell.js";
 export { traefikLabels, configHash, type TraefikDomain, type CertResolver, type TraefikServiceInput, type TraefikWaf } from "./traefik.js";
 export {
