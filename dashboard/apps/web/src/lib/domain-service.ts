@@ -6,14 +6,15 @@
  * option: its token is stored encrypted (like an integration secret) and the A
  * record can be synced to the current public IP on demand.
  *
- * Config lives in the Setting table (key/value), so no schema change is needed.
+ * Config lives in the Setting table (key/value, via setting-store), so no schema
+ * change is needed.
  */
 
-import { prisma } from "@polaris/db";
 import { loadEnv } from "@polaris/config";
 import { magicDomain, DEFAULT_SUBDOMAIN_BASE } from "@polaris/deploy";
 import { decryptSecret, encryptSecret } from "@polaris/storage";
 import { polarisZoneHost, zoneDnsVerified } from "./domain-zones";
+import { getSetting, setSetting } from "./setting-store";
 import { getPolarisPublicUrl } from "./polaris-tunnel-service";
 
 const KEYS = {
@@ -35,23 +36,6 @@ export interface DomainConfig {
     deployBase: string;
     /** Public IP used to build free subdomains, when no domain is configured. */
     publicIp: string;
-}
-
-async function getSetting(key: string): Promise<string | null> {
-    const row = await prisma.setting.findUnique({ where: { key }, select: { value: true } });
-    return row?.value ?? null;
-}
-
-async function setSetting(key: string, value: string | null): Promise<void> {
-    if (value === null) {
-        await prisma.setting.deleteMany({ where: { key } });
-        return;
-    }
-    await prisma.setting.upsert({
-        where: { key },
-        create: { key, value, scope: "global" },
-        update: { value }
-    });
 }
 
 /** Normalize a user-typed domain into an https base URL with no trailing slash. */

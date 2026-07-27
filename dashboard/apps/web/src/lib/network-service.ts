@@ -10,7 +10,6 @@
  * in the Setting table (no schema change).
  */
 
-import { prisma } from "@polaris/db";
 import { DEFAULT_SUBDOMAIN_BASE, magicDomain } from "@polaris/deploy";
 import {
     isCarrierGradeNat,
@@ -23,6 +22,7 @@ import {
 } from "@polaris/core";
 import { deployBase, duckdnsConfigured, getPublicIp } from "./domain-service";
 import { deployZoneBase, zoneDnsVerified } from "./domain-zones";
+import { getSetting, setSetting } from "./setting-store";
 
 /**
  * - `auto`     : classify from detection (public IP -> public, else LAN-only).
@@ -181,18 +181,6 @@ export async function detectPlacement(force = false): Promise<ServerPlacement> {
 /** Re-detect the public IP if the cached value is older than this. */
 const DETECT_TTL_MS = 6 * 60 * 60 * 1000;
 
-async function getSetting(key: string): Promise<string | null> {
-    const row = await prisma.setting.findUnique({ where: { key }, select: { value: true } });
-    return row?.value ?? null;
-}
-
-async function setSetting(key: string, value: string | null): Promise<void> {
-    if (value === null) {
-        await prisma.setting.deleteMany({ where: { key } });
-        return;
-    }
-    await prisma.setting.upsert({ where: { key }, create: { key, value, scope: "global" }, update: { value } });
-}
 
 /** Fetch the box's external public IP from an echo service, cached with a TTL. */
 export async function detectPublicIp(force = false): Promise<string | null> {

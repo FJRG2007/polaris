@@ -2,11 +2,16 @@
  * Proof that the DNS the guided setup asked for actually exists, and - when the
  * operator has connected a Cloudflare API token - the ability to create it for them.
  *
- * The check resolves a random label inside each zone rather than the zone host
- * itself: only a real wildcard record answers for a name nobody has ever created, so
- * this catches the common half-done setup (the `plr.example.com` A record added, the
- * `*.plr.example.com` one forgotten) that would otherwise surface as every deployed
- * service getting a hostname that resolves nowhere.
+ * The check resolves both names a zone needs, because the half-done setup goes wrong
+ * in either direction: a random label proves the WILDCARD answers (nothing else could
+ * answer for a name nobody ever created), and the zone host itself is checked on its
+ * own, since no wildcard covers it and it is exactly what the dashboard URL and share
+ * links are built from.
+ *
+ * Resolving is not the same as serving, though. On a home line the wildcard points at
+ * the router, which answers DNS for the whole house whether or not 80/443 are
+ * forwarded here - so before the layout is called proven, Polaris asks the hostname
+ * for its own health endpoint and requires its own answer.
  */
 
 import { resolve4 } from "node:dns/promises";
@@ -22,7 +27,7 @@ import {
 import { setDomainConfig } from "./domain-service";
 import { detectPublicIp } from "./network-service";
 import { loadCloudflareToken } from "./integrations/cloudflare-account-service";
-import { findDnsRecord, resolveZoneForHostname, upsertARecord } from "./integrations/cloudflare-api";
+import { findDnsRecords, pruneDnsRecords, resolveZoneForHostname, upsertARecord } from "./integrations/cloudflare-api";
 
 export interface ZoneDnsCheck {
     /** The zone's own hostname (`plr.example.com`). */
@@ -51,46 +56,100 @@ async function resolveOrEmpty(hostname: string): Promise<string[]> {
     }
 }
 
-/** Check every configured zone's wildcard, against the server's public IP. */
+/** Check both names a zone needs - its wildcard and its own host - against this
+ *  server's public IP, and whether the hostname actually serves Polaris. */
 export async function checkZoneDns(): Promise<ZoneDnsReport> {
     const [config, expectedIp] = await Promise.all([getDomainZones(), detectPublicIp()]);
     const records = zoneRecords(config);
     const zones = await Promise.all(
         records.map(async (record) => {
-            const addresses = await resolveOrEmpty(`${randomLabel(3)}.${record.host}`);
-            if (addresses.length === 0) {
+            const [wildcardAddresses, hostAddresses] = await Promise.all([
+                resolveOrEmpty(`${randomLabel(3)}.${record.host}`),
+                resolveOrEmpty(record.host)
+            ]);
+            const missing = [
+                wildcardAddresses.length === 0 ? record.wildcard : null,
+                hostAddresses.length === 0 ? record.host : null
+            ].filter((name): name is string => name !== null);
+            const addresses = [...new Set([...wildcardAddresses, ...hostAddresses])];
+            if (missing.length > 0) {
                 return {
                     host: record.host,
                     wildcard: record.wildcard,
                     addresses,
                     ok: false,
-                    detail: `No DNS answer for ${record.wildcard} yet. Records can take a few minutes to propagate.`
+                    detail: `No DNS answer for ${missing.join(" or ")} yet. Records can take a few minutes to propagate.`
                 };
             }
-            // Without a known public IP the record cannot be compared, only confirmed
+            // Without a known public IP the records cannot be compared, only confirmed
             // to exist - which is still the useful half of the answer.
-            const ok = !expectedIp || addresses.includes(expectedIp);
+            const elsewhere = expectedIp
+                ? [...wildcardAddresses, ...hostAddresses].filter((address) => address !== expectedIp)
+                : [];
+            if (elsewhere.length > 0) {
+                return {
+                    host: record.host,
+                    wildcard: record.wildcard,
+                    addresses,
+                    ok: false,
+                    detail: `Resolves to ${addresses.join(", ")}, but this server is at ${expectedIp}.`
+                };
+            }
+            // DNS pointing here is not the same as traffic arriving here: on a home line
+            // it is the router that answers, and nothing so far says 80/443 reach this
+            // box. Ask the hostname for Polaris and require Polaris to answer.
+            const reachable = await servesPolaris(record.host);
             return {
                 host: record.host,
                 wildcard: record.wildcard,
                 addresses,
-                ok,
-                detail: ok
-                    ? `Resolves to ${addresses.join(", ")}.`
-                    : `Resolves to ${addresses.join(", ")}, but this server is at ${expectedIp}.`
+                ok: reachable,
+                detail: reachable
+                    ? `Resolves to ${addresses.join(", ")} and serves this Polaris.`
+                    : `Resolves to ${addresses.join(", ")}, but nothing answers on it yet - check that ports 80 and 443 reach this server.`
             };
         })
     );
-    // "Verified" has to mean "seen resolving HERE", so it is only recorded when the
-    // server's own address is known to compare against: without it, a wildcard
-    // pointing at a completely different machine would look like proof and promote
-    // every share link onto it.
+    // "Verified" has to mean "seen resolving HERE and serving this Polaris", so it is
+    // only recorded when the server's own address is known to compare against:
+    // without it, a wildcard pointing at a completely different machine would look
+    // like proof and promote every share link onto it.
     if (expectedIp) {
         const verified = zones.length > 0 && zones.every((zone) => zone.ok);
         await setZoneDnsVerified(verified);
         if (verified) await applyDashboardZone();
     }
     return { expectedIp, zones };
+}
+
+/** Polaris's own readiness probe: unauthenticated, and it answers `{"status":"ok"}`,
+ *  so an unrelated server holding the address does not pass for Polaris. */
+const HEALTH_PATH = "/api/health";
+
+/**
+ * Whether the hostname reaches a Polaris over HTTP. Deliberately plain HTTP on the
+ * public name: the certificate does not exist until the hostname works, so requiring
+ * HTTPS here would fail for the very setup it is meant to confirm. What this rules
+ * out is the case that matters - DNS pointed at a router with nothing forwarded, or
+ * at a machine that serves something else entirely.
+ */
+async function servesPolaris(hostname: string): Promise<boolean> {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 5000);
+    try {
+        const res = await fetch(`http://${hostname}${HEALTH_PATH}`, {
+            cache: "no-store",
+            redirect: "follow",
+            signal: controller.signal
+        });
+        if (!res.ok) return false;
+        const body = (await res.json().catch(() => null)) as { status?: unknown } | null;
+        return body?.status === "ok";
+    } catch {
+        return false;
+    } finally {
+        clearTimeout(timer);
+    }
 }
 
 /**
@@ -120,6 +179,8 @@ export interface ZoneDnsProvisionResult {
     created: string[];
     /** Records that already existed and were repointed at this server. */
     replaced: string[];
+    /** Names that already pointed here, so nothing had to be done. */
+    unchanged: string[];
     /** Records pointing somewhere else, left untouched until the operator confirms. */
     conflicts: Array<{ name: string; content: string }>;
     failed: Array<{ name: string; detail: string }>;
@@ -143,20 +204,28 @@ export async function provisionZoneDns(options: { overwrite?: boolean } = {}): P
     if (!ip) throw new Error("Polaris could not detect this server's public IP, so it does not know what to point DNS at");
 
     const zone = await resolveZoneForHostname(token, config.baseDomain);
-    const result: ZoneDnsProvisionResult = { created: [], replaced: [], conflicts: [], failed: [] };
+    const result: ZoneDnsProvisionResult = { created: [], replaced: [], unchanged: [], conflicts: [], failed: [] };
     // Sequential on purpose: Cloudflare rate-limits per account, and a handful of
     // records is not worth risking a 429 that leaves the layout half-created.
     for (const record of zoneRecords(config)) {
         for (const name of [record.host, record.wildcard]) {
             try {
-                const existing = await findDnsRecord(token, zone.id, "A", name);
-                if (existing?.content === ip) continue;
-                if (existing && !options.overwrite) {
-                    result.conflicts.push({ name, content: existing.content });
+                const existing = await findDnsRecords(token, zone.id, "A", name);
+                // Every address the name answers with has to be this server: one stray
+                // record left in place keeps the name round-robining onto a machine
+                // that does not serve the app.
+                const elsewhere = existing.filter((entry) => entry.content !== ip);
+                if (existing.length > 0 && elsewhere.length === 0) {
+                    result.unchanged.push(name);
                     continue;
                 }
-                await upsertARecord(token, zone.id, name, ip);
-                (existing ? result.replaced : result.created).push(name);
+                if (elsewhere.length > 0 && !options.overwrite) {
+                    result.conflicts.push({ name, content: elsewhere.map((entry) => entry.content).join(", ") });
+                    continue;
+                }
+                const recordId = await upsertARecord(token, zone.id, name, ip);
+                await pruneDnsRecords(token, zone.id, recordId, existing);
+                (existing.length > 0 ? result.replaced : result.created).push(name);
             } catch (caught) {
                 result.failed.push({
                     name,

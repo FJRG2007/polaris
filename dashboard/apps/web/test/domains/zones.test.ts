@@ -18,9 +18,15 @@ const { deployHostname, deployZoneBase, getDomainZones, listDeployZones, saveDom
     "../../src/lib/domain-zones"
 );
 
-/** What the Setting row holds after a save, so a read sees what was written. */
-function stored(value: unknown): void {
-    findUnique.mockResolvedValue({ value: JSON.stringify(value) });
+/** What the Setting rows hold after a save, so a read sees what was written. Zones
+ *  only mint hostnames once their DNS has been proven, so the flag is part of the
+ *  fixture - `verified: false` is the "saved but not proven yet" state. */
+function stored(value: unknown, verified = true): void {
+    findUnique.mockImplementation(async ({ where }: { where: { key: string } }) => {
+        if (where.key === "domain.zones") return { value: JSON.stringify(value) };
+        if (where.key === "domain.zones.verified") return verified ? { value: "1" } : null;
+        return null;
+    });
 }
 
 describe("saveDomainZones", () => {
@@ -191,5 +197,26 @@ describe("zoneRecords", () => {
 
     it("asks for nothing when there is no domain", () => {
         expect(zoneRecords({ baseDomain: "", zones: [] })).toEqual([]);
+    });
+});
+
+describe("the verification gate", () => {
+    beforeEach(() => {
+        findUnique.mockReset();
+        stored(
+            {
+                baseDomain: "example.com",
+                zones: [{ label: "plr", scope: "deploy", primary: true }]
+            },
+            false
+        );
+    });
+
+    it("mints no hostname on a layout whose DNS has never been seen working", async () => {
+        expect(await deployHostname("invoices")).toBe("unverified");
+    });
+
+    it("offers no zone in the picker either, so it cannot be the default there", async () => {
+        expect(await listDeployZones()).toEqual([]);
     });
 });

@@ -161,24 +161,36 @@ export interface CfDnsRecord {
 }
 
 /**
- * The record of one type/name that already exists, or null. Callers that are about to
- * write a name the operator may already be using check this first: an upsert replaces
- * whatever is there, and the name can be their domain's apex.
+ * Every record of one type/name that already exists. Callers that are about to write a
+ * name the operator may already be using check this first: an upsert replaces what is
+ * there, and the name can be their domain's apex. All of them are returned, not the
+ * first - a name legitimately holds several A records (an apex on a CDN usually has
+ * two to four), and judging the name by one of them would both miss records pointing
+ * elsewhere and leave them behind after a write.
  */
-export async function findDnsRecord(
+export async function findDnsRecords(
     token: string,
     zoneId: string,
     type: string,
     name: string
-): Promise<CfDnsRecord | null> {
+): Promise<CfDnsRecord[]> {
     const existing = await cf<Array<{ id?: unknown; content?: unknown }>>(
         token,
         "GET",
         `/zones/${zoneId}/dns_records?type=${type}&name=${encodeURIComponent(name)}`
     );
-    const current = Array.isArray(existing) ? existing.find((entry) => typeof entry?.id === "string") : undefined;
-    if (!current || typeof current.id !== "string") return null;
-    return { id: current.id, content: typeof current.content === "string" ? current.content : "" };
+    if (!Array.isArray(existing)) return [];
+    return existing
+        .filter((entry): entry is { id: string; content?: unknown } => typeof entry?.id === "string")
+        .map((entry) => ({ id: entry.id, content: typeof entry.content === "string" ? entry.content : "" }));
+}
+
+/** Delete every record of a type/name except one, so a name that round-robined between
+ *  several addresses ends up pointing only where the caller asked. */
+export async function pruneDnsRecords(token: string, zoneId: string, keepId: string, records: CfDnsRecord[]): Promise<void> {
+    for (const record of records) {
+        if (record.id !== keepId) await deleteDnsRecord(token, zoneId, record.id);
+    }
 }
 
 /** Create or replace a DNS record of one type/name, returning its record id. */
@@ -187,7 +199,9 @@ async function upsertRecord(
     zoneId: string,
     record: { type: string; name: string; content: string; proxied: boolean; ttl: number }
 ): Promise<string> {
-    const current = await findDnsRecord(token, zoneId, record.type, record.name);
+    // The first is the one rewritten; a name holding several is the caller's business
+    // (see pruneDnsRecords), since only it knows whether the others should survive.
+    const [current] = await findDnsRecords(token, zoneId, record.type, record.name);
     if (current) {
         await cf(token, "PUT", `/zones/${zoneId}/dns_records/${current.id}`, record);
         return current.id;

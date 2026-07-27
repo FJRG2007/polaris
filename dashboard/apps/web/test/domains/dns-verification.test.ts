@@ -39,6 +39,15 @@ vi.mock("../../src/lib/integrations/cloudflare-account-service", () => ({ loadCl
 const { checkZoneDns } = await import("../../src/lib/domain-dns");
 const { saveDomainZones, setDashboardZoneIntent, zoneDnsVerified } = await import("../../src/lib/domain-zones");
 
+/** The reachability probe: resolving proves DNS, this proves traffic arrives here. */
+function serving(ok: boolean): void {
+    vi.stubGlobal("fetch", async () =>
+        ok
+            ? new Response(JSON.stringify({ status: "ok" }), { status: 200 })
+            : new Response("", { status: 502 })
+    );
+}
+
 const LAYOUT = {
     baseDomain: "example.com",
     zones: [
@@ -52,8 +61,19 @@ describe("checkZoneDns", () => {
         store.clear();
         resolve4.mockReset();
         setDomainConfig.mockReset();
+        serving(true);
         await saveDomainZones(LAYOUT);
         await setDashboardZoneIntent(true);
+    });
+
+    it("waits for the hostname to actually serve Polaris, not just to resolve", async () => {
+        resolve4.mockResolvedValue(["51.15.20.30"]);
+        serving(false);
+        await checkZoneDns();
+        // The usual home-line trap: DNS points at the router, but 80/443 were never
+        // forwarded, so nothing here answers on the name.
+        expect(await zoneDnsVerified()).toBe(false);
+        expect(setDomainConfig).not.toHaveBeenCalled();
     });
 
     it("leaves the dashboard where it is while the zone resolves nowhere", async () => {

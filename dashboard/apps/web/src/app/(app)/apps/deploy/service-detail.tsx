@@ -1559,6 +1559,9 @@ function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
     const [port, setPort] = useState(app.port != null ? String(app.port) : "");
     const [advanced, setAdvanced] = useState(false);
     const [exposure, setExposure] = useState<ExposureKind>("subdomain");
+    // Set as soon as the operator picks a method, so the async zone default below
+    // never overrides a deliberate choice.
+    const exposureTouched = useRef(false);
     const [cfConnected, setCfConnected] = useState(false);
     const [duckSub, setDuckSub] = useState<string | null>(null);
     const [zones, setZones] = useState<Array<{ label: string; host: string; primary: boolean }>>([]);
@@ -1582,7 +1585,10 @@ function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
                 // A configured domain is the best default: it is the only option that
                 // yields a stable, public hostname without a third party in the path.
                 // The layout's own default zone wins, not merely the first stored one.
-                if (result.length > 0) {
+                // Only while the operator has not chosen yet, though - this resolves
+                // after a round trip, and replacing a choice made in the meantime would
+                // add a different kind of domain than the one they pressed for.
+                if (result.length > 0 && !exposureTouched.current) {
                     setExposure("zone");
                     setZoneLabel((result.find((zone) => zone.primary) ?? result[0])?.label ?? "");
                 }
@@ -1822,7 +1828,10 @@ function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
                             Exposure
                             <Select
                                 value={exposure}
-                                onValueChange={(value) => setExposure(value as ExposureKind)}
+                                onValueChange={(value) => {
+                                    exposureTouched.current = true;
+                                    setExposure(value as ExposureKind);
+                                }}
                                 options={EXPOSURE_OPTIONS.filter((option) => option.value !== "zone" || zones.length > 0)}
                                 aria-label="Exposure method"
                             />

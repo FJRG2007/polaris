@@ -191,7 +191,7 @@ export async function polarisZoneHost(): Promise<string | null> {
 
 /** Why a hostname could not be minted, so the caller can say which of the two it is
  *  instead of sending the operator back to a setup that is actually fine. */
-export type ZoneMintFailure = "no-domain" | "unknown-zone";
+export type ZoneMintFailure = "no-domain" | "unknown-zone" | "unverified";
 
 export interface MintedHostname {
     hostname: string;
@@ -209,6 +209,10 @@ export async function deployHostname(
 ): Promise<MintedHostname | ZoneMintFailure> {
     const config = await getDomainZones();
     if (!config.baseDomain) return "no-domain";
+    // The same gate the picker applies, enforced where the hostname is actually
+    // minted: an unproven zone yields a name nobody can reach and an ACME order that
+    // cannot complete, however the caller got here.
+    if (!(await zoneDnsVerified())) return "unverified";
     const zone = pickZone(config.zones, "deploy", options.zoneLabel);
     if (!zone) return "unknown-zone";
     return {
@@ -224,6 +228,10 @@ export async function deployHostname(
 export async function listDeployZones(): Promise<Array<{ label: string; host: string; primary: boolean }>> {
     const config = await getDomainZones();
     if (!config.baseDomain) return [];
+    // Unproven zones are not offered: this is the picker's default, so a service added
+    // right after the wizard would otherwise take a hostname that resolves nowhere and
+    // ask Let's Encrypt to certify it, retrying until the records exist.
+    if (!(await zoneDnsVerified())) return [];
     return config.zones
         .filter((zone) => zone.scope === "deploy")
         .map((zone) => ({ label: zone.label, host: zoneHost(zone, config.baseDomain), primary: zone.primary }));

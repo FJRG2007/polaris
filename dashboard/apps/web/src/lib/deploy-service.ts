@@ -261,6 +261,11 @@ export async function addApplicationDomain(
         if (minted === "no-domain") {
             throw new Error("No domain is configured yet. Run the guided setup under Domains first.");
         }
+        if (minted === "unverified") {
+            throw new Error(
+                "That domain has not been seen working yet. Run the DNS check under Domains, then add the domain."
+            );
+        }
         if (minted === "unknown-zone") {
             throw new Error("That zone no longer exists. Pick another one, or add it back under Domains.");
         }

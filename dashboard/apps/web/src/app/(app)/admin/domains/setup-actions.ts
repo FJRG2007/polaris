@@ -34,7 +34,7 @@ import {
     type LocalEnvironment,
     type NetworkStatus
 } from "@/lib/network-service";
-import { normalizeBaseDomain } from "@polaris/deploy";
+import { isZoneLabel, normalizeBaseDomain } from "@polaris/deploy";
 
 export interface DomainSetupState {
     environment: LocalEnvironment;
@@ -96,10 +96,12 @@ export interface DomainSetupResult {
 }
 
 /**
- * Apply the wizard's answers. The strategy decides what a domain means here: a
- * wildcard strategy stores the zone layout and switches exposure to it, a tunnel
- * strategy keeps the domain for per-service tunnel hostnames, and the free-subdomain
- * strategy clears the domain so nothing claims DNS that was never created.
+ * Apply the wizard's answers. Only a wildcard strategy owns a domain here: it stores
+ * the zone layout and switches exposure to it. A tunnel or free-subdomain strategy
+ * clears the stored domain - their hostnames come from the tunnel provider or from
+ * sslip.io, so a zone would claim DNS that was never created. Re-running the setup
+ * and choosing one of those therefore drops a layout saved earlier, which is the
+ * intended reading of "this is how the box is exposed now".
  */
 export async function saveDomainSetupAction(input: unknown): Promise<DomainSetupResult> {
     const user = await requireAdmin();
@@ -114,7 +116,13 @@ export async function saveDomainSetupAction(input: unknown): Promise<DomainSetup
     // DuckDNS name Polaris keeps pointed at this server. A tunnel strategy stores
     // none - its hostnames are published by the tunnel provider, so a zone here
     // would ask the operator to create DNS records that must not exist.
-    const duckSubdomain = parsed.data.duckdnsSubdomain.trim().toLowerCase();
+    // DuckDNS shows the operator the full name, so pasting "mypolaris.duckdns.org" is
+    // the natural move - and concatenating it would store mypolaris.duckdns.org.duckdns.org
+    // as the zone base and the sync target, both wrong with nothing to show for it.
+    const duckSubdomain = parsed.data.duckdnsSubdomain
+        .trim()
+        .toLowerCase()
+        .replace(/\.duckdns\.org\.?$/, "");
     const baseDomain =
         strategy === "duckdns"
             ? duckSubdomain && `${duckSubdomain}.duckdns.org`
@@ -126,8 +134,11 @@ export async function saveDomainSetupAction(input: unknown): Promise<DomainSetup
     // wildcard domain, which mints LAN-only hostnames on a perfectly public server -
     // a worse state than before the wizard ran. Half-applied answers are the other
     // failure this prevents: the environment used to be saved even on this error.
-    if (strategy === "duckdns" && !duckSubdomain) {
-        return { state: await domainSetupStateAction(), error: "Enter your DuckDNS subdomain" };
+    if (strategy === "duckdns" && !isZoneLabel(duckSubdomain)) {
+        return {
+            state: await domainSetupStateAction(),
+            error: duckSubdomain ? "Enter just the subdomain, e.g. mypolaris" : "Enter your DuckDNS subdomain"
+        };
     }
     if (meta.needsDomain && meta.wildcard && !baseDomain) {
         return { state: await domainSetupStateAction(), error: "Enter the domain you want to use" };
@@ -212,6 +223,7 @@ export async function provisionZoneDnsAction(input?: unknown): Promise<ZoneDnsPr
         return {
             created: [],
             replaced: [],
+            unchanged: [],
             conflicts: [],
             failed: [],
             error: caught instanceof Error ? caught.message : "Could not create the DNS records"

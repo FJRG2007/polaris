@@ -514,6 +514,7 @@ function DnsStep({ state, publicIp }: { state: DomainSetupState; publicIp: strin
         const result = await provisionZoneDnsAction({ overwrite }).catch((caught: unknown) => ({
             created: [],
             replaced: [],
+            unchanged: [],
             conflicts: [],
             failed: [],
             error: caught instanceof Error ? caught.message : "Could not create the DNS records"
@@ -524,13 +525,17 @@ function DnsStep({ state, publicIp }: { state: DomainSetupState; publicIp: strin
             return;
         }
         setConflicts(result.conflicts);
+        // A run where every record was already right is the good outcome, not a failure:
+        // counting only what changed would report "0 created, 0 repointed" and read like
+        // the button did nothing.
         const parts = [
-            `${result.created.length} created`,
-            `${result.replaced.length} repointed`,
+            ...(result.created.length > 0 ? [`${result.created.length} created`] : []),
+            ...(result.replaced.length > 0 ? [`${result.replaced.length} repointed`] : []),
+            ...(result.unchanged.length > 0 ? [`${result.unchanged.length} already correct`] : []),
             ...(result.conflicts.length > 0 ? [`${result.conflicts.length} left alone`] : []),
             ...(result.failed.length > 0 ? [`failed: ${result.failed.map((entry) => entry.name).join(", ")}`] : [])
         ];
-        setMessage(`${parts.join(", ")}.`);
+        setMessage(parts.length > 0 ? `${parts.join(", ")}.` : "Nothing to do - the records are already in place.");
         await check();
     }
 
