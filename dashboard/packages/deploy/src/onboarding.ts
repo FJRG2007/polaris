@@ -64,10 +64,7 @@ export function onboardingScript(options: OnboardingOptions): string {
         "  curl -fsSL https://get.docker.com | sh;",
         "fi",
         "docker --version",
-        // The dynamic directory holds routes for backends Traefik cannot discover
-        // through Docker - today, services published from another box over a reverse
-        // SSH tunnel (see reverse-tunnel.ts).
-        `mkdir -p ${deployRoot} ${volumeRoot} /var/lib/polaris/traefik/dynamic`,
+        `mkdir -p ${deployRoot} ${volumeRoot} /var/lib/polaris/traefik`,
         `docker network inspect ${net} >/dev/null 2>&1 || docker network create ${net}`,
         'echo "== starting Traefik =="',
         `docker rm -f polaris-traefik >/dev/null 2>&1 || true`,
@@ -81,8 +78,6 @@ export function onboardingScript(options: OnboardingOptions): string {
             "--providers.docker=true",
             "--providers.docker.exposedbydefault=false",
             `--providers.docker.network=${net}`,
-            "--providers.file.directory=/traefik/dynamic",
-            "--providers.file.watch=true",
             "--entrypoints.web.address=:80",
             "--entrypoints.websecure.address=:443",
             "--certificatesresolvers.letsencrypt.acme.httpchallenge=true",

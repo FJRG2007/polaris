@@ -15,7 +15,6 @@ export type ExposureStrategy =
     | "own-domain"
     | "duckdns"
     | "free-subdomain"
-    | "server-tunnel"
     | "cloudflare-tunnel"
     | "quick-tunnel";
 
@@ -23,7 +22,6 @@ export const EXPOSURE_STRATEGIES: ExposureStrategy[] = [
     "own-domain",
     "duckdns",
     "free-subdomain",
-    "server-tunnel",
     "cloudflare-tunnel",
     "quick-tunnel"
 ];
@@ -72,19 +70,6 @@ export const STRATEGY_META: Record<ExposureStrategy, StrategyMeta> = {
         mode: "auto",
         needsDomain: false
     },
-    "server-tunnel": {
-        label: "Tunnel through your own server",
-        summary: "Services here are published by one of your own servers over an outbound SSH tunnel, on a hostname under that server's wildcard domain.",
-        dependency: "Only your own server and OpenSSH - nothing you do not control.",
-        requires: [
-            "A server registered in Polaris with a public IP",
-            "A wildcard domain pointed at that server",
-            "Polaris onboarding run on it (Traefik)"
-        ],
-        wildcard: false,
-        mode: "tunnel",
-        needsDomain: false
-    },
     "cloudflare-tunnel": {
         label: "Cloudflare tunnel",
         summary: "An outbound tunnel exposes each service on your domain. Works with no public IP and no open ports.",
@@ -121,14 +106,13 @@ export interface StrategyChoice {
 
 /** Order per environment, best first. Anything omitted is unavailable there. */
 const ORDER: Record<ServerEnvironment, [ExposureStrategy, ...ExposureStrategy[]]> = {
-    vps: ["own-domain", "free-subdomain", "server-tunnel", "cloudflare-tunnel", "duckdns", "quick-tunnel"],
-    cloud: ["own-domain", "free-subdomain", "server-tunnel", "cloudflare-tunnel", "duckdns", "quick-tunnel"],
-    "home-nat": ["own-domain", "duckdns", "server-tunnel", "cloudflare-tunnel", "free-subdomain", "quick-tunnel"],
-    // Own tunnel server first: it is the only way to keep a carrier-NAT box on your
-    // own domain without handing every request to a third party - when there is a
-    // box with a public IP to run it on. Cloudflare is next for when there is not.
-    "home-cgnat": ["server-tunnel", "cloudflare-tunnel", "quick-tunnel", "free-subdomain"],
-    unknown: ["free-subdomain", "own-domain", "duckdns", "server-tunnel", "cloudflare-tunnel", "quick-tunnel"]
+    vps: ["own-domain", "free-subdomain", "cloudflare-tunnel", "duckdns", "quick-tunnel"],
+    cloud: ["own-domain", "free-subdomain", "cloudflare-tunnel", "duckdns", "quick-tunnel"],
+    "home-nat": ["own-domain", "duckdns", "cloudflare-tunnel", "free-subdomain", "quick-tunnel"],
+    // A tunnel is the only thing that reaches a carrier-NAT line at all, so the
+    // ranking there is between tunnels rather than against a wildcard record.
+    "home-cgnat": ["cloudflare-tunnel", "quick-tunnel", "free-subdomain"],
+    unknown: ["free-subdomain", "own-domain", "duckdns", "cloudflare-tunnel", "quick-tunnel"]
 };
 
 /** Why the top option is the top option, in the operator's terms. */
@@ -136,7 +120,7 @@ const RECOMMENDATION: Record<ServerEnvironment, string> = {
     vps: "This server holds its own public IP, so a wildcard record pointed straight at it is the shortest path - free and with nobody in between.",
     cloud: "The instance is publicly addressable, so a wildcard record pointed straight at it is the shortest path. Allow 80 and 443 in its security group.",
     "home-nat": "Your router owns a public IP, so forwarding 80 and 443 gives you real domains with no third-party service in the path.",
-    "home-cgnat": "Your ISP shares one address between customers, so no port can be forwarded to this server - only an outbound tunnel reaches it. Publishing through a server you already own keeps your domain and your traffic out of a third party's hands; pick Cloudflare below if you have no server with a public IP.",
+    "home-cgnat": "Your ISP shares one address between customers, so no port can be forwarded to this server. An outbound tunnel is the only thing that reaches it.",
     unknown: "Answer where this server lives to get a recommendation that matches it. Free subdomains work either way in the meantime."
 };
 

@@ -65,13 +65,6 @@ import {
     type NgrokTunnelStatus
 } from "@/lib/deploy/ngrok-tunnel-service";
 import {
-    getServerTunnelStatus,
-    listTunnelServers,
-    startServerTunnel,
-    stopServerTunnel,
-    type ServerTunnelStatus
-} from "@/lib/deploy/server-tunnel-service";
-import {
     getNamedTunnelStatus,
     provisionNamedTunnel,
     setNamedTunnelEnabled,
@@ -634,54 +627,6 @@ export async function stopNgrokTunnelAction(applicationId: string): Promise<{ er
     const user = await requirePermission("deploy.manage");
     try {
         await stopNgrokTunnel(applicationId, user.id);
-        await recordAudit({ actorId: user.id, action: "deploy.tunnel.stop", targetType: "application", targetId: applicationId });
-        return {};
-    } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not stop the tunnel" };
-    }
-}
-
-/** State of an app's server tunnel (published through a server the operator owns). */
-export async function serverTunnelStatusAction(applicationId: string): Promise<ServerTunnelStatus> {
-    const user = await requirePermission("deploy.manage");
-    try {
-        return await getServerTunnelStatus(applicationId, user.id);
-    } catch {
-        return { configured: false, running: false, hostname: null, serverName: null };
-    }
-}
-
-/** The servers that can publish a tunnel, for the exposure picker. */
-export async function tunnelServersAction(): Promise<Array<{ id: string; name: string; domain: string }>> {
-    const user = await requirePermission("deploy.manage");
-    return listTunnelServers(user.id);
-}
-
-/** Publish an app through a server tunnel and return the hostname it lands on. */
-export async function startServerTunnelAction(input: {
-    applicationId: string;
-    hostId?: string;
-}): Promise<{ error?: string; hostname?: string | null }> {
-    const user = await requirePermission("deploy.manage");
-    try {
-        const status = await startServerTunnel(input.applicationId, user.id, { hostId: input.hostId });
-        await recordAudit({
-            actorId: user.id,
-            action: "deploy.tunnel.start",
-            targetType: "application",
-            targetId: input.applicationId
-        });
-        return { hostname: status.hostname };
-    } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not start the tunnel" };
-    }
-}
-
-/** Stop an app's server tunnel and drop the route it left behind. */
-export async function stopServerTunnelAction(applicationId: string): Promise<{ error?: string }> {
-    const user = await requirePermission("deploy.manage");
-    try {
-        await stopServerTunnel(applicationId, user.id);
         await recordAudit({ actorId: user.id, action: "deploy.tunnel.stop", targetType: "application", targetId: applicationId });
         return {};
     } catch (caught) {

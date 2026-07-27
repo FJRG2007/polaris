@@ -26,7 +26,6 @@ import { gitBuildContext, type GitSource } from "./git-build-service";
 import { getLatestCommit, githubCloneAuthHeader } from "./github-service";
 import { resolveRegistryLogin } from "./registry-credential-service";
 import { quickTunnelAppIds, tunnelHostForApp, stopQuickTunnel } from "./deploy/quick-tunnel-service";
-import { stopServerTunnel } from "./deploy/server-tunnel-service";
 import { resolveWaf, resolveWafBatch } from "./waf-service";
 
 /** A locally-installed messaging hub (this catalog app) joins a dedicated web<->hub
@@ -753,10 +752,6 @@ export async function removeApplicationDeployment(applicationId: string, ownerId
     if ((await quickTunnelAppIds()).includes(applicationId)) {
         await stopQuickTunnel(applicationId, ownerId).catch(() => undefined);
     }
-    // Same for a server tunnel, and it matters more: what it leaves behind lives on
-    // another machine - a Traefik route answering for a hostname nothing serves, and a
-    // port reservation on that server - which nothing else would ever clean up.
-    await stopServerTunnel(applicationId, ownerId).catch(() => undefined);
     await prisma.deployment.updateMany({
         where: { deployableType: "application", deployableId: applicationId, status: { in: ["running", "stopped"] } },
         data: { status: "removed", finishedAt: new Date() }

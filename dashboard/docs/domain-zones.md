@@ -89,36 +89,9 @@ check that passes, since every invite, notification and login link is built from
 ## Tunnels
 
 When no wildcard can reach the box - carrier NAT being the usual reason - hostnames
-come from an outbound tunnel instead:
+come from an outbound tunnel instead: a Cloudflare named tunnel on the operator's own
+domain, a throwaway `*.trycloudflare.com` quick link, or ngrok. Each is configured
+under Integrations and offered per service in Deploy.
 
-| Option | Hostname | Depends on |
-| ------ | -------- | ---------- |
-| Server tunnel | `<app>-<hash>.<that server's wildcard domain>` | A server you already own |
-| Cloudflare named | Your hostname on Cloudflare | A Cloudflare account |
-| Cloudflare quick | `*.trycloudflare.com`, changes each start | Nobody (no account) |
-| ngrok | An ngrok URL | An ngrok account |
-
-**Server tunnel** is the self-hosted one and is recommended first on carrier NAT,
-because nothing in it is a third party - it is OpenSSH on one side and a server the
-operator already registered on the other:
-
-1. A sidecar here runs `ssh -R <bind>:<port>:<app host>:<app port>` out to that
-   server, authenticating with a key minted on the server itself (`tunnelSetupScript`)
-   so the operator's own SSH credentials never leave Polaris. The key is authorized
-   `restrict,port-forwarding`: it can open the forward and nothing else - no shell,
-   no sftp - so a leaked sidecar env var is not a login on that server.
-2. The forward binds to the server's Docker gateway - reachable by its Traefik, not
-   from the internet - which needs `GatewayPorts clientspecified` in its sshd. The
-   setup script reads the gateway from Docker rather than assuming `172.17.0.1`, and
-   sets the sshd option through `sshd_config.d/` where the distro includes it.
-3. Polaris writes a Traefik dynamic-config file on that server routing the hostname
-   to the forwarded port, and Traefik issues the certificate.
-
-The port starts from the app id and is then allocated against the ports already handed
-out on that server, so it is stable per app and never shared - two tunnels on one port
-would leave the second hostname serving the first app's service. It is recorded before
-the sidecar starts, so a start that fails halfway still knows what to clean up.
-
-The sidecar's restart policy plus `ExitOnForwardFailure` make the tunnel self-healing.
-Polaris is not in the data path: the dashboard can restart, or be down, without
-dropping a published service.
+A self-hosted option - publishing through a server the operator already owns, over a
+reverse SSH tunnel - is being built on `feat/server-tunnels`.
