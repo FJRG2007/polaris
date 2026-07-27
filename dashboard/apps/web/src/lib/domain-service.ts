@@ -13,6 +13,7 @@ import { prisma } from "@polaris/db";
 import { loadEnv } from "@polaris/config";
 import { magicDomain, DEFAULT_SUBDOMAIN_BASE } from "@polaris/deploy";
 import { decryptSecret, encryptSecret } from "@polaris/storage";
+import { polarisZoneHost } from "./domain-zones";
 import { getPolarisPublicUrl } from "./polaris-tunnel-service";
 
 const KEYS = {
@@ -137,13 +138,19 @@ export async function appBaseUrl(): Promise<string> {
 
 /**
  * Base URL for share links and drop points. Prefers an explicitly configured
- * sharing domain, then a running Polaris Cloudflare tunnel (the NAT fallback, since
- * a DuckDNS/auto name is not reachable from outside a NATed box), then a DuckDNS
- * subdomain, then a free auto subdomain, and finally the app domain / env fallback.
+ * sharing domain, then the operator's own Polaris zone, then a running Polaris
+ * Cloudflare tunnel (the NAT fallback, since a DuckDNS/auto name is not reachable
+ * from outside a NATed box), then a DuckDNS subdomain, then a free auto subdomain,
+ * and finally the app domain / env fallback.
  */
 export async function sharingBaseUrl(): Promise<string> {
     const configured = normalizeUrl(await getSetting(KEYS.sharing));
     if (configured) return configured;
+
+    // A configured zone is a domain the operator pointed here on purpose, so it beats
+    // an ephemeral tunnel URL that may just be left over from before they set it up.
+    const zone = await polarisZoneHost();
+    if (zone) return `https://${zone}`;
 
     // A Polaris Cloudflare tunnel, when running, is a working public URL - prefer it
     // over the DuckDNS/auto names, which do not resolve to a reachable box behind NAT.

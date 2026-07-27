@@ -16,6 +16,10 @@ export async function ensureShareReachability(): Promise<void> {
     // An explicitly configured public sharing domain is the operator's choice; trust it.
     if (config.sharingDomain) return;
     const status = await getNetworkStatus();
+    // A zone layout means the operator pointed DNS at this box (and forwarded the
+    // ports, or they would not have finished the setup): links already work, and a
+    // tunnel would only add a slower path in front of them.
+    if (status.effectiveMode === "wildcard") return;
     // The box's own IP is internet-reachable, so DuckDNS/auto names work as-is.
     if (status.autoSubdomainsPublic) return;
     await ensurePolarisTunnel().catch(() => undefined);

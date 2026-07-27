@@ -22,6 +22,7 @@ import {
     type ServerEnvironment
 } from "@polaris/core";
 import { deployBase, duckdnsConfigured, getPublicIp } from "./domain-service";
+import { deployZoneBase } from "./domain-zones";
 
 /**
  * - `auto`     : classify from detection (public IP -> public, else LAN-only).
@@ -235,6 +236,8 @@ export interface NetworkStatus {
     autoSubdomainsPublic: boolean;
     /** The wildcard base domain the operator configured (empty if none). */
     wildcardDomain: string;
+    /** True when it comes from the zone layout, so editing it here would be ignored. */
+    wildcardManaged: boolean;
     /** The free-subdomain magic base (sslip.io by default). */
     subdomainBase: string;
     /** Whether the box looks like a cloud VM or a home/office server. */
@@ -244,22 +247,33 @@ export interface NetworkStatus {
 }
 
 export async function getNetworkStatus(): Promise<NetworkStatus> {
-    const [storedMode, wildcard, subdomainIp, publicIp, base, placement, duckdns] = await Promise.all([
+    const [storedMode, storedWildcard, zoneBase, subdomainIp, publicIp, base, placement, duckdns] = await Promise.all([
         getSetting(KEYS.mode),
         getSetting(KEYS.wildcardDomain),
+        deployZoneBase(),
         getPublicIp(),
         detectPublicIp(),
         deployBase(),
         detectPlacement(),
         duckdnsConfigured()
     ]);
+    // The zone layout is the source of truth once a base domain is configured: the
+    // guided setup writes it, and every deploy zone already carries its own wildcard
+    // record. The standalone field stays as the fallback for setups that predate it.
+    const wildcard = zoneBase ?? storedWildcard;
     const mode = MODES.includes(storedMode as NetworkMode) ? (storedMode as NetworkMode) : "auto";
     // IPv4 only: the free subdomain encodes the address in a DNS label, which a
     // public IPv6 cannot survive - treating one as reachable would mint a hostname
     // with colons in it and ask Let's Encrypt to certify it.
     const autoSubdomainsPublic = Boolean(subdomainIp) && isPublicIpv4(subdomainIp!);
     const natted = !autoSubdomainsPublic || (Boolean(publicIp) && publicIp !== subdomainIp);
-    const effectiveMode: EffectiveMode = mode === "auto" ? (autoSubdomainsPublic ? "public" : "lan") : mode;
+    // A saved zone layout is an explicit statement that DNS points here, so
+    // "automatic" honours it instead of falling back to a LAN-only free subdomain -
+    // otherwise finishing the guided setup would change nothing until the mode was
+    // also flipped by hand. The legacy standalone field does not promote the mode on
+    // its own: it predates the layout and may name a domain nobody ever pointed here.
+    const effectiveMode: EffectiveMode =
+        mode === "auto" ? (zoneBase ? "wildcard" : autoSubdomainsPublic ? "public" : "lan") : mode;
     return {
         mode,
         effectiveMode,
@@ -268,6 +282,7 @@ export async function getNetworkStatus(): Promise<NetworkStatus> {
         natted,
         autoSubdomainsPublic,
         wildcardDomain: wildcard ?? "",
+        wildcardManaged: Boolean(zoneBase),
         subdomainBase: base,
         placement,
         duckdns
