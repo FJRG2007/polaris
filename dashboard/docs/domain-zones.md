@@ -75,25 +75,37 @@ constrains the next:
    third-party dependencies first (`src/lib/domain-strategies.ts`). On carrier NAT,
    port-forwarding options are shown as unavailable with the reason instead of being
    hidden.
-3. **Domain and zones**, then the DNS records to create - with a resolver check that
-   queries a random name inside each zone (only a real wildcard answers), and
-   one-click record creation when a Cloudflare API token is connected.
+3. **Domain and zones**, then the DNS records to create - with a check that resolves
+   both names each zone needs and asks the hostname for an HTTP answer, plus one-click
+   record creation when a Cloudflare API token is connected.
 
 Saving writes the environment, the exposure mode and the zone layout in one action,
 so they cannot drift apart. Only a wildcard strategy stores a base domain: a tunnel
 publishes each service itself, so its domain lives with the tunnel's credentials
 under Integrations and no DNS record is asked for here.
 
-The resolver check runs on save, whenever the setup is opened while the layout is
-still unproven, and on the DNS step - and it is what marks the layout as resolving
-here. Everything that hands out a hostname waits for that flag: `getNetworkStatus()`
-only reports `wildcard` as the effective mode once it is set (until then new services
-keep their free subdomain, rather than getting a name that resolves nowhere and an
-ACME order that cannot validate), share links (`sharingBaseUrl`), and the dashboard's
-own URL, which the setup only *asks* to move onto the Polaris zone - the move happens
-on the first check that passes, since every invite, notification and login link is
-built from it. A wildcard base typed by hand under Network & exposure is the
-operator's own statement about DNS they manage and needs no such proof.
+The check runs on save, whenever the setup is opened while the layout is still
+unproven, and on the DNS step. It records **two** separate facts, because they gate
+different things and only one of them can be established reliably from this side:
+
+| Flag | Proven by | Gates |
+| ---- | --------- | ----- |
+| `verified` | The zone host *and* a random name under it resolve to this server | Minting hostnames: `getNetworkStatus()` reporting `wildcard`, `deployHostname`, the zone picker |
+| `reachable` | An HTTP request to the zone host is answered at all | Handing links to other people: `sharingBaseUrl`, moving the dashboard's URL, standing the fallback tunnel down |
+
+Any HTTP status counts as an answer, including the edge's own 404 - a zone host is not
+a site Polaris serves (services live *under* it), so requiring a particular response
+would require something that by design does not exist. What it rules out is a refused
+connection or a timeout: DNS pointed at a router whose ports were never forwarded.
+
+The two are apart because the probe leaves this box. Plenty of routers will not send a
+request back to their own public address, so a domain that works perfectly from the
+internet can look dead from the inside - which must not be allowed to block minting,
+or such a setup could never publish anything. It is allowed to keep the tunnel up,
+where being wrong costs nothing but a redundant hop.
+
+A wildcard base typed by hand under Network & exposure is the operator's own statement
+about DNS they manage and needs no such proof.
 
 One-click creation on Cloudflare only adds records and repoints the ones already
 pointing here. A name that answers with a different address - the apex, when a zone

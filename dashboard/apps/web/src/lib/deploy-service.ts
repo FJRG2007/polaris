@@ -322,8 +322,20 @@ export async function addApplicationDomain(
     }
     // Idempotent: re-adding the same domain to the same app is a no-op, not an error
     // (the auto free subdomain is deterministic, so "Add domain" would hit this).
-    const existing = await prisma.domain.findFirst({ where: { hostname, applicationId }, select: { id: true } });
+    // "No-op" is about the row, not its settings, though: re-adding after changing the
+    // target port is how an operator re-points a domain, and returning the hostname
+    // with the old port still routed reports success for something that did not happen.
+    const existing = await prisma.domain.findFirst({
+        where: { hostname, applicationId },
+        select: { id: true, targetPort: true, certResolver: true }
+    });
     if (existing) {
+        if (existing.targetPort !== opts.targetPort || existing.certResolver !== certResolver) {
+            await prisma.domain.update({
+                where: { id: existing.id },
+                data: { targetPort: opts.targetPort, certResolver }
+            });
+        }
         await syncAppRoutes().catch(() => undefined);
         return hostname;
     }

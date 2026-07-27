@@ -50,6 +50,11 @@ export interface DomainSetupState {
 /** Everything the wizard renders from, in one round trip. */
 export async function domainSetupStateAction(): Promise<DomainSetupState> {
     await requireAdmin();
+    return domainSetupState();
+}
+
+/** The same, without the permission check, for callers already inside one. */
+async function domainSetupState(): Promise<DomainSetupState> {
     // Records created at a registrar take minutes to propagate, so the check that runs
     // on save usually fails and the layout stays unproven - and an unproven zone hands
     // out no hostnames. Opening the setup re-proves it, rather than leaving the
@@ -105,9 +110,13 @@ export interface DomainSetupResult {
  */
 export async function saveDomainSetupAction(input: unknown): Promise<DomainSetupResult> {
     const user = await requireAdmin();
+    // Read once, and reuse it on every path that rejects the input: the read is not
+    // free (DNS, an HTTP probe per zone, a public-IP lookup) and none of that changes
+    // because the operator mistyped something.
+    const current = await domainSetupState();
     const parsed = setupSchema.safeParse(input);
     if (!parsed.success) {
-        return { state: await domainSetupStateAction(), error: parsed.error.issues[0]?.message ?? "Invalid setup" };
+        return { state: current, error: parsed.error.issues[0]?.message ?? "Invalid setup" };
     }
     const { strategy, environment, useForDashboard } = parsed.data;
     const meta = STRATEGY_META[strategy];
@@ -134,14 +143,28 @@ export async function saveDomainSetupAction(input: unknown): Promise<DomainSetup
     // wildcard domain, which mints LAN-only hostnames on a perfectly public server -
     // a worse state than before the wizard ran. Half-applied answers are the other
     // failure this prevents: the environment used to be saved even on this error.
-    if (strategy === "duckdns" && !isZoneLabel(duckSubdomain)) {
-        return {
-            state: await domainSetupStateAction(),
-            error: duckSubdomain ? "Enter just the subdomain, e.g. mypolaris" : "Enter your DuckDNS subdomain"
-        };
+    // Validation answers with the state the caller already has: re-reading it here
+    // would pay for DNS lookups, an HTTP probe per zone and a public-IP round trip
+    // before showing the operator that they mistyped a domain.
+    if (strategy === "duckdns") {
+        // An empty label is a valid ZONE label (it means the base domain itself), so
+        // it has to be rejected on its own - otherwise a blank field saves a layout
+        // with no domain under a strategy whose whole point is the domain.
+        if (!duckSubdomain || !isZoneLabel(duckSubdomain)) {
+            return {
+                state: current,
+                error: duckSubdomain ? "Enter just the subdomain, e.g. mypolaris" : "Enter your DuckDNS subdomain"
+            };
+        }
+        // Without a token nothing can update the record, so the setup would report
+        // success while the name points wherever DuckDNS last had it - and the DNS
+        // step would promise Polaris keeps it up to date.
+        if (!current.domains.hasDuckdnsToken && !parsed.data.duckdnsToken.trim()) {
+            return { state: current, error: "Enter your DuckDNS token so Polaris can keep the record updated" };
+        }
     }
     if (meta.needsDomain && meta.wildcard && !baseDomain) {
-        return { state: await domainSetupStateAction(), error: "Enter the domain you want to use" };
+        return { state: current, error: "Enter the domain you want to use" };
     }
 
     try {

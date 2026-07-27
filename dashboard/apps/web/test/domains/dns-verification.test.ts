@@ -37,15 +37,20 @@ vi.mock("../../src/lib/domain-service", () => ({ setDomainConfig }));
 vi.mock("../../src/lib/integrations/cloudflare-account-service", () => ({ loadCloudflareToken: async () => null }));
 
 const { checkZoneDns } = await import("../../src/lib/domain-dns");
-const { saveDomainZones, setDashboardZoneIntent, zoneDnsVerified } = await import("../../src/lib/domain-zones");
+const { saveDomainZones, setDashboardZoneIntent, zoneDnsVerified, zoneReachable } = await import(
+    "../../src/lib/domain-zones"
+);
 
-/** The reachability probe: resolving proves DNS, this proves traffic arrives here. */
-function serving(ok: boolean): void {
-    vi.stubGlobal("fetch", async () =>
-        ok
-            ? new Response(JSON.stringify({ status: "ok" }), { status: 200 })
-            : new Response("", { status: 502 })
-    );
+/**
+ * The reachability probe. Any answer counts - a zone host is not a site Polaris
+ * serves, so the edge's own 404 is proof enough that packets arrive - which is why
+ * "not reachable" is a refused connection, not a status code.
+ */
+function serving(reachable: boolean): void {
+    vi.stubGlobal("fetch", async () => {
+        if (!reachable) throw new Error("ECONNREFUSED");
+        return new Response("not found", { status: 404 });
+    });
 }
 
 const LAYOUT = {
@@ -66,13 +71,16 @@ describe("checkZoneDns", () => {
         await setDashboardZoneIntent(true);
     });
 
-    it("waits for the hostname to actually serve Polaris, not just to resolve", async () => {
+    it("still mints hostnames when nothing answers, but hands out no links", async () => {
         resolve4.mockResolvedValue(["51.15.20.30"]);
         serving(false);
         await checkZoneDns();
-        // The usual home-line trap: DNS points at the router, but 80/443 were never
-        // forwarded, so nothing here answers on the name.
-        expect(await zoneDnsVerified()).toBe(false);
+        // The DNS is right, so the layout is usable - a router that will not loop a
+        // request back to its own public address must not stop the domain working.
+        expect(await zoneDnsVerified()).toBe(true);
+        // But nothing has been seen answering, so the dashboard stays where it is and
+        // the fallback tunnel keeps covering the links.
+        expect(await zoneReachable()).toBe(false);
         expect(setDomainConfig).not.toHaveBeenCalled();
     });
 

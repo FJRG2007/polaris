@@ -28,8 +28,10 @@ import {
 import { getSetting, setSetting } from "./setting-store";
 
 const KEY = "domain.zones";
-/** Set once the zones' wildcards have been seen resolving to this server. */
+/** Set once the zones' names have been seen resolving to this server. */
 const VERIFIED_KEY = "domain.zones.verified";
+/** Set once something on the domain has actually answered over HTTP. */
+const REACHABLE_KEY = "domain.zones.reachable";
 /** Set while the operator wants the dashboard moved onto the Polaris zone. */
 const DASHBOARD_KEY = "domain.zones.dashboard";
 
@@ -109,18 +111,18 @@ export async function saveDomainZones(input: unknown): Promise<DomainZoneConfig>
     }
     const config: DomainZoneConfig = { baseDomain: parsed.data.baseDomain, zones };
     await setSetting(KEY, JSON.stringify(config));
-    // A changed layout is unproven again: the new zones' wildcards have never been
-    // seen resolving, and callers use that flag to decide whether the domain is safe
-    // to hand out. It is re-earned by the next DNS check.
+    // A changed layout is unproven again on both counts: the new names have never
+    // been seen resolving, let alone answering. Both are re-earned by the next check.
     await setSetting(VERIFIED_KEY, null);
+    await setSetting(REACHABLE_KEY, null);
     return config;
 }
 
 /**
- * Whether the configured zones have been seen resolving to this server. Callers that
- * hand a URL to someone else use this: a zone saved in the wizard is an intention,
- * not a working domain, and a link on a hostname that resolves nowhere is worse than
- * a link on an ugly one that works.
+ * Whether the configured zones have been seen resolving to this server - both the
+ * zone host and its wildcard. This is what gates minting a hostname: a zone saved in
+ * the wizard is an intention, and a service given a name that resolves nowhere also
+ * gets a certificate order that cannot complete.
  */
 export async function zoneDnsVerified(): Promise<boolean> {
     return (await getSetting(VERIFIED_KEY)) === "1";
@@ -129,6 +131,26 @@ export async function zoneDnsVerified(): Promise<boolean> {
 /** Record the outcome of a DNS check (see domain-dns). */
 export async function setZoneDnsVerified(verified: boolean): Promise<void> {
     await setSetting(VERIFIED_KEY, verified ? "1" : null);
+}
+
+/**
+ * Whether traffic to the domain has been seen arriving here, which correct DNS does
+ * not prove on its own: on a home line the record points at the router, and the ports
+ * may never have been forwarded.
+ *
+ * Kept apart from `zoneDnsVerified` because the probe can only ever confirm, never
+ * deny - it runs from this box, and plenty of routers do not loop a request back to
+ * their own WAN address. So it gates the two things where being wrong is cheap:
+ * standing the fallback tunnel down, and moving the dashboard's own URL. Minting
+ * hostnames waits for DNS only, or a domain that works from outside but not from the
+ * inside could never publish anything.
+ */
+export async function zoneReachable(): Promise<boolean> {
+    return (await getSetting(REACHABLE_KEY)) === "1";
+}
+
+export async function setZoneReachable(reachable: boolean): Promise<void> {
+    await setSetting(REACHABLE_KEY, reachable ? "1" : null);
 }
 
 /**

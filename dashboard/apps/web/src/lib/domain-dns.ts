@@ -8,10 +8,15 @@
  * own, since no wildcard covers it and it is exactly what the dashboard URL and share
  * links are built from.
  *
- * Resolving is not the same as serving, though. On a home line the wildcard points at
- * the router, which answers DNS for the whole house whether or not 80/443 are
- * forwarded here - so before the layout is called proven, Polaris asks the hostname
- * for its own health endpoint and requires its own answer.
+ * Resolving is not the same as being reachable, though: on a home line the record
+ * points at the router, which answers DNS for the whole house whether or not 80/443
+ * were ever forwarded here. So the hostname is also asked for an HTTP answer - any
+ * answer - and the outcome is recorded as a SECOND, separate flag. It has to be
+ * separate, because the request leaves this box: plenty of routers will not send it
+ * back to their own public address, and a domain that works perfectly from the
+ * internet would look dead from the inside. Correct DNS is therefore what lets
+ * Polaris mint hostnames; an answer on the wire is what lets it hand links to other
+ * people and stand the fallback tunnel down.
  */
 
 import { resolve4 } from "node:dns/promises";
@@ -22,6 +27,7 @@ import {
     polarisZoneHost,
     setDashboardZoneIntent,
     setZoneDnsVerified,
+    setZoneReachable,
     zoneRecords
 } from "./domain-zones";
 import { setDomainConfig } from "./domain-service";
@@ -36,8 +42,11 @@ export interface ZoneDnsCheck {
     wildcard: string;
     /** What a name inside the zone resolves to today. */
     addresses: string[];
-    /** True when the wildcard resolves and points at this server. */
+
+    /** True when both of the zone's names resolve to this server. */
     ok: boolean;
+    /** True when something answered on the hostname from here (see the probe). */
+    reachable: boolean;
     detail: string;
 }
 
@@ -78,6 +87,7 @@ export async function checkZoneDns(): Promise<ZoneDnsReport> {
                     wildcard: record.wildcard,
                     addresses,
                     ok: false,
+                    reachable: false,
                     detail: `No DNS answer for ${missing.join(" or ")} yet. Records can take a few minutes to propagate.`
                 };
             }
@@ -92,59 +102,65 @@ export async function checkZoneDns(): Promise<ZoneDnsReport> {
                     wildcard: record.wildcard,
                     addresses,
                     ok: false,
+                    reachable: false,
                     detail: `Resolves to ${addresses.join(", ")}, but this server is at ${expectedIp}.`
                 };
             }
-            // DNS pointing here is not the same as traffic arriving here: on a home line
-            // it is the router that answers, and nothing so far says 80/443 reach this
-            // box. Ask the hostname for Polaris and require Polaris to answer.
-            const reachable = await servesPolaris(record.host);
+            // DNS pointing here is not the same as traffic arriving here: on a home
+            // line it is the router that answers, and nothing so far says 80/443 reach
+            // this box. Asked separately, and never used to fail the zone - the probe
+            // leaves this machine, and a router that does not loop a request back to
+            // its own WAN address would make a perfectly working domain look dead.
+            const reachable = await answersHere(record.host);
             return {
                 host: record.host,
                 wildcard: record.wildcard,
                 addresses,
-                ok: reachable,
+                ok: true,
+                reachable,
                 detail: reachable
-                    ? `Resolves to ${addresses.join(", ")} and serves this Polaris.`
-                    : `Resolves to ${addresses.join(", ")}, but nothing answers on it yet - check that ports 80 and 443 reach this server.`
+                    ? `Resolves to ${addresses.join(", ")} and answers here.`
+                    : `Resolves to ${addresses.join(", ")}. Nothing answered on it from this side - fine if your router does not route its own public address back inward, otherwise check that ports 80 and 443 reach this server.`
             };
         })
     );
-    // "Verified" has to mean "seen resolving HERE and serving this Polaris", so it is
-    // only recorded when the server's own address is known to compare against:
-    // without it, a wildcard pointing at a completely different machine would look
-    // like proof and promote every share link onto it.
+    // "Verified" has to mean "seen resolving HERE", so it is only recorded when the
+    // server's own address is known to compare against: without it, a wildcard
+    // pointing at a completely different machine would look like proof.
     if (expectedIp) {
         const verified = zones.length > 0 && zones.every((zone) => zone.ok);
         await setZoneDnsVerified(verified);
-        if (verified) await applyDashboardZone();
+        // Handing a link to someone else asks for more than correct DNS, so the two
+        // are recorded apart: this one is what moves the dashboard's URL and stands
+        // the fallback tunnel down.
+        const reachable = verified && zones.every((zone) => zone.reachable);
+        await setZoneReachable(reachable);
+        if (reachable) await applyDashboardZone();
     }
     return { expectedIp, zones };
 }
 
-/** Polaris's own readiness probe: unauthenticated, and it answers `{"status":"ok"}`,
- *  so an unrelated server holding the address does not pass for Polaris. */
-const HEALTH_PATH = "/api/health";
-
 /**
- * Whether the hostname reaches a Polaris over HTTP. Deliberately plain HTTP on the
- * public name: the certificate does not exist until the hostname works, so requiring
- * HTTPS here would fail for the very setup it is meant to confirm. What this rules
- * out is the case that matters - DNS pointed at a router with nothing forwarded, or
- * at a machine that serves something else entirely.
+ * Whether an HTTP request to the hostname is answered at all. Any status counts,
+ * including the edge's own 404: a zone host is not a site Polaris serves - deployed
+ * services live *under* it - so demanding a particular response would be demanding
+ * something that by design does not exist. What is being established is that packets
+ * for that name arrive at this box's port 80, which a refused connection or a timeout
+ * rules out and any answer confirms.
+ *
+ * Plain HTTP on purpose: the certificate for the name cannot exist until the name
+ * works, so requiring HTTPS would fail for the very setup this confirms.
  */
-async function servesPolaris(hostname: string): Promise<boolean> {
+async function answersHere(hostname: string): Promise<boolean> {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 5000);
     try {
-        const res = await fetch(`http://${hostname}${HEALTH_PATH}`, {
+        await fetch(`http://${hostname}/`, {
             cache: "no-store",
-            redirect: "follow",
+            redirect: "manual",
             signal: controller.signal
         });
-        if (!res.ok) return false;
-        const body = (await res.json().catch(() => null)) as { status?: unknown } | null;
-        return body?.status === "ok";
+        return true;
     } catch {
         return false;
     } finally {

@@ -8,7 +8,7 @@
  */
 
 import { getDomainConfig } from "./domain-service";
-import { zoneDnsVerified } from "./domain-zones";
+import { zoneReachable } from "./domain-zones";
 import { getNetworkStatus } from "./network-service";
 import { ensurePolarisTunnel } from "./polaris-tunnel-service";
 
@@ -16,10 +16,11 @@ export async function ensureShareReachability(): Promise<void> {
     const config = await getDomainConfig();
     // An explicitly configured public sharing domain is the operator's choice; trust it.
     if (config.sharingDomain) return;
-    // A zone whose wildcard has been seen resolving here is a working public domain,
-    // so a tunnel would only add a slower path in front of it. An unverified one is
-    // just an intention - the tunnel below stays the safety net until it checks out.
-    if (await zoneDnsVerified()) return;
+    // A zone that has been seen answering on the wire is a working public domain, so a
+    // tunnel would only add a slower path in front of it. Correct DNS alone is not
+    // enough here: it does not say the ports reach this box, and this is exactly the
+    // decision where being wrong costs the operator working links.
+    if (await zoneReachable()) return;
     const status = await getNetworkStatus();
     // The box's own IP is internet-reachable, so DuckDNS/auto names work as-is.
     if (status.autoSubdomainsPublic) return;

@@ -13,7 +13,7 @@
 import { loadEnv } from "@polaris/config";
 import { magicDomain, DEFAULT_SUBDOMAIN_BASE } from "@polaris/deploy";
 import { decryptSecret, encryptSecret } from "@polaris/storage";
-import { polarisZoneHost, zoneDnsVerified } from "./domain-zones";
+import { polarisZoneHost, zoneReachable } from "./domain-zones";
 import { getSetting, setSetting } from "./setting-store";
 import { getPolarisPublicUrl } from "./polaris-tunnel-service";
 
@@ -135,7 +135,7 @@ export async function sharingBaseUrl(): Promise<string> {
     // seen resolving here. Saving the layout in the wizard is an intention; until the
     // records exist, a link on that hostname resolves nowhere, and the tunnel below
     // still works.
-    if (await zoneDnsVerified()) {
+    if (await zoneReachable()) {
         const zone = await polarisZoneHost();
         if (zone) return `https://${zone}`;
     }
