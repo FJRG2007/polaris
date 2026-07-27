@@ -65,11 +65,12 @@ import {
     type NgrokTunnelStatus
 } from "@/lib/deploy/ngrok-tunnel-service";
 import {
-    getOpenTunnelStatus,
-    startOpenTunnel,
-    stopOpenTunnel,
-    type OpenTunnelStatus
-} from "@/lib/deploy/opentunnel-service";
+    getServerTunnelStatus,
+    listTunnelServers,
+    startServerTunnel,
+    stopServerTunnel,
+    type ServerTunnelStatus
+} from "@/lib/deploy/server-tunnel-service";
 import {
     getNamedTunnelStatus,
     provisionNamedTunnel,
@@ -640,33 +641,47 @@ export async function stopNgrokTunnelAction(applicationId: string): Promise<{ er
     }
 }
 
-/** State of an app's OpenTunnel tunnel (stable hostname on your own tunnel server). */
-export async function openTunnelStatusAction(applicationId: string): Promise<OpenTunnelStatus> {
+/** State of an app's server tunnel (published through a server the operator owns). */
+export async function serverTunnelStatusAction(applicationId: string): Promise<ServerTunnelStatus> {
     const user = await requirePermission("deploy.manage");
     try {
-        return await getOpenTunnelStatus(applicationId, user.id);
+        return await getServerTunnelStatus(applicationId, user.id);
     } catch {
-        return { configured: false, running: false, hostname: null };
+        return { configured: false, running: false, hostname: null, serverName: null };
     }
 }
 
-/** Start (or restart) an app's OpenTunnel tunnel and return its stable hostname. */
-export async function startOpenTunnelAction(applicationId: string): Promise<{ error?: string; hostname?: string | null }> {
+/** The servers that can publish a tunnel, for the exposure picker. */
+export async function tunnelServersAction(): Promise<Array<{ id: string; name: string; domain: string }>> {
+    const user = await requirePermission("deploy.manage");
+    return listTunnelServers(user.id);
+}
+
+/** Publish an app through a server tunnel and return the hostname it lands on. */
+export async function startServerTunnelAction(input: {
+    applicationId: string;
+    hostId?: string;
+}): Promise<{ error?: string; hostname?: string | null }> {
     const user = await requirePermission("deploy.manage");
     try {
-        const status = await startOpenTunnel(applicationId, user.id);
-        await recordAudit({ actorId: user.id, action: "deploy.tunnel.start", targetType: "application", targetId: applicationId });
+        const status = await startServerTunnel(input.applicationId, user.id, { hostId: input.hostId });
+        await recordAudit({
+            actorId: user.id,
+            action: "deploy.tunnel.start",
+            targetType: "application",
+            targetId: input.applicationId
+        });
         return { hostname: status.hostname };
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Could not start the tunnel" };
     }
 }
 
-/** Stop an app's OpenTunnel tunnel. */
-export async function stopOpenTunnelAction(applicationId: string): Promise<{ error?: string }> {
+/** Stop an app's server tunnel and drop the route it left behind. */
+export async function stopServerTunnelAction(applicationId: string): Promise<{ error?: string }> {
     const user = await requirePermission("deploy.manage");
     try {
-        await stopOpenTunnel(applicationId, user.id);
+        await stopServerTunnel(applicationId, user.id);
         await recordAudit({ actorId: user.id, action: "deploy.tunnel.stop", targetType: "application", targetId: applicationId });
         return {};
     } catch (caught) {

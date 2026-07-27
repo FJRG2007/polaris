@@ -90,9 +90,10 @@ import {
     ngrokTunnelStatusAction,
     startNgrokTunnelAction,
     stopNgrokTunnelAction,
-    openTunnelStatusAction,
-    startOpenTunnelAction,
-    stopOpenTunnelAction
+    serverTunnelStatusAction,
+    startServerTunnelAction,
+    stopServerTunnelAction,
+    tunnelServersAction
 } from "./actions";
 
 const TABS = ["Deployments", "Variables", "Metrics", "Console", "Files", "Volumes", "Security", "Settings"] as const;
@@ -1480,26 +1481,26 @@ function NgrokTunnelRow({ appId, nonce, onChanged }: { appId: string; nonce: num
     );
 }
 
-/** The app's OpenTunnel tunnel on the operator's own tunnel server. The hostname is
- *  derived, so the row shows it while the tunnel is down too - it does not change. */
-function OpenTunnelRow({ appId, nonce, onChanged }: { appId: string; nonce: number; onChanged: () => void }) {
-    const [status, setStatus] = useState<Awaited<ReturnType<typeof openTunnelStatusAction>> | null>(null);
+/** The app's tunnel through one of the operator's own servers. The hostname is stable,
+ *  so the row keeps showing it while the sidecar is down - it says "not running". */
+function ServerTunnelRow({ appId, nonce, onChanged }: { appId: string; nonce: number; onChanged: () => void }) {
+    const [status, setStatus] = useState<Awaited<ReturnType<typeof serverTunnelStatusAction>> | null>(null);
     const [pending, startTransition] = useTransition();
     useEffect(() => {
-        void openTunnelStatusAction(appId).then(setStatus).catch(() => undefined);
+        void serverTunnelStatusAction(appId).then(setStatus).catch(() => undefined);
     }, [appId, nonce]);
-    if (!status?.running || !status.hostname) return null;
+    if (!status?.hostname) return null;
     return (
         <ExposureRow
             icon={<Globe className="size-3.5 text-primary" />}
             label={status.hostname}
             href={`https://${status.hostname}`}
-            badge="opentunnel"
+            badge={status.running ? (status.serverName ?? "tunnel") : "not running"}
             enabled
             pending={pending}
             onToggle={() =>
                 startTransition(async () => {
-                    await stopOpenTunnelAction(appId).catch(() => undefined);
+                    await stopServerTunnelAction(appId).catch(() => undefined);
                     onChanged();
                 })
             }
@@ -1552,7 +1553,7 @@ type ExposureKind =
     | "cf-named"
     | "cf-quick"
     | "ngrok"
-    | "opentunnel";
+    | "server-tunnel";
 
 const EXPOSURE_OPTIONS: { value: ExposureKind; label: string; icon: ReactNode }[] = [
     { value: "zone", label: "Your domain (zone subdomain)", icon: <Globe className="size-4 text-primary" /> },
@@ -1560,7 +1561,7 @@ const EXPOSURE_OPTIONS: { value: ExposureKind; label: string; icon: ReactNode }[
     { value: "local", label: "Local subdomain (LAN)", icon: <MapPin className="size-4 text-muted-foreground" /> },
     { value: "le", label: "Custom domain - Let's Encrypt", icon: <Globe className="size-4 text-muted-foreground" /> },
     { value: "cf-named", label: "Cloudflare tunnel - custom domain", icon: <CloudflareMark className="size-4" /> },
-    { value: "opentunnel", label: "OpenTunnel - your own tunnel server", icon: <Globe className="size-4 text-primary" /> },
+    { value: "server-tunnel", label: "Tunnel through your own server", icon: <Globe className="size-4 text-primary" /> },
     { value: "cf-quick", label: "Cloudflare quick link (free)", icon: <CloudflareMark className="size-4" /> },
     { value: "ngrok", label: "ngrok tunnel", icon: <NgrokMark className="size-4" /> },
     { value: "duckdns", label: "DuckDNS subdomain", icon: <img src="/logos/duckdns.webp" alt="" className="size-4" /> },
@@ -1593,6 +1594,8 @@ function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
     const [cfConnected, setCfConnected] = useState(false);
     const [duckSub, setDuckSub] = useState<string | null>(null);
     const [zones, setZones] = useState<Array<{ label: string; host: string; primary: boolean }>>([]);
+    const [tunnelServers, setTunnelServers] = useState<Array<{ id: string; name: string; domain: string }>>([]);
+    const [tunnelServer, setTunnelServer] = useState("");
     const [zoneLabel, setZoneLabel] = useState<string | null>(null);
     const [randomName, setRandomName] = useState(false);
     const [tunnelNonce, setTunnelNonce] = useState(0);
@@ -1607,6 +1610,15 @@ function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
         // machine (and the server would ignore it anyway). Those keep their own
         // server's domain instead.
         if (app.serverId !== "local") return;
+        // A tunnel publishes a service that runs here through another server, so it is
+        // only on offer for local apps, and only when a server can actually terminate
+        // one (registered, with a wildcard domain of its own).
+        void tunnelServersAction()
+            .then((result) => {
+                setTunnelServers(result);
+                setTunnelServer(result[0]?.id ?? "");
+            })
+            .catch(() => undefined);
         void deployZonesAction()
             .then((result) => {
                 setZones(result);
@@ -1709,8 +1721,8 @@ function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
                 result = await startQuickTunnelAction(app.id);
             } else if (exposure === "ngrok") {
                 result = await startNgrokTunnelAction(app.id);
-            } else if (exposure === "opentunnel") {
-                result = await startOpenTunnelAction(app.id);
+            } else if (exposure === "server-tunnel") {
+                result = await startServerTunnelAction({ applicationId: app.id, hostId: tunnelServer || undefined });
             }
             if (result.error) setError(result.error);
             else {
@@ -1727,7 +1739,7 @@ function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
     }
 
     const submitLabel =
-        exposure === "cf-quick" || exposure === "ngrok" || exposure === "opentunnel"
+        exposure === "cf-quick" || exposure === "ngrok" || exposure === "server-tunnel"
             ? "Expose"
             : exposure === "cf-named"
               ? cfConnected
@@ -1844,7 +1856,7 @@ function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
                     <NamedTunnelRow appId={app.id} nonce={tunnelNonce} onChanged={() => setTunnelNonce((nonce) => nonce + 1)} />
                     <QuickTunnelRow appId={app.id} nonce={tunnelNonce} onChanged={() => setTunnelNonce((nonce) => nonce + 1)} />
                     <NgrokTunnelRow appId={app.id} nonce={tunnelNonce} onChanged={() => setTunnelNonce((nonce) => nonce + 1)} />
-                    <OpenTunnelRow appId={app.id} nonce={tunnelNonce} onChanged={() => setTunnelNonce((nonce) => nonce + 1)} />
+                    <ServerTunnelRow appId={app.id} nonce={tunnelNonce} onChanged={() => setTunnelNonce((nonce) => nonce + 1)} />
                 </ul>
                 <MethodBlock
                     icon={<Globe className="size-4" />}
@@ -1857,10 +1869,25 @@ function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
                             <Select
                                 value={exposure}
                                 onValueChange={(value) => setExposure(value as ExposureKind)}
-                                options={EXPOSURE_OPTIONS.filter((option) => option.value !== "zone" || zones.length > 0)}
+                                options={EXPOSURE_OPTIONS.filter(
+                                    (option) =>
+                                        (option.value !== "zone" || zones.length > 0) &&
+                                        (option.value !== "server-tunnel" || tunnelServers.length > 0)
+                                )}
                                 aria-label="Exposure method"
                             />
                         </label>
+                        {exposure === "server-tunnel" && tunnelServers.length > 1 && (
+                            <Select
+                                value={tunnelServer || (tunnelServers[0]?.id ?? "")}
+                                onValueChange={setTunnelServer}
+                                options={tunnelServers.map((server) => ({
+                                    value: server.id,
+                                    label: `${server.name} (*.${server.domain})`
+                                }))}
+                                aria-label="Publishing server"
+                            />
+                        )}
                         {exposure === "zone" && zones.length > 0 && (
                             <div className="flex flex-col gap-2">
                                 <Select
@@ -1932,8 +1959,8 @@ function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
                                               : "Create the tunnel in Cloudflare and paste its connector token. Tip: connect a Cloudflare API token under Integrations to skip this - then you only pick a hostname."
                                           : exposure === "cf-quick"
                                             ? "A throwaway *.trycloudflare.com URL - no account, no DNS, no port-forwarding. The link changes each time it starts."
-                                            : exposure === "opentunnel"
-                                              ? "A stable hostname on your own domain, served by an OpenTunnel server you run - no tunnel provider in the path and no ports open here. Set the server up under Integrations first."
+                                            : exposure === "server-tunnel"
+                                              ? "A stable hostname on your own domain, published by one of your servers over an outbound SSH tunnel - no ports open here and no tunnel provider in the path. Give that server a wildcard domain under Servers first."
                                               : "A public ngrok URL forwarded to this app. Add your ngrok authtoken under Integrations first; ngrok's free plan allows one tunnel at a time."}
                         </p>
                         {duckMissing && (

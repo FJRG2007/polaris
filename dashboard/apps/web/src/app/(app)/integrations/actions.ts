@@ -9,7 +9,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/session";
-import { DYMO_IP_RULES, findIntegration, readOpenTunnelConfig, type ScanAction } from "@/lib/integrations/registry";
+import { DYMO_IP_RULES, findIntegration, type ScanAction } from "@/lib/integrations/registry";
 import { getIntegrationState, upsertIntegration } from "@/lib/integration-service";
 import { verifyKey } from "@/lib/integrations/virustotal";
 import { verifyIp } from "@/lib/integrations/dymo";
@@ -67,46 +67,6 @@ export async function saveTunnelAction(input: {
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Saved, but the tunnel could not start" };
     }
-    revalidatePath("/integrations");
-    return {};
-}
-
-/**
- * Configure the operator's own OpenTunnel server: where it lives and the token to
- * authenticate with. Per-app tunnels read this, so a server domain is required
- * before it can be enabled - an enabled integration with no domain would offer an
- * exposure option that fails the moment it is used. Running tunnels are not
- * restarted here: they pick up the change when the operator restarts them, which
- * keeps a typo in this dialog from taking every published app offline.
- */
-export async function saveOpenTunnelAction(input: {
-    enabled: boolean;
-    domain: string;
-    basePath: string;
-    insecure: boolean;
-    token?: string;
-}): Promise<{ error?: string }> {
-    const user = await requireAdmin();
-    const config = readOpenTunnelConfig({
-        domain: input.domain,
-        basePath: input.basePath,
-        insecure: input.insecure
-    });
-    if (input.enabled && !config.domain) return { error: "Enter your tunnel server's domain before enabling it" };
-    const newToken = input.token && input.token.trim() ? input.token.trim() : undefined;
-    await upsertIntegration("opentunnel", {
-        enabled: input.enabled,
-        config: { ...config },
-        secret: newToken,
-        installedById: user.id
-    });
-    await recordAudit({
-        actorId: user.id,
-        action: "integration.configure",
-        targetType: "integration",
-        targetId: "opentunnel",
-        metadata: { enabled: input.enabled }
-    });
     revalidatePath("/integrations");
     return {};
 }

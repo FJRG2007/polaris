@@ -87,14 +87,24 @@ come from an outbound tunnel instead:
 
 | Option | Hostname | Depends on |
 | ------ | -------- | ---------- |
-| OpenTunnel | `<app>-<hash>.<base path>.<your domain>` | A tunnel server you run |
+| Server tunnel | `<app>-<hash>.<that server's wildcard domain>` | A server you already own |
 | Cloudflare named | Your hostname on Cloudflare | A Cloudflare account |
 | Cloudflare quick | `*.trycloudflare.com`, changes each start | Nobody (no account) |
 | ngrok | An ngrok URL | An ngrok account |
 
-**OpenTunnel** is the self-hosted one and is recommended first on carrier NAT: the
-operator runs `opentunnel server --domain <domain> --letsencrypt` on any box with a
-public IP, sets the domain and auth token under Integrations, and Polaris runs a
-client sidecar per service that dials out and forwards to the app's published port.
-The hostname is derived from the app, so it is stable across restarts and knowable
-before the tunnel is up.
+**Server tunnel** is the self-hosted one and is recommended first on carrier NAT,
+because nothing in it is a third party - it is OpenSSH on one side and a server the
+operator already registered on the other:
+
+1. A sidecar here runs `ssh -R <bind>:<port>:<app host>:<app port>` out to that
+   server, authenticating with a key minted on the server itself (`tunnelSetupScript`)
+   so the operator's own SSH credentials never leave Polaris.
+2. The forward binds to the server's Docker bridge gateway - reachable by its Traefik,
+   not from the internet - which needs `GatewayPorts clientspecified` in its sshd.
+3. Polaris writes a Traefik dynamic-config file on that server routing the hostname
+   to the forwarded port, and Traefik issues the certificate.
+
+The port is derived from the app id, so both ends agree without an allocation table,
+and the sidecar's restart policy plus `ExitOnForwardFailure` make the tunnel
+self-healing. Polaris is not in the data path: the dashboard can restart, or be down,
+without dropping a published service.

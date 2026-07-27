@@ -92,32 +92,6 @@ export function readDymoConfig(config: Record<string, unknown> | undefined): Dym
     };
 }
 
-/** OpenTunnel's non-secret config: the server the tunnels connect out to. */
-export interface OpenTunnelConfig {
-    /** The tunnel server's domain (`example.com`), without scheme. */
-    domain: string;
-    /** The server's base path, the label its hostnames sit under (`op` by default). */
-    basePath: string;
-    /** Accept the server's self-signed certificate (a server without Let's Encrypt). */
-    insecure: boolean;
-}
-
-export const OPENTUNNEL_DEFAULTS: OpenTunnelConfig = { domain: "", basePath: "op", insecure: false };
-
-/** Read a stored OpenTunnel config, normalizing what an operator may have pasted. */
-export function readOpenTunnelConfig(config: Record<string, unknown> | undefined): OpenTunnelConfig {
-    const domain = typeof config?.domain === "string" ? config.domain : "";
-    // An explicit empty base path is a choice (hostnames sit on the domain itself),
-    // so only an absent key falls back to the server's own default.
-    const basePath = typeof config?.basePath === "string" ? config.basePath : OPENTUNNEL_DEFAULTS.basePath;
-    return {
-        domain: domain.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, ""),
-        // An empty base path is meaningful: hostnames then sit directly on the domain.
-        basePath: basePath.trim().toLowerCase().replace(/^\.|\.$/g, ""),
-        insecure: config?.insecure === true
-    };
-}
-
 export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
     {
         slug: "virustotal",
@@ -179,18 +153,6 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         requiresApiKey: true,
         apiKeyLabel: "Authtoken",
         apiKeyHelp: "Your ngrok authtoken from the ngrok dashboard."
-    },
-    {
-        slug: "opentunnel",
-        name: "OpenTunnel",
-        category: "Automation",
-        summary: "Expose apps through your own tunnel server - no third-party service.",
-        description:
-            "Connects each app to an OpenTunnel server you run yourself (on any box with a public IP), so a machine behind carrier NAT gets public hostnames on your own domain without a tunnel provider in the path. Run `opentunnel server --domain <your-domain> --letsencrypt` there, then set the domain and its token here.",
-        docsUrl: "https://github.com/FJRG2007/opentunnel",
-        requiresApiKey: true,
-        apiKeyLabel: "Auth token",
-        apiKeyHelp: "One of the tokens the server was started with (--auth-tokens). Leave the server without tokens only on a trusted network."
     },
     {
         slug: "duckdns",

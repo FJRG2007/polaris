@@ -4,7 +4,7 @@
  */
 
 import { requireAdmin } from "@/lib/session";
-import { INTEGRATIONS, readDymoConfig, readOpenTunnelConfig, readVirusTotalConfig } from "@/lib/integrations/registry";
+import { INTEGRATIONS, readDymoConfig, readVirusTotalConfig } from "@/lib/integrations/registry";
 import { listIntegrationStates } from "@/lib/integration-service";
 import { getDomainConfig } from "@/lib/domain-service";
 import { getGithubStatus } from "@/lib/github-service";
@@ -27,7 +27,6 @@ export default async function IntegrationsPage() {
         const state = states.get(entry.slug);
         const virustotal = entry.slug === "virustotal" ? readVirusTotalConfig(state?.config) : undefined;
         const dymo = entry.slug === "dymo" ? readDymoConfig(state?.config) : undefined;
-        const openTunnel = entry.slug === "opentunnel" ? readOpenTunnelConfig(state?.config) : undefined;
         const isDuck = entry.slug === "duckdns";
         const duckConfigured = isDuck && domains.hasDuckdnsToken && Boolean(domains.duckdnsSubdomain);
         return {
@@ -52,10 +51,7 @@ export default async function IntegrationsPage() {
             githubInstallations: entry.slug === "github" ? github.installations : undefined,
             githubHtmlUrl: entry.slug === "github" ? github.htmlUrl ?? undefined : undefined,
             cloudflareApiConnected: entry.slug === "cloudflare" ? cloudflare.connected : undefined,
-            cloudflareAccountName: entry.slug === "cloudflare" ? cloudflare.accountName ?? undefined : undefined,
-            openTunnelDomain: openTunnel?.domain,
-            openTunnelBasePath: openTunnel?.basePath,
-            openTunnelInsecure: openTunnel?.insecure
+            cloudflareAccountName: entry.slug === "cloudflare" ? cloudflare.accountName ?? undefined : undefined
         };
     });
 

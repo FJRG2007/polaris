@@ -20,9 +20,9 @@ describe("strategiesFor", () => {
 
     it("recommends a tunnel behind carrier NAT, where no port can be forwarded", () => {
         const choice = strategiesFor("home-cgnat");
-        // The self-hosted tunnel first: it is the only one that keeps the operator's
-        // domain and traffic out of a third party's hands.
-        expect(choice.recommended).toBe("opentunnel");
+        // Publishing through a server the operator already owns comes first: it is the
+        // only option that keeps their domain and traffic out of a third party's hands.
+        expect(choice.recommended).toBe("server-tunnel");
         expect(choice.options.filter((option) => option.available).map((option) => option.id)).toContain(
             "cloudflare-tunnel"
         );

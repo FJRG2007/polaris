@@ -37,7 +37,6 @@ import {
     saveDymoAction,
     saveTunnelAction,
     saveVirusTotalAction,
-    saveOpenTunnelAction,
     syncDuckdnsAction,
     testDymoKeyAction,
     testVirusTotalKeyAction
@@ -75,12 +74,6 @@ export interface IntegrationCard {
     githubInstallations?: string[];
     /** GitHub App: the app's GitHub page, for the Install button. */
     githubHtmlUrl?: string;
-    /** OpenTunnel: the tunnel server's domain (empty when not set). */
-    openTunnelDomain?: string;
-    /** OpenTunnel: the server's base path, the label its hostnames sit under. */
-    openTunnelBasePath?: string;
-    /** OpenTunnel: accept the server's self-signed certificate. */
-    openTunnelInsecure?: boolean;
 }
 
 export function IntegrationsView({ cards }: { cards: IntegrationCard[] }) {
@@ -138,8 +131,6 @@ export function IntegrationsView({ cards }: { cards: IntegrationCard[] }) {
                 <TunnelDialog card={configuring} onClose={() => setConfiguring(null)} />
             ) : configuring?.slug === "duckdns" ? (
                 <DuckDnsDialog card={configuring} onClose={() => setConfiguring(null)} />
-            ) : configuring?.slug === "opentunnel" ? (
-                <OpenTunnelDialog card={configuring} onClose={() => setConfiguring(null)} />
             ) : null}
         </>
     );
@@ -326,106 +317,6 @@ function CloudflareApiTokenSection({ card }: { card: IntegrationCard }) {
 
             {error ? <p className="text-sm text-danger">{error}</p> : null}
         </div>
-    );
-}
-
-/**
- * The operator's own tunnel server. Hostnames land on `<app>.<base path>.<domain>`,
- * so the two fields together describe where apps will be published; the token is
- * whatever the server was started with.
- */
-function OpenTunnelDialog({ card, onClose }: { card: IntegrationCard; onClose: () => void }) {
-    const [enabled, setEnabled] = useState(card.hasSecret ? card.enabled : true);
-    const [domain, setDomain] = useState(card.openTunnelDomain ?? "");
-    const [basePath, setBasePath] = useState(card.openTunnelBasePath ?? "op");
-    const [insecure, setInsecure] = useState(card.openTunnelInsecure ?? false);
-    const [token, setToken] = useState("");
-    const [error, setError] = useState<string | null>(null);
-    const [pending, startTransition] = useTransition();
-
-    function onSave() {
-        setError(null);
-        startTransition(async () => {
-            const result = await saveOpenTunnelAction({
-                enabled,
-                domain,
-                basePath,
-                insecure,
-                token: token || undefined
-            });
-            if (result.error) setError(result.error);
-            else onClose();
-        });
-    }
-
-    const preview = `myapp.${basePath.trim() ? `${basePath.trim()}.` : ""}${domain.trim() || "example.com"}`;
-
-    return (
-        <Dialog open onOpenChange={(open) => !open && onClose()}>
-            <DialogContent className="max-w-md">
-                <DialogHeader>
-                    <DialogTitle className="flex items-center gap-2">{card.name}</DialogTitle>
-                    <DialogDescription>{card.description}</DialogDescription>
-                </DialogHeader>
-                <div className="flex flex-col gap-4">
-                    <div className="flex items-center justify-between gap-3 rounded-md border border-border p-3 text-sm">
-                        <span>Enabled</span>
-                        <Switch checked={enabled} onChange={setEnabled} aria-label="Enabled" />
-                    </div>
-                    <label className="flex flex-col gap-1 text-sm">
-                        Server domain
-                        <Input
-                            value={domain}
-                            onChange={(event) => setDomain(event.target.value)}
-                            placeholder="example.com"
-                            autoComplete="off"
-                        />
-                    </label>
-                    <label className="flex flex-col gap-1 text-sm">
-                        Base path
-                        <Input
-                            value={basePath}
-                            onChange={(event) => setBasePath(event.target.value)}
-                            placeholder="op"
-                            autoComplete="off"
-                        />
-                        <span className="text-xs text-muted-foreground">
-                            The label the server publishes under. Apps get <code>{preview}</code>. Leave empty to publish
-                            on the domain itself.
-                        </span>
-                    </label>
-                    <label className="flex flex-col gap-1 text-sm">
-                        {card.apiKeyLabel ?? "Auth token"}
-                        <Input
-                            type="password"
-                            value={token}
-                            onChange={(event) => setToken(event.target.value)}
-                            placeholder={card.hasSecret ? "Saved - enter a new token to replace it" : "Paste the token"}
-                            autoComplete="off"
-                        />
-                        {card.apiKeyHelp ? <span className="text-xs text-muted-foreground">{card.apiKeyHelp}</span> : null}
-                    </label>
-                    <div className="flex items-center justify-between gap-3 rounded-md border border-border p-3 text-sm">
-                        <span>
-                            Accept a self-signed certificate
-                            <span className="block text-xs text-muted-foreground">
-                                Only for a server without Let&apos;s Encrypt.
-                            </span>
-                        </span>
-                        <Switch checked={insecure} onChange={setInsecure} aria-label="Accept a self-signed certificate" />
-                    </div>
-                    {error ? <p className="text-sm text-danger">{error}</p> : null}
-                    <div className="flex justify-end gap-2">
-                        <Button variant="ghost" onClick={onClose}>
-                            Cancel
-                        </Button>
-                        <Button onClick={onSave} disabled={pending}>
-                            {pending ? "Applying..." : "Save"}
-                        </Button>
-                    </div>
-                </div>
-            </DialogContent>
-        </Dialog>
     );
 }
 
