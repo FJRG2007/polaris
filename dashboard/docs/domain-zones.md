@@ -19,6 +19,10 @@ A **zone** is a DNS label under a base domain the operator controls:
   `*.example.com` serve everything. The base can be a subdomain too
   (`plr.polaris.com`), which is how a single registered domain hosts several
   Polaris instances.
+- Two scopes may share a label - a Polaris zone and a deploy zone both on the base
+  domain is exactly the layout above - because one wildcard record answers for both.
+  Two zones of the *same* scope on one label are a duplicate and the second is
+  dropped.
 
 Each zone needs exactly two A records - the host and its wildcard - both pointed at
 the server's public IP. After that Polaris mints hostnames without touching DNS
@@ -80,11 +84,21 @@ so they cannot drift apart. Only a wildcard strategy stores a base domain: a tun
 publishes each service itself, so its domain lives with the tunnel's credentials
 under Integrations and no DNS record is asked for here.
 
-The resolver check runs on save and again on the DNS step, and it is what marks the
-layout as resolving here. Everything that hands a hostname to someone else waits for
-that flag: share links (`sharingBaseUrl`) and the dashboard's own URL, which the
-setup only *asks* to move onto the Polaris zone - the move happens on the first
-check that passes, since every invite, notification and login link is built from it.
+The resolver check runs on save, whenever the setup is opened while the layout is
+still unproven, and on the DNS step - and it is what marks the layout as resolving
+here. Everything that hands out a hostname waits for that flag: `getNetworkStatus()`
+only reports `wildcard` as the effective mode once it is set (until then new services
+keep their free subdomain, rather than getting a name that resolves nowhere and an
+ACME order that cannot validate), share links (`sharingBaseUrl`), and the dashboard's
+own URL, which the setup only *asks* to move onto the Polaris zone - the move happens
+on the first check that passes, since every invite, notification and login link is
+built from it. A wildcard base typed by hand under Network & exposure is the
+operator's own statement about DNS they manage and needs no such proof.
+
+One-click creation on Cloudflare only adds records and repoints the ones already
+pointing here. A name that answers with a different address - the apex, when a zone
+has an empty label - is reported back instead, and is only replaced if the operator
+confirms it.
 
 ## Tunnels
 

@@ -22,7 +22,7 @@ import {
     type ServerEnvironment
 } from "@polaris/core";
 import { deployBase, duckdnsConfigured, getPublicIp } from "./domain-service";
-import { deployZoneBase } from "./domain-zones";
+import { deployZoneBase, zoneDnsVerified } from "./domain-zones";
 
 /**
  * - `auto`     : classify from detection (public IP -> public, else LAN-only).
@@ -238,6 +238,9 @@ export interface NetworkStatus {
     wildcardDomain: string;
     /** True when it comes from the zone layout, so editing it here would be ignored. */
     wildcardManaged: boolean;
+    /** True when the wildcard can be handed out: a zone's DNS has been seen resolving
+     *  here, or the domain was named by hand and is the operator's own statement. */
+    wildcardReady: boolean;
     /** The free-subdomain magic base (sslip.io by default). */
     subdomainBase: string;
     /** Whether the box looks like a cloud VM or a home/office server. */
@@ -247,16 +250,18 @@ export interface NetworkStatus {
 }
 
 export async function getNetworkStatus(): Promise<NetworkStatus> {
-    const [storedMode, storedWildcard, zoneBase, subdomainIp, publicIp, base, placement, duckdns] = await Promise.all([
-        getSetting(KEYS.mode),
-        getSetting(KEYS.wildcardDomain),
-        deployZoneBase(),
-        getPublicIp(),
-        detectPublicIp(),
-        deployBase(),
-        detectPlacement(),
-        duckdnsConfigured()
-    ]);
+    const [storedMode, storedWildcard, zoneBase, zoneVerified, subdomainIp, publicIp, base, placement, duckdns] =
+        await Promise.all([
+            getSetting(KEYS.mode),
+            getSetting(KEYS.wildcardDomain),
+            deployZoneBase(),
+            zoneDnsVerified(),
+            getPublicIp(),
+            detectPublicIp(),
+            deployBase(),
+            detectPlacement(),
+            duckdnsConfigured()
+        ]);
     // The zone layout is the source of truth once a base domain is configured: the
     // guided setup writes it, and every deploy zone already carries its own wildcard
     // record. The standalone field stays as the fallback for setups that predate it.
@@ -267,13 +272,23 @@ export async function getNetworkStatus(): Promise<NetworkStatus> {
     // with colons in it and ask Let's Encrypt to certify it.
     const autoSubdomainsPublic = Boolean(subdomainIp) && isPublicIpv4(subdomainIp!);
     const natted = !autoSubdomainsPublic || (Boolean(publicIp) && publicIp !== subdomainIp);
-    // A saved zone layout is an explicit statement that DNS points here, so
-    // "automatic" honours it instead of falling back to a LAN-only free subdomain -
-    // otherwise finishing the guided setup would change nothing until the mode was
-    // also flipped by hand. The legacy standalone field does not promote the mode on
-    // its own: it predates the layout and may name a domain nobody ever pointed here.
+    // A zone layout is an intention until its wildcard has been seen resolving to this
+    // server, so the wildcard is only exposed once the DNS check has passed: minting
+    // `<app>.plr.example.com` before the record exists hands out a hostname nothing
+    // resolves and asks Let's Encrypt to validate it, once per service. Until then the
+    // free subdomain stays, and the mode flips on its own when the check succeeds. The
+    // legacy standalone field is the operator's own statement about DNS they manage, so
+    // it needs no proof - but it does not promote the mode on its own either.
+    const wildcardReady = zoneBase ? zoneVerified : Boolean(storedWildcard);
+    const fallbackMode: EffectiveMode = autoSubdomainsPublic ? "public" : "lan";
     const effectiveMode: EffectiveMode =
-        mode === "auto" ? (zoneBase ? "wildcard" : autoSubdomainsPublic ? "public" : "lan") : mode;
+        mode === "auto"
+            ? zoneBase && zoneVerified
+                ? "wildcard"
+                : fallbackMode
+            : mode === "wildcard" && !wildcardReady
+              ? fallbackMode
+              : mode;
     return {
         mode,
         effectiveMode,
@@ -283,6 +298,7 @@ export async function getNetworkStatus(): Promise<NetworkStatus> {
         autoSubdomainsPublic,
         wildcardDomain: wildcard ?? "",
         wildcardManaged: Boolean(zoneBase),
+        wildcardReady,
         subdomainBase: base,
         placement,
         duckdns

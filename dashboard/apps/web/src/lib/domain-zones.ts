@@ -56,15 +56,18 @@ export interface DomainZoneConfig {
 }
 
 /**
- * Keep the stored layout self-consistent: no two zones on the same hostname (they
- * would fight over the same wildcard), exactly one primary per scope, and a Polaris
- * zone always present so the control plane has somewhere to live.
+ * Keep the stored layout self-consistent: no two zones of the same scope on one
+ * hostname (they would fight over which is the default), and exactly one primary per
+ * scope. Two scopes may share a label - a Polaris zone and a deploy zone both on the
+ * base domain is the documented way to put everything on `example.com` - because a
+ * single wildcard record serves both, and `zoneRecords` asks for it once.
  */
 function reconcile(zones: DomainZone[]): DomainZone[] {
     const seen = new Set<string>();
     const unique = zones.filter((zone) => {
-        if (seen.has(zone.label)) return false;
-        seen.add(zone.label);
+        const key = `${zone.scope}:${zone.label}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
         return true;
     });
     const scopes: ZoneScope[] = ["polaris", "deploy"];
@@ -154,11 +157,16 @@ export interface ZoneRecords {
 
 export function zoneRecords(config: DomainZoneConfig): ZoneRecords[] {
     if (!config.baseDomain) return [];
-    return config.zones.map((zone) => ({
-        zone,
-        host: zoneHost(zone, config.baseDomain),
-        wildcard: zoneWildcard(zone, config.baseDomain)
-    }));
+    // One pair per hostname, not per zone: zones of different scopes may sit on the
+    // same label, and one wildcard record answers for both - listing it twice would
+    // show the operator the same record to create twice and check it twice.
+    const seen = new Set<string>();
+    return config.zones.flatMap((zone) => {
+        const host = zoneHost(zone, config.baseDomain);
+        if (seen.has(host)) return [];
+        seen.add(host);
+        return [{ zone, host, wildcard: zoneWildcard(zone, config.baseDomain) }];
+    });
 }
 
 /**

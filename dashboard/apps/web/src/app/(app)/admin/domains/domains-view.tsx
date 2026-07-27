@@ -340,6 +340,12 @@ function NetworkExposure({ nonce }: { nonce: number }) {
                                 Taken from your zone layout. Change it in the guided setup above.
                             </span>
                         )}
+                        {status.wildcardManaged && !status.wildcardReady && (
+                            <span className="text-xs text-warning">
+                                Not in use yet: the wildcard has not been seen resolving to this server. New services
+                                keep a free subdomain until the DNS check in the guided setup passes.
+                            </span>
+                        )}
                     </label>
                 )}
 

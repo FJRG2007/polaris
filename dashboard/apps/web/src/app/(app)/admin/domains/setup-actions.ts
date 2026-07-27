@@ -19,6 +19,7 @@ import {
     getDomainZones,
     saveDomainZones,
     setDashboardZoneIntent,
+    zoneDnsVerified,
     zoneRecords,
     type DomainZoneConfig
 } from "@/lib/domain-zones";
@@ -49,6 +50,12 @@ export interface DomainSetupState {
 /** Everything the wizard renders from, in one round trip. */
 export async function domainSetupStateAction(): Promise<DomainSetupState> {
     await requireAdmin();
+    // Records created at a registrar take minutes to propagate, so the check that runs
+    // on save usually fails and the layout stays unproven - and an unproven zone hands
+    // out no hostnames. Opening the setup re-proves it, rather than leaving the
+    // operator to guess that a button on the last step is what unblocks their domain.
+    const saved = await getDomainZones();
+    if (saved.baseDomain && !(await zoneDnsVerified())) await checkZoneDns().catch(() => undefined);
     const [environment, network, zones, domains, cloudflare] = await Promise.all([
         getLocalEnvironment(),
         getNetworkStatus(),
@@ -182,16 +189,30 @@ export async function checkZoneDnsAction(): Promise<ZoneDnsReport> {
     return checkZoneDns();
 }
 
-/** Create the zone + wildcard records through the connected Cloudflare account. */
-export async function provisionZoneDnsAction(): Promise<ZoneDnsProvisionResult & { error?: string }> {
+const provisionSchema = z.object({ overwrite: z.boolean().default(false) });
+
+/**
+ * Create the zone + wildcard records through the connected Cloudflare account. Names
+ * that already point elsewhere come back as conflicts and are only repointed on a
+ * second call with `overwrite`, once the operator has seen what would be replaced.
+ */
+export async function provisionZoneDnsAction(input?: unknown): Promise<ZoneDnsProvisionResult & { error?: string }> {
     const user = await requireAdmin();
+    const overwrite = provisionSchema.safeParse(input ?? {}).data?.overwrite ?? false;
     try {
-        const result = await provisionZoneDns();
-        await recordAudit({ actorId: user.id, action: "domains.dns.provision", targetType: "setting", targetId: "zones" });
+        const result = await provisionZoneDns({ overwrite });
+        await recordAudit({
+            actorId: user.id,
+            action: "domains.dns.provision",
+            targetType: "setting",
+            targetId: overwrite ? "zones:overwrite" : "zones"
+        });
         return result;
     } catch (caught) {
         return {
             created: [],
+            replaced: [],
+            conflicts: [],
             failed: [],
             error: caught instanceof Error ? caught.message : "Could not create the DNS records"
         };

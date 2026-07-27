@@ -22,7 +22,7 @@ import {
 import { setDomainConfig } from "./domain-service";
 import { detectPublicIp } from "./network-service";
 import { loadCloudflareToken } from "./integrations/cloudflare-account-service";
-import { resolveZoneForHostname, upsertARecord } from "./integrations/cloudflare-api";
+import { findDnsRecord, resolveZoneForHostname, upsertARecord } from "./integrations/cloudflare-api";
 
 export interface ZoneDnsCheck {
     /** The zone's own hostname (`plr.example.com`). */
@@ -118,30 +118,45 @@ async function applyDashboardZone(): Promise<void> {
 
 export interface ZoneDnsProvisionResult {
     created: string[];
+    /** Records that already existed and were repointed at this server. */
+    replaced: string[];
+    /** Records pointing somewhere else, left untouched until the operator confirms. */
+    conflicts: Array<{ name: string; content: string }>;
     failed: Array<{ name: string; detail: string }>;
 }
 
 /**
  * Create the zone and wildcard A records through the connected Cloudflare account,
  * so an operator whose domain is already on Cloudflare never opens its dashboard.
- * Idempotent: existing records are updated to the current IP. Throws when there is
- * no token, no domain, or no detectable public IP - each with what to do about it.
+ * Idempotent: a record that already points here is left as it is. Throws when there
+ * is no token, no domain, or no detectable public IP - each with what to do about it.
+ *
+ * A record that points somewhere else is never touched without `overwrite`: a zone
+ * with an empty label puts the operator's apex (`example.com`) on this list, and
+ * repointing that would take their existing website offline. They are reported back
+ * so the caller can name them and ask.
  */
-export async function provisionZoneDns(): Promise<ZoneDnsProvisionResult> {
+export async function provisionZoneDns(options: { overwrite?: boolean } = {}): Promise<ZoneDnsProvisionResult> {
     const [config, token, ip] = await Promise.all([getDomainZones(), loadCloudflareToken(), detectPublicIp()]);
     if (!config.baseDomain) throw new Error("Set a base domain first");
     if (!token) throw new Error("Connect a Cloudflare API token under Integrations first");
     if (!ip) throw new Error("Polaris could not detect this server's public IP, so it does not know what to point DNS at");
 
     const zone = await resolveZoneForHostname(token, config.baseDomain);
-    const result: ZoneDnsProvisionResult = { created: [], failed: [] };
+    const result: ZoneDnsProvisionResult = { created: [], replaced: [], conflicts: [], failed: [] };
     // Sequential on purpose: Cloudflare rate-limits per account, and a handful of
     // records is not worth risking a 429 that leaves the layout half-created.
     for (const record of zoneRecords(config)) {
         for (const name of [record.host, record.wildcard]) {
             try {
+                const existing = await findDnsRecord(token, zone.id, "A", name);
+                if (existing?.content === ip) continue;
+                if (existing && !options.overwrite) {
+                    result.conflicts.push({ name, content: existing.content });
+                    continue;
+                }
                 await upsertARecord(token, zone.id, name, ip);
-                result.created.push(name);
+                (existing ? result.replaced : result.created).push(name);
             } catch (caught) {
                 result.failed.push({
                     name,

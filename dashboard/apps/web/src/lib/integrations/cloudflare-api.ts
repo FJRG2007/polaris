@@ -154,19 +154,41 @@ export async function putTunnelPlaceholder(
     });
 }
 
+export interface CfDnsRecord {
+    id: string;
+    /** What the record points at today (an IP for an A record). */
+    content: string;
+}
+
+/**
+ * The record of one type/name that already exists, or null. Callers that are about to
+ * write a name the operator may already be using check this first: an upsert replaces
+ * whatever is there, and the name can be their domain's apex.
+ */
+export async function findDnsRecord(
+    token: string,
+    zoneId: string,
+    type: string,
+    name: string
+): Promise<CfDnsRecord | null> {
+    const existing = await cf<Array<{ id?: unknown; content?: unknown }>>(
+        token,
+        "GET",
+        `/zones/${zoneId}/dns_records?type=${type}&name=${encodeURIComponent(name)}`
+    );
+    const current = Array.isArray(existing) ? existing.find((entry) => typeof entry?.id === "string") : undefined;
+    if (!current || typeof current.id !== "string") return null;
+    return { id: current.id, content: typeof current.content === "string" ? current.content : "" };
+}
+
 /** Create or replace a DNS record of one type/name, returning its record id. */
 async function upsertRecord(
     token: string,
     zoneId: string,
     record: { type: string; name: string; content: string; proxied: boolean; ttl: number }
 ): Promise<string> {
-    const existing = await cf<Array<{ id?: unknown }>>(
-        token,
-        "GET",
-        `/zones/${zoneId}/dns_records?type=${record.type}&name=${encodeURIComponent(record.name)}`
-    );
-    const current = Array.isArray(existing) ? existing.find((entry) => typeof entry?.id === "string") : undefined;
-    if (current && typeof current.id === "string") {
+    const current = await findDnsRecord(token, zoneId, record.type, record.name);
+    if (current) {
         await cf(token, "PUT", `/zones/${zoneId}/dns_records/${current.id}`, record);
         return current.id;
     }

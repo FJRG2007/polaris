@@ -26,7 +26,7 @@ import {
 } from "lucide-react";
 import { Badge, Button, Card, CardBody, CardHeader, CardTitle, Checkbox, Input, Select } from "@polaris/ui";
 import type { ServerEnvironment } from "@polaris/core";
-import type { ZoneDnsReport } from "@/lib/domain-dns";
+import type { ZoneDnsProvisionResult, ZoneDnsReport } from "@/lib/domain-dns";
 import { strategiesFor, STRATEGY_META, type ExposureStrategy } from "@/lib/domain-strategies";
 import { ENVIRONMENT_CHOICES, ENVIRONMENT_META } from "../../apps/servers/environment-meta";
 import {
@@ -487,6 +487,7 @@ function DomainStep({
 
 function DnsStep({ state, publicIp }: { state: DomainSetupState; publicIp: string | null }) {
     const [report, setReport] = useState<ZoneDnsReport | null>(null);
+    const [conflicts, setConflicts] = useState<ZoneDnsProvisionResult["conflicts"]>([]);
     const [busy, setBusy] = useState<"check" | "create" | null>(null);
     const [message, setMessage] = useState<string | null>(null);
 
@@ -504,11 +505,16 @@ function DnsStep({ state, publicIp }: { state: DomainSetupState; publicIp: strin
         }
     }
 
-    async function create() {
+    // `overwrite` is only ever true on the second press, after the conflicting records
+    // below have been shown: repointing a name the operator already uses - the apex of
+    // their domain, when a zone has an empty label - takes whatever is there offline.
+    async function create(overwrite = false) {
         setBusy("create");
         setMessage(null);
-        const result = await provisionZoneDnsAction().catch((caught: unknown) => ({
+        const result = await provisionZoneDnsAction({ overwrite }).catch((caught: unknown) => ({
             created: [],
+            replaced: [],
+            conflicts: [],
             failed: [],
             error: caught instanceof Error ? caught.message : "Could not create the DNS records"
         }));
@@ -517,11 +523,14 @@ function DnsStep({ state, publicIp }: { state: DomainSetupState; publicIp: strin
             setMessage(result.error);
             return;
         }
-        setMessage(
-            result.failed.length > 0
-                ? `Created ${result.created.length}, failed: ${result.failed.map((entry) => entry.name).join(", ")}`
-                : `Created ${result.created.length} records.`
-        );
+        setConflicts(result.conflicts);
+        const parts = [
+            `${result.created.length} created`,
+            `${result.replaced.length} repointed`,
+            ...(result.conflicts.length > 0 ? [`${result.conflicts.length} left alone`] : []),
+            ...(result.failed.length > 0 ? [`failed: ${result.failed.map((entry) => entry.name).join(", ")}`] : [])
+        ];
+        setMessage(`${parts.join(", ")}.`);
         await check();
     }
 
@@ -580,13 +589,39 @@ function DnsStep({ state, publicIp }: { state: DomainSetupState; publicIp: strin
                     <RefreshCw className={`size-4 ${busy === "check" ? "animate-spin" : ""}`} /> Check DNS
                 </Button>
                 {state.cloudflareConnected && (
-                    <Button size="sm" onClick={create} disabled={busy !== null}>
+                    <Button size="sm" onClick={() => create()} disabled={busy !== null}>
                         <Globe className="size-4" /> Create them on Cloudflare
                     </Button>
                 )}
             </div>
 
             {message && <p className="text-xs text-muted-foreground">{message}</p>}
+
+            {conflicts.length > 0 && (
+                <div className="flex flex-col gap-2 rounded-md border border-warning/30 bg-warning/5 px-3 py-2 text-xs">
+                    <span className="flex items-start gap-2 text-muted-foreground">
+                        <TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-warning" />
+                        These records already exist and point somewhere else. Polaris left them alone - replacing one
+                        takes whatever answers on it today offline.
+                    </span>
+                    <ul className="flex flex-col gap-0.5 pl-5 text-muted-foreground">
+                        {conflicts.map((conflict) => (
+                            <li key={conflict.name}>
+                                <code>{conflict.name}</code> - {conflict.content || "unknown address"}
+                            </li>
+                        ))}
+                    </ul>
+                    <Button
+                        size="sm"
+                        variant="secondary"
+                        className="w-fit"
+                        onClick={() => create(true)}
+                        disabled={busy !== null}
+                    >
+                        Point them at this server
+                    </Button>
+                </div>
+            )}
 
             <ZoneResults report={report} />
         </div>

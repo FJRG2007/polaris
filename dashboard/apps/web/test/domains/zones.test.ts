@@ -52,15 +52,29 @@ describe("saveDomainZones", () => {
         expect(config.zones.find((zone) => zone.primary)?.label).toBe("plr");
     });
 
-    it("drops a second zone on the same hostname", async () => {
+    it("drops a second zone of the same scope on the same hostname", async () => {
         const config = await saveDomainZones({
             baseDomain: "example.com",
             zones: [
                 { label: "plr", scope: "deploy", primary: true },
-                { label: "plr", scope: "polaris", primary: true }
+                { label: "plr", scope: "deploy", primary: false }
             ]
         });
         expect(config.zones).toHaveLength(1);
+    });
+
+    it("keeps Polaris and deployed services on one hostname, sharing its wildcard", async () => {
+        const config = await saveDomainZones({
+            baseDomain: "example.com",
+            zones: [
+                { label: "", scope: "polaris", primary: true },
+                { label: "", scope: "deploy", primary: true }
+            ]
+        });
+        expect(config.zones).toHaveLength(2);
+        expect(zoneRecords(config)).toEqual([
+            { zone: config.zones[0], host: "example.com", wildcard: "*.example.com" }
+        ]);
     });
 
     it("refuses a domain with nowhere to put deployed services", async () => {
