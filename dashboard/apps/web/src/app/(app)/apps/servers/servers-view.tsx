@@ -30,6 +30,8 @@ export interface ServerRow {
     port: number | null;
     authMethod: string | null;
     environment: ServerEnvironment;
+    /** Wildcard domain pointed at this server, empty when none is configured. */
+    wildcardDomain: string;
     /** What Polaris detected, offered as the default when the environment is unset. */
     suggested: ServerEnvironment;
     /** False while the value is only Polaris's guess, not the operator's answer. */
@@ -58,6 +60,7 @@ export function ServersView({ servers }: { servers: ServerRow[] }) {
             hostId: server.kind === "host" ? server.id : null,
             name: server.name,
             current: server.environment,
+            wildcardDomain: server.wildcardDomain,
             suggested: server.suggested,
             confirmed: server.confirmed
         });

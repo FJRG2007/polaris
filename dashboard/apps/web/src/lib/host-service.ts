@@ -10,6 +10,7 @@
 import { loadEnv } from "@polaris/config";
 import type { CreateHostInput, HostCredentials, ServerEnvironment } from "@polaris/core";
 import { prisma } from "@polaris/db";
+import { isBaseDomain, normalizeBaseDomain } from "@polaris/deploy";
 import { testAndCaptureHostKey, type SshAuth } from "@polaris/ssh";
 import { decryptCredentials, encryptCredentials } from "@polaris/storage";
 
@@ -25,6 +26,7 @@ export async function listHosts(ownerId: string) {
             username: true,
             authMethod: true,
             environment: true,
+            wildcardDomain: true,
             status: true,
             createdAt: true
         },
@@ -109,6 +111,24 @@ export async function setHostEnvironment(
     environment: ServerEnvironment
 ): Promise<boolean> {
     const { count } = await prisma.host.updateMany({ where: { id: hostId, ownerId }, data: { environment } });
+    return count > 0;
+}
+
+/**
+ * Point a wildcard domain at a server, so its services get real domains from its
+ * own edge rather than a hostname that encodes its IP. Blank clears it. The value
+ * is normalized the same way as the Polaris zone base, so a pasted `*.apps.example.com`
+ * or `https://apps.example.com/` all store as `apps.example.com` - a stray scheme or
+ * wildcard prefix would otherwise end up inside every hostname built from it.
+ * Owner-scoped; false when no host of this owner matched.
+ */
+export async function setHostWildcardDomain(ownerId: string, hostId: string, domain: string): Promise<boolean> {
+    const clean = normalizeBaseDomain(domain);
+    if (clean && !isBaseDomain(clean)) throw new Error("Enter a domain like apps.example.com");
+    const { count } = await prisma.host.updateMany({
+        where: { id: hostId, ownerId },
+        data: { wildcardDomain: clean || null }
+    });
     return count > 0;
 }
 

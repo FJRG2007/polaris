@@ -316,12 +316,20 @@ export interface AutoDomainPlan {
  * served by the internal CA, flagged so the UI can say so instead of pretending it
  * works everywhere. Null when no IP or domain is known at all.
  */
-export async function resolveAutoDomain(name: string, override?: { ip: string }): Promise<AutoDomainPlan | null> {
+export async function resolveAutoDomain(
+    name: string,
+    override?: { ip: string; wildcard?: string | null }
+): Promise<AutoDomainPlan | null> {
     // An app on a remote server gets a subdomain that embeds THAT server's IP and
     // is served by its own edge, so it never inherits the Polaris host's IP or
     // network mode: a public IP earns a real Let's Encrypt name, a private one a
     // LAN-only internal name. The wildcard/mode logic below is for the local host.
     if (override) {
+        // A wildcard pointed at that server is a real domain its own edge serves, so
+        // it beats the IP-derived name - and it is the only option when the server is
+        // reached by hostname, where there is no address to encode.
+        const wildcard = override.wildcard?.trim();
+        if (wildcard) return { hostname: magicDomain(name, "", wildcard), cert: "le", kind: "auto" };
         const ip = override.ip.trim();
         // The subdomain encodes the address in a DNS label, so a host reached by
         // name or over IPv6 has no auto domain to offer - the caller falls back.

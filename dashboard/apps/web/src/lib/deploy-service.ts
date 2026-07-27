@@ -216,9 +216,11 @@ export async function addApplicationDomain(
         include: { target: { include: { host: true } } }
     });
     if (!app) throw new Error("Application not found");
-    // A remote-server app's auto domain must embed that server's IP (served by its
-    // own edge), not the Polaris host's - otherwise it points at the wrong box.
-    const remoteIp = app.target.kind !== "local" ? app.target.host?.address?.trim() : undefined;
+    // A remote-server app's auto domain comes from THAT server - its own wildcard
+    // domain, or failing that its IP - and is served by its own edge, never from the
+    // Polaris host's, which would point the name at the wrong box.
+    const remoteHost = app.target.kind !== "local" ? app.target.host : null;
+    const remoteIp = remoteHost?.address?.trim();
     let hostname = opts.hostname?.trim();
     let kind = "custom";
     // Cert/exposure resolution: a caller-chosen mode wins (e.g. "none" for a domain
@@ -228,8 +230,8 @@ export async function addApplicationDomain(
     let certResolver: string = opts.cert ?? "le";
     // A zone hostname is only for services on the Polaris host: the zone's wildcard
     // record points at this box, so a remote server's app would get a name that
-    // resolves to the wrong machine. Those keep the IP-derived auto domain below.
-    if (!hostname && !remoteIp && (opts.zoneLabel !== undefined || opts.random)) {
+    // resolves to the wrong machine. Those take their own server's domain below.
+    if (!hostname && !remoteHost && (opts.zoneLabel !== undefined || opts.random)) {
         const minted = await deployHostname(app.slug, { zoneLabel: opts.zoneLabel, random: opts.random });
         if (!minted) throw new Error("No domain is configured yet. Run the guided setup under Domains first.");
         hostname = minted;
@@ -241,10 +243,15 @@ export async function addApplicationDomain(
         // real internet-reachable name with Let's Encrypt; otherwise a LAN-only
         // sslip.io name (kind "lan") - so the app never gets a subdomain that
         // silently fails off the network; the UI labels it and offers public setup.
-        const plan = await resolveAutoDomain(app.slug, remoteIp ? { ip: remoteIp } : undefined);
+        const plan = await resolveAutoDomain(
+            app.slug,
+            remoteHost ? { ip: remoteIp ?? "", wildcard: remoteHost.wildcardDomain } : undefined
+        );
         if (!plan) {
             throw new Error(
-                "No public IP is configured for free subdomains. Set one in Domains settings, or enter a custom domain."
+                remoteHost
+                    ? "This server is reached by name and has no wildcard domain, so there is no subdomain to generate. Set one on the server, or enter a custom domain."
+                    : "No public IP is configured for free subdomains. Set one in Domains settings, or enter a custom domain."
             );
         }
         hostname = plan.hostname;

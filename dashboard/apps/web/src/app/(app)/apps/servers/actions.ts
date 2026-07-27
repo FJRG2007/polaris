@@ -7,12 +7,13 @@
  * anything is stored, so a bad host fails fast with a clear message.
  */
 
+import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { createHostSchema, setServerEnvironmentSchema } from "@polaris/core";
 import { requirePermission } from "@/lib/session";
 import { recordAudit } from "@/lib/audit-service";
 import { setLocalEnvironment } from "@/lib/network-service";
-import { createHost, deleteHost, setHostEnvironment } from "@/lib/host-service";
+import { createHost, deleteHost, setHostEnvironment, setHostWildcardDomain } from "@/lib/host-service";
 
 const SERVERS_PATH = "/apps/servers";
 
@@ -57,6 +58,39 @@ export async function setServerEnvironmentAction(input: unknown): Promise<{ erro
         targetType: hostId ? "host" : "system",
         targetId: hostId ?? "local",
         metadata: { environment }
+    });
+    revalidatePath(SERVERS_PATH);
+    return {};
+}
+
+const serverWildcardSchema = z.object({
+    hostId: z.string().uuid(),
+    /** Blank clears it, so the server falls back to IP-derived free subdomains. */
+    wildcardDomain: z.string().max(253)
+});
+
+/**
+ * Point a wildcard domain at one server. Services deployed there then get a real
+ * domain from that server's own edge instead of a hostname built from its IP - the
+ * per-server equivalent of the Polaris host's zone layout, and the only thing that
+ * gives a server reached by hostname any subdomain at all.
+ */
+export async function setServerWildcardAction(input: unknown): Promise<{ error?: string }> {
+    const user = await requirePermission("system.manage");
+    const parsed = serverWildcardSchema.safeParse(input);
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid domain" };
+    try {
+        if (!(await setHostWildcardDomain(user.id, parsed.data.hostId, parsed.data.wildcardDomain))) {
+            return { error: "Server not found" };
+        }
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not save the domain" };
+    }
+    await recordAudit({
+        actorId: user.id,
+        action: "server.wildcard",
+        targetType: "host",
+        targetId: parsed.data.hostId
     });
     revalidatePath(SERVERS_PATH);
     return {};

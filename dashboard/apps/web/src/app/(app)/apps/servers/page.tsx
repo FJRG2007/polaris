@@ -60,6 +60,9 @@ export default async function ServersPage() {
             port: null,
             authMethod: null,
             environment: local.environment,
+            // The Polaris box's own zones are richer than one wildcard and are set up
+            // under Domains, so this column is for registered servers only.
+            wildcardDomain: "",
             suggested: local.detected,
             confirmed: local.confirmed
         },
@@ -76,6 +79,7 @@ export default async function ServersPage() {
                 port: host.port,
                 authMethod: host.authMethod,
                 environment,
+                wildcardDomain: host.wildcardDomain ?? "",
                 suggested: environmentFromAddress(host.address),
                 // The add-server form prefills this from the address, but shows the
                 // value and its routing note before submit - so a stored value was

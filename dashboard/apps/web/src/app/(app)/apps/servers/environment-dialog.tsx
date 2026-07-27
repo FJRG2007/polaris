@@ -10,8 +10,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check } from "lucide-react";
 import type { ServerEnvironment } from "@polaris/core";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@polaris/ui";
-import { setServerEnvironmentAction } from "./actions";
+import { Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Input } from "@polaris/ui";
+import { setServerEnvironmentAction, setServerWildcardAction } from "./actions";
 import { ENVIRONMENT_CHOICES, ENVIRONMENT_META } from "./environment-meta";
 
 export interface EnvironmentTarget {
@@ -19,6 +19,8 @@ export interface EnvironmentTarget {
     hostId: string | null;
     name: string;
     current: ServerEnvironment;
+    /** Wildcard domain pointed at this server, empty when none is configured. */
+    wildcardDomain: string;
     /** Polaris's own guess, surfaced while there is no answer yet. */
     suggested: ServerEnvironment;
     confirmed: boolean;
@@ -45,7 +47,9 @@ export function EnvironmentDialog({
             setError(result.error);
             return;
         }
-        onClose();
+        // A registered server also has its domain here, so the dialog stays open to
+        // finish that; the local box has nothing left to answer.
+        if (!target.hostId) onClose();
         router.refresh();
     }
 
@@ -72,7 +76,7 @@ export function EnvironmentDialog({
                     <DialogTitle>Where does {target?.name} live?</DialogTitle>
                     <DialogDescription>
                         This decides how a domain can be pointed at it, and whether it can serve public traffic
-                        directly.
+                        directly. Registered servers can also take a wildcard domain of their own below.
                     </DialogDescription>
                 </DialogHeader>
                 {suggestion ? (
@@ -110,8 +114,65 @@ export function EnvironmentDialog({
                         );
                     })}
                 </div>
+                {target?.hostId ? <ServerWildcard hostId={target.hostId} current={target.wildcardDomain} /> : null}
                 {error ? <p className="mt-2 text-sm text-danger">{error}</p> : null}
             </DialogContent>
         </Dialog>
+    );
+}
+
+/**
+ * The wildcard domain for one server. With it, services deployed there get
+ * `<service>.<domain>` from that server's own edge; without it they fall back to a
+ * hostname built from the server's IP, which a server reached by name cannot have
+ * at all.
+ */
+function ServerWildcard({ hostId, current }: { hostId: string; current: string }) {
+    const router = useRouter();
+    const [value, setValue] = useState(current);
+    const [saving, setSaving] = useState(false);
+    const [saved, setSaved] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    async function save() {
+        setSaving(true);
+        setSaved(false);
+        setError(null);
+        const result = await setServerWildcardAction({ hostId, wildcardDomain: value });
+        setSaving(false);
+        if (result.error) {
+            setError(result.error);
+            return;
+        }
+        setSaved(true);
+        router.refresh();
+    }
+
+    return (
+        <div className="mt-4 flex flex-col gap-2 border-t border-border pt-4">
+            <label className="flex flex-col gap-1 text-sm">
+                Wildcard domain for this server
+                <div className="flex items-center gap-2">
+                    <Input
+                        value={value}
+                        onChange={(event) => {
+                            setValue(event.target.value);
+                            setSaved(false);
+                        }}
+                        placeholder="apps.example.com"
+                        autoComplete="off"
+                    />
+                    <Button size="sm" variant="secondary" onClick={save} disabled={saving || value === current}>
+                        {saving ? "Saving..." : "Save"}
+                    </Button>
+                </div>
+            </label>
+            <p className="text-xs text-muted-foreground">
+                Point <code>*.{value.trim() || "apps.example.com"}</code> at this server, and its services get a real
+                domain with a Let&apos;s Encrypt certificate. Leave empty to use free IP-based subdomains.
+            </p>
+            {saved ? <p className="text-xs text-success">Saved.</p> : null}
+            {error ? <p className="text-xs text-danger">{error}</p> : null}
+        </div>
     );
 }

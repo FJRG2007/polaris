@@ -37,10 +37,27 @@ resolve nowhere.
   service keeps its URL.
 - Random: `<random>.plr.example.com`, for unguessable or throwaway exposure.
 
-Services on a **remote** server never get a zone hostname: the zone's wildcard
-points at the Polaris host, so those keep an IP-derived `sslip.io` name served by
-their own edge. Per-server zones would be the next step if remote servers need real
-domains.
+Services on a **remote** server never get a Polaris zone hostname: the zone's
+wildcard points at the Polaris host. They use their own server's domain instead -
+see below.
+
+## Per-server wildcards
+
+Each registered server carries an optional `wildcardDomain` (`Host.wildcardDomain`,
+set from the server's dialog under Servers). Services deployed there get
+`<slug>-<hash>.<that domain>`, served with Let's Encrypt by that server's own edge.
+
+Resolution order for a service on a remote server:
+
+1. The server's wildcard domain, if set.
+2. A subdomain encoding the server's IP (`sslip.io`) - public certificate when the
+   address is routable, internal CA and a LAN-only label when it is not.
+3. Nothing, when the server is reached by hostname and has no wildcard: there is no
+   address to encode, so the UI asks for a domain instead of inventing one.
+
+This keeps routing per-topology: a home box and a data-centre box each answer for
+their own hostnames, and Polaris never inserts itself into the request path of the
+services it deployed.
 
 ## Guided setup
 
