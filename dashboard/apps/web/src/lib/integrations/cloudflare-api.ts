@@ -154,20 +154,17 @@ export async function putTunnelPlaceholder(
     });
 }
 
-/** Point `hostname` at the tunnel via a proxied CNAME, creating or updating the record. */
-export async function upsertTunnelCname(
+/** Create or replace a DNS record of one type/name, returning its record id. */
+async function upsertRecord(
     token: string,
     zoneId: string,
-    hostname: string,
-    tunnelId: string
+    record: { type: string; name: string; content: string; proxied: boolean; ttl: number }
 ): Promise<string> {
-    const content = `${tunnelId}.cfargotunnel.com`;
     const existing = await cf<Array<{ id?: unknown }>>(
         token,
         "GET",
-        `/zones/${zoneId}/dns_records?type=CNAME&name=${encodeURIComponent(hostname)}`
+        `/zones/${zoneId}/dns_records?type=${record.type}&name=${encodeURIComponent(record.name)}`
     );
-    const record = { type: "CNAME", name: hostname, content, proxied: true, ttl: 1 };
     const current = Array.isArray(existing) ? existing.find((entry) => typeof entry?.id === "string") : undefined;
     if (current && typeof current.id === "string") {
         await cf(token, "PUT", `/zones/${zoneId}/dns_records/${current.id}`, record);
@@ -176,6 +173,31 @@ export async function upsertTunnelCname(
     const created = await cf<{ id?: unknown }>(token, "POST", `/zones/${zoneId}/dns_records`, record);
     if (typeof created?.id !== "string") throw new Error("Cloudflare did not return a DNS record id");
     return created.id;
+}
+
+/** Point `hostname` at the tunnel via a proxied CNAME, creating or updating the record. */
+export async function upsertTunnelCname(
+    token: string,
+    zoneId: string,
+    hostname: string,
+    tunnelId: string
+): Promise<string> {
+    return upsertRecord(token, zoneId, {
+        type: "CNAME",
+        name: hostname,
+        content: `${tunnelId}.cfargotunnel.com`,
+        proxied: true,
+        ttl: 1
+    });
+}
+
+/**
+ * Point `hostname` (a zone host or its `*.` wildcard) straight at an IP. Left
+ * unproxied: the record must resolve to the server's own address so Let's Encrypt
+ * can validate it over HTTP and so the edge, not Cloudflare, terminates TLS.
+ */
+export async function upsertARecord(token: string, zoneId: string, hostname: string, ip: string): Promise<string> {
+    return upsertRecord(token, zoneId, { type: "A", name: hostname, content: ip, proxied: false, ttl: 300 });
 }
 
 /** Best-effort deletion of a DNS record (teardown never blocks on it). */

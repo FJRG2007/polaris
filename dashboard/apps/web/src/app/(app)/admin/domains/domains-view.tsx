@@ -12,6 +12,7 @@ import { CheckCircle2, Download, Globe, Link2, Loader2, Network, RefreshCw, Shie
 import { Badge, Button, Card, CardBody, CardHeader, CardTitle, Input, Select } from "@polaris/ui";
 import type { DomainConfig } from "@/lib/domain-service";
 import type { NetworkMode, NetworkStatus } from "@/lib/network-service";
+import { DomainSetupWizard } from "./setup-wizard";
 import {
     clearDuckdnsTokenAction,
     networkStatusAction,
@@ -36,6 +37,9 @@ export function DomainsView({
     const [saved, setSaved] = useState(false);
     const [syncing, setSyncing] = useState(false);
     const [syncResult, setSyncResult] = useState<{ ok: boolean; detail: string } | null>(null);
+    // Bumped when the wizard saves, so the panels below re-read what it changed
+    // (exposure mode, wildcard domain, DuckDNS) instead of showing stale values.
+    const [setupNonce, setSetupNonce] = useState(0);
 
     async function onSave() {
         setSaving(true);
@@ -66,7 +70,9 @@ export function DomainsView({
 
     return (
         <div className="flex max-w-2xl flex-col gap-4">
-            <NetworkExposure />
+            <DomainSetupWizard onSaved={() => setSetupNonce((nonce) => nonce + 1)} />
+
+            <NetworkExposure nonce={setupNonce} />
 
             <Card>
                 <CardHeader>
@@ -197,12 +203,13 @@ const MODE_OPTIONS = [
 ];
 
 /**
- * Network topology + exposure control. Shows whether the box is publicly reachable
- * or behind NAT, lets the operator pick how auto domains are exposed, and gives
- * step-by-step setup for the public options so free subdomains that would only
- * work on the LAN are never handed out as if they worked everywhere.
+ * Network topology + exposure control: the manual view behind the guided setup.
+ * Shows whether the box is publicly reachable or behind NAT, lets the operator
+ * override how auto domains are exposed, and explains what each mode needs, so a
+ * free subdomain that would only work on the LAN is never handed out as if it
+ * worked everywhere.
  */
-function NetworkExposure() {
+function NetworkExposure({ nonce }: { nonce: number }) {
     const [status, setStatus] = useState<NetworkStatus | null>(null);
     const [mode, setMode] = useState<NetworkMode>("auto");
     const [wildcard, setWildcard] = useState("");
@@ -217,7 +224,7 @@ function NetworkExposure() {
             setWildcard(next.wildcardDomain);
             setLoading(false);
         });
-    }, []);
+    }, [nonce]);
 
     async function redetect() {
         setBusy(true);
@@ -228,7 +235,13 @@ function NetworkExposure() {
     async function save() {
         setBusy(true);
         setSaved(false);
-        setStatus(await saveNetworkConfigAction({ mode, wildcardDomain: wildcard }));
+        // A zone-managed wildcard is not editable here, so it is not written back:
+        // storing a copy would leave two values for one setting.
+        setStatus(
+            await saveNetworkConfigAction(
+                status?.wildcardManaged ? { mode } : { mode, wildcardDomain: wildcard }
+            )
+        );
         setBusy(false);
         setSaved(true);
     }
@@ -320,7 +333,13 @@ function NetworkExposure() {
                             onChange={(event) => setWildcard(event.target.value)}
                             placeholder="apps.example.com"
                             autoComplete="off"
+                            disabled={status.wildcardManaged}
                         />
+                        {status.wildcardManaged && (
+                            <span className="text-xs text-muted-foreground">
+                                Taken from your zone layout. Change it in the guided setup above.
+                            </span>
+                        )}
                     </label>
                 )}
 
