@@ -110,11 +110,13 @@ export async function saveDomainSetupAction(input: unknown): Promise<DomainSetup
         }
 
         // The domain a wildcard strategy builds zones on: the operator's own, or the
-        // DuckDNS name Polaris keeps pointed at this server.
+        // DuckDNS name Polaris keeps pointed at this server. A tunnel strategy stores
+        // none - its hostnames are published by the tunnel provider, so a zone here
+        // would ask the operator to create DNS records that must not exist.
         const baseDomain =
             strategy === "duckdns"
                 ? `${parsed.data.duckdnsSubdomain.trim().toLowerCase()}.duckdns.org`
-                : meta.needsDomain
+                : meta.wildcard && meta.needsDomain
                   ? parsed.data.baseDomain
                   : "";
         const zones = await saveDomainZones({ baseDomain, zones: parsed.data.zones });

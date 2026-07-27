@@ -89,7 +89,10 @@ import {
     cloudflareAccountStatusAction,
     ngrokTunnelStatusAction,
     startNgrokTunnelAction,
-    stopNgrokTunnelAction
+    stopNgrokTunnelAction,
+    openTunnelStatusAction,
+    startOpenTunnelAction,
+    stopOpenTunnelAction
 } from "./actions";
 
 const TABS = ["Deployments", "Variables", "Metrics", "Console", "Files", "Volumes", "Security", "Settings"] as const;
@@ -1477,6 +1480,33 @@ function NgrokTunnelRow({ appId, nonce, onChanged }: { appId: string; nonce: num
     );
 }
 
+/** The app's OpenTunnel tunnel on the operator's own tunnel server. The hostname is
+ *  derived, so the row shows it while the tunnel is down too - it does not change. */
+function OpenTunnelRow({ appId, nonce, onChanged }: { appId: string; nonce: number; onChanged: () => void }) {
+    const [status, setStatus] = useState<Awaited<ReturnType<typeof openTunnelStatusAction>> | null>(null);
+    const [pending, startTransition] = useTransition();
+    useEffect(() => {
+        void openTunnelStatusAction(appId).then(setStatus).catch(() => undefined);
+    }, [appId, nonce]);
+    if (!status?.running || !status.hostname) return null;
+    return (
+        <ExposureRow
+            icon={<Globe className="size-3.5 text-primary" />}
+            label={status.hostname}
+            href={`https://${status.hostname}`}
+            badge="opentunnel"
+            enabled
+            pending={pending}
+            onToggle={() =>
+                startTransition(async () => {
+                    await stopOpenTunnelAction(appId).catch(() => undefined);
+                    onChanged();
+                })
+            }
+        />
+    );
+}
+
 /** The app's Cloudflare named tunnel (stable hostname), shown when configured. */
 function NamedTunnelRow({ appId, nonce, onChanged }: { appId: string; nonce: number; onChanged: () => void }) {
     const [status, setStatus] = useState<Awaited<ReturnType<typeof namedTunnelStatusAction>> | null>(null);
@@ -1512,7 +1542,17 @@ function NamedTunnelRow({ appId, nonce, onChanged }: { appId: string; nonce: num
 }
 
 /** Every way to expose a service, unified into the one Public access selector. */
-type ExposureKind = "zone" | "subdomain" | "local" | "le" | "duckdns" | "proxy" | "cf-named" | "cf-quick" | "ngrok";
+type ExposureKind =
+    | "zone"
+    | "subdomain"
+    | "local"
+    | "le"
+    | "duckdns"
+    | "proxy"
+    | "cf-named"
+    | "cf-quick"
+    | "ngrok"
+    | "opentunnel";
 
 const EXPOSURE_OPTIONS: { value: ExposureKind; label: string; icon: ReactNode }[] = [
     { value: "zone", label: "Your domain (zone subdomain)", icon: <Globe className="size-4 text-primary" /> },
@@ -1520,6 +1560,7 @@ const EXPOSURE_OPTIONS: { value: ExposureKind; label: string; icon: ReactNode }[
     { value: "local", label: "Local subdomain (LAN)", icon: <MapPin className="size-4 text-muted-foreground" /> },
     { value: "le", label: "Custom domain - Let's Encrypt", icon: <Globe className="size-4 text-muted-foreground" /> },
     { value: "cf-named", label: "Cloudflare tunnel - custom domain", icon: <CloudflareMark className="size-4" /> },
+    { value: "opentunnel", label: "OpenTunnel - your own tunnel server", icon: <Globe className="size-4 text-primary" /> },
     { value: "cf-quick", label: "Cloudflare quick link (free)", icon: <CloudflareMark className="size-4" /> },
     { value: "ngrok", label: "ngrok tunnel", icon: <NgrokMark className="size-4" /> },
     { value: "duckdns", label: "DuckDNS subdomain", icon: <img src="/logos/duckdns.webp" alt="" className="size-4" /> },
@@ -1659,6 +1700,8 @@ function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
                 result = await startQuickTunnelAction(app.id);
             } else if (exposure === "ngrok") {
                 result = await startNgrokTunnelAction(app.id);
+            } else if (exposure === "opentunnel") {
+                result = await startOpenTunnelAction(app.id);
             }
             if (result.error) setError(result.error);
             else {
@@ -1675,7 +1718,7 @@ function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
     }
 
     const submitLabel =
-        exposure === "cf-quick" || exposure === "ngrok"
+        exposure === "cf-quick" || exposure === "ngrok" || exposure === "opentunnel"
             ? "Expose"
             : exposure === "cf-named"
               ? cfConnected
@@ -1792,6 +1835,7 @@ function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
                     <NamedTunnelRow appId={app.id} nonce={tunnelNonce} onChanged={() => setTunnelNonce((nonce) => nonce + 1)} />
                     <QuickTunnelRow appId={app.id} nonce={tunnelNonce} onChanged={() => setTunnelNonce((nonce) => nonce + 1)} />
                     <NgrokTunnelRow appId={app.id} nonce={tunnelNonce} onChanged={() => setTunnelNonce((nonce) => nonce + 1)} />
+                    <OpenTunnelRow appId={app.id} nonce={tunnelNonce} onChanged={() => setTunnelNonce((nonce) => nonce + 1)} />
                 </ul>
                 <MethodBlock
                     icon={<Globe className="size-4" />}
@@ -1879,7 +1923,9 @@ function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
                                               : "Create the tunnel in Cloudflare and paste its connector token. Tip: connect a Cloudflare API token under Integrations to skip this - then you only pick a hostname."
                                           : exposure === "cf-quick"
                                             ? "A throwaway *.trycloudflare.com URL - no account, no DNS, no port-forwarding. The link changes each time it starts."
-                                            : "A public ngrok URL forwarded to this app. Add your ngrok authtoken under Integrations first; ngrok's free plan allows one tunnel at a time."}
+                                            : exposure === "opentunnel"
+                                              ? "A stable hostname on your own domain, served by an OpenTunnel server you run - no tunnel provider in the path and no ports open here. Set the server up under Integrations first."
+                                              : "A public ngrok URL forwarded to this app. Add your ngrok authtoken under Integrations first; ngrok's free plan allows one tunnel at a time."}
                         </p>
                         {duckMissing && (
                             <a href="/integrations" className="inline-flex w-fit items-center gap-1 text-xs text-primary hover:underline">

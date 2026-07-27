@@ -347,13 +347,26 @@ function DomainStep({
         onZones(zones.map((zone, position) => (zone.scope === scope ? { ...zone, primary: position === index } : zone)));
     }
 
-    if (strategy === "free-subdomain" || strategy === "quick-tunnel") {
+    // Only a wildcard strategy has zones to lay out. A tunnel publishes each service
+    // itself, so the domain lives with the tunnel's own credentials under Integrations
+    // - asking for DNS records here would be asking for records that must not exist.
+    if (!meta.wildcard) {
         return (
             <div className="flex flex-col gap-3">
-                <StepTitle title="Nothing to configure" hint="This option needs no domain and no DNS." />
+                <StepTitle
+                    title={meta.needsDomain ? "Set this up under Integrations" : "Nothing to configure"}
+                    hint={meta.needsDomain ? "The tunnel publishes each service itself." : "This option needs no domain and no DNS."}
+                />
                 <p className="rounded-md border border-border/60 bg-surface/40 px-3 py-2 text-xs text-muted-foreground">
-                    {meta.summary} You can come back and point a domain here at any time.
+                    {meta.summary}
                 </p>
+                {meta.needsDomain ? (
+                    <a href="/integrations" className="w-fit text-xs text-primary hover:underline">
+                        Open Integrations
+                    </a>
+                ) : (
+                    <p className="text-xs text-muted-foreground">You can come back and point a domain here at any time.</p>
+                )}
             </div>
         );
     }

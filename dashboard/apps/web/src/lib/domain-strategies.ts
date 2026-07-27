@@ -11,12 +11,19 @@
 import type { ServerEnvironment } from "@polaris/core";
 import type { NetworkMode } from "./network-service";
 
-export type ExposureStrategy = "own-domain" | "duckdns" | "free-subdomain" | "cloudflare-tunnel" | "quick-tunnel";
+export type ExposureStrategy =
+    | "own-domain"
+    | "duckdns"
+    | "free-subdomain"
+    | "opentunnel"
+    | "cloudflare-tunnel"
+    | "quick-tunnel";
 
 export const EXPOSURE_STRATEGIES: ExposureStrategy[] = [
     "own-domain",
     "duckdns",
     "free-subdomain",
+    "opentunnel",
     "cloudflare-tunnel",
     "quick-tunnel"
 ];
@@ -65,6 +72,15 @@ export const STRATEGY_META: Record<ExposureStrategy, StrategyMeta> = {
         mode: "auto",
         needsDomain: false
     },
+    opentunnel: {
+        label: "Your own tunnel server (OpenTunnel)",
+        summary: "Apps get a stable hostname on your domain through a tunnel server you run yourself. No open ports here, and no tunnel provider in the path.",
+        dependency: "Only your own server - nothing you do not control.",
+        requires: ["A domain you control", "A server with a public IP to run OpenTunnel on", "The server's auth token"],
+        wildcard: false,
+        mode: "tunnel",
+        needsDomain: true
+    },
     "cloudflare-tunnel": {
         label: "Cloudflare tunnel",
         summary: "An outbound tunnel exposes each service on your domain. Works with no public IP and no open ports.",
@@ -101,11 +117,14 @@ export interface StrategyChoice {
 
 /** Order per environment, best first. Anything omitted is unavailable there. */
 const ORDER: Record<ServerEnvironment, [ExposureStrategy, ...ExposureStrategy[]]> = {
-    vps: ["own-domain", "free-subdomain", "cloudflare-tunnel", "duckdns", "quick-tunnel"],
-    cloud: ["own-domain", "free-subdomain", "cloudflare-tunnel", "duckdns", "quick-tunnel"],
-    "home-nat": ["own-domain", "duckdns", "cloudflare-tunnel", "free-subdomain", "quick-tunnel"],
-    "home-cgnat": ["cloudflare-tunnel", "quick-tunnel", "free-subdomain"],
-    unknown: ["free-subdomain", "own-domain", "duckdns", "cloudflare-tunnel", "quick-tunnel"]
+    vps: ["own-domain", "free-subdomain", "opentunnel", "cloudflare-tunnel", "duckdns", "quick-tunnel"],
+    cloud: ["own-domain", "free-subdomain", "opentunnel", "cloudflare-tunnel", "duckdns", "quick-tunnel"],
+    "home-nat": ["own-domain", "duckdns", "opentunnel", "cloudflare-tunnel", "free-subdomain", "quick-tunnel"],
+    // Own tunnel server first: it is the only way to keep a carrier-NAT box on your
+    // own domain without handing every request to a third party - when there is a
+    // box with a public IP to run it on. Cloudflare is next for when there is not.
+    "home-cgnat": ["opentunnel", "cloudflare-tunnel", "quick-tunnel", "free-subdomain"],
+    unknown: ["free-subdomain", "own-domain", "duckdns", "opentunnel", "cloudflare-tunnel", "quick-tunnel"]
 };
 
 /** Why the top option is the top option, in the operator's terms. */
@@ -113,7 +132,7 @@ const RECOMMENDATION: Record<ServerEnvironment, string> = {
     vps: "This server holds its own public IP, so a wildcard record pointed straight at it is the shortest path - free and with nobody in between.",
     cloud: "The instance is publicly addressable, so a wildcard record pointed straight at it is the shortest path. Allow 80 and 443 in its security group.",
     "home-nat": "Your router owns a public IP, so forwarding 80 and 443 gives you real domains with no third-party service in the path.",
-    "home-cgnat": "Your ISP shares one address between customers, so no port can be forwarded to this server. An outbound tunnel is the only thing that reaches it.",
+    "home-cgnat": "Your ISP shares one address between customers, so no port can be forwarded to this server - only an outbound tunnel reaches it. Running the tunnel server yourself keeps your domain and your traffic out of a third party's hands; pick Cloudflare below if you have no box with a public IP.",
     unknown: "Answer where this server lives to get a recommendation that matches it. Free subdomains work either way in the meantime."
 };
 

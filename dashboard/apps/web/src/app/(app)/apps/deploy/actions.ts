@@ -65,6 +65,12 @@ import {
     type NgrokTunnelStatus
 } from "@/lib/deploy/ngrok-tunnel-service";
 import {
+    getOpenTunnelStatus,
+    startOpenTunnel,
+    stopOpenTunnel,
+    type OpenTunnelStatus
+} from "@/lib/deploy/opentunnel-service";
+import {
     getNamedTunnelStatus,
     provisionNamedTunnel,
     setNamedTunnelEnabled,
@@ -627,6 +633,40 @@ export async function stopNgrokTunnelAction(applicationId: string): Promise<{ er
     const user = await requirePermission("deploy.manage");
     try {
         await stopNgrokTunnel(applicationId, user.id);
+        await recordAudit({ actorId: user.id, action: "deploy.tunnel.stop", targetType: "application", targetId: applicationId });
+        return {};
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not stop the tunnel" };
+    }
+}
+
+/** State of an app's OpenTunnel tunnel (stable hostname on your own tunnel server). */
+export async function openTunnelStatusAction(applicationId: string): Promise<OpenTunnelStatus> {
+    const user = await requirePermission("deploy.manage");
+    try {
+        return await getOpenTunnelStatus(applicationId, user.id);
+    } catch {
+        return { configured: false, running: false, hostname: null };
+    }
+}
+
+/** Start (or restart) an app's OpenTunnel tunnel and return its stable hostname. */
+export async function startOpenTunnelAction(applicationId: string): Promise<{ error?: string; hostname?: string | null }> {
+    const user = await requirePermission("deploy.manage");
+    try {
+        const status = await startOpenTunnel(applicationId, user.id);
+        await recordAudit({ actorId: user.id, action: "deploy.tunnel.start", targetType: "application", targetId: applicationId });
+        return { hostname: status.hostname };
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not start the tunnel" };
+    }
+}
+
+/** Stop an app's OpenTunnel tunnel. */
+export async function stopOpenTunnelAction(applicationId: string): Promise<{ error?: string }> {
+    const user = await requirePermission("deploy.manage");
+    try {
+        await stopOpenTunnel(applicationId, user.id);
         await recordAudit({ actorId: user.id, action: "deploy.tunnel.stop", targetType: "application", targetId: applicationId });
         return {};
     } catch (caught) {

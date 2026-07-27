@@ -76,4 +76,25 @@ constrains the next:
    one-click record creation when a Cloudflare API token is connected.
 
 Saving writes the environment, the exposure mode and the zone layout in one action,
-so they cannot drift apart.
+so they cannot drift apart. Only a wildcard strategy stores a base domain: a tunnel
+publishes each service itself, so its domain lives with the tunnel's credentials
+under Integrations and no DNS record is asked for here.
+
+## Tunnels
+
+When no wildcard can reach the box - carrier NAT being the usual reason - hostnames
+come from an outbound tunnel instead:
+
+| Option | Hostname | Depends on |
+| ------ | -------- | ---------- |
+| OpenTunnel | `<app>-<hash>.<base path>.<your domain>` | A tunnel server you run |
+| Cloudflare named | Your hostname on Cloudflare | A Cloudflare account |
+| Cloudflare quick | `*.trycloudflare.com`, changes each start | Nobody (no account) |
+| ngrok | An ngrok URL | An ngrok account |
+
+**OpenTunnel** is the self-hosted one and is recommended first on carrier NAT: the
+operator runs `opentunnel server --domain <domain> --letsencrypt` on any box with a
+public IP, sets the domain and auth token under Integrations, and Polaris runs a
+client sidecar per service that dials out and forwards to the app's published port.
+The hostname is derived from the app, so it is stable across restarts and knowable
+before the tunnel is up.
