@@ -104,7 +104,14 @@ export async function checkZoneDns(): Promise<ZoneDnsReport> {
 async function applyDashboardZone(): Promise<void> {
     if (!(await getDashboardZoneIntent())) return;
     const host = await polarisZoneHost();
-    if (!host) return;
+    // The layout may no longer have a Polaris zone (the operator can remove it), and a
+    // standing intention that can never be carried out would sit there forever, silently
+    // doing nothing on every future check. Drop it instead - the wizard only offers the
+    // choice while such a zone exists.
+    if (!host) {
+        await setDashboardZoneIntent(false);
+        return;
+    }
     await setDomainConfig({ appDomain: host });
     await setDashboardZoneIntent(false);
 }

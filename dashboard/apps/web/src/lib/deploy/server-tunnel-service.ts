@@ -16,7 +16,6 @@ import { loadEnv } from "@polaris/config";
 import { execCommand, openSshClient } from "@polaris/ssh";
 import { decryptSecret, encryptSecret } from "@polaris/storage";
 import {
-    magicDomain,
     quoteArgv,
     parseTunnelSetup,
     reverseTunnelArgv,
@@ -65,7 +64,9 @@ const hostKey = (appId: string): string => `deploy.stunnel.${appId}.hostname`;
 const serverKey = (appId: string): string => `deploy.stunnel.${appId}.hostId`;
 const keyKey = (hostId: string): string => `deploy.stunnel.key.${hostId}`;
 const bindKey = (hostId: string): string => `deploy.stunnel.bind.${hostId}`;
-const portsKey = (hostId: string): string => `deploy.stunnel.ports.${hostId}`;
+/** One row per claimed port, so the unique key on it is the allocation lock. */
+const portRowKey = (hostId: string, port: number): string => `deploy.stunnel.port.${hostId}.${port}`;
+const appPortKey = (hostId: string, appId: string): string => `deploy.stunnel.appport.${hostId}.${appId}`;
 
 /** Servers that can publish a tunnel: registered, and with a wildcard domain whose
  *  `*` record the operator pointed at them. */
@@ -164,43 +165,54 @@ async function ensureTunnelServer(hostId: string, ownerId: string): Promise<{ ke
     return { key, bindAddress: parsed.bindAddress };
 }
 
-/** The ports handed out on one server, as app id -> port. An unreadable value is
- *  treated as empty rather than trusted: a bad entry would hide a real allocation. */
-async function loadPorts(hostId: string): Promise<Record<string, number>> {
-    const raw = await getSetting(portsKey(hostId));
-    if (!raw) return {};
-    try {
-        const parsed = JSON.parse(raw) as Record<string, unknown>;
-        return Object.fromEntries(
-            Object.entries(parsed).filter((entry): entry is [string, number] => Number.isInteger(entry[1]))
-        );
-    } catch {
-        return {};
-    }
-}
-
 /**
  * The app's forwarded port on that server, allocated on first use and kept from then
- * on. Two tunnels must never derive the same one: the second `ssh -R` cannot bind and
- * exits, while its route still points at the port the first one is holding - so its
- * hostname would serve the other app's service to whoever knows the name.
+ * on. Two tunnels must never share one: the second `ssh -R` cannot bind and exits,
+ * while its route still points at the port the first is holding - so its hostname
+ * would serve the other app's service to whoever knows the name.
+ *
+ * Each port is claimed by inserting a row keyed on it, so the database's unique key
+ * decides who gets it. A read-modify-write over one shared row cannot: two starts
+ * against the same server interleave, both read the same reservations, and the later
+ * write drops the earlier one - which is exactly the collision this prevents.
  */
 async function allocatePort(hostId: string, appId: string): Promise<number> {
-    const taken = await loadPorts(hostId);
-    const existing = taken[appId];
-    if (existing) return existing;
-    const port = reverseTunnelPort(appId, Object.values(taken));
-    await setSetting(portsKey(hostId), JSON.stringify({ ...taken, [appId]: port }));
-    return port;
+    const existing = Number(await getSetting(appPortKey(hostId, appId)));
+    if (Number.isInteger(existing) && existing > 0) return existing;
+
+    const tried: number[] = [];
+    for (let attempt = 0; attempt < 64; attempt += 1) {
+        const port = reverseTunnelPort(appId, tried);
+        try {
+            await prisma.setting.create({
+                data: { key: portRowKey(hostId, port), value: appId, scope: "global" }
+            });
+        } catch (caught) {
+            // Taken by another app (unique key). Ours only if this is a retry of a
+            // half-finished allocation, in which case the port is already ours.
+            const owner = await getSetting(portRowKey(hostId, port));
+            if (owner !== appId) {
+                tried.push(port);
+                continue;
+            }
+            void caught;
+        }
+        await setSetting(appPortKey(hostId, appId), String(port));
+        return port;
+    }
+    throw new Error("That server has no free tunnel port left");
 }
 
 /** Hand the port back, so a server does not fill up with reservations for apps whose
  *  tunnels are long gone. */
 async function releasePort(hostId: string, appId: string): Promise<void> {
-    const taken = await loadPorts(hostId);
-    if (!(appId in taken)) return;
-    delete taken[appId];
-    await setSetting(portsKey(hostId), Object.keys(taken).length > 0 ? JSON.stringify(taken) : null);
+    const port = await getSetting(appPortKey(hostId, appId));
+    if (!port) return;
+    // Only if it is still ours: an already-recycled port now belongs to another app.
+    if ((await getSetting(portRowKey(hostId, Number(port)))) === appId) {
+        await setSetting(portRowKey(hostId, Number(port)), null);
+    }
+    await setSetting(appPortKey(hostId, appId), null);
 }
 
 /**
@@ -230,10 +242,15 @@ function tunnelSpec(project: string, service: string, argv: string[], keyB64: st
                 ports: [],
                 volumes: [],
                 labels: {},
+                // `$$` is compose's escape for a literal `$`: the command goes into a
+                // compose file, and compose substitutes variables in it before Docker
+                // ever runs anything. Unescaped, POLARIS_TUNNEL_KEY (which lives in the
+                // container's environment, not the daemon's) would be replaced with an
+                // empty string and the sidecar would write an empty key file.
                 command: [
                     "sh",
                     "-c",
-                    `umask 077; printf '%s' "$POLARIS_TUNNEL_KEY" | base64 -d > ${KEY_PATH}; exec ${quoteArgv(argv)}`
+                    `umask 077; printf '%s' "$$POLARIS_TUNNEL_KEY" | base64 -d > ${KEY_PATH}; exec ${quoteArgv(argv)}`
                 ],
                 networks: [PROXY_NETWORK],
                 restart: "unless-stopped"
@@ -263,7 +280,11 @@ export async function startServerTunnel(
     const localIp = await getPublicIp();
     if (!localIp) throw new Error("This box has no address to forward the tunnel to");
 
-    const hostname = magicDomain(app.slug, "", server.domain);
+    // The hostname is keyed on the app id, not just its slug: slugs are only unique
+    // within an environment, so two services called "api" in different projects would
+    // otherwise mint the same name on one server and the second would quietly take
+    // over the first's traffic.
+    const hostname = `${app.slug}-${shortHash(appId, 6)}.${server.domain}`;
     const { key, bindAddress } = await ensureTunnelServer(server.id, ownerId);
     const remotePort = await allocatePort(server.id, appId);
     const spec = { appId, hostname, localHost: localIp, localPort: hostPortForApp(appId), remotePort, bindAddress };
@@ -278,6 +299,20 @@ export async function startServerTunnel(
     // it, and a failure here leaves nothing running to clean up.
     const config = Buffer.from(reverseTunnelConfig(spec), "utf8").toString("base64");
     const file = `${DYNAMIC_DIR}/${reverseTunnelName(appId)}.yml`;
+    // A server onboarded before tunnel support runs a Traefik with no file provider: it
+    // never reads the route, so writing one would succeed and the hostname would answer
+    // 404 forever. Checked here rather than assumed, and said plainly.
+    const traefik = await onServer(
+        connection,
+        "docker inspect polaris-traefik --format '{{json .Config.Cmd}}' 2>/dev/null || true"
+    );
+    if (!traefik.stdout.includes("providers.file.directory")) {
+        await releasePort(server.id, appId);
+        throw new Error(
+            `Traefik on ${server.name} was started before tunnel support. Re-run onboarding on that server, then try again.`
+        );
+    }
+
     const write = await onServer(connection, `mkdir -p ${DYNAMIC_DIR} && echo ${config} | base64 -d > ${file}`);
     if (write.code !== 0) {
         await releasePort(server.id, appId);
@@ -297,10 +332,19 @@ export async function startServerTunnel(
     await setSetting(hostKey(appId), hostname);
     await setSetting(serverKey(appId), server.id);
     const ports = new HostdPorts();
+    let running = false;
     try {
         await ports.composeDown(project).catch(() => undefined);
         await ports.composeUp(tunnelSpec(project, service, argv, Buffer.from(key, "utf8").toString("base64")));
+        // Up is not the same as forwarding: sshd refuses a non-loopback bind unless
+        // GatewayPorts was actually applied (the setup script cannot force it when sudo
+        // needs a password), and `ExitOnForwardFailure` then kills ssh on every dial. So
+        // the sidecar is given a moment and asked whether it is still alive, rather than
+        // reporting a tunnel that is quietly restart-looping.
+        running = await settled(ports, service);
     } catch (caught) {
+        // A start that never got off the ground leaves nothing behind: the route on the
+        // operator's server and the port reservation both go with it.
         await ports.composeDown(project).catch(() => undefined);
         await dropRemoteRoute(server.id, appId, ownerId);
         await setSetting(hostKey(appId), null);
@@ -310,7 +354,19 @@ export async function startServerTunnel(
         await ports.dispose();
     }
 
-    return { configured: true, running: true, hostname, serverName: server.name };
+    return { configured: true, running, hostname, serverName: server.name };
+}
+
+/** Whether the sidecar is still running a few seconds after it started - long enough
+ *  for a refused forward to have taken it down. */
+async function settled(ports: HostdPorts, service: string): Promise<boolean> {
+    await new Promise((resolve) => setTimeout(resolve, 4000));
+    try {
+        const info = (await ports.inspect(service)) as { State?: { Running?: boolean; Restarting?: boolean } };
+        return Boolean(info?.State?.Running) && !info.State?.Restarting;
+    } catch {
+        return false;
+    }
 }
 
 /** Tear the tunnel down and drop the route it left on the server. Idempotent. */

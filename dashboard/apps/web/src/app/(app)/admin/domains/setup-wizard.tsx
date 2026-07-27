@@ -464,7 +464,10 @@ function DomainStep({
                 </p>
             </div>
 
-            {effectiveBase && (
+            {/* Only offered while there is a Polaris zone to move onto: with the zone
+                removed the choice could never be carried out, and a checkbox that does
+                nothing is worse than no checkbox. */}
+            {effectiveBase && zones.some((zone) => zone.scope === "polaris") && (
                 <div className="flex flex-col gap-1">
                     <label className="flex items-center gap-2 text-sm">
                         <Checkbox
