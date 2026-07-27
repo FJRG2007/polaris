@@ -1,0 +1,62 @@
+# Domain zones
+
+Polaris hands out hostnames constantly - one per deployed service, per share link,
+per preview. Zones make that a one-time DNS job instead of a per-hostname one.
+
+## The model
+
+A **zone** is a DNS label under a base domain the operator controls:
+
+| Zone     | Scope   | Hostname            | Wildcard record       |
+| -------- | ------- | ------------------- | --------------------- |
+| `polaris`| polaris | `polaris.example.com` | `*.polaris.example.com` |
+| `plr`    | deploy  | `plr.example.com`     | `*.plr.example.com`     |
+
+- `scope: "polaris"` - Polaris itself (dashboard, share links, drop points).
+- `scope: "deploy"` - services deployed through Deploy. Several are allowed; one is
+  the default new services land in.
+- An **empty label** means the base domain itself, so `example.com` +
+  `*.example.com` serve everything. The base can be a subdomain too
+  (`plr.polaris.com`), which is how a single registered domain hosts several
+  Polaris instances.
+
+Each zone needs exactly two A records - the host and its wildcard - both pointed at
+the server's public IP. After that Polaris mints hostnames without touching DNS
+again, which is what keeps hostname allocation O(1) as services grow.
+
+Config lives in one `domain.zones` Setting (JSON, Zod-validated on every read) and
+is the single source of truth for the wildcard base: `getNetworkStatus()` derives
+`wildcardDomain` from the default deploy zone, and `resolveAutoDomain()` builds
+`<slug>-<hash>.<zone>` from it. A stored value this version cannot parse is treated
+as unconfigured rather than trusted - a malformed layout would mint hostnames that
+resolve nowhere.
+
+## Hostnames
+
+- Deterministic: `<slug>-<hash>.plr.example.com`, stable across redeploys, so a
+  service keeps its URL.
+- Random: `<random>.plr.example.com`, for unguessable or throwaway exposure.
+
+Services on a **remote** server never get a zone hostname: the zone's wildcard
+points at the Polaris host, so those keep an IP-derived `sslip.io` name served by
+their own edge. Per-server zones would be the next step if remote servers need real
+domains.
+
+## Guided setup
+
+`/admin/domains` asks three questions and applies them together, because each one
+constrains the next:
+
+1. **Where does this server run?** (`home-nat`, `home-cgnat`, `vps`, `cloud`)
+   Detected first, then confirmed - no probe can see a router's port forwarding or
+   a CGNAT line from the inside.
+2. **How should services be reachable?** Options ranked free-first, fewest
+   third-party dependencies first (`src/lib/domain-strategies.ts`). On carrier NAT,
+   port-forwarding options are shown as unavailable with the reason instead of being
+   hidden.
+3. **Domain and zones**, then the DNS records to create - with a resolver check that
+   queries a random name inside each zone (only a real wildcard answers), and
+   one-click record creation when a Cloudflare API token is connected.
+
+Saving writes the environment, the exposure mode and the zone layout in one action,
+so they cannot drift apart.
