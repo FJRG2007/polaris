@@ -248,8 +248,15 @@ export async function addApplicationDomain(
     let certResolver: string = opts.cert ?? "le";
     // A zone hostname is only for services on the Polaris host: the zone's wildcard
     // record points at this box, so a remote server's app would get a name that
-    // resolves to the wrong machine. Those take their own server's domain below.
-    if (!hostname && !remoteHost && (opts.zoneLabel !== undefined || opts.random)) {
+    // resolves to the wrong machine. Those take their own server's domain below - and
+    // are told so, rather than being handed a different hostname than they asked for
+    // (a "random" one that is neither random nor in the zone they named).
+    if (!hostname && remoteHost && (opts.zoneLabel !== undefined || opts.random)) {
+        throw new Error(
+            "This service runs on another server, so it takes that server's own wildcard domain rather than a zone hostname. Set one on the server, or enter a custom domain."
+        );
+    }
+    if (!hostname && (opts.zoneLabel !== undefined || opts.random)) {
         const minted = await deployHostname(app.slug, { zoneLabel: opts.zoneLabel, random: opts.random });
         if (minted === "no-domain") {
             throw new Error("No domain is configured yet. Run the guided setup under Domains first.");

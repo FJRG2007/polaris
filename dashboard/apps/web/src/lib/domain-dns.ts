@@ -11,7 +11,15 @@
 
 import { resolve4 } from "node:dns/promises";
 import { randomLabel } from "@polaris/deploy";
-import { getDomainZones, setZoneDnsVerified, zoneRecords } from "./domain-zones";
+import {
+    getDashboardZoneIntent,
+    getDomainZones,
+    polarisZoneHost,
+    setDashboardZoneIntent,
+    setZoneDnsVerified,
+    zoneRecords
+} from "./domain-zones";
+import { setDomainConfig } from "./domain-service";
 import { detectPublicIp } from "./network-service";
 import { loadCloudflareToken } from "./integrations/cloudflare-account-service";
 import { resolveZoneForHostname, upsertARecord } from "./integrations/cloudflare-api";
@@ -77,8 +85,28 @@ export async function checkZoneDns(): Promise<ZoneDnsReport> {
     // server's own address is known to compare against: without it, a wildcard
     // pointing at a completely different machine would look like proof and promote
     // every share link onto it.
-    if (expectedIp) await setZoneDnsVerified(zones.length > 0 && zones.every((zone) => zone.ok));
+    if (expectedIp) {
+        const verified = zones.length > 0 && zones.every((zone) => zone.ok);
+        await setZoneDnsVerified(verified);
+        if (verified) await applyDashboardZone();
+    }
     return { expectedIp, zones };
+}
+
+/**
+ * Move the dashboard onto the Polaris zone, once the setup asked for it and the zone
+ * has just been proven to resolve here. Every URL Polaris hands out is built from the
+ * app domain, so writing it the moment the wizard is saved points invites, notification
+ * links and the dashboard's own link at a name that does not exist until the operator
+ * creates the records - this is the same gate `sharingBaseUrl` applies. One-shot: the
+ * intention is cleared once carried out, and re-stated by the next guided setup.
+ */
+async function applyDashboardZone(): Promise<void> {
+    if (!(await getDashboardZoneIntent())) return;
+    const host = await polarisZoneHost();
+    if (!host) return;
+    await setDomainConfig({ appDomain: host });
+    await setDashboardZoneIntent(false);
 }
 
 export interface ZoneDnsProvisionResult {

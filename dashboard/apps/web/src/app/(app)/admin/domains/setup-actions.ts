@@ -15,7 +15,13 @@ import { serverEnvironmentSchema } from "@polaris/core";
 import { requireAdmin } from "@/lib/session";
 import { recordAudit } from "@/lib/audit-service";
 import { checkZoneDns, provisionZoneDns, type ZoneDnsProvisionResult, type ZoneDnsReport } from "@/lib/domain-dns";
-import { getDomainZones, saveDomainZones, zoneRecords, type DomainZoneConfig } from "@/lib/domain-zones";
+import {
+    getDomainZones,
+    saveDomainZones,
+    setDashboardZoneIntent,
+    zoneRecords,
+    type DomainZoneConfig
+} from "@/lib/domain-zones";
 import { getCloudflareAccountStatus } from "@/lib/integrations/cloudflare-account-service";
 import { EXPOSURE_STRATEGIES, STRATEGY_META, type ExposureStrategy } from "@/lib/domain-strategies";
 import { getDomainConfig, setDomainConfig, syncDuckDns, type DomainConfig } from "@/lib/domain-service";
@@ -27,7 +33,7 @@ import {
     type LocalEnvironment,
     type NetworkStatus
 } from "@/lib/network-service";
-import { normalizeBaseDomain, zoneHost } from "@polaris/deploy";
+import { normalizeBaseDomain } from "@polaris/deploy";
 
 export interface DomainSetupState {
     environment: LocalEnvironment;
@@ -140,14 +146,19 @@ export async function saveDomainSetupAction(input: unknown): Promise<DomainSetup
         // and the strategy actually serves the zone: a wrong app domain breaks every
         // link Polaris hands out, including the one they are reading this on. A tunnel
         // exposes one hostname at a time, so its domain never becomes the app URL here.
-        if (useForDashboard && zones.baseDomain && meta.wildcard) {
-            const polaris = zones.zones.find((zone) => zone.scope === "polaris");
-            if (polaris) await setDomainConfig({ appDomain: zoneHost(polaris, zones.baseDomain) });
-        }
+        // Recorded as an intention - the DNS check below carries it out, and only if
+        // the zone is actually answering by then.
+        await setDashboardZoneIntent(useForDashboard && Boolean(zones.baseDomain) && meta.wildcard);
 
         // A fresh DuckDNS record is useless until it points somewhere; do it now
         // rather than waiting for the next sync tick.
         if (strategy === "duckdns") await syncDuckDns().catch(() => undefined);
+
+        // Prove the layout straight away instead of leaving it unverified until someone
+        // presses a button on the last step - a DuckDNS wildcard, which needs no records
+        // at all, would otherwise never be marked as resolving, and every share link
+        // would keep falling back to a tunnel for a domain that already works.
+        if (zones.baseDomain) await checkZoneDns().catch(() => undefined);
 
         await recordAudit({
             actorId: user.id,

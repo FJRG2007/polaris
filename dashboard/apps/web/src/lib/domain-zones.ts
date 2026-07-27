@@ -30,6 +30,8 @@ import { getSetting, setSetting } from "./setting-store";
 const KEY = "domain.zones";
 /** Set once the zones' wildcards have been seen resolving to this server. */
 const VERIFIED_KEY = "domain.zones.verified";
+/** Set while the operator wants the dashboard moved onto the Polaris zone. */
+const DASHBOARD_KEY = "domain.zones.dashboard";
 
 const zoneSchema = z.object({
     label: z.string().trim().toLowerCase().refine(isZoneLabel, "Use a single label like plr, or leave it empty"),
@@ -124,6 +126,21 @@ export async function zoneDnsVerified(): Promise<boolean> {
 /** Record the outcome of a DNS check (see domain-dns). */
 export async function setZoneDnsVerified(verified: boolean): Promise<void> {
     await setSetting(VERIFIED_KEY, verified ? "1" : null);
+}
+
+/**
+ * Whether the operator asked for the dashboard to move onto the Polaris zone. Kept as
+ * an intention rather than applied on the spot: the app domain is what every URL
+ * Polaris hands out is built from - invites, notification links, the dashboard link
+ * itself - so it may only move once the zone has been seen resolving here (see
+ * `applyDashboardZone` in domain-dns). Cleared once carried out.
+ */
+export async function getDashboardZoneIntent(): Promise<boolean> {
+    return (await getSetting(DASHBOARD_KEY)) === "1";
+}
+
+export async function setDashboardZoneIntent(wanted: boolean): Promise<void> {
+    await setSetting(DASHBOARD_KEY, wanted ? "1" : null);
 }
 
 /** Every zone as the pair of DNS names it needs, for the setup checklist. */

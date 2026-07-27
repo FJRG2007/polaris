@@ -18,9 +18,11 @@ import { decryptSecret, encryptSecret } from "@polaris/storage";
 import {
     magicDomain,
     quoteArgv,
+    parseTunnelSetup,
     reverseTunnelArgv,
     reverseTunnelConfig,
     reverseTunnelName,
+    reverseTunnelPort,
     shortHash,
     tunnelSetupScript,
     type ComposeSpec
@@ -62,6 +64,8 @@ function names(appId: string): { project: string; service: string } {
 const hostKey = (appId: string): string => `deploy.stunnel.${appId}.hostname`;
 const serverKey = (appId: string): string => `deploy.stunnel.${appId}.hostId`;
 const keyKey = (hostId: string): string => `deploy.stunnel.key.${hostId}`;
+const bindKey = (hostId: string): string => `deploy.stunnel.bind.${hostId}`;
+const portsKey = (hostId: string): string => `deploy.stunnel.ports.${hostId}`;
 
 /** Servers that can publish a tunnel: registered, and with a wildcard domain whose
  *  `*` record the operator pointed at them. */
@@ -74,15 +78,22 @@ export async function listTunnelServers(ownerId: string): Promise<Array<{ id: st
     return hosts.map((host) => ({ id: host.id, name: host.name, domain: host.wildcardDomain ?? "" }));
 }
 
-/** Load an app the caller owns. The tunnel client runs beside the service, so the
- *  app must be deployed on this box; a remote one is already publicly routable. */
-async function requireLocalApp(appId: string, ownerId: string): Promise<{ id: string; slug: string }> {
+/** Load an app the caller owns. Every entry point here starts with this: the hostname
+ *  a tunnel publishes on is not something another owner's account may read or move. */
+async function requireOwnedApp(appId: string, ownerId: string): Promise<{ id: string; slug: string; local: boolean }> {
     const app = await prisma.application.findFirst({
         where: { id: appId, environment: { project: { ownerId } } },
         include: { target: true }
     });
     if (!app) throw new Error("Application not found");
-    if (app.target.kind !== "local") {
+    return { id: app.id, slug: app.slug, local: app.target.kind === "local" };
+}
+
+/** The same, for the paths that bring a tunnel up: the tunnel client runs beside the
+ *  service, so the app must be deployed on this box; a remote one is already routable. */
+async function requireLocalApp(appId: string, ownerId: string): Promise<{ id: string; slug: string }> {
+    const app = await requireOwnedApp(appId, ownerId);
+    if (!app.local) {
         throw new Error("A server tunnel publishes a service running on this box; this one runs on another server");
     }
     return { id: app.id, slug: app.slug };
@@ -132,20 +143,77 @@ async function onServer(
 }
 
 /**
- * Prepare the server once: mint the tunnel key, authorize it, and allow a forward to
- * bind off loopback. Cached - the key is only minted on the first tunnel to a server.
+ * Prepare the server once: mint the tunnel key, authorize it restricted to port
+ * forwarding, allow a forward to bind off loopback, and learn where it has to bind -
+ * the server's own Docker gateway, which is not the stock address on a daemon with a
+ * custom `bip`, rootless Docker or Podman. Cached per server; the setup script is
+ * idempotent, so a server that only misses the bind address re-runs it safely.
  */
-async function ensureTunnelKey(hostId: string, ownerId: string): Promise<string> {
-    const cached = await loadKey(hostId);
-    if (cached) return cached;
+async function ensureTunnelServer(hostId: string, ownerId: string): Promise<{ key: string; bindAddress: string }> {
+    const [cachedKey, cachedBind] = await Promise.all([loadKey(hostId), getSetting(bindKey(hostId))]);
+    if (cachedKey && cachedBind) return { key: cachedKey, bindAddress: cachedBind };
     const connection = await getHostConnection(hostId, ownerId);
     const { stdout, code } = await onServer(connection, tunnelSetupScript());
-    const key = stdout.slice(stdout.indexOf("-----BEGIN")).trim();
-    if (code !== 0 || !key.startsWith("-----BEGIN")) {
+    const parsed = parseTunnelSetup(stdout);
+    const key = cachedKey ?? parsed.key;
+    if (code !== 0 || !key) {
         throw new Error("Could not set up the tunnel key on that server. Check it is onboarded and reachable.");
     }
-    await storeKey(hostId, key);
-    return key;
+    if (!cachedKey) await storeKey(hostId, key);
+    await setSetting(bindKey(hostId), parsed.bindAddress);
+    return { key, bindAddress: parsed.bindAddress };
+}
+
+/** The ports handed out on one server, as app id -> port. An unreadable value is
+ *  treated as empty rather than trusted: a bad entry would hide a real allocation. */
+async function loadPorts(hostId: string): Promise<Record<string, number>> {
+    const raw = await getSetting(portsKey(hostId));
+    if (!raw) return {};
+    try {
+        const parsed = JSON.parse(raw) as Record<string, unknown>;
+        return Object.fromEntries(
+            Object.entries(parsed).filter((entry): entry is [string, number] => Number.isInteger(entry[1]))
+        );
+    } catch {
+        return {};
+    }
+}
+
+/**
+ * The app's forwarded port on that server, allocated on first use and kept from then
+ * on. Two tunnels must never derive the same one: the second `ssh -R` cannot bind and
+ * exits, while its route still points at the port the first one is holding - so its
+ * hostname would serve the other app's service to whoever knows the name.
+ */
+async function allocatePort(hostId: string, appId: string): Promise<number> {
+    const taken = await loadPorts(hostId);
+    const existing = taken[appId];
+    if (existing) return existing;
+    const port = reverseTunnelPort(appId, Object.values(taken));
+    await setSetting(portsKey(hostId), JSON.stringify({ ...taken, [appId]: port }));
+    return port;
+}
+
+/** Hand the port back, so a server does not fill up with reservations for apps whose
+ *  tunnels are long gone. */
+async function releasePort(hostId: string, appId: string): Promise<void> {
+    const taken = await loadPorts(hostId);
+    if (!(appId in taken)) return;
+    delete taken[appId];
+    await setSetting(portsKey(hostId), Object.keys(taken).length > 0 ? JSON.stringify(taken) : null);
+}
+
+/**
+ * Drop everything a tunnel left on its server: the Traefik route and the port
+ * reservation. Best-effort on the route - an unreachable server must not block tearing
+ * a tunnel down, and its route points at a port nothing answers on once the tunnel is
+ * gone - but the reservation is local, so it is always released.
+ */
+async function dropRemoteRoute(hostId: string, appId: string, ownerId: string): Promise<void> {
+    await getHostConnection(hostId, ownerId)
+        .then((connection) => onServer(connection, `rm -f ${DYNAMIC_DIR}/${reverseTunnelName(appId)}.yml`))
+        .catch(() => undefined);
+    await releasePort(hostId, appId);
 }
 
 /** The sidecar: write the key, then hold the reverse forward open. */
@@ -196,16 +264,25 @@ export async function startServerTunnel(
     if (!localIp) throw new Error("This box has no address to forward the tunnel to");
 
     const hostname = magicDomain(app.slug, "", server.domain);
-    const spec = { appId, hostname, localHost: localIp, localPort: hostPortForApp(appId) };
-    const key = await ensureTunnelKey(server.id, ownerId);
+    const { key, bindAddress } = await ensureTunnelServer(server.id, ownerId);
+    const remotePort = await allocatePort(server.id, appId);
+    const spec = { appId, hostname, localHost: localIp, localPort: hostPortForApp(appId), remotePort, bindAddress };
     const connection = await getHostConnection(server.id, ownerId);
+
+    // Moving an app to another server leaves the old one answering that hostname from
+    // a forward nothing dials any more; it is dropped before the new one takes over.
+    const previous = await getSetting(serverKey(appId));
+    if (previous && previous !== server.id) await dropRemoteRoute(previous, appId, ownerId);
 
     // The route first: the forward is useless until the server knows what to do with
     // it, and a failure here leaves nothing running to clean up.
     const config = Buffer.from(reverseTunnelConfig(spec), "utf8").toString("base64");
     const file = `${DYNAMIC_DIR}/${reverseTunnelName(appId)}.yml`;
     const write = await onServer(connection, `mkdir -p ${DYNAMIC_DIR} && echo ${config} | base64 -d > ${file}`);
-    if (write.code !== 0) throw new Error("Could not write the route on that server");
+    if (write.code !== 0) {
+        await releasePort(server.id, appId);
+        throw new Error("Could not write the route on that server");
+    }
 
     const argv = reverseTunnelArgv(spec, {
         host: connection.address,
@@ -214,22 +291,33 @@ export async function startServerTunnel(
         keyPath: KEY_PATH
     });
     const { project, service } = names(appId);
+    // Recorded before the sidecar comes up: from here the server carries a route only
+    // this app's teardown knows how to remove, so a start that fails halfway must still
+    // be able to find it - otherwise the hostname is left answering forever.
+    await setSetting(hostKey(appId), hostname);
+    await setSetting(serverKey(appId), server.id);
     const ports = new HostdPorts();
     try {
         await ports.composeDown(project).catch(() => undefined);
         await ports.composeUp(tunnelSpec(project, service, argv, Buffer.from(key, "utf8").toString("base64")));
+    } catch (caught) {
+        await ports.composeDown(project).catch(() => undefined);
+        await dropRemoteRoute(server.id, appId, ownerId);
+        await setSetting(hostKey(appId), null);
+        await setSetting(serverKey(appId), null);
+        throw caught;
     } finally {
         await ports.dispose();
     }
 
-    await setSetting(hostKey(appId), hostname);
-    await setSetting(serverKey(appId), server.id);
     return { configured: true, running: true, hostname, serverName: server.name };
 }
 
 /** Tear the tunnel down and drop the route it left on the server. Idempotent. */
 export async function stopServerTunnel(appId: string, ownerId: string): Promise<void> {
-    await requireLocalApp(appId, ownerId);
+    // Ownership only: an app moved to another server after its tunnel was published
+    // still has to be able to take that hostname back down.
+    await requireOwnedApp(appId, ownerId);
     const { project } = names(appId);
     const ports = new HostdPorts();
     try {
@@ -238,19 +326,14 @@ export async function stopServerTunnel(appId: string, ownerId: string): Promise<
         await ports.dispose();
     }
     const hostId = await getSetting(serverKey(appId));
-    if (hostId) {
-        // Best-effort: an unreachable server must not block tearing the sidecar down,
-        // and its route points at a port nothing answers on once the tunnel is gone.
-        await getHostConnection(hostId, ownerId)
-            .then((connection) => onServer(connection, `rm -f ${DYNAMIC_DIR}/${reverseTunnelName(appId)}.yml`))
-            .catch(() => undefined);
-    }
+    if (hostId) await dropRemoteRoute(hostId, appId, ownerId);
     await setSetting(hostKey(appId), null);
     await setSetting(serverKey(appId), null);
 }
 
 /** Whether the app's tunnel sidecar is up, and the hostname it publishes. */
 export async function getServerTunnelStatus(appId: string, ownerId: string): Promise<ServerTunnelStatus> {
+    await requireOwnedApp(appId, ownerId);
     const servers = await listTunnelServers(ownerId);
     const [hostname, hostId] = await Promise.all([getSetting(hostKey(appId)), getSetting(serverKey(appId))]);
     const server = servers.find((entry) => entry.id === hostId);

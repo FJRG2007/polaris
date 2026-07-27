@@ -465,13 +465,18 @@ function DomainStep({
             </div>
 
             {effectiveBase && (
-                <label className="flex items-center gap-2 text-sm">
-                    <Checkbox
-                        checked={useForDashboard}
-                        onChange={(event) => onUseForDashboard(event.target.checked)}
-                    />
-                    Use the Polaris zone for the dashboard too
-                </label>
+                <div className="flex flex-col gap-1">
+                    <label className="flex items-center gap-2 text-sm">
+                        <Checkbox
+                            checked={useForDashboard}
+                            onChange={(event) => onUseForDashboard(event.target.checked)}
+                        />
+                        Use the Polaris zone for the dashboard too
+                    </label>
+                    <span className="text-xs text-muted-foreground">
+                        Applied once the zone is seen resolving to this server, so no link breaks in the meantime.
+                    </span>
+                </div>
             )}
         </div>
     );
@@ -517,6 +522,13 @@ function DnsStep({ state, publicIp }: { state: DomainSetupState; publicIp: strin
         await check();
     }
 
+    // Checking is what records the zone as resolving here, and Polaris only hands out
+    // links on a zone it has seen resolve - so it runs on its own instead of waiting
+    // for a button, which the DuckDNS path below does not even show.
+    useEffect(() => {
+        if (state.records.length > 0) void check();
+    }, [state.records.length]);
+
     // DuckDNS manages one record - the subdomain's IP - and answers for everything
     // under it, so listing per-zone A records would ask for records that cannot be
     // created (and "Create them on Cloudflare" would fail on a domain that is not
@@ -532,6 +544,15 @@ function DnsStep({ state, publicIp }: { state: DomainSetupState; publicIp: strin
                         ? `Nothing to create: ${state.zones.baseDomain} already resolves every subdomain, and Polaris keeps it pointed at this server as your IP changes.`
                         : "Services get their hostname the moment they are deployed."}
                 </p>
+                {duckdns && (
+                    <div className="flex flex-wrap items-center gap-2">
+                        <Button size="sm" variant="secondary" onClick={check} disabled={busy !== null}>
+                            <RefreshCw className={`size-4 ${busy === "check" ? "animate-spin" : ""}`} /> Check DNS
+                        </Button>
+                        {message && <span className="text-xs text-muted-foreground">{message}</span>}
+                    </div>
+                )}
+                {duckdns && <ZoneResults report={report} />}
             </div>
         );
     }
@@ -564,6 +585,15 @@ function DnsStep({ state, publicIp }: { state: DomainSetupState; publicIp: strin
 
             {message && <p className="text-xs text-muted-foreground">{message}</p>}
 
+            <ZoneResults report={report} />
+        </div>
+    );
+}
+
+/** What the last check saw for each zone - the proof the records are really there. */
+function ZoneResults({ report }: { report: ZoneDnsReport | null }) {
+    return (
+        <>
             {report?.zones.map((zone) => (
                 <p
                     key={zone.wildcard}
@@ -581,7 +611,7 @@ function DnsStep({ state, publicIp }: { state: DomainSetupState; publicIp: strin
                     </span>
                 </p>
             ))}
-        </div>
+        </>
     );
 }
 

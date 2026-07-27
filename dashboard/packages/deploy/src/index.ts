@@ -25,13 +25,15 @@ export {
 } from "./zones.js";
 export { quoteArg, quoteArgv } from "./shell.js";
 export {
+    parseTunnelSetup,
     reverseTunnelArgv,
     reverseTunnelConfig,
     reverseTunnelName,
     reverseTunnelPort,
     tunnelSetupScript,
-    TUNNEL_BIND_ADDRESS,
-    type ReverseTunnelSpec
+    DEFAULT_TUNNEL_BIND_ADDRESS,
+    type ReverseTunnelSpec,
+    type TunnelSetupResult
 } from "./reverse-tunnel.js";
 export { traefikLabels, configHash, type TraefikDomain, type CertResolver, type TraefikServiceInput, type TraefikWaf } from "./traefik.js";
 export {

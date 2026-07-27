@@ -80,6 +80,12 @@ so they cannot drift apart. Only a wildcard strategy stores a base domain: a tun
 publishes each service itself, so its domain lives with the tunnel's credentials
 under Integrations and no DNS record is asked for here.
 
+The resolver check runs on save and again on the DNS step, and it is what marks the
+layout as resolving here. Everything that hands a hostname to someone else waits for
+that flag: share links (`sharingBaseUrl`) and the dashboard's own URL, which the
+setup only *asks* to move onto the Polaris zone - the move happens on the first
+check that passes, since every invite, notification and login link is built from it.
+
 ## Tunnels
 
 When no wildcard can reach the box - carrier NAT being the usual reason - hostnames
@@ -98,13 +104,21 @@ operator already registered on the other:
 
 1. A sidecar here runs `ssh -R <bind>:<port>:<app host>:<app port>` out to that
    server, authenticating with a key minted on the server itself (`tunnelSetupScript`)
-   so the operator's own SSH credentials never leave Polaris.
-2. The forward binds to the server's Docker bridge gateway - reachable by its Traefik,
-   not from the internet - which needs `GatewayPorts clientspecified` in its sshd.
+   so the operator's own SSH credentials never leave Polaris. The key is authorized
+   `restrict,port-forwarding`: it can open the forward and nothing else - no shell,
+   no sftp - so a leaked sidecar env var is not a login on that server.
+2. The forward binds to the server's Docker gateway - reachable by its Traefik, not
+   from the internet - which needs `GatewayPorts clientspecified` in its sshd. The
+   setup script reads the gateway from Docker rather than assuming `172.17.0.1`, and
+   sets the sshd option through `sshd_config.d/` where the distro includes it.
 3. Polaris writes a Traefik dynamic-config file on that server routing the hostname
    to the forwarded port, and Traefik issues the certificate.
 
-The port is derived from the app id, so both ends agree without an allocation table,
-and the sidecar's restart policy plus `ExitOnForwardFailure` make the tunnel
-self-healing. Polaris is not in the data path: the dashboard can restart, or be down,
-without dropping a published service.
+The port starts from the app id and is then allocated against the ports already handed
+out on that server, so it is stable per app and never shared - two tunnels on one port
+would leave the second hostname serving the first app's service. It is recorded before
+the sidecar starts, so a start that fails halfway still knows what to clean up.
+
+The sidecar's restart policy plus `ExitOnForwardFailure` make the tunnel self-healing.
+Polaris is not in the data path: the dashboard can restart, or be down, without
+dropping a published service.
