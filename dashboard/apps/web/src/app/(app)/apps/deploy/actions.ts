@@ -10,6 +10,7 @@ import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { requirePermission } from "@/lib/session";
 import { ensurePublicIp, getDomainConfig } from "@/lib/domain-service";
+import { listDeployZones } from "@/lib/domain-zones";
 import { getNetworkStatus } from "@/lib/network-service";
 import { recordAudit } from "@/lib/audit-service";
 import { getOrCreateLocalTarget, getOrCreateHostTarget } from "@/lib/deploy-target-service";
@@ -468,6 +469,8 @@ export async function addDomainAction(input: {
     hostname?: string;
     targetPort: number;
     cert?: "internal" | "le" | "none";
+    zoneLabel?: string;
+    random?: boolean;
 }): Promise<{ error?: string; hostname?: string }> {
     const user = await requirePermission("deploy.manage");
     const port = Number(input.targetPort);
@@ -478,7 +481,9 @@ export async function addDomainAction(input: {
         const hostname = await addApplicationDomain(input.applicationId, user.id, {
             hostname: input.hostname,
             targetPort: port,
-            cert: input.cert
+            cert: input.cert,
+            zoneLabel: input.zoneLabel,
+            random: input.random
         });
         await recordAudit({ actorId: user.id, action: "deploy.domain.add", targetType: "application", targetId: input.applicationId });
         revalidatePath(DEPLOY_PATH);
@@ -534,6 +539,13 @@ export async function duckdnsSubdomainAction(): Promise<{ subdomain: string | nu
     await requirePermission("deploy.manage");
     const config = await getDomainConfig();
     return { subdomain: config.duckdnsSubdomain || null };
+}
+
+/** The deploy zones a service can get a hostname in, for the exposure picker. Empty
+ *  when no domain is configured, so the form offers the free-subdomain path instead. */
+export async function deployZonesAction(): Promise<Array<{ label: string; host: string }>> {
+    await requirePermission("deploy.manage");
+    return listDeployZones();
 }
 
 export async function removeDomainAction(domainId: string): Promise<void> {

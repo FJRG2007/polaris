@@ -19,6 +19,7 @@ import { getDriver, getPorts, toTargetInfo, type TargetRow } from "./deploy/runt
 import { LocalRouter, type AppRoute } from "./deploy/router";
 import { getOrCreateHostTarget, getOrCreateLocalTarget } from "./deploy-target-service";
 import { getPublicIp } from "./domain-service";
+import { deployHostname } from "./domain-zones";
 import { resolveAutoDomain } from "./network-service";
 import { ensureLocalCa } from "./local-ca-service";
 import { gitBuildContext, type GitSource } from "./git-build-service";
@@ -200,7 +201,15 @@ export async function createApplication(ownerId: string, input: CreateApplicatio
 export async function addApplicationDomain(
     applicationId: string,
     ownerId: string,
-    opts: { hostname?: string; targetPort: number; cert?: "internal" | "le" | "none" }
+    opts: {
+        hostname?: string;
+        targetPort: number;
+        cert?: "internal" | "le" | "none";
+        /** Mint the hostname in this deploy zone instead of the default one. */
+        zoneLabel?: string;
+        /** Mint an unguessable hostname rather than one derived from the name. */
+        random?: boolean;
+    }
 ): Promise<string> {
     const app = await prisma.application.findFirst({
         where: { id: applicationId, environment: { project: { ownerId } } },
@@ -217,6 +226,16 @@ export async function addApplicationDomain(
     // automatic HTTPS from Let's Encrypt, and a free/LAN subdomain (sslip.io on a
     // private IP, where ACME cannot validate) is served with Caddy's internal CA.
     let certResolver: string = opts.cert ?? "le";
+    // A zone hostname is only for services on the Polaris host: the zone's wildcard
+    // record points at this box, so a remote server's app would get a name that
+    // resolves to the wrong machine. Those keep the IP-derived auto domain below.
+    if (!hostname && !remoteIp && (opts.zoneLabel !== undefined || opts.random)) {
+        const minted = await deployHostname(app.slug, { zoneLabel: opts.zoneLabel, random: opts.random });
+        if (!minted) throw new Error("No domain is configured yet. Run the guided setup under Domains first.");
+        hostname = minted;
+        kind = "auto";
+        if (!opts.cert) certResolver = "le";
+    }
     if (!hostname) {
         // The network mode decides the auto domain: a wildcard/public setup mints a
         // real internet-reachable name with Let's Encrypt; otherwise a LAN-only

@@ -33,6 +33,7 @@ import {
 } from "lucide-react";
 import {
     Button,
+    Checkbox,
     Dialog,
     DialogContent,
     DialogTitle,
@@ -59,6 +60,7 @@ import { WafEditor } from "./waf-editor";
 import {
     addDomainAction,
     autoExposeAction,
+    deployZonesAction,
     duckdnsSubdomainAction,
     deleteEnvVarAction,
     deployApplicationAction,
@@ -1510,9 +1512,10 @@ function NamedTunnelRow({ appId, nonce, onChanged }: { appId: string; nonce: num
 }
 
 /** Every way to expose a service, unified into the one Public access selector. */
-type ExposureKind = "subdomain" | "local" | "le" | "duckdns" | "proxy" | "cf-named" | "cf-quick" | "ngrok";
+type ExposureKind = "zone" | "subdomain" | "local" | "le" | "duckdns" | "proxy" | "cf-named" | "cf-quick" | "ngrok";
 
 const EXPOSURE_OPTIONS: { value: ExposureKind; label: string; icon: ReactNode }[] = [
+    { value: "zone", label: "Your domain (zone subdomain)", icon: <Globe className="size-4 text-primary" /> },
     { value: "subdomain", label: "Free subdomain (auto)", icon: <Globe className="size-4 text-muted-foreground" /> },
     { value: "local", label: "Local subdomain (LAN)", icon: <MapPin className="size-4 text-muted-foreground" /> },
     { value: "le", label: "Custom domain - Let's Encrypt", icon: <Globe className="size-4 text-muted-foreground" /> },
@@ -1522,6 +1525,10 @@ const EXPOSURE_OPTIONS: { value: ExposureKind; label: string; icon: ReactNode }[
     { value: "duckdns", label: "DuckDNS subdomain", icon: <img src="/logos/duckdns.webp" alt="" className="size-4" /> },
     { value: "proxy", label: "Behind a tunnel/proxy", icon: <Globe className="size-4 text-muted-foreground" /> }
 ];
+
+/** Stands in for the base-domain zone, whose label is empty - Radix rejects an
+ *  empty select value, and "@" is how a DNS zone's own record is written anyway. */
+const ZONE_ROOT = "@";
 
 /** A URL-safe label from the app name, the default for a local/DuckDNS subdomain. */
 function defaultLabel(name: string): string {
@@ -1544,6 +1551,9 @@ function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
     const [exposure, setExposure] = useState<ExposureKind>("subdomain");
     const [cfConnected, setCfConnected] = useState(false);
     const [duckSub, setDuckSub] = useState<string | null>(null);
+    const [zones, setZones] = useState<Array<{ label: string; host: string }>>([]);
+    const [zoneLabel, setZoneLabel] = useState<string | null>(null);
+    const [randomName, setRandomName] = useState(false);
     const [tunnelNonce, setTunnelNonce] = useState(0);
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
@@ -1551,6 +1561,14 @@ function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
     useEffect(() => {
         void cloudflareAccountStatusAction().then((status) => setCfConnected(status.connected)).catch(() => undefined);
         void duckdnsSubdomainAction().then((result) => setDuckSub(result.subdomain)).catch(() => undefined);
+        void deployZonesAction()
+            .then((result) => {
+                setZones(result);
+                // A configured domain is the best default: it is the only option that
+                // yields a stable, public hostname without a third party in the path.
+                if (result.length > 0) setExposure("zone");
+            })
+            .catch(() => undefined);
     }, []);
 
     function saveSettings() {
@@ -1580,7 +1598,12 @@ function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
     // Advanced). "local"/"duckdns" ask for just a label; "le"/"proxy"/"cf-named" a full
     // hostname; "subdomain"/tunnels need nothing.
     const isDomainExposure =
-        exposure === "subdomain" || exposure === "local" || exposure === "le" || exposure === "duckdns" || exposure === "proxy";
+        exposure === "zone" ||
+        exposure === "subdomain" ||
+        exposure === "local" ||
+        exposure === "le" ||
+        exposure === "duckdns" ||
+        exposure === "proxy";
     const usesLabel = exposure === "local" || exposure === "duckdns";
     const needsHostname = exposure === "le" || exposure === "proxy" || exposure === "cf-named";
     const labelSuffix = exposure === "local" ? ".plr.local" : exposure === "duckdns" && duckSub ? `.${duckSub}.duckdns.org` : "";
@@ -1605,7 +1628,14 @@ function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
         const labelValue = label.trim() || defaultLabel(app.name);
         startTransition(async () => {
             let result: { error?: string } = {};
-            if (exposure === "subdomain") {
+            if (exposure === "zone") {
+                result = await addDomainAction({
+                    applicationId: app.id,
+                    targetPort: targetPort(),
+                    zoneLabel: zoneLabel ?? zones[0]?.label ?? "",
+                    random: randomName
+                });
+            } else if (exposure === "subdomain") {
                 // Auto = always reachable: a universally-resolvable sslip.io LAN name,
                 // plus a free Cloudflare quick tunnel for public access when behind NAT.
                 result = await autoExposeAction({ applicationId: app.id, targetPort: targetPort() });
@@ -1774,10 +1804,27 @@ function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
                             <Select
                                 value={exposure}
                                 onValueChange={(value) => setExposure(value as ExposureKind)}
-                                options={EXPOSURE_OPTIONS}
+                                options={EXPOSURE_OPTIONS.filter((option) => option.value !== "zone" || zones.length > 0)}
                                 aria-label="Exposure method"
                             />
                         </label>
+                        {exposure === "zone" && zones.length > 0 && (
+                            <div className="flex flex-col gap-2">
+                                <Select
+                                    value={(zoneLabel ?? zones[0]?.label) || ZONE_ROOT}
+                                    onValueChange={(value) => setZoneLabel(value === ZONE_ROOT ? "" : value)}
+                                    options={zones.map((zone) => ({ value: zone.label || ZONE_ROOT, label: `*.${zone.host}` }))}
+                                    aria-label="Zone"
+                                />
+                                <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                                    <Checkbox
+                                        checked={randomName}
+                                        onChange={(event) => setRandomName(event.target.checked)}
+                                    />
+                                    Use a random name instead of the service&apos;s
+                                </label>
+                            </div>
+                        )}
                         {usesLabel && !duckMissing && (
                             <div className="flex items-center gap-2">
                                 <Input
@@ -1812,7 +1859,9 @@ function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
                             />
                         )}
                         <p className="text-xs text-muted-foreground">
-                            {exposure === "subdomain"
+                            {exposure === "zone"
+                                ? "A hostname on your own domain, covered by the zone's wildcard record - no DNS to add, with a Let's Encrypt certificate. The name is derived from the service, or random if you prefer an unguessable URL."
+                                : exposure === "subdomain"
                                 ? "Always reachable: a free sslip.io subdomain that resolves on any device (a public Let's Encrypt name on a reachable box). Behind NAT, Polaris also starts a free Cloudflare quick link so it works from outside. Connect a Cloudflare account or a custom domain for a stable public URL."
                                 : exposure === "local"
                                   ? "A friendly <name>.plr.local address, LOCAL only - it resolves on your LAN via mDNS (works on macOS/iOS and most modern devices; Windows may not resolve it, use the free subdomain there). Trusted HTTPS once you install the CA root (Admin - Domains)."
