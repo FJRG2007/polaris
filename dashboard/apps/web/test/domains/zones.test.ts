@@ -125,30 +125,37 @@ describe("hostnames minted from the layout", () => {
 
     it("mints a stable hostname in the default zone", async () => {
         const first = await deployHostname("invoices");
-        expect(first).toMatch(/\.plr\.example\.com$/);
-        expect(await deployHostname("invoices")).toBe(first);
+        expect(first).toMatchObject({ zoneHost: "plr.example.com" });
+        expect(first).toHaveProperty("hostname", expect.stringMatching(/\.plr\.example\.com$/));
+        expect(await deployHostname("invoices")).toEqual(first);
     });
 
     it("mints in another zone when asked, including the base domain", async () => {
-        expect(await deployHostname("invoices", { zoneLabel: "" })).toMatch(/^[a-z0-9-]+\.example\.com$/);
+        const minted = await deployHostname("invoices", { zoneLabel: "" });
+        expect(minted).toMatchObject({ zoneHost: "example.com" });
+        expect(minted).toHaveProperty("hostname", expect.stringMatching(/^[a-z0-9-]+\.example\.com$/));
     });
 
     it("mints an unguessable hostname on request", async () => {
         const random = await deployHostname("invoices", { random: true });
-        expect(random).toMatch(/\.plr\.example\.com$/);
-        expect(await deployHostname("invoices", { random: true })).not.toBe(random);
+        expect(random).toHaveProperty("hostname", expect.stringMatching(/\.plr\.example\.com$/));
+        expect(await deployHostname("invoices", { random: true })).not.toEqual(random);
     });
 
-    it("lists the deploy zones for a picker", async () => {
+    it("lists the deploy zones for a picker, flagging the default", async () => {
         expect(await listDeployZones()).toEqual([
-            { label: "plr", host: "plr.example.com" },
-            { label: "", host: "example.com" }
+            { label: "plr", host: "plr.example.com", primary: true },
+            { label: "", host: "example.com", primary: false }
         ]);
+    });
+
+    it("says a requested zone is gone, rather than blaming the setup", async () => {
+        expect(await deployHostname("invoices", { zoneLabel: "deleted" })).toBe("unknown-zone");
     });
 
     it("has no hostname to offer when no domain is configured", async () => {
         findUnique.mockResolvedValue(null);
-        expect(await deployHostname("invoices")).toBeNull();
+        expect(await deployHostname("invoices")).toBe("no-domain");
         expect(await deployZoneBase()).toBeNull();
     });
 });

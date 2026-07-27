@@ -8,6 +8,7 @@
  */
 
 import { getDomainConfig } from "./domain-service";
+import { zoneDnsVerified } from "./domain-zones";
 import { getNetworkStatus } from "./network-service";
 import { ensurePolarisTunnel } from "./polaris-tunnel-service";
 
@@ -15,11 +16,11 @@ export async function ensureShareReachability(): Promise<void> {
     const config = await getDomainConfig();
     // An explicitly configured public sharing domain is the operator's choice; trust it.
     if (config.sharingDomain) return;
+    // A zone whose wildcard has been seen resolving here is a working public domain,
+    // so a tunnel would only add a slower path in front of it. An unverified one is
+    // just an intention - the tunnel below stays the safety net until it checks out.
+    if (await zoneDnsVerified()) return;
     const status = await getNetworkStatus();
-    // A zone layout means the operator pointed DNS at this box (and forwarded the
-    // ports, or they would not have finished the setup): links already work, and a
-    // tunnel would only add a slower path in front of them.
-    if (status.effectiveMode === "wildcard") return;
     // The box's own IP is internet-reachable, so DuckDNS/auto names work as-is.
     if (status.autoSubdomainsPublic) return;
     await ensurePolarisTunnel().catch(() => undefined);

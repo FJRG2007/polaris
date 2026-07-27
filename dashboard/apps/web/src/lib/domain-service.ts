@@ -13,7 +13,7 @@ import { prisma } from "@polaris/db";
 import { loadEnv } from "@polaris/config";
 import { magicDomain, DEFAULT_SUBDOMAIN_BASE } from "@polaris/deploy";
 import { decryptSecret, encryptSecret } from "@polaris/storage";
-import { polarisZoneHost } from "./domain-zones";
+import { polarisZoneHost, zoneDnsVerified } from "./domain-zones";
 import { getPolarisPublicUrl } from "./polaris-tunnel-service";
 
 const KEYS = {
@@ -147,10 +147,14 @@ export async function sharingBaseUrl(): Promise<string> {
     const configured = normalizeUrl(await getSetting(KEYS.sharing));
     if (configured) return configured;
 
-    // A configured zone is a domain the operator pointed here on purpose, so it beats
-    // an ephemeral tunnel URL that may just be left over from before they set it up.
-    const zone = await polarisZoneHost();
-    if (zone) return `https://${zone}`;
+    // A configured zone beats an ephemeral tunnel URL - but only once its DNS has been
+    // seen resolving here. Saving the layout in the wizard is an intention; until the
+    // records exist, a link on that hostname resolves nowhere, and the tunnel below
+    // still works.
+    if (await zoneDnsVerified()) {
+        const zone = await polarisZoneHost();
+        if (zone) return `https://${zone}`;
+    }
 
     // A Polaris Cloudflare tunnel, when running, is a working public URL - prefer it
     // over the DuckDNS/auto names, which do not resolve to a reachable box behind NAT.

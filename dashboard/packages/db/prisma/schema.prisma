@@ -1144,7 +1144,8 @@ model Domain {
     id            String   @id @default(uuid(7)) @db.Uuid
     applicationId String   @db.Uuid
     hostname      String   @unique
-    // auto (free sslip.io/traefik.me) | custom | duckdns
+    // auto (free sslip.io/traefik.me, or a zone name derived from the service) |
+    // random (an unguessable name minted in a zone) | lan | custom | duckdns
     kind          String   @default("auto")
     targetPort    Int
     https         Boolean  @default(true)

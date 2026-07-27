@@ -28,6 +28,8 @@ import {
 import { getSetting, setSetting } from "./setting-store";
 
 const KEY = "domain.zones";
+/** Set once the zones' wildcards have been seen resolving to this server. */
+const VERIFIED_KEY = "domain.zones.verified";
 
 const zoneSchema = z.object({
     label: z.string().trim().toLowerCase().refine(isZoneLabel, "Use a single label like plr, or leave it empty"),
@@ -102,7 +104,26 @@ export async function saveDomainZones(input: unknown): Promise<DomainZoneConfig>
     }
     const config: DomainZoneConfig = { baseDomain: parsed.data.baseDomain, zones };
     await setSetting(KEY, JSON.stringify(config));
+    // A changed layout is unproven again: the new zones' wildcards have never been
+    // seen resolving, and callers use that flag to decide whether the domain is safe
+    // to hand out. It is re-earned by the next DNS check.
+    await setSetting(VERIFIED_KEY, null);
     return config;
+}
+
+/**
+ * Whether the configured zones have been seen resolving to this server. Callers that
+ * hand a URL to someone else use this: a zone saved in the wizard is an intention,
+ * not a working domain, and a link on a hostname that resolves nowhere is worse than
+ * a link on an ugly one that works.
+ */
+export async function zoneDnsVerified(): Promise<boolean> {
+    return (await getSetting(VERIFIED_KEY)) === "1";
+}
+
+/** Record the outcome of a DNS check (see domain-dns). */
+export async function setZoneDnsVerified(verified: boolean): Promise<void> {
+    await setSetting(VERIFIED_KEY, verified ? "1" : null);
 }
 
 /** Every zone as the pair of DNS names it needs, for the setup checklist. */
@@ -143,29 +164,42 @@ export async function polarisZoneHost(): Promise<string | null> {
     return zone ? zoneHost(zone, config.baseDomain) : null;
 }
 
+/** Why a hostname could not be minted, so the caller can say which of the two it is
+ *  instead of sending the operator back to a setup that is actually fine. */
+export type ZoneMintFailure = "no-domain" | "unknown-zone";
+
+export interface MintedHostname {
+    hostname: string;
+    /** The zone's own hostname, for finding other names Polaris minted in it. */
+    zoneHost: string;
+}
+
 /**
  * A hostname for a service inside a deploy zone: deterministic from the name (so a
- * redeploy keeps the URL) or random when the caller wants an unguessable one. Null
- * when no domain is configured, so the caller falls back to a free subdomain.
+ * redeploy keeps the URL) or random when the caller wants an unguessable one.
  */
 export async function deployHostname(
     name: string,
     options: { zoneLabel?: string; random?: boolean } = {}
-): Promise<string | null> {
+): Promise<MintedHostname | ZoneMintFailure> {
     const config = await getDomainZones();
-    if (!config.baseDomain) return null;
+    if (!config.baseDomain) return "no-domain";
     const zone = pickZone(config.zones, "deploy", options.zoneLabel);
-    if (!zone) return null;
-    return options.random
-        ? randomZoneHostname(zone, config.baseDomain)
-        : zoneHostname(name, zone, config.baseDomain);
+    if (!zone) return "unknown-zone";
+    return {
+        hostname: options.random
+            ? randomZoneHostname(zone, config.baseDomain)
+            : zoneHostname(name, zone, config.baseDomain),
+        zoneHost: zoneHost(zone, config.baseDomain)
+    };
 }
 
-/** The deploy zones offered in a picker, as `{ label, host }` pairs. */
-export async function listDeployZones(): Promise<Array<{ label: string; host: string }>> {
+/** The deploy zones offered in a picker. `primary` marks the layout's default, so a
+ *  picker preselects the same zone the server would have chosen on its own. */
+export async function listDeployZones(): Promise<Array<{ label: string; host: string; primary: boolean }>> {
     const config = await getDomainZones();
     if (!config.baseDomain) return [];
     return config.zones
         .filter((zone) => zone.scope === "deploy")
-        .map((zone) => ({ label: zone.label, host: zoneHost(zone, config.baseDomain) }));
+        .map((zone) => ({ label: zone.label, host: zoneHost(zone, config.baseDomain), primary: zone.primary }));
 }

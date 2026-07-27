@@ -27,7 +27,7 @@ import {
     type LocalEnvironment,
     type NetworkStatus
 } from "@/lib/network-service";
-import { zoneHost } from "@polaris/deploy";
+import { normalizeBaseDomain, zoneHost } from "@polaris/deploy";
 
 export interface DomainSetupState {
     environment: LocalEnvironment;
@@ -97,28 +97,39 @@ export async function saveDomainSetupAction(input: unknown): Promise<DomainSetup
     const { strategy, environment, useForDashboard } = parsed.data;
     const meta = STRATEGY_META[strategy];
 
+    // The domain a wildcard strategy builds zones on: the operator's own, or the
+    // DuckDNS name Polaris keeps pointed at this server. A tunnel strategy stores
+    // none - its hostnames are published by the tunnel provider, so a zone here
+    // would ask the operator to create DNS records that must not exist.
+    const duckSubdomain = parsed.data.duckdnsSubdomain.trim().toLowerCase();
+    const baseDomain =
+        strategy === "duckdns"
+            ? duckSubdomain && `${duckSubdomain}.duckdns.org`
+            : meta.wildcard && meta.needsDomain
+              ? normalizeBaseDomain(parsed.data.baseDomain)
+              : "";
+    // Everything is validated before the first write: a strategy that needs a domain
+    // and does not get one would otherwise store the exposure mode "wildcard" with no
+    // wildcard domain, which mints LAN-only hostnames on a perfectly public server -
+    // a worse state than before the wizard ran. Half-applied answers are the other
+    // failure this prevents: the environment used to be saved even on this error.
+    if (strategy === "duckdns" && !duckSubdomain) {
+        return { state: await domainSetupStateAction(), error: "Enter your DuckDNS subdomain" };
+    }
+    if (meta.needsDomain && meta.wildcard && !baseDomain) {
+        return { state: await domainSetupStateAction(), error: "Enter the domain you want to use" };
+    }
+
     try {
         await setLocalEnvironment(environment);
 
         if (strategy === "duckdns") {
-            const subdomain = parsed.data.duckdnsSubdomain.trim().toLowerCase();
-            if (!subdomain) throw new Error("Enter your DuckDNS subdomain");
             await setDomainConfig({
-                duckdnsSubdomain: subdomain,
+                duckdnsSubdomain: duckSubdomain,
                 ...(parsed.data.duckdnsToken.trim() ? { duckdnsToken: parsed.data.duckdnsToken.trim() } : {})
             });
         }
 
-        // The domain a wildcard strategy builds zones on: the operator's own, or the
-        // DuckDNS name Polaris keeps pointed at this server. A tunnel strategy stores
-        // none - its hostnames are published by the tunnel provider, so a zone here
-        // would ask the operator to create DNS records that must not exist.
-        const baseDomain =
-            strategy === "duckdns"
-                ? `${parsed.data.duckdnsSubdomain.trim().toLowerCase()}.duckdns.org`
-                : meta.wildcard && meta.needsDomain
-                  ? parsed.data.baseDomain
-                  : "";
         const zones = await saveDomainZones({ baseDomain, zones: parsed.data.zones });
         // The standalone wildcard field is cleared: from here the zone layout is the
         // only thing that names a wildcard domain, so a value left over from an earlier

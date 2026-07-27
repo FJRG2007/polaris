@@ -485,14 +485,25 @@ function DnsStep({ state, publicIp }: { state: DomainSetupState; publicIp: strin
     async function check() {
         setBusy("check");
         setMessage(null);
-        setReport(await checkZoneDnsAction());
-        setBusy(null);
+        try {
+            setReport(await checkZoneDnsAction());
+        } catch (caught) {
+            // Without this the buttons stay disabled forever on any failure, leaving
+            // the operator on a dead final step with nothing said.
+            setMessage(caught instanceof Error ? caught.message : "Could not check the DNS records");
+        } finally {
+            setBusy(null);
+        }
     }
 
     async function create() {
         setBusy("create");
         setMessage(null);
-        const result = await provisionZoneDnsAction();
+        const result = await provisionZoneDnsAction().catch((caught: unknown) => ({
+            created: [],
+            failed: [],
+            error: caught instanceof Error ? caught.message : "Could not create the DNS records"
+        }));
         setBusy(null);
         if (result.error) {
             setMessage(result.error);
@@ -506,12 +517,20 @@ function DnsStep({ state, publicIp }: { state: DomainSetupState; publicIp: strin
         await check();
     }
 
-    if (state.records.length === 0) {
+    // DuckDNS manages one record - the subdomain's IP - and answers for everything
+    // under it, so listing per-zone A records would ask for records that cannot be
+    // created (and "Create them on Cloudflare" would fail on a domain that is not
+    // theirs). Polaris keeps that one record pointed here on its own.
+    const duckdns = state.zones.baseDomain.endsWith(".duckdns.org");
+
+    if (state.records.length === 0 || duckdns) {
         return (
             <div className="flex flex-col gap-3">
-                <StepTitle title="Done" hint="This setup needs no DNS records." />
+                <StepTitle title="Done" hint={duckdns ? "DuckDNS answers for every name under your subdomain." : "This setup needs no DNS records."} />
                 <p className="rounded-md border border-success/30 bg-success/5 px-3 py-2 text-xs text-muted-foreground">
-                    Services get their hostname the moment they are deployed.
+                    {duckdns
+                        ? `Nothing to create: ${state.zones.baseDomain} already resolves every subdomain, and Polaris keeps it pointed at this server as your IP changes.`
+                        : "Services get their hostname the moment they are deployed."}
                 </p>
             </div>
         );

@@ -549,7 +549,7 @@ export async function duckdnsSubdomainAction(): Promise<{ subdomain: string | nu
 
 /** The deploy zones a service can get a hostname in, for the exposure picker. Empty
  *  when no domain is configured, so the form offers the free-subdomain path instead. */
-export async function deployZonesAction(): Promise<Array<{ label: string; host: string }>> {
+export async function deployZonesAction(): Promise<Array<{ label: string; host: string; primary: boolean }>> {
     await requirePermission("deploy.manage");
     return listDeployZones();
 }

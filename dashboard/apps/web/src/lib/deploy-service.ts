@@ -194,6 +194,24 @@ export async function createApplication(ownerId: string, input: CreateApplicatio
 }
 
 /**
+ * The random hostname this app already holds directly inside a zone, if any. The
+ * match is exact by construction - one label under the zone host - because a suffix
+ * test alone would treat `app.plr.example.com` as living in the base-domain zone
+ * `example.com` and hand back a hostname from a different zone entirely.
+ */
+async function findRandomDomain(
+    applicationId: string,
+    zoneHost: string
+): Promise<{ id: string; hostname: string; targetPort: number; certResolver: string } | null> {
+    const rows = await prisma.domain.findMany({
+        where: { applicationId, kind: "random", hostname: { endsWith: `.${zoneHost}` } },
+        select: { id: true, hostname: true, targetPort: true, certResolver: true }
+    });
+    const depth = zoneHost.split(".").length + 1;
+    return rows.find((row) => row.hostname.split(".").length === depth) ?? null;
+}
+
+/**
  * Attach a domain to an application. With no hostname a free auto subdomain is
  * generated (Traefik + Let's Encrypt serves it); the routing labels take effect
  * on the next deploy. Returns the hostname.
@@ -233,9 +251,32 @@ export async function addApplicationDomain(
     // resolves to the wrong machine. Those take their own server's domain below.
     if (!hostname && !remoteHost && (opts.zoneLabel !== undefined || opts.random)) {
         const minted = await deployHostname(app.slug, { zoneLabel: opts.zoneLabel, random: opts.random });
-        if (!minted) throw new Error("No domain is configured yet. Run the guided setup under Domains first.");
-        hostname = minted;
-        kind = "auto";
+        if (minted === "no-domain") {
+            throw new Error("No domain is configured yet. Run the guided setup under Domains first.");
+        }
+        if (minted === "unknown-zone") {
+            throw new Error("That zone no longer exists. Pick another one, or add it back under Domains.");
+        }
+        // A random name is meant to be unguessable, not new on every click: minting a
+        // fresh one each time would pile up a Domain row, an edge route and a
+        // certificate request per press, with nothing saying which is the real URL.
+        const existing = opts.random ? await findRandomDomain(applicationId, minted.zoneHost) : null;
+        if (existing) {
+            // The operator may have changed the port since; the reused name should
+            // serve what they just asked for rather than silently keeping the old one.
+            if (existing.targetPort !== opts.targetPort || existing.certResolver !== (opts.cert ?? "le")) {
+                await prisma.domain.update({
+                    where: { id: existing.id },
+                    data: { targetPort: opts.targetPort, certResolver: opts.cert ?? "le" }
+                });
+                await syncAppRoutes().catch(() => undefined);
+            }
+            return existing.hostname;
+        }
+        hostname = minted.hostname;
+        // Marked distinctly so the next random request finds exactly this row, and
+        // never a name derived from the service (which must keep its own hostname).
+        kind = opts.random ? "random" : "auto";
         if (!opts.cert) certResolver = "le";
     }
     if (!hostname) {

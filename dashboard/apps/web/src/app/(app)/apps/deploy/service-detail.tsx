@@ -1592,7 +1592,7 @@ function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
     const [exposure, setExposure] = useState<ExposureKind>("subdomain");
     const [cfConnected, setCfConnected] = useState(false);
     const [duckSub, setDuckSub] = useState<string | null>(null);
-    const [zones, setZones] = useState<Array<{ label: string; host: string }>>([]);
+    const [zones, setZones] = useState<Array<{ label: string; host: string; primary: boolean }>>([]);
     const [zoneLabel, setZoneLabel] = useState<string | null>(null);
     const [randomName, setRandomName] = useState(false);
     const [tunnelNonce, setTunnelNonce] = useState(0);
@@ -1602,15 +1602,24 @@ function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
     useEffect(() => {
         void cloudflareAccountStatusAction().then((status) => setCfConnected(status.connected)).catch(() => undefined);
         void duckdnsSubdomainAction().then((result) => setDuckSub(result.subdomain)).catch(() => undefined);
+        // The zones belong to the Polaris host: their wildcard points here, so an app
+        // on a remote server would be offered a hostname that resolves to the wrong
+        // machine (and the server would ignore it anyway). Those keep their own
+        // server's domain instead.
+        if (app.serverId !== "local") return;
         void deployZonesAction()
             .then((result) => {
                 setZones(result);
                 // A configured domain is the best default: it is the only option that
                 // yields a stable, public hostname without a third party in the path.
-                if (result.length > 0) setExposure("zone");
+                // The layout's own default zone wins, not merely the first stored one.
+                if (result.length > 0) {
+                    setExposure("zone");
+                    setZoneLabel((result.find((zone) => zone.primary) ?? result[0])?.label ?? "");
+                }
             })
             .catch(() => undefined);
-    }, []);
+    }, [app.serverId]);
 
     function saveSettings() {
         setError(null);

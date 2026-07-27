@@ -11,7 +11,7 @@
 
 import { resolve4 } from "node:dns/promises";
 import { randomLabel } from "@polaris/deploy";
-import { getDomainZones, zoneRecords } from "./domain-zones";
+import { getDomainZones, setZoneDnsVerified, zoneRecords } from "./domain-zones";
 import { detectPublicIp } from "./network-service";
 import { loadCloudflareToken } from "./integrations/cloudflare-account-service";
 import { resolveZoneForHostname, upsertARecord } from "./integrations/cloudflare-api";
@@ -73,6 +73,11 @@ export async function checkZoneDns(): Promise<ZoneDnsReport> {
             };
         })
     );
+    // "Verified" has to mean "seen resolving HERE", so it is only recorded when the
+    // server's own address is known to compare against: without it, a wildcard
+    // pointing at a completely different machine would look like proof and promote
+    // every share link onto it.
+    if (expectedIp) await setZoneDnsVerified(zones.length > 0 && zones.every((zone) => zone.ok));
     return { expectedIp, zones };
 }
 
