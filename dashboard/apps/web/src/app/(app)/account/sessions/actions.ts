@@ -7,8 +7,12 @@
  */
 
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
+import { listSessionActivity, type SessionActivityEntry } from "@/lib/audit-service";
 import { requireUser } from "@/lib/session";
 import { decideLoginApproval, revokeOtherSessions, revokeUserSession } from "@/lib/session-directory";
+
+const sessionIdSchema = z.string().uuid();
 
 export async function revokeSessionAction(sessionId: string): Promise<{ error?: string }> {
     const user = await requireUser();
@@ -23,6 +27,16 @@ export async function revokeOtherSessionsAction(): Promise<{ count: number }> {
     const count = await revokeOtherSessions(user.id, user.sessionId);
     revalidatePath("/account/sessions");
     return { count };
+}
+
+/** What was done from one of the caller's sessions, newest first. */
+export async function sessionActivityAction(
+    sessionId: unknown
+): Promise<{ entries?: SessionActivityEntry[]; error?: string }> {
+    const user = await requireUser();
+    const parsed = sessionIdSchema.safeParse(sessionId);
+    if (!parsed.success) return { error: "Unknown session." };
+    return { entries: await listSessionActivity(user.id, parsed.data) };
 }
 
 export async function decideLoginApprovalAction(

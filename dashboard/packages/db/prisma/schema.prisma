@@ -882,10 +882,15 @@ model AuditLog {
     targetId   String?  @db.Uuid
     metadata   String?
     ipHash     String?
+    // The session the action arrived on, so a user can read their own history
+    // one device at a time. Deliberately not a foreign key: ending a session
+    // must not erase what was done from it.
+    sessionId  String?  @db.Uuid
     at         DateTime @default(now())
 
     @@index([actorId])
     @@index([action])
+    @@index([sessionId])
 }
 
 model Setting {

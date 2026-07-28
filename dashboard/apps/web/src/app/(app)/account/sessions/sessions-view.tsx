@@ -6,18 +6,21 @@
  * approving one is what lets somebody in.
  *
  * Device labels come from the client-supplied user-agent, so they are treated as
- * hints - the address and the timestamps are what a user should judge by.
+ * hints - the address and the timestamps are what a user should judge by. When
+ * those are not enough to place a session, Activity opens what was actually done
+ * from it before deciding whether to sign it out.
  */
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Check, LogOut, MonitorSmartphone, X } from "lucide-react";
+import { Check, History, LogOut, MonitorSmartphone, X } from "lucide-react";
 import { Badge, Button, Card, CardBody } from "@polaris/ui";
 import { useConfirm } from "@/components/confirm-dialog";
 import { RelativeTime } from "@/components/relative-time";
 import { signOut } from "@/lib/auth-client";
 import type { SessionView } from "@/lib/session-directory";
 import { decideLoginApprovalAction, revokeOtherSessionsAction, revokeSessionAction } from "./actions";
+import { SessionActivityDialog } from "./session-activity-dialog";
 
 function Origin({ session }: { session: SessionView }) {
     const where = [session.ip, session.country].filter(Boolean).join(" - ");
@@ -33,6 +36,7 @@ export function SessionsView({ sessions }: { sessions: SessionView[] }) {
     const [confirm, confirmElement] = useConfirm();
     const [busyId, setBusyId] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [activityFor, setActivityFor] = useState<SessionView | null>(null);
 
     const pending = sessions.filter((session) => session.approval === "pending");
     const active = sessions.filter((session) => session.approval !== "pending");
@@ -165,18 +169,36 @@ export function SessionsView({ sessions }: { sessions: SessionView[] }) {
                                     <Origin session={session} />
                                 </div>
                             </div>
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                disabled={busyId === session.id}
-                                onClick={() => void (session.current ? signOutHere() : revoke(session))}
-                            >
-                                Sign out
-                            </Button>
+                            <div className="flex shrink-0 items-center gap-1">
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    title="Activity from this session"
+                                    onClick={() => setActivityFor(session)}
+                                >
+                                    <History className="size-4" />
+                                    <span className="sr-only sm:not-sr-only">Activity</span>
+                                </Button>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    disabled={busyId === session.id}
+                                    onClick={() => void (session.current ? signOutHere() : revoke(session))}
+                                >
+                                    Sign out
+                                </Button>
+                            </div>
                         </div>
                     ))}
                 </CardBody>
             </Card>
+
+            <SessionActivityDialog
+                session={activityFor}
+                onOpenChange={(open) => {
+                    if (!open) setActivityFor(null);
+                }}
+            />
 
             {confirmElement}
         </div>
