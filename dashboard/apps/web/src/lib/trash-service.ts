@@ -11,6 +11,7 @@ import { randomBytes } from "node:crypto";
 import { baseName, normalizeRelPath } from "@polaris/core";
 import { prisma } from "@polaris/db";
 import { getDriver } from "@/lib/storage-service";
+import { invalidateFolderSizes } from "@/lib/drive-folder-size";
 import { POLARIS_DIR, TRASH_DIR } from "@/lib/system-paths";
 
 export { TRASH_DIR };
@@ -61,6 +62,7 @@ export async function moveToTrash(ownerId: string, connectionId: string, path: s
     } finally {
         await driver.dispose();
     }
+    await invalidateFolderSizes(connectionId, source);
 }
 
 /** Every trashed item owned by the user, newest first, with its connection name. */
@@ -77,12 +79,14 @@ export async function restoreTrash(ownerId: string, id: string): Promise<void> {
     const row = await prisma.trashItem.findFirst({ where: { id, ownerId } });
     if (!row) return;
     const driver = await getDriver(row.connectionId, ownerId);
+    let destination = row.originalPath;
     try {
-        const destination = await freeDestination(driver, row.originalPath);
+        destination = await freeDestination(driver, row.originalPath);
         await driver.move(row.trashPath, destination);
     } finally {
         await driver.dispose();
     }
+    await invalidateFolderSizes(row.connectionId, destination);
     await prisma.trashItem.delete({ where: { id: row.id } });
 }
 

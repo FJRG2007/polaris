@@ -20,6 +20,7 @@ import { generateToken, hashToken } from "@polaris/core/tokens";
 import { hashLinkPassword, verifyLinkPassword } from "@polaris/core/link-password";
 import { prisma } from "@polaris/db";
 import { getDriverForConnection } from "@/lib/storage-service";
+import { invalidateFolderSizes } from "@/lib/drive-folder-size";
 
 /** A file request as needed by the public upload path. */
 export type FileRequestRecord = Awaited<ReturnType<typeof resolveFileRequestByToken>>;
@@ -421,6 +422,10 @@ export async function deleteSubmission(requestId: string, submissionId: string):
     } finally {
         await driver.dispose();
     }
+    await invalidateFolderSizes(
+        submission.request.destinationConnectionId,
+        normalizeRelPath(submission.storedPath)
+    );
     await prisma.fileRequestSubmission.delete({ where: { id: submission.id } });
     return true;
 }

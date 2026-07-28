@@ -11,6 +11,7 @@ import { baseName, normalizeRelPath } from "@polaris/core";
 import { prisma } from "@polaris/db";
 import { isUuid } from "@/lib/uuid";
 import { getDriver } from "@/lib/storage-service";
+import { invalidateFolderSizes } from "@/lib/drive-folder-size";
 import { moveToTrash } from "@/lib/trash-service";
 import { recordAudit } from "@/lib/audit-service";
 
@@ -71,6 +72,7 @@ export async function sweepDueDeletions(connectionId?: string): Promise<number> 
                 } finally {
                     await driver.dispose();
                 }
+                await invalidateFolderSizes(row.connectionId, normalizeRelPath(row.path));
             } else {
                 await moveToTrash(row.ownerId, row.connectionId, row.path);
             }

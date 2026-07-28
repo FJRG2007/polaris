@@ -38,17 +38,17 @@ import {
     Eraser,
     Eye,
     EyeOff,
-    File,
     FileArchive,
     FilePlus,
     Files,
     Folder,
     FolderInput,
     FolderPlus,
-    FolderTree,
+    FolderTree as FolderTreeIcon,
     FolderUp,
     Inbox,
     Info,
+    KeyRound,
     LayoutGrid,
     List,
     Lock,
@@ -102,8 +102,12 @@ import {
 import { FilePreview, isViewable, type ViewerTarget } from "./file-viewer";
 import { ITEM_ICONS, ITEM_ICON_COLORS, iconColorClass, iconComponent } from "./item-icons";
 import { matchesStructured, parseSearch } from "./search-query";
+import { matchShortcut, SHORTCUT_HINTS } from "./shortcuts";
+import { useDriveInsights } from "./use-drive-insights";
 import { SelectionZipMenu } from "./selection-zip-menu";
 import { ArchiveDialog } from "./archive-dialog";
+import { FolderTree } from "./folder-tree";
+import { fileIconFor } from "./file-icons";
 import { RelativeTime } from "@/components/relative-time";
 import { UserProfileDialog } from "@/components/user-profile-dialog";
 import type { DriveEntry } from "./types";
@@ -309,6 +313,48 @@ export function FilesView({
     const [archiveTarget, setArchiveTarget] = useState<DriveEntry | null>(null);
     const [activityLoading, setActivityLoading] = useState(false);
 
+    // Folder weights and archive locks: measured in the background once the
+    // listing itself is on screen, never blocking it, and only asked for when the
+    // folder actually holds something whose answer is not already on screen. The
+    // signature covers what a write would change, so the weights are measured
+    // again after an upload, a delete or a rename, but not after a change that
+    // only touches presentation (a star, a note, a custom icon).
+    const hasInsights = entries.some(
+        (entry) => entry.kind === "dir" || /\.(zip|rar)$/i.test(entry.name)
+    );
+    const listingRevision = useMemo(
+        () => entries.map((entry) => `${entry.path}:${entry.size}:${entry.modifiedAt}`).join("|"),
+        [entries]
+    );
+    const insights = useDriveInsights(
+        connectionId,
+        path,
+        !loading && error === null && hasInsights,
+        listingRevision
+    );
+
+    /** Measured weight of a folder, or the plain size of a file. */
+    function sizeLabel(entry: DriveEntry): string {
+        if (entry.kind !== "dir") return formatBytes(BigInt(entry.size));
+        const weight = insights.sizes.get(entry.path);
+        if (!weight) return insights.pending.has(entry.path) ? "..." : "-";
+        const total = formatBytes(weight.bytes);
+        return weight.partial ? `min. ${total}` : total;
+    }
+
+    /** What the size of a folder means, spelled out for the cell's tooltip. */
+    function sizeTitle(entry: DriveEntry): string | undefined {
+        if (entry.kind !== "dir") return undefined;
+        const weight = insights.sizes.get(entry.path);
+        if (!weight) {
+            return insights.pending.has(entry.path) ? "Measuring this folder..." : undefined;
+        }
+        const files = `${weight.files} file${weight.files === 1 ? "" : "s"}`;
+        const folders = `${weight.folders} folder${weight.folders === 1 ? "" : "s"}`;
+        const contents = `${files} in ${folders}`;
+        return weight.partial ? `${contents}. A locked folder inside was not counted.` : contents;
+    }
+
     function openNote(entry: DriveEntry) {
         setNoteTarget(entry);
         setNoteValue(entry.note ?? "");
@@ -335,11 +381,25 @@ export function FilesView({
         setMoveDest(path);
     }
 
+    /** The picked destination as a clean relative path ("" is the connection root). */
+    const normalizedMoveDest = moveDest.trim().replace(/^\/+|\/+$/g, "");
+
+    /** Why the picked destination cannot be used, or null when the move is valid. */
+    const moveError = ((): string | null => {
+        if (!moveTargets) return null;
+        if (moveTargets.some((entry) => movesIntoSelf(entry.path, normalizedMoveDest))) {
+            return "A folder cannot be moved into itself.";
+        }
+        if (moveTargets.every((entry) => parentOf(entry.path) === normalizedMoveDest)) {
+            return "Already in that folder.";
+        }
+        return null;
+    })();
+
     function submitMove(event: React.FormEvent) {
         event.preventDefault();
-        if (!moveTargets) return;
-        const dest = moveDest.trim().replace(/^\/+|\/+$/g, "");
-        for (const entry of moveTargets) onMove(entry, dest);
+        if (!moveTargets || moveError) return;
+        for (const entry of moveTargets) onMove(entry, normalizedMoveDest);
         setMoveTargets(null);
     }
     const [dragUpload, setDragUpload] = useState(false);
@@ -532,6 +592,41 @@ export function FilesView({
         if (dragged) onMove(dragged, folder.path);
     }
 
+    // Create and upload shortcuts. They listen on the window so they work wherever
+    // the focus sits in the explorer, and stand down whenever something else owns
+    // the keyboard: a text field, an inline rename, an open dialog or menu, or the
+    // file preview. Re-bound on every render, so the handler always reads current
+    // state rather than a stale closure.
+    useEffect(() => {
+        function onShortcut(event: globalThis.KeyboardEvent) {
+            if (renaming || viewerTarget || pendingFolder) return;
+            const target = event.target as HTMLElement | null;
+            if (target?.closest("input, textarea, select, [contenteditable='true']")) return;
+            if (document.querySelector("[role='dialog'], [role='menu']")) return;
+            const shortcut = matchShortcut(event);
+            if (!shortcut) return;
+            if (shortcut === "new-folder" || shortcut === "new-file") {
+                if (pending) return;
+                event.preventDefault();
+                if (shortcut === "new-folder") onNewFolder();
+                else onNewFile();
+                return;
+            }
+            if (shortcut === "request-files") {
+                if (pending) return;
+                event.preventDefault();
+                onRequestFiles(path, path.split("/").pop() ?? "");
+                return;
+            }
+            if (uploading) return;
+            event.preventDefault();
+            if (shortcut === "upload-folder") void pickFolder();
+            else fileInput.current?.click();
+        }
+        window.addEventListener("keydown", onShortcut);
+        return () => window.removeEventListener("keydown", onShortcut);
+    });
+
     // Selection, rename and the open preview are tied to a specific listing; drop
     // them whenever the location changes so nothing stale leaks across folders.
     useEffect(() => {
@@ -640,12 +735,18 @@ export function FilesView({
         }
 
         const direction = sortDir === "asc" ? 1 : -1;
+        // A folder has no size of its own, so sorting by size ranks it by what the
+        // background pass measured - and re-ranks it as measurements arrive.
+        const weightOf = (entry: DriveEntry): number =>
+            entry.kind === "dir"
+                ? Number(insights.sizes.get(entry.path)?.bytes ?? 0n)
+                : Number(entry.size);
         // Folders group above files; the chosen key orders within each group.
         return [...rows].sort((a, b) => {
             const dirA = a.kind === "dir" ? 0 : 1;
             const dirB = b.kind === "dir" ? 0 : 1;
             if (dirA !== dirB) return dirA - dirB;
-            if (sortKey === "size") return (Number(a.size) - Number(b.size)) * direction;
+            if (sortKey === "size") return (weightOf(a) - weightOf(b)) * direction;
             if (sortKey === "created") {
                 return (
                     (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()) * direction
@@ -671,7 +772,8 @@ export function FilesView({
         sortKey,
         sortDir,
         showHidden,
-        starredOnly
+        starredOnly,
+        insights
     ]);
 
     const selectedEntries = visible.filter((entry) => selected.has(entry.path));
@@ -1284,11 +1386,18 @@ export function FilesView({
                                 onRequestFiles(path, segments[segments.length - 1] ?? "")
                             }
                             disabled={pending}
+                            title={`Request files (${SHORTCUT_HINTS["request-files"]})`}
                         >
                             <Inbox className="size-4" />
                             Request files
                         </Button>
-                        <Button size="sm" variant="ghost" onClick={onNewFolder} disabled={pending}>
+                        <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={onNewFolder}
+                            disabled={pending}
+                            title={`New folder (${SHORTCUT_HINTS["new-folder"]})`}
+                        >
                             <FolderPlus className="size-4" />
                             New folder
                         </Button>
@@ -1303,10 +1412,16 @@ export function FilesView({
                                 <DropdownMenuItem onSelect={() => fileInput.current?.click()}>
                                     <Upload className="size-4" />
                                     Files
+                                    <span className="ml-auto pl-6 text-xs text-muted-foreground">
+                                        {SHORTCUT_HINTS["upload-files"]}
+                                    </span>
                                 </DropdownMenuItem>
                                 <DropdownMenuItem onSelect={() => void pickFolder()}>
                                     <FolderUp className="size-4" />
                                     Folder
+                                    <span className="ml-auto pl-6 text-xs text-muted-foreground">
+                                        {SHORTCUT_HINTS["upload-folder"]}
+                                    </span>
                                 </DropdownMenuItem>
                             </DropdownMenuContent>
                         </DropdownMenu>
@@ -1366,7 +1481,7 @@ export function FilesView({
                             )}
                         >
                             {searchScope === "recursive" ? (
-                                <FolderTree className="size-4" />
+                                <FolderTreeIcon className="size-4" />
                             ) : (
                                 <Folder className="size-4" />
                             )}
@@ -1756,12 +1871,16 @@ export function FilesView({
                                                                             </span>
                                                                         </span>
                                                                     )}
-                                                                    <span className="text-[11px] text-muted-foreground">
-                                                                        {entry.kind === "dir"
+                                                                    <span
+                                                                        className="text-[11px] text-muted-foreground"
+                                                                        title={sizeTitle(entry)}
+                                                                    >
+                                                                        {entry.kind === "dir" &&
+                                                                        !insights.sizes.has(
+                                                                            entry.path
+                                                                        )
                                                                             ? "Folder"
-                                                                            : formatBytes(
-                                                                                  BigInt(entry.size)
-                                                                              )}
+                                                                            : sizeLabel(entry)}
                                                                     </span>
                                                                     <div className="flex items-center gap-1">
                                                                         {entry.favorite ? (
@@ -1769,6 +1888,14 @@ export function FilesView({
                                                                         ) : null}
                                                                         {entry.locked ? (
                                                                             <Lock className="size-3 text-muted-foreground" />
+                                                                        ) : null}
+                                                                        {insights.locked.has(
+                                                                            entry.path
+                                                                        ) ? (
+                                                                            <KeyRound
+                                                                                className="size-3 text-amber-400"
+                                                                                aria-label="Needs a password"
+                                                                            />
                                                                         ) : null}
                                                                         {entry.note ? (
                                                                             <StickyNote className="size-3 text-amber-500" />
@@ -2024,6 +2151,14 @@ export function FilesView({
                                                                                             aria-label="Favorite"
                                                                                         />
                                                                                     ) : null}
+                                                                                    {insights.locked.has(
+                                                                                        entry.path
+                                                                                    ) ? (
+                                                                                        <KeyRound
+                                                                                            className="size-3 shrink-0 text-amber-400"
+                                                                                            aria-label="Needs a password"
+                                                                                        />
+                                                                                    ) : null}
                                                                                     {entry.note ? (
                                                                                         <StickyNote
                                                                                             className="size-3 shrink-0 text-amber-500"
@@ -2047,14 +2182,11 @@ export function FilesView({
                                                                                 }
                                                                             />
                                                                         </div>
-                                                                        <div className="w-24 shrink-0 px-2 text-muted-foreground">
-                                                                            {entry.kind === "dir"
-                                                                                ? "-"
-                                                                                : formatBytes(
-                                                                                      BigInt(
-                                                                                          entry.size
-                                                                                      )
-                                                                                  )}
+                                                                        <div
+                                                                            className="w-24 shrink-0 px-2 text-muted-foreground"
+                                                                            title={sizeTitle(entry)}
+                                                                        >
+                                                                            {sizeLabel(entry)}
                                                                         </div>
                                                                         <div className="flex w-12 shrink-0 justify-end px-2">
                                                                             <Button
@@ -2090,19 +2222,40 @@ export function FilesView({
                         <ContextMenuItem onSelect={onNewFolder}>
                             <FolderPlus className="size-4" />
                             New folder
+                            <span className="ml-auto pl-6 text-xs text-muted-foreground">
+                                {SHORTCUT_HINTS["new-folder"]}
+                            </span>
                         </ContextMenuItem>
                         <ContextMenuItem onSelect={onNewFile}>
                             <FilePlus className="size-4" />
                             New file
+                            <span className="ml-auto pl-6 text-xs text-muted-foreground">
+                                {SHORTCUT_HINTS["new-file"]}
+                            </span>
                         </ContextMenuItem>
                         <ContextMenuSeparator />
                         <ContextMenuItem onSelect={() => fileInput.current?.click()}>
                             <Upload className="size-4" />
                             Upload files
+                            <span className="ml-auto pl-6 text-xs text-muted-foreground">
+                                {SHORTCUT_HINTS["upload-files"]}
+                            </span>
                         </ContextMenuItem>
                         <ContextMenuItem onSelect={() => void pickFolder()}>
                             <FolderUp className="size-4" />
                             Upload folder
+                            <span className="ml-auto pl-6 text-xs text-muted-foreground">
+                                {SHORTCUT_HINTS["upload-folder"]}
+                            </span>
+                        </ContextMenuItem>
+                        <ContextMenuItem
+                            onSelect={() => onRequestFiles(path, path.split("/").pop() ?? "")}
+                        >
+                            <Inbox className="size-4" />
+                            Request files here
+                            <span className="ml-auto pl-6 text-xs text-muted-foreground">
+                                {SHORTCUT_HINTS["request-files"]}
+                            </span>
                         </ContextMenuItem>
                         {clipboard ? (
                             <ContextMenuItem onSelect={paste}>
@@ -2120,6 +2273,12 @@ export function FilesView({
                         <span className="break-all text-sm font-medium">
                             {selectedEntries[0].name}
                         </span>
+                        {insights.locked.has(selectedEntries[0].path) ? (
+                            <span className="flex items-center gap-1 text-xs text-amber-400">
+                                <KeyRound className="size-3" />
+                                Password-protected
+                            </span>
+                        ) : null}
                     </div>
                     <dl className="flex flex-col gap-2 text-xs">
                         <div className="flex justify-between gap-2">
@@ -2134,10 +2293,8 @@ export function FilesView({
                         </div>
                         <div className="flex justify-between gap-2">
                             <dt className="text-muted-foreground">Size</dt>
-                            <dd className="text-right">
-                                {selectedEntries[0].kind === "dir"
-                                    ? "-"
-                                    : formatBytes(BigInt(selectedEntries[0].size))}
+                            <dd className="text-right" title={sizeTitle(selectedEntries[0])}>
+                                {sizeLabel(selectedEntries[0])}
                             </dd>
                         </div>
                         <div className="flex justify-between gap-2">
@@ -2461,9 +2618,9 @@ export function FilesView({
                                 /{detailsTarget.path.split("/").slice(0, -1).join("/")}
                             </dd>
                             <dt className="text-muted-foreground">Size</dt>
-                            <dd>
+                            <dd title={sizeTitle(detailsTarget)}>
                                 {detailsTarget.kind === "dir"
-                                    ? "-"
+                                    ? sizeLabel(detailsTarget)
                                     : `${formatBytes(BigInt(detailsTarget.size))} (${Number(detailsTarget.size).toLocaleString()} bytes)`}
                             </dd>
                             <dt className="text-muted-foreground">Modified</dt>
@@ -2533,17 +2690,24 @@ export function FilesView({
                                 : "item"}
                         </DialogTitle>
                         <DialogDescription>
-                            Destination folder (relative to the connection root; empty means the
-                            root).
+                            Pick the destination folder, or type its path.
                         </DialogDescription>
                     </DialogHeader>
                     <form onSubmit={submitMove} className="flex flex-col gap-3">
+                        <FolderTree
+                            connectionId={connectionId}
+                            value={normalizedMoveDest}
+                            onChange={setMoveDest}
+                            className="max-h-72"
+                        />
                         <Input
-                            autoFocus
                             value={moveDest}
                             onChange={(event) => setMoveDest(event.target.value)}
                             placeholder="e.g. Documents/Archive"
                         />
+                        {moveError ? (
+                            <p className="text-xs text-muted-foreground">{moveError}</p>
+                        ) : null}
                         <div className="flex justify-end gap-2">
                             <Button
                                 type="button"
@@ -2552,7 +2716,9 @@ export function FilesView({
                             >
                                 Cancel
                             </Button>
-                            <Button type="submit">Move</Button>
+                            <Button type="submit" disabled={moveError !== null}>
+                                Move
+                            </Button>
                         </div>
                     </form>
                 </DialogContent>
@@ -2561,15 +2727,13 @@ export function FilesView({
     );
 }
 
-/** The icon for an entry - a user-set custom icon/color, or the default by kind. */
+/** The icon for an entry: a user-set one, else the folder mark or the file type's. */
 function EntryIcon({ entry, className = "size-4" }: { entry: DriveEntry; className?: string }) {
     const Custom = iconComponent(entry.icon);
     if (Custom) return <Custom className={cn(className, iconColorClass(entry.iconColor))} />;
-    return entry.kind === "dir" ? (
-        <Folder className={cn(className, "text-primary")} />
-    ) : (
-        <File className={cn(className, "text-muted-foreground")} />
-    );
+    if (entry.kind === "dir") return <Folder className={cn(className, "text-primary")} />;
+    const { icon: Icon, className: color } = fileIconFor(entry.name);
+    return <Icon className={cn(className, color)} />;
 }
 
 interface UploadItem {

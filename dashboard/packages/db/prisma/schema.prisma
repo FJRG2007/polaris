@@ -453,6 +453,7 @@ model StorageConnection {
     fileRequests FileRequest[]
     uploads      UploadSession[]
     itemMeta     DriveItemMeta[]
+    folderSizes  DriveFolderSize[]
     trashItems   TrashItem[]
     acls         DriveAcl[]
     locks        AccessLock[]
@@ -530,6 +531,26 @@ model DriveItemMeta {
 
     @@unique([connectionId, path])
     @@index([ownerId])
+}
+
+// Measured size of everything under a folder. This is a derived measurement, not
+// a mirror of the tree: walking a remote folder is expensive, so the result is
+// kept with the time it was taken and reused until it ages out or Polaris itself
+// writes under (or above) the path. `partial` marks a walk that hit its budget,
+// making `bytes` a lower bound rather than the exact total.
+model DriveFolderSize {
+    id           String   @id @default(uuid(7)) @db.Uuid
+    connectionId String   @db.Uuid
+    path         String
+    bytes        BigInt   @default(0)
+    files        Int      @default(0)
+    folders      Int      @default(0)
+    partial      Boolean  @default(false)
+    computedAt   DateTime @default(now())
+
+    connection StorageConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+
+    @@unique([connectionId, path])
 }
 
 model DockerConnection {

@@ -41,6 +41,7 @@ import {
     listArchiveEntries,
     type ArchiveEntry
 } from "@/lib/drive-archive-read";
+import { invalidateFolderSizes } from "@/lib/drive-folder-size";
 import {
     moveItemMeta,
     recordItemCreator,
@@ -248,6 +249,7 @@ export async function mkdirAction(
         await driver.dispose();
     }
     await recordItemCreator(connectionId, target, user.id);
+    await invalidateFolderSizes(connectionId, target);
     await recordAudit({
         actorId: user.id,
         action: "drive.mkdir",
@@ -290,6 +292,7 @@ export async function createFileAction(
         await driver.dispose();
     }
     await recordItemCreator(connectionId, target, user.id);
+    await invalidateFolderSizes(connectionId, target);
     await recordAudit({
         actorId: user.id,
         action: "drive.create",
@@ -309,6 +312,7 @@ export async function deleteEntryAction(connectionId: string, path: string): Pro
     } finally {
         await driver.dispose();
     }
+    await invalidateFolderSizes(connectionId, normalizeRelPath(path));
     await recordAudit({
         actorId: user.id,
         action: "drive.delete",
@@ -375,6 +379,7 @@ export async function generateZipAction(
         await driver.dispose();
     }
 
+    await invalidateFolderSizes(connectionId, destPath);
     await recordAudit({
         actorId: user.id,
         action: "drive.zip.create",
@@ -449,6 +454,7 @@ export async function extractArchiveAction(
     } finally {
         await driver.dispose();
     }
+    await invalidateFolderSizes(connectionId, dest);
     await recordAudit({
         actorId: user.id,
         action: "drive.archive.extract",
@@ -493,6 +499,7 @@ export async function emptyFolderAction(
             await moveToTrash(user.id, connectionId, child);
         }
     }
+    await invalidateFolderSizes(connectionId, normalizeRelPath(path));
     await recordAudit({
         actorId: user.id,
         action: "drive.empty",
@@ -638,6 +645,9 @@ export async function renameAction(
     }
     // Keep any custom icon / hidden flag attached to the item after it moves.
     await moveItemMeta(connectionId, normalizedFrom, normalizedTo);
+    // Both ends change weight: the folder it left and the one it landed in.
+    await invalidateFolderSizes(connectionId, normalizedFrom);
+    await invalidateFolderSizes(connectionId, normalizedTo);
     await recordAudit({
         actorId: user.id,
         action: "drive.move",
@@ -782,6 +792,7 @@ export async function copyAction(
         await driver.dispose();
     }
     await recordItemCreator(connectionId, destination, user.id);
+    await invalidateFolderSizes(connectionId, destination);
     await recordAudit({
         actorId: user.id,
         action: "drive.copy",

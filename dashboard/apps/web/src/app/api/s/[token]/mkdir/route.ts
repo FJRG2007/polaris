@@ -7,6 +7,7 @@
 
 import { normalizeRelPath } from "@polaris/core";
 import { getDriverForConnection } from "@/lib/storage-service";
+import { invalidateFolderSizes } from "@/lib/drive-folder-size";
 import { logShareAccess, resolveWithinShare } from "@/lib/share-service";
 import { gateShareRequest } from "@/lib/share-access";
 
@@ -48,6 +49,7 @@ export async function POST(
     const driver = await getDriverForConnection(share.connectionId);
     try {
         await driver.mkdir(target);
+        await invalidateFolderSizes(share.connectionId, target);
         void logShareAccess({ shareId: share.id, action: "mkdir", ip, ipHash, userAgentHash });
         return Response.json({ ok: true });
     } catch (error) {

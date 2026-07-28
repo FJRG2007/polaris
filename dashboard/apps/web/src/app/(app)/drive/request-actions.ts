@@ -18,6 +18,7 @@ import type { StorageDriver } from "@polaris/storage";
 import { requirePermission } from "@/lib/session";
 import { authorizeDrive, DriveAccessError, DriveLockedError } from "@/lib/drive-authz";
 import { getDriverForConnection, SmbShareRequiredError } from "@/lib/storage-service";
+import { invalidateFolderSizes } from "@/lib/drive-folder-size";
 import {
     createFileRequest,
     createTemplate,
@@ -93,6 +94,7 @@ async function prepareDropPointFolder(
         }
         const finalPath = normalizeRelPath(`${base}/${name}`);
         await driver.mkdir(finalPath);
+        await invalidateFolderSizes(connectionId, finalPath);
         return finalPath;
     } finally {
         await driver.dispose();

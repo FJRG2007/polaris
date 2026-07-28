@@ -17,6 +17,7 @@ import { extensionOf } from "@/app/(app)/drive/file-categories";
 import { getSession } from "@/lib/session";
 import { getDriverForConnection } from "@/lib/storage-service";
 import { recordItemCreator } from "@/lib/drive-meta-service";
+import { invalidateFolderSizes } from "@/lib/drive-folder-size";
 import {
     bumpVisitUpload,
     countSubmissions,
@@ -179,6 +180,7 @@ export async function PUT(
             destination,
             userId ?? fileRequest.ownerId
         );
+        await invalidateFolderSizes(fileRequest.destinationConnectionId, destination);
 
         // Security scan (VirusTotal, when enabled). Runs before acknowledging the
         // upload so the configured action - block by default - can be enforced on a
