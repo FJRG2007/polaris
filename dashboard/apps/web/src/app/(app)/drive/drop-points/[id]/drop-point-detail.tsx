@@ -41,6 +41,7 @@ import {
 } from "@polaris/ui";
 import { GeoPicker } from "@/components/geo-picker";
 import { useConfirm } from "@/components/confirm-dialog";
+import { useFormChanged } from "@/lib/use-form-changed";
 import { RequestDialog } from "../../request-dialog";
 import {
     deleteSubmissionAction,
@@ -669,6 +670,16 @@ function EditDropPointDialog({
     const [error, setError] = useState<string | null>(null);
     const [geoCountries, setGeoCountries] = useState<string[]>(config.allowedCountries);
     const [geoContinents, setGeoContinents] = useState<string[]>(config.allowedContinents);
+    const { formProps, changed: fieldsChanged } = useFormChanged();
+
+    // The locations live outside the form, so they are compared separately;
+    // together they decide whether there is anything to save at all.
+    const sameList = (a: string[], b: string[]) =>
+        a.length === b.length && [...a].sort().join() === [...b].sort().join();
+    const changed =
+        fieldsChanged ||
+        !sameList(geoCountries, config.allowedCountries) ||
+        !sameList(geoContinents, config.allowedContinents);
 
     async function onSubmit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
@@ -738,7 +749,7 @@ function EditDropPointDialog({
                         {config.destinationPath || config.connectionName}&quot;.
                     </DialogDescription>
                 </DialogHeader>
-                <form onSubmit={onSubmit} className="flex flex-col gap-3">
+                <form onSubmit={onSubmit} className="flex flex-col gap-3" {...formProps}>
                     <label className="flex flex-col gap-1 text-sm">
                         Title
                         <Input
@@ -924,7 +935,7 @@ function EditDropPointDialog({
                     </label>
                     {error ? <p className="text-sm text-danger">{error}</p> : null}
                     <div className="flex justify-end">
-                        <Button type="submit" disabled={pending}>
+                        <Button type="submit" disabled={pending || !changed}>
                             {pending ? "Saving..." : "Save changes"}
                         </Button>
                     </div>

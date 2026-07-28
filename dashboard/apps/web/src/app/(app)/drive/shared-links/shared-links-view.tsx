@@ -31,6 +31,7 @@ import {
     type ShareLogRow
 } from "../share-actions";
 import { useConfirm } from "@/components/confirm-dialog";
+import { useFormChanged } from "@/lib/use-form-changed";
 
 export interface ShareRow {
     id: string;
@@ -233,6 +234,7 @@ function EditShareDialog({
 }) {
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const { formProps, changed } = useFormChanged();
 
     async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
         event.preventDefault();
@@ -288,7 +290,7 @@ function EditShareDialog({
                     <DialogDescription className="truncate">{share?.path || "(root)"}</DialogDescription>
                 </DialogHeader>
                 {share ? (
-                    <form onSubmit={onSubmit} className="flex flex-col gap-3">
+                    <form onSubmit={onSubmit} className="flex flex-col gap-3" {...formProps}>
                         <label className="flex flex-col gap-1 text-sm">
                             Password
                             <Input name="password" type="password" placeholder="Leave blank to keep" autoComplete="off" />
@@ -384,7 +386,7 @@ function EditShareDialog({
                         </div>
                         {error ? <p className="text-sm text-danger">{error}</p> : null}
                         <div className="flex justify-end">
-                            <Button type="submit" disabled={pending}>
+                            <Button type="submit" disabled={pending || !changed}>
                                 {pending ? "Saving..." : "Save changes"}
                             </Button>
                         </div>

@@ -29,6 +29,7 @@ import {
 import {
     AccessRulesEditor,
     accessRulesAreEmpty,
+    accessRulesEqual,
     EMPTY_ACCESS_RULES,
     type AccessRulesValue
 } from "@/components/access-rules-editor";
@@ -262,7 +263,7 @@ function SignInRulesDialog({
                         <Button variant="ghost" onClick={() => onOpenChange(false)}>
                             Cancel
                         </Button>
-                        <Button onClick={() => void save()} disabled={busy}>
+                        <Button onClick={() => void save()} disabled={busy || accessRulesEqual(value, initial)}>
                             {busy ? "Saving..." : "Save"}
                         </Button>
                     </div>
@@ -297,6 +298,18 @@ function GroupDialog({
     );
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
+
+    /** Editing an existing group only offers Save once something actually differs. */
+    const unchanged =
+        group !== null &&
+        name.trim() === group.name &&
+        description.trim() === (group.description ?? "") &&
+        accessRulesEqual(value, {
+            groupIds: [],
+            allowedCidrs: group.allowedCidrs,
+            allowedCountries: group.allowedCountries,
+            allowedContinents: group.allowedContinents
+        });
 
     async function save() {
         setBusy(true);
@@ -353,7 +366,7 @@ function GroupDialog({
                         <Button variant="ghost" onClick={() => onOpenChange(false)}>
                             Cancel
                         </Button>
-                        <Button onClick={() => void save()} disabled={busy || name.trim() === ""}>
+                        <Button onClick={() => void save()} disabled={busy || name.trim() === "" || unchanged}>
                             {busy ? "Saving..." : group ? "Save changes" : "Create group"}
                         </Button>
                     </div>

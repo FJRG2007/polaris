@@ -53,6 +53,16 @@ const TEMPLATE = JSON.stringify(
 );
 
 /** One-line summary of a document's statements, tolerant of malformed JSON. */
+/** The editor works on indented JSON, so the stored document is compared in the
+ *  same shape - reindenting is not what tells us the policy changed. */
+function pretty(document: string): string {
+    try {
+        return JSON.stringify(JSON.parse(document), null, 2);
+    } catch {
+        return document;
+    }
+}
+
 function summarize(document: string): string {
     try {
         const parsed = JSON.parse(document) as {
@@ -181,15 +191,15 @@ function PolicyCard({
     const [open, setOpen] = useState(false);
     const [name, setName] = useState(policy.name);
     const [description, setDescription] = useState(policy.description ?? "");
-    const [document, setDocument] = useState(() => {
-        try {
-            return JSON.stringify(JSON.parse(policy.document), null, 2);
-        } catch {
-            return policy.document;
-        }
-    });
+    const [document, setDocument] = useState(() => pretty(policy.document));
     const [attach, setAttach] = useState("");
     const [error, setError] = useState<string | null>(null);
+
+    /** Nothing to save while the editor still holds the stored policy. */
+    const unchanged =
+        name.trim() === policy.name &&
+        description.trim() === (policy.description ?? "") &&
+        document === pretty(policy.document);
 
     function onSave() {
         setError(null);
@@ -332,7 +342,7 @@ function PolicyCard({
                                 />
                                 {error ? <p className="text-sm text-danger">{error}</p> : null}
                                 <div>
-                                    <Button size="sm" disabled={disabled} onClick={onSave}>
+                                    <Button size="sm" disabled={disabled || unchanged} onClick={onSave}>
                                         Save changes
                                     </Button>
                                 </div>

@@ -131,12 +131,22 @@ export function VolumeForm({
 
     const needsService = !editing && !applicationId && (services?.length ?? 0) > 0;
     const usesCustomPath = editing || pathMode === "custom";
+    // Editing a volume back to the values it already has is not a save.
+    const unchanged =
+        volume !== undefined &&
+        kind === volume.kind &&
+        name.trim() === volume.name &&
+        mountPath.trim() === volume.mountPath &&
+        sizeLimit.trim() === (volume.sizeLimit ?? "") &&
+        source.trim() === (volume.source ?? "") &&
+        connectionId === (volume.connectionId ?? "");
     const canSave =
         (applicationId || serviceId) &&
         name.trim() &&
         mountPath.trim() &&
         (kind !== "nas" || connectionId) &&
-        (kind === "volume" || !usesCustomPath || source.trim());
+        (kind === "volume" || !usesCustomPath || source.trim()) &&
+        !unchanged;
 
     return (
         <div className="flex flex-col gap-3">

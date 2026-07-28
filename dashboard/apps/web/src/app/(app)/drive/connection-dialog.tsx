@@ -25,6 +25,7 @@ import {
     DialogTrigger,
     Input
 } from "@polaris/ui";
+import { useFormChanged } from "@/lib/use-form-changed";
 import {
     createConnectionAction,
     detectNasAction,
@@ -188,6 +189,7 @@ export function EditConnectionDialog({
     const router = useRouter();
     const [error, setError] = useState<string | null>(null);
     const [pending, setPending] = useState(false);
+    const { formProps, changed } = useFormChanged();
 
     if (!connection) return null;
     const kind = connection.kind;
@@ -252,7 +254,7 @@ export function EditConnectionDialog({
                         </span>
                     </div>
                 ) : null}
-                <form key={connection.id} onSubmit={onSubmit} className="flex flex-col gap-3">
+                <form key={connection.id} onSubmit={onSubmit} className="flex flex-col gap-3" {...formProps}>
                     <label className="flex flex-col gap-1 text-sm">
                         Name
                         <Input name="name" required defaultValue={connection.name} />
@@ -305,7 +307,7 @@ export function EditConnectionDialog({
                                 Cancel
                             </Button>
                         </DialogClose>
-                        <Button type="submit" disabled={pending}>
+                        <Button type="submit" disabled={pending || !changed}>
                             {pending ? "Saving..." : "Save changes"}
                         </Button>
                     </div>

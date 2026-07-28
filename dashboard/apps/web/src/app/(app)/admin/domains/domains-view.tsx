@@ -41,6 +41,14 @@ export function DomainsView({
     // (exposure mode, wildcard domain, DuckDNS) instead of showing stale values.
     const [setupNonce, setSetupNonce] = useState(0);
 
+    /** Nothing to save until a field differs from what is stored. A token is only
+     *  ever typed, never read back, so any entry counts as a change. */
+    const changed =
+        appDomain.trim() !== config.appDomain ||
+        sharingDomain.trim() !== config.sharingDomain ||
+        duckSub.trim() !== config.duckdnsSubdomain ||
+        duckToken !== "";
+
     async function onSave() {
         setSaving(true);
         setSaved(false);
@@ -186,7 +194,7 @@ export function DomainsView({
 
             <div className="flex items-center justify-end gap-3">
                 {saved ? <span className="text-sm text-success">Saved.</span> : null}
-                <Button onClick={onSave} disabled={saving}>
+                <Button onClick={onSave} disabled={saving || !changed}>
                     {saving ? "Saving..." : "Save"}
                 </Button>
             </div>
