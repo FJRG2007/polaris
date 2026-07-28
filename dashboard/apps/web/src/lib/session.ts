@@ -8,9 +8,9 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { userHasPermission } from "@polaris/auth";
-import { prisma } from "@polaris/db";
 import type { Permission } from "@polaris/core";
 import { auth } from "@/lib/auth";
+import { guardSession } from "@/lib/session-guard";
 
 export interface SessionUser {
     id: string;
@@ -18,6 +18,8 @@ export interface SessionUser {
     name: string;
     image?: string | null;
     isAdmin: boolean;
+    /** The session this request arrived on, so a user can manage their own. */
+    sessionId: string;
 }
 
 /**
@@ -35,16 +37,40 @@ export async function getSession() {
     }
 }
 
-/** Resolve the current user or redirect to sign-in. A banned account is treated
- *  as signed out, so a ban takes effect on the banned user's next request. */
+/**
+ * Resolve the current user or redirect. Beyond "is there a session", this is
+ * where every account-security control is enforced: a ban, an expired or refused
+ * session, a sign-in still waiting for approval, and the inactivity lock all end
+ * here as a redirect (see session-guard). The screens that resolve those states
+ * use resolveSession() instead, or they would redirect to themselves.
+ */
 export async function requireUser(): Promise<SessionUser> {
+    const resolved = await resolveSession();
+    if (!resolved) redirect("/oauth/login");
+    const verdict = await guardSession({
+        userId: resolved.id,
+        sessionId: resolved.sessionId,
+        sessionCreatedAt: resolved.sessionCreatedAt
+    });
+    if (!verdict.ok) redirect(verdict.redirect);
+    return resolved;
+}
+
+/** The signed-in user with no security gate applied, or null. Only the screens
+ *  that exist to clear a gate (lock, pending approval) may use this. */
+export async function resolveSession(): Promise<(SessionUser & { sessionCreatedAt: Date }) | null> {
     const session = await getSession();
-    if (!session?.user) redirect("/oauth/login");
+    if (!session?.user || !session.session) return null;
     const user = session.user as { id: string; email: string; name: string; image?: string | null };
-    const record = await prisma.user.findUnique({ where: { id: user.id }, select: { bannedAt: true } });
-    if (record?.bannedAt) redirect("/oauth/login?banned=1");
-    const isAdmin = (session.user as { isAdmin?: boolean }).isAdmin === true;
-    return { id: user.id, email: user.email, name: user.name, image: user.image, isAdmin };
+    return {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        image: user.image,
+        isAdmin: (session.user as { isAdmin?: boolean }).isAdmin === true,
+        sessionId: session.session.id,
+        sessionCreatedAt: new Date(session.session.createdAt)
+    };
 }
 
 /** Require a specific permission; redirect to the drive with a denial flag if missing. */

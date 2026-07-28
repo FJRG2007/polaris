@@ -9,7 +9,13 @@ import { POLARIS_APPS, resolveActiveApp } from "@/lib/apps";
 
 export function AppNav({ isAdmin = false }: { isAdmin?: boolean }) {
     const pathname = usePathname();
-    const apps = POLARIS_APPS.filter((app) => !app.adminOnly || isAdmin);
+    const apps = POLARIS_APPS.filter((app) => !app.hidden && (!app.adminOnly || isAdmin));
     const current = resolveActiveApp(pathname);
-    return <AppSwitcher apps={apps} currentAppId={current.id} />;
+    return (
+        <AppSwitcher
+            apps={apps}
+            currentAppId={current.id}
+            currentApp={current.hidden ? current : undefined}
+        />
+    );
 }

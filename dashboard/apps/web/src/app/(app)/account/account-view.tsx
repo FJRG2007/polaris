@@ -1,15 +1,16 @@
 "use client";
 
 /**
- * Account self-service view: three independent forms (profile, email, password),
- * each with its own busy/result state so saving one never disturbs the others.
- * Every change is re-authorized server-side; this view only reflects the result.
+ * Profile self-service view: two independent forms (profile, email), each with
+ * its own busy/result state so saving one never disturbs the other. Credentials
+ * live under Account > Security. Every change is re-authorized server-side; this
+ * view only reflects the result.
  */
 
 import { useState, type FormEvent, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardBody, Button, Input } from "@polaris/ui";
-import { changeEmailAction, changePasswordAction, updateProfileAction } from "./actions";
+import { changeEmailAction, updateProfileAction } from "./actions";
 
 type Result = { ok?: string; error?: string } | null;
 
@@ -41,8 +42,6 @@ export function AccountView({ name, email, username }: { name: string; email: st
     const [profileResult, setProfileResult] = useState<Result>(null);
     const [emailBusy, setEmailBusy] = useState(false);
     const [emailResult, setEmailResult] = useState<Result>(null);
-    const [pwBusy, setPwBusy] = useState(false);
-    const [pwResult, setPwResult] = useState<Result>(null);
 
     async function onProfile(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
@@ -73,22 +72,6 @@ export function AccountView({ name, email, username }: { name: string; email: st
             (event.target as HTMLFormElement).reset();
             router.refresh();
         }
-    }
-
-    async function onPassword(event: FormEvent<HTMLFormElement>) {
-        event.preventDefault();
-        const form = new FormData(event.currentTarget);
-        const next = String(form.get("newPassword") ?? "");
-        if (next !== String(form.get("confirmPassword") ?? "")) {
-            setPwResult({ error: "The new passwords do not match." });
-            return;
-        }
-        setPwBusy(true);
-        setPwResult(null);
-        const result = await changePasswordAction(String(form.get("currentPassword") ?? ""), next);
-        setPwBusy(false);
-        setPwResult(result.error ? result : { ok: "Password changed." });
-        if (!result.error) (event.target as HTMLFormElement).reset();
     }
 
     return (
@@ -129,31 +112,6 @@ export function AccountView({ name, email, username }: { name: string; email: st
                         <Feedback result={emailResult} />
                         <Button type="submit" disabled={emailBusy} className="ml-auto">
                             {emailBusy ? "Updating..." : "Update email"}
-                        </Button>
-                    </div>
-                </form>
-            </Section>
-
-            <Section title="Password" description="Use at least 10 characters.">
-                <form onSubmit={onPassword} className="flex flex-col gap-3">
-                    <label className="flex flex-col gap-1 text-sm">
-                        Current password
-                        <Input name="currentPassword" type="password" required autoComplete="current-password" />
-                    </label>
-                    <div className="grid gap-3 sm:grid-cols-2">
-                        <label className="flex flex-col gap-1 text-sm">
-                            New password
-                            <Input name="newPassword" type="password" required autoComplete="new-password" />
-                        </label>
-                        <label className="flex flex-col gap-1 text-sm">
-                            Confirm new password
-                            <Input name="confirmPassword" type="password" required autoComplete="new-password" />
-                        </label>
-                    </div>
-                    <div className="flex items-center justify-between gap-2">
-                        <Feedback result={pwResult} />
-                        <Button type="submit" disabled={pwBusy} className="ml-auto">
-                            {pwBusy ? "Changing..." : "Change password"}
                         </Button>
                     </div>
                 </form>

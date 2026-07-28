@@ -20,9 +20,12 @@ import {
     FolderOpen,
     Globe,
     Inbox,
+    KeyRound,
     LayoutDashboard,
     Link2,
     MessagesSquare,
+    MonitorSmartphone,
+    Network,
     Radio,
     Rocket,
     ScrollText,
@@ -32,6 +35,7 @@ import {
     Star,
     Store,
     Trash2,
+    UserCog,
     Users,
     UsersRound,
     type LucideIcon
@@ -69,6 +73,13 @@ const APP_SIDEBARS: Record<string, SidebarItem[]> = {
         { label: "Channels", href: "/inbox/channels", icon: Radio },
         { label: "Logs", href: "/inbox/logs", icon: ScrollText }
     ],
+    account: [
+        { label: "Profile", href: "/account", icon: UserCog },
+        { label: "Security", href: "/account/security", icon: ShieldCheck },
+        { label: "Sessions", href: "/account/sessions", icon: MonitorSmartphone },
+        { label: "Access rules", href: "/account/access", icon: Network },
+        { label: "API keys", href: "/account/api-keys", icon: KeyRound }
+    ],
     admin: [
         { label: "Overview", href: "/admin", icon: LayoutDashboard },
         { label: "Users", href: "/admin/users", icon: Users },
@@ -83,7 +94,7 @@ const APP_SIDEBARS: Record<string, SidebarItem[]> = {
 
 /** Section roots that must match their own path exactly, so they do not stay
  *  highlighted while a sibling sub-route is open. */
-const EXACT_MATCH = new Set(["/drive", "/admin", "/inbox"]);
+const EXACT_MATCH = new Set(["/drive", "/admin", "/inbox", "/account"]);
 
 export function AppSidebar() {
     const pathname = usePathname();

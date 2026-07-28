@@ -11,6 +11,7 @@ import {
     LayoutGrid,
     MessagesSquare,
     SlidersHorizontal,
+    UserCog,
     type LucideIcon
 } from "lucide-react";
 
@@ -23,6 +24,9 @@ export interface AppEntry {
     locked?: boolean;
     /** Only visible to administrators (filtered out of the switcher otherwise). */
     adminOnly?: boolean;
+    /** Kept out of the switcher list: a personal section reached from the account
+     *  menu, which still owns its paths so the rail and the header follow it. */
+    hidden?: boolean;
     /** Extra path prefixes this app owns beyond `href`, so routes that live
      *  outside the app's own subtree (e.g. legacy top-level admin pages) still
      *  resolve to it for the switcher highlight and the sidebar. */
@@ -73,6 +77,15 @@ export const POLARIS_APPS: AppEntry[] = [
         // Admin pages that historically live at the top level, so they still
         // resolve to the Management app in the switcher and sidebar.
         match: ["/integrations", "/settings"]
+    },
+    {
+        id: "account",
+        label: "My account",
+        description: "Profile, security & API keys",
+        icon: UserCog,
+        href: "/account",
+        // Reached from the account menu, not the switcher.
+        hidden: true
     }
 ];
 

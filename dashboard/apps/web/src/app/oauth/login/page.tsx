@@ -20,17 +20,38 @@ function postLoginTarget(): string {
     return redirect && redirect.startsWith("/") && !redirect.startsWith("//") ? redirect : "/drive";
 }
 
+/** Why the previous session ended, when it ended for a reason worth explaining.
+ *  Deliberately vague about network rules: the page is public, so it says the
+ *  access was refused without describing the rule that refused it. */
+const SESSION_NOTICES: Readonly<Record<string, string>> = {
+    banned: "That account has been suspended.",
+    expired: "Your session reached its time limit. Sign in again.",
+    blocked: "Sign-in is not allowed from this location.",
+    denied: "That sign-in was denied from another device."
+};
+
+function sessionNotice(): string | null {
+    const params = new URLSearchParams(window.location.search);
+    for (const [key, message] of Object.entries(SESSION_NOTICES)) {
+        if (params.get(key) === "1") return message;
+    }
+    return null;
+}
+
 export default function LoginPage() {
     const router = useRouter();
     const form = useZodForm(loginSchema);
     const [values, setValues] = useState({ identifier: "", password: "" });
     const [error, setError] = useState<string | null>(null);
+    const [notice, setNotice] = useState<string | null>(null);
     const [pending, setPending] = useState(false);
 
-    // Prefill the identifier with the one used last on this device.
+    // Prefill the identifier with the one used last on this device, and explain
+    // why the last session ended if it ended for a reason.
     useEffect(() => {
         const remembered = window.localStorage.getItem(LAST_IDENTIFIER_KEY);
         if (remembered) setValues((prev) => ({ ...prev, identifier: remembered }));
+        setNotice(sessionNotice());
     }, []);
 
     function update(field: "identifier" | "password", value: string) {
@@ -52,13 +73,19 @@ export default function LoginPage() {
             setError(GENERIC_ERROR);
             return;
         }
-        const { error: signInError } = await signIn.email({ email, password: parsed.password });
+        const { data, error: signInError } = await signIn.email({ email, password: parsed.password });
         setPending(false);
         if (signInError) {
             setError(GENERIC_ERROR);
             return;
         }
         window.localStorage.setItem(LAST_IDENTIFIER_KEY, parsed.identifier);
+        // With a second factor armed, the password alone issues no session: the
+        // challenge page completes the sign-in. Carry the destination across.
+        if ((data as { twoFactorRedirect?: boolean } | null)?.twoFactorRedirect) {
+            router.push(`/oauth/2fa?redirect=${encodeURIComponent(postLoginTarget())}`);
+            return;
+        }
         router.push(postLoginTarget());
         router.refresh();
     }
@@ -71,6 +98,11 @@ export default function LoginPage() {
                     <CardTitle>Sign in to Polaris</CardTitle>
                 </CardHeader>
                 <CardBody>
+                    {notice ? (
+                        <p className="mb-3 rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+                            {notice}
+                        </p>
+                    ) : null}
                     <form onSubmit={onSubmit} noValidate className="flex flex-col gap-3">
                         <div className="flex flex-col gap-1">
                             <Input

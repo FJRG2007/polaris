@@ -1,7 +1,8 @@
 /**
- * "My account" page (/account): lets the signed-in user manage their own profile
- * (name, username), email, and password. Server component that loads the current
- * user's editable fields and hands them to the client view.
+ * Profile page (/account): the signed-in user's own name, username, and email.
+ * Credentials, sessions, network rules, and API keys each have their own page
+ * under the same section. Server component that loads the editable fields and
+ * hands them to the client view.
  */
 
 import { prisma } from "@polaris/db";
@@ -20,8 +21,8 @@ export default async function AccountPage() {
     return (
         <div className="mx-auto flex max-w-2xl flex-col gap-4">
             <div>
-                <h1 className="text-lg font-semibold">My account</h1>
-                <p className="text-sm text-muted-foreground">Update your profile, email, and password.</p>
+                <h1 className="text-lg font-semibold">Profile</h1>
+                <p className="text-sm text-muted-foreground">How you appear in Polaris, and how you sign in.</p>
             </div>
             <AccountView
                 name={user?.name ?? session.name}

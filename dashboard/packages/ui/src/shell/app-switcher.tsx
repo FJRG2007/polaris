@@ -31,12 +31,17 @@ export interface PolarisApp {
 
 export function AppSwitcher({
     apps,
-    currentAppId
+    currentAppId,
+    currentApp
 }: {
     apps: readonly PolarisApp[];
     currentAppId: string;
+    /** The active section when it is not one of the listed apps (personal
+     *  account pages, for one), so the trigger names where the user actually is
+     *  instead of falling back to the first app. */
+    currentApp?: PolarisApp;
 }) {
-    const current = apps.find((app) => app.id === currentAppId) ?? apps[0];
+    const current = currentApp ?? apps.find((app) => app.id === currentAppId) ?? apps[0];
     if (!current) return null;
     const CurrentIcon = current.icon;
     return (
