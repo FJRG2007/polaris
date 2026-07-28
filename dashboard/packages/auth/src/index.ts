@@ -27,6 +27,42 @@ export {
     type GroupMemberInfo
 } from "./groups.js";
 export {
+    getUserSecurity,
+    updateSessionLimits,
+    setLoginApprovalRequired,
+    setQuickPin,
+    clearQuickPin,
+    verifyQuickPin,
+    verifyAccountPassword,
+    listSecurityQuestions,
+    setSecurityQuestions,
+    clearSecurityQuestions,
+    verifySecurityAnswers,
+    resetUserPassword,
+    updateSignInRules,
+    type UserSecuritySettings
+} from "./security.js";
+export { verifyTotpForSession, twoFactorEnabled } from "./two-factor.js";
+export {
+    listAccessGroups,
+    createAccessGroup,
+    updateAccessGroup,
+    deleteAccessGroup,
+    resolveSignInRules,
+    type AccessGroupView
+} from "./access-groups.js";
+export {
+    createApiKey,
+    listApiKeys,
+    revokeApiKey,
+    deleteApiKey,
+    verifyApiKey,
+    touchApiKey,
+    scopesAvailableTo,
+    type ApiKeyView,
+    type VerifiedApiKey
+} from "./api-keys.js";
+export {
     createPolicy,
     updatePolicy,
     deletePolicy,

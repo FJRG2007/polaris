@@ -39,6 +39,9 @@ model User {
     username      String?  @unique
     emailVerified Boolean  @default(false)
     image         String?
+    // Owned by the better-auth two-factor plugin; flipped on once the user has
+    // verified their authenticator, and back off when they disable it.
+    twoFactorEnabled Boolean @default(false)
     // Second gate for admin-only routes, independent of role permissions.
     isAdmin       Boolean  @default(false)
     // When set, the account is banned: sign-in is refused and sessions are void.
@@ -66,6 +69,13 @@ model User {
     deployTargets     DeployTarget[]
     projects          Project[]
     deployTickets     DeployTicket[]
+    security            UserSecurity?
+    securityQuestions   SecurityQuestion[]
+    accessGroups        AccessGroup[]
+    accessGroupBindings UserAccessGroup[]
+    apiKeys             ApiKey[]
+    twoFactors          TwoFactor[]
+    sessionStates       SessionState[]
 }
 
 model Session {
@@ -78,7 +88,8 @@ model Session {
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
 
-    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+    user  User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+    state SessionState?
 
     @@index([userId])
 }
@@ -149,6 +160,177 @@ model Invite {
     invitedBy User @relation("InviteInviter", fields: [invitedById], references: [id], onDelete: Cascade)
 
     @@index([email])
+}
+
+// ---------------------------------------------------------------------------
+// Account security
+//
+// Everything a user configures about their own account's protection. The rows
+// here are per-user, self-service, and never contain a recoverable secret: the
+// PIN and the security-question answers go through the same slow hasher as
+// passwords, and an API key is only ever stored as the SHA-256 of the issued
+// secret.
+// ---------------------------------------------------------------------------
+
+// Owned by the better-auth two-factor plugin (TOTP secret + backup codes). The
+// secret is encrypted by better-auth under POLARIS_AUTH_SECRET before it lands
+// here, and neither column is ever returned to a client.
+model TwoFactor {
+    id                      String    @id @default(uuid(7)) @db.Uuid
+    userId                  String    @db.Uuid
+    secret                  String
+    backupCodes             String
+    verified                Boolean   @default(true)
+    failedVerificationCount Int       @default(0)
+    lockedUntil             DateTime?
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@index([userId])
+    @@index([secret])
+}
+
+// A user's own security preferences. One row per user, created lazily the first
+// time they change anything (absent means every default below applies).
+model UserSecurity {
+    userId               String    @id @db.Uuid
+    // Hash of the 4-6 digit quick-unlock PIN, or null when none is set.
+    // The PIN only re-opens a locked dashboard; signing in always needs the
+    // password, so its low entropy never guards the account itself.
+    pinHash              String?
+    pinUpdatedAt         DateTime?
+    // Minutes of inactivity before the dashboard locks. 0 disables the lock.
+    idleLockMinutes      Int       @default(0)
+    // Absolute session lifetime in minutes, after which the session is signed
+    // out regardless of activity. 0 keeps the global default.
+    sessionMaxMinutes    Int       @default(0)
+    // New sign-ins must be approved from an already-active session.
+    requireLoginApproval Boolean   @default(false)
+    // Sign-in restrictions set directly on the account, on top of whatever the
+    // attached access groups contribute. JSON string arrays for SQLite
+    // portability; empty everywhere means no restriction.
+    allowedCidrs         String    @default("[]")
+    allowedCountries     String    @default("[]")
+    allowedContinents    String    @default("[]")
+    createdAt            DateTime  @default(now())
+    updatedAt            DateTime  @updatedAt
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// A knowledge-based recovery factor: used to prove identity when the user wants
+// to set a new password without knowing the current one. Answers are hashed
+// (normalized to lowercase first), so a database dump does not reveal them.
+model SecurityQuestion {
+    id         String   @id @default(uuid(7)) @db.Uuid
+    userId     String   @db.Uuid
+    question   String
+    answerHash String
+    createdAt  DateTime @default(now())
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@index([userId])
+}
+
+// A named, reusable set of network rules ("Home", "Office") a user attaches to
+// their sign-in and to individual API keys, so the same allowlist does not have
+// to be retyped per target. Rules are additive: the effective allowlist is the
+// union of every attached group plus the target's own inline rules.
+model AccessGroup {
+    id                String   @id @default(uuid(7)) @db.Uuid
+    ownerId           String   @db.Uuid
+    name              String
+    description       String?
+    // JSON string arrays: IP/CIDR rules, ISO country codes, continent codes.
+    allowedCidrs      String   @default("[]")
+    allowedCountries  String   @default("[]")
+    allowedContinents String   @default("[]")
+    createdAt         DateTime @default(now())
+    updatedAt         DateTime @updatedAt
+
+    owner   User                @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+    users   UserAccessGroup[]
+    apiKeys ApiKeyAccessGroup[]
+
+    @@unique([ownerId, name])
+    @@index([ownerId])
+}
+
+// Access groups applied to a user's own sign-ins.
+model UserAccessGroup {
+    userId  String @db.Uuid
+    groupId String @db.Uuid
+
+    user  User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+    group AccessGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+    @@id([userId, groupId])
+    @@index([groupId])
+}
+
+// Access groups applied to one API key.
+model ApiKeyAccessGroup {
+    apiKeyId String @db.Uuid
+    groupId  String @db.Uuid
+
+    apiKey ApiKey      @relation(fields: [apiKeyId], references: [id], onDelete: Cascade)
+    group  AccessGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+    @@id([apiKeyId, groupId])
+    @@index([groupId])
+}
+
+// A personal access token. The secret is shown once at creation and stored only
+// as a SHA-256 hash, so a database dump yields no usable keys. A key can never
+// exceed its owner's own permissions - `scopes` narrows, it never grants.
+model ApiKey {
+    id                String    @id @default(uuid(7)) @db.Uuid
+    userId            String    @db.Uuid
+    name              String
+    // Public, non-secret identifier shown in the UI and carried in the key
+    // itself, so a key is recognizable without storing the secret.
+    prefix            String    @unique
+    keyHash           String    @unique
+    // JSON array of permission keys this key may exercise.
+    scopes            String    @default("[]")
+    allowedCidrs      String    @default("[]")
+    allowedCountries  String    @default("[]")
+    allowedContinents String    @default("[]")
+    expiresAt         DateTime?
+    lastUsedAt        DateTime?
+    lastUsedIp        String?
+    revokedAt         DateTime?
+    createdAt         DateTime  @default(now())
+
+    user   User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+    groups ApiKeyAccessGroup[]
+
+    @@index([userId])
+}
+
+// Polaris-owned state for one better-auth session: whether the sign-in has been
+// approved, whether the idle lock has engaged, and where it came from. Kept in a
+// separate table because better-auth owns the Session row's columns.
+model SessionState {
+    sessionId  String    @id @db.Uuid
+    userId     String    @db.Uuid
+    // approved | pending | denied. Only "approved" may use the dashboard.
+    approval   String    @default("approved")
+    // Set when inactivity locked the dashboard; cleared by a PIN/password unlock.
+    lockedAt   DateTime?
+    lastSeenAt DateTime  @default(now())
+    // The address the session was last evaluated from; a change re-runs the
+    // account's network rules instead of trusting the first decision forever.
+    ip         String?
+    country    String?
+    userAgent  String?
+    createdAt  DateTime  @default(now())
+
+    session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+    user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@index([userId])
 }
 
 // A named bundle of users. Policies attach to a group so a grant applies to

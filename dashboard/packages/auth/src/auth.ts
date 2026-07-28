@@ -12,7 +12,8 @@
  */
 
 import { randomUUID } from "node:crypto";
-import { betterAuth } from "better-auth";
+import { betterAuth, type BetterAuthPlugin } from "better-auth";
+import { twoFactor } from "better-auth/plugins";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { loadEnv } from "@polaris/config";
 import { prisma } from "@polaris/db";
@@ -20,6 +21,20 @@ import { prisma } from "@polaris/db";
 /** Session lifetime: 7 days, refreshed at most once per day. */
 const SESSION_MAX_AGE = 60 * 60 * 24 * 7;
 const SESSION_UPDATE_AGE = 60 * 60 * 24;
+
+/**
+ * TOTP second factor with single-use backup codes. Verification is required
+ * before the factor is armed, so a user who mis-scans the QR cannot lock
+ * themselves out. Email OTP stays unconfigured on purpose (Polaris has no
+ * outbound mail), which leaves those endpoints inert.
+ *
+ * Typed as the plugin base rather than left inferred: the plugin's endpoint
+ * types embed better-auth's own nested zod, which this package cannot name in
+ * its emitted declarations. The browser client declares the two-factor paths it
+ * calls, so nothing loses type safety - the flow runs through @polaris/web's
+ * auth client, not through auth.api here.
+ */
+const PLUGINS: BetterAuthPlugin[] = [twoFactor({ issuer: "Polaris" })];
 
 export function createAuth() {
     const env = loadEnv();
@@ -54,6 +69,7 @@ export function createAuth() {
             expiresIn: SESSION_MAX_AGE,
             updateAge: SESSION_UPDATE_AGE
         },
+        plugins: PLUGINS,
         user: {
             additionalFields: {
                 // Server-only flag; never accepted from client input.
