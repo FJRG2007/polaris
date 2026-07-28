@@ -406,7 +406,11 @@ export function FilesView({
         lastIndex.current = index;
     }
 
-    /** Double-clicking the name (specifically) renames; elsewhere on the row opens. */
+    /**
+     * Double-clicking the name text renames. The hit area is strictly the text -
+     * the icon, the padding around it and the rest of the row open the item, so a
+     * double-click that misses the label never traps the user in a rename.
+     */
     function nameDoubleClick(event: MouseEvent, entry: DriveEntry) {
         event.preventDefault();
         event.stopPropagation();
@@ -1689,17 +1693,19 @@ export function FilesView({
                                                                             className="h-7 w-full py-1 text-center text-xs"
                                                                         />
                                                                     ) : (
-                                                                        <span
-                                                                            className="w-full truncate text-xs"
-                                                                            title={entry.name}
-                                                                            onDoubleClick={(e) =>
-                                                                                nameDoubleClick(
-                                                                                    e,
-                                                                                    entry
-                                                                                )
-                                                                            }
-                                                                        >
-                                                                            {entry.name}
+                                                                        <span className="w-full min-w-0 text-xs">
+                                                                            <span
+                                                                                className="inline-block max-w-full cursor-text truncate align-bottom"
+                                                                                title={entry.name}
+                                                                                onDoubleClick={(e) =>
+                                                                                    nameDoubleClick(
+                                                                                        e,
+                                                                                        entry
+                                                                                    )
+                                                                                }
+                                                                            >
+                                                                                {entry.name}
+                                                                            </span>
                                                                         </span>
                                                                     )}
                                                                     <span className="text-[11px] text-muted-foreground">
@@ -1872,14 +1878,6 @@ export function FilesView({
                                                                                     onClick={(e) =>
                                                                                         e.preventDefault()
                                                                                     }
-                                                                                    onDoubleClick={(
-                                                                                        e
-                                                                                    ) =>
-                                                                                        nameDoubleClick(
-                                                                                            e,
-                                                                                            entry
-                                                                                        )
-                                                                                    }
                                                                                     className="flex items-center gap-2 hover:text-primary"
                                                                                 >
                                                                                     <EntryIcon
@@ -1887,7 +1885,19 @@ export function FilesView({
                                                                                             entry
                                                                                         }
                                                                                     />
-                                                                                    {entry.name}
+                                                                                    <span
+                                                                                        className="cursor-text truncate"
+                                                                                        onDoubleClick={(
+                                                                                            e
+                                                                                        ) =>
+                                                                                            nameDoubleClick(
+                                                                                                e,
+                                                                                                entry
+                                                                                            )
+                                                                                        }
+                                                                                    >
+                                                                                        {entry.name}
+                                                                                    </span>
                                                                                     {searchScope ===
                                                                                         "recursive" &&
                                                                                     entry.path.includes(
@@ -1928,14 +1938,6 @@ export function FilesView({
                                                                                     onClick={(e) =>
                                                                                         e.preventDefault()
                                                                                     }
-                                                                                    onDoubleClick={(
-                                                                                        e
-                                                                                    ) =>
-                                                                                        nameDoubleClick(
-                                                                                            e,
-                                                                                            entry
-                                                                                        )
-                                                                                    }
                                                                                     className="flex items-center gap-2 hover:text-primary"
                                                                                 >
                                                                                     <EntryIcon
@@ -1943,7 +1945,19 @@ export function FilesView({
                                                                                             entry
                                                                                         }
                                                                                     />
-                                                                                    {entry.name}
+                                                                                    <span
+                                                                                        className="cursor-text truncate"
+                                                                                        onDoubleClick={(
+                                                                                            e
+                                                                                        ) =>
+                                                                                            nameDoubleClick(
+                                                                                                e,
+                                                                                                entry
+                                                                                            )
+                                                                                        }
+                                                                                    >
+                                                                                        {entry.name}
+                                                                                    </span>
                                                                                     {searchScope ===
                                                                                         "recursive" &&
                                                                                     entry.path.includes(
