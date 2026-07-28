@@ -4,9 +4,12 @@
  * The file table for one location: breadcrumb, a search/sort/filter toolbar, and
  * a selectable list. Rows support fuzzy search (fuse.js), category/size/date
  * filters, multi-select (ctrl toggles, shift extends a range), inline rename
- * (double-click the name), a right-click context menu, and bulk download/delete.
- * All of this is client-side over the already-fetched listing, so it stays fast
- * and does not re-hit the NAS on every keystroke.
+ * (double-click the name text), a right-click context menu, and bulk
+ * download/delete. Opening a file swaps the listing for its preview in place -
+ * the details panel pinned to the right keeps describing it - rather than
+ * covering the explorer with a modal. All of this is client-side over the
+ * already-fetched listing, so it stays fast and does not re-hit the NAS on
+ * every keystroke.
  */
 
 import {
@@ -26,6 +29,7 @@ import {
     ArrowDownAZ,
     ArrowUpAZ,
     CalendarClock,
+    ChevronLeft,
     ChevronRight,
     ClipboardCopy,
     ClipboardPaste,
@@ -95,7 +99,7 @@ import {
     extensionOf,
     type FileCategory
 } from "./file-categories";
-import { FileViewer, isViewable, type ViewerTarget } from "./file-viewer";
+import { FilePreview, isViewable, type ViewerTarget } from "./file-viewer";
 import { ITEM_ICONS, ITEM_ICON_COLORS, iconColorClass, iconComponent } from "./item-icons";
 import { matchesStructured, parseSearch } from "./search-query";
 import { SelectionZipMenu } from "./selection-zip-menu";
@@ -359,6 +363,9 @@ export function FilesView({
     }
 
     function openViewer(entry: DriveEntry) {
+        // The preview takes over the listing area and the details panel beside it
+        // describes what is open, so the file has to be the selected one.
+        setSelected(new Set([entry.path]));
         setViewerTarget({
             connectionId,
             path: entry.path,
@@ -366,6 +373,12 @@ export function FilesView({
             size: entry.size,
             modifiedAt: entry.modifiedAt
         });
+    }
+
+    /** Share the file the preview is showing. */
+    function shareViewerTarget() {
+        const entry = entries.find((item) => item.path === viewerTarget?.path);
+        if (entry) onShare(entry);
     }
 
     // Keep the open viewer's properties honest after a refresh: saving from one of
@@ -519,11 +532,12 @@ export function FilesView({
         if (dragged) onMove(dragged, folder.path);
     }
 
-    // Selection and rename are tied to a specific listing; drop them whenever the
-    // location changes so a stale selection never leaks across folders.
+    // Selection, rename and the open preview are tied to a specific listing; drop
+    // them whenever the location changes so nothing stale leaks across folders.
     useEffect(() => {
         setSelected(new Set());
         setRenaming(null);
+        setViewerTarget(null);
         lastIndex.current = null;
         cursorRef.current = null;
     }, [connectionId, path]);
@@ -1182,10 +1196,44 @@ export function FilesView({
 
     return (
         <>
+            {viewerTarget ? (
+                <div className="flex min-w-0 flex-1 flex-col lg:pr-72">
+                    <div className="mb-3 flex items-center justify-between gap-2">
+                        <div className="flex min-w-0 items-center gap-2">
+                            <Button size="sm" variant="ghost" onClick={() => setViewerTarget(null)}>
+                                <ChevronLeft className="size-4" />
+                                Back
+                            </Button>
+                            <span className="min-w-0 truncate text-sm font-medium">
+                                {viewerTarget.name}
+                            </span>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-2">
+                            <Button size="sm" variant="ghost" onClick={shareViewerTarget}>
+                                <Share2 className="size-4" />
+                                Share
+                            </Button>
+                            <Button asChild size="sm" variant="secondary">
+                                <a
+                                    href={downloadUrl(connectionId, viewerTarget.path)}
+                                    download={viewerTarget.name}
+                                >
+                                    <Download className="size-4" />
+                                    Download
+                                </a>
+                            </Button>
+                        </div>
+                    </div>
+                    <div className="min-h-0 flex-1 overflow-auto rounded-lg border border-border bg-surface/40">
+                        <FilePreview target={viewerTarget} onSaved={onSaved} />
+                    </div>
+                </div>
+            ) : null}
             <div
                 className={cn(
                     "flex min-w-0 flex-1 flex-col",
-                    selectedEntries.length === 1 && "lg:pr-72"
+                    selectedEntries.length === 1 && "lg:pr-72",
+                    viewerTarget && "hidden"
                 )}
             >
                 <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
@@ -2238,22 +2286,6 @@ export function FilesView({
                     </div>
                 </aside>
             ) : null}
-
-            <FileViewer
-                target={viewerTarget}
-                onOpenChange={(open) => !open && setViewerTarget(null)}
-                onSaved={onSaved}
-                onShare={(t) =>
-                    onShare({
-                        name: t.name,
-                        path: t.path,
-                        kind: "file",
-                        size: t.size ?? "0",
-                        modifiedAt: t.modifiedAt ?? new Date().toISOString(),
-                        createdAt: t.modifiedAt ?? new Date().toISOString()
-                    })
-                }
-            />
 
             <UserProfileDialog
                 userId={profileUserId}

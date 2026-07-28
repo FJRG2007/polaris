@@ -28,6 +28,7 @@ export type ViewerKind =
     | "pdf"
     | "sheet"
     | "doc"
+    | "slides"
     | "markdown"
     | "text"
     | "none";

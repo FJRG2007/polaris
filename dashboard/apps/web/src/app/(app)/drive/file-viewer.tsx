@@ -1,17 +1,19 @@
 "use client";
 
 /**
- * In-dashboard file viewer. Opens a file in a modal and renders it inline by
- * type - images natively, audio/video through a Polaris-themed Plyr, PDFs in the
- * browser's native viewer (with pdf.js behind an Edit mode), spreadsheets/CSV in
- * an editable grid, .docx read-only through mammoth, and anything else as
- * editable plain text (Notepad-style), binary or oversized files read-only.
+ * In-dashboard file viewer. `FilePreview` renders a file's bytes by type and the
+ * `FileViewer` modal wraps it for the contexts that have nowhere to put it
+ * inline (a public share). The Drive explorer embeds `FilePreview` directly.
+ * By type: images natively, audio/video through a Polaris-themed Plyr, PDFs in
+ * the browser's native viewer (with pdf.js behind an Edit mode), spreadsheets/CSV in
+ * an editable grid, .docx read-only through mammoth, .pptx read-only as scaled
+ * slides, and anything else as editable plain text (Notepad-style), binary or
+ * oversized files read-only.
  * Each viewer lives in ./viewer and pulls its heavy library in dynamically, so
  * nothing runs during SSR and a library only loads when a file of that type is
  * opened. Bytes are streamed from the drive route with an inline disposition
  * (Range-enabled, so media scrubbing works) and stay same-origin, so no external
- * assets are ever fetched. A properties sidebar and Share/Download actions sit
- * alongside the preview.
+ * assets are ever fetched.
  */
 
 import { Download, Share2 } from "lucide-react";
@@ -22,6 +24,7 @@ import { DocView } from "./viewer/doc-view";
 import { MarkdownView } from "./viewer/markdown-view";
 import { MediaView } from "./viewer/media-view";
 import { PdfView } from "./viewer/pdf-view";
+import { PptxView } from "./viewer/pptx-view";
 import { SheetEditor } from "./viewer/sheet-editor";
 import { PlainTextEditor } from "./viewer/text-editor";
 import type { ViewerKind, ViewerTarget, ViewerUrlFor } from "./viewer/types";
@@ -33,6 +36,7 @@ const VIDEO = new Set(["mp4", "webm", "mov", "m4v", "ogv"]);
 const AUDIO = new Set(["mp3", "wav", "flac", "aac", "ogg", "oga", "m4a", "opus"]);
 const SHEET = new Set(["xlsx", "xls", "csv", "ods", "tsv"]);
 const DOC = new Set(["docx"]);
+const SLIDES = new Set(["pptx", "ppsx", "potx"]);
 const MARKDOWN = new Set(["md", "markdown", "mdown", "mkd"]);
 
 /**
@@ -47,6 +51,7 @@ export function viewerKind(name: string): ViewerKind {
     if (ext === "pdf") return "pdf";
     if (SHEET.has(ext)) return "sheet";
     if (DOC.has(ext)) return "doc";
+    if (SLIDES.has(ext)) return "slides";
     if (MARKDOWN.has(ext)) return "markdown";
     return "text";
 }
@@ -57,10 +62,52 @@ export function isViewable(name: string): boolean {
 }
 
 /** Default byte URL for a Drive-owned file (served by the session-scoped route). */
-function driveByteUrl(target: ViewerTarget, inline: boolean): string {
+export function driveByteUrl(target: ViewerTarget, inline: boolean): string {
     const query = new URLSearchParams({ c: target.connectionId ?? "", p: target.path });
     if (inline) query.set("disposition", "inline");
     return `/api/drive/download?${query.toString()}`;
+}
+
+/**
+ * A file's bytes rendered by whichever viewer its extension selects. Kept apart
+ * from the dialog so the Drive explorer can show the same preview inline, next
+ * to its own details panel, while a public share still opens it in a modal.
+ */
+export function FilePreview({
+    target,
+    onSaved,
+    urlFor,
+    readOnly = false
+}: {
+    target: ViewerTarget;
+    onSaved?: (name: string) => void;
+    urlFor?: ViewerUrlFor;
+    readOnly?: boolean;
+}) {
+    const src = (urlFor ?? driveByteUrl)(target, true);
+    const kind = viewerKind(target.name);
+
+    if (kind === "image") {
+        return (
+            <div className="flex items-center justify-center p-4">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                    src={src}
+                    alt={target.name}
+                    className="max-h-[80vh] max-w-full object-contain"
+                />
+            </div>
+        );
+    }
+    if (kind === "video" || kind === "audio") return <MediaView src={src} kind={kind} />;
+    if (kind === "pdf") return <PdfView src={src} target={target} readOnly={readOnly} onSaved={onSaved} />;
+    if (kind === "sheet")
+        return <SheetEditor src={src} target={target} readOnly={readOnly} onSaved={onSaved} />;
+    if (kind === "doc") return <DocView src={src} />;
+    if (kind === "slides") return <PptxView src={src} />;
+    if (kind === "markdown")
+        return <MarkdownView src={src} target={target} readOnly={readOnly} onSaved={onSaved} />;
+    return <PlainTextEditor src={src} target={target} readOnly={readOnly} onSaved={onSaved} />;
 }
 
 export function FileViewer({
@@ -82,8 +129,6 @@ export function FileViewer({
     readOnly?: boolean;
 }) {
     const byteUrl = urlFor ?? driveByteUrl;
-    const kind = target ? viewerKind(target.name) : "none";
-    const inlineSrc = target ? byteUrl(target, true) : "";
     const extension = target ? extensionOf(target.name) : "";
 
     return (
@@ -111,48 +156,12 @@ export function FileViewer({
                 <div className="flex min-h-0 flex-1">
                     <div className="min-h-0 min-w-0 flex-1 overflow-auto bg-surface/40">
                         {target ? (
-                            kind === "image" ? (
-                                <div className="flex items-center justify-center p-4">
-                                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                                    <img
-                                        src={inlineSrc}
-                                        alt={target.name}
-                                        className="max-h-[80vh] max-w-full object-contain"
-                                    />
-                                </div>
-                            ) : kind === "video" || kind === "audio" ? (
-                                <MediaView src={inlineSrc} kind={kind} />
-                            ) : kind === "pdf" ? (
-                                <PdfView
-                                    src={inlineSrc}
-                                    target={target}
-                                    readOnly={readOnly}
-                                    onSaved={onSaved}
-                                />
-                            ) : kind === "sheet" ? (
-                                <SheetEditor
-                                    src={inlineSrc}
-                                    target={target}
-                                    readOnly={readOnly}
-                                    onSaved={onSaved}
-                                />
-                            ) : kind === "doc" ? (
-                                <DocView src={inlineSrc} />
-                            ) : kind === "markdown" ? (
-                                <MarkdownView
-                                    src={inlineSrc}
-                                    target={target}
-                                    readOnly={readOnly}
-                                    onSaved={onSaved}
-                                />
-                            ) : (
-                                <PlainTextEditor
-                                    src={inlineSrc}
-                                    target={target}
-                                    readOnly={readOnly}
-                                    onSaved={onSaved}
-                                />
-                            )
+                            <FilePreview
+                                target={target}
+                                urlFor={urlFor}
+                                readOnly={readOnly}
+                                onSaved={onSaved}
+                            />
                         ) : null}
                     </div>
                     {target ? (
