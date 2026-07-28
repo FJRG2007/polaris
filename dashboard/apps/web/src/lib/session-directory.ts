@@ -8,7 +8,9 @@
  * a decision - and is rendered as a short summary rather than echoed raw.
  */
 
+import { verifyQuickPin } from "@polaris/auth";
 import { prisma } from "@polaris/db";
+import { auth } from "@/lib/auth";
 import { recordAudit } from "@/lib/audit-service";
 
 export interface SessionView {
@@ -113,11 +115,16 @@ export async function revokeOtherSessions(userId: string, currentSessionId: stri
  * Approve or refuse a pending sign-in from an already-trusted session. A refusal
  * ends the waiting session immediately rather than leaving it parked, so a
  * rejected attempt holds nothing.
+ *
+ * Letting somebody in is the direction that needs proof, so it asks for the
+ * quick-unlock PIN - an open dashboard someone walked up to should not be enough.
+ * Refusing needs no PIN: it only ever closes a door.
  */
 export async function decideLoginApproval(
     userId: string,
     sessionId: string,
-    approve: boolean
+    approve: boolean,
+    pin?: string
 ): Promise<{ error?: string }> {
     const state = await prisma.sessionState.findFirst({
         where: { sessionId, userId, approval: "pending" },
@@ -126,6 +133,9 @@ export async function decideLoginApproval(
     if (!state) return { error: "That sign-in is no longer waiting." };
 
     if (approve) {
+        if (!(await verifyQuickPin(auth, userId, String(pin ?? "")))) {
+            return { error: "That PIN is not right." };
+        }
         await prisma.sessionState.update({
             where: { sessionId },
             data: { approval: "approved", lastSeenAt: new Date() }

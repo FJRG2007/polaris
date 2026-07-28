@@ -44,6 +44,7 @@
         "node-unrar-js": "2.0.2",
         "pdfjs-dist": "6.1.200",
         "plyr": "3.7.8",
+        "qrcode.react": "4.2.0",
         "react": "19.0.0",
         "react-dom": "19.0.0",
         "undici": "6.21.1",

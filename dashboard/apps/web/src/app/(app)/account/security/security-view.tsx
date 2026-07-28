@@ -9,6 +9,7 @@
  */
 
 import { useState } from "react";
+import { Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { IDLE_LOCK_CHOICES, SECURITY_QUESTION_COUNT, SESSION_MAX_CHOICES } from "@polaris/core";
 import { Button, Card, CardBody, Select, Switch } from "@polaris/ui";
@@ -51,6 +52,7 @@ export function SecurityView({
     const [limitsBusy, setLimitsBusy] = useState(false);
     const [limitsResult, setLimitsResult] = useState<{ error?: string; ok?: string } | null>(null);
     const [approval, setApproval] = useState(requireLoginApproval);
+    const [approvalError, setApprovalError] = useState<string | null>(null);
 
     const limitsChanged =
         limits.idleLockMinutes !== idleLockMinutes || limits.sessionMaxMinutes !== sessionMaxMinutes;
@@ -64,9 +66,16 @@ export function SecurityView({
         if (!result.error) router.refresh();
     }
 
+    /** Optimistic, with the switch put back if the server refuses the change. */
     async function toggleApproval(next: boolean) {
         setApproval(next);
-        await setLoginApprovalAction(next);
+        setApprovalError(null);
+        const result = await setLoginApprovalAction(next);
+        if (result.error) {
+            setApproval(!next);
+            setApprovalError(result.error);
+            return;
+        }
         router.refresh();
     }
 
@@ -101,13 +110,22 @@ export function SecurityView({
 
             <SettingCard
                 title="Quick unlock PIN"
-                description="Reopens a locked dashboard without retyping your password."
+                description={
+                    approval
+                        ? "Reopens a locked dashboard, and confirms a new sign-in you allow."
+                        : "Reopens a locked dashboard without retyping your password."
+                }
                 status={hasPin ? "Set" : "Not set"}
                 statusTone={hasPin ? "on" : "off"}
             >
                 {hasPin ? (
-                    <Button variant="outline" onClick={() => setDialog("pin-off")}>
-                        Remove
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label="Remove quick unlock PIN"
+                        onClick={() => setDialog("pin-off")}
+                    >
+                        <Trash2 className="size-4" />
                     </Button>
                 ) : null}
                 <Button onClick={() => setDialog("pin")}>{hasPin ? "Change" : "Set PIN"}</Button>
@@ -120,8 +138,13 @@ export function SecurityView({
                 statusTone={hasQuestions ? "on" : "off"}
             >
                 {hasQuestions ? (
-                    <Button variant="outline" onClick={() => setDialog("questions-off")}>
-                        Remove
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label="Remove security questions"
+                        onClick={() => setDialog("questions-off")}
+                    >
+                        <Trash2 className="size-4" />
                     </Button>
                 ) : null}
                 <Button onClick={() => setDialog("questions")}>{hasQuestions ? "Update" : "Set up"}</Button>
@@ -129,16 +152,22 @@ export function SecurityView({
 
             <SettingCard
                 title="Approve new sign-ins"
-                description="A new sign-in waits until you allow it from a session that is already open."
+                description={
+                    hasPin
+                        ? "A new sign-in waits until you allow it with your PIN from a session that is already open."
+                        : "Needs a quick unlock PIN: allowing a sign-in asks for it."
+                }
                 status={approval ? "On" : "Off"}
                 statusTone={approval ? "on" : "off"}
             >
                 <Switch
                     checked={approval}
+                    disabled={!hasPin && !approval}
                     onChange={(next) => void toggleApproval(next)}
                     aria-label="Require approval for new sign-ins"
                 />
             </SettingCard>
+            {approvalError ? <Feedback error={approvalError} /> : null}
 
             <Card>
                 <CardBody className="flex flex-col gap-3">

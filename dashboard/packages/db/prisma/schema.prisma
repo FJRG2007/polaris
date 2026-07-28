@@ -76,6 +76,24 @@ model User {
     apiKeys             ApiKey[]
     twoFactors          TwoFactor[]
     sessionStates       SessionState[]
+    emails              UserEmail[]
+}
+
+// Addresses a user owns besides the one they sign in with. The primary stays on
+// User.email because that is what authenticates; these are alternates, and any
+// of them can be marked as a way to reach the owner if they lose access. Unique
+// across the table, and checked against every primary before being added, so one
+// address never belongs to two accounts.
+model UserEmail {
+    id        String   @id @default(uuid(7)) @db.Uuid
+    userId    String   @db.Uuid
+    email     String   @unique
+    recovery  Boolean  @default(false)
+    createdAt DateTime @default(now())
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@index([userId])
 }
 
 model Session {

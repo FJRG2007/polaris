@@ -9,10 +9,15 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { listSessionActivity, type SessionActivityEntry } from "@/lib/audit-service";
+import { rateLimit } from "@/lib/rate-limit-service";
 import { requireUser } from "@/lib/session";
 import { decideLoginApproval, revokeOtherSessions, revokeUserSession } from "@/lib/session-directory";
 
 const sessionIdSchema = z.string().uuid();
+
+/** Guess-throttling for the PIN that stands between a waiting sign-in and access. */
+const APPROVAL_LIMIT = 5;
+const APPROVAL_WINDOW_MS = 15 * 60 * 1000;
 
 export async function revokeSessionAction(sessionId: string): Promise<{ error?: string }> {
     const user = await requireUser();
@@ -39,12 +44,23 @@ export async function sessionActivityAction(
     return { entries: await listSessionActivity(user.id, parsed.data) };
 }
 
+/**
+ * Decide a waiting sign-in. Approving asks for the quick-unlock PIN, so the
+ * attempts are throttled the way any short secret has to be; refusing is free.
+ */
 export async function decideLoginApprovalAction(
     sessionId: string,
-    approve: boolean
+    approve: boolean,
+    pin?: string
 ): Promise<{ error?: string }> {
     const user = await requireUser();
-    const result = await decideLoginApproval(user.id, String(sessionId), approve === true);
+    if (approve === true) {
+        const throttle = await rateLimit(`signin-approval:${user.id}`, APPROVAL_LIMIT, APPROVAL_WINDOW_MS);
+        if (!throttle.ok) {
+            return { error: `Too many attempts. Try again in ${Math.ceil(throttle.retryAfterMs / 60000)} minutes.` };
+        }
+    }
+    const result = await decideLoginApproval(user.id, String(sessionId), approve === true, String(pin ?? ""));
     if (!result.error) revalidatePath("/account/sessions");
     return result;
 }

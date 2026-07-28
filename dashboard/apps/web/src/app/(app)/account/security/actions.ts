@@ -17,6 +17,7 @@ import {
     changeUserPassword,
     clearQuickPin,
     clearSecurityQuestions,
+    getUserSecurity,
     resetUserPassword,
     setLoginApprovalRequired,
     setQuickPin,
@@ -96,6 +97,11 @@ export async function setPinAction(input: unknown): Promise<ActionResult> {
 
 export async function clearPinAction(password: string): Promise<ActionResult> {
     const user = await requireUser();
+    // Approving a sign-in is what the PIN proves, so it cannot outlive the PIN.
+    const security = await getUserSecurity(user.id);
+    if (security.requireLoginApproval) {
+        return { error: "Turn off Approve new sign-ins first - approving one asks for this PIN." };
+    }
     const result = await clearQuickPin(auth, user.id, String(password));
     if (!result.error) {
         await recordAudit({ actorId: user.id, action: "account.pin.cleared" });
@@ -114,8 +120,16 @@ export async function updateSessionLimitsAction(input: unknown): Promise<ActionR
     return {};
 }
 
+/**
+ * Turn the sign-in approval gate on or off. Allowing a waiting sign-in asks for
+ * the quick-unlock PIN, so the gate cannot be armed without one: otherwise the
+ * approval would rest on nothing more than the open session it is decided from.
+ */
 export async function setLoginApprovalAction(required: boolean): Promise<ActionResult> {
     const user = await requireUser();
+    if (required === true && !(await getUserSecurity(user.id)).hasPin) {
+        return { error: "Set a quick unlock PIN first - approving a sign-in asks for it." };
+    }
     await setLoginApprovalRequired(user.id, required === true);
     await recordAudit({
         actorId: user.id,

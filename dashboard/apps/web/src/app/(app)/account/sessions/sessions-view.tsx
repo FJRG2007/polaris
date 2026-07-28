@@ -11,10 +11,21 @@
  * from it before deciding whether to sign it out.
  */
 
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Check, History, LogOut, MonitorSmartphone, X } from "lucide-react";
-import { Badge, Button, Card, CardBody } from "@polaris/ui";
+import {
+    Badge,
+    Button,
+    Card,
+    CardBody,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    Input
+} from "@polaris/ui";
 import { useConfirm } from "@/components/confirm-dialog";
 import { RelativeTime } from "@/components/relative-time";
 import { signOut } from "@/lib/auth-client";
@@ -37,15 +48,17 @@ export function SessionsView({ sessions }: { sessions: SessionView[] }) {
     const [busyId, setBusyId] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [activityFor, setActivityFor] = useState<SessionView | null>(null);
+    const [approving, setApproving] = useState<SessionView | null>(null);
 
     const pending = sessions.filter((session) => session.approval === "pending");
     const active = sessions.filter((session) => session.approval !== "pending");
     const others = active.filter((session) => !session.current);
 
-    async function decide(sessionId: string, approve: boolean) {
+    /** Refusing is immediate; allowing goes through the PIN prompt first. */
+    async function deny(sessionId: string) {
         setBusyId(sessionId);
         setError(null);
-        const result = await decideLoginApprovalAction(sessionId, approve);
+        const result = await decideLoginApprovalAction(sessionId, false);
         setBusyId(null);
         if (result.error) setError(result.error);
         else router.refresh();
@@ -116,7 +129,7 @@ export function SessionsView({ sessions }: { sessions: SessionView[] }) {
                                         variant="outline"
                                         size="sm"
                                         disabled={busyId === session.id}
-                                        onClick={() => void decide(session.id, false)}
+                                        onClick={() => void deny(session.id)}
                                     >
                                         <X className="size-4" />
                                         Deny
@@ -124,7 +137,7 @@ export function SessionsView({ sessions }: { sessions: SessionView[] }) {
                                     <Button
                                         size="sm"
                                         disabled={busyId === session.id}
-                                        onClick={() => void decide(session.id, true)}
+                                        onClick={() => setApproving(session)}
                                     >
                                         <Check className="size-4" />
                                         Approve
@@ -200,7 +213,97 @@ export function SessionsView({ sessions }: { sessions: SessionView[] }) {
                 }}
             />
 
+            <ApproveSignInDialog
+                session={approving}
+                onOpenChange={(open) => {
+                    if (!open) setApproving(null);
+                }}
+                onApproved={() => {
+                    setApproving(null);
+                    router.refresh();
+                }}
+            />
+
             {confirmElement}
         </div>
+    );
+}
+
+/**
+ * The PIN prompt in front of an approval. An open dashboard is not proof that
+ * the person at it is the account owner, so letting a new device in asks for the
+ * quick-unlock PIN - the same secret that reopens a locked session.
+ */
+function ApproveSignInDialog({
+    session,
+    onOpenChange,
+    onApproved
+}: {
+    session: SessionView | null;
+    onOpenChange: (open: boolean) => void;
+    onApproved: () => void;
+}) {
+    const [pin, setPin] = useState("");
+    const [busy, setBusy] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    async function onSubmit(event: FormEvent<HTMLFormElement>) {
+        event.preventDefault();
+        if (!session) return;
+        setBusy(true);
+        setError(null);
+        const result = await decideLoginApprovalAction(session.id, true, pin);
+        setBusy(false);
+        if (result.error) {
+            setError(result.error);
+            return;
+        }
+        setPin("");
+        onApproved();
+    }
+
+    return (
+        <Dialog
+            open={session !== null}
+            onOpenChange={(next) => {
+                onOpenChange(next);
+                if (!next) {
+                    setPin("");
+                    setError(null);
+                }
+            }}
+        >
+            <DialogContent className="max-w-sm">
+                <DialogHeader>
+                    <DialogTitle>Allow this sign-in?</DialogTitle>
+                    <DialogDescription>
+                        {session?.device} gets in as you. Enter your unlock PIN to confirm.
+                    </DialogDescription>
+                </DialogHeader>
+                <form onSubmit={onSubmit} className="flex flex-col gap-3">
+                    <label className="flex flex-col gap-1 text-sm">
+                        Unlock PIN
+                        <Input
+                            type="password"
+                            inputMode="numeric"
+                            maxLength={6}
+                            autoComplete="off"
+                            value={pin}
+                            onChange={(event) => setPin(event.target.value)}
+                            required
+                        />
+                    </label>
+                    {error ? <p className="text-sm text-danger">{error}</p> : null}
+                    <div className="flex justify-end gap-2">
+                        <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
+                            Cancel
+                        </Button>
+                        <Button type="submit" disabled={busy || pin.length < 4}>
+                            {busy ? "Checking..." : "Approve"}
+                        </Button>
+                    </div>
+                </form>
+            </DialogContent>
+        </Dialog>
     );
 }

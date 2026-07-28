@@ -8,13 +8,33 @@
  * Enrollment is deliberately three steps - password, then the secret, then a code
  * that proves the authenticator actually works. The factor is only armed after
  * that last step, so a mis-copied secret cannot lock anyone out. Backup codes are
- * shown once, in the same breath, because that is the only moment they exist.
+ * shown once, in the same breath, because that is the only moment they exist -
+ * hence the copy, download and print controls sitting right next to them.
  */
 
 import { useState, type FormEvent } from "react";
-import { Copy } from "lucide-react";
-import { Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Input } from "@polaris/ui";
+import { Copy, Download, Printer } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
+import {
+    Button,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+    Input
+} from "@polaris/ui";
 import { authClient } from "@/lib/auth-client";
+import {
+    backupCodesFile,
+    backupCodesHtml,
+    BACKUP_CODE_FORMATS,
+    type BackupCodeFormat
+} from "@/lib/backup-codes";
 import { Feedback } from "./setting-card";
 
 /** The `secret` query parameter of an otpauth:// URI, for manual entry. */
@@ -29,6 +49,35 @@ function secretFromUri(uri: string): string {
 /** Format a base32 secret in groups of four so it can be typed without losing place. */
 function groupSecret(secret: string): string {
     return secret.replace(/(.{4})/g, "$1 ").trim();
+}
+
+/** Hand a generated file to the browser as a download. */
+function download(codes: string[], format: BackupCodeFormat): void {
+    const file = backupCodesFile(codes, format);
+    const url = URL.createObjectURL(new Blob([file.body], { type: file.type }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = file.name;
+    link.click();
+    URL.revokeObjectURL(url);
+}
+
+/**
+ * Print the codes from an offscreen frame. A frame rather than a second window,
+ * because a popup blocker would swallow the window and the codes are only shown
+ * once - there is no second chance to get them onto paper.
+ */
+function printCodes(codes: string[]): void {
+    const frame = document.createElement("iframe");
+    frame.setAttribute("aria-hidden", "true");
+    frame.style.cssText = "position:fixed;width:0;height:0;border:0;visibility:hidden";
+    frame.srcdoc = backupCodesHtml(codes);
+    frame.onload = () => {
+        frame.contentWindow?.print();
+        // Outlives the print dialog, which is modal on the frame's window.
+        setTimeout(() => frame.remove(), 60_000);
+    };
+    document.body.append(frame);
 }
 
 export function EnableTwoFactorDialog({
@@ -124,6 +173,16 @@ export function EnableTwoFactorDialog({
                     </form>
                 ) : (
                     <form onSubmit={onVerify} className="flex flex-col gap-3">
+                        <div className="flex flex-col items-center gap-2">
+                            {/* Fixed light colors: a QR has to stay readable in dark mode. */}
+                            <div className="rounded-md bg-white p-3">
+                                <QRCodeSVG value={totpUri} size={148} bgColor="#ffffff" fgColor="#000000" />
+                            </div>
+                            <span className="text-xs text-muted-foreground">
+                                Scan this with your authenticator, or use the key below.
+                            </span>
+                        </div>
+
                         <div className="flex flex-col gap-1">
                             <span className="text-xs text-muted-foreground">Setup key</span>
                             <div className="flex items-center gap-2">
@@ -154,16 +213,44 @@ export function EnableTwoFactorDialog({
                                     <span key={code}>{code}</span>
                                 ))}
                             </div>
-                            <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                className="self-start"
-                                onClick={() => void navigator.clipboard.writeText(backupCodes.join("\n"))}
-                            >
-                                <Copy className="size-4" />
-                                Copy codes
-                            </Button>
+                            <div className="flex flex-wrap gap-1">
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => void navigator.clipboard.writeText(backupCodes.join("\n"))}
+                                >
+                                    <Copy className="size-4" />
+                                    Copy
+                                </Button>
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <Button type="button" variant="ghost" size="sm">
+                                            <Download className="size-4" />
+                                            Download
+                                        </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="start">
+                                        {BACKUP_CODE_FORMATS.map((entry) => (
+                                            <DropdownMenuItem
+                                                key={entry.format}
+                                                onSelect={() => download(backupCodes, entry.format)}
+                                            >
+                                                {entry.label}
+                                            </DropdownMenuItem>
+                                        ))}
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => printCodes(backupCodes)}
+                                >
+                                    <Printer className="size-4" />
+                                    Print
+                                </Button>
+                            </div>
                         </div>
 
                         <label className="flex flex-col gap-1 text-sm">
