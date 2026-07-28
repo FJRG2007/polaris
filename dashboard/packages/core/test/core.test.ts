@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { ipAllowed, ipInCidr } from "../src/cidr.js";
 import { normalizeRelPath, UnsafePathError, extName, joinUnderRoot } from "../src/paths.js";
 import { generateToken, hashToken, tokenMatchesHash } from "../src/tokens.js";
-import { hasPermission, mergeRolePermissions, DEFAULT_ROLES } from "../src/permissions.js";
+import { expandPermissions, hasPermission, mergeRolePermissions, DEFAULT_ROLES } from "../src/permissions.js";
 import {
     checkUploadCandidate,
     createFileRequestSchema,
@@ -74,6 +74,22 @@ describe("permissions", () => {
         expect(hasPermission(admin, "users.manage")).toBe(true);
         expect(hasPermission(viewer, "users.manage")).toBe(false);
         expect(hasPermission(viewer, "drive.read")).toBe(true);
+    });
+
+    it("completes a grant with what it implies, in canonical order", () => {
+        expect(expandPermissions(["drive.write"])).toEqual(["drive.read", "drive.write"]);
+        expect(expandPermissions(["shares.manage", "drive.delete"])).toEqual([
+            "drive.read",
+            "drive.delete",
+            "shares.create",
+            "shares.manage"
+        ]);
+        expect(expandPermissions(["drive.read", "drive.read"])).toEqual(["drive.read"]);
+    });
+
+    it("keeps implication out of the check, so a grant is only what it says", () => {
+        expect(hasPermission(["drive.write"], "drive.read")).toBe(false);
+        expect(hasPermission(expandPermissions(["drive.write"]), "drive.read")).toBe(true);
     });
 });
 

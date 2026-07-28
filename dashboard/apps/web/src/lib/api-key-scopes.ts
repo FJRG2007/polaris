@@ -1,8 +1,12 @@
 /**
- * Human labels for the permission scopes an API key can carry. Client-safe on
- * purpose: the key dialog renders these, so this module must not reach for
- * anything that drags the database layer into the browser bundle. Resolving
- * which scopes a user may actually pick lives server-side, in @polaris/auth.
+ * Human labels for the permission scopes an API key can carry, and the grouping
+ * the key dialog reads them in: one section per resource, broadest permission
+ * last, so what a key can reach is scannable rather than a flat checklist.
+ *
+ * Client-safe on purpose: the key dialog renders these, so this module must not
+ * reach for anything that drags the database layer into the browser bundle.
+ * Resolving which scopes a user may actually pick lives server-side, in
+ * @polaris/auth.
  */
 
 import type { Permission } from "@polaris/core";
@@ -22,3 +26,34 @@ export const SCOPE_LABELS: Readonly<Record<Permission, string>> = {
     "settings.manage": "Manage settings",
     "system.manage": "Manage the system"
 };
+
+/** What each scope actually lets the key do, in the terms a caller would use. */
+export const SCOPE_HINTS: Readonly<Record<Permission, string>> = {
+    "drive.read": "List folders and download files.",
+    "drive.write": "Upload, rename, and move files.",
+    "drive.delete": "Send files to the trash and empty it.",
+    "connections.manage": "Add, edit, and remove storage connections.",
+    "shares.create": "Share files the key can already read.",
+    "shares.manage": "Edit and revoke share links from anyone.",
+    "requests.create": "Open drop points for others to upload to.",
+    "requests.manage": "Edit and close drop points from anyone.",
+    "deploy.read": "Inspect apps, deployments, and logs.",
+    "deploy.manage": "Deploy, restart, and remove apps.",
+    "users.manage": "Invite, edit, and remove users.",
+    "settings.manage": "Change instance settings.",
+    "system.manage": "Run updates and system operations."
+};
+
+export interface ScopeGroup {
+    readonly title: string;
+    readonly scopes: readonly Permission[];
+}
+
+/** Resource sections, in the order the dialog shows them. */
+export const SCOPE_GROUPS: readonly ScopeGroup[] = [
+    { title: "Files", scopes: ["drive.read", "drive.write", "drive.delete"] },
+    { title: "Storage", scopes: ["connections.manage"] },
+    { title: "Sharing", scopes: ["shares.create", "shares.manage", "requests.create", "requests.manage"] },
+    { title: "Deployments", scopes: ["deploy.read", "deploy.manage"] },
+    { title: "Administration", scopes: ["users.manage", "settings.manage", "system.manage"] }
+];

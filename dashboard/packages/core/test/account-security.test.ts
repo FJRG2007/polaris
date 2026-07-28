@@ -132,6 +132,25 @@ describe("api keys", () => {
         expect(parsed.scopes).toEqual(["drive.read"]);
         expect(parsed.allowedCidrs).toEqual(["10.0.0.0/8"]);
     });
+
+    it("writes out the scopes a picked one implies", () => {
+        const parsed = createApiKeySchema.parse({
+            name: "Backup script",
+            scopes: ["deploy.manage", "drive.write"],
+            expiresInDays: 90
+        });
+        expect(parsed.scopes).toEqual(["drive.read", "drive.write", "deploy.read", "deploy.manage"]);
+    });
+
+    it("takes a hand-picked expiry date, but only one in the future and not absurdly far", () => {
+        const base = { name: "Backup script", scopes: ["drive.read"], expiresInDays: 0 };
+        const day = 24 * 60 * 60 * 1000;
+        const at = (offset: number) => new Date(Date.now() + offset).toISOString();
+        expect(createApiKeySchema.safeParse({ ...base, expiresAt: at(30 * day) }).success).toBe(true);
+        expect(createApiKeySchema.safeParse({ ...base, expiresAt: at(-day) }).success).toBe(false);
+        expect(createApiKeySchema.safeParse({ ...base, expiresAt: at(11 * 365 * day) }).success).toBe(false);
+        expect(createApiKeySchema.safeParse({ ...base, expiresAt: "31/12/2026" }).success).toBe(false);
+    });
 });
 
 describe("stored list columns", () => {

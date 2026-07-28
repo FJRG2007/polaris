@@ -25,6 +25,8 @@ export const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(
                 className={cn(
                     "relative inline-flex size-4 shrink-0 items-center justify-center rounded border transition-colors",
                     active ? "border-primary bg-primary text-primary-foreground" : "border-input bg-surface",
+                    // A locked box still reads as checked, just not as yours to change.
+                    props.disabled ? "opacity-60" : null,
                     className
                 )}
             >
@@ -32,7 +34,7 @@ export const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(
                     ref={ref}
                     type="checkbox"
                     checked={checked}
-                    className="absolute inset-0 cursor-pointer opacity-0"
+                    className="absolute inset-0 cursor-pointer opacity-0 disabled:cursor-default"
                     {...props}
                 />
                 {indeterminate ? (

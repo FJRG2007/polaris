@@ -11,13 +11,12 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Copy, KeyRound, Plus } from "lucide-react";
 import type { AccessGroupView, ApiKeyView } from "@polaris/auth";
-import { API_KEY_EXPIRY_CHOICES, type Permission } from "@polaris/core";
+import { API_KEY_EXPIRY_CHOICES, expandPermissions, type Permission } from "@polaris/core";
 import {
     Badge,
     Button,
     Card,
     CardBody,
-    Checkbox,
     Dialog,
     DialogContent,
     DialogDescription,
@@ -33,11 +32,29 @@ import {
 } from "@/components/access-rules-editor";
 import { useConfirm } from "@/components/confirm-dialog";
 import { RelativeTime } from "@/components/relative-time";
-import { SCOPE_LABELS } from "@/lib/api-key-scopes";
 import { createApiKeyAction, deleteApiKeyAction, revokeApiKeyAction } from "./actions";
+import { ScopePicker } from "./scope-picker";
+
+/** The Select value that swaps the fixed spans for a date of the user's choosing. */
+const CUSTOM_EXPIRY = "custom";
 
 function expiryLabel(days: number): string {
     return days === 0 ? "Never expires" : `${days} days`;
+}
+
+/** A picked day expires at the end of it, local time - the day itself still works. */
+function endOfDay(date: string): Date | null {
+    const [year, month, day] = date.split("-").map(Number);
+    if (!year || !month || !day) return null;
+    return new Date(year, month - 1, day, 23, 59, 59, 999);
+}
+
+/** Today, local time, as the earliest day a key may be set to expire on. */
+function earliestExpiryDate(): string {
+    const now = new Date();
+    const month = String(now.getMonth() + 1).padStart(2, "0");
+    const day = String(now.getDate()).padStart(2, "0");
+    return `${now.getFullYear()}-${month}-${day}`;
 }
 
 /** What a key's state should read as in the list. */
@@ -194,15 +211,21 @@ function CreateKeyDialog({
 }) {
     const [name, setName] = useState("");
     const [scopes, setScopes] = useState<Permission[]>([]);
-    const [expiresInDays, setExpiresInDays] = useState(90);
+    const [expiry, setExpiry] = useState<string>("90");
+    const [expiryDate, setExpiryDate] = useState("");
     const [rules, setRules] = useState<AccessRulesValue>(EMPTY_ACCESS_RULES);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
+    const custom = expiry === CUSTOM_EXPIRY;
+    const chosenDate = custom ? endOfDay(expiryDate) : null;
+    const dateReady = !custom || (chosenDate !== null && chosenDate.getTime() > Date.now());
+
     function reset() {
         setName("");
         setScopes([]);
-        setExpiresInDays(90);
+        setExpiry("90");
+        setExpiryDate("");
         setRules(EMPTY_ACCESS_RULES);
         setError(null);
     }
@@ -210,7 +233,13 @@ function CreateKeyDialog({
     async function submit() {
         setBusy(true);
         setError(null);
-        const result = await createApiKeyAction({ name, scopes, expiresInDays, ...rules });
+        const result = await createApiKeyAction({
+            name,
+            scopes: expandPermissions(scopes),
+            expiresInDays: custom ? 0 : Number(expiry),
+            expiresAt: chosenDate?.toISOString(),
+            ...rules
+        });
         setBusy(false);
         if (result.error || !result.secret) {
             setError(result.error ?? "Could not create the key.");
@@ -249,42 +278,38 @@ function CreateKeyDialog({
 
                     <div className="flex flex-col gap-1">
                         <span className="text-xs text-muted-foreground">Scopes</span>
-                        {availableScopes.length === 0 ? (
-                            <p className="text-sm text-muted-foreground">
-                                You hold no permissions a key could carry.
-                            </p>
-                        ) : (
-                            <div className="grid gap-1 sm:grid-cols-2">
-                                {availableScopes.map((scope) => (
-                                    <label key={scope} className="flex items-center gap-2 text-sm">
-                                        <Checkbox
-                                            checked={scopes.includes(scope)}
-                                            onChange={(event) =>
-                                                setScopes((prev) =>
-                                                    event.target.checked
-                                                        ? [...prev, scope]
-                                                        : prev.filter((entry) => entry !== scope)
-                                                )
-                                            }
-                                        />
-                                        {SCOPE_LABELS[scope]}
-                                    </label>
-                                ))}
-                            </div>
-                        )}
+                        <ScopePicker available={availableScopes} selected={scopes} onChange={setScopes} />
                     </div>
 
-                    <label className="flex flex-col gap-1 text-sm">
-                        Expiry
-                        <Select
-                            value={String(expiresInDays)}
-                            onValueChange={(value) => setExpiresInDays(Number(value))}
-                            options={API_KEY_EXPIRY_CHOICES.map((days) => ({
-                                value: String(days),
-                                label: expiryLabel(days)
-                            }))}
-                        />
-                    </label>
+                    <div className="flex flex-col gap-2">
+                        <label className="flex flex-col gap-1 text-sm">
+                            Expiry
+                            <Select
+                                value={expiry}
+                                onValueChange={setExpiry}
+                                options={[
+                                    ...API_KEY_EXPIRY_CHOICES.map((days) => ({
+                                        value: String(days),
+                                        label: expiryLabel(days)
+                                    })),
+                                    { value: CUSTOM_EXPIRY, label: "Custom date" }
+                                ]}
+                            />
+                        </label>
+                        {custom ? (
+                            <label className="flex flex-col gap-1 text-sm">
+                                <span className="text-xs text-muted-foreground">
+                                    Works through the end of the chosen day.
+                                </span>
+                                <Input
+                                    type="date"
+                                    value={expiryDate}
+                                    min={earliestExpiryDate()}
+                                    onChange={(event) => setExpiryDate(event.target.value)}
+                                />
+                            </label>
+                        ) : null}
+                    </div>
 
                     <div className="flex flex-col gap-1">
                         <span className="text-xs font-medium">Where the key may be used</span>
@@ -298,7 +323,7 @@ function CreateKeyDialog({
                         </Button>
                         <Button
                             onClick={() => void submit()}
-                            disabled={busy || name.trim() === "" || scopes.length === 0}
+                            disabled={busy || name.trim() === "" || scopes.length === 0 || !dateReady}
                         >
                             {busy ? "Creating..." : "Create key"}
                         </Button>

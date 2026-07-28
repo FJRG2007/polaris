@@ -60,6 +60,16 @@ function generatePrefix(): string {
 
 const MINUTES_PER_DAY = 24 * 60;
 
+/** When a key stops working: a hand-picked date if there is one, otherwise the
+ *  chosen span, and null for a key that never expires. */
+function expiryFor(input: CreateApiKeyInput): Date | null {
+    if (input.expiresAt) return new Date(input.expiresAt);
+    if (input.expiresInDays > 0) {
+        return new Date(Date.now() + input.expiresInDays * MINUTES_PER_DAY * 60 * 1000);
+    }
+    return null;
+}
+
 /**
  * Issue a key. The returned `secret` is the only time the full value exists
  * outside the caller's hands - it is not recoverable afterwards.
@@ -84,10 +94,7 @@ export async function createApiKey(
             allowedCidrs: stringifyList(input.allowedCidrs),
             allowedCountries: stringifyList(input.allowedCountries),
             allowedContinents: stringifyList(input.allowedContinents),
-            expiresAt:
-                input.expiresInDays > 0
-                    ? new Date(Date.now() + input.expiresInDays * MINUTES_PER_DAY * 60 * 1000)
-                    : null,
+            expiresAt: expiryFor(input),
             groups: { createMany: { data: owned.map((group) => ({ groupId: group.id })) } }
         },
         select: { id: true }

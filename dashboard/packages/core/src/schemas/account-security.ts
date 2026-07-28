@@ -13,7 +13,7 @@
 import { z } from "zod";
 import { isCidr, isIpAddress } from "../cidr.js";
 import { CONTINENTS, COUNTRY_CODES } from "../geo.js";
-import { PERMISSIONS } from "../permissions.js";
+import { expandPermissions, PERMISSIONS } from "../permissions.js";
 
 /** A single IP address or CIDR range in a network allowlist. */
 export const ipRuleField = z
@@ -157,20 +157,38 @@ export const API_KEY_PREFIX = "plk";
 /** How long a key may live. 0 means it never expires. */
 export const API_KEY_EXPIRY_CHOICES = [0, 7, 30, 90, 180, 365] as const;
 
+/** How far ahead a hand-picked expiry date may sit. */
+export const API_KEY_MAX_EXPIRY_YEARS = 10;
+
 export const createApiKeySchema = accessRulesSchema.extend({
     name: z.string().trim().min(1, "Name is required").max(60),
     /** Permissions the key may exercise; it can only ever narrow its owner's own. */
     scopes: z
         .array(z.enum(PERMISSIONS))
         .min(1, "Pick at least one scope")
-        .transform((values) => Array.from(new Set(values))),
+        .transform((values) => expandPermissions(values)),
     expiresInDays: z
         .number()
         .int()
         .refine((value) => (API_KEY_EXPIRY_CHOICES as readonly number[]).includes(value), {
             message: "Unsupported expiry"
         })
-        .default(90)
+        .default(90),
+    /** A hand-picked expiry instant. Takes the place of one of the fixed spans. */
+    expiresAt: z
+        .string()
+        .datetime({ offset: true })
+        .optional()
+        .refine((value) => value === undefined || new Date(value).getTime() > Date.now(), {
+            message: "Pick a date in the future"
+        })
+        .refine(
+            (value) =>
+                value === undefined ||
+                new Date(value).getTime() <
+                    Date.now() + API_KEY_MAX_EXPIRY_YEARS * 365 * 24 * 60 * 60 * 1000,
+            { message: `Pick a date within ${API_KEY_MAX_EXPIRY_YEARS} years` }
+        )
 });
 
 export type CreateApiKeyInput = z.infer<typeof createApiKeySchema>;
