@@ -1438,7 +1438,9 @@ function QuickTunnelRow({ appId, nonce, onChanged }: { appId: string; nonce: num
             icon={<CloudflareMark className="size-3.5" />}
             label={status.url ? status.url.replace(/^https?:\/\//, "") : "starting..."}
             href={status.url}
-            badge="quick link"
+            // The sidecar can be up with a hostname that no longer answers, so say
+            // which it is instead of presenting every running tunnel as a live link.
+            badge={!status.url ? "starting..." : status.reachable ? "quick link" : "not answering"}
             enabled
             pending={pending}
             onToggle={() =>

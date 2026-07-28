@@ -573,7 +573,7 @@ export async function quickTunnelStatusAction(applicationId: string): Promise<Qu
     try {
         return await getQuickTunnelStatus(applicationId, user.id);
     } catch {
-        return { running: false, url: null };
+        return { running: false, url: null, reachable: false };
     }
 }
 

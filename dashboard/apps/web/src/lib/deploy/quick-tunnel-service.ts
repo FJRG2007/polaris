@@ -15,6 +15,7 @@ import { prisma } from "@polaris/db";
 import type { ComposeSpec } from "@polaris/deploy";
 import { shortHash } from "@polaris/deploy";
 import { HostdPorts } from "./ports-hostd";
+import { newestUrl, tunnelReachable } from "./tunnel-url";
 import { parseStoredTunnel, type StoredTunnel } from "./quick-tunnel-store";
 import { getPublicIp } from "../domain-service";
 import { syncAppRoutes } from "../deploy-service";
@@ -28,6 +29,9 @@ export interface QuickTunnelStatus {
     running: boolean;
     /** The public URL while the tunnel is up, or null. */
     url: string | null;
+    /** Whether that URL was seen answering. A sidecar can be up with a hostname
+     *  that is already dead, so this is what says the link actually works. */
+    reachable: boolean;
 }
 
 /** Compose project/service names for an app's quick tunnel (charset-safe for hostd). */
@@ -107,7 +111,8 @@ function tunnelSpec(project: string, service: string, origin: string, hostHeader
 
 /** Read the sidecar's current logs and extract the trycloudflare.com URL, or null.
  *  cloudflared prints the URL once at startup, so a generous tail keeps it readable
- *  for a while after a (re)start before it scrolls past the window. */
+ *  for a while after a (re)start before it scrolls past the window - and that same
+ *  window can hold the URLs of earlier runs, so only the newest one is current. */
 async function readUrlFromLogs(ports: HostdPorts, service: string): Promise<string | null> {
     let buffer = "";
     try {
@@ -117,7 +122,7 @@ async function readUrlFromLogs(ports: HostdPorts, service: string): Promise<stri
     } catch {
         return null;
     }
-    return buffer.match(URL_PATTERN)?.[0] ?? null;
+    return newestUrl(buffer, URL_PATTERN);
 }
 
 /** The sidecar container's start time, used to detect a restart (which mints a new
@@ -172,7 +177,7 @@ export async function startQuickTunnel(appId: string, ownerId: string): Promise<
         // Publish the edge route for this tunnel's host so the first request is proxied
         // (and logged) rather than 404'd by the edge for an unknown host.
         await syncAppRoutes().catch(() => undefined);
-        return { running: true, url };
+        return { running: true, url, reachable: url ? await tunnelReachable(url) : false };
     } finally {
         await ports.dispose();
     }
@@ -207,24 +212,29 @@ export async function getQuickTunnelStatus(appId: string, ownerId: string): Prom
         const info = (await ports.inspect(service)) as { State?: { Running?: boolean; StartedAt?: string } };
         if (!info?.State?.Running) {
             await forgetTunnel(appId);
-            return { running: false, url: null };
+            return { running: false, url: null, reachable: false };
         }
         const startedAt = info.State.StartedAt ?? null;
         const stored = await getStored(appId);
-        // Same container instance as when we captured the URL: it cannot have changed,
-        // so trust the stored URL and skip the fragile log re-read entirely.
+        // Same container instance as when we captured the URL - but cloudflared can
+        // restart inside a container that never stopped, and that mints a new hostname
+        // while the old one stops resolving. So the cached URL is reported only while it
+        // still answers; trusting it blindly is what showed a dead link as a live one.
+        let probed: string | null = null;
         if (startedAt && stored.startedAt === startedAt && stored.url) {
-            return { running: true, url: stored.url };
+            probed = stored.url;
+            if (await tunnelReachable(stored.url)) return { running: true, url: stored.url, reachable: true };
         }
-        // First status, or a restart minted a new URL (the old one is now dead). Re-read
-        // from the fresh logs and record this instance so subsequent checks are cheap. If
-        // the URL has already scrolled past the log window, report no URL (honest -
-        // prompting a restart) rather than the stale, dead one.
-        const url = await readUrlFromLogs(ports, service);
+        // First status, or the cached URL has gone dead. Re-read from the fresh logs and
+        // record this instance so subsequent checks are cheap. If the URL has already
+        // scrolled past the log window, fall back to the stored one and let the probe
+        // report whether it works, rather than claiming a working tunnel either way.
+        const url = (await readUrlFromLogs(ports, service)) ?? stored.url;
         await markTunnelLive(appId, url, startedAt);
-        return { running: true, url };
+        if (!url) return { running: true, url: null, reachable: false };
+        return { running: true, url, reachable: url === probed ? false : await tunnelReachable(url) };
     } catch {
-        return { running: false, url: (await getStored(appId)).url };
+        return { running: false, url: (await getStored(appId)).url, reachable: false };
     } finally {
         await ports.dispose();
     }

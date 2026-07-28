@@ -15,6 +15,7 @@ import { prisma } from "@polaris/db";
 import type { ComposeSpec } from "@polaris/deploy";
 import { shortHash } from "@polaris/deploy";
 import { HostdPorts } from "./ports-hostd";
+import { newestUrl } from "./tunnel-url";
 import { getPublicIp } from "../domain-service";
 import { hostPortForApp } from "../deploy-service";
 import { getIntegrationSecret, getIntegrationState } from "../integration-service";
@@ -84,7 +85,7 @@ async function readUrlFromLogs(ports: HostdPorts, service: string): Promise<stri
     } catch {
         return null;
     }
-    return buffer.match(URL_PATTERN)?.[0] ?? null;
+    return newestUrl(buffer, URL_PATTERN);
 }
 
 function delay(ms: number): Promise<void> {

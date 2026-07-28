@@ -14,6 +14,7 @@
 import { prisma } from "@polaris/db";
 import type { ComposeSpec } from "@polaris/deploy";
 import { HostdPorts } from "./deploy/ports-hostd";
+import { newestUrl } from "./deploy/tunnel-url";
 
 const PROJECT = "polaris-ptunnel";
 const SERVICE = "ptunnel";
@@ -61,7 +62,7 @@ async function readUrlFromLogs(ports: HostdPorts): Promise<string | null> {
     } catch {
         return null;
     }
-    return buffer.match(URL_PATTERN)?.[0] ?? null;
+    return newestUrl(buffer, URL_PATTERN);
 }
 
 async function getStoredUrl(): Promise<string | null> {
