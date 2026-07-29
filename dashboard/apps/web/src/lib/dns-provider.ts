@@ -176,6 +176,15 @@ const REGISTRY_SUFFIX =
  */
 const resolver = new Resolver({ timeout: 2000, tries: 1 });
 
+/**
+ * How deep the walk starts. A name is 253 characters of labels as far as the schema is
+ * concerned, and one lookup per label on a domain that resolves nowhere would hold the
+ * request open for minutes. The zone bases this looks up are two to five labels, so a
+ * longer name is walked from its last five - which is where the registrable domain, the
+ * one that actually answers, sits anyway.
+ */
+const MAX_ZONE_LABELS = 5;
+
 /** Resolve one zone's nameservers, treating "no such zone" as an empty answer. */
 async function resolveNsOrEmpty(zone: string): Promise<string[]> {
     try {
@@ -196,7 +205,7 @@ async function resolveNsOrEmpty(zone: string): Promise<string[]> {
  */
 export async function detectDnsProvider(domain: string): Promise<DnsProviderInfo | null> {
     const labels = domain.trim().toLowerCase().replace(/\.$/, "").split(".").filter(Boolean);
-    for (let index = 0; index + 2 <= labels.length; index += 1) {
+    for (let index = Math.max(0, labels.length - MAX_ZONE_LABELS); index + 2 <= labels.length; index += 1) {
         const zone = labels.slice(index).join(".");
         // Only above the domain that was typed: `me.io`, `id.me` and `in.ai` read as
         // registry suffixes too, and skipping them would drop the hint on a domain the

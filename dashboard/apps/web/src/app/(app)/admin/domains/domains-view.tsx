@@ -98,8 +98,12 @@ function useStoredField(stored: string) {
 
     useEffect(() => {
         if (stored === adopted.current) return;
-        setValue((current) => (current === adopted.current ? stored : current));
+        // Read before the ref moves on: React runs the updater when it renders, not
+        // when it is queued, so an updater that read the ref itself would compare the
+        // field against the value it is about to adopt and never see it as untouched.
+        const previous = adopted.current;
         adopted.current = stored;
+        setValue((current) => (current === previous ? stored : current));
     }, [stored]);
 
     /** Take a value as the stored one, once a save has written it. */
@@ -405,6 +409,10 @@ function NetworkExposure({ nonce }: { nonce: number }) {
     const [busy, setBusy] = useState(false);
     const [saved, setSaved] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    // What the last read (or save) left in these two controls. The setup re-reads this
+    // panel whenever it changes something, so a control nobody has touched follows the
+    // stored value, and one the operator has changed and not saved yet is left alone.
+    const loaded = useRef({ mode: "auto" as NetworkMode, wildcard: "" });
 
     useEffect(() => {
         // A re-read after the setup changed something has to clear what the last one
@@ -412,9 +420,11 @@ function NetworkExposure({ nonce }: { nonce: number }) {
         setError(null);
         void networkStatusAction()
             .then((next) => {
+                const previous = loaded.current;
+                loaded.current = { mode: next.mode, wildcard: next.wildcardDomain };
                 setStatus(next);
-                setMode(next.mode);
-                setWildcard(next.wildcardDomain);
+                setMode((current) => (current === previous.mode ? next.mode : current));
+                setWildcard((current) => (current === previous.wildcard ? next.wildcardDomain : current));
             })
             .catch((caught: unknown) => {
                 setError(caught instanceof Error ? caught.message : "Could not read the network status");
@@ -441,11 +451,11 @@ function NetworkExposure({ nonce }: { nonce: number }) {
         try {
             // A zone-managed wildcard is not editable here, so it is not written back:
             // storing a copy would leave two values for one setting.
-            setStatus(
-                await saveNetworkConfigAction(
-                    status?.wildcardManaged ? { mode } : { mode, wildcardDomain: wildcard }
-                )
+            const next = await saveNetworkConfigAction(
+                status?.wildcardManaged ? { mode } : { mode, wildcardDomain: wildcard }
             );
+            loaded.current = { mode: next.mode, wildcard: next.wildcardDomain };
+            setStatus(next);
             setSaved(true);
         } catch (caught) {
             setError(caught instanceof Error ? caught.message : "Could not save the exposure mode");

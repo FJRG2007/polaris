@@ -135,6 +135,17 @@ describe("detectDnsProvider", () => {
         expect(asked).toEqual(["me.io"]);
     });
 
+    it("walks a long name from its last labels instead of one lookup per label", async () => {
+        // The hint runs from a server action on every pause in typing, and each lookup
+        // that finds nothing waits out its own timeout: a name with a hundred labels
+        // would hold the request open for minutes to find a zone that sits at the end.
+        const deep = `${Array.from({ length: 40 }, (_, index) => `l${index}`).join(".")}.example.com`;
+        answers.set("example.com", ["dana.ns.cloudflare.com"]);
+        const info = await detectDnsProvider(deep);
+        expect(info?.zone).toBe("example.com");
+        expect(asked.length).toBeLessThanOrEqual(4);
+    });
+
     it("answers null for a domain that does not exist yet, which keeps the offer open", async () => {
         expect(await detectDnsProvider("not-registered-yet.com")).toBeNull();
     });

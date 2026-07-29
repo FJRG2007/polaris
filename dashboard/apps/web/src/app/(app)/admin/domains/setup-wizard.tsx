@@ -78,6 +78,7 @@ export function DomainSetupWizard({ onState }: { onState?: (state: DomainSetupSt
     const [useForDashboard, setUseForDashboard] = useState(true);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [loadError, setLoadError] = useState<string | null>(null);
     const [resumed, setResumed] = useState(false);
     const [provider, setProvider] = useState<DnsProviderInfo | null>(null);
 
@@ -94,26 +95,41 @@ export function DomainSetupWizard({ onState }: { onState?: (state: DomainSetupSt
         onState?.(next);
     }
 
+    /**
+     * The first read, which everything below renders from. It is not a cheap one - it
+     * re-checks the zone's DNS and looks up the public IP - so it can fail, and a failure
+     * that only stopped the spinner would leave the operator on "Reading your setup..."
+     * for good with nothing to press.
+     */
+    function load() {
+        setLoadError(null);
+        void domainSetupStateAction()
+            .then((next) => {
+                applyState(next);
+                const draft = readSetupDraft();
+                const answers = draft ?? savedAnswers(next);
+                setEnvironment(answers.environment);
+                setStrategy(answers.strategy);
+                setBaseDomain(answers.baseDomain);
+                setZones(answers.zones.map((zone) => ({ ...zone })));
+                setDuckSub(answers.duckSub);
+                setUseForDashboard(answers.useForDashboard);
+                if (draft) {
+                    setStep(draft.step);
+                    setResumed(true);
+                    return;
+                }
+                // Nothing unfinished, but a layout already saved: what that domain's DNS
+                // is doing is the useful view, not the first question over again.
+                if (next.zones.baseDomain) setStep(3);
+            })
+            .catch((caught: unknown) => {
+                setLoadError(caught instanceof Error ? caught.message : "Could not read your setup");
+            });
+    }
+
     useEffect(() => {
-        void domainSetupStateAction().then((next) => {
-            applyState(next);
-            const draft = readSetupDraft();
-            const answers = draft ?? savedAnswers(next);
-            setEnvironment(answers.environment);
-            setStrategy(answers.strategy);
-            setBaseDomain(answers.baseDomain);
-            setZones(answers.zones.map((zone) => ({ ...zone })));
-            setDuckSub(answers.duckSub);
-            setUseForDashboard(answers.useForDashboard);
-            if (draft) {
-                setStep(draft.step);
-                setResumed(true);
-                return;
-            }
-            // Nothing unfinished, but a layout already saved: what that domain's DNS is
-            // doing is the useful view, not the first question over again.
-            if (next.zones.baseDomain) setStep(3);
-        });
+        load();
     }, []);
 
     // Kept only while the answers are unsaved and say something the server does not
@@ -151,8 +167,21 @@ export function DomainSetupWizard({ onState }: { onState?: (state: DomainSetupSt
     if (!state) {
         return (
             <Card>
-                <CardBody className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Loader2 className="size-4 animate-spin" /> Reading your setup...
+                <CardBody className="flex flex-col gap-2 text-sm text-muted-foreground">
+                    {loadError ? (
+                        <>
+                            <p className="flex items-start gap-2 rounded-md border border-danger/30 bg-danger/5 px-3 py-2 text-xs text-danger">
+                                <TriangleAlert className="mt-0.5 size-3.5 shrink-0" /> {loadError}
+                            </p>
+                            <Button size="sm" variant="secondary" className="w-fit" onClick={load}>
+                                <RefreshCw className="size-4" /> Try again
+                            </Button>
+                        </>
+                    ) : (
+                        <span className="flex items-center gap-2">
+                            <Loader2 className="size-4 animate-spin" /> Reading your setup...
+                        </span>
+                    )}
                 </CardBody>
             </Card>
         );
@@ -184,14 +213,26 @@ export function DomainSetupWizard({ onState }: { onState?: (state: DomainSetupSt
         setStep(0);
     }
 
-    /** Re-read what the server holds, after something the wizard did changed it. */
+    /**
+     * Re-read what the server holds, after something the wizard did changed it. It never
+     * rejects: this runs after the write it follows has already succeeded, and letting it
+     * throw would unwind the caller - leaving the button that started it spinning over a
+     * token that is, in fact, connected.
+     */
     async function refresh() {
-        applyState(await domainSetupStateAction());
+        try {
+            applyState(await domainSetupStateAction());
+        } catch (caught) {
+            setError(caught instanceof Error ? caught.message : "Could not re-read your setup");
+        }
     }
 
     async function save() {
         setBusy(true);
         setError(null);
+        // The action reports what it refused as `error`, but it can still reject outright
+        // on an expired session or a dropped connection - and a Save button left spinning
+        // and disabled is a dead end that only a reload gets out of.
         const result = await saveDomainSetupAction({
             environment,
             strategy,
@@ -200,14 +241,23 @@ export function DomainSetupWizard({ onState }: { onState?: (state: DomainSetupSt
             duckdnsSubdomain: duckSub,
             duckdnsToken: duckToken,
             useForDashboard
-        });
+        }).catch((caught: unknown) => ({
+            state: null,
+            error: caught instanceof Error ? caught.message : "Could not save the domain setup"
+        }));
         setBusy(false);
-        if (result.error) {
-            setError(result.error);
+        if (!result.state || result.error) {
+            setError(result.error ?? "Could not save the domain setup");
             return;
         }
         applyState(result.state);
         setZones(result.state.zones.zones.map((zone) => ({ ...zone })));
+        // The server normalizes what it stored - a pasted URL becomes a bare domain, a
+        // DuckDNS name loses its suffix - so the answers on screen are put back to the
+        // ones it holds. Left as typed, they read as unsaved changes and step 2 would
+        // resume from a draft the operator never made.
+        setBaseDomain(result.state.zones.baseDomain);
+        setDuckSub(result.state.domains.duckdnsSubdomain);
         setDuckToken("");
         // The answers now live on the server, so the local copy has nothing left to
         // protect and would only compete with what the operator changes from here.
@@ -882,8 +932,14 @@ function CloudflareConnect({ zone, onConnected }: { zone: string; onConnected: (
             return;
         }
         setToken("");
-        await onConnected();
-        setBusy(false);
+        try {
+            // The token is stored by this point, so whatever happens next must not leave
+            // the button spinning: on a reload the account is connected and nothing on
+            // screen would explain why pressing it did nothing.
+            await onConnected();
+        } finally {
+            setBusy(false);
+        }
     }
 
     return (

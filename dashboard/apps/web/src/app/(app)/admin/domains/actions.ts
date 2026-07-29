@@ -43,8 +43,12 @@ const domainsSchema = z.object({
  * Save whichever domain settings were passed. Partial on purpose: the page saves the
  * app/sharing pair and the DuckDNS pair from separate panels, and a call that carried
  * the whole shape would have each one write back its stale copy of the other's fields.
+ *
+ * Typed from the schema as well as parsed against it: every field being optional means
+ * a mistyped key is stripped in silence, so a caller that sends `duckdnsTokn` would be
+ * told the settings were saved while the token never reached the database.
  */
-export async function saveDomainsAction(input: unknown): Promise<{ config: DomainConfig }> {
+export async function saveDomainsAction(input: z.input<typeof domainsSchema>): Promise<{ config: DomainConfig }> {
     const user = await requireAdmin();
     const parsed = domainsSchema.safeParse(input);
     if (!parsed.success) throw new Error("Invalid domain settings");
