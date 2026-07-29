@@ -1,6 +1,9 @@
 /**
- * Domains admin panel (/admin/domains). Configure the app domain and the sharing
- * domain (used for share links and drop points), and manage DuckDNS. Admin-only.
+ * Domains admin panel (/admin/domains). The guided setup decides how the box is
+ * exposed and under which domain; this page also holds Polaris's own addresses (the
+ * app domain and the sharing domain used for share links and drop points), the root
+ * certificate for `polaris.local`, and - under Advanced - the manual exposure and
+ * DuckDNS controls. Admin-only.
  */
 
 import { PageHeader } from "@polaris/ui";

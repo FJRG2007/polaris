@@ -5,6 +5,11 @@
  * lives, how services should be exposed, and which domain and zones to use - and this
  * applies them in one place, so the exposure mode, the zone layout and the DuckDNS
  * credentials can never drift apart the way they do when each is saved on its own.
+ * The chosen strategy is recorded alongside them, because what a strategy leaves
+ * behind does not identify it well enough to reopen the setup on the right answer.
+ *
+ * Reading is served from here too: the state the wizard renders from, and the lookup
+ * of who answers DNS for a domain as it is typed.
  *
  * Admin-gated: these change every URL Polaris hands out.
  */

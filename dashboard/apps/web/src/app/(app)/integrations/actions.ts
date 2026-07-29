@@ -103,9 +103,11 @@ export async function syncDuckdnsAction(): Promise<{ ok: boolean; detail: string
 }
 
 /**
- * Connect a Cloudflare API token for automated named tunnels. Validates the token
- * and resolves the account; when it can reach several accounts and none is chosen,
- * returns them so the UI can prompt (nothing is stored until an account is set).
+ * Connect a Cloudflare API token for automated named tunnels and zone DNS. Validates
+ * the token and resolves the account; when it can reach several accounts and none is
+ * chosen, returns them so the UI can prompt (nothing is stored until an account is
+ * set). Also called from the domains guided setup, which asks for the token inline so
+ * the zone's records can be created without a detour through this page.
  */
 export async function connectCloudflareAccountAction(input: {
     token: string;
