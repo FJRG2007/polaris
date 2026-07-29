@@ -31,7 +31,8 @@ import {
     zoneRecords
 } from "./domain-zones";
 import { setDomainConfig } from "./domain-service";
-import { detectPublicIp } from "./network-service";
+import { detectPublicIp, getLocalEnvironment } from "./network-service";
+import { reportRouterAdvice, type RouterAdvice } from "./network-advice";
 import { loadCloudflareToken } from "./integrations/cloudflare-account-service";
 import { findDnsRecords, pruneDnsRecords, resolveZoneForHostname, upsertARecord } from "./integrations/cloudflare-api";
 
@@ -54,6 +55,9 @@ export interface ZoneDnsReport {
     /** The address the records should point at, when one is known. */
     expectedIp: string | null;
     zones: ZoneDnsCheck[];
+    /** What is left to do outside Polaris - a router forward, a firewall rule - for
+     *  the domain to work. Null when there is no Polaris zone to diagnose. */
+    router: RouterAdvice | null;
 }
 
 /** Resolve one name, returning an empty list rather than throwing on NXDOMAIN. */
@@ -137,7 +141,30 @@ export async function checkZoneDns(): Promise<ZoneDnsReport> {
         await setZoneReachable(reachable);
         if (reachable) await applyDashboardZone();
     }
-    return { expectedIp, zones };
+    // Only diagnose the router once the records themselves are right. Before that the
+    // name resolves nowhere, so nothing could answer on it - and the operator would be
+    // sent to their router over what is actually a missing DNS record.
+    const resolves = zones.length > 0 && zones.every((zone) => zone.ok);
+    return { expectedIp, zones, router: resolves ? await checkRouter() : null };
+}
+
+/**
+ * Diagnose what is still in the way of the domain, on the one hostname the dashboard
+ * itself serves - so the probe can ask who answered instead of settling for the fact
+ * that somebody did.
+ *
+ * Best-effort: this is advice, and a failure here must not fail the DNS check the
+ * operator actually pressed the button for.
+ */
+async function checkRouter(): Promise<RouterAdvice | null> {
+    try {
+        const host = await polarisZoneHost();
+        if (!host) return null;
+        const { environment } = await getLocalEnvironment();
+        return await reportRouterAdvice(environment, host);
+    } catch {
+        return null;
+    }
 }
 
 /**

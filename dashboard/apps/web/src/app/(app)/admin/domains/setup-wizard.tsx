@@ -1074,7 +1074,35 @@ function ZoneResults({ report }: { report: ZoneDnsReport | null }) {
                     </span>
                 </p>
             ))}
+            {report?.router && !report.router.ok ? <RouterAdviceNote advice={report.router} /> : null}
         </>
+    );
+}
+
+/** What is left to do outside Polaris. Shown only when there is something to do:
+ *  the records being right is already reported above, and repeating "and the router
+ *  is fine too" for every check would bury the case that needs acting on. */
+function RouterAdviceNote({ advice }: { advice: NonNullable<ZoneDnsReport["router"]> }) {
+    const danger = advice.level === "danger";
+    return (
+        <div
+            className={`flex items-start gap-2 rounded-md border px-3 py-2 text-xs ${
+                danger ? "border-danger/30 bg-danger/5" : "border-warning/30 bg-warning/5"
+            }`}
+        >
+            <TriangleAlert className={`mt-0.5 size-3.5 shrink-0 ${danger ? "text-danger" : "text-warning"}`} />
+            <div className="flex flex-col gap-1 text-muted-foreground">
+                <p className="font-medium text-foreground">{advice.title}</p>
+                <p>{advice.detail}</p>
+                {advice.steps.length > 0 && (
+                    <ol className="ml-4 list-decimal">
+                        {advice.steps.map((step) => (
+                            <li key={step}>{step}</li>
+                        ))}
+                    </ol>
+                )}
+            </div>
+        </div>
     );
 }
 
