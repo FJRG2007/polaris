@@ -8,7 +8,7 @@
  */
 
 import { useState, useTransition } from "react";
-import { CheckCircle2, ExternalLink, Loader2, RefreshCw, ShieldCheck } from "lucide-react";
+import { CheckCircle2, Circle, ExternalLink, Loader2, RefreshCw, ShieldCheck } from "lucide-react";
 import {
     Badge,
     Button,
@@ -25,6 +25,11 @@ import {
     cn
 } from "@polaris/ui";
 import { DYMO_IP_RULES, SCAN_ACTIONS, type ScanAction } from "@/lib/integrations/registry";
+import {
+    CLOUDFLARE_TOKEN_LINKS,
+    CLOUDFLARE_TOKEN_PERMISSIONS,
+    type CloudflareTokenScope
+} from "@/lib/integrations/cloudflare-token-link";
 import { IntegrationLogo } from "@/components/logos";
 import {
     connectCloudflareAccountAction,
@@ -62,9 +67,11 @@ export interface IntegrationCard {
     deny: string[];
     /** DuckDNS: the configured subdomain (empty when not set). */
     duckdnsSubdomain?: string;
-    /** Cloudflare: whether an API token is connected (for automated named tunnels). */
+    /** Cloudflare: whether a token that can create named tunnels is connected. */
     cloudflareApiConnected?: boolean;
-    /** Cloudflare: the connected account name, when an API token is set. */
+    /** Cloudflare: whether a token that can write DNS records is connected. */
+    cloudflareDnsConnected?: boolean;
+    /** Cloudflare: the connected account name, when a tunnel token is set. */
     cloudflareAccountName?: string;
     /** GitHub: how it is connected, when connected. */
     githubMethod?: "pat" | "app" | null;
@@ -196,33 +203,61 @@ function TunnelDialog({ card, onClose }: { card: IntegrationCard; onClose: () =>
     );
 }
 
+/** What a token can be created for, in the order an operator most likely wants. */
+const CLOUDFLARE_SCOPES: Array<{ id: CloudflareTokenScope; label: string; hint: string }> = [
+    { id: "all", label: "Everything", hint: "One token for records and tunnels." },
+    { id: "dns", label: "DNS only", hint: "Points your domains at this server." },
+    { id: "tunnel", label: "Tunnels only", hint: "Publishes apps with no ports open." }
+];
+
 /**
- * Connect a Cloudflare API token so per-app named tunnels can be provisioned
- * automatically (Polaris creates the tunnel + DNS; the operator only picks a
- * hostname). Separate from the connector token above, which runs a server-wide
- * tunnel and grants no API access. Handles the multi-account case by prompting
- * for which account the token should act on.
+ * Connect the API tokens Polaris uses Cloudflare through. Two capabilities, because
+ * they need different permissions and either is useful alone: writing a zone's DNS
+ * records, and creating a named tunnel per app. One token can carry both, and an
+ * operator who would rather not give a DNS credential any tunnel access connects two.
+ *
+ * Separate from the connector token above, which runs one server-wide tunnel and
+ * grants no API access at all.
+ *
+ * Each choice links to Cloudflare's token form with its permissions already ticked.
+ * The permissions stay written out beside it because a key Cloudflare does not
+ * recognize is dropped silently - the form opens looking entirely normal with that
+ * row missing, and the operator only finds out when the token is rejected here.
  */
 function CloudflareApiTokenSection({ card }: { card: IntegrationCard }) {
-    const [connected, setConnected] = useState(card.cloudflareApiConnected ?? false);
+    const [tunnelConnected, setTunnelConnected] = useState(card.cloudflareApiConnected ?? false);
+    const [dnsConnected, setDnsConnected] = useState(card.cloudflareDnsConnected ?? false);
     const [accountName, setAccountName] = useState(card.cloudflareAccountName ?? "");
+    const [scope, setScope] = useState<CloudflareTokenScope>("all");
     const [token, setToken] = useState("");
     const [accounts, setAccounts] = useState<{ id: string; name: string }[]>([]);
     const [accountId, setAccountId] = useState("");
     const [error, setError] = useState<string | null>(null);
+    const [note, setNote] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
 
     function onConnect(chosen?: string) {
         setError(null);
+        setNote(null);
         startTransition(async () => {
-            const result = await connectCloudflareAccountAction({ token, accountId: chosen });
+            const result = await connectCloudflareAccountAction({ token, scope, accountId: chosen });
             if (result.error) {
                 setError(result.error);
                 return;
             }
             if (result.connected) {
-                setConnected(true);
-                setAccountName(result.accountName ?? "");
+                const stored = result.stored ?? [];
+                if (stored.includes("dns")) setDnsConnected(true);
+                if (stored.includes("tunnel")) {
+                    setTunnelConnected(true);
+                    setAccountName(result.accountName ?? "");
+                }
+                // An "everything" token that reached no account lands as DNS only. Said
+                // plainly here, because the row above simply not lighting up is the kind
+                // of half-success an operator reads as a bug.
+                if (scope === "all" && !stored.includes("tunnel")) {
+                    setNote("Connected for DNS. The token reaches no account, so tunnels still need one.");
+                }
                 setAccounts([]);
                 setToken("");
                 return;
@@ -234,49 +269,78 @@ function CloudflareApiTokenSection({ card }: { card: IntegrationCard }) {
         });
     }
 
-    function onDisconnect() {
+    function onDisconnect(which: CloudflareTokenScope) {
         setError(null);
+        setNote(null);
         startTransition(async () => {
-            const result = await disconnectCloudflareAccountAction();
-            if (result.error) setError(result.error);
-            else {
-                setConnected(false);
+            const result = await disconnectCloudflareAccountAction({ scope: which });
+            if (result.error) {
+                setError(result.error);
+                return;
+            }
+            if (which !== "tunnel") setDnsConnected(false);
+            if (which !== "dns") {
+                setTunnelConnected(false);
                 setAccountName("");
             }
         });
     }
 
+    const active = CLOUDFLARE_SCOPES.find((entry) => entry.id === scope);
+    // Nothing left to ask for once both are connected; the rows above carry the state
+    // and a form offering a token for capabilities that already work is just noise.
+    const complete = dnsConnected && tunnelConnected;
+
     return (
         <div className="flex flex-col gap-3 border-t border-border pt-4">
             <div className="flex flex-col gap-1">
-                <span className="text-sm font-medium">Automatic tunnels (API token)</span>
+                <span className="text-sm font-medium">API access</span>
                 <span className="text-xs text-muted-foreground">
-                    Connect an API token and Polaris sets up each app's tunnel and DNS for you - you only pick a
-                    hostname. Create a Custom Token with these three permissions:
-                </span>
-                <ul className="flex flex-col gap-0.5 text-xs text-muted-foreground">
-                    <li>- Account -&gt; <span className="text-foreground">Cloudflare Tunnel</span> -&gt; Edit</li>
-                    <li>- Zone -&gt; <span className="text-foreground">DNS</span> -&gt; Edit</li>
-                    <li>- Zone -&gt; <span className="text-foreground">Zone</span> -&gt; Read</li>
-                </ul>
-                <span className="text-xs text-muted-foreground">
-                    Add an Account resource row to see the Cloudflare Tunnel permission (it is not under Zone).
-                    Cloudflare has no link that pre-fills these, so add them by hand on the token page.
+                    Lets Polaris create your DNS records and each app&apos;s tunnel for you. One token can do both,
+                    or connect them separately.
                 </span>
             </div>
 
-            {connected ? (
-                <div className="flex items-center justify-between gap-3 rounded-md border border-border bg-surface/40 p-2.5 text-sm">
-                    <span className="flex items-center gap-1.5">
-                        <CheckCircle2 className="size-4 text-success" />
-                        Connected{accountName ? ` as ${accountName}` : ""}
-                    </span>
-                    <Button type="button" variant="ghost" size="sm" onClick={onDisconnect} disabled={pending}>
-                        {pending ? <Loader2 className="size-4 animate-spin" /> : "Disconnect"}
-                    </Button>
-                </div>
-            ) : (
+            <div className="flex flex-col gap-2">
+                <CloudflareCapability
+                    label="DNS records"
+                    detail="Points your zones at this server."
+                    connected={dnsConnected}
+                    pending={pending}
+                    onDisconnect={() => onDisconnect("dns")}
+                />
+                <CloudflareCapability
+                    label="Named tunnels"
+                    detail={tunnelConnected && accountName ? `Account: ${accountName}` : "One tunnel per app, no open ports."}
+                    connected={tunnelConnected}
+                    pending={pending}
+                    onDisconnect={() => onDisconnect("tunnel")}
+                />
+            </div>
+
+            {!complete && (
                 <div className="flex flex-col gap-2">
+                    <div className="flex flex-wrap gap-1.5">
+                        {CLOUDFLARE_SCOPES.map((entry) => (
+                            <button
+                                key={entry.id}
+                                type="button"
+                                onClick={() => setScope(entry.id)}
+                                className={`rounded-md border px-2 py-1 text-xs transition-colors ${
+                                    scope === entry.id
+                                        ? "border-primary bg-primary/5 text-foreground"
+                                        : "border-border/60 text-muted-foreground hover:bg-muted/40"
+                                }`}
+                            >
+                                {entry.label}
+                            </button>
+                        ))}
+                    </div>
+                    <span className="text-xs text-muted-foreground">
+                        {active?.hint} The link opens Cloudflare with{" "}
+                        {CLOUDFLARE_TOKEN_PERMISSIONS[scope].join(", ")} already selected.
+                    </span>
+
                     <Input
                         type="password"
                         autoComplete="off"
@@ -286,7 +350,7 @@ function CloudflareApiTokenSection({ card }: { card: IntegrationCard }) {
                     />
                     {accounts.length > 0 ? (
                         <div className="flex flex-col gap-1 text-xs text-muted-foreground">
-                            Account
+                            The token reaches several accounts - pick the one to use
                             <Select
                                 value={accountId}
                                 onValueChange={setAccountId}
@@ -296,12 +360,12 @@ function CloudflareApiTokenSection({ card }: { card: IntegrationCard }) {
                     ) : null}
                     <div className="flex items-center justify-between gap-2">
                         <a
-                            href="https://dash.cloudflare.com/profile/api-tokens"
+                            href={CLOUDFLARE_TOKEN_LINKS[scope]}
                             target="_blank"
                             rel="noreferrer noopener"
                             className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
                         >
-                            Create a token <ExternalLink className="size-3" />
+                            Create the token on Cloudflare <ExternalLink className="size-3" />
                         </a>
                         <Button
                             type="button"
@@ -309,13 +373,58 @@ function CloudflareApiTokenSection({ card }: { card: IntegrationCard }) {
                             onClick={() => onConnect(accounts.length > 0 ? accountId : undefined)}
                             disabled={pending || !token.trim() || (accounts.length > 0 && !accountId)}
                         >
-                            {pending ? <Loader2 className="size-4 animate-spin" /> : accounts.length > 0 ? "Confirm account" : "Connect"}
+                            {pending ? (
+                                <Loader2 className="size-4 animate-spin" />
+                            ) : accounts.length > 0 ? (
+                                "Use this account"
+                            ) : (
+                                "Connect"
+                            )}
                         </Button>
                     </div>
                 </div>
             )}
 
+            {note ? <p className="text-xs text-muted-foreground">{note}</p> : null}
             {error ? <p className="text-sm text-danger">{error}</p> : null}
+        </div>
+    );
+}
+
+/** One thing the API access buys, and whether it is paid for. */
+function CloudflareCapability({
+    label,
+    detail,
+    connected,
+    pending,
+    onDisconnect
+}: {
+    label: string;
+    detail: string;
+    connected: boolean;
+    pending: boolean;
+    onDisconnect: () => void;
+}) {
+    return (
+        <div className="flex items-center justify-between gap-3 rounded-md border border-border bg-surface/40 p-2.5">
+            <span className="flex min-w-0 flex-col">
+                <span className="flex items-center gap-1.5 text-sm">
+                    {connected ? (
+                        <CheckCircle2 className="size-4 shrink-0 text-success" />
+                    ) : (
+                        <Circle className="size-4 shrink-0 text-muted-foreground" />
+                    )}
+                    {label}
+                </span>
+                <span className="truncate pl-5.5 text-xs text-muted-foreground">
+                    {connected ? detail : `Not connected. ${detail}`}
+                </span>
+            </span>
+            {connected && (
+                <Button type="button" variant="ghost" size="sm" onClick={onDisconnect} disabled={pending}>
+                    {pending ? <Loader2 className="size-4 animate-spin" /> : "Disconnect"}
+                </Button>
+            )}
         </div>
     );
 }

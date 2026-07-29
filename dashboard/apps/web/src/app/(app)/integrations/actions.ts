@@ -23,9 +23,10 @@ import {
 import { applyTunnel } from "@/lib/tunnel-service";
 import { setDomainConfig, syncDuckDns } from "@/lib/domain-service";
 import {
-    connectCloudflareAccount,
-    disconnectCloudflareAccount
+    connectCloudflareToken,
+    disconnectCloudflareToken
 } from "@/lib/integrations/cloudflare-account-service";
+import type { CloudflareTokenScope } from "@/lib/integrations/cloudflare-token-link";
 import type { CfAccount } from "@/lib/integrations/cloudflare-api";
 import { recordAudit } from "@/lib/audit-service";
 
@@ -103,40 +104,65 @@ export async function syncDuckdnsAction(): Promise<{ ok: boolean; detail: string
 }
 
 /**
- * Connect a Cloudflare API token for automated named tunnels and zone DNS. Validates
- * the token and resolves the account; when it can reach several accounts and none is
- * chosen, returns them so the UI can prompt (nothing is stored until an account is
- * set). Also called from the domains guided setup, which asks for the token inline so
- * the zone's records can be created without a detour through this page.
+ * Connect a Cloudflare API token for `scope` - DNS records, named tunnels, or one
+ * token carrying both. Validates it and, where an account is needed, resolves it;
+ * when the token reaches several accounts and none is chosen, returns them so the UI
+ * can prompt (nothing is stored until one is set). Also called from the domains
+ * guided setup, which asks for a DNS token inline so the zone's records can be
+ * created without a detour through this page.
  */
 export async function connectCloudflareAccountAction(input: {
     token: string;
+    scope?: CloudflareTokenScope;
     accountId?: string;
-}): Promise<{ error?: string; connected?: boolean; accounts?: CfAccount[]; accountName?: string }> {
+}): Promise<{
+    error?: string;
+    connected?: boolean;
+    accounts?: CfAccount[];
+    accountName?: string;
+    stored?: CloudflareTokenScope[];
+}> {
     const user = await requireAdmin();
     try {
-        const result = await connectCloudflareAccount(input.token, input.accountId);
+        const scope = input.scope ?? "all";
+        const result = await connectCloudflareToken(input.token, { scope, ...(input.accountId ? { accountId: input.accountId } : {}) });
         if (result.connected) {
             await recordAudit({
                 actorId: user.id,
                 action: "integration.configure",
                 targetType: "integration",
                 targetId: "cloudflare",
-                metadata: { method: "api-token" }
+                // What the token was connected for, not the token: an audit row naming
+                // the scope explains a later change, and never repeats a credential.
+                metadata: { method: "api-token", scope, stored: result.stored.join(",") }
             });
             revalidatePath("/integrations");
         }
-        return { connected: result.connected, accounts: result.accounts, accountName: result.accountName };
+        return {
+            connected: result.connected,
+            accounts: result.accounts,
+            accountName: result.accountName,
+            stored: result.stored
+        };
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Could not connect the Cloudflare token" };
     }
 }
 
-/** Forget the connected Cloudflare API token and account. */
-export async function disconnectCloudflareAccountAction(): Promise<{ error?: string }> {
+/** Forget one connected Cloudflare token, or both. */
+export async function disconnectCloudflareAccountAction(input?: {
+    scope?: CloudflareTokenScope;
+}): Promise<{ error?: string }> {
     const user = await requireAdmin();
-    await disconnectCloudflareAccount();
-    await recordAudit({ actorId: user.id, action: "integration.disable", targetType: "integration", targetId: "cloudflare" });
+    const scope = input?.scope ?? "all";
+    await disconnectCloudflareToken(scope);
+    await recordAudit({
+        actorId: user.id,
+        action: "integration.disable",
+        targetType: "integration",
+        targetId: "cloudflare",
+        metadata: { scope }
+    });
     revalidatePath("/integrations");
     return {};
 }

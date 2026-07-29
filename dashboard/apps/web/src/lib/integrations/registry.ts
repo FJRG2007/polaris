@@ -132,11 +132,11 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
     },
     {
         slug: "cloudflare",
-        name: "Cloudflare Tunnel",
+        name: "Cloudflare",
         category: "Automation",
-        summary: "Expose deployed apps over a public domain with no port-forwarding.",
+        summary: "Create your DNS records and expose apps with no port-forwarding.",
         description:
-            "Runs a Cloudflare Tunnel from this server so apps are reachable on your domain without opening any ports. Create a tunnel in the Cloudflare dashboard, add a public hostname pointing to http://<this-host-ip>:80, and paste its token here - Polaris routes each hostname to the right app.",
+            "Connect an API token and Polaris writes your zones' DNS records and gives each app its own tunnel, so nothing is typed into a DNS panel and no ports are opened. One token can do both, or connect DNS and tunnels separately. A connector token can also be pasted here to run a single server-wide tunnel instead.",
         docsUrl: "https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/",
         requiresApiKey: true,
         apiKeyLabel: "Tunnel token",

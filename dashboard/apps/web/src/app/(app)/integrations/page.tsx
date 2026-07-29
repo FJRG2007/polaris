@@ -19,8 +19,8 @@ export default async function IntegrationsPage() {
     const github = await getGithubStatus();
     // DuckDNS config lives with the domain settings (Setting keys), not an Integration row.
     const domains = await getDomainConfig();
-    // Cloudflare's API-token connection (for automated named tunnels) is separate
-    // from the marketplace connector token that runs the server-wide tunnel.
+    // Cloudflare's API tokens (DNS records and named tunnels) are separate from the
+    // marketplace connector token that runs the server-wide tunnel.
     const cloudflare = await getCloudflareAccountStatus();
 
     const cards: IntegrationCard[] = INTEGRATIONS.map((entry) => {
@@ -50,9 +50,8 @@ export default async function IntegrationsPage() {
             githubLogin: entry.slug === "github" ? github.login ?? undefined : undefined,
             githubInstallations: entry.slug === "github" ? github.installations : undefined,
             githubHtmlUrl: entry.slug === "github" ? github.htmlUrl ?? undefined : undefined,
-            // The card is the tunnel one, so it reports the account, not the token: a
-            // DNS-scoped token connected from the domains setup cannot run a tunnel.
             cloudflareApiConnected: entry.slug === "cloudflare" ? cloudflare.connected : undefined,
+            cloudflareDnsConnected: entry.slug === "cloudflare" ? cloudflare.dnsReady : undefined,
             cloudflareAccountName: entry.slug === "cloudflare" ? cloudflare.accountName ?? undefined : undefined
         };
     });

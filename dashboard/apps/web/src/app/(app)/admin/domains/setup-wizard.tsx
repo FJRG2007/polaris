@@ -927,6 +927,10 @@ function CloudflareConnect({ zone, onConnected }: { zone: string; onConnected: (
         setError(null);
         const result = await connectCloudflareAccountAction({
             token,
+            // The setup only ever needs to write records, and the link beside this
+            // field asks Cloudflare for exactly that - so connecting it as anything
+            // wider would reject the token it just told the operator to create.
+            scope: "dns",
             ...(accountId ? { accountId } : {})
         }).catch((caught: unknown) => ({
             error: caught instanceof Error ? caught.message : "Could not connect the Cloudflare token",
