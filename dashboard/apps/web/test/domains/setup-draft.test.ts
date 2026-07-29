@@ -126,7 +126,11 @@ function setupState(saved: {
     strategy?: SetupDraft["strategy"];
 }): DomainSetupState {
     return {
-        environment: { environment: saved.environment ?? "home-nat", detected: "home-nat", confirmed: true },
+        environment: {
+            environment: saved.environment ?? "home-nat",
+            detected: "home-nat",
+            confirmed: true
+        },
         network: { mode: saved.mode ?? "auto" },
         zones: { baseDomain: saved.baseDomain ?? "", zones: saved.zones ?? [] },
         domains: { duckdnsSubdomain: saved.duckSub ?? "" },
@@ -138,13 +142,18 @@ function setupState(saved: {
 
 describe("what the setup opens on", () => {
     it("shows the domain that is configured, not the strategy it would recommend", () => {
-        const state = setupState({ baseDomain: "plr.example.com", zones: [{ label: "", scope: "deploy", primary: true }] });
+        const state = setupState({
+            baseDomain: "plr.example.com",
+            zones: [{ label: "", scope: "deploy", primary: true }]
+        });
         expect(configuredStrategy(state)).toBe("own-domain");
         expect(savedAnswers(state).baseDomain).toBe("plr.example.com");
     });
 
     it("tells a DuckDNS layout apart from a domain of the operator's own", () => {
-        expect(configuredStrategy(setupState({ baseDomain: "mypolaris.duckdns.org" }))).toBe("duckdns");
+        expect(configuredStrategy(setupState({ baseDomain: "mypolaris.duckdns.org" }))).toBe(
+            "duckdns"
+        );
     });
 
     it("reads a tunnel from the exposure mode, which is all a tunnel leaves behind", () => {
@@ -155,12 +164,16 @@ describe("what the setup opens on", () => {
         // Both tunnels store the same mode and no domain, and a free subdomain stores
         // what an unconfigured box already holds - so only the saved answer tells them
         // apart, and it stands even where the inference would have answered too.
-        expect(configuredStrategy(setupState({ mode: "tunnel", strategy: "quick-tunnel" }))).toBe("quick-tunnel");
-        expect(configuredStrategy(setupState({ strategy: "free-subdomain", environment: "vps" }))).toBe(
-            "free-subdomain"
+        expect(configuredStrategy(setupState({ mode: "tunnel", strategy: "quick-tunnel" }))).toBe(
+            "quick-tunnel"
         );
         expect(
-            configuredStrategy(setupState({ baseDomain: "example.com", strategy: "cloudflare-tunnel" }))
+            configuredStrategy(setupState({ strategy: "free-subdomain", environment: "vps" }))
+        ).toBe("free-subdomain");
+        expect(
+            configuredStrategy(
+                setupState({ baseDomain: "example.com", strategy: "cloudflare-tunnel" })
+            )
         ).toBe("cloudflare-tunnel");
     });
 
@@ -188,7 +201,10 @@ describe("whether a draft is worth keeping", () => {
             { ...saved, environment: "vps" as ServerEnvironment },
             { ...saved, duckSub: "mypolaris" },
             { ...saved, strategy: "duckdns" as const },
-            { ...saved, zones: [...saved.zones, { label: "apps", scope: "deploy" as const, primary: true }] },
+            {
+                ...saved,
+                zones: [...saved.zones, { label: "apps", scope: "deploy" as const, primary: true }]
+            },
             { ...saved, zones: [{ label: "plr", scope: "deploy" as const, primary: true }] }
         ]) {
             expect(isUntouched(changed, state), JSON.stringify(changed)).toBe(false);

@@ -30,7 +30,9 @@ export const setupDraftSchema = z.object({
     environment: serverEnvironmentSchema,
     strategy: z.enum(EXPOSURE_STRATEGIES as [ExposureStrategy, ...ExposureStrategy[]]),
     baseDomain: z.string(),
-    zones: z.array(z.object({ label: z.string(), scope: z.enum(["polaris", "deploy"]), primary: z.boolean() })),
+    zones: z.array(
+        z.object({ label: z.string(), scope: z.enum(["polaris", "deploy"]), primary: z.boolean() })
+    ),
     duckSub: z.string(),
     useForDashboard: z.boolean()
 });
@@ -63,7 +65,8 @@ export function configuredStrategy(state: DomainSetupState): ExposureStrategy | 
 export function savedAnswers(state: DomainSetupState): SetupAnswers {
     return {
         environment: state.environment.environment,
-        strategy: configuredStrategy(state) ?? strategiesFor(state.environment.environment).recommended,
+        strategy:
+            configuredStrategy(state) ?? strategiesFor(state.environment.environment).recommended,
         baseDomain: state.zones.baseDomain,
         zones: state.zones.zones.map((zone) => ({ ...zone })),
         duckSub: state.domains.duckdnsSubdomain,

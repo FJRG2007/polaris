@@ -59,7 +59,9 @@ describe("dnsProviderFor", () => {
     });
 
     it("stays unknown rather than guessing at a provider it does not know", () => {
-        expect(dnsProviderFor(["ns1.some-tiny-registrar.example", "ns2.some-tiny-registrar.example"])).toBeNull();
+        expect(
+            dnsProviderFor(["ns1.some-tiny-registrar.example", "ns2.some-tiny-registrar.example"])
+        ).toBeNull();
         expect(dnsProviderFor([])).toBeNull();
     });
 

@@ -75,7 +75,12 @@ const DNS_PROVIDERS: DnsProvider[] = [
         match: [".dns-parking.com"],
         url: () => "https://hpanel.hostinger.com/domains"
     },
-    { id: "vercel", label: "Vercel", match: [".vercel-dns.com"], url: () => "https://vercel.com/dashboard/domains" },
+    {
+        id: "vercel",
+        label: "Vercel",
+        match: [".vercel-dns.com"],
+        url: () => "https://vercel.com/dashboard/domains"
+    },
     { id: "ns1", label: "NS1 / Netlify", match: [".nsone.net"] },
     {
         id: "digitalocean",
@@ -95,10 +100,25 @@ const DNS_PROVIDERS: DnsProvider[] = [
         match: [".squarespacedns.com"],
         url: () => "https://account.squarespace.com/domains"
     },
-    { id: "azure", label: "Azure DNS", match: [".azure-dns."], url: () => "https://portal.azure.com" },
-    { id: "ovh", label: "OVH", match: [".ovh.net"], url: () => "https://www.ovh.com/manager/#/web/domain" },
+    {
+        id: "azure",
+        label: "Azure DNS",
+        match: [".azure-dns."],
+        url: () => "https://portal.azure.com"
+    },
+    {
+        id: "ovh",
+        label: "OVH",
+        match: [".ovh.net"],
+        url: () => "https://www.ovh.com/manager/#/web/domain"
+    },
     { id: "ionos", label: "IONOS", match: [".ui-dns."], url: () => "https://my.ionos.com/domains" },
-    { id: "gandi", label: "Gandi", match: [".gandi.net"], url: () => "https://admin.gandi.net/domain" },
+    {
+        id: "gandi",
+        label: "Gandi",
+        match: [".gandi.net"],
+        url: () => "https://admin.gandi.net/domain"
+    },
     {
         id: "hetzner",
         label: "Hetzner",
@@ -111,11 +131,31 @@ const DNS_PROVIDERS: DnsProvider[] = [
         match: [".porkbun.com"],
         url: () => "https://porkbun.com/account/domainsSpeedy"
     },
-    { id: "dnsimple", label: "DNSimple", match: [".dnsimple.com"], url: () => "https://dnsimple.com/domains" },
-    { id: "name-com", label: "Name.com", match: [".name.com"], url: () => "https://www.name.com/account/domain" },
-    { id: "linode", label: "Akamai / Linode", match: [".linode.com"], url: () => "https://cloud.linode.com/domains" },
+    {
+        id: "dnsimple",
+        label: "DNSimple",
+        match: [".dnsimple.com"],
+        url: () => "https://dnsimple.com/domains"
+    },
+    {
+        id: "name-com",
+        label: "Name.com",
+        match: [".name.com"],
+        url: () => "https://www.name.com/account/domain"
+    },
+    {
+        id: "linode",
+        label: "Akamai / Linode",
+        match: [".linode.com"],
+        url: () => "https://cloud.linode.com/domains"
+    },
     { id: "bunny", label: "Bunny DNS", match: [".bunny.net"], url: () => "https://dash.bunny.net" },
-    { id: "duckdns", label: "DuckDNS", match: [".duckdns.org"], url: () => "https://www.duckdns.org/domains" },
+    {
+        id: "duckdns",
+        label: "DuckDNS",
+        match: [".duckdns.org"],
+        url: () => "https://www.duckdns.org/domains"
+    },
     {
         id: "dondominio",
         label: "DonDominio",
@@ -146,15 +186,21 @@ export interface DnsProviderInfo {
  * operator a panel that does not hold their records.
  */
 function matchesNameserver(host: string, fragment: string): boolean {
-    return fragment.endsWith(".") || fragment.endsWith("-") ? host.includes(fragment) : host.endsWith(fragment);
+    return fragment.endsWith(".") || fragment.endsWith("-")
+        ? host.includes(fragment)
+        : host.endsWith(fragment);
 }
 
 /** The provider a set of nameservers belongs to, or null when none is recognized. */
 export function dnsProviderFor(nameservers: string[]): DnsProvider | null {
-    const hosts = nameservers.map((nameserver) => nameserver.trim().toLowerCase().replace(/\.$/, ""));
+    const hosts = nameservers.map((nameserver) =>
+        nameserver.trim().toLowerCase().replace(/\.$/, "")
+    );
     return (
         DNS_PROVIDERS.find((provider) =>
-            hosts.some((host) => provider.match.some((fragment) => matchesNameserver(host, fragment)))
+            hosts.some((host) =>
+                provider.match.some((fragment) => matchesNameserver(host, fragment))
+            )
         ) ?? null
     );
 }
@@ -205,7 +251,11 @@ async function resolveNsOrEmpty(zone: string): Promise<string[]> {
  */
 export async function detectDnsProvider(domain: string): Promise<DnsProviderInfo | null> {
     const labels = domain.trim().toLowerCase().replace(/\.$/, "").split(".").filter(Boolean);
-    for (let index = Math.max(0, labels.length - MAX_ZONE_LABELS); index + 2 <= labels.length; index += 1) {
+    for (
+        let index = Math.max(0, labels.length - MAX_ZONE_LABELS);
+        index + 2 <= labels.length;
+        index += 1
+    ) {
         const zone = labels.slice(index).join(".");
         // Only above the domain that was typed: `me.io`, `id.me` and `in.ai` read as
         // registry suffixes too, and skipping them would drop the hint on a domain the
@@ -218,7 +268,9 @@ export async function detectDnsProvider(domain: string): Promise<DnsProviderInfo
             id: provider?.id ?? null,
             label: provider?.label ?? null,
             zone,
-            nameservers: nameservers.map((nameserver) => nameserver.toLowerCase().replace(/\.$/, "")),
+            nameservers: nameservers.map((nameserver) =>
+                nameserver.toLowerCase().replace(/\.$/, "")
+            ),
             url: provider?.url?.(zone) ?? null,
             automatable: provider?.automatable === true
         };
