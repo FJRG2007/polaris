@@ -10,6 +10,7 @@
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/session";
 import { DYMO_IP_RULES, findIntegration, type ScanAction } from "@/lib/integrations/registry";
+import { isTunnelToken, tunnelTokenHint } from "@/lib/integrations/tunnel-token";
 import { getIntegrationState, upsertIntegration } from "@/lib/integration-service";
 import { verifyKey } from "@/lib/integrations/virustotal";
 import { verifyIp } from "@/lib/integrations/dymo";
@@ -36,39 +37,53 @@ const SCAN_ACTIONS = new Set<ScanAction>(["block", "quarantine", "notify"]);
  * Configure a tunnel provider (cloudflare/ngrok). Enabling one runs the tunnel
  * container; only one runs per server, so enabling a provider disables the other.
  * The token is tri-state (a value replaces it, blank keeps it).
+ *
+ * Every failure comes back as a message rather than a thrown action: the caller is
+ * a dialog, and an action that rejects takes the whole page down with it.
  */
 export async function saveTunnelAction(input: {
     provider: "cloudflare" | "ngrok";
     enabled: boolean;
     token?: string;
 }): Promise<{ error?: string }> {
+    // Outside the try - it redirects an unauthorized caller by throwing.
     const user = await requireAdmin();
     const provider = input.provider;
     if (provider !== "cloudflare" && provider !== "ngrok") return { error: "Unknown tunnel provider" };
-    const existing = await getIntegrationState(provider);
     const newToken = input.token && input.token.trim() ? input.token.trim() : undefined;
-    const willHaveToken = Boolean(newToken) || Boolean(existing?.hasSecret);
-    if (input.enabled && !willHaveToken) return { error: "Add the token before enabling it" };
+    if (newToken && !isTunnelToken(provider, newToken)) return { error: tunnelTokenHint(provider) };
 
-    if (input.enabled) {
-        // Only one tunnel per server - turn the other provider off.
-        const other = provider === "cloudflare" ? "ngrok" : "cloudflare";
-        await upsertIntegration(other, { enabled: false });
+    try {
+        const existing = await getIntegrationState(provider);
+        const willHaveToken = Boolean(newToken) || Boolean(existing?.hasSecret);
+        if (input.enabled && !willHaveToken) return { error: "Add the token before enabling it" };
+
+        if (input.enabled) {
+            // Only one tunnel per server - turn the other provider off.
+            const other = provider === "cloudflare" ? "ngrok" : "cloudflare";
+            await upsertIntegration(other, { enabled: false });
+        }
+        await upsertIntegration(provider, { enabled: input.enabled, secret: newToken, installedById: user.id });
+        await recordAudit({
+            actorId: user.id,
+            action: "integration.configure",
+            targetType: "integration",
+            targetId: provider,
+            metadata: { enabled: input.enabled }
+        });
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "The tunnel settings could not be saved" };
     }
-    await upsertIntegration(provider, { enabled: input.enabled, secret: newToken, installedById: user.id });
-    await recordAudit({
-        actorId: user.id,
-        action: "integration.configure",
-        targetType: "integration",
-        targetId: provider,
-        metadata: { enabled: input.enabled }
-    });
+
+    // The settings are stored either way, so the page reflects them even when the
+    // container refuses to come up and the dialog stays open on the reason.
+    revalidatePath("/integrations");
     try {
         await applyTunnel();
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Saved, but the tunnel could not start" };
+        const detail = caught instanceof Error ? caught.message : "the tunnel could not start";
+        return { error: `Saved, but the tunnel could not start: ${detail}` };
     }
-    revalidatePath("/integrations");
     return {};
 }
 

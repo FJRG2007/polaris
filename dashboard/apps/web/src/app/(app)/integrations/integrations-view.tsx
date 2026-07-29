@@ -24,7 +24,9 @@ import {
     Switch,
     cn
 } from "@polaris/ui";
+import { runAction } from "@/lib/run-action";
 import { DYMO_IP_RULES, SCAN_ACTIONS, type ScanAction } from "@/lib/integrations/registry";
+import { isTunnelToken, tunnelTokenHint, type TunnelProviderSlug } from "@/lib/integrations/tunnel-token";
 import {
     CLOUDFLARE_TOKEN_LINKS,
     CLOUDFLARE_TOKEN_PERMISSIONS,
@@ -144,17 +146,28 @@ export function IntegrationsView({ cards }: { cards: IntegrationCard[] }) {
 }
 
 function TunnelDialog({ card, onClose }: { card: IntegrationCard; onClose: () => void }) {
-    const provider = card.slug as "cloudflare" | "ngrok";
+    const provider = card.slug as TunnelProviderSlug;
     // Default a first-time setup to enabled; respect the stored state once configured.
     const [enabled, setEnabled] = useState(card.hasSecret ? card.enabled : true);
     const [token, setToken] = useState("");
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
 
+    const entered = token.trim();
+    const valid = isTunnelToken(provider, entered);
+    // A blank field keeps the stored token, so an operator with one on file can save
+    // the switch on its own. With nothing on file, and with a token that cannot be
+    // one, there is nothing worth sending.
+    const canSave = valid || (entered === "" && card.hasSecret && enabled !== card.enabled);
+
     function onSave() {
         setError(null);
         startTransition(async () => {
-            const result = await saveTunnelAction({ provider, enabled, token: token || undefined });
+            const result = await runAction(
+                () => saveTunnelAction({ provider, enabled, token: entered || undefined }),
+                setError
+            );
+            if (!result) return;
             if (result.error) setError(result.error);
             else onClose();
         });
@@ -184,14 +197,18 @@ function TunnelDialog({ card, onClose }: { card: IntegrationCard; onClose: () =>
                             placeholder={card.hasSecret ? "Saved - enter a new token to replace it" : "Paste the token"}
                             autoComplete="off"
                         />
-                        {card.apiKeyHelp ? <span className="text-xs text-muted-foreground">{card.apiKeyHelp}</span> : null}
+                        {entered && !valid ? (
+                            <span className="text-xs text-danger">{tunnelTokenHint(provider)}</span>
+                        ) : card.apiKeyHelp ? (
+                            <span className="text-xs text-muted-foreground">{card.apiKeyHelp}</span>
+                        ) : null}
                     </label>
                     {error ? <p className="text-sm text-danger">{error}</p> : null}
                     <div className="flex justify-end gap-2">
                         <Button variant="ghost" onClick={onClose}>
                             Cancel
                         </Button>
-                        <Button onClick={onSave} disabled={pending}>
+                        <Button onClick={onSave} disabled={pending || !canSave}>
                             {pending ? "Applying..." : "Save"}
                         </Button>
                     </div>
@@ -240,7 +257,11 @@ function CloudflareApiTokenSection({ card }: { card: IntegrationCard }) {
         setError(null);
         setNote(null);
         startTransition(async () => {
-            const result = await connectCloudflareAccountAction({ token, scope, accountId: chosen });
+            const result = await runAction(
+                () => connectCloudflareAccountAction({ token, scope, accountId: chosen }),
+                setError
+            );
+            if (!result) return;
             if (result.error) {
                 setError(result.error);
                 return;
@@ -273,7 +294,8 @@ function CloudflareApiTokenSection({ card }: { card: IntegrationCard }) {
         setError(null);
         setNote(null);
         startTransition(async () => {
-            const result = await disconnectCloudflareAccountAction({ scope: which });
+            const result = await runAction(() => disconnectCloudflareAccountAction({ scope: which }), setError);
+            if (!result) return;
             if (result.error) {
                 setError(result.error);
                 return;
@@ -441,7 +463,11 @@ function DuckDnsDialog({ card, onClose }: { card: IntegrationCard; onClose: () =
         setError(null);
         setSynced(null);
         startSave(async () => {
-            const result = await saveDuckdnsAction({ subdomain, token: token || undefined });
+            const result = await runAction(
+                () => saveDuckdnsAction({ subdomain, token: token || undefined }),
+                setError
+            );
+            if (!result) return;
             if (result.error) setError(result.error);
             else onClose();
         });
@@ -451,7 +477,8 @@ function DuckDnsDialog({ card, onClose }: { card: IntegrationCard; onClose: () =
         setError(null);
         setSynced(null);
         startSync(async () => {
-            const result = await syncDuckdnsAction();
+            const result = await runAction(() => syncDuckdnsAction(), setError);
+            if (!result) return;
             if (result.ok) setSynced(result.detail);
             else setError(result.detail);
         });
@@ -551,7 +578,8 @@ function DymoDialog({ card, onClose }: { card: IntegrationCard; onClose: () => v
         setError(null);
         setTested(null);
         startTest(async () => {
-            const result = await testDymoKeyAction(apiKey);
+            const result = await runAction(() => testDymoKeyAction(apiKey), setError);
+            if (!result) return;
             if (result.ok) setTested("The key works.");
             else setError(result.error ?? "The key was rejected");
         });
@@ -560,7 +588,11 @@ function DymoDialog({ card, onClose }: { card: IntegrationCard; onClose: () => v
     function onSave() {
         setError(null);
         startSave(async () => {
-            const result = await saveDymoAction({ enabled, verifyAccessIp, deny: [...deny], apiKey });
+            const result = await runAction(
+                () => saveDymoAction({ enabled, verifyAccessIp, deny: [...deny], apiKey }),
+                setError
+            );
+            if (!result) return;
             if (result.error) setError(result.error);
             else onClose();
         });
@@ -726,8 +758,11 @@ function GitHubConnected({ card, onClose }: { card: IntegrationCard; onClose: ()
                                     disabled={busy}
                                     onClick={() =>
                                         startBusy(async () => {
-                                            const result = await refreshGithubInstallationsAction();
-                                            if (result.error) setError(result.error);
+                                            const result = await runAction(
+                                                () => refreshGithubInstallationsAction(),
+                                                setError
+                                            );
+                                            if (result?.error) setError(result.error);
                                         })
                                     }
                                 >
@@ -749,7 +784,8 @@ function GitHubConnected({ card, onClose }: { card: IntegrationCard; onClose: ()
                             disabled={busy}
                             onClick={() =>
                                 startBusy(async () => {
-                                    const result = await disconnectGithubAction();
+                                    const result = await runAction(() => disconnectGithubAction(), setError);
+                                    if (!result) return;
                                     if (result.error) setError(result.error);
                                     else onClose();
                                 })
@@ -778,7 +814,8 @@ function GitHubConnect({ card, onClose }: { card: IntegrationCard; onClose: () =
     function onConnectToken() {
         setError(null);
         startSave(async () => {
-            const result = await connectGithubAction(token);
+            const result = await runAction(() => connectGithubAction(token), setError);
+            if (!result) return;
             if (result.error) setError(result.error);
             else onClose();
         });
@@ -787,7 +824,8 @@ function GitHubConnect({ card, onClose }: { card: IntegrationCard; onClose: () =
     function onConnectExisting() {
         setError(null);
         startSave(async () => {
-            const result = await connectGithubAppAction({ appId, pem });
+            const result = await runAction(() => connectGithubAppAction({ appId, pem }), setError);
+            if (!result) return;
             if (result.error) setError(result.error);
             else onClose();
         });
@@ -917,7 +955,8 @@ function VirusTotalDialog({ card, onClose }: { card: IntegrationCard; onClose: (
         setError(null);
         setTested(null);
         startTest(async () => {
-            const result = await testVirusTotalKeyAction(apiKey);
+            const result = await runAction(() => testVirusTotalKeyAction(apiKey), setError);
+            if (!result) return;
             if (result.ok) setTested("The key works.");
             else setError(result.error ?? "The key was rejected");
         });
@@ -926,7 +965,11 @@ function VirusTotalDialog({ card, onClose }: { card: IntegrationCard; onClose: (
     function onSave() {
         setError(null);
         startSave(async () => {
-            const result = await saveVirusTotalAction({ enabled, scanDropPoints, onDetection, apiKey });
+            const result = await runAction(
+                () => saveVirusTotalAction({ enabled, scanDropPoints, onDetection, apiKey }),
+                setError
+            );
+            if (!result) return;
             if (result.error) setError(result.error);
             else onClose();
         });
