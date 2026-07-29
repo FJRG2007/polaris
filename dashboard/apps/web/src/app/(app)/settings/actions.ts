@@ -7,8 +7,10 @@
  */
 
 import { HostdClient } from "@polaris/hostd-client";
+import { loadEnv } from "@polaris/config";
 import { requireAdmin } from "@/lib/session";
 import { getUpdateStatus, type UpdateStatus } from "@/lib/update-service";
+import { collectUpdateReport, issueUrl } from "@/lib/update-report";
 
 export async function checkUpdatesAction(): Promise<UpdateStatus> {
     await requireAdmin();
@@ -32,5 +34,18 @@ export async function triggerHostUpdateAction(): Promise<{ status: UpdateTrigger
     } catch {
         return { status: "unreachable" };
     }
+}
+
+/**
+ * A prefilled bug report for an update that failed. Admin-only, like the log it
+ * quotes: it carries the host's build output and the deployment's own domain.
+ *
+ * Returns a link rather than filing anything. What goes in is a host's log, so the
+ * operator gets to read it on GitHub's own form and decide - the alternative would
+ * be publishing their output on their behalf.
+ */
+export async function updateReportAction(): Promise<{ url: string }> {
+    await requireAdmin();
+    return { url: issueUrl(loadEnv().POLARIS_REPO, await collectUpdateReport()) };
 }
 

@@ -7,11 +7,11 @@
  */
 
 import { useEffect, useRef, useState, useTransition } from "react";
-import { CheckCircle2, DownloadCloud, RefreshCw, TriangleAlert } from "lucide-react";
+import { Bug, CheckCircle2, DownloadCloud, RefreshCw, TriangleAlert } from "lucide-react";
 import { Button, Card, CardBody, CardHeader, CardTitle } from "@polaris/ui";
 import type { UpdateStatus } from "@/lib/update-service";
 import { isUpdateInFlight, type UpdateLogTail } from "@/lib/update-log";
-import { checkUpdatesAction, triggerHostUpdateAction } from "./actions";
+import { checkUpdatesAction, triggerHostUpdateAction, updateReportAction } from "./actions";
 
 interface Deployment {
     readonly appUrl: string;
@@ -45,6 +45,7 @@ export function SettingsView({
     // Live update log, streamed from the shared file the updater writes.
     const [logText, setLogText] = useState("");
     const [logExit, setLogExit] = useState<number | null>(null);
+    const [reporting, setReporting] = useState(false);
     const logRef = useRef<HTMLPreElement>(null);
     const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const waitRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -86,6 +87,26 @@ export function SettingsView({
         })();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
+
+    /**
+     * Open the prefilled issue. The tab is claimed before the await, because a
+     * window opened after one is a popup as far as the browser is concerned - and
+     * the report would be silently blocked on the click that asked for it.
+     */
+    async function onReport() {
+        setReporting(true);
+        const tab = window.open("", "_blank", "noopener");
+        try {
+            const { url } = await updateReportAction();
+            if (tab) tab.location.href = url;
+            else window.location.href = url;
+        } catch {
+            tab?.close();
+            setUpdateMsg("Could not prepare the report. The log above can be attached to an issue by hand.");
+        } finally {
+            setReporting(false);
+        }
+    }
 
     async function onUpdate() {
         setUpdating(true);
@@ -322,7 +343,25 @@ export function SettingsView({
                                                 {logExit === 0 ? "success" : `failed (exit ${logExit})`}
                                             </span>
                                         ) : null}
+                                        {logExit !== null && logExit !== 0 ? (
+                                            <Button
+                                                size="sm"
+                                                variant="secondary"
+                                                className="ml-auto"
+                                                onClick={onReport}
+                                                disabled={reporting}
+                                            >
+                                                <Bug className="size-3.5" />
+                                                {reporting ? "Preparing..." : "Report this failure"}
+                                            </Button>
+                                        ) : null}
                                     </div>
+                                    {logExit !== null && logExit !== 0 ? (
+                                        <p>
+                                            Opens a prefilled issue with this log, your build, server type and domain.
+                                            Nothing is sent until you submit it.
+                                        </p>
+                                    ) : null}
                                     <pre
                                         ref={logRef}
                                         className="max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-md border border-border bg-foreground/[0.04] p-2 font-mono text-[11px] leading-relaxed text-foreground"
