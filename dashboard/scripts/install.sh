@@ -563,6 +563,15 @@ main() {
         log "replaced the placeholder example.com address with the LAN default (:80, http://polaris.local)"
     fi
 
+    # The same reservation bites the ACME contact address, which cannot be rewritten
+    # to a working default the way an address can - nobody but the operator knows
+    # their mailbox. Left empty it falls back to admin@example.com, Let's Encrypt
+    # refuses to register the account, and no public certificate is ever issued: the
+    # domain resolves, the edge routes it, and HTTPS still fails. So say so instead.
+    if ! grep -qE '^POLARIS_ACME_EMAIL=.*@.*\.' .env || grep -qE '^POLARIS_ACME_EMAIL=.*example\.com' .env; then
+        err "set POLARIS_ACME_EMAIL in .env to a real address before pointing a public domain here, or Let's Encrypt will issue no certificate"
+    fi
+
     setup_hostnames
     install_cli
 

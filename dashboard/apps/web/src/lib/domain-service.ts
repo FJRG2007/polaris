@@ -14,6 +14,7 @@ import { loadEnv } from "@polaris/config";
 import { magicDomain, DEFAULT_SUBDOMAIN_BASE } from "@polaris/deploy";
 import { decryptSecret, encryptSecret } from "@polaris/storage";
 import { polarisZoneHost, zoneReachable } from "./domain-zones";
+import { syncDashboardRoute } from "./domain-edge";
 import { getSetting, setSetting } from "./setting-store";
 import { getPolarisPublicUrl } from "./polaris-tunnel-service";
 
@@ -169,6 +170,10 @@ export async function setDomainConfig(input: {
     if (input.duckdnsSubdomain !== undefined) await setSetting(KEYS.duckSub, input.duckdnsSubdomain.trim() || null);
     if (input.deployBase !== undefined) await setSetting(KEYS.deployBase, input.deployBase.trim() || null);
     if (input.publicIp !== undefined) await setSetting(KEYS.publicIp, input.publicIp.trim() || null);
+    // A saved domain is only a domain once the edge serves it, so republish the route
+    // here rather than at each call site - the wizard, the admin panel and the DNS
+    // check's dashboard move all land on this function.
+    if (input.appDomain !== undefined || input.sharingDomain !== undefined) await syncDashboardRoute();
     if (input.duckdnsToken !== undefined && input.duckdnsToken.trim()) {
         const blob = encryptSecret(input.duckdnsToken.trim(), loadEnv().POLARIS_MASTER_KEY);
         await setSetting(

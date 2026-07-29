@@ -32,6 +32,12 @@ export async function register(): Promise<void> {
     const { syncAppRoutes, reconcileNasMounts } = await import("./lib/deploy-service");
     void syncAppRoutes().catch((error) => console.error("polaris: initial route sync failed:", error));
 
+    // Same for the dashboard's own public hostnames, which the compose labels cannot
+    // carry: they are fixed at `up` time, so a domain configured afterwards would only
+    // reach the edge again the next time it was saved.
+    const { syncDashboardRoute } = await import("./lib/domain-edge");
+    void syncDashboardRoute();
+
     // Migrate any quick tunnel still forwarding straight to an app's port onto the edge,
     // so its traffic is logged (and future restarts leave an edge tunnel untouched).
     const { reconcileQuickTunnels } = await import("./lib/deploy/quick-tunnel-service");

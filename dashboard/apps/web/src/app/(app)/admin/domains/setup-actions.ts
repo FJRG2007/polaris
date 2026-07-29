@@ -32,6 +32,7 @@ import {
 import { getCloudflareAccountStatus } from "@/lib/integrations/cloudflare-account-service";
 import { EXPOSURE_STRATEGIES, STRATEGY_META, type ExposureStrategy } from "@/lib/domain-strategies";
 import { getDomainConfig, setDomainConfig, syncDuckDns, type DomainConfig } from "@/lib/domain-service";
+import { syncDashboardRoute } from "@/lib/domain-edge";
 import { getSetting, setSetting } from "@/lib/setting-store";
 import {
     getLocalEnvironment,
@@ -215,6 +216,12 @@ export async function saveDomainSetupAction(input: unknown): Promise<DomainSetup
         // only thing that names a wildcard domain, so a value left over from an earlier
         // setup cannot keep exposing services on a domain the operator just dropped.
         await setNetworkConfig({ mode: meta.mode, wildcardDomain: "" });
+
+        // Serve the zone before anything checks whether it is being served. The
+        // reachability probe below - and the dashboard move it can trigger - both ask
+        // whether traffic for the zone arrives here, which it cannot until the edge
+        // has a route for the name.
+        await syncDashboardRoute();
 
         // The dashboard only moves onto the new domain when the operator asked for it
         // and the strategy actually serves the zone: a wrong app domain breaks every
