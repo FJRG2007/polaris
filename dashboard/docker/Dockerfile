@@ -49,7 +49,14 @@ COPY patches ./patches
 
 # `npm ci` installs the whole workspace from the committed lockfile, then runs the
 # root postinstall (patch-package) to apply patches/.
-RUN --mount=type=cache,target=/root/.npm npm ci
+#
+# No BuildKit cache mount here. An update builds this image on the operator's own
+# machine, where `docker compose` falls back to the classic builder whenever the
+# buildx plugin is absent - and the classic builder rejects `RUN --mount` outright,
+# which fails the update with a Docker error and leaves the box on its old build.
+# The layer cache already covers the common case: this step only re-runs when the
+# lockfile changes, which is exactly when the packages have to be fetched anyway.
+RUN npm ci
 
 # The source tree follows (node_modules/.next/dist are .dockerignore'd, so this
 # does not clobber the installed dependencies above).

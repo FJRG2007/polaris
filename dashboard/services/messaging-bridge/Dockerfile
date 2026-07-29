@@ -25,7 +25,10 @@ COPY services/messaging-bridge/package.json ./services/messaging-bridge/
 # The bridge pulls Puppeteer transitively; skip its Chromium download (the runner
 # uses the system chromium instead).
 ENV PUPPETEER_SKIP_DOWNLOAD=true
-RUN --mount=type=cache,target=/root/.npm npm ci
+# Plain `npm ci`, no BuildKit cache mount: an update builds this on the operator's
+# own machine, and `docker compose` falls back to the classic builder wherever the
+# buildx plugin is absent - which rejects `RUN --mount` and fails the update.
+RUN npm ci
 
 COPY . .
 # @polaris/messaging must be built first (the bridge bundles from its dist).
