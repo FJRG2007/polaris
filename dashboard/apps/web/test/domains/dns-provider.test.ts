@@ -127,6 +127,14 @@ describe("detectDnsProvider", () => {
         expect((await detectDnsProvider("example.uk"))?.id).toBe("cloudflare");
     });
 
+    it("still looks up the domain that was typed when it reads as a registry suffix", async () => {
+        // `me.io` is a domain somebody bought, not a label a registry delegates under -
+        // and so are `id.me` and `net.io`. The rule only holds above the typed domain.
+        answers.set("me.io", ["dana.ns.cloudflare.com"]);
+        expect((await detectDnsProvider("me.io"))?.id).toBe("cloudflare");
+        expect(asked).toEqual(["me.io"]);
+    });
+
     it("answers null for a domain that does not exist yet, which keeps the offer open", async () => {
         expect(await detectDnsProvider("not-registered-yet.com")).toBeNull();
     });

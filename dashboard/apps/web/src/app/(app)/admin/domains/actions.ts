@@ -6,6 +6,7 @@
  * tri-state (a value sets it, blank keeps it); a separate action clears it.
  */
 
+import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/session";
 import {
@@ -26,18 +27,28 @@ import {
 import { recordAudit } from "@/lib/audit-service";
 
 /**
+ * The four settings this page edits, and nothing else. `setDomainConfig` also writes the
+ * deploy base and the stored public IP, which every auto hostname is built from - an
+ * action is reachable with any payload, so parsing is what keeps those two out of its
+ * reach and what stops a non-string reaching `.trim()` as a 500.
+ */
+const domainsSchema = z.object({
+    appDomain: z.string().optional(),
+    sharingDomain: z.string().optional(),
+    duckdnsSubdomain: z.string().optional(),
+    duckdnsToken: z.string().optional()
+});
+
+/**
  * Save whichever domain settings were passed. Partial on purpose: the page saves the
  * app/sharing pair and the DuckDNS pair from separate panels, and a call that carried
  * the whole shape would have each one write back its stale copy of the other's fields.
  */
-export async function saveDomainsAction(input: {
-    appDomain?: string;
-    sharingDomain?: string;
-    duckdnsSubdomain?: string;
-    duckdnsToken?: string;
-}): Promise<{ config: DomainConfig }> {
+export async function saveDomainsAction(input: unknown): Promise<{ config: DomainConfig }> {
     const user = await requireAdmin();
-    await setDomainConfig(input);
+    const parsed = domainsSchema.safeParse(input);
+    if (!parsed.success) throw new Error("Invalid domain settings");
+    await setDomainConfig(parsed.data);
     await recordAudit({ actorId: user.id, action: "domains.configure", targetType: "setting", targetId: "domains" });
     revalidatePath("/admin/domains");
     return { config: await getDomainConfig() };

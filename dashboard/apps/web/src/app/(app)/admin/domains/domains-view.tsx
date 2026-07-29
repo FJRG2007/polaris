@@ -12,7 +12,7 @@
  * setting is the fastest way to leave an operator unsure which one won.
  */
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
     CheckCircle2,
     ChevronDown,
@@ -47,16 +47,19 @@ export function DomainsView({
 }) {
     const [config, setConfig] = useState(initialConfig);
     const [advanced, setAdvanced] = useState(false);
-    // Bumped when the wizard saves, so the exposure panel re-reads what it changed
-    // (exposure mode, wildcard domain) instead of showing stale values. The domain
-    // settings come back from the wizard itself, so they need no second round trip.
+    // Bumped on every read the wizard makes, not only after a save: creating the records
+    // from the setup is what first proves the zone resolves, which promotes the exposure
+    // mode - so the panel would otherwise keep reporting "lan" underneath a setup that
+    // says the DNS is in place.
     const [setupNonce, setSetupNonce] = useState(0);
 
     return (
         <div className="flex max-w-2xl flex-col gap-4">
             <DomainSetupWizard
-                onDomains={setConfig}
-                onSaved={() => setSetupNonce((nonce) => nonce + 1)}
+                onState={(next) => {
+                    setConfig(next.domains);
+                    setSetupNonce((nonce) => nonce + 1);
+                }}
             />
 
             <AppDomains config={config} effectiveAppUrl={effectiveAppUrl} onSaved={setConfig} />
@@ -84,6 +87,31 @@ export function DomainsView({
 }
 
 /**
+ * A field that follows the stored value until the operator edits it. The guided setup
+ * rewrites these same settings while the page is open - it moves the dashboard onto the
+ * Polaris zone the moment that zone answers - so a field nobody has touched has to
+ * follow, and a field being typed into must not be replaced mid-word with nothing said.
+ */
+function useStoredField(stored: string) {
+    const [value, setValue] = useState(stored);
+    const adopted = useRef(stored);
+
+    useEffect(() => {
+        if (stored === adopted.current) return;
+        setValue((current) => (current === adopted.current ? stored : current));
+        adopted.current = stored;
+    }, [stored]);
+
+    /** Take a value as the stored one, once a save has written it. */
+    function adopt(next: string) {
+        adopted.current = next;
+        setValue(next);
+    }
+
+    return { value, setValue, adopt };
+}
+
+/**
  * The two addresses Polaris itself uses, which the guided setup does not decide: where
  * the dashboard answers, and which domain the links it hands out are built from.
  */
@@ -96,32 +124,30 @@ function AppDomains({
     effectiveAppUrl: string;
     onSaved: (next: DomainConfig) => void;
 }) {
-    const [appDomain, setAppDomain] = useState(config.appDomain);
-    const [sharingDomain, setSharingDomain] = useState(config.sharingDomain);
+    // The guided setup moves the dashboard onto the Polaris zone once it resolves, so
+    // the app domain can change without this card being touched.
+    const appDomain = useStoredField(config.appDomain);
+    const sharingDomain = useStoredField(config.sharingDomain);
     const [saving, setSaving] = useState(false);
     const [saved, setSaved] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    // The guided setup moves the dashboard onto the Polaris zone once it resolves, so
-    // the app domain can change without this card being touched. Following the stored
-    // value keeps the field from showing an address that is no longer in use.
-    useEffect(() => {
-        setAppDomain(config.appDomain);
-        setSharingDomain(config.sharingDomain);
-    }, [config.appDomain, config.sharingDomain]);
-
     /** Nothing to save until a field differs from what is stored. */
-    const changed = appDomain.trim() !== config.appDomain || sharingDomain.trim() !== config.sharingDomain;
+    const changed =
+        appDomain.value.trim() !== config.appDomain || sharingDomain.value.trim() !== config.sharingDomain;
 
     async function save() {
         setSaving(true);
         setSaved(false);
         setError(null);
         try {
-            const result = await saveDomainsAction({ appDomain, sharingDomain });
+            const result = await saveDomainsAction({
+                appDomain: appDomain.value,
+                sharingDomain: sharingDomain.value
+            });
             onSaved(result.config);
-            setAppDomain(result.config.appDomain);
-            setSharingDomain(result.config.sharingDomain);
+            appDomain.adopt(result.config.appDomain);
+            sharingDomain.adopt(result.config.sharingDomain);
             setSaved(true);
         } catch (caught) {
             setError(caught instanceof Error ? caught.message : "Could not save the domains");
@@ -142,8 +168,8 @@ function AppDomains({
                 <label className="flex flex-col gap-1 text-sm">
                     App domain
                     <Input
-                        value={appDomain}
-                        onChange={(event) => setAppDomain(event.target.value)}
+                        value={appDomain.value}
+                        onChange={(event) => appDomain.setValue(event.target.value)}
                         placeholder="polaris.example.com"
                         autoComplete="off"
                     />
@@ -159,8 +185,8 @@ function AppDomains({
                         Sharing domain
                     </span>
                     <Input
-                        value={sharingDomain}
-                        onChange={(event) => setSharingDomain(event.target.value)}
+                        value={sharingDomain.value}
+                        onChange={(event) => sharingDomain.setValue(event.target.value)}
                         placeholder="share.example.com"
                         autoComplete="off"
                     />
@@ -230,7 +256,9 @@ function LocalCertificate() {
  * or who only wants to replace the token - edits it.
  */
 function DuckDns({ config, onConfig }: { config: DomainConfig; onConfig: (next: DomainConfig) => void }) {
-    const [duckSub, setDuckSub] = useState(config.duckdnsSubdomain);
+    // The guided setup asks for the same subdomain, so a save there has to land here
+    // rather than leaving this card claiming the field is empty.
+    const duckSub = useStoredField(config.duckdnsSubdomain);
     const [duckToken, setDuckToken] = useState("");
     const [saving, setSaving] = useState(false);
     const [saved, setSaved] = useState(false);
@@ -238,14 +266,8 @@ function DuckDns({ config, onConfig }: { config: DomainConfig; onConfig: (next: 
     const [syncing, setSyncing] = useState(false);
     const [syncResult, setSyncResult] = useState<{ ok: boolean; detail: string } | null>(null);
 
-    // The guided setup asks for the same subdomain, so a save there has to land here
-    // rather than leaving this card claiming the field is empty.
-    useEffect(() => {
-        setDuckSub(config.duckdnsSubdomain);
-    }, [config.duckdnsSubdomain]);
-
     /** A token is only ever typed, never read back, so any entry counts as a change. */
-    const changed = duckSub.trim() !== config.duckdnsSubdomain || duckToken !== "";
+    const changed = duckSub.value.trim() !== config.duckdnsSubdomain || duckToken !== "";
 
     async function save() {
         setSaving(true);
@@ -253,11 +275,11 @@ function DuckDns({ config, onConfig }: { config: DomainConfig; onConfig: (next: 
         setError(null);
         try {
             const result = await saveDomainsAction({
-                duckdnsSubdomain: duckSub,
+                duckdnsSubdomain: duckSub.value,
                 duckdnsToken: duckToken || undefined
             });
             onConfig(result.config);
-            setDuckSub(result.config.duckdnsSubdomain);
+            duckSub.adopt(result.config.duckdnsSubdomain);
             setDuckToken("");
             setSaved(true);
         } catch (caught) {
@@ -313,8 +335,8 @@ function DuckDns({ config, onConfig }: { config: DomainConfig; onConfig: (next: 
                 <label className="flex flex-col gap-1 text-sm">
                     Subdomain
                     <Input
-                        value={duckSub}
-                        onChange={(event) => setDuckSub(event.target.value)}
+                        value={duckSub.value}
+                        onChange={(event) => duckSub.setValue(event.target.value)}
                         placeholder="mypolaris"
                         autoComplete="off"
                     />
@@ -385,6 +407,9 @@ function NetworkExposure({ nonce }: { nonce: number }) {
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
+        // A re-read after the setup changed something has to clear what the last one
+        // failed with, or the error stays under a panel that has just loaded fine.
+        setError(null);
         void networkStatusAction()
             .then((next) => {
                 setStatus(next);

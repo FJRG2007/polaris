@@ -33,7 +33,6 @@ import {
 } from "lucide-react";
 import { Badge, Button, Card, CardBody, CardHeader, CardTitle, Checkbox, Input, Select } from "@polaris/ui";
 import type { ServerEnvironment } from "@polaris/core";
-import type { DomainConfig } from "@/lib/domain-service";
 import type { DnsProviderInfo } from "@/lib/dns-provider";
 import type { ZoneDnsProvisionResult, ZoneDnsReport } from "@/lib/domain-dns";
 import { CLOUDFLARE_DNS_TOKEN_URL } from "@/lib/integrations/cloudflare-token-link";
@@ -60,19 +59,14 @@ interface ZoneRow {
 const STEPS = ["Server", "Exposure", "Domain", "DNS"];
 
 /**
- * Two things are reported outwards, because the page around this cannot see either.
- * `onDomains` carries the domain settings from every fresh read: this setup writes the
- * DuckDNS pair and can move the dashboard onto the Polaris zone, both of which the
- * panels below also edit. `onSaved` says the layout was applied, which is what the
- * exposure panel has to re-read.
+ * Every fresh read of the server's state is reported outwards, because the page around
+ * this cannot see what the setup changed: it writes the DuckDNS pair, can move the
+ * dashboard onto the Polaris zone, and creating the records marks that zone as
+ * resolving - which promotes the exposure mode. Saving is not the only moment any of
+ * that happens, so a "saved" signal would leave the panels below showing the state from
+ * before the records existed.
  */
-export function DomainSetupWizard({
-    onDomains,
-    onSaved
-}: {
-    onDomains?: (domains: DomainConfig) => void;
-    onSaved?: () => void;
-}) {
+export function DomainSetupWizard({ onState }: { onState?: (state: DomainSetupState) => void }) {
     const [state, setState] = useState<DomainSetupState | null>(null);
     const [step, setStep] = useState(0);
     const [environment, setEnvironment] = useState<ServerEnvironment>("unknown");
@@ -97,7 +91,7 @@ export function DomainSetupWizard({
     // it - so the domain settings can change without the operator pressing anything.
     function applyState(next: DomainSetupState) {
         setState(next);
-        onDomains?.(next.domains);
+        onState?.(next);
     }
 
     useEffect(() => {
@@ -220,7 +214,6 @@ export function DomainSetupWizard({
         clearSetupDraft();
         setResumed(false);
         setStep(3);
-        onSaved?.();
     }
 
     return (
@@ -646,15 +639,22 @@ function DnsStep({
     const [message, setMessage] = useState<string | null>(null);
     const [connecting, setConnecting] = useState(false);
 
-    async function check() {
-        setBusy("check");
-        setMessage(null);
+    /** The check itself, without the button state: creating the records runs it too. */
+    async function runCheck() {
         try {
             setReport(await checkZoneDnsAction());
         } catch (caught) {
             // Without this the buttons stay disabled forever on any failure, leaving
             // the operator on a dead final step with nothing said.
             setMessage(caught instanceof Error ? caught.message : "Could not check the DNS records");
+        }
+    }
+
+    async function check() {
+        setBusy("check");
+        setMessage(null);
+        try {
+            await runCheck();
         } finally {
             setBusy(null);
         }
@@ -666,36 +666,42 @@ function DnsStep({
     async function create(overwrite = false) {
         setBusy("create");
         setMessage(null);
-        const result = await provisionZoneDnsAction({ overwrite }).catch((caught: unknown) => ({
-            created: [],
-            replaced: [],
-            unchanged: [],
-            conflicts: [],
-            failed: [],
-            error: caught instanceof Error ? caught.message : "Could not create the DNS records"
-        }));
-        setBusy(null);
-        if (result.error) {
-            setMessage(result.error);
-            return;
+        // Held across the check and the re-read below, not just the write: those are DNS
+        // resolution and an HTTP probe per zone, seconds in which a live button would
+        // take a second press as another provision run.
+        try {
+            const result = await provisionZoneDnsAction({ overwrite }).catch((caught: unknown) => ({
+                created: [],
+                replaced: [],
+                unchanged: [],
+                conflicts: [],
+                failed: [],
+                error: caught instanceof Error ? caught.message : "Could not create the DNS records"
+            }));
+            if (result.error) {
+                setMessage(result.error);
+                return;
+            }
+            setConflicts(result.conflicts);
+            // A run where every record was already right is the good outcome, not a
+            // failure: counting only what changed would report "0 created, 0 repointed"
+            // and read like the button did nothing.
+            const parts = [
+                ...(result.created.length > 0 ? [`${result.created.length} created`] : []),
+                ...(result.replaced.length > 0 ? [`${result.replaced.length} repointed`] : []),
+                ...(result.unchanged.length > 0 ? [`${result.unchanged.length} already correct`] : []),
+                ...(result.conflicts.length > 0 ? [`${result.conflicts.length} left alone`] : []),
+                ...(result.failed.length > 0 ? [`failed: ${result.failed.map((entry) => entry.name).join(", ")}`] : [])
+            ];
+            setMessage(parts.length > 0 ? `${parts.join(", ")}.` : "Nothing to do - the records are already in place.");
+            await runCheck();
+            // The check above is where a zone is first seen answering, which is what
+            // moves the dashboard onto it - so what the server holds has just changed
+            // under the rest of the page, and only a re-read tells it.
+            await onRefresh();
+        } finally {
+            setBusy(null);
         }
-        setConflicts(result.conflicts);
-        // A run where every record was already right is the good outcome, not a failure:
-        // counting only what changed would report "0 created, 0 repointed" and read like
-        // the button did nothing.
-        const parts = [
-            ...(result.created.length > 0 ? [`${result.created.length} created`] : []),
-            ...(result.replaced.length > 0 ? [`${result.replaced.length} repointed`] : []),
-            ...(result.unchanged.length > 0 ? [`${result.unchanged.length} already correct`] : []),
-            ...(result.conflicts.length > 0 ? [`${result.conflicts.length} left alone`] : []),
-            ...(result.failed.length > 0 ? [`failed: ${result.failed.map((entry) => entry.name).join(", ")}`] : [])
-        ];
-        setMessage(parts.length > 0 ? `${parts.join(", ")}.` : "Nothing to do - the records are already in place.");
-        await check();
-        // The check above is where a zone is first seen answering, which is what moves
-        // the dashboard onto it - so what the server holds has just changed under the
-        // rest of the page, and only a re-read tells it.
-        await onRefresh();
     }
 
     // Checking is what records the zone as resolving here, and Polaris only hands out

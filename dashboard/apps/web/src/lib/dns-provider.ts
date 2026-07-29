@@ -198,7 +198,10 @@ export async function detectDnsProvider(domain: string): Promise<DnsProviderInfo
     const labels = domain.trim().toLowerCase().replace(/\.$/, "").split(".").filter(Boolean);
     for (let index = 0; index + 2 <= labels.length; index += 1) {
         const zone = labels.slice(index).join(".");
-        if (REGISTRY_SUFFIX.test(zone)) break;
+        // Only above the domain that was typed: `me.io`, `id.me` and `in.ai` read as
+        // registry suffixes too, and skipping them would drop the hint on a domain the
+        // operator owns outright.
+        if (index > 0 && REGISTRY_SUFFIX.test(zone)) break;
         const nameservers = await resolveNsOrEmpty(zone);
         if (nameservers.length === 0) continue;
         const provider = dnsProviderFor(nameservers);
