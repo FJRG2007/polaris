@@ -671,7 +671,7 @@ export async function cloudflareAccountStatusAction(): Promise<CloudflareAccount
     try {
         return await getCloudflareAccountStatus();
     } catch {
-        return { connected: false, accountId: null, accountName: null };
+        return { connected: false, dnsReady: false, accountId: null, accountName: null };
     }
 }
 

@@ -62,6 +62,8 @@ export interface DomainSetupState {
     strategy: ExposureStrategy | null;
     /** Whether a Cloudflare API token is connected, so DNS can be created for the operator. */
     cloudflareConnected: boolean;
+    /** Whether that token also reaches an account, which is what named tunnels need. */
+    cloudflareTunnelReady: boolean;
     /** The DNS records the current layout needs. */
     records: Array<{ host: string; wildcard: string; scope: string }>;
 }
@@ -97,7 +99,10 @@ async function domainSetupState(): Promise<DomainSetupState> {
         // a strategy this one does not would otherwise preselect an option that no
         // longer exists, leaving step 2 with nothing highlighted.
         strategy: EXPOSURE_STRATEGIES.includes(strategy as ExposureStrategy) ? (strategy as ExposureStrategy) : null,
-        cloudflareConnected: cloudflare.connected,
+        // The records need the token and nothing else, so a zone-scoped token counts
+        // as connected here even though it reaches no account.
+        cloudflareConnected: cloudflare.dnsReady,
+        cloudflareTunnelReady: cloudflare.connected,
         records: zoneRecords(zones).map((record) => ({
             host: record.host,
             wildcard: record.wildcard,

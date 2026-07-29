@@ -323,7 +323,7 @@ export function DomainSetupWizard({ onState }: { onState?: (state: DomainSetupSt
                     <StrategyStep
                         choice={choice}
                         selected={strategy}
-                        cloudflareConnected={state.cloudflareConnected}
+                        tunnelReady={state.cloudflareTunnelReady}
                         onSelect={setStrategy}
                     />
                 )}
@@ -437,12 +437,13 @@ function EnvironmentStep({
 function StrategyStep({
     choice,
     selected,
-    cloudflareConnected,
+    tunnelReady,
     onSelect
 }: {
     choice: ReturnType<typeof strategiesFor>;
     selected: ExposureStrategy;
-    cloudflareConnected: boolean;
+    /** A token that reaches an account. A DNS-only one cannot create a tunnel. */
+    tunnelReady: boolean;
     onSelect: (next: ExposureStrategy) => void;
 }) {
     return (
@@ -472,7 +473,7 @@ function StrategyStep({
                                     </Badge>
                                 )}
                                 {option.meta.wildcard && <Badge variant="neutral">Wildcard</Badge>}
-                                {option.id === "cloudflare-tunnel" && cloudflareConnected && (
+                                {option.id === "cloudflare-tunnel" && tunnelReady && (
                                     <Badge variant="neutral">Token connected</Badge>
                                 )}
                             </span>

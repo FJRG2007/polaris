@@ -50,6 +50,8 @@ export default async function IntegrationsPage() {
             githubLogin: entry.slug === "github" ? github.login ?? undefined : undefined,
             githubInstallations: entry.slug === "github" ? github.installations : undefined,
             githubHtmlUrl: entry.slug === "github" ? github.htmlUrl ?? undefined : undefined,
+            // The card is the tunnel one, so it reports the account, not the token: a
+            // DNS-scoped token connected from the domains setup cannot run a tunnel.
             cloudflareApiConnected: entry.slug === "cloudflare" ? cloudflare.connected : undefined,
             cloudflareAccountName: entry.slug === "cloudflare" ? cloudflare.accountName ?? undefined : undefined
         };
