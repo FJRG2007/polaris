@@ -8,6 +8,7 @@
 
 import { PageHeader } from "@polaris/ui";
 import { requireAdmin } from "@/lib/session";
+import { getDomainZones } from "@/lib/domain-zones";
 import { appBaseUrl, getDomainConfig } from "@/lib/domain-service";
 import { DomainsView } from "./domains-view";
 
@@ -15,7 +16,14 @@ export const dynamic = "force-dynamic";
 
 export default async function DomainsPage() {
     await requireAdmin();
-    const [config, effectiveAppUrl] = await Promise.all([getDomainConfig(), appBaseUrl()]);
+    // The zone layout is read here as well as by the setup, so the addresses below can
+    // propose the configured domain on the first paint instead of after the setup has
+    // finished loading and reported it.
+    const [config, effectiveAppUrl, zones] = await Promise.all([
+        getDomainConfig(),
+        appBaseUrl(),
+        getDomainZones()
+    ]);
 
     return (
         <>
@@ -23,7 +31,7 @@ export default async function DomainsPage() {
                 title="Domains"
                 description="Choose the domains Polaris uses for the dashboard and for the links it hands out."
             />
-            <DomainsView initialConfig={config} effectiveAppUrl={effectiveAppUrl} />
+            <DomainsView initialConfig={config} initialZones={zones} effectiveAppUrl={effectiveAppUrl} />
         </>
     );
 }

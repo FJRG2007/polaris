@@ -28,7 +28,9 @@ import {
 } from "lucide-react";
 import { Badge, Button, Card, CardBody, CardHeader, CardTitle, Input, Select } from "@polaris/ui";
 import type { DomainConfig } from "@/lib/domain-service";
+import type { DomainZoneConfig } from "@/lib/domain-zones";
 import type { NetworkMode, NetworkStatus } from "@/lib/network-service";
+import { domainSuggestions, type DomainSuggestions } from "@/lib/domain-suggestions";
 import { DomainSetupWizard } from "./setup-wizard";
 import {
     clearDuckdnsTokenAction,
@@ -40,12 +42,18 @@ import {
 
 export function DomainsView({
     initialConfig,
+    initialZones,
     effectiveAppUrl
 }: {
     initialConfig: DomainConfig;
+    initialZones: DomainZoneConfig;
     effectiveAppUrl: string;
 }) {
     const [config, setConfig] = useState(initialConfig);
+    // Followed rather than read once: the setup edits the zone layout on the same page,
+    // so the addresses it feeds would otherwise keep proposing the domain the operator
+    // had configured when they opened the page.
+    const [zones, setZones] = useState(initialZones);
     const [advanced, setAdvanced] = useState(false);
     // Bumped on every read the wizard makes, not only after a save: creating the records
     // from the setup is what first proves the zone resolves, which promotes the exposure
@@ -58,11 +66,17 @@ export function DomainsView({
             <DomainSetupWizard
                 onState={(next) => {
                     setConfig(next.domains);
+                    setZones(next.zones);
                     setSetupNonce((nonce) => nonce + 1);
                 }}
             />
 
-            <AppDomains config={config} effectiveAppUrl={effectiveAppUrl} onSaved={setConfig} />
+            <AppDomains
+                config={config}
+                suggestions={domainSuggestions(zones)}
+                effectiveAppUrl={effectiveAppUrl}
+                onSaved={setConfig}
+            />
 
             <LocalCertificate />
 
@@ -121,10 +135,13 @@ function useStoredField(stored: string) {
  */
 function AppDomains({
     config,
+    suggestions,
     effectiveAppUrl,
     onSaved
 }: {
     config: DomainConfig;
+    /** What the configured zones can answer for, or nulls when no domain is set up. */
+    suggestions: DomainSuggestions;
     effectiveAppUrl: string;
     onSaved: (next: DomainConfig) => void;
 }) {
@@ -174,13 +191,14 @@ function AppDomains({
                     <Input
                         value={appDomain.value}
                         onChange={(event) => appDomain.setValue(event.target.value)}
-                        placeholder="polaris.example.com"
+                        placeholder={suggestions.app ?? "polaris.example.com"}
                         autoComplete="off"
                     />
                     <span className="text-xs text-muted-foreground">
                         The dashboard&apos;s stable address. Leave empty to use the deployment default (
                         {effectiveAppUrl}).
                     </span>
+                    <Suggestion value={appDomain.value} suggestion={suggestions.app} onUse={appDomain.setValue} />
                 </label>
 
                 <label className="flex flex-col gap-1 text-sm">
@@ -191,7 +209,7 @@ function AppDomains({
                     <Input
                         value={sharingDomain.value}
                         onChange={(event) => sharingDomain.setValue(event.target.value)}
-                        placeholder="share.example.com"
+                        placeholder={suggestions.sharing ?? "share.example.com"}
                         autoComplete="off"
                     />
                     <span className="text-xs text-muted-foreground">
@@ -199,6 +217,11 @@ function AppDomains({
                         subdomain (e.g. a dokploy / traefik.me one) here for disposable links. Falls back to the app
                         domain.
                     </span>
+                    <Suggestion
+                        value={sharingDomain.value}
+                        suggestion={suggestions.sharing}
+                        onUse={sharingDomain.setValue}
+                    />
                 </label>
 
                 {error ? <ErrorNote message={error} /> : null}
@@ -211,6 +234,33 @@ function AppDomains({
                 </div>
             </CardBody>
         </Card>
+    );
+}
+
+/**
+ * The name the configured zones can already answer for, one press away. Offered only
+ * while the field is empty: once something is typed the suggestion is a competing
+ * answer, and replacing what the operator wrote is not a hint's job. It fills the
+ * field rather than saving, so the value is still theirs to change or discard.
+ */
+function Suggestion({
+    value,
+    suggestion,
+    onUse
+}: {
+    value: string;
+    suggestion: string | null;
+    onUse: (next: string) => void;
+}) {
+    if (!suggestion || value.trim()) return null;
+    return (
+        <button
+            type="button"
+            onClick={() => onUse(suggestion)}
+            className="w-fit text-xs text-primary underline-offset-2 hover:underline"
+        >
+            Use {suggestion}
+        </button>
     );
 }
 

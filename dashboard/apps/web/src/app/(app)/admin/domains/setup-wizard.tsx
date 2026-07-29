@@ -806,6 +806,7 @@ function DnsStep({
     const cloudflarePossible = provider === null || provider.id === "cloudflare";
     // Proven, not assumed: a zone counts as done only once the check has seen both of
     // its names answer with this server's address.
+    const done = new Map(report?.zones.map((zone) => [zone.wildcard, zone.ok]) ?? []);
     const verified = report !== null && report.zones.length > 0 && report.zones.every((zone) => zone.ok);
 
     return (
@@ -823,8 +824,8 @@ function DnsStep({
             <div className="flex flex-col divide-y divide-border/60 rounded-md border border-border/60">
                 {state.records.map((record) => (
                     <div key={record.wildcard} className="flex flex-col gap-1 p-2 text-xs">
-                        <RecordRow name={record.host} ip={publicIp} />
-                        <RecordRow name={record.wildcard} ip={publicIp} />
+                        <RecordRow name={record.host} ip={publicIp} done={done.get(record.wildcard) === true} />
+                        <RecordRow name={record.wildcard} ip={publicIp} done={done.get(record.wildcard) === true} />
                     </div>
                 ))}
             </div>
@@ -835,7 +836,12 @@ function DnsStep({
                 <Button size="sm" variant="secondary" onClick={check} disabled={busy !== null}>
                     <RefreshCw className={`size-4 ${busy === "check" ? "animate-spin" : ""}`} /> Check DNS
                 </Button>
+                {/* Withdrawn once every zone answers with this server's address: there is
+                    nothing left to create, and a live button there invites a second run
+                    whose only possible outcome is "already correct". Any zone still
+                    pending brings it back, since that one does have records to write. */}
                 {cloudflarePossible &&
+                    !verified &&
                     (state.cloudflareConnected ? (
                         <Button size="sm" onClick={() => create()} disabled={busy !== null}>
                             <Globe className="size-4" /> Create them on Cloudflare
@@ -1068,13 +1074,20 @@ function ZoneResults({ report }: { report: ZoneDnsReport | null }) {
     );
 }
 
-function RecordRow({ name, ip }: { name: string; ip: string | null }) {
+/** One record the zone needs. `done` means the check saw this zone's names answer
+ *  with this server's address, so the record exists and is pointed correctly. */
+function RecordRow({ name, ip, done }: { name: string; ip: string | null; done: boolean }) {
     const [copied, setCopied] = useState(false);
     return (
         <div className="flex items-center gap-2">
-            <Badge variant="neutral">A</Badge>
+            <Badge variant={done ? "success" : "neutral"}>A</Badge>
             <code className="flex-1 truncate">{name}</code>
             <code className="text-muted-foreground">{ip ?? "your public IP"}</code>
+            {done && (
+                <span title="Answering with this server's address" aria-label="Created" role="img">
+                    <CheckCircle2 className="size-3.5 shrink-0 text-success" />
+                </span>
+            )}
             <button
                 type="button"
                 aria-label={`Copy ${name}`}
