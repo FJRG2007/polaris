@@ -123,12 +123,14 @@ function setupState(saved: {
     zones?: SetupDraft["zones"];
     duckSub?: string;
     mode?: string;
+    strategy?: SetupDraft["strategy"];
 }): DomainSetupState {
     return {
         environment: { environment: saved.environment ?? "home-nat", detected: "home-nat", confirmed: true },
         network: { mode: saved.mode ?? "auto" },
         zones: { baseDomain: saved.baseDomain ?? "", zones: saved.zones ?? [] },
         domains: { duckdnsSubdomain: saved.duckSub ?? "" },
+        strategy: saved.strategy ?? null,
         cloudflareConnected: false,
         records: []
     } as unknown as DomainSetupState;
@@ -147,6 +149,19 @@ describe("what the setup opens on", () => {
 
     it("reads a tunnel from the exposure mode, which is all a tunnel leaves behind", () => {
         expect(configuredStrategy(setupState({ mode: "tunnel" }))).toBe("cloudflare-tunnel");
+    });
+
+    it("gives back the strategy that was chosen, not the one its traces suggest", () => {
+        // Both tunnels store the same mode and no domain, and a free subdomain stores
+        // what an unconfigured box already holds - so only the saved answer tells them
+        // apart, and it stands even where the inference would have answered too.
+        expect(configuredStrategy(setupState({ mode: "tunnel", strategy: "quick-tunnel" }))).toBe("quick-tunnel");
+        expect(configuredStrategy(setupState({ strategy: "free-subdomain", environment: "vps" }))).toBe(
+            "free-subdomain"
+        );
+        expect(
+            configuredStrategy(setupState({ baseDomain: "example.com", strategy: "cloudflare-tunnel" }))
+        ).toBe("cloudflare-tunnel");
     });
 
     it("falls back to the recommendation only when nothing is configured at all", () => {
@@ -172,11 +187,17 @@ describe("whether a draft is worth keeping", () => {
             { ...saved, baseDomain: "other.example.com" },
             { ...saved, environment: "vps" as ServerEnvironment },
             { ...saved, duckSub: "mypolaris" },
-            { ...saved, useForDashboard: false },
+            { ...saved, strategy: "duckdns" as const },
             { ...saved, zones: [...saved.zones, { label: "apps", scope: "deploy" as const, primary: true }] },
             { ...saved, zones: [{ label: "plr", scope: "deploy" as const, primary: true }] }
         ]) {
             expect(isUntouched(changed, state), JSON.stringify(changed)).toBe(false);
         }
+    });
+
+    it("does not count the dashboard choice, which the server never keeps as an answer", () => {
+        // It is carried out and cleared, so it always reads back as its default:
+        // comparing it would call a saved setup unsaved for good.
+        expect(isUntouched({ ...savedAnswers(state), useForDashboard: false }, state)).toBe(true);
     });
 });

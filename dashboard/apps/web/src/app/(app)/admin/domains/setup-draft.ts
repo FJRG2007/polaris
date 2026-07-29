@@ -46,8 +46,14 @@ export type SetupAnswers = Omit<SetupDraft, "step">;
  * configured: that recommendation can be a strategy with no domain at all, which hides
  * the operator's own domain behind two steps and skips the provider lookup that the
  * Cloudflare shortcut hangs off.
+ *
+ * The answer the setup saved comes first, because what it leaves behind cannot always
+ * be read back: the two tunnels both store the exposure mode "tunnel" with no domain,
+ * and a free subdomain stores what an untouched box already holds. Inferring from the
+ * layout is the fallback for a setup saved before the answer was recorded.
  */
 export function configuredStrategy(state: DomainSetupState): ExposureStrategy | null {
+    if (state.strategy) return state.strategy;
     if (state.zones.baseDomain.endsWith(".duckdns.org")) return "duckdns";
     if (state.zones.baseDomain) return "own-domain";
     return state.network.mode === "tunnel" ? "cloudflare-tunnel" : null;
@@ -72,6 +78,11 @@ export function savedAnswers(state: DomainSetupState): SetupAnswers {
  * that merely repeats what is configured is worse than no draft: it resumes the
  * operator into a form they had opened to look at, rather than onto the state of the
  * domain they came to check.
+ *
+ * `useForDashboard` is left out on purpose: it is an intention the server carries out
+ * and clears rather than an answer it keeps, so it reads back as its default however
+ * it was saved - and comparing it would call every setup unsaved for good the moment
+ * an operator unticked it once.
  */
 export function isUntouched(answers: SetupAnswers, state: DomainSetupState): boolean {
     const saved = savedAnswers(state);
@@ -80,7 +91,6 @@ export function isUntouched(answers: SetupAnswers, state: DomainSetupState): boo
         answers.strategy === saved.strategy &&
         answers.baseDomain === saved.baseDomain &&
         answers.duckSub === saved.duckSub &&
-        answers.useForDashboard === saved.useForDashboard &&
         answers.zones.length === saved.zones.length &&
         answers.zones.every((zone, index) => {
             const other = saved.zones[index];

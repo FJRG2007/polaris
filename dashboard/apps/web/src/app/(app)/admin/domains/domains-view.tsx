@@ -414,10 +414,17 @@ function NetworkExposure({ nonce }: { nonce: number }) {
     // stored value, and one the operator has changed and not saved yet is left alone.
     const loaded = useRef({ mode: "auto" as NetworkMode, wildcard: "" });
 
-    useEffect(() => {
+    /**
+     * The read this panel renders from. Callable rather than inline in the effect: it
+     * detects the public IP and the hosting placement, so it can fail, and the setup
+     * only re-reads when it changes something of its own - leaving the operator with a
+     * message and nothing to press.
+     */
+    function load() {
         // A re-read after the setup changed something has to clear what the last one
         // failed with, or the error stays under a panel that has just loaded fine.
         setError(null);
+        setLoading(true);
         void networkStatusAction()
             .then((next) => {
                 const previous = loaded.current;
@@ -430,6 +437,10 @@ function NetworkExposure({ nonce }: { nonce: number }) {
                 setError(caught instanceof Error ? caught.message : "Could not read the network status");
             })
             .finally(() => setLoading(false));
+    }
+
+    useEffect(() => {
+        load();
     }, [nonce]);
 
     async function redetect() {
@@ -456,6 +467,10 @@ function NetworkExposure({ nonce }: { nonce: number }) {
             );
             loaded.current = { mode: next.mode, wildcard: next.wildcardDomain };
             setStatus(next);
+            // Put back as it was stored - the server strips a scheme, a `*.` prefix and
+            // a trailing slash - so what is on screen is what was saved, and the field
+            // does not keep reading as an unsaved change.
+            setWildcard(next.wildcardDomain);
             setSaved(true);
         } catch (caught) {
             setError(caught instanceof Error ? caught.message : "Could not save the exposure mode");
@@ -479,6 +494,9 @@ function NetworkExposure({ nonce }: { nonce: number }) {
             <Card>
                 <CardBody className="flex flex-col gap-2">
                     <ErrorNote message={error ?? "Could not read the network status"} />
+                    <Button size="sm" variant="secondary" className="w-fit" onClick={load}>
+                        <RefreshCw className="size-4" /> Try again
+                    </Button>
                 </CardBody>
             </Card>
         );
@@ -486,6 +504,11 @@ function NetworkExposure({ nonce }: { nonce: number }) {
 
     const effective = status.effectiveMode;
     const publiclyReachable = effective === "public" || effective === "wildcard";
+    /** Nothing to save until a control differs from what the last read or save left.
+     *  A zone-managed wildcard is not written back, so it cannot be a change either. */
+    const changed =
+        mode !== loaded.current.mode ||
+        (!status.wildcardManaged && wildcard.trim() !== loaded.current.wildcard);
 
     return (
         <Card>
@@ -563,8 +586,8 @@ function NetworkExposure({ nonce }: { nonce: number }) {
                 {error ? <ErrorNote message={error} /> : null}
 
                 <div className="flex items-center justify-end gap-3">
-                    {saved && <span className="text-sm text-success">Saved.</span>}
-                    <Button onClick={save} disabled={busy}>
+                    {saved && !changed ? <span className="text-sm text-success">Saved.</span> : null}
+                    <Button onClick={save} disabled={busy || !changed}>
                         {busy ? "Saving..." : "Save exposure"}
                     </Button>
                 </div>

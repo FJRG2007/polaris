@@ -21,6 +21,7 @@ import {
     detectPublicIp,
     getNetworkStatus,
     setNetworkConfig,
+    MODES,
     type NetworkMode,
     type NetworkStatus
 } from "@/lib/network-service";
@@ -82,12 +83,22 @@ export async function networkStatusAction(redetect = false): Promise<NetworkStat
     return getNetworkStatus();
 }
 
-export async function saveNetworkConfigAction(input: {
-    mode?: NetworkMode;
-    wildcardDomain?: string;
-}): Promise<NetworkStatus> {
+/**
+ * The exposure mode is checked again downstream, but the wildcard domain is not: it is
+ * stored as given and then interpolated into the hostnames Polaris mints and asks
+ * Let's Encrypt to certify, so a non-string reaching `.trim()` is a 500 and a
+ * kilobyte-long one is a certificate request nobody can explain.
+ */
+const networkSchema = z.object({
+    mode: z.enum(MODES as [NetworkMode, ...NetworkMode[]]).optional(),
+    wildcardDomain: z.string().max(253).optional()
+});
+
+export async function saveNetworkConfigAction(input: z.input<typeof networkSchema>): Promise<NetworkStatus> {
     const user = await requireAdmin();
-    await setNetworkConfig(input);
+    const parsed = networkSchema.safeParse(input);
+    if (!parsed.success) throw new Error("Invalid network settings");
+    await setNetworkConfig(parsed.data);
     await recordAudit({ actorId: user.id, action: "network.configure", targetType: "setting", targetId: "network" });
     revalidatePath("/admin/domains");
     return getNetworkStatus();

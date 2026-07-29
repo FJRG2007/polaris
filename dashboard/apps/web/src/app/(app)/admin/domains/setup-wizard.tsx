@@ -154,9 +154,18 @@ export function DomainSetupWizard({ onState }: { onState?: (state: DomainSetupSt
         if (!STRATEGY_META[strategy].wildcard || !effectiveBase.includes(".")) return;
         let cancelled = false;
         const timer = setTimeout(() => {
-            void detectDnsProviderAction({ domain: effectiveBase }).then((next) => {
-                if (!cancelled) setProvider(next);
-            });
+            void detectDnsProviderAction({ domain: effectiveBase })
+                .then((next) => {
+                    if (!cancelled) setProvider(next);
+                })
+                // The action answers null for a domain it cannot resolve, but the call
+                // itself can still fail - an expired session, a dropped connection -
+                // and this fires on every pause in typing. No hint is the right outcome
+                // there: a lookup that never ran says nothing about the domain, and null
+                // keeps the Cloudflare offer open.
+                .catch(() => {
+                    if (!cancelled) setProvider(null);
+                });
         }, 600);
         return () => {
             cancelled = true;

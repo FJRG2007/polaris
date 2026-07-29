@@ -27,6 +27,7 @@ import {
 import { getCloudflareAccountStatus } from "@/lib/integrations/cloudflare-account-service";
 import { EXPOSURE_STRATEGIES, STRATEGY_META, type ExposureStrategy } from "@/lib/domain-strategies";
 import { getDomainConfig, setDomainConfig, syncDuckDns, type DomainConfig } from "@/lib/domain-service";
+import { getSetting, setSetting } from "@/lib/setting-store";
 import {
     getLocalEnvironment,
     getNetworkStatus,
@@ -37,11 +38,23 @@ import {
 } from "@/lib/network-service";
 import { isBaseDomain, isZoneLabel, normalizeBaseDomain } from "@polaris/deploy";
 
+/** The strategy the setup last saved. Its own key because nothing else records it. */
+const STRATEGY_KEY = "domain.setup.strategy";
+
 export interface DomainSetupState {
     environment: LocalEnvironment;
     network: NetworkStatus;
     zones: DomainZoneConfig;
     domains: DomainConfig;
+    /**
+     * What the operator chose last time, or null for a layout saved before this was
+     * recorded. Kept because the side effects a strategy leaves behind cannot tell
+     * them apart: both tunnels store the exposure mode "tunnel" and no domain, and a
+     * free subdomain stores exactly what an unconfigured box holds - so reopening the
+     * setup would offer an account the operator never connected, or the environment's
+     * recommendation in place of the answer they gave.
+     */
+    strategy: ExposureStrategy | null;
     /** Whether a Cloudflare API token is connected, so DNS can be created for the operator. */
     cloudflareConnected: boolean;
     /** The DNS records the current layout needs. */
@@ -62,18 +75,23 @@ async function domainSetupState(): Promise<DomainSetupState> {
     // operator to guess that a button on the last step is what unblocks their domain.
     const saved = await getDomainZones();
     if (saved.baseDomain && !(await zoneDnsVerified())) await checkZoneDns().catch(() => undefined);
-    const [environment, network, zones, domains, cloudflare] = await Promise.all([
+    const [environment, network, zones, domains, cloudflare, strategy] = await Promise.all([
         getLocalEnvironment(),
         getNetworkStatus(),
         getDomainZones(),
         getDomainConfig(),
-        getCloudflareAccountStatus()
+        getCloudflareAccountStatus(),
+        getSetting(STRATEGY_KEY)
     ]);
     return {
         environment,
         network,
         zones,
         domains,
+        // Validated like any other stored value: a key written by a version that knew
+        // a strategy this one does not would otherwise preselect an option that no
+        // longer exists, leaving step 2 with nothing highlighted.
+        strategy: EXPOSURE_STRATEGIES.includes(strategy as ExposureStrategy) ? (strategy as ExposureStrategy) : null,
         cloudflareConnected: cloudflare.connected,
         records: zoneRecords(zones).map((record) => ({
             host: record.host,
@@ -170,6 +188,10 @@ export async function saveDomainSetupAction(input: unknown): Promise<DomainSetup
 
     try {
         await setLocalEnvironment(environment);
+        // The answer itself, not just what it stores: reopening the setup reads this
+        // back, so a strategy that leaves the same traces as another one still comes
+        // back as the one that was chosen.
+        await setSetting(STRATEGY_KEY, strategy);
 
         if (strategy === "duckdns") {
             await setDomainConfig({
