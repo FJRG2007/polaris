@@ -15,14 +15,12 @@ export default async function DomainsPage() {
     const [config, effectiveAppUrl] = await Promise.all([getDomainConfig(), appBaseUrl()]);
 
     return (
-        // Short page: centre it in the content area rather than leaving it stranded
-        // at the top. Taller content simply grows and scrolls as usual.
-        <div className="flex flex-1 flex-col justify-center">
+        <>
             <PageHeader
                 title="Domains"
                 description="Choose the domains Polaris uses for the dashboard and for the links it hands out."
             />
             <DomainsView initialConfig={config} effectiveAppUrl={effectiveAppUrl} />
-        </div>
+        </>
     );
 }

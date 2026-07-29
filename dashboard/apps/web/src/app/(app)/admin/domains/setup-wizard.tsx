@@ -33,6 +33,7 @@ import {
 } from "lucide-react";
 import { Badge, Button, Card, CardBody, CardHeader, CardTitle, Checkbox, Input, Select } from "@polaris/ui";
 import type { ServerEnvironment } from "@polaris/core";
+import type { DomainConfig } from "@/lib/domain-service";
 import type { DnsProviderInfo } from "@/lib/dns-provider";
 import type { ZoneDnsProvisionResult, ZoneDnsReport } from "@/lib/domain-dns";
 import { CLOUDFLARE_DNS_TOKEN_URL } from "@/lib/integrations/cloudflare-token-link";
@@ -58,7 +59,20 @@ interface ZoneRow {
 
 const STEPS = ["Server", "Exposure", "Domain", "DNS"];
 
-export function DomainSetupWizard({ onSaved }: { onSaved?: () => void }) {
+/**
+ * Two things are reported outwards, because the page around this cannot see either.
+ * `onDomains` carries the domain settings from every fresh read: this setup writes the
+ * DuckDNS pair and can move the dashboard onto the Polaris zone, both of which the
+ * panels below also edit. `onSaved` says the layout was applied, which is what the
+ * exposure panel has to re-read.
+ */
+export function DomainSetupWizard({
+    onDomains,
+    onSaved
+}: {
+    onDomains?: (domains: DomainConfig) => void;
+    onSaved?: () => void;
+}) {
     const [state, setState] = useState<DomainSetupState | null>(null);
     const [step, setStep] = useState(0);
     const [environment, setEnvironment] = useState<ServerEnvironment>("unknown");
@@ -78,9 +92,17 @@ export function DomainSetupWizard({ onSaved }: { onSaved?: () => void }) {
     const effectiveBase =
         strategy === "duckdns" ? duckSub.trim() && `${duckSub.trim()}.duckdns.org` : baseDomain.trim();
 
+    // Every fresh read is handed on, not just the one after a save: opening the setup
+    // re-checks the DNS, and a zone that has started answering moves the dashboard onto
+    // it - so the domain settings can change without the operator pressing anything.
+    function applyState(next: DomainSetupState) {
+        setState(next);
+        onDomains?.(next.domains);
+    }
+
     useEffect(() => {
         void domainSetupStateAction().then((next) => {
-            setState(next);
+            applyState(next);
             const draft = readSetupDraft();
             const answers = draft ?? savedAnswers(next);
             setEnvironment(answers.environment);
@@ -170,7 +192,7 @@ export function DomainSetupWizard({ onSaved }: { onSaved?: () => void }) {
 
     /** Re-read what the server holds, after something the wizard did changed it. */
     async function refresh() {
-        setState(await domainSetupStateAction());
+        applyState(await domainSetupStateAction());
     }
 
     async function save() {
@@ -190,7 +212,7 @@ export function DomainSetupWizard({ onSaved }: { onSaved?: () => void }) {
             setError(result.error);
             return;
         }
-        setState(result.state);
+        applyState(result.state);
         setZones(result.state.zones.zones.map((zone) => ({ ...zone })));
         setDuckToken("");
         // The answers now live on the server, so the local copy has nothing left to
@@ -279,7 +301,7 @@ export function DomainSetupWizard({ onSaved }: { onSaved?: () => void }) {
                         state={state}
                         publicIp={state.network.publicIp}
                         provider={provider}
-                        onConnected={refresh}
+                        onRefresh={refresh}
                     />
                 )}
 
@@ -611,12 +633,12 @@ function DnsStep({
     state,
     publicIp,
     provider,
-    onConnected
+    onRefresh
 }: {
     state: DomainSetupState;
     publicIp: string | null;
     provider: DnsProviderInfo | null;
-    onConnected: () => Promise<void>;
+    onRefresh: () => Promise<void>;
 }) {
     const [report, setReport] = useState<ZoneDnsReport | null>(null);
     const [conflicts, setConflicts] = useState<ZoneDnsProvisionResult["conflicts"]>([]);
@@ -670,6 +692,10 @@ function DnsStep({
         ];
         setMessage(parts.length > 0 ? `${parts.join(", ")}.` : "Nothing to do - the records are already in place.");
         await check();
+        // The check above is where a zone is first seen answering, which is what moves
+        // the dashboard onto it - so what the server holds has just changed under the
+        // rest of the page, and only a re-read tells it.
+        await onRefresh();
     }
 
     // Checking is what records the zone as resolving here, and Polaris only hands out
@@ -769,7 +795,7 @@ function DnsStep({
                         // The panel disappears on its own once the refreshed state says
                         // the token is connected, so the records are created straight
                         // away rather than behind a second button.
-                        await onConnected();
+                        await onRefresh();
                         await create();
                     }}
                 />

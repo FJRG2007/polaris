@@ -13,7 +13,7 @@
  * of leaving them to find it. Nothing here changes DNS - it only decides what to offer.
  */
 
-import { resolveNs } from "node:dns/promises";
+import { Resolver } from "node:dns/promises";
 
 export interface DnsProvider {
     id: string;
@@ -27,10 +27,11 @@ export interface DnsProvider {
 }
 
 /**
- * Nameserver fragments per provider, most common first. Fragments start at a label
- * boundary so `.name.com` cannot match `something.name.com.br`, and stay short enough
- * to survive the shard numbering every provider does differently (`ns-1.awsdns-02.org`,
- * `hydrogen.ns1.hetzner.com`).
+ * Nameserver fragments per provider, most common first. A fragment starts at a label
+ * boundary, and one that also ends on a whole label has to end the hostname (see
+ * `matchesNameserver`), so `.name.com` cannot claim `ns1.name.com.br`. The rest stay
+ * short enough to survive the shard numbering every provider does differently
+ * (`ns-1.awsdns-02.org`, `hydrogen.ns1.hetzner.com`).
  *
  * A URL is only listed where the provider has a stable one; where a per-domain link
  * exists it is used, otherwise the panel the domain is managed from. An entry without
@@ -137,20 +138,48 @@ export interface DnsProviderInfo {
     automatable: boolean;
 }
 
+/**
+ * Whether a nameserver hostname belongs to a fragment. A fragment ending on a partial
+ * label (`.awsdns-`) or on a label separator (`.azure-dns.`, whose TLD varies by
+ * region) can land anywhere in the hostname; one ending on a whole label has to end
+ * the hostname too, or `.name.com` would claim `ns1.name.com.br` and offer the
+ * operator a panel that does not hold their records.
+ */
+function matchesNameserver(host: string, fragment: string): boolean {
+    return fragment.endsWith(".") || fragment.endsWith("-") ? host.includes(fragment) : host.endsWith(fragment);
+}
+
 /** The provider a set of nameservers belongs to, or null when none is recognized. */
 export function dnsProviderFor(nameservers: string[]): DnsProvider | null {
     const hosts = nameservers.map((nameserver) => nameserver.trim().toLowerCase().replace(/\.$/, ""));
     return (
         DNS_PROVIDERS.find((provider) =>
-            hosts.some((host) => provider.match.some((fragment) => host.includes(fragment)))
+            hosts.some((host) => provider.match.some((fragment) => matchesNameserver(host, fragment)))
         ) ?? null
     );
 }
 
+/**
+ * A registry suffix: one of the administrative labels a country registry delegates
+ * under instead of selling, on a two-letter ccTLD. The registrable domain below
+ * `co.uk`, `com.br` or `ne.jp` is three labels, not two, and the walk has to stop
+ * there. A rule rather than the full public suffix list, which only this hint would
+ * use - and being wrong here costs a hint, never a record.
+ */
+const REGISTRY_SUFFIX =
+    /^(ac|asn|biz|co|com|edu|firm|gen|go|gob|gov|govt|id|in|ind|info|int|ltd|me|mil|ne|net|nom|or|org|plc|res|sch|web)\.[a-z]{2}$/;
+
+/**
+ * One lookup, bounded. The default resolver keeps retrying for tens of seconds on a
+ * zone that black-holes its queries, and this runs from a server action on every pause
+ * in typing - no hint is worth holding a request open that long.
+ */
+const resolver = new Resolver({ timeout: 2000, tries: 1 });
+
 /** Resolve one zone's nameservers, treating "no such zone" as an empty answer. */
 async function resolveNsOrEmpty(zone: string): Promise<string[]> {
     try {
-        return await resolveNs(zone);
+        return await resolver.resolveNs(zone);
     } catch {
         return [];
     }
@@ -159,8 +188,8 @@ async function resolveNsOrEmpty(zone: string): Promise<string[]> {
 /**
  * Who answers DNS for a domain. Walks up label by label because the zone base is
  * usually a subdomain (`plr.example.com`) while only the registrable domain is
- * delegated, and stops before the TLD - that one always answers, and would name the
- * registry instead of the operator's provider.
+ * delegated, and stops at that domain - the TLD and the registry suffixes above it
+ * always answer, and would name the registry instead of the operator's provider.
  *
  * Returns null when nothing above the domain answers at all, which is the honest
  * outcome for a domain that does not exist yet.
@@ -169,6 +198,7 @@ export async function detectDnsProvider(domain: string): Promise<DnsProviderInfo
     const labels = domain.trim().toLowerCase().replace(/\.$/, "").split(".").filter(Boolean);
     for (let index = 0; index + 2 <= labels.length; index += 1) {
         const zone = labels.slice(index).join(".");
+        if (REGISTRY_SUFFIX.test(zone)) break;
         const nameservers = await resolveNsOrEmpty(zone);
         if (nameservers.length === 0) continue;
         const provider = dnsProviderFor(nameservers);

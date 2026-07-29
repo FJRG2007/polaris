@@ -47,13 +47,17 @@ export function DomainsView({
 }) {
     const [config, setConfig] = useState(initialConfig);
     const [advanced, setAdvanced] = useState(false);
-    // Bumped when the wizard saves, so the panels below re-read what it changed
-    // (exposure mode, wildcard domain, DuckDNS) instead of showing stale values.
+    // Bumped when the wizard saves, so the exposure panel re-reads what it changed
+    // (exposure mode, wildcard domain) instead of showing stale values. The domain
+    // settings come back from the wizard itself, so they need no second round trip.
     const [setupNonce, setSetupNonce] = useState(0);
 
     return (
         <div className="flex max-w-2xl flex-col gap-4">
-            <DomainSetupWizard onSaved={() => setSetupNonce((nonce) => nonce + 1)} />
+            <DomainSetupWizard
+                onDomains={setConfig}
+                onSaved={() => setSetupNonce((nonce) => nonce + 1)}
+            />
 
             <AppDomains config={config} effectiveAppUrl={effectiveAppUrl} onSaved={setConfig} />
 
@@ -96,6 +100,15 @@ function AppDomains({
     const [sharingDomain, setSharingDomain] = useState(config.sharingDomain);
     const [saving, setSaving] = useState(false);
     const [saved, setSaved] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    // The guided setup moves the dashboard onto the Polaris zone once it resolves, so
+    // the app domain can change without this card being touched. Following the stored
+    // value keeps the field from showing an address that is no longer in use.
+    useEffect(() => {
+        setAppDomain(config.appDomain);
+        setSharingDomain(config.sharingDomain);
+    }, [config.appDomain, config.sharingDomain]);
 
     /** Nothing to save until a field differs from what is stored. */
     const changed = appDomain.trim() !== config.appDomain || sharingDomain.trim() !== config.sharingDomain;
@@ -103,12 +116,18 @@ function AppDomains({
     async function save() {
         setSaving(true);
         setSaved(false);
-        const result = await saveDomainsAction({ appDomain, sharingDomain });
-        onSaved(result.config);
-        setAppDomain(result.config.appDomain);
-        setSharingDomain(result.config.sharingDomain);
-        setSaving(false);
-        setSaved(true);
+        setError(null);
+        try {
+            const result = await saveDomainsAction({ appDomain, sharingDomain });
+            onSaved(result.config);
+            setAppDomain(result.config.appDomain);
+            setSharingDomain(result.config.sharingDomain);
+            setSaved(true);
+        } catch (caught) {
+            setError(caught instanceof Error ? caught.message : "Could not save the domains");
+        } finally {
+            setSaving(false);
+        }
     }
 
     return (
@@ -152,6 +171,8 @@ function AppDomains({
                     </span>
                 </label>
 
+                {error ? <ErrorNote message={error} /> : null}
+
                 <div className="flex items-center justify-end gap-3">
                     {saved && !changed ? <span className="text-sm text-success">Saved.</span> : null}
                     <Button onClick={save} disabled={saving || !changed}>
@@ -160,6 +181,19 @@ function AppDomains({
                 </div>
             </CardBody>
         </Card>
+    );
+}
+
+/**
+ * What went wrong, where the operator is looking. Every save here reaches the server,
+ * so any of them can fail on an expired session or a dropped connection - and a button
+ * that goes back to "Save" with nothing said reads as though nothing happened.
+ */
+function ErrorNote({ message }: { message: string }) {
+    return (
+        <p className="flex items-start gap-2 rounded-md border border-danger/30 bg-danger/5 px-3 py-2 text-xs text-danger">
+            <TriangleAlert className="mt-0.5 size-3.5 shrink-0" /> {message}
+        </p>
     );
 }
 
@@ -200,8 +234,15 @@ function DuckDns({ config, onConfig }: { config: DomainConfig; onConfig: (next: 
     const [duckToken, setDuckToken] = useState("");
     const [saving, setSaving] = useState(false);
     const [saved, setSaved] = useState(false);
+    const [error, setError] = useState<string | null>(null);
     const [syncing, setSyncing] = useState(false);
     const [syncResult, setSyncResult] = useState<{ ok: boolean; detail: string } | null>(null);
+
+    // The guided setup asks for the same subdomain, so a save there has to land here
+    // rather than leaving this card claiming the field is empty.
+    useEffect(() => {
+        setDuckSub(config.duckdnsSubdomain);
+    }, [config.duckdnsSubdomain]);
 
     /** A token is only ever typed, never read back, so any entry counts as a change. */
     const changed = duckSub.trim() !== config.duckdnsSubdomain || duckToken !== "";
@@ -209,27 +250,43 @@ function DuckDns({ config, onConfig }: { config: DomainConfig; onConfig: (next: 
     async function save() {
         setSaving(true);
         setSaved(false);
-        const result = await saveDomainsAction({
-            duckdnsSubdomain: duckSub,
-            duckdnsToken: duckToken || undefined
-        });
-        onConfig(result.config);
-        setDuckSub(result.config.duckdnsSubdomain);
-        setDuckToken("");
-        setSaving(false);
-        setSaved(true);
+        setError(null);
+        try {
+            const result = await saveDomainsAction({
+                duckdnsSubdomain: duckSub,
+                duckdnsToken: duckToken || undefined
+            });
+            onConfig(result.config);
+            setDuckSub(result.config.duckdnsSubdomain);
+            setDuckToken("");
+            setSaved(true);
+        } catch (caught) {
+            setError(caught instanceof Error ? caught.message : "Could not save the DuckDNS settings");
+        } finally {
+            setSaving(false);
+        }
     }
 
     async function sync() {
         setSyncing(true);
         setSyncResult(null);
-        setSyncResult(await syncDuckDnsAction());
-        setSyncing(false);
+        try {
+            setSyncResult(await syncDuckDnsAction());
+        } catch (caught) {
+            setSyncResult({ ok: false, detail: caught instanceof Error ? caught.message : "Could not reach DuckDNS" });
+        } finally {
+            setSyncing(false);
+        }
     }
 
     async function clearToken() {
-        const result = await clearDuckdnsTokenAction();
-        onConfig(result.config);
+        setError(null);
+        try {
+            const result = await clearDuckdnsTokenAction();
+            onConfig(result.config);
+        } catch (caught) {
+            setError(caught instanceof Error ? caught.message : "Could not remove the stored token");
+        }
     }
 
     return (
@@ -290,6 +347,7 @@ function DuckDns({ config, onConfig }: { config: DomainConfig; onConfig: (next: 
                         {syncResult.ok ? "DuckDNS updated." : syncResult.detail}
                     </p>
                 ) : null}
+                {error ? <ErrorNote message={error} /> : null}
 
                 <div className="flex items-center justify-end gap-3">
                     {saved && !changed ? <span className="text-sm text-success">Saved.</span> : null}
@@ -324,41 +382,68 @@ function NetworkExposure({ nonce }: { nonce: number }) {
     const [loading, setLoading] = useState(true);
     const [busy, setBusy] = useState(false);
     const [saved, setSaved] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
-        void networkStatusAction().then((next) => {
-            setStatus(next);
-            setMode(next.mode);
-            setWildcard(next.wildcardDomain);
-            setLoading(false);
-        });
+        void networkStatusAction()
+            .then((next) => {
+                setStatus(next);
+                setMode(next.mode);
+                setWildcard(next.wildcardDomain);
+            })
+            .catch((caught: unknown) => {
+                setError(caught instanceof Error ? caught.message : "Could not read the network status");
+            })
+            .finally(() => setLoading(false));
     }, [nonce]);
 
     async function redetect() {
         setBusy(true);
-        setStatus(await networkStatusAction(true));
-        setBusy(false);
+        setError(null);
+        try {
+            setStatus(await networkStatusAction(true));
+        } catch (caught) {
+            setError(caught instanceof Error ? caught.message : "Could not re-detect the network");
+        } finally {
+            setBusy(false);
+        }
     }
 
     async function save() {
         setBusy(true);
         setSaved(false);
-        // A zone-managed wildcard is not editable here, so it is not written back:
-        // storing a copy would leave two values for one setting.
-        setStatus(
-            await saveNetworkConfigAction(
-                status?.wildcardManaged ? { mode } : { mode, wildcardDomain: wildcard }
-            )
-        );
-        setBusy(false);
-        setSaved(true);
+        setError(null);
+        try {
+            // A zone-managed wildcard is not editable here, so it is not written back:
+            // storing a copy would leave two values for one setting.
+            setStatus(
+                await saveNetworkConfigAction(
+                    status?.wildcardManaged ? { mode } : { mode, wildcardDomain: wildcard }
+                )
+            );
+            setSaved(true);
+        } catch (caught) {
+            setError(caught instanceof Error ? caught.message : "Could not save the exposure mode");
+        } finally {
+            setBusy(false);
+        }
     }
 
-    if (loading || !status) {
+    if (loading) {
         return (
             <Card>
                 <CardBody className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Loader2 className="size-4 animate-spin" /> Detecting network...
+                </CardBody>
+            </Card>
+        );
+    }
+
+    if (!status) {
+        return (
+            <Card>
+                <CardBody className="flex flex-col gap-2">
+                    <ErrorNote message={error ?? "Could not read the network status"} />
                 </CardBody>
             </Card>
         );
@@ -439,6 +524,8 @@ function NetworkExposure({ nonce }: { nonce: number }) {
                 )}
 
                 <ExposureGuidance status={status} mode={mode} wildcard={wildcard} />
+
+                {error ? <ErrorNote message={error} /> : null}
 
                 <div className="flex items-center justify-end gap-3">
                     {saved && <span className="text-sm text-success">Saved.</span>}
