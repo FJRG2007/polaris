@@ -1,14 +1,31 @@
 "use client";
 
 /**
- * Domains admin panel. Two domains: the app domain (dashboard) and the sharing
- * domain (share links / drop points - point a throwaway free subdomain here). Plus
- * DuckDNS, whose token is stored encrypted and whose record can be synced to the
- * current public IP on demand. Each section saves independently.
+ * Domains admin panel. The guided setup owns the decisions - where the box runs, how
+ * it is exposed, which domain and zones - and everything else on the page is either a
+ * separate question it does not answer (the dashboard's own address, the sharing
+ * domain, trusting the LAN certificate) or the manual controls behind it.
+ *
+ * Those manual controls sit under Advanced rather than beside the setup, because they
+ * are the same settings a second time: an exposure mode the setup already stored and a
+ * DuckDNS pair it already asked for, each with its own Save. Two panels editing one
+ * setting is the fastest way to leave an operator unsure which one won.
  */
 
-import { useEffect, useState, type ReactNode } from "react";
-import { CheckCircle2, Download, Globe, Link2, Loader2, Network, RefreshCw, ShieldCheck, TriangleAlert } from "lucide-react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import {
+    CheckCircle2,
+    ChevronDown,
+    ChevronRight,
+    Download,
+    Globe,
+    Link2,
+    Loader2,
+    Network,
+    RefreshCw,
+    ShieldCheck,
+    TriangleAlert
+} from "lucide-react";
 import { Badge, Button, Card, CardBody, CardHeader, CardTitle, Input, Select } from "@polaris/ui";
 import type { DomainConfig } from "@/lib/domain-service";
 import type { NetworkMode, NetworkStatus } from "@/lib/network-service";
@@ -29,176 +46,343 @@ export function DomainsView({
     effectiveAppUrl: string;
 }) {
     const [config, setConfig] = useState(initialConfig);
-    const [appDomain, setAppDomain] = useState(initialConfig.appDomain);
-    const [sharingDomain, setSharingDomain] = useState(initialConfig.sharingDomain);
-    const [duckSub, setDuckSub] = useState(initialConfig.duckdnsSubdomain);
-    const [duckToken, setDuckToken] = useState("");
-    const [saving, setSaving] = useState(false);
-    const [saved, setSaved] = useState(false);
-    const [syncing, setSyncing] = useState(false);
-    const [syncResult, setSyncResult] = useState<{ ok: boolean; detail: string } | null>(null);
-    // Bumped when the wizard saves, so the panels below re-read what it changed
-    // (exposure mode, wildcard domain, DuckDNS) instead of showing stale values.
+    const [advanced, setAdvanced] = useState(false);
+    // Bumped on every read the wizard makes, not only after a save: creating the records
+    // from the setup is what first proves the zone resolves, which promotes the exposure
+    // mode - so the panel would otherwise keep reporting "lan" underneath a setup that
+    // says the DNS is in place.
     const [setupNonce, setSetupNonce] = useState(0);
-
-    /** Nothing to save until a field differs from what is stored. A token is only
-     *  ever typed, never read back, so any entry counts as a change. */
-    const changed =
-        appDomain.trim() !== config.appDomain ||
-        sharingDomain.trim() !== config.sharingDomain ||
-        duckSub.trim() !== config.duckdnsSubdomain ||
-        duckToken !== "";
-
-    async function onSave() {
-        setSaving(true);
-        setSaved(false);
-        const result = await saveDomainsAction({
-            appDomain,
-            sharingDomain,
-            duckdnsSubdomain: duckSub,
-            duckdnsToken: duckToken || undefined
-        });
-        setConfig(result.config);
-        setDuckToken("");
-        setSaving(false);
-        setSaved(true);
-    }
-
-    async function onSync() {
-        setSyncing(true);
-        setSyncResult(null);
-        setSyncResult(await syncDuckDnsAction());
-        setSyncing(false);
-    }
-
-    async function onClearToken() {
-        const result = await clearDuckdnsTokenAction();
-        setConfig(result.config);
-    }
 
     return (
         <div className="flex max-w-2xl flex-col gap-4">
-            <DomainSetupWizard onSaved={() => setSetupNonce((nonce) => nonce + 1)} />
+            <DomainSetupWizard
+                onState={(next) => {
+                    setConfig(next.domains);
+                    setSetupNonce((nonce) => nonce + 1);
+                }}
+            />
 
-            <NetworkExposure nonce={setupNonce} />
+            <AppDomains config={config} effectiveAppUrl={effectiveAppUrl} onSaved={setConfig} />
 
-            <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                        <Globe className="size-4 text-primary" />
-                        Domains
-                    </CardTitle>
-                </CardHeader>
-                <CardBody className="flex flex-col gap-4">
-                    <label className="flex flex-col gap-1 text-sm">
-                        App domain
-                        <Input
-                            value={appDomain}
-                            onChange={(event) => setAppDomain(event.target.value)}
-                            placeholder="polaris.example.com"
-                            autoComplete="off"
-                        />
-                        <span className="text-xs text-muted-foreground">
-                            The dashboard&apos;s stable address. Leave empty to use the deployment default (
-                            {effectiveAppUrl}).
-                        </span>
-                    </label>
+            <LocalCertificate />
 
-                    <label className="flex flex-col gap-1 text-sm">
-                        <span className="flex items-center gap-1.5">
-                            <Link2 className="size-3.5 text-muted-foreground" />
-                            Sharing domain
-                        </span>
-                        <Input
-                            value={sharingDomain}
-                            onChange={(event) => setSharingDomain(event.target.value)}
-                            placeholder="share.example.com"
-                            autoComplete="off"
-                        />
-                        <span className="text-xs text-muted-foreground">
-                            Used for the links Polaris hands out (share links and drop points). Point a throwaway free
-                            subdomain (e.g. a dokploy / traefik.me one) here for disposable links. Falls back to the app
-                            domain.
-                        </span>
-                    </label>
-                </CardBody>
-            </Card>
-
-            <Card>
-                <CardHeader>
-                    <div className="flex items-center justify-between gap-2">
-                        <CardTitle className="flex items-center gap-2">
-                            DuckDNS
-                            {config.hasDuckdnsToken ? <Badge variant="success">Configured</Badge> : null}
-                        </CardTitle>
-                        <Button size="sm" variant="secondary" onClick={onSync} disabled={syncing || !config.hasDuckdnsToken}>
-                            <RefreshCw className={`size-4 ${syncing ? "animate-spin" : ""}`} />
-                            {syncing ? "Syncing..." : "Sync IP now"}
-                        </Button>
-                    </div>
-                </CardHeader>
-                <CardBody className="flex flex-col gap-4">
-                    <p className="text-xs text-muted-foreground">
-                        Free dynamic DNS. Polaris keeps your DuckDNS record pointed at this host&apos;s current public IP,
-                        auto-synced every few minutes. Use <code>&lt;sub&gt;.duckdns.org</code> as the wildcard base above
-                        (DuckDNS resolves <code>*.&lt;sub&gt;.duckdns.org</code> too) for free public subdomains with
-                        Let&apos;s Encrypt.
-                    </p>
-                    <label className="flex flex-col gap-1 text-sm">
-                        Subdomain
-                        <Input
-                            value={duckSub}
-                            onChange={(event) => setDuckSub(event.target.value)}
-                            placeholder="mypolaris"
-                            autoComplete="off"
-                        />
-                        <span className="text-xs text-muted-foreground">
-                            The part before <code>.duckdns.org</code>.
-                        </span>
-                    </label>
-                    <label className="flex flex-col gap-1 text-sm">
-                        Token
-                        <Input
-                            type="password"
-                            value={duckToken}
-                            onChange={(event) => setDuckToken(event.target.value)}
-                            placeholder={config.hasDuckdnsToken ? "Saved - enter a new token to replace it" : "DuckDNS token"}
-                            autoComplete="off"
-                        />
-                    </label>
-                    {config.hasDuckdnsToken ? (
-                        <button
-                            type="button"
-                            onClick={onClearToken}
-                            className="self-start text-xs text-muted-foreground underline-offset-2 hover:underline"
-                        >
-                            Remove stored token
-                        </button>
-                    ) : null}
-                    {syncResult ? (
-                        <p
-                            className={`flex items-center gap-1.5 text-sm ${
-                                syncResult.ok ? "text-success" : "text-danger"
-                            }`}
-                        >
-                            {syncResult.ok ? (
-                                <CheckCircle2 className="size-4" />
-                            ) : (
-                                <TriangleAlert className="size-4" />
-                            )}
-                            {syncResult.ok ? "DuckDNS updated." : syncResult.detail}
-                        </p>
-                    ) : null}
-                </CardBody>
-            </Card>
-
-            <div className="flex items-center justify-end gap-3">
-                {saved ? <span className="text-sm text-success">Saved.</span> : null}
-                <Button onClick={onSave} disabled={saving || !changed}>
-                    {saving ? "Saving..." : "Save"}
-                </Button>
+            <div className="flex flex-col gap-4">
+                <button
+                    type="button"
+                    onClick={() => setAdvanced((value) => !value)}
+                    className="inline-flex w-fit items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                >
+                    {advanced ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}
+                    Advanced: exposure mode and DuckDNS
+                </button>
+                {advanced && (
+                    <>
+                        <NetworkExposure nonce={setupNonce} />
+                        <DuckDns config={config} onConfig={setConfig} />
+                    </>
+                )}
             </div>
         </div>
+    );
+}
+
+/**
+ * A field that follows the stored value until the operator edits it. The guided setup
+ * rewrites these same settings while the page is open - it moves the dashboard onto the
+ * Polaris zone the moment that zone answers - so a field nobody has touched has to
+ * follow, and a field being typed into must not be replaced mid-word with nothing said.
+ */
+function useStoredField(stored: string) {
+    const [value, setValue] = useState(stored);
+    const adopted = useRef(stored);
+
+    useEffect(() => {
+        if (stored === adopted.current) return;
+        // Read before the ref moves on: React runs the updater when it renders, not
+        // when it is queued, so an updater that read the ref itself would compare the
+        // field against the value it is about to adopt and never see it as untouched.
+        const previous = adopted.current;
+        adopted.current = stored;
+        setValue((current) => (current === previous ? stored : current));
+    }, [stored]);
+
+    /** Take a value as the stored one, once a save has written it. */
+    function adopt(next: string) {
+        adopted.current = next;
+        setValue(next);
+    }
+
+    return { value, setValue, adopt };
+}
+
+/**
+ * The two addresses Polaris itself uses, which the guided setup does not decide: where
+ * the dashboard answers, and which domain the links it hands out are built from.
+ */
+function AppDomains({
+    config,
+    effectiveAppUrl,
+    onSaved
+}: {
+    config: DomainConfig;
+    effectiveAppUrl: string;
+    onSaved: (next: DomainConfig) => void;
+}) {
+    // The guided setup moves the dashboard onto the Polaris zone once it resolves, so
+    // the app domain can change without this card being touched.
+    const appDomain = useStoredField(config.appDomain);
+    const sharingDomain = useStoredField(config.sharingDomain);
+    const [saving, setSaving] = useState(false);
+    const [saved, setSaved] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    /** Nothing to save until a field differs from what is stored. */
+    const changed =
+        appDomain.value.trim() !== config.appDomain || sharingDomain.value.trim() !== config.sharingDomain;
+
+    async function save() {
+        setSaving(true);
+        setSaved(false);
+        setError(null);
+        try {
+            const result = await saveDomainsAction({
+                appDomain: appDomain.value,
+                sharingDomain: sharingDomain.value
+            });
+            onSaved(result.config);
+            appDomain.adopt(result.config.appDomain);
+            sharingDomain.adopt(result.config.sharingDomain);
+            setSaved(true);
+        } catch (caught) {
+            setError(caught instanceof Error ? caught.message : "Could not save the domains");
+        } finally {
+            setSaving(false);
+        }
+    }
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                    <Globe className="size-4 text-primary" />
+                    Polaris&apos;s own addresses
+                </CardTitle>
+            </CardHeader>
+            <CardBody className="flex flex-col gap-4">
+                <label className="flex flex-col gap-1 text-sm">
+                    App domain
+                    <Input
+                        value={appDomain.value}
+                        onChange={(event) => appDomain.setValue(event.target.value)}
+                        placeholder="polaris.example.com"
+                        autoComplete="off"
+                    />
+                    <span className="text-xs text-muted-foreground">
+                        The dashboard&apos;s stable address. Leave empty to use the deployment default (
+                        {effectiveAppUrl}).
+                    </span>
+                </label>
+
+                <label className="flex flex-col gap-1 text-sm">
+                    <span className="flex items-center gap-1.5">
+                        <Link2 className="size-3.5 text-muted-foreground" />
+                        Sharing domain
+                    </span>
+                    <Input
+                        value={sharingDomain.value}
+                        onChange={(event) => sharingDomain.setValue(event.target.value)}
+                        placeholder="share.example.com"
+                        autoComplete="off"
+                    />
+                    <span className="text-xs text-muted-foreground">
+                        Used for the links Polaris hands out (share links and drop points). Point a throwaway free
+                        subdomain (e.g. a dokploy / traefik.me one) here for disposable links. Falls back to the app
+                        domain.
+                    </span>
+                </label>
+
+                {error ? <ErrorNote message={error} /> : null}
+
+                <div className="flex items-center justify-end gap-3">
+                    {saved && !changed ? <span className="text-sm text-success">Saved.</span> : null}
+                    <Button onClick={save} disabled={saving || !changed}>
+                        {saving ? "Saving..." : "Save"}
+                    </Button>
+                </div>
+            </CardBody>
+        </Card>
+    );
+}
+
+/**
+ * What went wrong, where the operator is looking. Every save here reaches the server,
+ * so any of them can fail on an expired session or a dropped connection - and a button
+ * that goes back to "Save" with nothing said reads as though nothing happened.
+ */
+function ErrorNote({ message }: { message: string }) {
+    return (
+        <p className="flex items-start gap-2 rounded-md border border-danger/30 bg-danger/5 px-3 py-2 text-xs text-danger">
+            <TriangleAlert className="mt-0.5 size-3.5 shrink-0" /> {message}
+        </p>
+    );
+}
+
+/** The root certificate that makes the LAN hostname trusted, once, per device. */
+function LocalCertificate() {
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                    <ShieldCheck className="size-4 text-primary" /> Trust this device (polaris.local)
+                </CardTitle>
+            </CardHeader>
+            <CardBody className="flex flex-col gap-2 text-xs">
+                <p className="text-muted-foreground">
+                    LAN hostnames can&apos;t get a public certificate, so Polaris signs its own. Install this root
+                    certificate on your devices once to make <code>https://polaris.local</code> trusted with no browser
+                    warning. macOS/iOS: open it and trust it in Keychain / Profiles. Windows: import into &quot;Trusted
+                    Root Certification Authorities&quot;. Firefox: import under Authorities.
+                </p>
+                <a
+                    href="/api/system/local-ca"
+                    className="inline-flex w-fit items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 font-medium text-foreground transition-colors hover:bg-muted"
+                >
+                    <Download className="size-3.5" /> Download root certificate
+                </a>
+            </CardBody>
+        </Card>
+    );
+}
+
+/**
+ * DuckDNS on its own terms: the guided setup asks for the same pair when DuckDNS is
+ * the chosen strategy, and this is where an operator who uses it for something else -
+ * or who only wants to replace the token - edits it.
+ */
+function DuckDns({ config, onConfig }: { config: DomainConfig; onConfig: (next: DomainConfig) => void }) {
+    // The guided setup asks for the same subdomain, so a save there has to land here
+    // rather than leaving this card claiming the field is empty.
+    const duckSub = useStoredField(config.duckdnsSubdomain);
+    const [duckToken, setDuckToken] = useState("");
+    const [saving, setSaving] = useState(false);
+    const [saved, setSaved] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [syncing, setSyncing] = useState(false);
+    const [syncResult, setSyncResult] = useState<{ ok: boolean; detail: string } | null>(null);
+
+    /** A token is only ever typed, never read back, so any entry counts as a change. */
+    const changed = duckSub.value.trim() !== config.duckdnsSubdomain || duckToken !== "";
+
+    async function save() {
+        setSaving(true);
+        setSaved(false);
+        setError(null);
+        try {
+            const result = await saveDomainsAction({
+                duckdnsSubdomain: duckSub.value,
+                duckdnsToken: duckToken || undefined
+            });
+            onConfig(result.config);
+            duckSub.adopt(result.config.duckdnsSubdomain);
+            setDuckToken("");
+            setSaved(true);
+        } catch (caught) {
+            setError(caught instanceof Error ? caught.message : "Could not save the DuckDNS settings");
+        } finally {
+            setSaving(false);
+        }
+    }
+
+    async function sync() {
+        setSyncing(true);
+        setSyncResult(null);
+        try {
+            setSyncResult(await syncDuckDnsAction());
+        } catch (caught) {
+            setSyncResult({ ok: false, detail: caught instanceof Error ? caught.message : "Could not reach DuckDNS" });
+        } finally {
+            setSyncing(false);
+        }
+    }
+
+    async function clearToken() {
+        setError(null);
+        try {
+            const result = await clearDuckdnsTokenAction();
+            onConfig(result.config);
+        } catch (caught) {
+            setError(caught instanceof Error ? caught.message : "Could not remove the stored token");
+        }
+    }
+
+    return (
+        <Card>
+            <CardHeader>
+                <div className="flex items-center justify-between gap-2">
+                    <CardTitle className="flex items-center gap-2">
+                        DuckDNS
+                        {config.hasDuckdnsToken ? <Badge variant="success">Configured</Badge> : null}
+                    </CardTitle>
+                    <Button size="sm" variant="secondary" onClick={sync} disabled={syncing || !config.hasDuckdnsToken}>
+                        <RefreshCw className={`size-4 ${syncing ? "animate-spin" : ""}`} />
+                        {syncing ? "Syncing..." : "Sync IP now"}
+                    </Button>
+                </div>
+            </CardHeader>
+            <CardBody className="flex flex-col gap-4">
+                <p className="text-xs text-muted-foreground">
+                    Free dynamic DNS. Polaris keeps your DuckDNS record pointed at this host&apos;s current public IP,
+                    auto-synced every few minutes. Use <code>&lt;sub&gt;.duckdns.org</code> as the wildcard base in the
+                    guided setup (DuckDNS resolves <code>*.&lt;sub&gt;.duckdns.org</code> too) for free public
+                    subdomains with Let&apos;s Encrypt.
+                </p>
+                <label className="flex flex-col gap-1 text-sm">
+                    Subdomain
+                    <Input
+                        value={duckSub.value}
+                        onChange={(event) => duckSub.setValue(event.target.value)}
+                        placeholder="mypolaris"
+                        autoComplete="off"
+                    />
+                    <span className="text-xs text-muted-foreground">
+                        The part before <code>.duckdns.org</code>.
+                    </span>
+                </label>
+                <label className="flex flex-col gap-1 text-sm">
+                    Token
+                    <Input
+                        type="password"
+                        value={duckToken}
+                        onChange={(event) => setDuckToken(event.target.value)}
+                        placeholder={config.hasDuckdnsToken ? "Saved - enter a new token to replace it" : "DuckDNS token"}
+                        autoComplete="off"
+                    />
+                </label>
+                {config.hasDuckdnsToken ? (
+                    <button
+                        type="button"
+                        onClick={clearToken}
+                        className="self-start text-xs text-muted-foreground underline-offset-2 hover:underline"
+                    >
+                        Remove stored token
+                    </button>
+                ) : null}
+                {syncResult ? (
+                    <p className={`flex items-center gap-1.5 text-sm ${syncResult.ok ? "text-success" : "text-danger"}`}>
+                        {syncResult.ok ? <CheckCircle2 className="size-4" /> : <TriangleAlert className="size-4" />}
+                        {syncResult.ok ? "DuckDNS updated." : syncResult.detail}
+                    </p>
+                ) : null}
+                {error ? <ErrorNote message={error} /> : null}
+
+                <div className="flex items-center justify-end gap-3">
+                    {saved && !changed ? <span className="text-sm text-success">Saved.</span> : null}
+                    <Button onClick={save} disabled={saving || !changed}>
+                        {saving ? "Saving..." : "Save"}
+                    </Button>
+                </div>
+            </CardBody>
+        </Card>
     );
 }
 
@@ -224,37 +408,78 @@ function NetworkExposure({ nonce }: { nonce: number }) {
     const [loading, setLoading] = useState(true);
     const [busy, setBusy] = useState(false);
     const [saved, setSaved] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    // What the last read (or save) left in these two controls. The setup re-reads this
+    // panel whenever it changes something, so a control nobody has touched follows the
+    // stored value, and one the operator has changed and not saved yet is left alone.
+    const loaded = useRef({ mode: "auto" as NetworkMode, wildcard: "" });
+
+    /**
+     * The read this panel renders from. Callable rather than inline in the effect: it
+     * detects the public IP and the hosting placement, so it can fail, and the setup
+     * only re-reads when it changes something of its own - leaving the operator with a
+     * message and nothing to press.
+     */
+    function load() {
+        // A re-read after the setup changed something has to clear what the last one
+        // failed with, or the error stays under a panel that has just loaded fine.
+        setError(null);
+        setLoading(true);
+        void networkStatusAction()
+            .then((next) => {
+                const previous = loaded.current;
+                loaded.current = { mode: next.mode, wildcard: next.wildcardDomain };
+                setStatus(next);
+                setMode((current) => (current === previous.mode ? next.mode : current));
+                setWildcard((current) => (current === previous.wildcard ? next.wildcardDomain : current));
+            })
+            .catch((caught: unknown) => {
+                setError(caught instanceof Error ? caught.message : "Could not read the network status");
+            })
+            .finally(() => setLoading(false));
+    }
 
     useEffect(() => {
-        void networkStatusAction().then((next) => {
-            setStatus(next);
-            setMode(next.mode);
-            setWildcard(next.wildcardDomain);
-            setLoading(false);
-        });
+        load();
     }, [nonce]);
 
     async function redetect() {
         setBusy(true);
-        setStatus(await networkStatusAction(true));
-        setBusy(false);
+        setError(null);
+        try {
+            setStatus(await networkStatusAction(true));
+        } catch (caught) {
+            setError(caught instanceof Error ? caught.message : "Could not re-detect the network");
+        } finally {
+            setBusy(false);
+        }
     }
 
     async function save() {
         setBusy(true);
         setSaved(false);
-        // A zone-managed wildcard is not editable here, so it is not written back:
-        // storing a copy would leave two values for one setting.
-        setStatus(
-            await saveNetworkConfigAction(
+        setError(null);
+        try {
+            // A zone-managed wildcard is not editable here, so it is not written back:
+            // storing a copy would leave two values for one setting.
+            const next = await saveNetworkConfigAction(
                 status?.wildcardManaged ? { mode } : { mode, wildcardDomain: wildcard }
-            )
-        );
-        setBusy(false);
-        setSaved(true);
+            );
+            loaded.current = { mode: next.mode, wildcard: next.wildcardDomain };
+            setStatus(next);
+            // Put back as it was stored - the server strips a scheme, a `*.` prefix and
+            // a trailing slash - so what is on screen is what was saved, and the field
+            // does not keep reading as an unsaved change.
+            setWildcard(next.wildcardDomain);
+            setSaved(true);
+        } catch (caught) {
+            setError(caught instanceof Error ? caught.message : "Could not save the exposure mode");
+        } finally {
+            setBusy(false);
+        }
     }
 
-    if (loading || !status) {
+    if (loading) {
         return (
             <Card>
                 <CardBody className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -264,8 +489,26 @@ function NetworkExposure({ nonce }: { nonce: number }) {
         );
     }
 
+    if (!status) {
+        return (
+            <Card>
+                <CardBody className="flex flex-col gap-2">
+                    <ErrorNote message={error ?? "Could not read the network status"} />
+                    <Button size="sm" variant="secondary" className="w-fit" onClick={load}>
+                        <RefreshCw className="size-4" /> Try again
+                    </Button>
+                </CardBody>
+            </Card>
+        );
+    }
+
     const effective = status.effectiveMode;
     const publiclyReachable = effective === "public" || effective === "wildcard";
+    /** Nothing to save until a control differs from what the last read or save left.
+     *  A zone-managed wildcard is not written back, so it cannot be a change either. */
+    const changed =
+        mode !== loaded.current.mode ||
+        (!status.wildcardManaged && wildcard.trim() !== loaded.current.wildcard);
 
     return (
         <Card>
@@ -309,25 +552,6 @@ function NetworkExposure({ nonce }: { nonce: number }) {
                     </p>
                 )}
 
-                <div className="flex flex-col gap-2 rounded-md border border-border/60 p-3 text-xs">
-                    <div className="flex items-center gap-2">
-                        <ShieldCheck className="size-4 shrink-0 text-primary" />
-                        <span className="font-medium text-foreground">Trust this device (polaris.local)</span>
-                    </div>
-                    <p className="text-muted-foreground">
-                        LAN hostnames can&apos;t get a public certificate, so Polaris signs its own. Install this root
-                        certificate on your devices once to make <code>https://polaris.local</code> trusted with no
-                        browser warning. macOS/iOS: open it and trust it in Keychain / Profiles. Windows: import into
-                        &quot;Trusted Root Certification Authorities&quot;. Firefox: import under Authorities.
-                    </p>
-                    <a
-                        href="/api/system/local-ca"
-                        className="inline-flex w-fit items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 font-medium text-foreground transition-colors hover:bg-muted"
-                    >
-                        <Download className="size-3.5" /> Download root certificate
-                    </a>
-                </div>
-
                 <label className="flex flex-col gap-1 text-sm">
                     Exposure mode
                     <Select value={mode} onValueChange={(value) => setMode(value as NetworkMode)} options={MODE_OPTIONS} />
@@ -359,9 +583,11 @@ function NetworkExposure({ nonce }: { nonce: number }) {
 
                 <ExposureGuidance status={status} mode={mode} wildcard={wildcard} />
 
+                {error ? <ErrorNote message={error} /> : null}
+
                 <div className="flex items-center justify-end gap-3">
-                    {saved && <span className="text-sm text-success">Saved.</span>}
-                    <Button onClick={save} disabled={busy}>
+                    {saved && !changed ? <span className="text-sm text-success">Saved.</span> : null}
+                    <Button onClick={save} disabled={busy || !changed}>
                         {busy ? "Saving..." : "Save exposure"}
                     </Button>
                 </div>

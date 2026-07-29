@@ -36,7 +36,7 @@ import { getSetting, setSetting } from "./setting-store";
 export type NetworkMode = "auto" | "lan" | "public" | "wildcard" | "tunnel";
 export type EffectiveMode = Exclude<NetworkMode, "auto">;
 
-const MODES: NetworkMode[] = ["auto", "lan", "public", "wildcard", "tunnel"];
+export const MODES: NetworkMode[] = ["auto", "lan", "public", "wildcard", "tunnel"];
 
 const KEYS = {
     mode: "network.mode",

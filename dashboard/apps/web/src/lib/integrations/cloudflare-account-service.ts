@@ -6,6 +6,12 @@
  * stored envelope-encrypted at rest with the master key (never in plaintext); the
  * chosen account id and name are stored alongside for display and API calls.
  *
+ * The domains guided setup connects the same token through the same action, so the
+ * zone's records can be created without leaving it. Nothing here checks which
+ * permissions a token carries - only that it is active and reaches an account - so a
+ * DNS-only token connected there is stored like any other and named tunnels will fail
+ * on it until one with the tunnel permission replaces it.
+ *
  * This is separate from the marketplace "Cloudflare Tunnel" connector token (a
  * server-wide tunnel run by tunnel-service): that grants no API access, this one
  * does. Config lives in the Setting table, so no schema change is needed.

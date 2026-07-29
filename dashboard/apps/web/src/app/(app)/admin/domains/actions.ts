@@ -6,6 +6,7 @@
  * tri-state (a value sets it, blank keeps it); a separate action clears it.
  */
 
+import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/session";
 import {
@@ -20,19 +21,39 @@ import {
     detectPublicIp,
     getNetworkStatus,
     setNetworkConfig,
+    MODES,
     type NetworkMode,
     type NetworkStatus
 } from "@/lib/network-service";
 import { recordAudit } from "@/lib/audit-service";
 
-export async function saveDomainsAction(input: {
-    appDomain: string;
-    sharingDomain: string;
-    duckdnsSubdomain: string;
-    duckdnsToken?: string;
-}): Promise<{ config: DomainConfig }> {
+/**
+ * The four settings this page edits, and nothing else. `setDomainConfig` also writes the
+ * deploy base and the stored public IP, which every auto hostname is built from - an
+ * action is reachable with any payload, so parsing is what keeps those two out of its
+ * reach and what stops a non-string reaching `.trim()` as a 500.
+ */
+const domainsSchema = z.object({
+    appDomain: z.string().optional(),
+    sharingDomain: z.string().optional(),
+    duckdnsSubdomain: z.string().optional(),
+    duckdnsToken: z.string().optional()
+});
+
+/**
+ * Save whichever domain settings were passed. Partial on purpose: the page saves the
+ * app/sharing pair and the DuckDNS pair from separate panels, and a call that carried
+ * the whole shape would have each one write back its stale copy of the other's fields.
+ *
+ * Typed from the schema as well as parsed against it: every field being optional means
+ * a mistyped key is stripped in silence, so a caller that sends `duckdnsTokn` would be
+ * told the settings were saved while the token never reached the database.
+ */
+export async function saveDomainsAction(input: z.input<typeof domainsSchema>): Promise<{ config: DomainConfig }> {
     const user = await requireAdmin();
-    await setDomainConfig(input);
+    const parsed = domainsSchema.safeParse(input);
+    if (!parsed.success) throw new Error("Invalid domain settings");
+    await setDomainConfig(parsed.data);
     await recordAudit({ actorId: user.id, action: "domains.configure", targetType: "setting", targetId: "domains" });
     revalidatePath("/admin/domains");
     return { config: await getDomainConfig() };
@@ -62,12 +83,22 @@ export async function networkStatusAction(redetect = false): Promise<NetworkStat
     return getNetworkStatus();
 }
 
-export async function saveNetworkConfigAction(input: {
-    mode?: NetworkMode;
-    wildcardDomain?: string;
-}): Promise<NetworkStatus> {
+/**
+ * The exposure mode is checked again downstream, but the wildcard domain is not: it is
+ * stored as given and then interpolated into the hostnames Polaris mints and asks
+ * Let's Encrypt to certify, so a non-string reaching `.trim()` is a 500 and a
+ * kilobyte-long one is a certificate request nobody can explain.
+ */
+const networkSchema = z.object({
+    mode: z.enum(MODES as [NetworkMode, ...NetworkMode[]]).optional(),
+    wildcardDomain: z.string().max(253).optional()
+});
+
+export async function saveNetworkConfigAction(input: z.input<typeof networkSchema>): Promise<NetworkStatus> {
     const user = await requireAdmin();
-    await setNetworkConfig(input);
+    const parsed = networkSchema.safeParse(input);
+    if (!parsed.success) throw new Error("Invalid network settings");
+    await setNetworkConfig(parsed.data);
     await recordAudit({ actorId: user.id, action: "network.configure", targetType: "setting", targetId: "network" });
     revalidatePath("/admin/domains");
     return getNetworkStatus();
