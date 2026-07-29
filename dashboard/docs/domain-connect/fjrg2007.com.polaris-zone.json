@@ -1,0 +1,26 @@
+{
+  "providerId": "fjrg2007.com",
+  "providerName": "Polaris",
+  "serviceId": "polaris-zone",
+  "serviceName": "Polaris zone",
+  "version": 1,
+  "description": "Points a Polaris zone and every hostname under it at your server. Applied once per zone: at the zone's label for plr.example.com, or at the domain itself when the zone has no label.",
+  "syncPubKeyDomain": "dc.fjrg2007.com",
+  "syncBlock": false,
+  "records": [
+    {
+      "groupId": "zone_host",
+      "type": "A",
+      "host": "@",
+      "pointsTo": "%ip4%",
+      "ttl": 300
+    },
+    {
+      "groupId": "zone_wildcard",
+      "type": "A",
+      "host": "*",
+      "pointsTo": "%ip4%",
+      "ttl": 300
+    }
+  ]
+}
