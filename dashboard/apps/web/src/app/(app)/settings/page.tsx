@@ -17,7 +17,9 @@ export default async function SettingsPage() {
     const status = await getUpdateStatus();
 
     return (
-        <>
+        // Short page: centre it in the content area rather than leaving it stranded
+        // at the top. Taller content simply grows and scrolls as usual.
+        <div className="flex flex-1 flex-col justify-center">
             <PageHeader title="Settings" description="General configuration for this Polaris deployment." />
             <SettingsView
                 initialStatus={status}
@@ -29,6 +31,6 @@ export default async function SettingsPage() {
                     autoUpdate: env.POLARIS_AUTO_UPDATE
                 }}
             />
-        </>
+        </div>
     );
 }

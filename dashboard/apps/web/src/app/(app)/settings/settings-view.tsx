@@ -10,6 +10,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { CheckCircle2, DownloadCloud, RefreshCw, TriangleAlert } from "lucide-react";
 import { Button, Card, CardBody, CardHeader, CardTitle } from "@polaris/ui";
 import type { UpdateStatus } from "@/lib/update-service";
+import { isUpdateInFlight, type UpdateLogTail } from "@/lib/update-log";
 import { checkUpdatesAction, triggerHostUpdateAction } from "./actions";
 
 interface Deployment {
@@ -61,6 +62,28 @@ export function SettingsView({
             lastAutoCheck = Date.now();
             onCheck();
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    // An update runs on the host, not in this tab: reloading or navigating away
+    // drops the local state while the updater keeps going. The shared log file is
+    // the only truth, so on mount re-attach to a run that is still being written -
+    // otherwise the card looks idle while Polaris is mid-update.
+    useEffect(() => {
+        void (async () => {
+            try {
+                const res = await fetch("/api/updates/logs?offset=0", { cache: "no-store" });
+                if (!res.ok) return;
+                const data = (await res.json()) as UpdateLogTail;
+                if (!isUpdateInFlight(data, Date.now())) return;
+                setUpdating(true);
+                setUpdateMsg("Update in progress - reconnecting automatically when Polaris is back.");
+                pollLogs();
+                waitForUpdate();
+            } catch {
+                // No log to re-attach to; leave the card in its idle state.
+            }
+        })();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
@@ -156,13 +179,7 @@ export function SettingsView({
             try {
                 const res = await fetch(`/api/updates/logs?offset=${offset}`, { cache: "no-store" });
                 if (!res.ok) return; // transient (or web restarting); keep trying
-                const data = (await res.json()) as {
-                    exists: boolean;
-                    content: string;
-                    nextOffset: number;
-                    done: boolean;
-                    exitCode: number | null;
-                };
+                const data = (await res.json()) as UpdateLogTail;
                 if (!data.exists) {
                     missing += 1;
                     if (missing >= 4 && !sawContent) {
@@ -265,25 +282,27 @@ export function SettingsView({
                         <Row label="Last checked" value={formatChecked(status.checkedAt)} />
                     </dl>
 
-                    {behind ? (
+                    {behind || updating || logText ? (
                         <div className="flex flex-col gap-2 rounded-md border border-border bg-muted/30 p-3 text-xs text-muted-foreground">
-                            <div className="flex items-center justify-between gap-2">
-                                <span>
-                                    An update is available.{" "}
-                                    <a
-                                        className="text-primary hover:underline"
-                                        href={status.url}
-                                        target="_blank"
-                                        rel="noreferrer"
-                                    >
-                                        View changes
-                                    </a>
-                                </span>
-                                <Button size="sm" onClick={onUpdate} disabled={updating}>
-                                    {updating ? <RefreshCw className="size-4 animate-spin" /> : <DownloadCloud className="size-4" />}
-                                    {updating ? "Updating..." : "Update now"}
-                                </Button>
-                            </div>
+                            {behind ? (
+                                <div className="flex items-center justify-between gap-2">
+                                    <span>
+                                        An update is available.{" "}
+                                        <a
+                                            className="text-primary hover:underline"
+                                            href={status.url}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                        >
+                                            View changes
+                                        </a>
+                                    </span>
+                                    <Button size="sm" onClick={onUpdate} disabled={updating}>
+                                        {updating ? <RefreshCw className="size-4 animate-spin" /> : <DownloadCloud className="size-4" />}
+                                        {updating ? "Updating..." : "Update now"}
+                                    </Button>
+                                </div>
+                            ) : null}
                             {updateMsg ? <p className="text-foreground">{updateMsg}</p> : null}
                             {showManual ? (
                                 <p>

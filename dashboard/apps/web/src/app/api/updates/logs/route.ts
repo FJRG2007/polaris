@@ -11,6 +11,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { open, stat } from "node:fs/promises";
 import { getSession } from "@/lib/session";
+import type { UpdateLogTail } from "@/lib/update-log";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -29,7 +30,15 @@ export async function GET(request: NextRequest): Promise<Response> {
     const raw = Number(request.nextUrl.searchParams.get("offset") ?? "0");
     let offset = Number.isFinite(raw) && raw >= 0 ? Math.floor(raw) : 0;
 
-    const notReadable = NextResponse.json({ exists: false, content: "", nextOffset: 0, done: false, exitCode: null });
+    const notReadable = NextResponse.json({
+        exists: false,
+        content: "",
+        nextOffset: 0,
+        done: false,
+        exitCode: null,
+        finished: false,
+        updatedAt: 0
+    } satisfies UpdateLogTail);
     const info = await stat(LOG_PATH).catch(() => null);
     if (!info || !info.isFile()) return notReadable;
     // A new run truncates the file; if our offset is past its end, restart from 0.
@@ -65,8 +74,13 @@ export async function GET(request: NextRequest): Promise<Response> {
             content,
             nextOffset,
             done,
-            exitCode: done && match ? Number(match[1]) : null
-        });
+            exitCode: done && match ? Number(match[1]) : null,
+            // Whether the run has ended at all, independent of how far the caller has
+            // read, plus when the file was last written. A client that just loaded the
+            // page uses both to tell a live update from a leftover log.
+            finished: match !== null,
+            updatedAt: info.mtimeMs
+        } satisfies UpdateLogTail);
     } finally {
         await handle.close();
     }
