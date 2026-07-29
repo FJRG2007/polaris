@@ -7,6 +7,12 @@
  * cannot use a wildcard record, and a wildcard record makes tunnels unnecessary.
  *
  * The recommended option is always preselected, so finishing means pressing Continue.
+ *
+ * Three things keep the operator out of dead ends: the answers survive a reload (they
+ * are kept locally until the setup is saved), reopening it lands on the domain that is
+ * already configured rather than on the first question again, and the domain's real DNS
+ * provider is looked up as it is typed - so the setup can create the records itself
+ * where it can, and link straight to the right panel where it cannot.
  */
 
 import { useEffect, useState } from "react";
@@ -15,6 +21,7 @@ import {
     CheckCircle2,
     ChevronLeft,
     Copy,
+    ExternalLink,
     Globe,
     Loader2,
     Plus,
@@ -26,11 +33,16 @@ import {
 } from "lucide-react";
 import { Badge, Button, Card, CardBody, CardHeader, CardTitle, Checkbox, Input, Select } from "@polaris/ui";
 import type { ServerEnvironment } from "@polaris/core";
+import type { DnsProviderInfo } from "@/lib/dns-provider";
 import type { ZoneDnsProvisionResult, ZoneDnsReport } from "@/lib/domain-dns";
+import { CLOUDFLARE_DNS_TOKEN_URL } from "@/lib/integrations/cloudflare-token-link";
 import { strategiesFor, STRATEGY_META, type ExposureStrategy } from "@/lib/domain-strategies";
 import { ENVIRONMENT_CHOICES, ENVIRONMENT_META } from "../../apps/servers/environment-meta";
+import { connectCloudflareAccountAction } from "../../integrations/actions";
+import { clearSetupDraft, isUntouched, readSetupDraft, savedAnswers, writeSetupDraft } from "./setup-draft";
 import {
     checkZoneDnsAction,
+    detectDnsProviderAction,
     domainSetupStateAction,
     provisionZoneDnsAction,
     saveDomainSetupAction,
@@ -58,17 +70,67 @@ export function DomainSetupWizard({ onSaved }: { onSaved?: () => void }) {
     const [useForDashboard, setUseForDashboard] = useState(true);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [resumed, setResumed] = useState(false);
+    const [provider, setProvider] = useState<DnsProviderInfo | null>(null);
+
+    // The domain the setup would actually use, which is what DNS is looked up for and
+    // what the zone previews are built from - a DuckDNS subdomain is a domain too.
+    const effectiveBase =
+        strategy === "duckdns" ? duckSub.trim() && `${duckSub.trim()}.duckdns.org` : baseDomain.trim();
 
     useEffect(() => {
         void domainSetupStateAction().then((next) => {
             setState(next);
-            setEnvironment(next.environment.environment);
-            setBaseDomain(next.zones.baseDomain);
-            setZones(next.zones.zones.map((zone) => ({ ...zone })));
-            setDuckSub(next.domains.duckdnsSubdomain);
-            setStrategy(strategiesFor(next.environment.environment).recommended);
+            const draft = readSetupDraft();
+            const answers = draft ?? savedAnswers(next);
+            setEnvironment(answers.environment);
+            setStrategy(answers.strategy);
+            setBaseDomain(answers.baseDomain);
+            setZones(answers.zones.map((zone) => ({ ...zone })));
+            setDuckSub(answers.duckSub);
+            setUseForDashboard(answers.useForDashboard);
+            if (draft) {
+                setStep(draft.step);
+                setResumed(true);
+                return;
+            }
+            // Nothing unfinished, but a layout already saved: what that domain's DNS is
+            // doing is the useful view, not the first question over again.
+            if (next.zones.baseDomain) setStep(3);
         });
     }, []);
+
+    // Kept only while the answers are unsaved and say something the server does not
+    // already hold. Past the save the server holds them, and a draft that merely repeats
+    // what is configured would resume the operator into a form they had opened to look
+    // at - instead of onto the state of the domain they came to check.
+    useEffect(() => {
+        if (!state || step > 2) return;
+        const draft = { step, environment, strategy, baseDomain, zones, duckSub, useForDashboard };
+        if (isUntouched(draft, state)) {
+            clearSetupDraft();
+            return;
+        }
+        writeSetupDraft(draft);
+    }, [state, step, environment, strategy, baseDomain, zones, duckSub, useForDashboard]);
+
+    // Who answers DNS for the typed domain. A hint, never a gate: it runs after a pause
+    // so a half-typed name does not fire a lookup per keystroke, and a late answer for a
+    // domain that has since changed is dropped rather than shown against the new one.
+    useEffect(() => {
+        setProvider(null);
+        if (!STRATEGY_META[strategy].wildcard || !effectiveBase.includes(".")) return;
+        let cancelled = false;
+        const timer = setTimeout(() => {
+            void detectDnsProviderAction({ domain: effectiveBase }).then((next) => {
+                if (!cancelled) setProvider(next);
+            });
+        }, 600);
+        return () => {
+            cancelled = true;
+            clearTimeout(timer);
+        };
+    }, [effectiveBase, strategy]);
 
     if (!state) {
         return (
@@ -87,6 +149,28 @@ export function DomainSetupWizard({ onSaved }: { onSaved?: () => void }) {
         // The recommendation is per environment, so a changed answer re-picks it -
         // otherwise step 2 would keep a choice that no longer fits the server.
         setStrategy(strategiesFor(next).recommended);
+    }
+
+    /** Drop the resumed answers and start again from what is actually saved. */
+    function startOver() {
+        if (!state) return;
+        const answers = savedAnswers(state);
+        clearSetupDraft();
+        setResumed(false);
+        setEnvironment(answers.environment);
+        setStrategy(answers.strategy);
+        setBaseDomain(answers.baseDomain);
+        setZones(answers.zones);
+        setDuckSub(answers.duckSub);
+        setUseForDashboard(answers.useForDashboard);
+        setDuckToken("");
+        setError(null);
+        setStep(0);
+    }
+
+    /** Re-read what the server holds, after something the wizard did changed it. */
+    async function refresh() {
+        setState(await domainSetupStateAction());
     }
 
     async function save() {
@@ -109,6 +193,10 @@ export function DomainSetupWizard({ onSaved }: { onSaved?: () => void }) {
         setState(result.state);
         setZones(result.state.zones.zones.map((zone) => ({ ...zone })));
         setDuckToken("");
+        // The answers now live on the server, so the local copy has nothing left to
+        // protect and would only compete with what the operator changes from here.
+        clearSetupDraft();
+        setResumed(false);
         setStep(3);
         onSaved?.();
     }
@@ -121,6 +209,10 @@ export function DomainSetupWizard({ onSaved }: { onSaved?: () => void }) {
                         <Wand2 className="size-4 text-primary" /> Guided setup
                     </CardTitle>
                     <div className="flex items-center gap-1.5">
+                        {/* The domain in use, on every step: the answer to "what is this
+                            box on" was two steps deep before, so reopening the setup read
+                            as though the domain had never been saved. */}
+                        {state.zones.baseDomain && <Badge variant="neutral">{state.zones.baseDomain}</Badge>}
                         {STEPS.map((title, index) => (
                             <span
                                 key={title}
@@ -132,6 +224,19 @@ export function DomainSetupWizard({ onSaved }: { onSaved?: () => void }) {
                 </div>
             </CardHeader>
             <CardBody className="flex flex-col gap-4">
+                {resumed && step <= 2 && (
+                    <div className="flex items-center justify-between gap-2 rounded-md border border-border/60 bg-surface/40 px-3 py-2 text-xs text-muted-foreground">
+                        <span>Picked up where you left off.</span>
+                        <button
+                            type="button"
+                            onClick={startOver}
+                            className="font-medium text-foreground underline-offset-2 hover:underline"
+                        >
+                            Start over
+                        </button>
+                    </div>
+                )}
+
                 {step === 0 && (
                     <EnvironmentStep
                         selected={environment}
@@ -153,11 +258,14 @@ export function DomainSetupWizard({ onSaved }: { onSaved?: () => void }) {
                     <DomainStep
                         strategy={strategy}
                         baseDomain={baseDomain}
+                        effectiveBase={effectiveBase}
                         zones={zones}
                         duckSub={duckSub}
                         duckToken={duckToken}
                         hasDuckToken={state.domains.hasDuckdnsToken}
                         useForDashboard={useForDashboard}
+                        provider={provider}
+                        cloudflareConnected={state.cloudflareConnected}
                         onBaseDomain={setBaseDomain}
                         onZones={setZones}
                         onDuckSub={setDuckSub}
@@ -166,7 +274,14 @@ export function DomainSetupWizard({ onSaved }: { onSaved?: () => void }) {
                     />
                 )}
 
-                {step === 3 && <DnsStep state={state} publicIp={state.network.publicIp} />}
+                {step === 3 && (
+                    <DnsStep
+                        state={state}
+                        publicIp={state.network.publicIp}
+                        provider={provider}
+                        onConnected={refresh}
+                    />
+                )}
 
                 {error && (
                     <p className="flex items-start gap-2 rounded-md border border-danger/30 bg-danger/5 px-3 py-2 text-xs text-danger">
@@ -310,11 +425,14 @@ function StrategyStep({
 function DomainStep({
     strategy,
     baseDomain,
+    effectiveBase,
     zones,
     duckSub,
     duckToken,
     hasDuckToken,
     useForDashboard,
+    provider,
+    cloudflareConnected,
     onBaseDomain,
     onZones,
     onDuckSub,
@@ -323,11 +441,14 @@ function DomainStep({
 }: {
     strategy: ExposureStrategy;
     baseDomain: string;
+    effectiveBase: string;
     zones: ZoneRow[];
     duckSub: string;
     duckToken: string;
     hasDuckToken: boolean;
     useForDashboard: boolean;
+    provider: DnsProviderInfo | null;
+    cloudflareConnected: boolean;
     onBaseDomain: (next: string) => void;
     onZones: (next: ZoneRow[]) => void;
     onDuckSub: (next: string) => void;
@@ -335,7 +456,6 @@ function DomainStep({
     onUseForDashboard: (next: boolean) => void;
 }) {
     const meta = STRATEGY_META[strategy];
-    const effectiveBase = strategy === "duckdns" ? (duckSub ? `${duckSub}.duckdns.org` : "") : baseDomain.trim();
 
     function updateZone(index: number, patch: Partial<ZoneRow>) {
         onZones(zones.map((zone, position) => (position === index ? { ...zone, ...patch } : zone)));
@@ -409,6 +529,8 @@ function DomainStep({
                     </span>
                 </label>
             )}
+
+            {provider && <ProviderHint provider={provider} cloudflareConnected={cloudflareConnected} />}
 
             <div className="flex flex-col gap-2">
                 <div className="flex items-center justify-between gap-2">
@@ -485,11 +607,22 @@ function DomainStep({
     );
 }
 
-function DnsStep({ state, publicIp }: { state: DomainSetupState; publicIp: string | null }) {
+function DnsStep({
+    state,
+    publicIp,
+    provider,
+    onConnected
+}: {
+    state: DomainSetupState;
+    publicIp: string | null;
+    provider: DnsProviderInfo | null;
+    onConnected: () => Promise<void>;
+}) {
     const [report, setReport] = useState<ZoneDnsReport | null>(null);
     const [conflicts, setConflicts] = useState<ZoneDnsProvisionResult["conflicts"]>([]);
     const [busy, setBusy] = useState<"check" | "create" | null>(null);
     const [message, setMessage] = useState<string | null>(null);
+    const [connecting, setConnecting] = useState(false);
 
     async function check() {
         setBusy("check");
@@ -574,11 +707,26 @@ function DnsStep({ state, publicIp }: { state: DomainSetupState; publicIp: strin
         );
     }
 
+    // Automation is only offered where it can work: a token writes into the Cloudflare
+    // zone, so on a domain served by someone else the button could only ever fail, and
+    // the hint above already points at the panel that can. An undetected provider keeps
+    // the offer - a lookup that failed is not evidence the domain is not on Cloudflare.
+    const cloudflarePossible = provider === null || provider.id === "cloudflare";
+    // Proven, not assumed: a zone counts as done only once the check has seen both of
+    // its names answer with this server's address.
+    const verified = report !== null && report.zones.length > 0 && report.zones.every((zone) => zone.ok);
+
     return (
         <div className="flex flex-col gap-3">
             <StepTitle
-                title="Create these DNS records"
-                hint={publicIp ? `Point them at this server: ${publicIp}` : "Polaris could not detect this server's public IP."}
+                title={verified ? "The DNS is in place" : "Create these DNS records"}
+                hint={
+                    verified
+                        ? `${state.zones.baseDomain} points at this server, so every service gets a hostname under it.`
+                        : publicIp
+                          ? `Point them at this server: ${publicIp}`
+                          : "Polaris could not detect this server's public IP."
+                }
             />
             <div className="flex flex-col divide-y divide-border/60 rounded-md border border-border/60">
                 {state.records.map((record) => (
@@ -589,16 +737,43 @@ function DnsStep({ state, publicIp }: { state: DomainSetupState; publicIp: strin
                 ))}
             </div>
 
+            {provider && <ProviderHint provider={provider} cloudflareConnected={state.cloudflareConnected} />}
+
             <div className="flex flex-wrap items-center gap-2">
                 <Button size="sm" variant="secondary" onClick={check} disabled={busy !== null}>
                     <RefreshCw className={`size-4 ${busy === "check" ? "animate-spin" : ""}`} /> Check DNS
                 </Button>
-                {state.cloudflareConnected && (
-                    <Button size="sm" onClick={() => create()} disabled={busy !== null}>
-                        <Globe className="size-4" /> Create them on Cloudflare
-                    </Button>
-                )}
+                {cloudflarePossible &&
+                    (state.cloudflareConnected ? (
+                        <Button size="sm" onClick={() => create()} disabled={busy !== null}>
+                            <Globe className="size-4" /> Create them on Cloudflare
+                        </Button>
+                    ) : (
+                        <Button
+                            size="sm"
+                            onClick={() => setConnecting(true)}
+                            disabled={busy !== null || connecting}
+                        >
+                            <Globe className="size-4" /> Create them for me
+                        </Button>
+                    ))}
             </div>
+
+            {/* The token is asked for here rather than under Integrations: it is the
+                same token either way, and a detour into another page mid-setup is
+                where operators put the domain down and do not come back. */}
+            {connecting && !state.cloudflareConnected && (
+                <CloudflareConnect
+                    zone={provider?.zone ?? state.zones.baseDomain}
+                    onConnected={async () => {
+                        // The panel disappears on its own once the refreshed state says
+                        // the token is connected, so the records are created straight
+                        // away rather than behind a second button.
+                        await onConnected();
+                        await create();
+                    }}
+                />
+            )}
 
             {message && <p className="text-xs text-muted-foreground">{message}</p>}
 
@@ -629,6 +804,143 @@ function DnsStep({ state, publicIp }: { state: DomainSetupState; publicIp: strin
             )}
 
             <ZoneResults report={report} />
+        </div>
+    );
+}
+
+/**
+ * Connect a Cloudflare API token without leaving the setup, then hand back so the
+ * records can be written. The link opens Cloudflare's own token form with the two
+ * permissions Polaris needs already ticked, so the operator creates it, pastes it
+ * back, and never picks anything out of a permission tree.
+ *
+ * The token is only ever sent to the server, which stores it encrypted; nothing here
+ * keeps a copy once it has been accepted.
+ */
+function CloudflareConnect({ zone, onConnected }: { zone: string; onConnected: () => Promise<void> }) {
+    const [token, setToken] = useState("");
+    const [accounts, setAccounts] = useState<Array<{ id: string; name: string }>>([]);
+    const [accountId, setAccountId] = useState("");
+    const [busy, setBusy] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    async function connect() {
+        setBusy(true);
+        setError(null);
+        const result = await connectCloudflareAccountAction({
+            token,
+            ...(accountId ? { accountId } : {})
+        }).catch((caught: unknown) => ({
+            error: caught instanceof Error ? caught.message : "Could not connect the Cloudflare token",
+            connected: false,
+            accounts: []
+        }));
+        if (result.error) {
+            setError(result.error);
+            setBusy(false);
+            return;
+        }
+        if (!result.connected) {
+            // The token reaches several accounts and Cloudflare will not pick one for
+            // us: ask which, then connect again with the answer.
+            const options = result.accounts ?? [];
+            setAccounts(options);
+            if (options[0]) setAccountId(options[0].id);
+            setBusy(false);
+            return;
+        }
+        setToken("");
+        await onConnected();
+        setBusy(false);
+    }
+
+    return (
+        <div className="flex flex-col gap-2 rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-xs">
+            <span className="text-muted-foreground">
+                Polaris writes the records through Cloudflare&apos;s API, which needs a token. The link opens
+                Cloudflare with the two permissions it needs already selected - create the token, paste it here,
+                and {zone ? <code>{zone}</code> : "your domain"} is set up without touching a DNS panel.
+            </span>
+            <a
+                href={CLOUDFLARE_DNS_TOKEN_URL}
+                target="_blank"
+                rel="noreferrer noopener"
+                className="inline-flex w-fit items-center gap-1 font-medium text-primary hover:underline"
+            >
+                Create the token on Cloudflare <ExternalLink className="size-3" />
+            </a>
+            <Input
+                type="password"
+                value={token}
+                onChange={(event) => setToken(event.target.value)}
+                placeholder="Paste your Cloudflare API token"
+                autoComplete="off"
+            />
+            {accounts.length > 0 && (
+                <label className="flex flex-col gap-1 text-muted-foreground">
+                    The token reaches several accounts - pick the one holding this domain
+                    <Select
+                        value={accountId}
+                        onValueChange={setAccountId}
+                        options={accounts.map((account) => ({ value: account.id, label: account.name }))}
+                    />
+                </label>
+            )}
+            {error && <p className="text-danger">{error}</p>}
+            <div className="flex justify-end">
+                <Button size="sm" onClick={connect} disabled={busy || !token.trim()}>
+                    {busy ? <Loader2 className="size-4 animate-spin" /> : null}
+                    {accounts.length > 0 ? "Use this account" : "Connect and create the records"}
+                </Button>
+            </div>
+        </div>
+    );
+}
+
+/**
+ * What the domain's own DNS provider means for this setup. Three outcomes, in order of
+ * how little work is left for the operator: Polaris can create the records itself,
+ * Polaris could once a token is connected, or here is the panel where they are created.
+ * A provider Polaris does not recognize still names its nameservers - that is usually
+ * enough for the operator to recognize who they are with.
+ */
+function ProviderHint({ provider, cloudflareConnected }: { provider: DnsProviderInfo; cloudflareConnected: boolean }) {
+    const automated = provider.automatable && cloudflareConnected;
+    return (
+        <div
+            className={`flex flex-wrap items-center justify-between gap-2 rounded-md border px-3 py-2 text-xs ${
+                automated ? "border-success/30 bg-success/5" : "border-border/60 bg-surface/40"
+            }`}
+        >
+            <span className="flex items-center gap-2 text-muted-foreground">
+                <Globe className={`size-3.5 shrink-0 ${automated ? "text-success" : "text-muted-foreground"}`} />
+                {provider.label ? (
+                    <span>
+                        <b className="font-medium text-foreground">{provider.label}</b> answers for{" "}
+                        <code>{provider.zone}</code>
+                        {automated
+                            ? " and your token is connected - Polaris creates the records for you."
+                            : provider.automatable
+                              ? " - Polaris can create the records for you on the last step, with no DNS panel at all."
+                              : "."}
+                    </span>
+                ) : (
+                    <span>
+                        <code>{provider.zone}</code> is served by <code>{provider.nameservers[0]}</code>. Create the
+                        records where you manage it.
+                    </span>
+                )}
+            </span>
+            {provider.url && (
+                <a
+                    href={provider.url}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    className="flex items-center gap-1 font-medium text-primary hover:underline"
+                >
+                    Open {provider.label} <ExternalLink className="size-3" />
+                </a>
+            )}
         </div>
     );
 }

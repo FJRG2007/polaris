@@ -15,6 +15,7 @@ import { serverEnvironmentSchema } from "@polaris/core";
 import { requireAdmin } from "@/lib/session";
 import { recordAudit } from "@/lib/audit-service";
 import { checkZoneDns, provisionZoneDns, type ZoneDnsProvisionResult, type ZoneDnsReport } from "@/lib/domain-dns";
+import { detectDnsProvider, type DnsProviderInfo } from "@/lib/dns-provider";
 import {
     getDomainZones,
     saveDomainZones,
@@ -34,7 +35,7 @@ import {
     type LocalEnvironment,
     type NetworkStatus
 } from "@/lib/network-service";
-import { isZoneLabel, normalizeBaseDomain } from "@polaris/deploy";
+import { isBaseDomain, isZoneLabel, normalizeBaseDomain } from "@polaris/deploy";
 
 export interface DomainSetupState {
     environment: LocalEnvironment;
@@ -215,6 +216,22 @@ export async function saveDomainSetupAction(input: unknown): Promise<DomainSetup
             error: caught instanceof Error ? caught.message : "Could not save the domain setup"
         };
     }
+}
+
+const detectSchema = z.object({ domain: z.string().min(1).max(253) });
+
+/**
+ * Who answers DNS for a domain the operator is typing. Answers null rather than
+ * throwing for anything unresolvable: this only decides which shortcut the setup
+ * offers, and a domain that does not exist yet is the normal case while typing.
+ */
+export async function detectDnsProviderAction(input: unknown): Promise<DnsProviderInfo | null> {
+    await requireAdmin();
+    const parsed = detectSchema.safeParse(input);
+    if (!parsed.success) return null;
+    const domain = normalizeBaseDomain(parsed.data.domain);
+    if (!isBaseDomain(domain)) return null;
+    return detectDnsProvider(domain).catch(() => null);
 }
 
 /** Resolve each zone's wildcard and report what it points at. */

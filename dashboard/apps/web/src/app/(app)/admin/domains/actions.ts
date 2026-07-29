@@ -25,10 +25,15 @@ import {
 } from "@/lib/network-service";
 import { recordAudit } from "@/lib/audit-service";
 
+/**
+ * Save whichever domain settings were passed. Partial on purpose: the page saves the
+ * app/sharing pair and the DuckDNS pair from separate panels, and a call that carried
+ * the whole shape would have each one write back its stale copy of the other's fields.
+ */
 export async function saveDomainsAction(input: {
-    appDomain: string;
-    sharingDomain: string;
-    duckdnsSubdomain: string;
+    appDomain?: string;
+    sharingDomain?: string;
+    duckdnsSubdomain?: string;
     duckdnsToken?: string;
 }): Promise<{ config: DomainConfig }> {
     const user = await requireAdmin();
