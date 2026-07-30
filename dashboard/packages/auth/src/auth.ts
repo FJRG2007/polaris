@@ -7,8 +7,10 @@
  * Email/password is the only enabled method for now. The custom isAdmin field is
  * mirrored onto the session user for the admin double-gate, but is input:false so
  * it can never be set through the public sign-up payload - only server code
- * flips it. trustedOrigins is pinned to the app URL to blunt the open-redirect
- * and origin-check classes of issue this library has historically had.
+ * flips it. trustedOrigins stays an allowlist - the app URL, the local names, and
+ * the domains this deployment is configured to answer on - to blunt the
+ * open-redirect and origin-check classes of issue this library has historically
+ * had. A request's own Host header is never trusted: it is the attacker's to set.
  */
 
 import { randomUUID } from "node:crypto";
@@ -36,17 +38,36 @@ const SESSION_UPDATE_AGE = 60 * 60 * 24;
  */
 const PLUGINS: BetterAuthPlugin[] = [twoFactor({ issuer: "Polaris" })];
 
-export function createAuth() {
+/** Both schemes for a hostname: a deployment is reached over plain HTTP on the LAN
+ *  and over HTTPS on its domain, often the same day. */
+function origins(host: string): string[] {
+    return [`https://${host}`, `http://${host}`];
+}
+
+export interface AuthOptions {
+    /**
+     * Hostnames this deployment answers on beyond the ones fixed in the
+     * environment - the domains an operator configured after install.
+     *
+     * Resolved per request rather than at startup, because they are configured
+     * while the server is running: a domain saved in the panel used to leave
+     * sign-in on that domain failing with INVALID_ORIGIN until the container was
+     * restarted. Supplied by the app, which owns where they are stored; failures
+     * are the caller's to swallow, and cost only the extra origins.
+     */
+    readonly configuredHosts?: () => Promise<readonly string[]>;
+}
+
+export function createAuth(options: AuthOptions = {}) {
     const env = loadEnv();
     const localName = env.POLARIS_LOCAL_HOSTNAME;
     // Trust the public origin plus the local-network names (homeassistant.local
     // style) so the dashboard works whether reached by domain, polaris.local, or
     // bare polaris. Deduplicated in case the app URL is already one of them.
-    const trustedOrigins = Array.from(
+    const fixedOrigins = Array.from(
         new Set([
             env.POLARIS_APP_URL,
-            `http://${localName}.local`,
-            `https://${localName}.local`,
+            ...origins(`${localName}.local`),
             `http://${localName}`
         ])
     );
@@ -54,7 +75,11 @@ export function createAuth() {
         appName: "Polaris",
         secret: env.POLARIS_AUTH_SECRET,
         baseURL: env.POLARIS_APP_URL,
-        trustedOrigins,
+        trustedOrigins: async () => {
+            if (!options.configuredHosts) return fixedOrigins;
+            const hosts = await options.configuredHosts().catch(() => []);
+            return [...fixedOrigins, ...hosts.flatMap(origins)];
+        },
         database: prismaAdapter(prisma, { provider: env.POLARIS_DB_PROVIDER }),
         emailAndPassword: {
             enabled: true,
