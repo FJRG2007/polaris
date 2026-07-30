@@ -18,6 +18,12 @@
 # Idempotent: re-running reconciles the stack and never overwrites an existing
 # .env. Everything is wrapped in main() so a truncated download cannot execute a
 # partial script.
+#
+# Also the library the updater borrows: sourced with POLARIS_INSTALL_LIB set, it
+# defines its helpers and stops short of running main(), so update.sh reconciles
+# .env and writes the update command with this exact code instead of a second copy
+# of it that could drift. It stays standalone for `curl | sh`, which has no other
+# file to read.
 set -eu
 
 REPO_URL="${POLARIS_REPO_URL:-https://github.com/FJRG2007/polaris.git}"
@@ -306,14 +312,21 @@ configure_edition() {
         # unset and the working tree is correct.
         host_repo="${POLARIS_HOST_REPO:-$(cd ../.. && pwd)}"
         set_env_var "$env_file" "COMPOSE_PROFILES" "full"
-        # The updater runs in the foreground, so redirecting the `docker run` output
-        # to the shared polaris-run volume (mounted in both hostd and web at
-        # /run/polaris) streams the whole update - git pull, image pull, migrations,
-        # redeploy, verify - to a file the dashboard tails live, and survives the web
-        # container being recreated mid-update. `>` truncates it, so each run starts
-        # clean; update.sh appends a POLARIS_UPDATE_EXIT=<code> marker on exit. No `$`
+        # Detached (`-d`), with the shared polaris-run volume mounted and the log path
+        # passed IN rather than redirected: the updater writes /run/polaris/update.log
+        # itself, timestamped, and stamps POLARIS_UPDATE_EXIT=<code> when it ends.
+        #
+        # Both details exist because the caller is a shell inside hostd. Attached, a
+        # `docker run` whose client dies - which is what happens when the update
+        # recreates hostd - takes the output redirect with it: the log stopped growing
+        # mid-update, no exit marker was ever written, and the dashboard sat on
+        # "Updating..." until someone reloaded. Detached and self-logging, the update
+        # and its log outlive anything the update itself restarts.
+        #
+        # The volume carries the compose project prefix, and both web and hostd mount
+        # it at /run/polaris - which is where the dashboard reads the log from. No `$`
         # in this value, so Compose never tries to interpolate it.
-        update_cmd="docker rm -f polaris-updater >/dev/null 2>&1; docker run --name polaris-updater --rm -e POLARIS_HOST_REPO=${host_repo} -v /var/run/docker.sock:/var/run/docker.sock -v ${host_repo}:/polaris -w /polaris/dashboard ghcr.io/fjrg2007/polaris-updater:latest sh scripts/update.sh > /run/polaris/update.log 2>&1"
+        update_cmd="docker rm -f polaris-updater >/dev/null 2>&1; docker run -d --name polaris-updater --rm -e POLARIS_HOST_REPO=${host_repo} -e POLARIS_UPDATE_LOG=/run/polaris/update.log -v /var/run/docker.sock:/var/run/docker.sock -v polaris_polaris-run:/run/polaris -v ${host_repo}:/polaris -w /polaris/dashboard ghcr.io/fjrg2007/polaris-updater:latest sh scripts/update.sh"
         set_env_var "$env_file" "POLARIS_HOSTD_UPDATE_CMD" "$update_cmd"
         log "full edition (privileged host daemon, in-band updates, local Docker host)"
     else
@@ -420,66 +433,26 @@ align_db_password() {
     err "could not align the database password automatically; run 'polaris doctor' if the web fails"
 }
 
-# CI publishes the web image only as the moving `:latest` tag, and it lands a few
-# minutes AFTER the commit does. An updater that simply pulls `:latest` therefore
-# RACES CI: right after a push it pulls the PREVIOUS commit's image and deploys code
-# older than the checkout it just fast-forwarded to, so the dashboard sits on
-# "update available" until some unrelated later run happens to land after CI caught
-# up. That race - made worse by a shallow clone, where the old staleness check could
-# not compare commits and silently deployed the stale image - is why updates "failed
-# all the time" on any change that touches the web image.
+# The published dashboard image. CI builds and pushes it on every change to the
+# release branch, and an install - like an update - deploys what it published rather
+# than building the same thing again locally: a source build takes minutes, needs
+# build tooling on the host, and produces an image nobody else has.
 #
-# The fix is to stop trusting the moving tag as a proxy for HEAD. When the pulled
-# source needs a web image that `:latest` is not YET built from, build it from source
-# at HEAD instead of deploying an older image. The deploy then ALWAYS matches the
-# checked-out commit: no CI race, no stale deploy, and no open-ended waiting. The
-# path list mirrors the `web` filter in dashboard-publish.yml (and update-service.ts)
-# so "did the web image change" agrees exactly with what CI would rebuild.
+# A build from source is the FALLBACK, for when the registry cannot be reached at
+# all. It is deliberately not used to "catch up" with a checkout that is ahead of the
+# published image: the image lands minutes after the commit, and the dashboard's
+# update check reads the registry (see lib/update-service.ts), so being briefly
+# behind a commit that has not been built yet is reported as such and clears itself
+# with no rebuild.
 WEB_IMAGE_REPO="ghcr.io/fjrg2007/polaris-dashboard"
 WEB_IMAGE="${WEB_IMAGE_REPO}:latest"
-WEB_IMAGE_PATHS='^dashboard/(apps|packages|cli|patches)/|^dashboard/docker/(Dockerfile|entrypoint\.sh)|^dashboard/package(-lock)?\.json$|^\.github/workflows/dashboard-publish\.yml$'
 
-# The commit an image was built from (baked in as POLARIS_BUILD_SHA), or empty.
-image_build_sha() {
-    docker image inspect "$1" \
-        --format '{{range .Config.Env}}{{println .}}{{end}}' 2>/dev/null \
-        | sed -n 's/^POLARIS_BUILD_SHA=//p' | head -n1
-}
-
-# HEAD of the checkout (full sha), or empty when this is not a git checkout.
+# HEAD of the checkout (full sha), or empty when this is not a git checkout. Stamped
+# into a fallback source build so it reports the commit it came from, exactly as a
+# published image does.
 head_sha() {
     command -v git >/dev/null 2>&1 || return 0
     git rev-parse HEAD 2>/dev/null || true
-}
-
-# The installer clones with --depth 1, and a shallow history cannot diff the running
-# build's commit against HEAD - which is exactly what defeated the old check and let
-# it deploy stale code. Complete the history once so the comparison below is exact.
-# Best-effort: offline simply falls through to a (still HEAD-correct) source build.
-ensure_full_history() {
-    command -v git >/dev/null 2>&1 || return 0
-    [ "$(git rev-parse --is-shallow-repository 2>/dev/null)" = "true" ] || return 0
-    git fetch --unshallow --quiet >/dev/null 2>&1 || true
-}
-
-# Whether a web IMAGE already carries the web code of the target commit - i.e. it is
-# safe to deploy for `target` without rebuilding. True (0) when the image was built
-# from target itself, OR when nothing under the web path filter changed between the
-# image's commit and target (so its web code is identical - the very rule
-# update-service.ts uses to decide the dashboard is up to date). False (1) otherwise,
-# INCLUDING when the image has no build stamp or its commit cannot be compared to
-# target: never assume an image is current on uncertainty - that is exactly what let
-# a stale image be deployed. The caller then builds from source at target instead.
-image_web_current() {
-    img_sha=$(image_build_sha "$1")
-    target="$2"
-    [ -n "$img_sha" ] || return 1
-    [ "$img_sha" = "$target" ] && return 0
-    git rev-parse --verify --quiet "${img_sha}^{commit}" >/dev/null 2>&1 || return 1
-    if git diff --name-only "$img_sha" "$target" 2>/dev/null | grep -qE "$WEB_IMAGE_PATHS"; then
-        return 1
-    fi
-    return 0
 }
 
 main() {
@@ -597,44 +570,18 @@ main() {
     COMPOSE_PROFILES=$(sed -n 's/^COMPOSE_PROFILES=//p' .env | head -n1)
     export COMPOSE_PROFILES
 
-    # Decide how to produce the web image for the checked-out commit. The deploy must
-    # match HEAD: use the published image ONLY when it already carries HEAD's web code;
-    # otherwise build from source at HEAD, so an update can never deploy older code
-    # than it just pulled - the root cause of "update available" never clearing.
-    # Only the rolling `latest` tag follows HEAD; a deliberate pin (a frozen release)
-    # and a non-git/source run just take the normal pull path unchanged.
-    ensure_full_history
-    target=$(head_sha)
-    tag=$(sed -n 's/^POLARIS_IMAGE_TAG=//p' .env 2>/dev/null | head -n1)
+    # Deploy what CI published. A source build happens only when the registry cannot
+    # be reached, so an install still works offline - it just takes the slow path.
     build_flag=""
-    if [ -n "$target" ] && [ "${tag:-latest}" = "latest" ]; then
-        # Refresh the local `latest` first so the check reflects what CI has published
-        # right now (best-effort: offline just checks the image already on disk).
-        docker pull "$WEB_IMAGE" >/dev/null 2>&1 || true
-        if image_web_current "$WEB_IMAGE" "$target"; then
-            log "the published web image already matches the current source; deploying it"
-        else
-            log "the published web image is not built from the current source yet; building from source at HEAD so the deploy always matches the update"
-            build_flag="--build"
-            POLARIS_BUILD_SHA="$target"; export POLARIS_BUILD_SHA
-            # Do not let compose's always-pull replace the image we just built with a
-            # registry `latest` that still lags this commit.
-            POLARIS_WEB_PULL_POLICY="never"; export POLARIS_WEB_PULL_POLICY
-        fi
-    fi
-
-    # Install and update are the same command: prefer the published images (fast),
-    # falling back to a source build if the registry is unavailable - which stays
-    # HEAD-correct and still applies migrations. Skipped if a build was already chosen.
-    if [ -z "$build_flag" ]; then
-        if $compose pull 2>/dev/null; then
-            log "starting from the published images (also applies database migrations)"
-        else
-            log "registry unavailable; building from source (also applies migrations)"
-            build_flag="--build"
-            [ -n "$target" ] && { POLARIS_BUILD_SHA="$target"; export POLARIS_BUILD_SHA; }
-            POLARIS_WEB_PULL_POLICY="never"; export POLARIS_WEB_PULL_POLICY
-        fi
+    if $compose pull 2>/dev/null; then
+        log "starting from the published images (also applies database migrations)"
+    else
+        log "registry unavailable; building from source (also applies migrations)"
+        build_flag="--build"
+        target=$(head_sha)
+        [ -n "$target" ] && { POLARIS_BUILD_SHA="$target"; export POLARIS_BUILD_SHA; }
+        # Do not let compose's always-pull replace the image we just built.
+        POLARIS_WEB_PULL_POLICY="never"; export POLARIS_WEB_PULL_POLICY
     fi
 
     # The dedicated web<->hub network a locally-installed messaging bridge joins to
@@ -715,4 +662,5 @@ main() {
     log "check status with: polaris status"
 }
 
-main "$@"
+# Sourced as a library (update.sh), or run as the installer.
+[ -n "${POLARIS_INSTALL_LIB:-}" ] || main "$@"
