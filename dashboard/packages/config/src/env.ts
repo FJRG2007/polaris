@@ -109,6 +109,17 @@ const envSchema = z.object({
     POLARIS_BUILD_SHA: z.string().default(""),
 
     /**
+     * Registry repository of the dashboard image. The update check reads the
+     * commit baked into the published image there, which is what makes "update
+     * available" mean "a new image exists to pull" rather than "a commit was
+     * pushed" - the two are minutes apart while CI builds.
+     */
+    POLARIS_WEB_IMAGE: z.string().default("ghcr.io/fjrg2007/polaris-dashboard"),
+
+    /** Tag the deployment runs, mirroring compose. `latest` tracks the release line. */
+    POLARIS_IMAGE_TAG: z.string().default("latest"),
+
+    /**
      * Docker-over-SSH access provisioned by `install.sh --ssh`. When enabled, the
      * Containers app can reach the host Engine over a dedicated, forced-command
      * key without mounting the docker socket into the container.

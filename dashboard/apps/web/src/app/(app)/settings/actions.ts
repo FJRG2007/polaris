@@ -1,9 +1,8 @@
 "use server";
 
 /**
- * Settings server actions. The update check re-runs the GitHub comparison,
- * bypassing the cache, so the operator gets a fresh answer on demand. Gated to
- * admins: update state and deployment settings are operator surfaces.
+ * Settings server actions. Gated to admins: update state and deployment settings
+ * are operator surfaces.
  */
 
 import { HostdClient } from "@polaris/hostd-client";
@@ -12,9 +11,14 @@ import { requireAdmin } from "@/lib/session";
 import { getUpdateStatus, type UpdateStatus } from "@/lib/update-service";
 import { collectUpdateReport, issueUrl } from "@/lib/update-report";
 
-export async function checkUpdatesAction(): Promise<UpdateStatus> {
+/**
+ * Current update status. `force` re-reads the registry and GitHub for the "Check
+ * for updates" button; simply opening the page takes the cached answer, which
+ * keeps a page visit from spending an API call every time.
+ */
+export async function checkUpdatesAction(force = true): Promise<UpdateStatus> {
     await requireAdmin();
-    return getUpdateStatus(true);
+    return getUpdateStatus(force);
 }
 
 /** Result of asking the host agent to update and redeploy Polaris. */
