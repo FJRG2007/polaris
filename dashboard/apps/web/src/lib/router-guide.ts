@@ -24,6 +24,37 @@ export type RouterBrand =
     | "mikrotik"
     | "other";
 
+/** A value the fixed-address form asks for, and where that value comes from. */
+export interface RouterReserveField {
+    /** What this brand's form calls it. */
+    readonly label: string;
+    readonly value: "name" | "mac" | "ip";
+}
+
+/**
+ * How a brand pins this server to one address. Two shapes, because routers split
+ * evenly between them: a table you add an entry to, and a device list where the
+ * lease already there is made permanent. Telling an operator to "reserve it in the
+ * DHCP settings" is only useful for the first kind, and only if they find the tab -
+ * on ZTE the LAN page has three, and the reservation is not on the one named DHCP.
+ */
+export type RouterReservation =
+    | {
+          readonly kind: "form";
+          readonly path: string;
+          /** The control that starts a new entry. */
+          readonly add: string;
+          readonly fields: readonly RouterReserveField[];
+          /** The control that commits it. */
+          readonly save: string;
+      }
+    | {
+          readonly kind: "device";
+          readonly path: string;
+          /** What to do to this server's entry once found, in the router's words. */
+          readonly action: string;
+      };
+
 export interface RouterBrandGuide {
     readonly id: RouterBrand;
     readonly label: string;
@@ -31,8 +62,14 @@ export interface RouterBrandGuide {
     readonly admin: string | null;
     /** The factory sign-in, as far as one brand-wide answer exists. */
     readonly signIn: string;
+    /** Where and how to give this server a fixed address. */
+    readonly reserve: RouterReservation;
     /** Menu path to the port-forwarding form. */
     readonly forwardPath: string;
+    /** The fields that form asks for, when this brand names them its own way. */
+    readonly forwardFields: readonly RouterFormField[] | null;
+    /** The control that commits a rule, when the brand names it something particular. */
+    readonly forwardSave: string | null;
     /** Menu path to whatever is holding 80 and 443, when the brand has a usual one. */
     readonly remotePath: string | null;
     /** What is different about this brand, in the operator's way. */
@@ -46,13 +83,63 @@ export interface RouterForwardRule {
     readonly port: number;
 }
 
+/**
+ * What a forwarding form asks for. Generic labels cover most brands, but some name
+ * the same five things differently enough that an operator cannot map one to the
+ * other - ZTE asks for a "LAN Host" and two port RANGES, and there is no row called
+ * "internal port" anywhere on the page.
+ */
+export type RouterForwardValue =
+    /** The rule's name. */
+    | "name"
+    /** TCP. */
+    | "protocol"
+    /** The port, once. */
+    | "port"
+    /** The port as a range, for forms whose port fields are `from ~ to`. */
+    | "portRange"
+    /** This server's LAN address. */
+    | "ip"
+    /** "any source", for forms that ask which WAN addresses the rule accepts. */
+    | "anySource";
+
+export interface RouterFormField {
+    readonly label: string;
+    readonly value: RouterForwardValue;
+}
+
 export const ROUTER_BRANDS: readonly RouterBrandGuide[] = [
     {
         id: "zte",
         label: "ZTE",
         admin: null,
         signIn: "The user and password printed on the label underneath the router. On an ISP box the user is usually `admin` and the password is the one on the label, not the WiFi key.",
-        forwardPath: "Internet > Security > Port Forwarding (in Spanish: Internet > Seguridad > Reenvio de puertos)",
+        reserve: {
+            kind: "form",
+            // Not the DHCP Server tab, which is where the name sends everyone first:
+            // that one sets the pool. The binding tab is the one that pins an address.
+            path: "Local Network > LAN > DHCP Binding",
+            add: "New Item",
+            fields: [
+                { label: "Name", value: "name" },
+                { label: "MAC Address", value: "mac" },
+                { label: "IP Address", value: "ip" }
+            ],
+            save: "Create New Item"
+        },
+        forwardPath: "Internet > Security > Port Forwarding",
+        // Verbatim from the H3640 form, in its order. None of the labels match the
+        // generic ones: the destination is "LAN Host", both port fields are ranges,
+        // and there is a WAN source range that has to be left wide open.
+        forwardFields: [
+            { label: "Name", value: "name" },
+            { label: "Protocol", value: "protocol" },
+            { label: "WAN Host IP Address", value: "anySource" },
+            { label: "LAN Host", value: "ip" },
+            { label: "WAN Port", value: "portRange" },
+            { label: "LAN Host Port", value: "portRange" }
+        ],
+        forwardSave: "Create New Item",
         remotePath: "Management & Diagnosis > Remote management (some builds keep it under Internet > Security > Access control)",
         caution:
             "ZTE firmware supplied by an ISP reserves 80, 443, 21 and 7547 for its own management and refuses to forward them. If the form rejects the rule, the ports cannot be opened on this router - publish Polaris through a tunnel instead, under Advanced below."
@@ -62,7 +149,19 @@ export const ROUTER_BRANDS: readonly RouterBrandGuide[] = [
         label: "Huawei",
         admin: "http://192.168.100.1",
         signIn: "The user and password on the label. ISP units keep port forwarding behind an installer account the label does not carry - ask your provider for it if the menu is missing.",
+        reserve: {
+            kind: "form",
+            path: "LAN > DHCP Static IP Configuration",
+            add: "New",
+            fields: [
+                { label: "MAC Address", value: "mac" },
+                { label: "IP Address", value: "ip" }
+            ],
+            save: "Apply"
+        },
         forwardPath: "Forward Rules > Port Mapping Configuration, with Type set to Custom",
+        forwardFields: null,
+        forwardSave: null,
         remotePath: "Security > ACL Rules, which is what usually publishes the admin page on the WAN side",
         caution: null
     },
@@ -71,7 +170,20 @@ export const ROUTER_BRANDS: readonly RouterBrandGuide[] = [
         label: "TP-Link",
         admin: "http://tplinkwifi.net",
         signIn: "The account you created on first setup. A router never set up asks for `admin` / `admin`.",
+        reserve: {
+            kind: "form",
+            path: "Advanced > Network > DHCP Server > Address Reservation",
+            add: "Add",
+            fields: [
+                { label: "MAC Address", value: "mac" },
+                { label: "IP Address", value: "ip" },
+                { label: "Description", value: "name" }
+            ],
+            save: "Save"
+        },
         forwardPath: "Advanced > NAT Forwarding > Virtual Servers > Add",
+        forwardFields: null,
+        forwardSave: null,
         remotePath: "Advanced > System Tools > Administration > Remote Management",
         caution: null
     },
@@ -80,7 +192,20 @@ export const ROUTER_BRANDS: readonly RouterBrandGuide[] = [
         label: "ASUS",
         admin: "http://router.asus.com",
         signIn: "The account you created on first setup, or `admin` / `admin` on one never set up.",
+        reserve: {
+            kind: "form",
+            path: "LAN > DHCP Server, with Enable Manual Assignment set to Yes",
+            add: "the + button under Manually Assigned IP around the DHCP list",
+            fields: [
+                { label: "MAC Address", value: "mac" },
+                { label: "IP Address", value: "ip" },
+                { label: "Name (optional)", value: "name" }
+            ],
+            save: "Apply"
+        },
         forwardPath: "WAN > Virtual Server / Port Forwarding, with Enable Port Forwarding set to Yes",
+        forwardFields: null,
+        forwardSave: null,
         remotePath: "Administration > System > Enable Web Access from WAN",
         caution: null
     },
@@ -89,7 +214,14 @@ export const ROUTER_BRANDS: readonly RouterBrandGuide[] = [
         label: "FRITZ!Box",
         admin: "http://fritz.box",
         signIn: "The FRITZ!Box password on the label or on the card that came with it. There is no user name.",
+        reserve: {
+            kind: "device",
+            path: "Home Network > Network > Network Connections",
+            action: 'open this server with the pencil button and tick "Always assign this network device the same IPv4 address"'
+        },
         forwardPath: "Internet > Permit Access > Port Sharing > Add Device for Sharing",
+        forwardFields: null,
+        forwardSave: null,
         remotePath: "Internet > Permit Access > FRITZ!Box Services",
         caution:
             "It shares ports per device: pick this server, then add one sharing for 80 and one for 443. Turn on the advanced view if the menu is not there."
@@ -99,7 +231,20 @@ export const ROUTER_BRANDS: readonly RouterBrandGuide[] = [
         label: "NETGEAR",
         admin: "http://routerlogin.net",
         signIn: "`admin` with the password you set. A router never set up uses `admin` / `password`.",
+        reserve: {
+            kind: "form",
+            path: "ADVANCED > Setup > LAN Setup > Address Reservation",
+            add: "Add",
+            fields: [
+                { label: "IP Address", value: "ip" },
+                { label: "MAC Address", value: "mac" },
+                { label: "Device Name", value: "name" }
+            ],
+            save: "Add"
+        },
         forwardPath: "ADVANCED > Advanced Setup > Port Forwarding / Port Triggering > Add Custom Service",
+        forwardFields: null,
+        forwardSave: null,
         remotePath: "ADVANCED > Advanced Setup > Remote Management",
         caution: null
     },
@@ -108,7 +253,14 @@ export const ROUTER_BRANDS: readonly RouterBrandGuide[] = [
         label: "MikroTik",
         admin: "http://192.168.88.1",
         signIn: "`admin`, with no password on a router still at defaults.",
+        reserve: {
+            kind: "device",
+            path: "IP > DHCP Server > Leases",
+            action: 'select the lease showing this server and press "Make Static"'
+        },
         forwardPath: "IP > Firewall > NAT > Add, chain dstnat",
+        forwardFields: null,
+        forwardSave: null,
         remotePath: "IP > Services, where the www and www-ssl services hold 80 and 443",
         caution:
             "The form is not a port-forward form: set chain=dstnat, protocol=tcp, dst-port=80,443, in-interface to the WAN interface, then action=dst-nat with to-addresses set to this server."
@@ -118,8 +270,20 @@ export const ROUTER_BRANDS: readonly RouterBrandGuide[] = [
         label: "Another brand",
         admin: null,
         signIn: "The user and password on the label underneath the router - on most boxes this is not the WiFi password. If it was changed and is lost, a factory reset is the only way back in.",
+        reserve: {
+            kind: "form",
+            path: "the DHCP or LAN settings, under a name like Address Reservation, DHCP Binding or Static Lease",
+            add: "the button that adds an entry",
+            fields: [
+                { label: "MAC address", value: "mac" },
+                { label: "IP address", value: "ip" }
+            ],
+            save: "Save"
+        },
         forwardPath:
             "Look for Port forwarding, Virtual server, NAT/PAT or Applications & Gaming - the same form under four different names.",
+        forwardFields: null,
+        forwardSave: null,
         remotePath: "Look for Remote management, Web access from WAN or Remote administration.",
         caution: null
     }

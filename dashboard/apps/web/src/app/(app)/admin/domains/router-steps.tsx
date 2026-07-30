@@ -26,7 +26,9 @@ import {
     routerGuide,
     FORWARD_RULES,
     ROUTER_BRANDS,
-    type RouterBrand
+    type RouterBrand,
+    type RouterForwardRule,
+    type RouterFormField
 } from "@/lib/router-guide";
 import { CopyButton } from "./copy-button";
 
@@ -38,6 +40,35 @@ function Value({ text }: { text: string }) {
             <CopyButton value={text} className="[&_svg]:size-3" />
         </span>
     );
+}
+
+/** The generic labels, for the brands whose form asks for the usual five things. */
+const GENERIC_FORWARD_FIELDS: readonly RouterFormField[] = [
+    { label: "Name", value: "name" },
+    { label: "Protocol", value: "protocol" },
+    { label: "External port (WAN)", value: "port" },
+    { label: "Internal port (LAN)", value: "port" },
+    { label: "Internal IP (device)", value: "ip" }
+];
+
+/** One cell of the forwarding table: what to put in this field for this rule. */
+function ForwardValue({ field, rule, lanIp }: { field: RouterFormField; rule: RouterForwardRule; lanIp: string | null }) {
+    switch (field.value) {
+        case "name":
+            return <Value text={rule.name} />;
+        case "protocol":
+            return <code className="text-foreground">{rule.protocol}</code>;
+        case "port":
+            return <code className="text-foreground">{rule.port}</code>;
+        case "portRange":
+            return <code className="text-foreground">{`${rule.port} ~ ${rule.port}`}</code>;
+        case "anySource":
+            // Left at zeroes on purpose: the field limits which WAN addresses may use
+            // the rule, and Polaris has to answer the whole internet.
+            return <code className="text-foreground">0.0.0.0 ~ 0.0.0.0</code>;
+        case "ip":
+            return lanIp ? <Value text={lanIp} /> : <span>this server</span>;
+    }
 }
 
 export function RouterSteps({ server, lanIp }: { server: string | null; lanIp: string | null }) {
@@ -115,13 +146,76 @@ export function RouterSteps({ server, lanIp }: { server: string | null; lanIp: s
                         </li>
                         <li>Sign in. {guide.signIn}</li>
                         <li>
-                            Give this server a fixed address. In the DHCP settings, reserve{" "}
-                            {lanIp ? <Value text={lanIp} /> : "this server's address"} for it - a forward points at an
-                            address, and a new lease would send it to another machine.
+                            Give this server a fixed address, so the forward keeps pointing at it - a new lease would
+                            otherwise hand {lanIp ? <Value text={lanIp} /> : "its address"} to another machine.
+                            <ol className="ml-4 mt-1 flex list-decimal flex-col gap-1">
+                                <li>
+                                    Go to <b className="font-medium text-foreground">{guide.reserve.path}</b>.
+                                </li>
+                                {guide.reserve.kind === "device" ? (
+                                    <li>
+                                        Find this server in the list - it is the one holding{" "}
+                                        {lanIp ? <Value text={lanIp} /> : "this server's address"} - then{" "}
+                                        {guide.reserve.action}.
+                                    </li>
+                                ) : (
+                                    <>
+                                        <li>
+                                            Press <b className="font-medium text-foreground">{guide.reserve.add}</b>.
+                                        </li>
+                                        <li>
+                                            Fill it in and save with{" "}
+                                            <b className="font-medium text-foreground">{guide.reserve.save}</b>:
+                                            <div className="mt-1 overflow-x-auto">
+                                                <table className="w-full min-w-72 border-separate border-spacing-x-3 text-left">
+                                                    <tbody className="align-top">
+                                                        {guide.reserve.fields.map((field) => (
+                                                            <tr key={field.label}>
+                                                                <td className="text-muted-foreground">{field.label}</td>
+                                                                <td>
+                                                                    {field.value === "name" ? (
+                                                                        <Value text="polaris" />
+                                                                    ) : field.value === "ip" ? (
+                                                                        lanIp ? (
+                                                                            <Value text={lanIp} />
+                                                                        ) : (
+                                                                            "this server's address"
+                                                                        )
+                                                                    ) : (
+                                                                        <>
+                                                                            the MAC shown next to{" "}
+                                                                            {lanIp ? (
+                                                                                <code className="text-foreground">
+                                                                                    {lanIp}
+                                                                                </code>
+                                                                            ) : (
+                                                                                "this server"
+                                                                            )}{" "}
+                                                                            in the router&apos;s own device list
+                                                                        </>
+                                                                    )}
+                                                                </td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </li>
+                                    </>
+                                )}
+                            </ol>
                         </li>
                         <li>
                             Create two rules in <b className="font-medium text-foreground">{guide.forwardPath}</b>, with
-                            exactly these values:
+                            exactly these values
+                            {guide.forwardSave ? (
+                                <>
+                                    {" "}
+                                    (saving each with{" "}
+                                    <b className="font-medium text-foreground">{guide.forwardSave}</b>)
+                                </>
+                            ) : null}
+                            :
                             <div className="mt-1 overflow-x-auto">
                                 <table className="w-full min-w-80 border-separate border-spacing-x-3 text-left">
                                     <thead>
@@ -135,46 +229,16 @@ export function RouterSteps({ server, lanIp }: { server: string | null; lanIp: s
                                         </tr>
                                     </thead>
                                     <tbody className="align-top">
-                                        <tr>
-                                            <td>Name</td>
-                                            {FORWARD_RULES.map((rule) => (
-                                                <td key={rule.name}>
-                                                    <Value text={rule.name} />
-                                                </td>
-                                            ))}
-                                        </tr>
-                                        <tr>
-                                            <td>Protocol</td>
-                                            {FORWARD_RULES.map((rule) => (
-                                                <td key={rule.name}>
-                                                    <code className="text-foreground">{rule.protocol}</code>
-                                                </td>
-                                            ))}
-                                        </tr>
-                                        <tr>
-                                            <td>External port (WAN)</td>
-                                            {FORWARD_RULES.map((rule) => (
-                                                <td key={rule.name}>
-                                                    <code className="text-foreground">{rule.port}</code>
-                                                </td>
-                                            ))}
-                                        </tr>
-                                        <tr>
-                                            <td>Internal port (LAN)</td>
-                                            {FORWARD_RULES.map((rule) => (
-                                                <td key={rule.name}>
-                                                    <code className="text-foreground">{rule.port}</code>
-                                                </td>
-                                            ))}
-                                        </tr>
-                                        <tr>
-                                            <td>Internal IP (device)</td>
-                                            {FORWARD_RULES.map((rule) => (
-                                                <td key={rule.name}>
-                                                    {lanIp ? <Value text={lanIp} /> : "this server"}
-                                                </td>
-                                            ))}
-                                        </tr>
+                                        {(guide.forwardFields ?? GENERIC_FORWARD_FIELDS).map((field, index) => (
+                                            <tr key={`${field.label}-${index}`}>
+                                                <td>{field.label}</td>
+                                                {FORWARD_RULES.map((rule) => (
+                                                    <td key={rule.name}>
+                                                        <ForwardValue field={field} rule={rule} lanIp={lanIp} />
+                                                    </td>
+                                                ))}
+                                            </tr>
+                                        ))}
                                     </tbody>
                                 </table>
                             </div>
