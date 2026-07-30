@@ -37,7 +37,8 @@ export async function GET(request: NextRequest): Promise<Response> {
         done: false,
         exitCode: null,
         finished: false,
-        updatedAt: 0
+        updatedAt: 0,
+        now: Date.now()
     } satisfies UpdateLogTail);
     const info = await stat(LOG_PATH).catch(() => null);
     if (!info || !info.isFile()) return notReadable;
@@ -77,9 +78,12 @@ export async function GET(request: NextRequest): Promise<Response> {
             exitCode: done && match ? Number(match[1]) : null,
             // Whether the run has ended at all, independent of how far the caller has
             // read, plus when the file was last written. A client that just loaded the
-            // page uses both to tell a live update from a leftover log.
+            // page uses both to tell a live update from a leftover log. Both timestamps
+            // come from here so the age of a run is never measured against a browser
+            // clock that disagrees with the host's.
             finished: match !== null,
-            updatedAt: info.mtimeMs
+            updatedAt: info.mtimeMs,
+            now: Date.now()
         } satisfies UpdateLogTail);
     } finally {
         await handle.close();

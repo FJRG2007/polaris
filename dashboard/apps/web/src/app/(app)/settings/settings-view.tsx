@@ -10,7 +10,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { Bug, CheckCircle2, DownloadCloud, RefreshCw, TriangleAlert } from "lucide-react";
 import { Button, Card, CardBody, CardHeader, CardTitle } from "@polaris/ui";
 import type { UpdateStatus } from "@/lib/update-service";
-import { isUpdateInFlight, type UpdateLogTail } from "@/lib/update-log";
+import { isRecentRun, isUpdateInFlight, type UpdateLogTail } from "@/lib/update-log";
 import { checkUpdatesAction, triggerHostUpdateAction, updateReportAction } from "./actions";
 
 interface Deployment {
@@ -67,26 +67,63 @@ export function SettingsView({
     }, []);
 
     // An update runs on the host, not in this tab: reloading or navigating away
-    // drops the local state while the updater keeps going. The shared log file is
-    // the only truth, so on mount re-attach to a run that is still being written -
-    // otherwise the card looks idle while Polaris is mid-update.
+    // drops the local state while the updater keeps going, and the update itself
+    // restarts the web container, so the page that started one rarely survives it.
+    // The shared log file is the only truth - on mount, re-attach to a run still
+    // being written, and show the outcome of one that has just ended. Without the
+    // second case the card comes back idle after any update, offering the same one
+    // again with nothing to say it already ran.
     useEffect(() => {
         void (async () => {
             try {
-                const res = await fetch("/api/updates/logs?offset=0", { cache: "no-store" });
-                if (!res.ok) return;
-                const data = (await res.json()) as UpdateLogTail;
-                if (!isUpdateInFlight(data, Date.now())) return;
-                setUpdating(true);
-                setUpdateMsg("Update in progress - reconnecting automatically when Polaris is back.");
-                pollLogs();
-                waitForUpdate();
+                const data = await fetchTail(0);
+                if (!data) return;
+                if (isUpdateInFlight(data, data.now)) {
+                    setUpdating(true);
+                    setUpdateMsg("Update in progress - reconnecting automatically when Polaris is back.");
+                    pollLogs();
+                    waitForUpdate();
+                    return;
+                }
+                if (isRecentRun(data, data.now)) await showFinishedRun(data);
             } catch {
                 // No log to re-attach to; leave the card in its idle state.
             }
         })();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
+
+    /** One poll of the shared log. Null when it cannot be read right now. */
+    async function fetchTail(offset: number): Promise<UpdateLogTail | null> {
+        const res = await fetch(`/api/updates/logs?offset=${offset}`, { cache: "no-store" });
+        if (!res.ok) return null;
+        return (await res.json()) as UpdateLogTail;
+    }
+
+    /**
+     * Render a run that ended before this page loaded. The log is read to its end
+     * rather than shown as the first chunk, because the interesting part of a
+     * failed build is the tail - and the report button needs the exit code.
+     */
+    async function showFinishedRun(first: UpdateLogTail): Promise<void> {
+        let data = first;
+        let text = first.content;
+        // Bounded: a build log this long is already past anything worth reading,
+        // and the pre only ever shows its tail.
+        for (let reads = 0; reads < 16 && !data.done; reads += 1) {
+            const next = await fetchTail(data.nextOffset);
+            if (!next || !next.exists) break;
+            data = next;
+            text += next.content;
+        }
+        setLogText(text.replace(/POLARIS_UPDATE_EXIT=-?\d+\s*/g, ""));
+        setLogExit(data.exitCode);
+        setUpdateMsg(
+            data.exitCode === null || data.exitCode === 0
+                ? `Last update finished at ${new Date(data.updatedAt).toLocaleTimeString()}.`
+                : `The last update failed (exit code ${data.exitCode}). See the log below.`
+        );
+    }
 
     /**
      * Open the prefilled issue. The tab is claimed before the await, because a
@@ -198,9 +235,8 @@ export function SettingsView({
         stopPolling();
         pollRef.current = setInterval(async () => {
             try {
-                const res = await fetch(`/api/updates/logs?offset=${offset}`, { cache: "no-store" });
-                if (!res.ok) return; // transient (or web restarting); keep trying
-                const data = (await res.json()) as UpdateLogTail;
+                const data = await fetchTail(offset);
+                if (!data) return; // transient (or web restarting); keep trying
                 if (!data.exists) {
                     missing += 1;
                     if (missing >= 4 && !sawContent) {
