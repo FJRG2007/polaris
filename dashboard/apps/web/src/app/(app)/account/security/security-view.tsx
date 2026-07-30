@@ -18,9 +18,9 @@ import {
     SESSION_MAX_CHOICES,
     type TwoFactorMethod
 } from "@polaris/core";
-import { Button, Card, CardBody, Select, Switch } from "@polaris/ui";
+import { Button, Card, CardBody, Select } from "@polaris/ui";
 import type { TwoFactorMethodStatus } from "@/lib/two-factor-delivery";
-import { setLoginApprovalAction, updateSessionLimitsAction } from "./actions";
+import { updateSessionLimitsAction } from "./actions";
 import { ChangePasswordDialog, RecoverPasswordDialog } from "./password-dialogs";
 import { DisableTwoFactorDialog, EnableTwoFactorDialog } from "./two-factor-dialogs";
 import { RemovePinDialog, SetPinDialog } from "./pin-dialogs";
@@ -51,7 +51,8 @@ export function SecurityView({
     phone,
     canSendWhatsApp,
     twoFactorMethods,
-    twoFactorPreferred
+    twoFactorPreferred,
+    otherSessions
 }: {
     hasPin: boolean;
     idleLockMinutes: number;
@@ -64,6 +65,8 @@ export function SecurityView({
     canSendWhatsApp: boolean;
     twoFactorMethods: TwoFactorMethodStatus[];
     twoFactorPreferred: TwoFactorMethod;
+    /** Open sessions other than this one, which is what a sign-in is approved from. */
+    otherSessions: number;
 }) {
     const router = useRouter();
     const [dialog, setDialog] = useState<string | null>(null);
@@ -72,9 +75,6 @@ export function SecurityView({
     const [limits, setLimits] = useState({ idleLockMinutes, sessionMaxMinutes });
     const [limitsBusy, setLimitsBusy] = useState(false);
     const [limitsResult, setLimitsResult] = useState<{ error?: string; ok?: string } | null>(null);
-    const [approval, setApproval] = useState(requireLoginApproval);
-    const [approvalError, setApprovalError] = useState<string | null>(null);
-
     const limitsChanged =
         limits.idleLockMinutes !== idleLockMinutes || limits.sessionMaxMinutes !== sessionMaxMinutes;
 
@@ -85,19 +85,6 @@ export function SecurityView({
         setLimitsBusy(false);
         setLimitsResult(result.error ? result : { ok: "Saved." });
         if (!result.error) router.refresh();
-    }
-
-    /** Optimistic, with the switch put back if the server refuses the change. */
-    async function toggleApproval(next: boolean) {
-        setApproval(next);
-        setApprovalError(null);
-        const result = await setLoginApprovalAction(next);
-        if (result.error) {
-            setApproval(!next);
-            setApprovalError(result.error);
-            return;
-        }
-        router.refresh();
     }
 
     const hasQuestions = questions.length === SECURITY_QUESTION_COUNT;
@@ -129,19 +116,20 @@ export function SecurityView({
                 )}
             </SettingCard>
 
-            {twoFactorEnabled ? (
-                <>
-                    <TwoFactorMethodsCard statuses={twoFactorMethods} preferred={twoFactorPreferred} />
-                    <PhoneCard phone={phone} canSend={canSendWhatsApp} />
-                </>
-            ) : null}
+            <TwoFactorMethodsCard
+                statuses={twoFactorMethods}
+                preferred={twoFactorPreferred}
+                twoFactorEnabled={twoFactorEnabled}
+                approval={{ enabled: requireLoginApproval, hasPin, otherSessions }}
+            />
+            {twoFactorEnabled ? <PhoneCard phone={phone} canSend={canSendWhatsApp} /> : null}
 
             <PasskeysCard passkeys={passkeys} />
 
             <SettingCard
                 title="Quick unlock PIN"
                 description={
-                    approval
+                    requireLoginApproval
                         ? "Reopens a locked dashboard, and confirms a new sign-in you allow."
                         : "Reopens a locked dashboard without retyping your password."
                 }
@@ -179,27 +167,6 @@ export function SecurityView({
                 ) : null}
                 <Button onClick={() => setDialog("questions")}>{hasQuestions ? "Update" : "Set up"}</Button>
             </SettingCard>
-
-            <SettingCard
-                title="Approve new sign-ins"
-                description={
-                    !hasPin
-                        ? "Needs a quick unlock PIN: allowing a sign-in asks for it."
-                        : twoFactorEnabled
-                          ? "After the code, a new sign-in still waits until you allow it with your PIN from a session that is already open."
-                          : "A new sign-in waits until you allow it with your PIN from a session that is already open."
-                }
-                status={approval ? "On" : "Off"}
-                statusTone={approval ? "on" : "off"}
-            >
-                <Switch
-                    checked={approval}
-                    disabled={!hasPin && !approval}
-                    onChange={(next) => void toggleApproval(next)}
-                    aria-label="Require approval for new sign-ins"
-                />
-            </SettingCard>
-            {approvalError ? <Feedback error={approvalError} /> : null}
 
             <Card>
                 <CardBody className="flex flex-col gap-3">

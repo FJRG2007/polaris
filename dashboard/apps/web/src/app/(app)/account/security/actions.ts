@@ -24,6 +24,7 @@ import {
     setQuickPin,
     setSecurityQuestions,
     updateSessionLimits,
+    verifyAccountPassword,
     verifySecurityAnswers,
     verifyTotpForSession,
     twoFactorEnabled
@@ -117,7 +118,7 @@ export async function clearPinAction(password: string): Promise<ActionResult> {
     // Approving a sign-in is what the PIN proves, so it cannot outlive the PIN.
     const security = await getUserSecurity(user.id);
     if (security.requireLoginApproval) {
-        return { error: "Turn off Approve new sign-ins first - approving one asks for this PIN." };
+        return { error: "Turn off approving sign-ins from an open session first - it asks for this PIN." };
     }
     const result = await clearQuickPin(auth, user.id, String(password));
     if (!result.error) {
@@ -141,9 +142,15 @@ export async function updateSessionLimitsAction(input: unknown): Promise<ActionR
  * Turn the sign-in approval gate on or off. Allowing a waiting sign-in asks for
  * the quick-unlock PIN, so the gate cannot be armed without one: otherwise the
  * approval would rest on nothing more than the open session it is decided from.
+ *
+ * Taking the gate down widens the ways in, so it is verified the same way the
+ * other second-factor settings are - a stolen session cannot quietly disarm it.
  */
-export async function setLoginApprovalAction(required: boolean): Promise<ActionResult> {
+export async function setLoginApprovalAction(required: boolean, password: string): Promise<ActionResult> {
     const user = await requireUser();
+    if (!(await verifyAccountPassword(auth, user.id, String(password)))) {
+        return { error: "Current password is incorrect." };
+    }
     if (required === true && !(await getUserSecurity(user.id)).hasPin) {
         return { error: "Set a quick unlock PIN first - approving a sign-in asks for it." };
     }

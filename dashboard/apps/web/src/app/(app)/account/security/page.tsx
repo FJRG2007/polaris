@@ -10,6 +10,7 @@
 import { getUserPhone, getUserSecurity, listSecurityQuestions, twoFactorEnabled } from "@polaris/auth";
 import { prisma } from "@polaris/db";
 import { requireUser } from "@/lib/session";
+import { listUserSessions } from "@/lib/session-directory";
 import { describeTwoFactorMethods } from "@/lib/two-factor-delivery";
 import { listPasskeys } from "./passkey-actions";
 import { SecurityView } from "./security-view";
@@ -18,7 +19,7 @@ export const dynamic = "force-dynamic";
 
 export default async function SecurityPage() {
     const user = await requireUser();
-    const [settings, questions, hasTwoFactor, passkeys, phone, methods, whatsappChannel] =
+    const [settings, questions, hasTwoFactor, passkeys, phone, methods, sessions, whatsappChannel] =
         await Promise.all([
             getUserSecurity(user.id),
             listSecurityQuestions(user.id),
@@ -26,6 +27,9 @@ export default async function SecurityPage() {
             listPasskeys(),
             getUserPhone(user.id),
             describeTwoFactorMethods(user.id),
+            // Approving a sign-in is done from another open session, so the card says
+            // how many there are rather than offering a gate with nothing behind it.
+            listUserSessions(user.id, user.sessionId),
             // Confirming a number is sent the same way the codes are, so the card
             // needs to know whether there is anything to send with.
             prisma.channel.findFirst({
@@ -54,6 +58,7 @@ export default async function SecurityPage() {
                 canSendWhatsApp={whatsappChannel !== null}
                 twoFactorMethods={methods}
                 twoFactorPreferred={settings.twoFactorPreferred}
+                otherSessions={sessions.filter((session) => !session.current).length}
             />
         </div>
     );
