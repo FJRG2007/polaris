@@ -113,6 +113,27 @@ export function routerAdvice(
         // browser: the status they are staring at, and the name in the header.
         const status = probe.status ? ` It answers ${probe.status}` : " It answers";
         const named = probe.server ? `, and calls itself "${probe.server}".` : ".";
+        // Carrier NAT first: it is a home line, but the forward the home branch asks
+        // for cannot be made on it, so the shared `atHome` answer would walk the
+        // operator through a router that has no inbound port to give them.
+        if (environment === "home-cgnat") {
+            return {
+                ok: false,
+                level: "danger",
+                title: "Your router is answering instead of Polaris",
+                detail:
+                    `${hostname} reaches your line, but the reply comes from the router.${status}${named}` +
+                    " Your provider shares one address between its customers, so no forward can bring the" +
+                    " request any further than this.",
+                steps: [
+                    "Use a tunnel to publish the site, which needs no open port.",
+                    "Or ask your provider for a public IP address, which some offer on request."
+                ],
+                key: "other:cgnat",
+                forward: false,
+                ...facts
+            };
+        }
         return atHome(environment)
             ? {
                   ok: false,

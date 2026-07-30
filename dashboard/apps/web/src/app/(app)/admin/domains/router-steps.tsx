@@ -8,10 +8,17 @@
  * than described in a sentence they have to translate. The brand starts on whatever
  * answered the reachability probe and stays a picker, because a router that names
  * itself is luck, not a guarantee.
+ *
+ * The rules come first and remote management last. Both can be why the router is
+ * answering instead of Polaris, but only one can be told apart from here: the probe
+ * leaves this server, so a router bouncing its own public address back inward looks
+ * exactly like one publishing its admin page to the internet - and the first is far
+ * the commoner. Leading with remote management sent operators to turn off a setting
+ * that was never on.
  */
 
-import { useState } from "react";
-import { Check, ChevronDown, Copy, ExternalLink } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { ChevronDown, ExternalLink } from "lucide-react";
 import { Button, Select } from "@polaris/ui";
 import {
     detectRouterBrand,
@@ -21,26 +28,14 @@ import {
     ROUTER_BRANDS,
     type RouterBrand
 } from "@/lib/router-guide";
+import { CopyButton } from "./copy-button";
 
 /** A value to type elsewhere: shown verbatim, copied in one click. */
 function Value({ text }: { text: string }) {
-    const [copied, setCopied] = useState(false);
     return (
         <span className="inline-flex items-center gap-1">
             <code className="text-foreground">{text}</code>
-            <button
-                type="button"
-                aria-label={`Copy ${text}`}
-                title="Copy"
-                className="text-muted-foreground transition-colors hover:text-foreground"
-                onClick={() => {
-                    void navigator.clipboard.writeText(text);
-                    setCopied(true);
-                    setTimeout(() => setCopied(false), 1500);
-                }}
-            >
-                {copied ? <Check className="size-3 text-success" /> : <Copy className="size-3" />}
-            </button>
+            <CopyButton value={text} className="[&_svg]:size-3" />
         </span>
     );
 }
@@ -48,6 +43,16 @@ function Value({ text }: { text: string }) {
 export function RouterSteps({ server, lanIp }: { server: string | null; lanIp: string | null }) {
     const [open, setOpen] = useState(false);
     const [brand, setBrand] = useState<RouterBrand>(() => detectRouterBrand(server));
+    // A brand the operator chose outranks anything a later probe recognizes. They
+    // may well be reading their own router's menus while the check runs again, and
+    // swapping the instructions underneath them is worse than being wrong quietly.
+    const picked = useRef(false);
+    const detected = detectRouterBrand(server);
+
+    useEffect(() => {
+        if (!picked.current && detected !== "other") setBrand(detected);
+    }, [detected]);
+
     const guide = routerGuide(brand);
     const gateway = likelyGateway(lanIp);
     const adminUrl = guide.admin ?? (gateway ? `http://${gateway}` : null);
@@ -61,7 +66,10 @@ export function RouterSteps({ server, lanIp }: { server: string | null; lanIp: s
                     Router brand
                     <Select
                         value={brand}
-                        onValueChange={(value) => setBrand(value as RouterBrand)}
+                        onValueChange={(value) => {
+                            picked.current = true;
+                            setBrand(value as RouterBrand);
+                        }}
                         options={ROUTER_BRANDS.map((entry) => ({ value: entry.id, label: entry.label }))}
                     />
                 </label>
@@ -106,12 +114,6 @@ export function RouterSteps({ server, lanIp }: { server: string | null; lanIp: s
                             )}
                         </li>
                         <li>Sign in. {guide.signIn}</li>
-                        <li>
-                            Free up the ports: go to{" "}
-                            {guide.remotePath ? <b className="font-medium text-foreground">{guide.remotePath}</b> : "the remote-management settings"}{" "}
-                            and turn off management from the internet (WAN), or move it to a port such as 8443. While
-                            the router answers on 80 and 443, nothing you forward can reach this server.
-                        </li>
                         <li>
                             Give this server a fixed address. In the DHCP settings, reserve{" "}
                             {lanIp ? <Value text={lanIp} /> : "this server's address"} for it - a forward points at an
@@ -184,6 +186,16 @@ export function RouterSteps({ server, lanIp }: { server: string | null; lanIp: s
                             )}
                         </li>
                         <li>Save, then run the DNS check again - it reports the moment the ports reach Polaris.</li>
+                        <li>
+                            Only if the router still answers after that: it is keeping the ports for its own admin
+                            page. Go to{" "}
+                            {guide.remotePath ? (
+                                <b className="font-medium text-foreground">{guide.remotePath}</b>
+                            ) : (
+                                "the remote-management settings"
+                            )}{" "}
+                            and turn off management from the internet (WAN), or move it to a port such as 8443.
+                        </li>
                     </ol>
 
                     {guide.caution && <p className="text-foreground">{guide.caution}</p>}

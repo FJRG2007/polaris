@@ -21,7 +21,6 @@ import {
     Check,
     CheckCircle2,
     ChevronLeft,
-    Copy,
     ExternalLink,
     Globe,
     Loader2,
@@ -50,6 +49,7 @@ import {
 } from "@/lib/domain-strategies";
 import { ENVIRONMENT_CHOICES, ENVIRONMENT_META } from "../../apps/servers/environment-meta";
 import { connectCloudflareAccountAction } from "../../integrations/actions";
+import { CopyButton } from "./copy-button";
 import { RouterSteps } from "./router-steps";
 import { clearSetupDraft, isUntouched, readSetupDraft, savedAnswers, writeSetupDraft } from "./setup-draft";
 import {
@@ -389,7 +389,16 @@ export function DomainSetupWizard({ onState }: { onState?: (state: DomainSetupSt
                         <ChevronLeft className="size-4" /> Back
                     </Button>
                     {step < 2 && (
-                        <Button size="sm" onClick={() => setStep((current) => current + 1)}>
+                        // Nothing past here reads well without an answer: the exposure
+                        // step would rank for a server it knows nothing about, promise
+                        // forwarding rules and have no router to point at. Detection
+                        // preselects a real answer whenever it managed one, so this
+                        // only stops someone whose box could not be classified.
+                        <Button
+                            size="sm"
+                            onClick={() => setStep((current) => current + 1)}
+                            disabled={step === 0 && environment === "unknown"}
+                        >
                             Continue
                         </Button>
                     )}
@@ -421,7 +430,14 @@ function EnvironmentStep({
 }) {
     return (
         <div className="flex flex-col gap-3">
-            <StepTitle title="Where does this server run?" hint="It decides which ways of reaching it can work at all." />
+            <StepTitle
+                title="Where does this server run?"
+                hint={
+                    selected === "unknown"
+                        ? "Pick one to continue. It decides which ways of reaching it can work at all."
+                        : "It decides which ways of reaching it can work at all."
+                }
+            />
             <div className="grid gap-2 sm:grid-cols-2">
                 {ENVIRONMENT_CHOICES.map((option) => {
                     const meta = ENVIRONMENT_META[option];
@@ -503,11 +519,13 @@ function StrategyStep({
                             <button
                                 key={option.id}
                                 type="button"
-                                disabled={!option.available}
-                                onClick={() => option.best && onSelect(option.best)}
+                                // Re-selecting the side already chosen keeps the
+                                // strategy picked below it: the card is worth
+                                // re-reading, and doing so must not undo a choice.
+                                onClick={() => !active && onSelect(option.best)}
                                 className={`flex flex-col gap-2 rounded-md border p-3 text-left transition-colors ${
                                     active ? "border-primary bg-primary/5" : "border-border/60 hover:bg-muted/40"
-                                } ${option.available ? "" : "cursor-not-allowed opacity-50"}`}
+                                }`}
                             >
                                 <span className="flex flex-wrap items-center gap-2 text-sm font-medium">
                                     {option.id === "tunnel" ? (
@@ -535,11 +553,7 @@ function StrategyStep({
                                         </span>
                                     ))}
                                 </span>
-                                {(option.note || !option.available) && (
-                                    <span className="text-xs text-warning">
-                                        {option.note ?? "Not possible on this kind of server."}
-                                    </span>
-                                )}
+                                {option.note && <span className="text-xs text-warning">{option.note}</span>}
                             </button>
                         );
                     })}
@@ -1227,7 +1241,6 @@ function RouterAdviceNote({ advice }: { advice: NonNullable<ZoneDnsReport["route
 /** One record the zone needs. `done` means the check saw this zone's names answer
  *  with this server's address, so the record exists and is pointed correctly. */
 function RecordRow({ name, ip, done }: { name: string; ip: string | null; done: boolean }) {
-    const [copied, setCopied] = useState(false);
     return (
         <div className="flex items-center gap-2">
             <Badge variant={done ? "success" : "neutral"}>A</Badge>
@@ -1238,18 +1251,7 @@ function RecordRow({ name, ip, done }: { name: string; ip: string | null; done: 
                     <CheckCircle2 className="size-3.5 shrink-0 text-success" />
                 </span>
             )}
-            <button
-                type="button"
-                aria-label={`Copy ${name}`}
-                className="text-muted-foreground transition-colors hover:text-foreground"
-                onClick={() => {
-                    void navigator.clipboard?.writeText(name);
-                    setCopied(true);
-                    setTimeout(() => setCopied(false), 1500);
-                }}
-            >
-                {copied ? <Check className="size-3.5 text-success" /> : <Copy className="size-3.5" />}
-            </button>
+            <CopyButton value={name} />
         </div>
     );
 }

@@ -162,14 +162,14 @@ export function approachOf(strategy: ExposureStrategy): ExposureApproach {
 export interface ApproachOption {
     id: ExposureApproach;
     meta: ApproachMeta;
-    /** False when no strategy on this side works on this server. */
-    available: boolean;
     /** What is different about this side on this server, when something is. */
     note?: string;
     /** Its strategies, in the same order the full list ranks them. */
     strategies: StrategyOption[];
-    /** The one to select when the operator picks this side, or null if none can be. */
-    best: ExposureStrategy | null;
+    /** The one to select when the operator picks this side. Both sides always have
+     *  one that works - a free subdomain and a quick tunnel need nothing of the
+     *  server - so this is never the absence of an option, only the best of them. */
+    best: ExposureStrategy;
 }
 
 export interface ApproachChoice {
@@ -202,9 +202,11 @@ export function approachesFor(environment: ServerEnvironment): ApproachChoice {
     const choice = strategiesFor(environment);
     const options: ApproachOption[] = (["ports", "tunnel"] as ExposureApproach[]).map((id) => {
         const strategies = choice.options.filter((option) => approachOf(option.id) === id);
-        const best = strategies.find((option) => option.available)?.id ?? null;
+        // The first that works, or the first there is: the ranking never leaves a
+        // side empty, so the fallback is a total function rather than a real case.
+        const best = (strategies.find((option) => option.available) ?? strategies[0]!).id;
         const note = APPROACH_NOTE[environment]?.[id];
-        return { id, meta: APPROACH_META[id], available: best !== null, ...(note ? { note } : {}), strategies, best };
+        return { id, meta: APPROACH_META[id], ...(note ? { note } : {}), strategies, best };
     });
     return { recommended: approachOf(choice.recommended), options };
 }

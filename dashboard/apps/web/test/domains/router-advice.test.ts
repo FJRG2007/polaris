@@ -70,6 +70,17 @@ describe("when something else answers", () => {
         expect(advice.steps.join(" ")).toMatch(/remote \(WAN\) management/);
     });
 
+    it("does not ask a carrier-NAT line for a forward it cannot make", () => {
+        // The router answers there too, but no rule in it can bring the request any
+        // further - so the walkthrough must not be offered, forward flag included.
+        const advice = routerAdvice("home-cgnat", "polaris.example.com", ROUTER);
+
+        expect(advice.forward).toBe(false);
+        expect(advice.steps.join(" ")).not.toMatch(/Forward ports/);
+        expect(advice.steps[0]).toMatch(/tunnel/);
+        expect(advice.detail).toContain("ZTE web server 1.0");
+    });
+
     it("does not blame a router on a box that has none", () => {
         const advice = routerAdvice("vps", "polaris.example.com", ROUTER);
 

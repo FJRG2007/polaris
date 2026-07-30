@@ -85,7 +85,6 @@ describe("approachesFor", () => {
     it("offers the router on a home line and a tunnel as the alternative", () => {
         const choice = approachesFor("home-nat");
         expect(choice.recommended).toBe("ports");
-        expect(choice.options.every((option) => option.available)).toBe(true);
         expect(choice.options.find((option) => option.id === "tunnel")?.best).toBe("cloudflare-tunnel");
     });
 
@@ -106,13 +105,11 @@ describe("approachesFor", () => {
         }
     });
 
-    it("picks each side's best from what that server can actually use", () => {
+    it("always has something to select on either side, and it is one that works", () => {
+        // Both sides carry an option that asks nothing of the server - a free
+        // subdomain, a quick tunnel - so neither is ever a dead card.
         for (const environment of ENVIRONMENTS) {
             for (const option of approachesFor(environment).options) {
-                if (option.best === null) {
-                    expect(option.strategies.some((strategy) => strategy.available)).toBe(false);
-                    continue;
-                }
                 expect(option.strategies.find((strategy) => strategy.id === option.best)?.available).toBe(true);
             }
         }
