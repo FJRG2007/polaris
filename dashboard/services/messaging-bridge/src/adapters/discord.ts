@@ -19,6 +19,7 @@ import { capabilitiesFor } from "@polaris/messaging";
 import type {
     AdapterContext,
     ChannelAdapter,
+    ChannelState,
     InteractivePrompt,
     OutboundMessage,
     SendResult,
@@ -58,15 +59,18 @@ const REDUCED_INTENTS = [
 ];
 
 // Ordered most- to least-privileged. `note` describes what is degraded at a tier
-// and is logged when we fall back to it (the full tier has nothing degraded).
-const INTENT_TIERS: { intents: GatewayIntentBits[]; note?: string }[] = [
-    { intents: FULL_INTENTS },
+// and is logged when we fall back to it (the full tier has nothing degraded), and
+// `missing` names the portal toggles that were refused, for the setup panel.
+const INTENT_TIERS: { intents: GatewayIntentBits[]; missing: string[]; note?: string }[] = [
+    { intents: FULL_INTENTS, missing: [] },
     {
         intents: CONTENT_INTENTS,
+        missing: ["Server Members"],
         note: "Discord: the Server Members intent is disabled in the Developer Portal, connecting without it - DM by username is disabled (use the numeric User ID); server-channel message text still works. Enable it under Bot > Privileged Gateway Intents."
     },
     {
         intents: REDUCED_INTENTS,
+        missing: ["Server Members", "Message Content"],
         note: "Discord: the Message Content intent is disabled in the Developer Portal, connecting with reduced intents - message text in server channels will be empty until you enable it (Bot > Privileged Gateway Intents)."
     }
 ];
@@ -77,6 +81,8 @@ export class DiscordAdapter implements ChannelAdapter {
     private readonly channelId: string;
     private readonly ctx: AdapterContext;
     private client: Client;
+    /** Privileged intents the portal refused, from the tier we settled on. */
+    private missingIntents: string[] = [];
 
     constructor(token: string, channelId: string, ctx: AdapterContext) {
         this.token = token;
@@ -137,13 +143,14 @@ export class DiscordAdapter implements ChannelAdapter {
         for (let tier = 0; tier < INTENT_TIERS.length; tier++) {
             const config = INTENT_TIERS[tier];
             if (!config) continue;
-            const { intents, note } = config;
+            const { intents, missing, note } = config;
             if (tier > 0) {
                 await this.client.destroy().catch(() => undefined);
                 this.client = this.build(intents);
             }
             try {
                 const result = await this.login();
+                this.missingIntents = missing;
                 if (note) this.ctx.log(note);
                 return result;
             } catch (caught) {
@@ -163,6 +170,26 @@ export class DiscordAdapter implements ChannelAdapter {
 
     async disconnect(): Promise<void> {
         await this.client.destroy();
+    }
+
+    /**
+     * What the bot can reach, and what its owner still has to switch on. A token
+     * that logs in says nothing about whether the bot is in a server or whether
+     * the privileged intents are on, and both are invisible from Discord's side
+     * until something fails - so they are reported here and shown on the channel.
+     */
+    getState(): ChannelState {
+        return {
+            status: this.client.isReady() ? "connected" : "connecting",
+            externalId: this.client.user?.tag,
+            setup: {
+                // The bot user's id is its application id, which is what an invite
+                // link needs; `application` is only populated once ready.
+                applicationId: this.client.application?.id ?? this.client.user?.id,
+                guilds: this.client.guilds.cache.size,
+                missingIntents: this.missingIntents
+            }
+        };
     }
 
     private buttonRows(
@@ -216,7 +243,7 @@ export class DiscordAdapter implements ChannelAdapter {
             }
         }
         throw new Error(
-            `Could not find a Discord user "${idOrName}". Enable the Server Members intent (Bot > Privileged Gateway Intents), make sure the bot shares a server with them, or use their numeric User ID.`
+            `Could not find a Discord user "${idOrName}". Finding somebody by name needs the bot in a server with them and the Server Members intent on - the channel's Manage panel has the invite link and the switches. Their numeric User ID works either way.`
         );
     }
 

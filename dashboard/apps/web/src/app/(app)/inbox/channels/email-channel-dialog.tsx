@@ -59,23 +59,27 @@ function initialSettings(provider: MailProvider, existing?: Record<string, strin
 
 export function EmailChannelDialog({
     channel,
+    initialProvider,
     onClose,
     onSaved,
     onRemoved
 }: {
     /** The channel being edited, or null when adding one. */
     channel: EmailChannelView | null;
+    /** Which provider a new sender starts on, when it was picked before the dialog. */
+    initialProvider?: MailProvider;
     onClose: () => void;
     onSaved: (channel: EmailChannelView) => void;
     onRemoved: (id: string) => void;
 }) {
     const editing = channel !== null;
+    const starting = channel?.provider ?? initialProvider ?? "brevo";
     const [confirm, confirmElement] = useConfirm();
-    const [provider, setProvider] = useState<MailProvider>(channel?.provider ?? "brevo");
+    const [provider, setProvider] = useState<MailProvider>(starting);
     const [name, setName] = useState(channel?.name ?? "");
     const [secret, setSecret] = useState("");
     const [settings, setSettings] = useState<Record<string, string>>(() =>
-        initialSettings(channel?.provider ?? "brevo", channel?.settings)
+        initialSettings(starting, channel?.settings)
     );
     const [testTo, setTestTo] = useState("");
     const [error, setError] = useState<string | null>(null);

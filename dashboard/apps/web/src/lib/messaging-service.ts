@@ -13,6 +13,7 @@ import { decryptSecret, encryptSecret } from "@polaris/storage";
 import { capabilitiesFor } from "@polaris/messaging";
 import type {
     ChannelCapabilities,
+    ChannelSetup,
     InteractivePrompt,
     InboundEvent,
     Platform,
@@ -838,6 +839,8 @@ export interface ChannelLiveState {
     status: string;
     qr?: string;
     externalId?: string;
+    /** What the channel still needs from its owner (Discord: invite, intents). */
+    setup?: ChannelSetup;
 }
 
 /** Poll the bridge for a channel's live state (QR / connected), persisting a
@@ -860,7 +863,7 @@ export async function channelState(ownerId: string, channelId: string): Promise<
     } else if (state.status === "error" || state.status === "disconnected") {
         await prisma.channel.update({ where: { id: channelId }, data: { status: state.status } });
     }
-    return { status: state.status, qr: state.qr, externalId: state.externalId };
+    return { status: state.status, qr: state.qr, externalId: state.externalId, setup: state.setup };
 }
 
 /** Re-establish live adapters in the bridge for channels the DB considers up. The

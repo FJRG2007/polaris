@@ -1,20 +1,19 @@
 "use client";
 
 /**
- * Channels page: every connected messaging channel as a card (the same shape as
- * the Integrations marketplace), each opening a Manage dialog to rename it, replace
- * its credentials or config, reconnect (or re-link WhatsApp Web by scanning a fresh
- * QR in place), or remove it. These channels are what the Watch app targets for
- * alerts and what the Inbox sends through. Connecting reuses
- * the Inbox's ConnectChannelDialog so the connect flow is identical everywhere.
+ * Channels page: everything Polaris talks through in one list - messaging
+ * channels and email senders alike - each as a card opening a Manage dialog to
+ * rename it, replace its credentials or config, reconnect (or re-link WhatsApp
+ * Web by scanning a fresh QR in place), or remove it. Connecting is a page of its
+ * own, so every way in is offered side by side instead of one being a button and
+ * the rest a dialog.
  */
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useState, useTransition, type ComponentType } from "react";
 import Link from "next/link";
 import {
     CheckCircle2,
     Loader2,
-    Mail,
     MessagesSquare,
     Plus,
     QrCode,
@@ -49,7 +48,7 @@ import {
     PLATFORM_LABEL,
     PLATFORM_LOGO
 } from "../platform-meta";
-import { ConnectChannelDialog } from "../inbox-view";
+import { DiscordSetupPanel } from "../discord-setup-panel";
 import { EmailChannelDialog } from "./email-channel-dialog";
 
 type ChannelKind = "telegram" | "whatsapp-cloud" | "whatsapp-web" | "discord" | "slack";
@@ -107,11 +106,10 @@ export function ChannelsView({
     bridgeReady: boolean;
 }) {
     const [channels, setChannels] = useState(initialChannels);
-    const [connecting, setConnecting] = useState(false);
     const [managing, setManaging] = useState<ChannelView | null>(null);
     const [emailChannels, setEmailChannels] = useState(initialEmailChannels);
-    // null closes the dialog; a channel edits it, and "new" adds one.
-    const [emailDialog, setEmailDialog] = useState<EmailChannelView | "new" | null>(null);
+    // Only ever an existing sender: adding one is the marketplace's job.
+    const [emailDialog, setEmailDialog] = useState<EmailChannelView | null>(null);
 
     function patchChannel(id: string, patch: Partial<ChannelView>) {
         setChannels((prev) => prev.map((item) => (item.id === id ? { ...item, ...patch } : item)));
@@ -124,19 +122,15 @@ export function ChannelsView({
                 <div>
                     <h1 className="text-lg font-semibold">Channels</h1>
                     <p className="text-sm text-muted-foreground">
-                        Messaging channels connected to Polaris. The Inbox and Watch alerts send
-                        through these.
+                        Everything Polaris talks through: the messaging channels the Inbox and Watch
+                        alerts send over, and the senders that carry its mail.
                     </p>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                    {/* Email needs no bridge, so it is never gated on one. */}
-                    <Button variant="secondary" onClick={() => setEmailDialog("new")}>
-                        <Mail className="size-4" /> Add email sender
-                    </Button>
-                    <Button onClick={() => setConnecting(true)} disabled={!bridgeReady}>
+                <Button asChild>
+                    <Link href="/inbox/channels/connect">
                         <Plus className="size-4" /> Connect a channel
-                    </Button>
-                </div>
+                    </Link>
+                </Button>
             </div>
 
             {!bridgeReady && (
@@ -146,120 +140,69 @@ export function ChannelsView({
                         <Link href="/apps/marketplace" className="text-primary hover:underline">
                             Apps marketplace
                         </Link>{" "}
-                        to connect channels.
+                        to connect messaging channels. Email senders work without it.
                     </CardBody>
                 </Card>
             )}
 
-            {channels.length === 0 ? (
+            {channels.length === 0 && emailChannels.length === 0 ? (
                 <Card>
                     <CardBody className="text-sm text-muted-foreground">
-                        No messaging channels connected yet. Connect one to start messaging and to
-                        target it from Watch alerts.
+                        Nothing connected yet. Connect a messaging channel to start chatting, or an
+                        email sender so Polaris can send sign-in mail.
                     </CardBody>
                 </Card>
             ) : (
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     {channels.map((channel) => {
                         const meta = PLATFORM_LOGO[channel.platform];
-                        const Logo = meta?.Logo;
-                        const connected = channel.status === "connected";
                         return (
-                            <Card key={channel.id}>
-                                <CardBody className="flex flex-col gap-3">
-                                    <div className="flex items-start gap-3">
-                                        <div
-                                            className="grid size-10 shrink-0 place-items-center rounded-md"
-                                            style={{
-                                                color: meta?.color,
-                                                backgroundColor: meta
-                                                    ? `${meta.color}1a`
-                                                    : undefined
-                                            }}
-                                        >
-                                            {Logo ? (
-                                                <Logo className="size-6" />
-                                            ) : (
-                                                <MessagesSquare className="size-6" />
-                                            )}
-                                        </div>
-                                        <div className="min-w-0 flex-1">
-                                            <div className="flex items-center gap-2">
-                                                <h2 className="truncate text-sm font-medium">
-                                                    {channel.name}
-                                                </h2>
-                                                <Badge
-                                                    className={cn(
-                                                        CHANNEL_STATUS_TONE[channel.status]
-                                                    )}
-                                                >
-                                                    {channel.status}
-                                                </Badge>
-                                            </div>
-                                            <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                                                {PLATFORM_LABEL[channel.platform] ??
-                                                    channel.platform}
-                                                {channel.provider === "whatsapp-cloud"
-                                                    ? " Cloud"
-                                                    : ""}
-                                                {channel.externalId
-                                                    ? ` - ${channel.externalId}`
-                                                    : ""}
-                                            </p>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center justify-end gap-2">
-                                        {connected && (
-                                            <span className="mr-auto inline-flex items-center gap-1 text-xs text-success">
-                                                <CheckCircle2 className="size-3.5" /> Connected
-                                            </span>
-                                        )}
-                                        <Button
-                                            size="sm"
-                                            variant="secondary"
-                                            onClick={() => setManaging(channel)}
-                                        >
-                                            <Settings2 className="size-4" /> Manage
-                                        </Button>
-                                    </div>
-                                </CardBody>
-                            </Card>
+                            <ChannelCard
+                                key={channel.id}
+                                Logo={meta?.Logo ?? MessagesSquare}
+                                color={meta?.color}
+                                name={channel.name}
+                                status={channel.status}
+                                statusLabel={channel.status}
+                                detail={[
+                                    `${PLATFORM_LABEL[channel.platform] ?? channel.platform}${
+                                        channel.provider === "whatsapp-cloud" ? " Cloud" : ""
+                                    }`,
+                                    channel.externalId
+                                ]
+                                    .filter(Boolean)
+                                    .join(" - ")}
+                                ready={channel.status === "connected" ? "Connected" : null}
+                                onManage={() => setManaging(channel)}
+                            />
                         );
                     })}
+                    {emailChannels.map((channel) => (
+                        <ChannelCard
+                            key={channel.id}
+                            Logo={EMAIL_CHANNEL_MARK.Logo}
+                            color={EMAIL_CHANNEL_MARK.color}
+                            name={channel.name}
+                            status={channel.status}
+                            statusLabel={channel.status === "connected" ? "ready" : channel.status}
+                            detail={[MAIL_PROVIDER_INFO[channel.provider].label, channel.from]
+                                .filter(Boolean)
+                                .join(" - ")}
+                            error={channel.error}
+                            ready={
+                                channel.status === "connected" && !channel.error
+                                    ? "Ready to send"
+                                    : null
+                            }
+                            onManage={() => setEmailDialog(channel)}
+                        />
+                    ))}
                 </div>
             )}
 
-            <div className="mt-2 flex flex-col gap-3">
-                <div>
-                    <h2 className="text-sm font-medium">Email senders</h2>
-                    <p className="text-xs text-muted-foreground">
-                        How Polaris sends mail: address verification, password resets, sign-in
-                        links and codes. An administrator picks which one carries them.
-                    </p>
-                </div>
-                {emailChannels.length === 0 ? (
-                    <Card>
-                        <CardBody className="text-sm text-muted-foreground">
-                            No email sender yet, so Polaris cannot send mail. Brevo and Mailjet both
-                            work from a personal address with no DNS to set up.
-                        </CardBody>
-                    </Card>
-                ) : (
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                        {emailChannels.map((channel) => (
-                            <EmailChannelCard
-                                key={channel.id}
-                                channel={channel}
-                                onManage={() => setEmailDialog(channel)}
-                            />
-                        ))}
-                    </div>
-                )}
-            </div>
-
             {emailDialog && (
                 <EmailChannelDialog
-                    channel={emailDialog === "new" ? null : emailDialog}
+                    channel={emailDialog}
                     onClose={() => setEmailDialog(null)}
                     onSaved={(saved) => {
                         setEmailChannels((prev) =>
@@ -278,19 +221,6 @@ export function ChannelsView({
                 />
             )}
 
-            {connecting && (
-                <ConnectChannelDialog
-                    bridgeReady={bridgeReady}
-                    onClose={() => setConnecting(false)}
-                    onConnected={(channel) => {
-                        setChannels((prev) => [
-                            ...prev.filter((item) => item.id !== channel.id),
-                            channel
-                        ]);
-                        setConnecting(false);
-                    }}
-                />
-            )}
             {managing && (
                 <ChannelManageDialog
                     channel={managing}
@@ -306,41 +236,57 @@ export function ChannelsView({
     );
 }
 
-/** An email sender, in the same card shape as a messaging channel. The status
- *  reflects the last credential check or send, and the reason is shown when it
- *  failed - a refused sending address is the usual cause and worth naming. */
-function EmailChannelCard({ channel, onManage }: { channel: EmailChannelView; onManage: () => void }) {
-    const { Logo, color } = EMAIL_CHANNEL_MARK;
+/** One connected channel, whatever it carries. A messaging channel and an email
+ *  sender differ only in what their subtitle says, so they share a card: the list
+ *  reads as one set of things Polaris talks through rather than two. */
+function ChannelCard({
+    Logo,
+    color,
+    name,
+    status,
+    statusLabel,
+    detail,
+    error,
+    ready,
+    onManage
+}: {
+    Logo: ComponentType<{ className?: string }>;
+    color?: string;
+    name: string;
+    status: string;
+    statusLabel: string;
+    detail: string;
+    /** Why the last check or send failed, when it did. */
+    error?: string | null;
+    /** The line shown when the channel is working, or null when it is not. */
+    ready: string | null;
+    onManage: () => void;
+}) {
     return (
         <Card>
             <CardBody className="flex flex-col gap-3">
                 <div className="flex items-start gap-3">
                     <div
                         className="grid size-10 shrink-0 place-items-center rounded-md"
-                        style={{ color, backgroundColor: `${color}1a` }}
+                        style={{ color, backgroundColor: color ? `${color}1a` : undefined }}
                     >
                         <Logo className="size-6" />
                     </div>
                     <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
-                            <h3 className="truncate text-sm font-medium">{channel.name}</h3>
-                            <Badge className={cn(CHANNEL_STATUS_TONE[channel.status])}>
-                                {channel.status === "connected" ? "ready" : channel.status}
-                            </Badge>
+                            <h2 className="truncate text-sm font-medium">{name}</h2>
+                            <Badge className={cn(CHANNEL_STATUS_TONE[status])}>{statusLabel}</Badge>
                         </div>
-                        <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                            {MAIL_PROVIDER_INFO[channel.provider].label}
-                            {channel.from ? ` - ${channel.from}` : ""}
-                        </p>
+                        <p className="mt-0.5 truncate text-xs text-muted-foreground">{detail}</p>
                     </div>
                 </div>
-                {channel.error ? <p className="text-xs text-danger">{channel.error}</p> : null}
+                {error ? <p className="text-xs text-danger">{error}</p> : null}
                 <div className="flex items-center justify-end gap-2">
-                    {channel.status === "connected" && !channel.error && (
+                    {ready ? (
                         <span className="mr-auto inline-flex items-center gap-1 text-xs text-success">
-                            <CheckCircle2 className="size-3.5" /> Ready to send
+                            <CheckCircle2 className="size-3.5" /> {ready}
                         </span>
-                    )}
+                    ) : null}
                     <Button size="sm" variant="secondary" onClick={onManage}>
                         <Settings2 className="size-4" /> Manage
                     </Button>
@@ -566,6 +512,10 @@ function ChannelManageDialog({
                                 {spec.tokenPlaceholder}
                             </span>
                         </label>
+                    )}
+
+                    {channel.platform === "discord" && !channel.provider && (
+                        <DiscordSetupPanel channelId={channel.id} />
                     )}
 
                     {spec.needsPhoneNumberId && (

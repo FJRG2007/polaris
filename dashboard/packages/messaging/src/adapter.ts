@@ -19,6 +19,23 @@ export interface SendResult {
     externalId?: string;
 }
 
+/**
+ * What a connected channel still needs from its owner. A credential that the
+ * platform accepts is not the same as a channel that can reach anybody: a Discord
+ * bot with a valid token starts in no server and, unless the portal switches
+ * them on, without the intents that let it read messages or find people. Reported
+ * rather than inferred, so the UI can say what is missing instead of waiting for
+ * the first send to fail.
+ */
+export interface ChannelSetup {
+    /** Discord application id, which an invite link is built from. */
+    applicationId?: string;
+    /** Servers the bot is in right now. */
+    guilds?: number;
+    /** Privileged intents the platform refused, by their name in the portal. */
+    missingIntents?: string[];
+}
+
 /** Onboarding/connection state, for adapters that log in asynchronously (a QR to
  *  scan, a pairing code). Synchronous adapters report "connected" from connect(). */
 export interface ChannelState {
@@ -27,6 +44,7 @@ export interface ChannelState {
     qr?: string;
     externalId?: string;
     detail?: string;
+    setup?: ChannelSetup;
 }
 
 /** A group of addressable send targets a bot can reach, for a recipient picker in
