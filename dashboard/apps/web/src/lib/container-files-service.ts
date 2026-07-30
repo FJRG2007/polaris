@@ -8,8 +8,8 @@
 
 import type { Readable } from "node:stream";
 import { prisma } from "@polaris/db";
-import { serviceName } from "@polaris/deploy";
 import { HostdClient } from "@polaris/hostd-client";
+import { currentReleaseRef } from "./deploy/releases";
 
 export interface ContainerEntry {
     readonly name: string;
@@ -21,13 +21,13 @@ export interface ContainerEntry {
 export async function resolveLocalContainer(applicationId: string, ownerId: string): Promise<string> {
     const app = await prisma.application.findFirst({
         where: { id: applicationId, environment: { project: { ownerId } } },
-        include: { environment: { include: { project: true } }, target: true }
+        include: { environment: { include: { project: true } }, target: true, volumes: { select: { id: true } } }
     });
     if (!app) throw new Error("Application not found");
     if (app.target.kind !== "local") {
         throw new Error("Container file browsing is currently supported on the local host only");
     }
-    return serviceName(app.environment.project.slug, app.slug, app.id);
+    return (await currentReleaseRef(app)).name;
 }
 
 /** Resolve an application to its local container name WITHOUT an owner check, for
@@ -36,13 +36,13 @@ export async function resolveLocalContainer(applicationId: string, ownerId: stri
 export async function resolveContainerName(applicationId: string): Promise<string> {
     const app = await prisma.application.findFirst({
         where: { id: applicationId },
-        include: { environment: { include: { project: true } }, target: true }
+        include: { environment: { include: { project: true } }, target: true, volumes: { select: { id: true } } }
     });
     if (!app) throw new Error("Application not found");
     if (app.target.kind !== "local") {
         throw new Error("Container file browsing is currently supported on the local host only");
     }
-    return serviceName(app.environment.project.slug, app.slug, app.id);
+    return (await currentReleaseRef(app)).name;
 }
 
 /** List a directory inside the container. Uses `ls -1Ap` so directories carry a

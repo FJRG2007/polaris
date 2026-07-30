@@ -32,3 +32,41 @@ export function magicDomain(name: string, ip: string, base: string = DEFAULT_SUB
 export function isMagicBase(base: string): boolean {
     return base === "sslip.io" || base === "traefik.me" || base === "nip.io";
 }
+
+/** The dashed IPv4 a magic domain ends its first label with, e.g. `-51-15-20-30`. */
+const TRAILING_IP = /-(\d{1,3}-\d{1,3}-\d{1,3}-\d{1,3})$/;
+
+/** Longest release marker kept in a hostname: enough for a short commit SHA. */
+const MARKER_LENGTH = 12;
+
+/**
+ * The hostname one particular release answers on, built from the service's own
+ * hostname by adding a marker (normally the commit) to it:
+ * `invoices-a1b2c3-51-15-20-30.sslip.io` becomes
+ * `invoices-a1b2c3-9f8e7d6-51-15-20-30.sslip.io`.
+ *
+ * The service's own hostname is never touched - it is the address people saved,
+ * and it follows whichever release is current. This is how Vercel and Railway
+ * present it: one address for the service, one more per build, so an older
+ * version stays reachable without ever taking over the address.
+ *
+ * Two shapes are protected. The marker goes INSIDE the first label, because an
+ * extra dot would fall outside a single-level wildcard (`*.plr.example.com`), so
+ * the name would resolve nowhere and need its own certificate. And it goes BEFORE
+ * the encoded address, because wildcard DNS reads that address at the end of the
+ * label - moving it would point the release at nothing.
+ *
+ * Null when there is nothing usable to build: no marker, no label to extend, or a
+ * result past the 63-character limit a DNS label has.
+ */
+export function releaseDomain(hostname: string, release: string): string | null {
+    const marker = slugify(release).slice(0, MARKER_LENGTH);
+    const dot = hostname.indexOf(".");
+    if (!marker || dot < 1) return null;
+    const label = hostname.slice(0, dot);
+    const address = label.match(TRAILING_IP);
+    const built = address
+        ? `${label.slice(0, -address[0].length)}-${marker}-${address[1]}`
+        : `${label}-${marker}`;
+    return built.length > 63 ? null : `${built}${hostname.slice(dot)}`;
+}

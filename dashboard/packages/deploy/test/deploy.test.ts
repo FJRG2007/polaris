@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { imageTag, serviceName, shortHash, slugify } from "../src/naming.js";
-import { isMagicBase, magicDomain } from "../src/subdomain.js";
+import { isMagicBase, magicDomain, releaseDomain } from "../src/subdomain.js";
 import { quoteArg, quoteArgv } from "../src/shell.js";
 import { buildCommand, buildSpec } from "../src/builders/index.js";
 import { configHash, traefikLabels } from "../src/traefik.js";
@@ -51,6 +51,44 @@ describe("subdomain", () => {
         expect(isMagicBase("sslip.io")).toBe(true);
         expect(isMagicBase("traefik.me")).toBe(true);
         expect(isMagicBase("example.com")).toBe(false);
+    });
+});
+
+describe("release subdomain", () => {
+    it("adds the commit to the service's own name and leaves that name alone", () => {
+        const service = magicDomain("invoices", "51.15.20.30");
+        const release = releaseDomain(service, "9f8e7d6");
+        expect(release).not.toBe(service);
+        expect(release).toContain("-9f8e7d6-");
+        expect(magicDomain("invoices", "51.15.20.30")).toBe(service);
+    });
+
+    it("keeps the encoded address at the end, where wildcard DNS reads it", () => {
+        expect(releaseDomain("invoices-a1b2c3-51-15-20-30.sslip.io", "9f8e7d6")).toBe(
+            "invoices-a1b2c3-9f8e7d6-51-15-20-30.sslip.io"
+        );
+    });
+
+    it("stays inside the first label, so a single-level wildcard still covers it", () => {
+        const release = releaseDomain("invoices-a1b2c3.plr.example.com", "9f8e7d6");
+        expect(release).toBe("invoices-a1b2c3-9f8e7d6.plr.example.com");
+        expect(release?.split(".")).toHaveLength(4);
+    });
+
+    it("gives two commits two hostnames", () => {
+        const first = releaseDomain("invoices-a1b2c3-1-2-3-4.sslip.io", "aaaaaaa");
+        expect(first).not.toBe(releaseDomain("invoices-a1b2c3-1-2-3-4.sslip.io", "bbbbbbb"));
+    });
+
+    it("shortens a full commit sha rather than overrunning the label", () => {
+        expect(releaseDomain("web-a1b2c3.sslip.io", "9f8e7d6c5b4a39281706")).toBe("web-a1b2c3-9f8e7d6c5b4a.sslip.io");
+    });
+
+    it("has nothing to offer without a usable marker or label", () => {
+        expect(releaseDomain("web-a1b2c3.sslip.io", "")).toBeNull();
+        expect(releaseDomain("web-a1b2c3.sslip.io", "!!!")).toBeNull();
+        expect(releaseDomain("sslip.io", "9f8e7d6")).not.toBeNull();
+        expect(releaseDomain(`${"a".repeat(60)}.sslip.io`, "9f8e7d6")).toBeNull();
     });
 });
 

@@ -1,13 +1,14 @@
 import { notFound } from "next/navigation";
-import { serviceName } from "@polaris/deploy";
 import { refreshCapabilities } from "@polaris/hostd-client";
 import { requirePermission, userHasManage } from "@/lib/session";
 import { getDeploymentStatuses, getProjectFull, hostPortForApp, listProjects } from "@/lib/deploy-service";
+import { currentReleaseRef } from "@/lib/deploy/releases";
 import { listActiveTunnelDomains } from "@/lib/deploy/tunnel-domains";
 import { getPublicIp } from "@/lib/domain-service";
 import type { TunnelDomain } from "@/lib/deploy/tunnel-domains";
 import { ProjectDetail } from "../project-detail";
-import type { AppDomain, ProjectSummary } from "../deploy-view";
+import type { ProjectSummary } from "../deploy-view";
+import type { AppDomain } from "../domain-rank";
 
 export const dynamic = "force-dynamic";
 
@@ -47,6 +48,15 @@ export default async function DeployProjectPage({ params }: { params: Promise<{ 
     const serverIp = await getPublicIp();
     const appIds = project.environments.flatMap((environment) => environment.applications.map((app) => app.id));
     const tunnelDomains = await listActiveTunnelDomains(appIds);
+    // A service that keeps its history is served by the release it currently points
+    // at, which has a container name and a published port of its own - so the
+    // terminal, the file browser and the direct IP:port link all have to follow it.
+    const allApps = project.environments.flatMap((environment) => environment.applications);
+    const serving = new Map(
+        await Promise.all(
+            allApps.map(async (app) => [app.id, await currentReleaseRef({ ...app, environment: { project } })] as const)
+        )
+    );
 
     const summary: ProjectSummary = {
         id: project.id,
@@ -66,23 +76,28 @@ export default async function DeployProjectPage({ params }: { params: Promise<{ 
                 targetId: app.targetId,
                 serverId: app.target.kind === "local" || !app.target.hostId ? "local" : app.target.hostId,
                 serverName: app.target.name,
-                containerRef: serviceName(project.slug, app.slug, app.id),
+                containerRef: serving.get(app.id)?.name ?? "",
                 autoDeploy: app.autoDeploy,
                 deployBranch: app.deployBranch,
                 commitFilter: app.commitFilter,
                 keepReleases: app.keepReleases,
                 port: portOf(app.sourceConfig),
-                ipUrl: serverIp ? `http://${serverIp}:${hostPortForApp(app.id)}` : null,
+                ipUrl: serverIp ? `http://${serverIp}:${hostPortForApp(serving.get(app.id)?.portSubject ?? app.id)}` : null,
                 domains: mergeTunnelDomains(
-                    app.domains.map((domain) => ({
-                        id: domain.id,
-                        hostname: domain.hostname,
-                        kind: domain.kind,
-                        enabled: domain.enabled,
-                        healthStatus: domain.healthStatus,
-                        healthCode: domain.healthCode,
-                        healthDetail: domain.healthDetail
-                    })),
+                    // A per-release hostname belongs to one build, not to the service, so
+                    // it is listed on that deployment rather than among the service's own
+                    // addresses.
+                    app.domains
+                        .filter((domain) => domain.kind !== "release")
+                        .map((domain) => ({
+                            id: domain.id,
+                            hostname: domain.hostname,
+                            kind: domain.kind,
+                            enabled: domain.enabled,
+                            healthStatus: domain.healthStatus,
+                            healthCode: domain.healthCode,
+                            healthDetail: domain.healthDetail
+                        })),
                     tunnelDomains.get(app.id) ?? []
                 ),
                 volumes: app.volumes.map((volume) => ({

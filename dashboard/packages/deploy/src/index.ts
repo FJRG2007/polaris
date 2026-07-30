@@ -6,7 +6,7 @@
  */
 
 export { slugify, shortHash, serviceName, imageTag } from "./naming.js";
-export { magicDomain, isMagicBase, DEFAULT_SUBDOMAIN_BASE } from "./subdomain.js";
+export { magicDomain, releaseDomain, isMagicBase, DEFAULT_SUBDOMAIN_BASE } from "./subdomain.js";
 export {
     defaultZones,
     isBaseDomain,

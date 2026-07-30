@@ -11,11 +11,17 @@
 import { prisma } from "@polaris/db";
 import { parseStoredTunnel } from "./quick-tunnel-store";
 
-/** A tunnel hostname shaped like an `AppDomain` row (kind "tunnel"). */
+/**
+ * A tunnel hostname shaped like an `AppDomain` row. The kind separates the two
+ * sorts of tunnel because they are not interchangeable as an address: a named
+ * tunnel keeps its hostname, while a quick/ngrok tunnel gets a new random one
+ * every time it starts - so "tunnel-temp" must never be presented as the
+ * service's address (see `domainRank`).
+ */
 export interface TunnelDomain {
     id: string;
     hostname: string;
-    kind: "tunnel";
+    kind: "tunnel" | "tunnel-temp";
     enabled: boolean;
 }
 
@@ -60,9 +66,11 @@ export async function listActiveTunnelDomains(appIds: string[]): Promise<Map<str
         // hostname to show yet.
         const quick = values.get(`deploy.qtunnel.${appId}`);
         const quickUrl = quick ? parseStoredTunnel(quick).url : null;
-        if (quickUrl) domains.push({ id: `qtunnel:${appId}`, hostname: hostnameOf(quickUrl), kind: "tunnel", enabled: true });
+        if (quickUrl) {
+            domains.push({ id: `qtunnel:${appId}`, hostname: hostnameOf(quickUrl), kind: "tunnel-temp", enabled: true });
+        }
         const ngrok = values.get(`deploy.ngrok.${appId}`);
-        if (ngrok) domains.push({ id: `ngrok:${appId}`, hostname: hostnameOf(ngrok), kind: "tunnel", enabled: true });
+        if (ngrok) domains.push({ id: `ngrok:${appId}`, hostname: hostnameOf(ngrok), kind: "tunnel-temp", enabled: true });
         const named = values.get(`deploy.ntunnel.${appId}.hostname`);
         if (named && values.get(`deploy.ntunnel.${appId}.disabled`) !== "1") {
             domains.push({ id: `ntunnel:${appId}`, hostname: hostnameOf(named), kind: "tunnel", enabled: true });

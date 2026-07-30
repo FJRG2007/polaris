@@ -31,13 +31,13 @@ import {
     SERVICE_TYPES,
     ServiceIcon,
     dbTone,
-    primaryDomain,
     serviceKindOf,
     type ProjectApp,
     type ProjectSummary,
     type ServiceKind,
     type ServiceView
 } from "./deploy-view";
+import { primaryDomain } from "./domain-rank";
 import { deleteApplicationAction, duplicateApplicationAction, saveLayoutAction } from "./actions";
 import { NewVolumeDialog, EditVolumeDialog, type EditVolume } from "./volume-form";
 

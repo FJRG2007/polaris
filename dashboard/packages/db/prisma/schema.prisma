@@ -1450,6 +1450,11 @@ model Deployment {
     // Commit author (GitHub), resolved at deploy time for the deployment avatar.
     authorName      String?
     authorAvatarUrl String?
+    // True when this release was deployed into a project of its own so it could
+    // stand beside the ones around it (see keepReleases). Recorded rather than
+    // derived, because it decides which container and port serve this release -
+    // and that must not change under it when the setting is turned off later.
+    isolated       Boolean   @default(false)
     // Relative path (under the deploy dir) of the streamed build/deploy log file.
     logPath        String?
     triggeredById  String?   @db.Uuid
@@ -1469,8 +1474,13 @@ model Domain {
     applicationId String   @db.Uuid
     hostname      String   @unique
     // auto (free sslip.io/traefik.me, or a zone name derived from the service) |
-    // random (an unguessable name minted in a zone) | lan | custom | duckdns
+    // random (an unguessable name minted in a zone) | lan | custom | duckdns |
+    // release (one build's own hostname, alongside the service's own address)
     kind          String   @default("auto")
+    // Set only on a "release" hostname: the deployment it serves, so it keeps
+    // answering from that build while the service's own domains follow whichever
+    // release is current. Soft pointer (no FK), like Deployment.deployableId.
+    deploymentId  String?  @db.Uuid
     targetPort    Int
     https         Boolean  @default(true)
     // When off, the hostname stops serving the app (its route is dropped) but the
@@ -1493,6 +1503,7 @@ model Domain {
     application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
 
     @@index([applicationId])
+    @@index([deploymentId])
 }
 
 // Environment variable or secret, scoped to an application or an environment.

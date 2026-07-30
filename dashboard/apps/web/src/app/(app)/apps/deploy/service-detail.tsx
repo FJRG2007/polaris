@@ -49,7 +49,8 @@ import {
 } from "@polaris/ui";
 import { isTunnelHostname } from "@polaris/core";
 import { CloudflareMark, NgrokMark } from "@/components/brand-icons";
-import { ServiceIcon, StatusPill, dbTone, isLocalDomain, primaryDomain, serviceKindOf, type ProjectApp } from "./deploy-view";
+import { ServiceIcon, StatusPill, dbTone, serviceKindOf, type ProjectApp } from "./deploy-view";
+import { isLocalDomain, primaryDomain } from "./domain-rank";
 import { MetricsHistory, percent, type MetricSpec } from "@/components/metrics-history";
 import { LogViewer } from "@/components/log-viewer";
 import type { HttpLogEntry } from "@polaris/deploy";
@@ -57,40 +58,7 @@ import { TerminalPanel } from "./terminal-panel";
 import { FilesPanel } from "./files-panel";
 import { VolumesTab } from "./volumes-panel";
 import { WafEditor } from "./waf-editor";
-import {
-    addDomainAction,
-    autoExposeAction,
-    deployZonesAction,
-    duckdnsSubdomainAction,
-    deleteEnvVarAction,
-    deployApplicationAction,
-    importEnvVarsAction,
-    listDeployServersAction,
-    listDeploymentsAction,
-    listEnvVarsAction,
-    setAppServerAction,
-    removeApplicationDeploymentAction,
-    removeDomainAction,
-    restartApplicationAction,
-    revealEnvVarAction,
-    saveEnvVarAction,
-    setAppPortAction,
-    setApplicationRunningAction,
-    setAutoDeployAction,
-    setDomainEnabledAction,
-    quickTunnelStatusAction,
-    startQuickTunnelAction,
-    stopQuickTunnelAction,
-    namedTunnelStatusAction,
-    startNamedTunnelAction,
-    stopNamedTunnelAction,
-    setNamedTunnelEnabledAction,
-    provisionNamedTunnelAction,
-    cloudflareAccountStatusAction,
-    ngrokTunnelStatusAction,
-    startNgrokTunnelAction,
-    stopNgrokTunnelAction,
-} from "./actions";
+import * as deployActions from "./actions";
 
 const TABS = ["Deployments", "Variables", "Metrics", "Console", "Files", "Volumes", "Security", "Settings"] as const;
 type Tab = (typeof TABS)[number];
@@ -164,7 +132,7 @@ export function ServiceDetail({ app, onChanged, onClose }: { app: ProjectApp; on
     );
 }
 
-type DepSummary = Awaited<ReturnType<typeof listDeploymentsAction>>[number];
+type DepSummary = Awaited<ReturnType<typeof deployActions.listDeploymentsAction>>[number];
 
 function relativeTime(iso: string): string {
     const minutes = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
@@ -221,6 +189,25 @@ function deploySubtitle(deployment: DepSummary, app: ProjectApp): string {
     return `${relativeTime(deployment.createdAt)}${by} via ${sourceLabel(app)}`;
 }
 
+/** The address one kept version answers on, beside the service's own. Only a
+ *  version that is still up has one, so there is never a link to nothing. */
+function ReleaseLink({ deployment }: { deployment: DepSummary }) {
+    if (!deployment.hostname) return null;
+    return (
+        <a
+            href={`https://${deployment.hostname}`}
+            target="_blank"
+            rel="noreferrer"
+            onClick={(event) => event.stopPropagation()}
+            aria-label={`Open this version at ${deployment.hostname}`}
+            title={deployment.hostname}
+            className="shrink-0 rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        >
+            <ExternalLink className="size-4" />
+        </a>
+    );
+}
+
 /** The per-deployment overflow menu: redeploy, restart, enable/disable, remove. */
 function DeploymentMenu({
     app,
@@ -259,15 +246,15 @@ function DeploymentMenu({
                 </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" onClick={(event) => event.stopPropagation()}>
-                <DropdownMenuItem onSelect={() => run(() => deployApplicationAction(app.id))}>
+                <DropdownMenuItem onSelect={() => run(() => deployActions.deployApplicationAction(app.id))}>
                     <RotateCw className="size-4" /> Redeploy
                 </DropdownMenuItem>
                 {isActive && (
                     <>
-                        <DropdownMenuItem onSelect={() => run(() => restartApplicationAction(app.id))}>
+                        <DropdownMenuItem onSelect={() => run(() => deployActions.restartApplicationAction(app.id))}>
                             <RotateCw className="size-4" /> Restart
                         </DropdownMenuItem>
-                        <DropdownMenuItem onSelect={() => run(() => setApplicationRunningAction(app.id, stopped))}>
+                        <DropdownMenuItem onSelect={() => run(() => deployActions.setApplicationRunningAction(app.id, stopped))}>
                             {stopped ? <Play className="size-4" /> : <Square className="size-4" />}
                             {stopped ? "Enable" : "Disable"}
                         </DropdownMenuItem>
@@ -276,7 +263,7 @@ function DeploymentMenu({
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                     className="text-danger focus:text-danger"
-                    onSelect={() => run(() => removeApplicationDeploymentAction(app.id))}
+                    onSelect={() => run(() => deployActions.removeApplicationDeploymentAction(app.id))}
                 >
                     <Trash2 className="size-4" /> Remove
                 </DropdownMenuItem>
@@ -293,7 +280,7 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
     const [busy, startTransition] = useTransition();
 
     function reload() {
-        void listDeploymentsAction(app.id).then(setItems);
+        void deployActions.listDeploymentsAction(app.id).then(setItems);
     }
     useEffect(reload, [app.id]);
 
@@ -310,7 +297,7 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
     function deploy() {
         startTransition(async () => {
             try {
-                const result = await deployApplicationAction(app.id);
+                const result = await deployActions.deployApplicationAction(app.id);
                 if (result.deploymentId) setLogsFor(result.deploymentId);
                 reload();
                 onChanged();
@@ -412,6 +399,7 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
                                 >
                                     View logs
                                 </Button>
+                                <ReleaseLink deployment={active} />
                                 <DeploymentMenu app={app} deployment={active} onAct={reload} onChanged={onChanged} />
                             </div>
                             <button
@@ -475,6 +463,7 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
                                                     <p className="truncate font-medium text-foreground">{depTitle(deployment)}</p>
                                                     <p className="truncate text-xs text-muted-foreground">{deploySubtitle(deployment, app)}</p>
                                                 </div>
+                                                <ReleaseLink deployment={deployment} />
                                                 <DeploymentMenu app={app} deployment={deployment} onAct={reload} onChanged={onChanged} />
                                             </li>
                                         );
@@ -1003,7 +992,7 @@ function HttpLogsView({ appId, deploymentStart }: { appId: string; deploymentSta
 function VariablesTab({ app }: { app: ProjectApp }) {
     const [scope, setScope] = useState<"application" | "environment">("application");
     const scopeId = scope === "application" ? app.id : app.environmentId;
-    const [items, setItems] = useState<Awaited<ReturnType<typeof listEnvVarsAction>> | null>(null);
+    const [items, setItems] = useState<Awaited<ReturnType<typeof deployActions.listEnvVarsAction>> | null>(null);
     const [key, setKey] = useState("");
     const [value, setValue] = useState("");
     const [isSecret, setIsSecret] = useState(true);
@@ -1020,7 +1009,7 @@ function VariablesTab({ app }: { app: ProjectApp }) {
     function reload() {
         setItems(null);
         setRevealed({});
-        void listEnvVarsAction(scope, scopeId).then(setItems);
+        void deployActions.listEnvVarsAction(scope, scopeId).then(setItems);
     }
     useEffect(reload, [scope, scopeId]);
 
@@ -1037,7 +1026,7 @@ function VariablesTab({ app }: { app: ProjectApp }) {
             setRevealed((prev) => ({ ...prev, [item.id]: item.value ?? "" }));
             return;
         }
-        void revealEnvVarAction(item.id).then((result) => {
+        void deployActions.revealEnvVarAction(item.id).then((result) => {
             if (typeof result.value === "string") setRevealed((prev) => ({ ...prev, [item.id]: result.value as string }));
         });
     }
@@ -1046,7 +1035,7 @@ function VariablesTab({ app }: { app: ProjectApp }) {
         setError(null);
         setNote(null);
         startTransition(async () => {
-            const result = await importEnvVarsAction({ scope, scopeId, text: raw, isSecret: true });
+            const result = await deployActions.importEnvVarsAction({ scope, scopeId, text: raw, isSecret: true });
             if (result.error) setError(result.error);
             else {
                 setRaw("");
@@ -1060,7 +1049,7 @@ function VariablesTab({ app }: { app: ProjectApp }) {
     function add() {
         setError(null);
         startTransition(async () => {
-            const result = await saveEnvVarAction({ scope, scopeId, key, value, isSecret });
+            const result = await deployActions.saveEnvVarAction({ scope, scopeId, key, value, isSecret });
             if (result.error) {
                 setError(result.error);
                 return;
@@ -1180,7 +1169,7 @@ function VariablesTab({ app }: { app: ProjectApp }) {
                                 <button
                                     type="button"
                                     title="Remove"
-                                    onClick={() => startTransition(async () => { await deleteEnvVarAction(item.id); reload(); })}
+                                    onClick={() => startTransition(async () => { await deployActions.deleteEnvVarAction(item.id); reload(); })}
                                     className="text-muted-foreground opacity-0 transition-opacity hover:text-danger group-hover:opacity-100"
                                 >
                                     <Trash2 className="size-4" />
@@ -1427,10 +1416,10 @@ function ExposureRow({
 
 /** The app's Cloudflare quick tunnel, shown when running. Refetches on `nonce` change. */
 function QuickTunnelRow({ appId, nonce, onChanged }: { appId: string; nonce: number; onChanged: () => void }) {
-    const [status, setStatus] = useState<Awaited<ReturnType<typeof quickTunnelStatusAction>> | null>(null);
+    const [status, setStatus] = useState<Awaited<ReturnType<typeof deployActions.quickTunnelStatusAction>> | null>(null);
     const [pending, startTransition] = useTransition();
     useEffect(() => {
-        void quickTunnelStatusAction(appId).then(setStatus).catch(() => undefined);
+        void deployActions.quickTunnelStatusAction(appId).then(setStatus).catch(() => undefined);
     }, [appId, nonce]);
     if (!status?.running) return null;
     return (
@@ -1445,7 +1434,7 @@ function QuickTunnelRow({ appId, nonce, onChanged }: { appId: string; nonce: num
             pending={pending}
             onToggle={() =>
                 startTransition(async () => {
-                    await stopQuickTunnelAction(appId).catch(() => undefined);
+                    await deployActions.stopQuickTunnelAction(appId).catch(() => undefined);
                     onChanged();
                 })
             }
@@ -1455,10 +1444,10 @@ function QuickTunnelRow({ appId, nonce, onChanged }: { appId: string; nonce: num
 
 /** The app's ngrok tunnel, shown when running. */
 function NgrokTunnelRow({ appId, nonce, onChanged }: { appId: string; nonce: number; onChanged: () => void }) {
-    const [status, setStatus] = useState<Awaited<ReturnType<typeof ngrokTunnelStatusAction>> | null>(null);
+    const [status, setStatus] = useState<Awaited<ReturnType<typeof deployActions.ngrokTunnelStatusAction>> | null>(null);
     const [pending, startTransition] = useTransition();
     useEffect(() => {
-        void ngrokTunnelStatusAction(appId).then(setStatus).catch(() => undefined);
+        void deployActions.ngrokTunnelStatusAction(appId).then(setStatus).catch(() => undefined);
     }, [appId, nonce]);
     if (!status?.running) return null;
     return (
@@ -1471,7 +1460,7 @@ function NgrokTunnelRow({ appId, nonce, onChanged }: { appId: string; nonce: num
             pending={pending}
             onToggle={() =>
                 startTransition(async () => {
-                    await stopNgrokTunnelAction(appId).catch(() => undefined);
+                    await deployActions.stopNgrokTunnelAction(appId).catch(() => undefined);
                     onChanged();
                 })
             }
@@ -1482,10 +1471,10 @@ function NgrokTunnelRow({ appId, nonce, onChanged }: { appId: string; nonce: num
 
 /** The app's Cloudflare named tunnel (stable hostname), shown when configured. */
 function NamedTunnelRow({ appId, nonce, onChanged }: { appId: string; nonce: number; onChanged: () => void }) {
-    const [status, setStatus] = useState<Awaited<ReturnType<typeof namedTunnelStatusAction>> | null>(null);
+    const [status, setStatus] = useState<Awaited<ReturnType<typeof deployActions.namedTunnelStatusAction>> | null>(null);
     const [pending, startTransition] = useTransition();
     useEffect(() => {
-        void namedTunnelStatusAction(appId).then(setStatus).catch(() => undefined);
+        void deployActions.namedTunnelStatusAction(appId).then(setStatus).catch(() => undefined);
     }, [appId, nonce]);
     if (!status?.configured || !status.hostname) return null;
     const enabled = status.enabled;
@@ -1499,13 +1488,13 @@ function NamedTunnelRow({ appId, nonce, onChanged }: { appId: string; nonce: num
             pending={pending}
             onToggle={(next) =>
                 startTransition(async () => {
-                    await setNamedTunnelEnabledAction({ applicationId: appId, enabled: next }).catch(() => undefined);
+                    await deployActions.setNamedTunnelEnabledAction({ applicationId: appId, enabled: next }).catch(() => undefined);
                     onChanged();
                 })
             }
             onRemove={() =>
                 startTransition(async () => {
-                    await stopNamedTunnelAction(appId).catch(() => undefined);
+                    await deployActions.stopNamedTunnelAction(appId).catch(() => undefined);
                     onChanged();
                 })
             }
@@ -1574,14 +1563,14 @@ function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
     const [pending, startTransition] = useTransition();
 
     useEffect(() => {
-        void cloudflareAccountStatusAction().then((status) => setCfConnected(status.connected)).catch(() => undefined);
-        void duckdnsSubdomainAction().then((result) => setDuckSub(result.subdomain)).catch(() => undefined);
+        void deployActions.cloudflareAccountStatusAction().then((status) => setCfConnected(status.connected)).catch(() => undefined);
+        void deployActions.duckdnsSubdomainAction().then((result) => setDuckSub(result.subdomain)).catch(() => undefined);
         // The zones belong to the Polaris host: their wildcard points here, so an app
         // on a remote server would be offered a hostname that resolves to the wrong
         // machine (and the server would ignore it anyway). Those keep their own
         // server's domain instead.
         if (app.serverId !== "local") return;
-        void deployZonesAction()
+        void deployActions.deployZonesAction()
             .then((result) => {
                 setZones(result);
                 // A configured domain is the best default: it is the only option that
@@ -1603,13 +1592,13 @@ function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
         startTransition(async () => {
             const portValue = Number(containerPort.trim());
             if (Number.isInteger(portValue) && portValue > 0) {
-                const portResult = await setAppPortAction(app.id, portValue);
+                const portResult = await deployActions.setAppPortAction(app.id, portValue);
                 if (portResult.error) {
                     setError(portResult.error);
                     return;
                 }
             }
-            const result = await setAutoDeployAction({
+            const result = await deployActions.setAutoDeployAction({
                 applicationId: app.id,
                 autoDeploy,
                 deployBranch: branch.trim() || undefined,
@@ -1647,7 +1636,7 @@ function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
         return app.port ?? (app.sourceType === "image" ? 80 : 3000);
     }
 
-    // One action for every exposure: domains go through addDomainAction, the three
+    // One action for every exposure: domains go through deployActions.addDomainAction, the three
     // tunnel kinds through their own start/provision actions. Tunnel results show up
     // in the list above via the row components once the nonce bumps.
     function submitExposure() {
@@ -1656,7 +1645,7 @@ function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
         startTransition(async () => {
             let result: { error?: string } = {};
             if (exposure === "zone") {
-                result = await addDomainAction({
+                result = await deployActions.addDomainAction({
                     applicationId: app.id,
                     targetPort: targetPort(),
                     zoneLabel: zoneLabel ?? zones[0]?.label ?? "",
@@ -1665,27 +1654,27 @@ function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
             } else if (exposure === "subdomain") {
                 // Auto = always reachable: a universally-resolvable sslip.io LAN name,
                 // plus a free Cloudflare quick tunnel for public access when behind NAT.
-                result = await autoExposeAction({ applicationId: app.id, targetPort: targetPort() });
+                result = await deployActions.autoExposeAction({ applicationId: app.id, targetPort: targetPort() });
             } else if (exposure === "local") {
-                result = await addDomainAction({ applicationId: app.id, hostname: `${labelValue}.plr.local`, targetPort: targetPort(), cert: "internal" });
+                result = await deployActions.addDomainAction({ applicationId: app.id, hostname: `${labelValue}.plr.local`, targetPort: targetPort(), cert: "internal" });
             } else if (exposure === "duckdns") {
                 if (!duckSub) {
                     setError("Configure DuckDNS under Integrations first");
                     return;
                 }
-                result = await addDomainAction({ applicationId: app.id, hostname: `${labelValue}.${duckSub}.duckdns.org`, targetPort: targetPort(), cert: "le" });
+                result = await deployActions.addDomainAction({ applicationId: app.id, hostname: `${labelValue}.${duckSub}.duckdns.org`, targetPort: targetPort(), cert: "le" });
             } else if (exposure === "le") {
-                result = await addDomainAction({ applicationId: app.id, hostname: hostname.trim() || undefined, targetPort: targetPort(), cert: "le" });
+                result = await deployActions.addDomainAction({ applicationId: app.id, hostname: hostname.trim() || undefined, targetPort: targetPort(), cert: "le" });
             } else if (exposure === "proxy") {
-                result = await addDomainAction({ applicationId: app.id, hostname: hostname.trim() || undefined, targetPort: targetPort(), cert: "none" });
+                result = await deployActions.addDomainAction({ applicationId: app.id, hostname: hostname.trim() || undefined, targetPort: targetPort(), cert: "none" });
             } else if (exposure === "cf-named") {
                 result = cfConnected
-                    ? await provisionNamedTunnelAction({ applicationId: app.id, hostname })
-                    : await startNamedTunnelAction({ applicationId: app.id, token: connectorToken, hostname });
+                    ? await deployActions.provisionNamedTunnelAction({ applicationId: app.id, hostname })
+                    : await deployActions.startNamedTunnelAction({ applicationId: app.id, token: connectorToken, hostname });
             } else if (exposure === "cf-quick") {
-                result = await startQuickTunnelAction(app.id);
+                result = await deployActions.startQuickTunnelAction(app.id);
             } else if (exposure === "ngrok") {
-                result = await startNgrokTunnelAction(app.id);
+                result = await deployActions.startNgrokTunnelAction(app.id);
             }
             if (result.error) setError(result.error);
             else {
@@ -1801,14 +1790,14 @@ function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
                             )}
                             <Switch
                                 checked={domain.enabled}
-                                onChange={(next) => startTransition(async () => { await setDomainEnabledAction(domain.id, next); onChanged(); })}
+                                onChange={(next) => startTransition(async () => { await deployActions.setDomainEnabledAction(domain.id, next); onChanged(); })}
                                 aria-label={domain.enabled ? "Disable domain" : "Enable domain"}
                             />
                             <span className="flex w-5 shrink-0 items-center justify-center">
                                 <button
                                     type="button"
                                     title="Remove domain"
-                                    onClick={() => startTransition(async () => { await removeDomainAction(domain.id); onChanged(); })}
+                                    onClick={() => startTransition(async () => { await deployActions.removeDomainAction(domain.id); onChanged(); })}
                                     className="text-muted-foreground opacity-0 transition-opacity hover:text-danger group-hover:opacity-100"
                                 >
                                     <Trash2 className="size-3.5" />
@@ -1978,7 +1967,9 @@ function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
                     <span>
                         <span className="font-medium">Keep previous deployments</span>
                         <span className="block text-xs text-muted-foreground">
-                            Keep old versions running instead of replacing them on each deploy. Off by default.
+                            Keep the last few versions running, each on its own address, while this
+                            service&apos;s own address stays on the newest. A service with a volume or on
+                            another server keeps the history but not the containers.
                         </span>
                     </span>
                     <Switch checked={keepReleases} onChange={setKeepReleases} aria-label="Keep previous deployments" />
@@ -2004,7 +1995,7 @@ function ServerSection({ app, onChanged }: { app: ProjectApp; onChanged: () => v
     const [pending, startTransition] = useTransition();
 
     useEffect(() => {
-        void listDeployServersAction()
+        void deployActions.listDeployServersAction()
             .then((list) => setServers(list))
             .catch(() => undefined);
     }, []);
@@ -2014,7 +2005,7 @@ function ServerSection({ app, onChanged }: { app: ProjectApp; onChanged: () => v
     function move() {
         setError(null);
         startTransition(async () => {
-            const result = await setAppServerAction(app.id, serverId);
+            const result = await deployActions.setAppServerAction(app.id, serverId);
             if (result.error) setError(result.error);
             else onChanged();
         });

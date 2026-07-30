@@ -12,10 +12,11 @@ import { join } from "node:path";
 import { loadEnv } from "@polaris/config";
 import { isTunnelHostname } from "@polaris/core";
 import { prisma } from "@polaris/db";
-import { bucketHttpMetrics, parseHttpLogs, serviceName, shortHash, slugify, type AppDeployPlan, type DeployResult, type HttpLogEntry, type HttpMetricPoint, type RuntimeContext, type RuntimeDriver } from "@polaris/deploy";
+import { bucketHttpMetrics, parseHttpLogs, releaseDomain, shortHash, slugify, type AppDeployPlan, type DeployResult, type HttpLogEntry, type HttpMetricPoint, type RuntimeContext, type RuntimeDriver } from "@polaris/deploy";
 import { decryptSecret } from "@polaris/storage";
 import { resolveMountTarget } from "./storage-service";
 import { getDriver, getPorts, toTargetInfo, type TargetRow } from "./deploy/runtime";
+import { KEPT_RELEASES, currentReleaseRef, keepsReleases, portSubject, releaseMarker, releaseRef, serviceRef } from "./deploy/releases";
 import { LocalRouter, type AppRoute } from "./deploy/router";
 import { getOrCreateHostTarget, getOrCreateLocalTarget } from "./deploy-target-service";
 import { getPublicIp } from "./domain-service";
@@ -212,9 +213,26 @@ async function findRandomDomain(
 }
 
 /**
- * Attach a domain to an application. With no hostname a free auto subdomain is
- * generated (Traefik + Let's Encrypt serves it); the routing labels take effect
- * on the next deploy. Returns the hostname.
+ * The free subdomain this app was already given, if any. "auto" and "lan" are the
+ * two shapes the generator produces (public name vs LAN-only name), and an app
+ * holds at most one - it is the address the service is known by.
+ */
+async function findAutoDomain(
+    applicationId: string
+): Promise<{ id: string; hostname: string; targetPort: number; certResolver: string } | null> {
+    return prisma.domain.findFirst({
+        where: { applicationId, kind: { in: ["auto", "lan"] } },
+        orderBy: { createdAt: "asc" },
+        select: { id: true, hostname: true, targetPort: true, certResolver: true }
+    });
+}
+
+/**
+ * Attach a domain to an application. With no hostname the app's free auto
+ * subdomain is used - minted the first time and reused unchanged after that, so a
+ * redeploy never moves the service to a different address (Traefik + Let's Encrypt
+ * serves it); the routing labels take effect on the next deploy. Returns the
+ * hostname.
  */
 export async function addApplicationDomain(
     applicationId: string,
@@ -292,6 +310,25 @@ export async function addApplicationDomain(
         if (!opts.cert) certResolver = "le";
     }
     if (!hostname) {
+        // The free subdomain an app already holds is the address people have saved,
+        // linked and bookmarked, so it is minted ONCE and reused from then on. The
+        // resolution below reads live network state (public IP, mode, whether a zone
+        // has been proven), all of which move over an install's life - re-deriving it
+        // on a later deploy would hand the same service a second, different name and
+        // quietly change what it answers on. Port and certificate still follow what
+        // the caller asked for, as when a random name is reused.
+        const pinned = await findAutoDomain(applicationId);
+        if (pinned) {
+            const wantedCert = opts.cert ?? pinned.certResolver;
+            if (pinned.targetPort !== opts.targetPort || pinned.certResolver !== wantedCert) {
+                await prisma.domain.update({
+                    where: { id: pinned.id },
+                    data: { targetPort: opts.targetPort, certResolver: wantedCert }
+                });
+                await syncAppRoutes().catch(() => undefined);
+            }
+            return pinned.hostname;
+        }
         // The network mode decides the auto domain: a wildcard/public setup mints a
         // real internet-reachable name with Let's Encrypt; otherwise a LAN-only
         // sslip.io name (kind "lan") - so the app never gets a subdomain that
@@ -374,6 +411,22 @@ export async function addApplicationDomain(
  * next phase, so those domains are not routed through the local edge here - they
  * are logged instead of being silently funnelled through Polaris (a SPOF).
  */
+/**
+ * What a hostname's port is derived from. A release hostname keeps pointing at the
+ * build it names, for as long as that build is kept. The service's own domains
+ * follow whichever release is current - which is how the address stays put while
+ * what answers on it moves - and fall back to the service itself for a service
+ * that does not keep its releases side by side.
+ */
+function dialTarget(
+    domain: { applicationId: string; deploymentId: string | null; application: { currentDeploymentId: string | null } },
+    isolated: ReadonlySet<string>
+): string {
+    if (domain.deploymentId) return domain.deploymentId;
+    const current = domain.application.currentDeploymentId;
+    return portSubject(domain.applicationId, current ? { id: current, isolated: isolated.has(current) } : null);
+}
+
 export async function syncAppRoutes(): Promise<void> {
     const domains = await prisma.domain.findMany({
         where: { enabled: true },
@@ -382,9 +435,23 @@ export async function syncAppRoutes(): Promise<void> {
             hostname: true,
             certResolver: true,
             applicationId: true,
-            application: { select: { target: { select: { kind: true } } } }
+            deploymentId: true,
+            application: { select: { target: { select: { kind: true } }, currentDeploymentId: true } }
         }
     });
+    // Which of the serving releases run in a project of their own, and so publish on
+    // a port of their own. One query for the whole edge rather than one per domain.
+    const isolated = new Set(
+        (
+            await prisma.deployment.findMany({
+                where: {
+                    isolated: true,
+                    id: { in: domains.map((domain) => domain.application.currentDeploymentId).filter((id) => id !== null) }
+                },
+                select: { id: true }
+            })
+        ).map((deployment) => deployment.id)
+    );
     const localIp = await getPublicIp();
     const localDomains = domains.filter((domain) => domain.application.target.kind === "local");
     // Served by the remote server's own edge (per-server edge, phase 2).
@@ -419,7 +486,7 @@ export async function syncAppRoutes(): Promise<void> {
                 hostname: domain.hostname,
                 certResolver: domain.certResolver,
                 dialHost: localIp,
-                dialPort: hostPortForApp(domain.applicationId),
+                dialPort: hostPortForApp(dialTarget(domain, isolated)),
                 allowLists: rule.allowLists,
                 deny: rule.deny,
                 requireLogin: rule.requireLogin
@@ -553,7 +620,9 @@ export async function reconcileNasMounts(): Promise<void> {
             // Only after a mount had to be re-created (a reboot) does the running
             // container hold a stale bind; restart it so the bind re-resolves.
             if (recreated) {
-                const container = serviceName(app.environment.project.slug, app.slug, app.id);
+                // A service with a NAS volume never runs its releases side by side, so
+                // its own container name is the one serving it.
+                const container = serviceRef(app.environment.project.slug, app.slug, app.id).name;
                 await ports.container(container, "restart");
                 console.log(`polaris: re-established NAS mount for ${app.slug} and restarted it`);
             }
@@ -567,16 +636,16 @@ export async function reconcileNasMounts(): Promise<void> {
 
 // --- deployment lifecycle (restart / disable / remove) ----------------------
 
-/** Resolve an app to its runtime container ref, compose project, and target. */
+/** Resolve an app to the container ref of the release currently serving it, its
+ *  compose project, and its target. */
 async function appRuntime(applicationId: string, ownerId: string) {
     const app = await prisma.application.findFirst({
         where: { id: applicationId, environment: { project: { ownerId } } },
-        include: { environment: { include: { project: true } }, target: true }
+        include: { environment: { include: { project: true } }, target: true, volumes: { select: { id: true } } }
     });
     if (!app) throw new Error("Application not found");
-    const container = serviceName(app.environment.project.slug, app.slug, app.id);
-    const project = `polaris-${shortHash(app.id, 8)}`;
-    return { app, container, project, target: app.target as TargetRow };
+    const ref = await currentReleaseRef(app);
+    return { app, container: ref.name, project: ref.project, target: app.target as TargetRow };
 }
 
 /**
@@ -754,14 +823,17 @@ export async function setApplicationRunning(
  * The application config stays, so it can be deployed again later.
  */
 export async function removeApplicationDeployment(applicationId: string, ownerId: string): Promise<void> {
-    const { project, target } = await appRuntime(applicationId, ownerId);
+    const { app, target } = await appRuntime(applicationId, ownerId);
     const ports = await getPorts(target, ownerId);
     try {
-        if (target.runtime === "swarm") await ports.stackDown(project);
-        else await ports.composeDown(project);
+        // Every release, not only the current one: a service that keeps its history
+        // has a container per kept build, and leaving those up would keep serving a
+        // service the operator just removed.
+        await downAllReleases(app, ports, target.runtime === "swarm");
     } finally {
         await ports.dispose();
     }
+    await prisma.domain.deleteMany({ where: { applicationId, kind: "release" } });
     // Tear down the app's quick tunnel alongside its deployment: the cloudflared sidecar
     // now forwards to a container that is gone, so leaving it up leaks a live public URL
     // and an orphan liveness record the boot reconcile keeps revisiting. Only apps with a
@@ -849,11 +921,19 @@ export function hostPortForApp(id: string): number {
     return 20000 + (parseInt(shortHash(id, 4), 16) % 20000);
 }
 
-/** Build the runtime plan for an application from its stored config. */
+/**
+ * Build the runtime plan for an application from its stored config. Given the
+ * release being deployed, a service that keeps its history plans that build into
+ * its own project, on its own port, answering on its own hostname - so the release
+ * before it keeps running. The service's own domains are deliberately left off it:
+ * they follow whichever release is current, and the edge re-points them the moment
+ * this one is promoted.
+ */
 async function buildAppPlan(
     applicationId: string,
-    ownerId: string
-): Promise<{ plan: AppDeployPlan; target: TargetRow; gitSource?: GitSource }> {
+    ownerId: string,
+    release?: { id: string; commitSha: string | null }
+): Promise<{ plan: AppDeployPlan; target: TargetRow; gitSource?: GitSource; keepsHistory: boolean }> {
     const app = await prisma.application.findFirst({
         where: { id: applicationId, environment: { project: { ownerId } } },
         include: { environment: { include: { project: true } }, target: true, volumes: true, domains: true }
@@ -861,7 +941,9 @@ async function buildAppPlan(
     if (!app) throw new Error("Application not found");
 
     const project = app.environment.project;
-    const composeProject = `polaris-${shortHash(app.id, 8)}`;
+    const base = serviceRef(project.slug, app.slug, app.id);
+    const kept = release !== undefined && keepsReleases(app);
+    const ref = kept ? releaseRef(base, releaseMarker(release)) : base;
     const source = JSON.parse(app.sourceConfig) as Record<string, unknown>;
     const env = await mergedEnv(app.environmentId, app.id);
     // A locally-targeted messaging hub reaches the web's ingest over the dedicated
@@ -904,9 +986,12 @@ async function buildAppPlan(
     );
 
     const plan: AppDeployPlan = {
-        ref: { name: serviceName(project.slug, app.slug, app.id), project: composeProject },
+        ref,
         mounts,
-        expose: { host: hostPortForApp(app.id), container: containerPort },
+        // A kept release publishes on a port of its own, derived from the deployment
+        // rather than the app, so it does not fight the release it stands beside for
+        // the service's port.
+        expose: { host: hostPortForApp(kept ? release.id : app.id), container: containerPort },
         // When the user has not pinned a container port, the value above is a guess
         // (a domain's target port or a source default); let the runtime refine it from
         // the image's own exposed port so IP:port reaches a live socket, not a dead one.
@@ -926,9 +1011,11 @@ async function buildAppPlan(
         extraNetworks: isLocalHub ? [HUB_NETWORK] : undefined,
         waf,
         // Disabled domains keep their record but are left out of the plan so no route
-        // labels are emitted for them until they are turned back on.
+        // labels are emitted for them until they are turned back on. A kept release
+        // carries only its own hostname; the service's own domains are re-pointed at
+        // it by the edge on promote, so no two releases ever claim the same address.
         domains: app.domains
-            .filter((domain) => domain.enabled)
+            .filter((domain) => domain.enabled && (kept ? domain.deploymentId === release.id : domain.deploymentId === null))
             .map((domain) => ({
                 hostname: domain.hostname,
                 targetPort: domain.targetPort,
@@ -957,7 +1044,7 @@ async function buildAppPlan(
             if (authHeader) gitSource.authHeader = authHeader;
         }
     }
-    return { plan, target: app.target, gitSource };
+    return { plan, target: app.target, gitSource, keepsHistory: keepsReleases(app) };
 }
 
 /** Merge environment-scoped and application-scoped env vars (app wins), decrypting
@@ -1031,7 +1118,7 @@ export async function deployApplication(
     userId: string,
     meta?: { commitMessage?: string; commitSha?: string; authorName?: string; authorAvatarUrl?: string }
 ): Promise<string> {
-    const { plan, target, gitSource } = await buildAppPlan(applicationId, ownerId);
+    const { plan, target, gitSource, keepsHistory } = await buildAppPlan(applicationId, ownerId);
 
     // Resolve the commit + author so the deployment shows who shipped it, Railway-
     // style. The provided meta (webhook / poller) wins; otherwise resolve the branch
@@ -1065,14 +1152,27 @@ export async function deployApplication(
             commitMessage,
             commitSha,
             authorName,
-            authorAvatarUrl
+            authorAvatarUrl,
+            isolated: keepsHistory
         }
     });
+    // A service that keeps its history needs the release's own hostname and its own
+    // project before the plan is handed to the runtime, so the container comes up
+    // answering on it. Only that case pays for the second plan.
+    let planned = plan;
+    if (keepsHistory) {
+        const release = { id: deployment.id, commitSha };
+        await ensureReleaseDomain(applicationId, release).catch((error) => {
+            console.error("polaris: could not name this release:", error);
+            return null;
+        });
+        planned = (await buildAppPlan(applicationId, ownerId, release)).plan;
+    }
     // The app keeps pointing at the previous successful release until this one
     // actually succeeds (see executeDeployment) - so history never shows a build
     // as "current" before it finishes, and the old version stays active until the
     // new one is up (zero-downtime cutover, the way Railway does it).
-    queue.enqueue(target.id, () => runDeployment(deployment.id, plan, target, ownerId, gitSource));
+    queue.enqueue(target.id, () => runDeployment(deployment.id, planned, target, ownerId, gitSource));
     return deployment.id;
 }
 
@@ -1086,6 +1186,8 @@ export interface DeploymentSummary {
     commitSha: string | null;
     authorName: string | null;
     authorAvatarUrl: string | null;
+    /** The hostname this release answers on while it is kept, if it has one. */
+    hostname: string | null;
 }
 
 /** An application's deployment history, most recent first (owner-checked). */
@@ -1110,6 +1212,16 @@ export async function listDeployments(applicationId: string, ownerId: string): P
             authorAvatarUrl: true
         }
     });
+    // The hostname a kept release answers on. Only releases that are still up have
+    // one, so the rest of the history simply shows none rather than a dead link.
+    const hostnames = new Map(
+        (
+            await prisma.domain.findMany({
+                where: { applicationId, kind: "release", enabled: true, deploymentId: { in: rows.map((row) => row.id) } },
+                select: { hostname: true, deploymentId: true }
+            })
+        ).map((domain) => [domain.deploymentId, domain.hostname])
+    );
     return rows.map((row) => ({
         id: row.id,
         status: row.status,
@@ -1119,7 +1231,8 @@ export async function listDeployments(applicationId: string, ownerId: string): P
         commitMessage: row.commitMessage,
         commitSha: row.commitSha,
         authorName: row.authorName,
-        authorAvatarUrl: row.authorAvatarUrl
+        authorAvatarUrl: row.authorAvatarUrl,
+        hostname: hostnames.get(row.id) ?? null
     }));
 }
 
@@ -1169,18 +1282,17 @@ export async function setApplicationServer(applicationId: string, ownerId: strin
     if (newTarget.id === app.targetId) return;
 
     if (app.currentDeploymentId) {
-        const composeProject = `polaris-${shortHash(app.id, 8)}`;
         const oldTarget = app.target as TargetRow;
         const ports = await getPorts(oldTarget, ownerId);
         try {
-            if (oldTarget.runtime === "swarm") await ports.stackDown(composeProject);
-            else await ports.composeDown(composeProject);
+            await downAllReleases(app, ports, oldTarget.runtime === "swarm");
         } catch {
             // The old server may be unreachable; retarget anyway rather than trap
             // the app on a dead target.
         } finally {
             await ports.dispose();
         }
+        await prisma.domain.deleteMany({ where: { applicationId, kind: "release" } });
         await prisma.deployment.updateMany({
             where: { deployableType: "application", deployableId: applicationId, status: { in: ["running", "stopped"] } },
             data: { status: "removed", finishedAt: new Date() }
@@ -1210,6 +1322,54 @@ export async function updateAutoDeploy(
             commitFilter: settings.commitFilter?.trim() || null,
             ...(settings.keepReleases !== undefined ? { keepReleases: settings.keepReleases } : {})
         }
+    });
+    // Giving up the history leaves the older versions running with nothing pointing
+    // at them, so they come down and their hostnames go with them. The service's own
+    // address is untouched - the current release keeps serving it, and takes back the
+    // service's own container name on its next deploy.
+    if (settings.keepReleases === false && app.keepReleases) {
+        await releaseCurrentOnly(applicationId, ownerId).catch((error) => {
+            console.error("polaris: could not take the superseded releases down:", error);
+        });
+        await syncAppRoutes().catch(() => undefined);
+    }
+}
+
+/** Take down every release except the one currently serving, and forget their
+ *  hostnames. Used when a service stops keeping its history. */
+async function releaseCurrentOnly(applicationId: string, ownerId: string): Promise<void> {
+    const app = await prisma.application.findFirst({
+        where: { id: applicationId, environment: { project: { ownerId } } },
+        include: { environment: { include: { project: true } }, target: true }
+    });
+    if (!app) return;
+    const superseded = (
+        await prisma.deployment.findMany({
+            where: {
+                deployableType: "application",
+                deployableId: applicationId,
+                status: { in: ["running", "stopped"] },
+                isolated: true
+            },
+            select: { id: true, commitSha: true }
+        })
+    ).filter((release) => release.id !== app.currentDeploymentId);
+    if (superseded.length === 0) return;
+    const base = serviceRef(app.environment.project.slug, app.slug, app.id);
+    const ports = await getPorts(app.target as TargetRow, ownerId);
+    try {
+        for (const release of superseded) {
+            await ports.composeDown(releaseRef(base, releaseMarker(release)).project).catch(() => undefined);
+        }
+    } finally {
+        await ports.dispose().catch(() => undefined);
+    }
+    await prisma.domain.deleteMany({
+        where: { applicationId, kind: "release", deploymentId: { in: superseded.map((release) => release.id) } }
+    });
+    await prisma.deployment.updateMany({
+        where: { id: { in: superseded.map((release) => release.id) } },
+        data: { status: "removed", finishedAt: new Date() }
     });
 }
 
@@ -1303,6 +1463,17 @@ function runDeployment(
 }
 
 /**
+ * Forget the hostname a release was given when its deploy does not come up. The
+ * name is created before the build so the container can answer on it; a build that
+ * failed has nothing behind it, and leaving the record would list a dead link and
+ * keep the edge asking for a certificate nothing serves.
+ */
+async function dropReleaseDomain(deploymentId: string): Promise<void> {
+    const removed = await prisma.domain.deleteMany({ where: { deploymentId, kind: "release" } });
+    if (removed.count > 0) await syncAppRoutes().catch(() => undefined);
+}
+
+/**
  * The shared deploy runner used by application and database deploys: open the log
  * file, resolve the ports and driver for the target, run the caller's work with a
  * RuntimeContext streaming into that log, and record the final status. Exported so
@@ -1355,12 +1526,14 @@ export async function executeDeployment(
             }
         });
         if (result.ok) await promoteDeployment(deploymentId);
+        else await dropReleaseDomain(deploymentId);
     } catch (error) {
         log(Buffer.from(`\n[error] ${error instanceof Error ? error.message : String(error)}\n`));
         await prisma.deployment.update({
             where: { id: deploymentId },
             data: { status: "failed", error: error instanceof Error ? error.message : "deploy failed", finishedAt: new Date() }
         });
+        await dropReleaseDomain(deploymentId);
     } finally {
         await ports.dispose();
         logStream.end();
@@ -1373,6 +1546,10 @@ export async function executeDeployment(
  * marked "running" is superseded to "removed" - so the Deployments tab shows one
  * ACTIVE release over a REMOVED history, the way Railway does, instead of several
  * stale "running" rows. No-op for non-application deployables.
+ *
+ * Promoting is what moves the service's address: `syncAppRoutes` re-points the
+ * service's own domains at whichever release is current, so the address never
+ * changes even though what answers on it does.
  */
 async function promoteDeployment(deploymentId: string): Promise<void> {
     const dep = await prisma.deployment.findUnique({
@@ -1399,9 +1576,122 @@ async function promoteDeployment(deploymentId: string): Promise<void> {
         where: { id: dep.deployableId },
         data: { currentDeploymentId: deploymentId }
     });
+    await retireOldReleases(dep.deployableId).catch((error) => {
+        console.error("polaris: could not retire superseded releases:", error);
+    });
     // Refresh the edge routes so a domain whose first deploy just came up starts
     // serving, and any host-port change is reflected.
     await syncAppRoutes().catch(() => undefined);
+}
+
+/**
+ * Give this deployment the hostname it will answer on for as long as it is kept:
+ * the service's own address with the release marker added to it. Derived from the
+ * stored address rather than resolved afresh, so the release lands on the same
+ * base and the same certificate as the service itself.
+ *
+ * Returns null when there is nothing to derive from (no address yet) or the name
+ * would not fit - the deploy carries on, it simply has no release URL.
+ */
+async function ensureReleaseDomain(
+    applicationId: string,
+    release: { id: string; commitSha: string | null }
+): Promise<string | null> {
+    const stable = await prisma.domain.findFirst({
+        where: { applicationId, deploymentId: null, kind: { in: ["auto", "lan"] } },
+        orderBy: { createdAt: "asc" },
+        select: { hostname: true, targetPort: true, certResolver: true, pathPrefix: true }
+    });
+    if (!stable) return null;
+    const hostname = releaseDomain(stable.hostname, releaseMarker(release));
+    if (!hostname) return null;
+    // Re-deploying the same commit lands on the same hostname; point the existing
+    // record at the new build rather than failing on the unique hostname.
+    const existing = await prisma.domain.findUnique({ where: { hostname }, select: { id: true, applicationId: true } });
+    if (existing) {
+        if (existing.applicationId !== applicationId) return null;
+        await prisma.domain.update({
+            where: { id: existing.id },
+            data: { deploymentId: release.id, targetPort: stable.targetPort, certResolver: stable.certResolver }
+        });
+        return hostname;
+    }
+    await prisma.domain.create({
+        data: {
+            applicationId,
+            hostname,
+            kind: "release",
+            deploymentId: release.id,
+            targetPort: stable.targetPort,
+            certResolver: stable.certResolver,
+            pathPrefix: stable.pathPrefix
+        }
+    });
+    return hostname;
+}
+
+/**
+ * Tear down the releases that have fallen out of the kept window: their container
+ * goes, their hostname goes with it, and the row is marked removed. Without this a
+ * service that keeps history would accumulate a container and a certificate per
+ * commit until the host ran out of room. The current release is never a candidate.
+ */
+async function retireOldReleases(applicationId: string): Promise<void> {
+    const app = await prisma.application.findUnique({
+        where: { id: applicationId },
+        include: { environment: { include: { project: true } }, target: true }
+    });
+    const current = app?.currentDeploymentId
+        ? await prisma.deployment.findUnique({ where: { id: app.currentDeploymentId }, select: { isolated: true } })
+        : null;
+    if (!app || !current?.isolated) return;
+    const kept = await prisma.deployment.findMany({
+        where: { deployableType: "application", deployableId: applicationId, status: "running", isolated: true },
+        orderBy: { createdAt: "desc" },
+        select: { id: true, commitSha: true }
+    });
+    const retiring = kept.slice(KEPT_RELEASES).filter((release) => release.id !== app.currentDeploymentId);
+
+    const base = serviceRef(app.environment.project.slug, app.slug, app.id);
+    const ports = await getPorts(app.target as TargetRow, app.environment.project.ownerId);
+    try {
+        // The service's own project, left behind the first time it started keeping its
+        // releases apart. Nothing points at it any more, and it still holds the
+        // service's port; downing it is a no-op once it is empty.
+        await ports.composeDown(base.project).catch(() => undefined);
+        for (const release of retiring) {
+            await ports.composeDown(releaseRef(base, releaseMarker(release)).project).catch(() => undefined);
+            await prisma.domain.deleteMany({ where: { applicationId, deploymentId: release.id } });
+            await prisma.deployment.update({
+                where: { id: release.id },
+                data: { status: "removed", finishedAt: new Date() }
+            });
+        }
+    } finally {
+        await ports.dispose().catch(() => undefined);
+    }
+}
+
+/**
+ * Take every release of a service down, whichever project each one runs under.
+ * Used when the service itself is going away, moving server, or giving up its
+ * history - anything that leaves a container behind with nothing pointing at it.
+ */
+async function downAllReleases(
+    app: { id: string; slug: string; environment: { project: { slug: string } } },
+    ports: Awaited<ReturnType<typeof getPorts>>,
+    swarm: boolean
+): Promise<void> {
+    const base = serviceRef(app.environment.project.slug, app.slug, app.id);
+    const releases = await prisma.deployment.findMany({
+        where: { deployableType: "application", deployableId: app.id, status: { in: ["running", "stopped"] } },
+        select: { id: true, commitSha: true }
+    });
+    const projects = [base.project, ...releases.map((release) => releaseRef(base, releaseMarker(release)).project)];
+    for (const project of [...new Set(projects)]) {
+        if (swarm) await ports.stackDown(project).catch(() => undefined);
+        else await ports.composeDown(project).catch(() => undefined);
+    }
 }
 
 /** Enqueue a job serialized behind any prior job for the same target. */

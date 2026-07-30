@@ -43,18 +43,8 @@ import { DockerMark, GitHubMark } from "@/components/brand-icons";
 import { LogViewer } from "@/components/log-viewer";
 import { TerminalPanel } from "./terminal-panel";
 import { FilesPanel } from "./files-panel";
-import {
-    addDomainAction,
-    createApplicationAction,
-    createDatabaseAction,
-    deployApplicationAction,
-    deployDatabaseAction,
-    githubReposAction,
-    inspectRepoAction,
-    listDeployServersAction,
-    setAutoDeployAction,
-    setDomainEnabledAction
-} from "./actions";
+import { isLocalDomain, primaryDomain } from "./domain-rank";
+import * as deployActions from "./actions";
 
 const DB_ENGINES = ["postgres", "mysql", "mariadb", "mongo", "redis"] as const;
 
@@ -127,50 +117,6 @@ export interface ProjectSummary {
 }
 
 export type ServiceKind = "github" | "image" | "database";
-
-/** A domain as carried on an app (the shape shared by the card and service detail). */
-export type AppDomain = {
-    id: string;
-    hostname: string;
-    kind: string;
-    enabled: boolean;
-    healthStatus?: string;
-    healthCode?: number | null;
-    healthDetail?: string | null;
-};
-
-/** Whether a domain resolves only on the local network (a LAN-only exposure). */
-export function isLocalDomain(domain: AppDomain): boolean {
-    return domain.kind === "lan" || domain.hostname.toLowerCase().endsWith(".local");
-}
-
-/** Rank a domain by how stable and reachable it is: the operator's own custom
- *  domain beats a public tunnel, which beats a free public subdomain, which beats a
- *  LAN-only name; a disabled domain never wins. A tunnel is publicly reachable even
- *  behind NAT, so it outranks an sslip.io/auto name that only resolves on the LAN.
- *  Used to pick the one domain worth surfacing for a service. */
-function domainRank(domain: AppDomain): number {
-    if (!domain.enabled) return -1;
-    if (isLocalDomain(domain)) return 1;
-    if (domain.kind === "auto" || domain.hostname.toLowerCase().endsWith(".sslip.io")) return 2;
-    if (domain.kind === "tunnel") return 3;
-    if (domain.kind === "custom") return 4;
-    return 3;
-}
-
-/** The best domain to surface for an app (most stable + reachable), or null. */
-export function primaryDomain<T extends AppDomain>(domains: readonly T[]): T | null {
-    let best: T | null = null;
-    let bestRank = 0;
-    for (const domain of domains) {
-        const rank = domainRank(domain);
-        if (rank > bestRank) {
-            best = domain;
-            bestRank = rank;
-        }
-    }
-    return best;
-}
 
 /** The service kind an application's source maps to (for icons). */
 export function serviceKindOf(sourceType: string): ServiceKind {
@@ -265,7 +211,7 @@ function AppCard({
     function onDeploy() {
         setError(null);
         startTransition(async () => {
-            const result = await deployApplicationAction(app.id);
+            const result = await deployActions.deployApplicationAction(app.id);
             if (result.error) setError(result.error);
             else if (result.deploymentId) setLogsFor(result.deploymentId);
             onChanged();
@@ -421,7 +367,7 @@ function DatabaseCard({
                         disabled={pending}
                         onClick={() =>
                             startTransition(async () => {
-                                await deployDatabaseAction(database.id);
+                                await deployActions.deployDatabaseAction(database.id);
                                 onChanged();
                             })
                         }
@@ -563,7 +509,7 @@ function useDeployServers(): { servers: ServerOption[]; serverId: string; setSer
     const [servers, setServers] = useState<ServerOption[]>([]);
     const [serverId, setServerId] = useState("local");
     useEffect(() => {
-        void listDeployServersAction()
+        void deployActions.listDeployServersAction()
             .then((list) => {
                 setServers(list);
                 if (list[0]) setServerId(list[0].id);
@@ -599,7 +545,7 @@ function NewImageForm({ environmentId, onDone }: { environmentId: string; onDone
         setError(null);
         const parsedPort = Number(port.trim());
         startTransition(async () => {
-            const result = await createApplicationAction({
+            const result = await deployActions.createApplicationAction({
                 environmentId,
                 name,
                 sourceType: "image",
@@ -687,7 +633,7 @@ function NewGithubForm({ environmentId, onDone }: { environmentId: string; onDon
             return;
         }
         setLoading(true);
-        void githubReposAction()
+        void deployActions.githubReposAction()
             .then((result) => {
                 repoCache = result.repos;
                 repoCacheConnected = result.connected;
@@ -716,7 +662,7 @@ function NewGithubForm({ environmentId, onDone }: { environmentId: string; onDon
         setFramework(null);
         setInspecting(true);
         const [owner, repoName] = repo.fullName.split("/");
-        void inspectRepoAction({ owner: owner ?? "", repo: repoName ?? "", branch: repo.defaultBranch })
+        void deployActions.inspectRepoAction({ owner: owner ?? "", repo: repoName ?? "", branch: repo.defaultBranch })
             .then((inspection) => {
                 setBuilder(inspection.builder);
                 setDockerfilePath(inspection.dockerfile ?? "Dockerfile");
@@ -730,7 +676,7 @@ function NewGithubForm({ environmentId, onDone }: { environmentId: string; onDon
         setError(null);
         const repoUrl = usePicker ? `https://github.com/${repoFullName}` : manualUrl.trim();
         startTransition(async () => {
-            const result = await createApplicationAction({
+            const result = await deployActions.createApplicationAction({
                 environmentId,
                 name,
                 sourceType: builder,
@@ -880,7 +826,7 @@ function NewDatabaseForm({ environmentId, onDone }: { environmentId: string; onD
     function submit() {
         setError(null);
         startTransition(async () => {
-            const result = await createDatabaseAction({ environmentId, engine, name, serverId });
+            const result = await deployActions.createDatabaseAction({ environmentId, engine, name, serverId });
             if (result.error) setError(result.error);
             else onDone();
         });
@@ -929,7 +875,7 @@ function AutoDeployDialog({
     function submit() {
         setError(null);
         startTransition(async () => {
-            const result = await setAutoDeployAction({
+            const result = await deployActions.setAutoDeployAction({
                 applicationId: app.id,
                 autoDeploy: enabled,
                 deployBranch: branch.trim() || undefined,
@@ -1003,7 +949,7 @@ function DomainDialog({
     function submit() {
         setError(null);
         startTransition(async () => {
-            const result = await addDomainAction({
+            const result = await deployActions.addDomainAction({
                 applicationId: app.id,
                 hostname: hostname.trim() || undefined,
                 targetPort: Number(port)
@@ -1046,7 +992,7 @@ function DomainDialog({
                                         checked={domain.enabled}
                                         onChange={(next) =>
                                             startTransition(async () => {
-                                                await setDomainEnabledAction(domain.id, next);
+                                                await deployActions.setDomainEnabledAction(domain.id, next);
                                                 onChanged();
                                             })
                                         }

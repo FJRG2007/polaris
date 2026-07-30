@@ -30,8 +30,23 @@ describe("listActiveTunnelDomains", () => {
         });
         const domains = await listActiveTunnelDomains([APP]);
         expect(domains.get(APP)).toEqual([
-            { id: `qtunnel:${APP}`, hostname: "ronald-kent-leg-plate.trycloudflare.com", kind: "tunnel", enabled: true }
+            {
+                id: `qtunnel:${APP}`,
+                hostname: "ronald-kent-leg-plate.trycloudflare.com",
+                kind: "tunnel-temp",
+                enabled: true
+            }
         ]);
+    });
+
+    it("marks quick and ngrok tunnels as throwaway, and a named one as the service's", async () => {
+        settings({
+            [`deploy.qtunnel.${APP}`]: JSON.stringify({ url: "https://a.trycloudflare.com", startedAt: null }),
+            [`deploy.ngrok.${APP}`]: "https://abc123.ngrok-free.app",
+            [`deploy.ntunnel.${APP}.hostname`]: "app.example.com"
+        });
+        const domains = await listActiveTunnelDomains([APP]);
+        expect(domains.get(APP)?.map((domain) => domain.kind)).toEqual(["tunnel-temp", "tunnel-temp", "tunnel"]);
     });
 
     it("still reads an older plain-URL quick tunnel record", async () => {
