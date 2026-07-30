@@ -4,9 +4,10 @@
  * through better-auth's context - the same hasher sign-in verifies against - so
  * there is one source of truth for how passwords are stored. Changing what signs
  * in (the primary address) and the password both re-verify the current password
- * first; profile edits (name, username) do not touch credentials.
+ * first; profile edits (name, username, company) do not touch credentials.
  */
 
+import { companyField } from "@polaris/core";
 import { prisma } from "@polaris/db";
 import type { Auth } from "./auth.js";
 
@@ -27,12 +28,13 @@ async function verifyPassword(auth: Auth, userId: string, password: string): Pro
     return ctx.password.verify({ hash, password });
 }
 
-/** Update a user's own display name and/or username. Username must stay unique. */
+/** Update a user's own display name, username, and/or company. Username must
+ *  stay unique; company is free text and may be cleared. */
 export async function updateUserProfile(
     userId: string,
-    input: { name?: string; username?: string | null }
+    input: { name?: string; username?: string | null; company?: string | null }
 ): Promise<{ error?: string }> {
-    const data: { name?: string; username?: string | null } = {};
+    const data: { name?: string; username?: string | null; company?: string | null } = {};
     if (input.name !== undefined) {
         const name = input.name.trim();
         if (!name) return { error: "Name cannot be empty." };
@@ -51,6 +53,11 @@ export async function updateUserProfile(
             if (taken) return { error: "That username is already taken." };
         }
         data.username = username;
+    }
+    if (input.company !== undefined) {
+        const parsed = companyField.safeParse(input.company ?? "");
+        if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the company." };
+        data.company = parsed.data || null;
     }
     if (Object.keys(data).length > 0) await prisma.user.update({ where: { id: userId }, data });
     return {};

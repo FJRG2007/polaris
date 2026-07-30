@@ -1,12 +1,12 @@
 /**
- * Profile page (/account): the signed-in user's own name, username, and the
- * addresses on the account - the one that signs in, plus any alternates.
- * Credentials, sessions, network rules, and API keys each have their own page
- * under the same section. Server component that loads the editable fields and
- * hands them to the client view.
+ * Profile page (/account): the signed-in user's own name, username, company, and
+ * the ways they can be reached - the address that signs in, any alternates, and
+ * the phone number. Credentials, sessions, network rules, and API keys each have
+ * their own page under the same section. Server component that loads the
+ * editable fields and hands them to the client view.
  */
 
-import { listUserEmails } from "@polaris/auth";
+import { getUserPhone, listUserEmails } from "@polaris/auth";
 import { prisma } from "@polaris/db";
 import { requireUser } from "@/lib/session";
 import { getAuthMailStatus } from "@/lib/auth-mail";
@@ -16,13 +16,20 @@ export const dynamic = "force-dynamic";
 
 export default async function AccountPage() {
     const session = await requireUser();
-    const [user, emails, mail] = await Promise.all([
+    const [user, emails, mail, phone, whatsappChannel] = await Promise.all([
         prisma.user.findUnique({
             where: { id: session.id },
-            select: { name: true, username: true }
+            select: { name: true, username: true, company: true }
         }),
         listUserEmails(session.id),
-        getAuthMailStatus()
+        getAuthMailStatus(),
+        getUserPhone(session.id),
+        // Confirming a number is sent the same way a sign-in code is, so the card
+        // needs to know whether there is anything to send with.
+        prisma.channel.findFirst({
+            where: { ownerId: session.id, platform: "whatsapp", status: "connected" },
+            select: { id: true }
+        })
     ]);
 
     return (
@@ -34,8 +41,11 @@ export default async function AccountPage() {
             <AccountView
                 name={user?.name ?? session.name}
                 username={user?.username ?? ""}
+                company={user?.company ?? ""}
                 emails={emails}
                 mailReady={mail.channelId !== null}
+                phone={phone}
+                canSendWhatsApp={whatsappChannel !== null}
             />
         </div>
     );

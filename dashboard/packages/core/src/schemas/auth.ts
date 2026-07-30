@@ -19,6 +19,9 @@ export const passwordField = z
     .string()
     .min(10, "Use at least 10 characters")
     .max(256, "Too long");
+/** Long enough for a legal name, short enough that the field stays a label. */
+export const MAX_COMPANY_LENGTH = 80;
+export const companyField = z.string().trim().max(MAX_COMPANY_LENGTH, `At most ${MAX_COMPANY_LENGTH} characters`);
 
 export const loginSchema = z.object({
     // Email or username.

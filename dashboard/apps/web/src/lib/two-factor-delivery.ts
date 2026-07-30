@@ -94,7 +94,7 @@ async function whatsappDestination(userId: string): Promise<Resolution> {
             select: { id: true }
         })
     ]);
-    if (!phone?.verified) return { destination: null, blocker: "No confirmed phone number on your account." };
+    if (!phone?.verified) return { destination: null, blocker: "Confirm a phone number on your profile first." };
     if (!channel) return { destination: null, blocker: "None of your WhatsApp channels is connected." };
     return { destination: { address: phone.phone, channelId: channel.id }, blocker: null };
 }

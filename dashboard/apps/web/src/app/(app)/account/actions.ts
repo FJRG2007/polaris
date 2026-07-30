@@ -52,11 +52,13 @@ export async function verifyEmailAction(input: unknown): Promise<{ error?: strin
 export async function updateProfileAction(input: {
     name?: string;
     username?: string | null;
+    company?: string | null;
 }): Promise<{ error?: string }> {
     const user = await requireUser();
     const result = await updateUserProfile(user.id, {
         name: typeof input.name === "string" ? input.name : undefined,
-        username: input.username === undefined ? undefined : (input.username ?? "")
+        username: input.username === undefined ? undefined : (input.username ?? ""),
+        company: input.company === undefined ? undefined : (input.company ?? "")
     });
     if (!result.error) revalidatePath("/account");
     return result;

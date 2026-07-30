@@ -39,6 +39,8 @@ model User {
     username      String?  @unique
     emailVerified Boolean  @default(false)
     image         String?
+    // Free-text organisation the account belongs to; shown on the profile only.
+    company       String?
     // Owned by the better-auth two-factor plugin; flipped on once the user has
     // verified their authenticator, and back off when they disable it.
     twoFactorEnabled Boolean @default(false)

@@ -1,7 +1,8 @@
 "use client";
 
 /**
- * The phone number second-factor codes can be sent to.
+ * The account's phone number: a profile detail that doubles as the address a
+ * second-factor code is sent to.
  *
  * It is written down first and confirmed second, because a mistyped digit would
  * otherwise send codes to a stranger for as long as nobody noticed. The
@@ -32,8 +33,8 @@ import {
     sendPhoneCodeAction,
     setPhoneAction,
     verifyPhoneAction
-} from "./two-factor-actions";
-import { Feedback } from "./setting-card";
+} from "./security/two-factor-actions";
+import { Feedback } from "./security/setting-card";
 
 export function PhoneCard({ phone, canSend }: { phone: UserPhoneView | null; canSend: boolean }) {
     const router = useRouter();
@@ -75,8 +76,8 @@ export function PhoneCard({ phone, canSend }: { phone: UserPhoneView | null; can
                     <div className="min-w-0">
                         <h2 className="text-sm font-medium">Phone number</h2>
                         <p className="text-xs text-muted-foreground">
-                            Where a WhatsApp code goes. Confirmed through one of your own WhatsApp
-                            channels, which is what carries the codes too.
+                            Confirmed through one of your own WhatsApp channels, which is also what
+                            carries a sign-in code when you use one.
                         </p>
                     </div>
                     <div className="flex shrink-0 items-center gap-2">

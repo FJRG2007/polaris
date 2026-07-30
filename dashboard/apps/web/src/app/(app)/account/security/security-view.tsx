@@ -11,7 +11,6 @@
 import { useState } from "react";
 import { Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import type { UserPhoneView } from "@polaris/auth";
 import {
     IDLE_LOCK_CHOICES,
     SECURITY_QUESTION_COUNT,
@@ -27,7 +26,6 @@ import { RemovePinDialog, SetPinDialog } from "./pin-dialogs";
 import { ClearQuestionsDialog, SecurityQuestionsDialog } from "./questions-dialog";
 import { TwoFactorMethodsCard } from "./two-factor-methods-card";
 import { PasskeysCard } from "./passkeys-card";
-import { PhoneCard } from "./phone-card";
 import type { PasskeyView } from "./passkey-actions";
 import { Feedback, SettingCard } from "./setting-card";
 
@@ -48,8 +46,6 @@ export function SecurityView({
     twoFactorEnabled,
     questions,
     passkeys,
-    phone,
-    canSendWhatsApp,
     twoFactorMethods,
     twoFactorPreferred,
     otherSessions
@@ -61,8 +57,6 @@ export function SecurityView({
     twoFactorEnabled: boolean;
     questions: string[];
     passkeys: PasskeyView[];
-    phone: UserPhoneView | null;
-    canSendWhatsApp: boolean;
     twoFactorMethods: TwoFactorMethodStatus[];
     twoFactorPreferred: TwoFactorMethod;
     /** Open sessions other than this one, which is what a sign-in is approved from. */
@@ -122,7 +116,6 @@ export function SecurityView({
                 twoFactorEnabled={twoFactorEnabled}
                 approval={{ enabled: requireLoginApproval, hasPin, otherSessions }}
             />
-            {twoFactorEnabled ? <PhoneCard phone={phone} canSend={canSendWhatsApp} /> : null}
 
             <PasskeysCard passkeys={passkeys} />
 
