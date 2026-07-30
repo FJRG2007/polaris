@@ -14,6 +14,8 @@
  * way out.
  */
 
+import { request as httpsRequest } from "node:https";
+import type { TLSSocket } from "node:tls";
 import { prisma } from "@polaris/db";
 import type { ServerEnvironment } from "@polaris/core";
 import { getHostLanIp } from "./host-address";
@@ -29,6 +31,15 @@ export type EdgeAnswer =
     /** Nothing answered at all. */
     | "silent";
 
+/** Whether a browser would accept the certificate the name is served with. */
+export type EdgeCertificate =
+    /** Issued for this name by an authority browsers trust. */
+    | "trusted"
+    /** Served, but browsers will warn - Polaris's own certificate, or the wrong name. */
+    | "untrusted"
+    /** Nothing answered on 443, so there is nothing to judge. */
+    | "unknown";
+
 export interface EdgeProbe {
     readonly answer: EdgeAnswer;
     /** How whatever answered named itself, when it did. Router firmware says so in
@@ -38,6 +49,8 @@ export interface EdgeProbe {
     /** The status it answered with, so the advice names the same error the operator
      *  is looking at in their browser. Null when nothing answered. */
     readonly status: number | null;
+    /** The state of HTTPS on the name, judged separately from reachability. */
+    readonly certificate: EdgeCertificate;
 }
 
 export interface RouterAdvice {
@@ -96,6 +109,27 @@ export function routerAdvice(
     // Carried by every outcome: what answered, and what a forward would point at.
     const facts = { server: probe.server, lanIp };
     if (probe.answer === "polaris") {
+        // The ports are open and Polaris is behind them. What can still be wrong is
+        // the certificate, and that is worth saying rather than folding into a green
+        // tick: the site works, and every visitor gets a browser warning.
+        if (probe.certificate === "untrusted") {
+            return {
+                ok: false,
+                level: "warning",
+                title: "Reachable, but browsers will warn about the certificate",
+                detail:
+                    `${hostname} reaches this server. HTTPS is being served with Polaris's own certificate` +
+                    " rather than one issued for this name, so browsers will not trust it.",
+                steps: [
+                    "A certificate is requested the first time the name is served; check again in a minute.",
+                    "If it does not arrive, the certificate authority needs a contact address:" +
+                        " set POLARIS_ACME_EMAIL in the deployment's .env and restart the edge."
+                ],
+                key: "cert:untrusted",
+                forward: false,
+                ...facts
+            };
+        }
         return {
             ok: true,
             level: "success",
@@ -216,35 +250,139 @@ export function routerAdvice(
     };
 }
 
+/** How long a single probe may take. Both run in parallel, so this is the total. */
+const PROBE_TIMEOUT_MS = 5000;
+
+/** Whether a body is Polaris's health answer, which nothing else serves. */
+function isHealth(text: string): boolean {
+    try {
+        return (JSON.parse(text) as { status?: string }).status === "ok";
+    } catch {
+        return false;
+    }
+}
+
+interface PortProbe {
+    readonly polaris: boolean;
+    readonly answered: boolean;
+    readonly status: number | null;
+    readonly server: string | null;
+}
+
+/**
+ * Port 80, without following the redirect.
+ *
+ * Following it was what made a working setup look dead: the edge sends :80 to
+ * https, the redirect was followed, and the certificate check failed - which throws
+ * exactly like nothing answering. So the redirect is inspected instead of taken. It
+ * is also evidence in itself: an edge that redirects THIS name to HTTPS on the same
+ * name is serving it, which a router bouncing the request back is not.
+ */
+async function probeHttp(hostname: string): Promise<PortProbe & { redirectsToTls: boolean }> {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
+    try {
+        const response = await fetch(`http://${hostname}/api/health`, {
+            cache: "no-store",
+            redirect: "manual",
+            signal: controller.signal
+        });
+        const server = response.headers.get("server");
+        const status = response.status;
+        if (response.ok && isHealth(await response.text().catch(() => ""))) {
+            return { polaris: true, answered: true, status, server, redirectsToTls: false };
+        }
+        const location = response.headers.get("location") ?? "";
+        let redirectsToTls = false;
+        try {
+            const target = new URL(location, `http://${hostname}`);
+            redirectsToTls = target.protocol === "https:" && target.hostname === hostname;
+        } catch {
+            // A Location this malformed is not evidence of anything.
+        }
+        return { polaris: false, answered: true, status, server, redirectsToTls };
+    } catch {
+        return { polaris: false, answered: false, status: null, server: null, redirectsToTls: false };
+    } finally {
+        clearTimeout(timer);
+    }
+}
+
+/**
+ * Port 443, without requiring the certificate to be valid.
+ *
+ * An untrusted certificate still proves the port reaches Polaris, and that is the
+ * question being asked here - whether a browser would accept it is reported on its
+ * own, because the two have different answers and different fixes. Node's own client
+ * rather than fetch: it is the one that will report both.
+ */
+function probeHttps(hostname: string): Promise<PortProbe & { trusted: boolean }> {
+    return new Promise((resolve) => {
+        const failed = { polaris: false, answered: false, status: null, server: null, trusted: false };
+        const request = httpsRequest(
+            {
+                host: hostname,
+                port: 443,
+                path: "/api/health",
+                method: "GET",
+                servername: hostname,
+                rejectUnauthorized: false,
+                timeout: PROBE_TIMEOUT_MS
+            },
+            (response) => {
+                const trusted = (response.socket as TLSSocket).authorized === true;
+                const status = response.statusCode ?? null;
+                const server = (response.headers.server as string | undefined) ?? null;
+                let body = "";
+                response.setEncoding("utf8");
+                // Bounded: a health answer is a few dozen bytes, and whatever else is
+                // on the port must not be read into memory unchecked.
+                response.on("data", (chunk: string) => {
+                    if (body.length < 4096) body += chunk;
+                });
+                response.on("end", () =>
+                    resolve({ polaris: isHealth(body), answered: true, status, server, trusted })
+                );
+                response.on("error", () => resolve(failed));
+            }
+        );
+        request.on("timeout", () => request.destroy());
+        request.on("error", () => resolve(failed));
+        request.end();
+    });
+}
+
 /**
  * Ask the hostname who is serving it. `/api/health` is the marker: unauthenticated,
  * answered by Polaris and nothing else, so a reply that is not it is positive
  * evidence of something in the way rather than an inconclusive result.
  *
- * Plain HTTP on purpose, like the reachability probe: the certificate for the name
- * cannot exist until the name works.
+ * Both ports are asked, because they fail apart: 80 open and 443 shut is a
+ * half-finished forward, and the certificate lives on 443 while the challenge that
+ * issues it arrives on 80.
  */
 export async function probeEdge(hostname: string): Promise<EdgeProbe> {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 5000);
-    try {
-        const response = await fetch(`http://${hostname}/api/health`, {
-            cache: "no-store",
-            redirect: "follow",
-            signal: controller.signal
-        });
-        const server = response.headers.get("server");
-        const status = response.status;
-        if (response.ok) {
-            const body = (await response.json().catch(() => null)) as { status?: string } | null;
-            if (body?.status === "ok") return { answer: "polaris", server, status };
-        }
-        return { answer: "other", server, status };
-    } catch {
-        return { answer: "silent", server: null, status: null };
-    } finally {
-        clearTimeout(timer);
+    const [http, https] = await Promise.all([probeHttp(hostname), probeHttps(hostname)]);
+    const certificate: EdgeCertificate = !https.answered ? "unknown" : https.trusted ? "trusted" : "untrusted";
+
+    if (https.polaris || http.polaris) {
+        return {
+            answer: "polaris",
+            server: null,
+            status: https.polaris ? https.status : http.status,
+            certificate
+        };
     }
+    // The edge sending this name to HTTPS is Polaris answering on 80, even when 443
+    // could not be read - a wrong certificate, or a rule that opened one port only.
+    if (http.redirectsToTls) {
+        return { answer: "polaris", server: http.server, status: http.status, certificate };
+    }
+    if (http.answered || https.answered) {
+        const source = http.answered ? http : https;
+        return { answer: "other", server: source.server, status: source.status, certificate };
+    }
+    return { answer: "silent", server: null, status: null, certificate };
 }
 
 /** Set once an advice has been raised, so it is not raised again while it holds. */

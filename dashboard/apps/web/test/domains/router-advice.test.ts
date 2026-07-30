@@ -13,6 +13,7 @@
  * no forward exists to make.
  */
 
+import { EventEmitter } from "node:events";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const findMany = vi.fn();
@@ -28,13 +29,49 @@ vi.mock("@polaris/db", () => ({
     }
 }));
 
+/**
+ * What port 443 answers, per test. Node's own client is used for that probe (it is
+ * the one that reports whether the certificate was accepted), so it is faked here
+ * rather than through the fetch stub the port-80 tests use.
+ */
+let tlsReply: { status: number; body: string; trusted: boolean; server?: string } | null = null;
+
+vi.mock("node:https", () => ({
+    request: (_options: unknown, callback: (response: unknown) => void) => {
+        const client = new EventEmitter() as EventEmitter & { end: () => void; destroy: () => void };
+        client.destroy = () => undefined;
+        client.end = () => {
+            if (!tlsReply) {
+                setTimeout(() => client.emit("error", new Error("ECONNREFUSED")), 0);
+                return;
+            }
+            const response = new EventEmitter() as EventEmitter & {
+                statusCode: number;
+                headers: Record<string, string | undefined>;
+                socket: { authorized: boolean };
+                setEncoding: () => void;
+            };
+            response.statusCode = tlsReply.status;
+            response.headers = { server: tlsReply.server };
+            response.socket = { authorized: tlsReply.trusted };
+            response.setEncoding = () => undefined;
+            setTimeout(() => {
+                callback(response);
+                response.emit("data", tlsReply?.body ?? "");
+                response.emit("end");
+            }, 0);
+        };
+        return client;
+    }
+}));
+
 const { probeEdge, reportRouterAdvice, routerAdvice } = await import("../../src/lib/network-advice");
 
 /** The probe result for a hostname nothing answered on. */
-const SILENT = { answer: "silent", server: null, status: null } as const;
+const SILENT = { answer: "silent", server: null, status: null, certificate: "unknown" } as const;
 /** Somebody answered, and named itself the way router firmware does. */
-const ROUTER = { answer: "other", server: "ZTE web server 1.0", status: 400 } as const;
-const POLARIS = { answer: "polaris", server: null, status: 200 } as const;
+const ROUTER = { answer: "other", server: "ZTE web server 1.0", status: 400, certificate: "unknown" } as const;
+const POLARIS = { answer: "polaris", server: null, status: 200, certificate: "trusted" } as const;
 
 describe("when Polaris itself answers", () => {
     it("has nothing left to ask for", () => {
@@ -152,6 +189,7 @@ describe("every advice", () => {
 describe("probing who answers", () => {
     beforeEach(() => {
         vi.unstubAllGlobals();
+        tlsReply = null;
     });
 
     it("takes only Polaris's own marker as Polaris", async () => {
@@ -169,7 +207,8 @@ describe("probing who answers", () => {
         expect(await probeEdge("a.example.com")).toEqual({
             answer: "other",
             server: "ZTE web server 1.0",
-            status: 400
+            status: 400,
+            certificate: "unknown"
         });
     });
 
@@ -185,7 +224,64 @@ describe("probing who answers", () => {
             throw new Error("ECONNREFUSED");
         });
 
-        expect(await probeEdge("a.example.com")).toEqual({ answer: "silent", server: null, status: null });
+        expect(await probeEdge("a.example.com")).toEqual({
+            answer: "silent",
+            server: null,
+            status: null,
+            certificate: "unknown"
+        });
+    });
+
+    it("still finds Polaris behind a certificate no browser would accept", async () => {
+        // The exact shape of a working forward with no issued certificate: :80
+        // redirects, :443 answers, and the certificate is Polaris's own. Following
+        // that redirect is what used to turn this into "nothing answered".
+        vi.stubGlobal(
+            "fetch",
+            async () =>
+                new Response(null, { status: 302, headers: { location: "https://a.example.com/api/health" } })
+        );
+        tlsReply = { status: 200, body: '{"status":"ok"}', trusted: false };
+
+        expect(await probeEdge("a.example.com")).toMatchObject({ answer: "polaris", certificate: "untrusted" });
+    });
+
+    it("counts the edge's own redirect to HTTPS as Polaris answering on 80", async () => {
+        // 443 unreadable (a half-finished forward), but only this deployment's edge
+        // sends this very name to HTTPS.
+        vi.stubGlobal(
+            "fetch",
+            async () =>
+                new Response(null, { status: 301, headers: { location: "https://a.example.com/api/health" } })
+        );
+
+        expect(await probeEdge("a.example.com")).toMatchObject({ answer: "polaris", certificate: "unknown" });
+    });
+
+    it("does not take a redirect somewhere else as Polaris", async () => {
+        // A router bouncing the request to its own portal is not evidence of anything.
+        vi.stubGlobal(
+            "fetch",
+            async () => new Response(null, { status: 302, headers: { location: "http://192.168.1.1/login.html" } })
+        );
+
+        expect(await probeEdge("a.example.com")).toMatchObject({ answer: "other" });
+    });
+});
+
+describe("when the certificate is the only thing wrong", () => {
+    it("says the site works and warns about the certificate, instead of blaming the ports", () => {
+        const advice = routerAdvice("home-nat", "polaris.example.com", {
+            answer: "polaris",
+            server: null,
+            status: 200,
+            certificate: "untrusted"
+        });
+
+        expect(advice.key).toBe("cert:untrusted");
+        expect(advice.forward).toBe(false);
+        expect(advice.title).not.toMatch(/may not reach/i);
+        expect(advice.detail).toMatch(/reaches this server/);
     });
 });
 
