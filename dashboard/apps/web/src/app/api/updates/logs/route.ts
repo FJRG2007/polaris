@@ -34,6 +34,7 @@ export async function GET(request: NextRequest): Promise<Response> {
         exists: false,
         content: "",
         nextOffset: 0,
+        size: 0,
         done: false,
         exitCode: null,
         finished: false,
@@ -74,8 +75,15 @@ export async function GET(request: NextRequest): Promise<Response> {
             exists: true,
             content,
             nextOffset,
+            // How much there is to read, so a caller wanting the end of a finished
+            // run can ask for it directly instead of walking the whole file to
+            // reach it.
+            size: info.size,
             done,
-            exitCode: done && match ? Number(match[1]) : null,
+            // From the marker alone. Gating it on `done` tied a fact about the run
+            // to how far this particular caller had read, so a page that had only
+            // read the first chunk could not tell a failed run from a live one.
+            exitCode: match ? Number(match[1]) : null,
             // Whether the run has ended at all, independent of how far the caller has
             // read, plus when the file was last written. A client that just loaded the
             // page uses both to tell a live update from a leftover log. Both timestamps

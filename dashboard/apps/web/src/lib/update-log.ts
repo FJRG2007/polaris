@@ -9,8 +9,12 @@ export interface UpdateLogTail {
     readonly exists: boolean;
     readonly content: string;
     readonly nextOffset: number;
+    /** The log's full size, so a caller can seek to its end in one more read. */
+    readonly size: number;
     /** The caller has read to the end of a finished run. */
     readonly done: boolean;
+    /** The code the run reported, or null when it reported none - which means the
+     *  outcome is unknown, not that it succeeded and not that it died. */
     readonly exitCode: number | null;
     /** The run has ended, however much of the log the caller has read. */
     readonly finished: boolean;
@@ -41,6 +45,11 @@ export function isUpdateInFlight(tail: UpdateLogTail, now: number): boolean {
  * it. An update outlives the tab that triggered it - the web container restarts
  * mid-run - so after a reload the card would otherwise be idle and offer the
  * same update again, with no sign that one just ran.
+ *
+ * A run reached this way may have reported no code, and that is not the same as
+ * having died: a build whose current step is quiet for longer than STALE_LOG_MS
+ * lands here while still running. The caller shows the outcome as unrecorded
+ * rather than deciding which of the two it was.
  */
 export function isRecentRun(tail: UpdateLogTail, now: number): boolean {
     return tail.exists && now - tail.updatedAt <= RECENT_RUN_MS;

@@ -30,6 +30,31 @@ function formatChecked(iso: string): string {
 // away and back within the session.
 let lastAutoCheck = 0;
 
+/** How much of a finished run's log to show. Matches the endpoint's chunk cap, so
+ *  the tail arrives in one read. */
+const TAIL_BYTES = 128 * 1024;
+
+/** How a run ended. A null code is a run that reported none - unknown, which is
+ *  neither a success nor a failure and must not be offered as a bug report. */
+interface UpdateResult {
+    readonly code: number | null;
+}
+
+/** Only a code the updater actually reported can be called a failure. */
+function isFailure(result: UpdateResult | null): boolean {
+    return result !== null && result.code !== null && result.code !== 0;
+}
+
+function outcomeLabel(result: UpdateResult): string {
+    if (result.code === null) return "no result reported";
+    return result.code === 0 ? "success" : `failed (exit ${result.code})`;
+}
+
+function outcomeTone(result: UpdateResult): string {
+    if (result.code === null) return "text-muted-foreground";
+    return result.code === 0 ? "text-success" : "text-danger";
+}
+
 export function SettingsView({
     initialStatus,
     deployment
@@ -44,7 +69,7 @@ export function SettingsView({
     const [showManual, setShowManual] = useState(false);
     // Live update log, streamed from the shared file the updater writes.
     const [logText, setLogText] = useState("");
-    const [logExit, setLogExit] = useState<number | null>(null);
+    const [logResult, setLogResult] = useState<UpdateResult | null>(null);
     const [reporting, setReporting] = useState(false);
     const logRef = useRef<HTMLPreElement>(null);
     const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -101,27 +126,34 @@ export function SettingsView({
     }
 
     /**
-     * Render a run that ended before this page loaded. The log is read to its end
-     * rather than shown as the first chunk, because the interesting part of a
-     * failed build is the tail - and the report button needs the exit code.
+     * Render a run that ended before this page loaded.
+     *
+     * The end of the log is what matters - the error that killed a build is its
+     * last lines - so it is asked for directly rather than walked to from the
+     * start, which on a long build ran out of reads before ever arriving and left
+     * the beginning of a successful compile on screen instead.
+     *
+     * A run that reported no exit code is shown as exactly that. It is either a
+     * build still running quietly or one that died, and the log cannot tell them
+     * apart, so it is not called either.
      */
     async function showFinishedRun(first: UpdateLogTail): Promise<void> {
-        let data = first;
         let text = first.content;
-        // Bounded: a build log this long is already past anything worth reading,
-        // and the pre only ever shows its tail.
-        for (let reads = 0; reads < 16 && !data.done; reads += 1) {
-            const next = await fetchTail(data.nextOffset);
-            if (!next || !next.exists) break;
-            data = next;
-            text += next.content;
+        if (first.size > first.nextOffset) {
+            const tail = await fetchTail(Math.max(0, first.size - TAIL_BYTES));
+            // Drop the partial first line: the offset is a byte count, so it lands
+            // wherever it lands.
+            if (tail?.exists) text = tail.content.slice(tail.content.indexOf("\n") + 1);
         }
         setLogText(text.replace(/POLARIS_UPDATE_EXIT=-?\d+\s*/g, ""));
-        setLogExit(data.exitCode);
+        setLogResult({ code: first.exitCode });
+        const at = new Date(first.updatedAt).toLocaleTimeString();
         setUpdateMsg(
-            data.exitCode === null || data.exitCode === 0
-                ? `Last update finished at ${new Date(data.updatedAt).toLocaleTimeString()}.`
-                : `The last update failed (exit code ${data.exitCode}). See the log below.`
+            first.exitCode === 0
+                ? `Last update finished at ${at}.`
+                : first.exitCode === null
+                  ? `An update was running at ${at} and never reported a result. It may still be going, or it may have been cut off.`
+                  : `The last update failed (exit code ${first.exitCode}). See the log below.`
         );
     }
 
@@ -153,7 +185,7 @@ export function SettingsView({
         if (result === "started") {
             setUpdateMsg("Update started - streaming the log below. This page reconnects automatically when Polaris is back.");
             setLogText("");
-            setLogExit(null);
+            setLogResult(null);
             pollLogs();
             // Also watch health: the web restarts on the new build during the update,
             // which reloads the page even if the log marker is missed - so the card
@@ -255,7 +287,7 @@ export function SettingsView({
                 }
                 if (data.done) {
                     stopPolling();
-                    setLogExit(data.exitCode);
+                    setLogResult({ code: data.exitCode });
                     if (data.exitCode === 0) {
                         setUpdateMsg("Update complete - reloading...");
                         setTimeout(() => window.location.reload(), 1200);
@@ -367,19 +399,20 @@ export function SettingsView({
                                     latest image and redeploy.
                                 </p>
                             ) : null}
-                            {updating || logText ? (
+                            {/* Rendered on the outcome as well as the text: a run cut
+                                off before its first line of output has none, and
+                                hiding the block would take the report button with it. */}
+                            {updating || logText || logResult ? (
                                 <div className="flex flex-col gap-1">
                                     <div className="flex items-center gap-2">
                                         <span className="font-medium text-foreground">Update log</span>
-                                        {updating && logExit === null ? (
+                                        {updating && !logResult ? (
                                             <RefreshCw className="size-3 animate-spin text-muted-foreground" />
                                         ) : null}
-                                        {logExit !== null ? (
-                                            <span className={logExit === 0 ? "text-success" : "text-danger"}>
-                                                {logExit === 0 ? "success" : `failed (exit ${logExit})`}
-                                            </span>
+                                        {logResult ? (
+                                            <span className={outcomeTone(logResult)}>{outcomeLabel(logResult)}</span>
                                         ) : null}
-                                        {logExit !== null && logExit !== 0 ? (
+                                        {isFailure(logResult) ? (
                                             <Button
                                                 size="sm"
                                                 variant="secondary"
@@ -392,7 +425,7 @@ export function SettingsView({
                                             </Button>
                                         ) : null}
                                     </div>
-                                    {logExit !== null && logExit !== 0 ? (
+                                    {isFailure(logResult) ? (
                                         <p>
                                             Opens a prefilled issue with this log, your build, server type and domain.
                                             Nothing is sent until you submit it.
@@ -402,7 +435,7 @@ export function SettingsView({
                                         ref={logRef}
                                         className="max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-md border border-border bg-foreground/[0.04] p-2 font-mono text-[11px] leading-relaxed text-foreground"
                                     >
-                                        {logText || "Waiting for the updater to start..."}
+                                        {logText || (logResult ? "The updater wrote nothing." : "Waiting for the updater to start...")}
                                     </pre>
                                 </div>
                             ) : null}

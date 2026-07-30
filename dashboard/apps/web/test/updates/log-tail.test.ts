@@ -143,4 +143,37 @@ describe("showing the run that just finished", () => {
         const result = await tail();
         expect(isRecentRun(result, Date.now() + RECENT_RUN_MS + 1000)).toBe(false);
     });
+
+    it("reports the exit code from the first poll, however little of the log it read", async () => {
+        // Gated on `done`, this was null until the caller had walked the whole
+        // file - so a page opening on a failed build could not tell it from a
+        // live one, and offered neither the failure nor the report.
+        await writeFile(logPath, `${"step\n".repeat(40_000)}POLARIS_UPDATE_EXIT=1\n`);
+        const first = await tail();
+
+        expect(first.done).toBe(false);
+        expect(first.exitCode).toBe(1);
+        expect(first.finished).toBe(true);
+    });
+
+    it("says how much there is, so the end can be asked for without walking to it", async () => {
+        await writeFile(logPath, `${"step\n".repeat(40_000)}POLARIS_UPDATE_EXIT=1\n`);
+        const first = await tail();
+        expect(first.size).toBeGreaterThan(first.nextOffset);
+
+        const end = await tail(first.size - 1024);
+        expect(end.content).toContain("POLARIS_UPDATE_EXIT=1");
+        expect(end.nextOffset).toBe(first.size);
+    });
+
+    it("leaves a run that reported no code without one, rather than calling it a success", async () => {
+        // Quiet-but-live and cut-off look the same from here; the difference is
+        // not the log's to invent.
+        await writeFile(logPath, "pulling image...\n");
+        const result = await tail();
+
+        expect(result.finished).toBe(false);
+        expect(result.exitCode).toBeNull();
+        expect(isRecentRun(result, Date.now())).toBe(true);
+    });
 });
