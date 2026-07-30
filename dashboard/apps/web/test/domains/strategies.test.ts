@@ -6,7 +6,15 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { EXPOSURE_STRATEGIES, strategiesFor, STRATEGY_META } from "../../src/lib/domain-strategies";
+import {
+    approachesFor,
+    approachOf,
+    EXPOSURE_STRATEGIES,
+    strategiesFor,
+    STRATEGY_META
+} from "../../src/lib/domain-strategies";
+
+const ENVIRONMENTS = ["vps", "cloud", "home-nat", "home-cgnat", "unknown"] as const;
 
 describe("strategiesFor", () => {
     it("recommends the operator's own domain on a server that holds a public IP", () => {
@@ -36,7 +44,7 @@ describe("strategiesFor", () => {
     });
 
     it("always lists every strategy, best first, with the recommendation available", () => {
-        for (const environment of ["vps", "cloud", "home-nat", "home-cgnat", "unknown"] as const) {
+        for (const environment of ENVIRONMENTS) {
             const choice = strategiesFor(environment);
             expect(choice.options).toHaveLength(EXPOSURE_STRATEGIES.length);
             expect(choice.options[0]?.id).toBe(choice.recommended);
@@ -52,6 +60,68 @@ describe("strategiesFor", () => {
     it("keeps a mode on every strategy, so saving one always sets the exposure", () => {
         for (const strategy of EXPOSURE_STRATEGIES) {
             expect(STRATEGY_META[strategy].mode).toBeTruthy();
+        }
+    });
+});
+
+describe("approachesFor", () => {
+    it("splits every strategy onto exactly one side, losing none", () => {
+        for (const environment of ENVIRONMENTS) {
+            const ids = approachesFor(environment).options.flatMap((option) =>
+                option.strategies.map((strategy) => strategy.id)
+            );
+            expect(ids).toHaveLength(EXPOSURE_STRATEGIES.length);
+            expect(new Set(ids).size).toBe(EXPOSURE_STRATEGIES.length);
+        }
+    });
+
+    it("agrees with the ranked list about which side wins", () => {
+        for (const environment of ENVIRONMENTS) {
+            const choice = approachesFor(environment);
+            expect(choice.recommended).toBe(approachOf(strategiesFor(environment).recommended));
+        }
+    });
+
+    it("offers the router on a home line and a tunnel as the alternative", () => {
+        const choice = approachesFor("home-nat");
+        expect(choice.recommended).toBe("ports");
+        expect(choice.options.every((option) => option.available)).toBe(true);
+        expect(choice.options.find((option) => option.id === "tunnel")?.best).toBe("cloudflare-tunnel");
+    });
+
+    it("says the port side leads nowhere behind carrier NAT instead of promising it works", () => {
+        const choice = approachesFor("home-cgnat");
+        expect(choice.recommended).toBe("tunnel");
+        const ports = choice.options.find((option) => option.id === "ports");
+        expect(ports?.note).toMatch(/no port can be forwarded/i);
+        // Still selectable: what is left on that side serves the local network, which
+        // is a real answer for a box nobody outside is meant to reach.
+        expect(ports?.best).toBe("free-subdomain");
+    });
+
+    it("does not send a data-centre server looking for a router it does not have", () => {
+        for (const environment of ["vps", "cloud"] as const) {
+            const ports = approachesFor(environment).options.find((option) => option.id === "ports");
+            expect(ports?.note).toMatch(/no router/i);
+        }
+    });
+
+    it("picks each side's best from what that server can actually use", () => {
+        for (const environment of ENVIRONMENTS) {
+            for (const option of approachesFor(environment).options) {
+                if (option.best === null) {
+                    expect(option.strategies.some((strategy) => strategy.available)).toBe(false);
+                    continue;
+                }
+                expect(option.strategies.find((strategy) => strategy.id === option.best)?.available).toBe(true);
+            }
+        }
+    });
+
+    it("states a cost against every upside, so neither side reads as free", () => {
+        for (const option of approachesFor("home-nat").options) {
+            expect(option.meta.pros.length).toBeGreaterThan(0);
+            expect(option.meta.cons.length).toBeGreaterThan(0);
         }
     });
 });

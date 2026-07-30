@@ -31,10 +31,10 @@ vi.mock("@polaris/db", () => ({
 const { probeEdge, reportRouterAdvice, routerAdvice } = await import("../../src/lib/network-advice");
 
 /** The probe result for a hostname nothing answered on. */
-const SILENT = { answer: "silent", server: null } as const;
+const SILENT = { answer: "silent", server: null, status: null } as const;
 /** Somebody answered, and named itself the way router firmware does. */
-const ROUTER = { answer: "other", server: "ZTE web server 1.0" } as const;
-const POLARIS = { answer: "polaris", server: null } as const;
+const ROUTER = { answer: "other", server: "ZTE web server 1.0", status: 400 } as const;
+const POLARIS = { answer: "polaris", server: null, status: 200 } as const;
 
 describe("when Polaris itself answers", () => {
     it("has nothing left to ask for", () => {
@@ -53,7 +53,21 @@ describe("when something else answers", () => {
         expect(advice.level).toBe("danger");
         // The operator recognizes their own box by this faster than by any description.
         expect(advice.detail).toContain("ZTE web server 1.0");
-        expect(advice.steps[0]).toMatch(/remote \(WAN\) management/);
+    });
+
+    it("names the status the operator is looking at, so the two are the same thing", () => {
+        expect(routerAdvice("home-nat", "polaris.example.com", ROUTER).detail).toContain("400");
+    });
+
+    it("asks for the forward first, and for remote management only if it persists", () => {
+        // From inside the network, a router publishing its admin page to the internet
+        // and a router merely bouncing the request back look identical - and the
+        // second is far the commoner. Leading with remote management sends the
+        // operator to disable a setting that was never the problem.
+        const advice = routerAdvice("home-nat", "polaris.example.com", ROUTER);
+
+        expect(advice.steps[0]).toMatch(/Forward ports 80 and 443/);
+        expect(advice.steps.join(" ")).toMatch(/remote \(WAN\) management/);
     });
 
     it("does not blame a router on a box that has none", () => {
@@ -106,6 +120,22 @@ describe("every advice", () => {
             expect(routerAdvice("home-nat", "polaris.example.com", probe).detail).toContain("polaris.example.com");
         }
     });
+
+    it("carries what the panel needs to walk the operator through their router", () => {
+        const advice = routerAdvice("home-nat", "polaris.example.com", ROUTER, "192.168.1.20");
+
+        expect(advice.forward).toBe(true);
+        expect(advice.server).toBe("ZTE web server 1.0");
+        expect(advice.lanIp).toBe("192.168.1.20");
+    });
+
+    it("offers no port forward where no forward can help", () => {
+        // A firewall rule on a VPS and a carrier-NAT line are not router problems;
+        // walking someone through a port forward there is a wasted afternoon.
+        expect(routerAdvice("vps", "a.example.com", SILENT).forward).toBe(false);
+        expect(routerAdvice("home-cgnat", "a.example.com", SILENT).forward).toBe(false);
+        expect(routerAdvice("home-nat", "a.example.com", POLARIS).forward).toBe(false);
+    });
 });
 
 describe("probing who answers", () => {
@@ -125,7 +155,11 @@ describe("probing who answers", () => {
             async () => new Response("<h2>400 Bad Request</h2>", { status: 400, headers: { server: "ZTE web server 1.0" } })
         );
 
-        expect(await probeEdge("a.example.com")).toEqual({ answer: "other", server: "ZTE web server 1.0" });
+        expect(await probeEdge("a.example.com")).toEqual({
+            answer: "other",
+            server: "ZTE web server 1.0",
+            status: 400
+        });
     });
 
     it("does not mistake a 200 from somebody else for Polaris", async () => {
@@ -140,7 +174,7 @@ describe("probing who answers", () => {
             throw new Error("ECONNREFUSED");
         });
 
-        expect(await probeEdge("a.example.com")).toEqual({ answer: "silent", server: null });
+        expect(await probeEdge("a.example.com")).toEqual({ answer: "silent", server: null, status: null });
     });
 });
 

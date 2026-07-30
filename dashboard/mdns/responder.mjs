@@ -9,6 +9,7 @@
  * which is why the compose service uses network_mode: host.
  */
 
+import { writeFile } from "node:fs/promises";
 import { networkInterfaces } from "node:os";
 import makeMdns from "multicast-dns";
 
@@ -22,15 +23,40 @@ const SERVICE_TYPE = "_http._tcp.local";
 const SERVICE_NAME = `Polaris._http._tcp.local`;
 const TTL = 120;
 
+/** Container plumbing on the host: not internal, and not an address any other
+ *  machine on the network can reach - so never the one to advertise. */
+const VIRTUAL = /^(docker|br-|veth|virbr|cni|flannel|kube|tailscale|zt)/;
+
 /** The host's primary non-internal IPv4, or an override from the environment. */
 function hostIpv4() {
     if (process.env.POLARIS_MDNS_IP) return process.env.POLARIS_MDNS_IP;
-    for (const addrs of Object.values(networkInterfaces())) {
+    for (const [name, addrs] of Object.entries(networkInterfaces())) {
+        if (VIRTUAL.test(name)) continue;
         for (const addr of addrs ?? []) {
             if (addr.family === "IPv4" && !addr.internal) return addr.address;
         }
     }
     return "127.0.0.1";
+}
+
+/**
+ * Publish the LAN address on the shared volume for the rest of the stack.
+ *
+ * This process runs on the host network, which makes it the only part of Polaris
+ * that can see that address at all - every other container sees its own bridge IP.
+ * The dashboard needs it to tell an operator which address to forward ports to, so
+ * it is written here rather than guessed there. Best-effort, and only on a change:
+ * a missing file simply means the dashboard says it does not know.
+ */
+const IP_FILE = process.env.POLARIS_HOST_IP_FILE || "/run/polaris/host-ip";
+let publishedIp = null;
+
+function publishIp(ip) {
+    if (ip === publishedIp) return;
+    publishedIp = ip;
+    writeFile(IP_FILE, `${ip}\n`).catch(() => {
+        // No shared volume (or not writable): the dashboard falls back to asking.
+    });
 }
 
 const mdns = makeMdns();
@@ -54,6 +80,7 @@ function records() {
 /** Push an unsolicited announcement so caches learn the name promptly. */
 function announce() {
     const r = records();
+    publishIp(r.a.data);
     mdns.respond({ answers: [r.a, r.ptr, r.srv, r.txt] });
 }
 

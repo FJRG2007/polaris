@@ -165,6 +165,11 @@ services:
     environment:
       POLARIS_MDNS_HOSTNAME: ${POLARIS_MDNS_HOSTNAME:-polaris}
       POLARIS_MDNS_PORT: ${POLARIS_MDNS_PORT:-80}
+    volumes:
+      # On the host network, so this is the only service that can see the LAN
+      # address; it writes it here for the dashboard, which needs it to say what
+      # a port forward should point at.
+      - polaris-run:/run/polaris
 
   # --- Full edition ---------------------------------------------------------
   # Privileged host daemon. Runs the static musl `polaris-hostd` binary and

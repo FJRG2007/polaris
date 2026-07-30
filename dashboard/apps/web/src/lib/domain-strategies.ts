@@ -104,6 +104,111 @@ export interface StrategyChoice {
     options: StrategyOption[];
 }
 
+/**
+ * The two ways traffic can reach this server, which is the question underneath every
+ * strategy: either the ports are opened to it, or it dials out and someone else
+ * accepts the traffic on its behalf. Asked first because it is the only part the
+ * operator has a real opinion about - one costs an afternoon in the router, the other
+ * costs an account and puts a company in the path of every request.
+ */
+export type ExposureApproach = "ports" | "tunnel";
+
+export interface ApproachMeta {
+    label: string;
+    /** One line on what actually happens to a request. */
+    summary: string;
+    /** What is better about it, in the operator's terms. */
+    pros: string[];
+    /** What it costs them. Never omitted - a choice with no downside is a slogan. */
+    cons: string[];
+}
+
+export const APPROACH_META: Record<ExposureApproach, ApproachMeta> = {
+    ports: {
+        label: "Open ports 80 and 443",
+        summary: "Visitors connect straight to this server. Nothing sits in between, and nothing has to keep working for it except your own line.",
+        pros: [
+            "No third party between visitors and this server",
+            "Free, with no account to create anywhere",
+            "One wildcard record covers every hostname Polaris mints"
+        ],
+        cons: [
+            "Two forwarding rules to create, in the router or in a firewall",
+            "Needs a public IP that reaches this server",
+            "Whoever connects sees the address of your line"
+        ]
+    },
+    tunnel: {
+        label: "Publish through a tunnel",
+        summary: "This server dials out to a provider, which takes the traffic and passes it back down. Set up in Polaris, with nothing to change in the router.",
+        pros: [
+            "Nothing to configure in the router",
+            "Works on a line where no port can be forwarded",
+            "Your own address stays behind the provider"
+        ],
+        cons: [
+            "Every request goes through the provider",
+            "Needs an account with them, free tier included",
+            "Speed and uptime become theirs rather than yours"
+        ]
+    }
+};
+
+/** Which side of the question a strategy answers. Tunnels dial out; the rest need ports. */
+export function approachOf(strategy: ExposureStrategy): ExposureApproach {
+    return STRATEGY_META[strategy].mode === "tunnel" ? "tunnel" : "ports";
+}
+
+export interface ApproachOption {
+    id: ExposureApproach;
+    meta: ApproachMeta;
+    /** False when no strategy on this side works on this server. */
+    available: boolean;
+    /** What is different about this side on this server, when something is. */
+    note?: string;
+    /** Its strategies, in the same order the full list ranks them. */
+    strategies: StrategyOption[];
+    /** The one to select when the operator picks this side, or null if none can be. */
+    best: ExposureStrategy | null;
+}
+
+export interface ApproachChoice {
+    recommended: ExposureApproach;
+    options: ApproachOption[];
+}
+
+/**
+ * What the generic wording gets wrong on a particular server. The tunnel side reads
+ * the same everywhere; the direct one does not - there is no router in a data centre,
+ * and on a carrier-NAT line there is no inbound port to open at all, which the label
+ * would otherwise promise.
+ */
+const APPROACH_NOTE: Partial<Record<ServerEnvironment, Partial<Record<ExposureApproach, string>>>> = {
+    vps: { ports: "No router in the way - allow inbound 80 and 443 in your provider's firewall instead." },
+    cloud: { ports: "No router in the way - allow inbound 80 and 443 in the instance's security group instead." },
+    "home-cgnat": {
+        ports:
+            "Your ISP shares one address between its customers, so no port can be forwarded to this server." +
+            " What is left on this side reaches your own network and nothing beyond it."
+    }
+};
+
+/**
+ * The same ranking, split in two so the setup can ask the question the operator can
+ * actually answer before asking which provider. Derived from `strategiesFor` rather
+ * than ranked again, so the two can never disagree about what a server can use.
+ */
+export function approachesFor(environment: ServerEnvironment): ApproachChoice {
+    const choice = strategiesFor(environment);
+    const options: ApproachOption[] = (["ports", "tunnel"] as ExposureApproach[]).map((id) => {
+        const strategies = choice.options.filter((option) => approachOf(option.id) === id);
+        const best = strategies.find((option) => option.available)?.id ?? null;
+        const note = APPROACH_NOTE[environment]?.[id];
+        return { id, meta: APPROACH_META[id], available: best !== null, ...(note ? { note } : {}), strategies, best };
+    });
+    return { recommended: approachOf(choice.recommended), options };
+}
+
 /** Order per environment, best first. Anything omitted is unavailable there. */
 const ORDER: Record<ServerEnvironment, [ExposureStrategy, ...ExposureStrategy[]]> = {
     vps: ["own-domain", "free-subdomain", "cloudflare-tunnel", "duckdns", "quick-tunnel"],
