@@ -399,6 +399,40 @@ setup_done() {
     [ "$count" -gt 0 ]
 }
 
+# Give Let's Encrypt the contact address it insists on, taken from the first
+# administrator's account.
+#
+# Without one no ACME account can be registered, so no certificate is ever issued:
+# the domain resolves, the edge routes it, and HTTPS fails with the deployment's own
+# certificate - a failure visible only in the edge's log, which is where it sat. The
+# address is already on this deployment and is the right person to email about an
+# expiring certificate, so it is used rather than asked for again.
+#
+# Never overwrites an address that is already set, and does nothing until an
+# administrator exists (a fresh install writes it on its first update instead).
+# Returns 0 only when it changed something, so the caller knows to restart the edge.
+sync_acme_email() {
+    target="$1"
+    case "$(sed -n 's/^POLARIS_ACME_EMAIL=//p' "$target" | head -n1)" in
+        "" | *example.com | REPLACE_ME*) ;;
+        *@*.*) return 1 ;;
+        *) ;;
+    esac
+    user=$(sed -n 's/^POSTGRES_USER=//p' "$target" | head -n1)
+    db=$(sed -n 's/^POSTGRES_DB=//p' "$target" | head -n1)
+    admin=$(docker compose exec -T postgres \
+        psql -U "${user:-polaris}" -d "${db:-polaris}" -tAc \
+        'SELECT email FROM "User" WHERE "isAdmin" = true AND "bannedAt" IS NULL ORDER BY "createdAt" LIMIT 1' \
+        2>/dev/null | tr -d '[:space:]')
+    case "$admin" in
+        *@*.*) ;;
+        *) return 1 ;;
+    esac
+    set_env_var "$target" "POLARIS_ACME_EMAIL" "$admin"
+    log "using $admin as the certificate contact address (Let's Encrypt requires one)"
+    return 0
+}
+
 # Make POSTGRES_PASSWORD the single source of truth. Postgres only reads
 # POSTGRES_PASSWORD when it first initializes its data volume and ignores it ever
 # after, so a regenerated .env - or a database role left at some earlier password -
@@ -596,6 +630,10 @@ main() {
     # time - no race, no restart churn.
     $compose up -d $build_flag postgres
     align_db_password
+
+    # With the database up, the certificate contact address can be taken from the
+    # administrator's own account - before the edge starts, so it registers with it.
+    sync_acme_email ".env" || true
 
     # Now bring up the rest against the already-aligned database.
     $compose up -d $build_flag --remove-orphans

@@ -271,6 +271,11 @@ main() {
     COMPOSE_PROFILES=$(sed -n 's/^COMPOSE_PROFILES=//p' .env | head -n1)
     export COMPOSE_PROFILES
 
+    # Before the edge is brought up below, so a deployment that has been running
+    # without a certificate contact address gets one and can finally be issued a
+    # certificate. Takes it from the administrator's account; never overwrites one.
+    sync_acme_email ".env" || true
+
     tag=$(sed -n 's/^POLARIS_IMAGE_TAG=//p' .env | head -n1)
     web_image="${WEB_IMAGE_REPO}:${tag:-latest}"
 
