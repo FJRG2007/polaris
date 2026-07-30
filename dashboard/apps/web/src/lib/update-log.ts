@@ -22,6 +22,13 @@ export interface UpdateLogTail {
     readonly updatedAt: number;
     /** The host's clock when it read the log, epoch ms. */
     readonly now: number;
+    /**
+     * Commit of the build answering this request. It is the one completion signal
+     * that cannot be missed: an update finishes when a different build starts
+     * serving, whether or not the log ever got its exit marker written - the
+     * updater can be cut off mid-run by the very restart it is performing.
+     */
+    readonly build: string | null;
 }
 
 /** A log nobody has written to for this long is a crashed run, not a live one. */

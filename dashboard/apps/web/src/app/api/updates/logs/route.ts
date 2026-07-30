@@ -29,6 +29,10 @@ export async function GET(request: NextRequest): Promise<Response> {
 
     const raw = Number(request.nextUrl.searchParams.get("offset") ?? "0");
     let offset = Number.isFinite(raw) && raw >= 0 ? Math.floor(raw) : 0;
+    // Whichever container answers this poll says which build it is. During a
+    // no-downtime rollover both the old and the new one serve for a few seconds, so
+    // the caller learns the update landed as soon as a request reaches the new one.
+    const build = (process.env.POLARIS_BUILD_SHA ?? "").trim() || null;
 
     const notReadable = NextResponse.json({
         exists: false,
@@ -39,7 +43,8 @@ export async function GET(request: NextRequest): Promise<Response> {
         exitCode: null,
         finished: false,
         updatedAt: 0,
-        now: Date.now()
+        now: Date.now(),
+        build
     } satisfies UpdateLogTail);
     const info = await stat(LOG_PATH).catch(() => null);
     if (!info || !info.isFile()) return notReadable;
@@ -91,7 +96,8 @@ export async function GET(request: NextRequest): Promise<Response> {
             // clock that disagrees with the host's.
             finished: match !== null,
             updatedAt: info.mtimeMs,
-            now: Date.now()
+            now: Date.now(),
+            build
         } satisfies UpdateLogTail);
     } finally {
         await handle.close();
