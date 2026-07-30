@@ -26,12 +26,13 @@ export default async function DomainsPage() {
     ]);
 
     return (
-        <>
+        // Narrow page: centre the column in the content area, header included.
+        <div className="mx-auto flex w-full max-w-2xl flex-col">
             <PageHeader
                 title="Domains"
                 description="Choose the domains Polaris uses for the dashboard and for the links it hands out."
             />
             <DomainsView initialConfig={config} initialZones={zones} effectiveAppUrl={effectiveAppUrl} />
-        </>
+        </div>
     );
 }

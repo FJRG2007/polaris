@@ -255,7 +255,7 @@ export function SettingsView({
     const behind = typeof status.behindBy === "number" && status.behindBy > 0;
 
     return (
-        <div className="flex max-w-2xl flex-col gap-4">
+        <div className="flex w-full flex-col gap-4">
             <Card>
                 <CardHeader>
                     <div className="flex items-center justify-between gap-2">
