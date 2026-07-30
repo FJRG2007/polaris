@@ -11,8 +11,23 @@
 
 import { readFile } from "node:fs/promises";
 
-const IP_FILE = process.env.POLARIS_HOST_IP_FILE ?? "/run/polaris/host-ip";
+const IP_FILE = process.env.POLARIS_HOST_IP_FILE ?? "/run/polaris-host/host-ip";
 const IPV4 = /^(?:(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.){3}(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)$/;
+
+/**
+ * Whether an address is one a router could forward to. Only the private ranges
+ * qualify: the responder falls back to whatever non-virtual interface comes first
+ * and `POLARIS_MDNS_IP` overrides its detection entirely, so a link-local address
+ * from a NIC that never got a lease, or a public one on a server that holds its
+ * own, can both reach the file - and either would be turned into a gateway link
+ * and a DHCP-reservation instruction for a network that does not exist.
+ */
+function isLanAddress(value: string): boolean {
+    const [a = 0, b = 0] = value.split(".").map(Number);
+    if (a === 10) return true;
+    if (a === 172 && b >= 16 && b <= 31) return true;
+    return a === 192 && b === 168;
+}
 
 /**
  * The LAN IPv4 this server answers on, or null when it is not published - an
@@ -24,5 +39,5 @@ export async function getHostLanIp(): Promise<string | null> {
     const raw = await readFile(IP_FILE, "utf8").catch(() => null);
     if (raw === null) return null;
     const value = raw.trim();
-    return IPV4.test(value) && !value.startsWith("127.") ? value : null;
+    return IPV4.test(value) && isLanAddress(value) ? value : null;
 }

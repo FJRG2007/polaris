@@ -100,6 +100,9 @@ services:
     volumes:
       # Socket + token shared with the daemon (populated only in the full edition).
       - polaris-run:/run/polaris
+      # The host's LAN address, published by the mDNS responder. Read-only: only
+      # the responder can see that address, and only it should write it.
+      - polaris-hostip:/run/polaris-host:ro
       # Container-local storage and upload scratch (POLARIS_DATA_DIR).
       - polaris-data:/var/lib/polaris
       # Traefik dynamic-config dir the dashboard writes deployed-app routes into.
@@ -168,8 +171,10 @@ services:
     volumes:
       # On the host network, so this is the only service that can see the LAN
       # address; it writes it here for the dashboard, which needs it to say what
-      # a port forward should point at.
-      - polaris-run:/run/polaris
+      # a port forward should point at. Its own volume, never polaris-run: that
+      # one carries the host daemon's socket and bearer token, and this process
+      # parses unsolicited multicast from the whole network.
+      - polaris-hostip:/run/polaris-host
 
   # --- Full edition ---------------------------------------------------------
   # Privileged host daemon. Runs the static musl `polaris-hostd` binary and
@@ -310,6 +315,7 @@ networks:
 volumes:
   polaris-postgres:
   polaris-run:
+  polaris-hostip:
   polaris-data:
   polaris-caddy-data:
   polaris-caddy-config:

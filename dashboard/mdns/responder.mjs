@@ -9,7 +9,7 @@
  * which is why the compose service uses network_mode: host.
  */
 
-import { writeFile } from "node:fs/promises";
+import { rename, writeFile } from "node:fs/promises";
 import { networkInterfaces } from "node:os";
 import makeMdns from "multicast-dns";
 
@@ -45,18 +45,40 @@ function hostIpv4() {
  * This process runs on the host network, which makes it the only part of Polaris
  * that can see that address at all - every other container sees its own bridge IP.
  * The dashboard needs it to tell an operator which address to forward ports to, so
- * it is written here rather than guessed there. Best-effort, and only on a change:
- * a missing file simply means the dashboard says it does not know.
+ * it is written here rather than guessed there.
+ *
+ * Written through a temporary file and renamed into place, because the reader is a
+ * dashboard request rather than a process that can be told to wait: a plain write
+ * truncates first, and a read landing in that window would find the file empty and
+ * report that Polaris does not know its own address.
+ *
+ * Only a write that succeeded counts as published. Memoising the attempt instead
+ * would make the first failure permanent - the guard would skip every later one,
+ * and the address would never appear for the life of the container.
  */
-const IP_FILE = process.env.POLARIS_HOST_IP_FILE || "/run/polaris/host-ip";
+const IP_FILE = process.env.POLARIS_HOST_IP_FILE || "/run/polaris-host/host-ip";
 let publishedIp = null;
+let publishFailure = null;
 
-function publishIp(ip) {
+async function publishIp(ip) {
     if (ip === publishedIp) return;
-    publishedIp = ip;
-    writeFile(IP_FILE, `${ip}\n`).catch(() => {
-        // No shared volume (or not writable): the dashboard falls back to asking.
-    });
+    const temp = `${IP_FILE}.tmp`;
+    try {
+        await writeFile(temp, `${ip}\n`);
+        await rename(temp, IP_FILE);
+        publishedIp = ip;
+        publishFailure = null;
+    } catch (error) {
+        // Said once per distinct cause: this runs on every announcement, and a
+        // volume that is never writable would otherwise print the same line for
+        // the life of the container. Silence was the old behaviour, and it left
+        // the dashboard saying it could not see the address with nothing to
+        // explain why - the likeliest cause being a root-owned mountpoint.
+        if (error.code !== publishFailure) {
+            publishFailure = error.code;
+            console.error(`mdns: could not publish the host address to ${IP_FILE}: ${error.message}`);
+        }
+    }
 }
 
 const mdns = makeMdns();
@@ -80,7 +102,7 @@ function records() {
 /** Push an unsolicited announcement so caches learn the name promptly. */
 function announce() {
     const r = records();
-    publishIp(r.a.data);
+    void publishIp(r.a.data);
     mdns.respond({ answers: [r.a, r.ptr, r.srv, r.txt] });
 }
 
