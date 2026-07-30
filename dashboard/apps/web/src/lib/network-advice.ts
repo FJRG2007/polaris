@@ -330,7 +330,9 @@ function probeHttps(hostname: string): Promise<PortProbe & { trusted: boolean }>
                 timeout: PROBE_TIMEOUT_MS
             },
             (response) => {
-                const trusted = (response.socket as TLSSocket).authorized === true;
+                // Read here, not on `end`: the socket is handed back to the pool when
+                // the response completes, and `response.socket` is null by then.
+                const trusted = (response.socket as TLSSocket | null)?.authorized === true;
                 const status = response.statusCode ?? null;
                 const server = (response.headers.server as string | undefined) ?? null;
                 let body = "";
