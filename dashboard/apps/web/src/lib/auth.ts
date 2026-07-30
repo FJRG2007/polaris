@@ -1,7 +1,9 @@
 /**
  * The app's better-auth instance. Constructed once here (env is guaranteed in a
  * running server) from the shared factory, and re-exported so route handlers,
- * server actions, and the session helpers all share one configuration.
+ * server actions, and the session helpers all share one configuration. Requests
+ * to the auth endpoints go through handleAuthRequest instead, which differs only
+ * in which address a passkey is bound to.
  *
  * The hostnames this deployment answers on are resolved per request from the domain
  * configuration - the same list published to the edge - so signing in on a domain
@@ -11,9 +13,9 @@
  * loaded by everything.
  */
 
-import { createAuth } from "@polaris/auth";
+import { createRequestAuth } from "@polaris/auth";
 
-export const auth = createAuth({
+const requestAuth = createRequestAuth({
     configuredHosts: async () => {
         const [{ dashboardHosts, publicHostname }, { getPolarisPublicUrl }] = await Promise.all([
             import("./domain-edge"),
@@ -44,3 +46,12 @@ export const auth = createAuth({
         return sendTwoFactorCode(input);
     }
 });
+
+export const auth = requestAuth.auth;
+
+/**
+ * The catch-all route's handler. It serves each request with the passkey relying
+ * party of the address it arrived on, so a passkey can be added and used on any
+ * of the names this deployment answers on rather than only the published one.
+ */
+export const handleAuthRequest = requestAuth.handle;

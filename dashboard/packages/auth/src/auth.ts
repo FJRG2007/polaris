@@ -10,7 +10,8 @@
  * flips it. trustedOrigins stays an allowlist - the app URL, the local names, and
  * the domains this deployment is configured to answer on - to blunt the
  * open-redirect and origin-check classes of issue this library has historically
- * had. A request's own Host header is never trusted: it is the attacker's to set.
+ * had. A request's own Host header decides only which of those already-trusted
+ * names a passkey is bound to; on its own it is the attacker's to set.
  */
 
 import { randomUUID } from "node:crypto";
@@ -21,6 +22,7 @@ import { prismaAdapter } from "better-auth/adapters/prisma";
 import { loadEnv } from "@polaris/config";
 import { prisma } from "@polaris/db";
 import {
+    passkeyRelyingPartyId,
     TWO_FACTOR_CODE_ATTEMPTS,
     TWO_FACTOR_CODE_TTL_MINUTES,
     TWO_FACTOR_METHOD_HEADER
@@ -35,33 +37,28 @@ const SESSION_UPDATE_AGE = 60 * 60 * 24;
 const MAGIC_LINK_TTL_SECONDS = 10 * 60;
 
 /**
- * The sign-in methods beyond a password: a TOTP second factor with single-use
- * backup codes, passkeys, and - on a deployment that has a mail sender - sign-in
- * by emailed link. Verification is required before the authenticator is armed,
- * so a user who mis-scans the QR cannot lock themselves out.
+ * WebAuthn binds a credential to one registrable domain, so the relying party
+ * follows the address the request arrived on instead of being pinned to the
+ * published one: the same Polaris is opened as polaris.local on the LAN and as
+ * its domain from outside, and both have to be able to hold a passkey. One
+ * credential still only works on the address it was created on - the account
+ * page says so, and offers to add one wherever the user actually is.
  *
- * Typed as the plugin base rather than left inferred: the plugin's endpoint
- * types embed better-auth's own nested zod, which this package cannot name in
- * its emitted declarations. The browser client declares the two-factor paths it
- * calls, so nothing loses type safety - the flow runs through @polaris/web's
- * auth client, not through auth.api here.
+ * The address is checked against the trusted list before it reaches here; an
+ * address that cannot be a relying party at all - a bare IP - leaves the plugin
+ * unregistered, so its endpoints are absent rather than failing halfway.
  */
-/**
- * WebAuthn binds a credential to one registrable domain, so a deployment reached
- * on several names has to pick one. The app URL is that one: it is the address an
- * operator publishes and the only one guaranteed to be reachable from outside.
- *
- * The practical consequence is worth stating plainly - a passkey registered on
- * the domain does not work when the same Polaris is opened as polaris.local, and
- * cannot be made to. Every other sign-in method still does.
- */
-function passkeyRelyingParty(appUrl: string): { rpID: string; origin: string } | null {
-    try {
-        const url = new URL(appUrl);
-        return { rpID: url.hostname, origin: url.origin };
-    } catch {
-        return null;
-    }
+function passkeyPlugin(address: string): BetterAuthPlugin | null {
+    const rpID = passkeyRelyingPartyId(address);
+    if (!rpID) return null;
+    return passkey({
+        rpID,
+        rpName: "Polaris",
+        // Pinned rather than left for the client to supply: an origin the caller
+        // chooses is an origin an attacker chooses. The port rides along, since
+        // it is part of the origin the browser reports.
+        origin: origins(address)
+    }) as BetterAuthPlugin;
 }
 
 /**
@@ -98,20 +95,22 @@ function twoFactorPlugin(options: AuthOptions): BetterAuthPlugin {
     });
 }
 
-function buildPlugins(options: AuthOptions, appUrl: string, trusted: readonly string[]): BetterAuthPlugin[] {
+/**
+ * The sign-in methods beyond a password: a TOTP second factor with single-use
+ * backup codes, passkeys, and - on a deployment that has a mail sender - sign-in
+ * by emailed link. Verification is required before the authenticator is armed,
+ * so a user who mis-scans the QR cannot lock themselves out.
+ *
+ * Typed as the plugin base rather than left inferred: the plugin's endpoint
+ * types embed better-auth's own nested zod, which this package cannot name in
+ * its emitted declarations. The browser client declares the two-factor paths it
+ * calls, so nothing loses type safety - the flow runs through @polaris/web's
+ * auth client, not through auth.api here.
+ */
+function buildPlugins(options: AuthOptions, address: string): BetterAuthPlugin[] {
     const plugins: BetterAuthPlugin[] = [twoFactorPlugin(options)];
-    const relyingParty = passkeyRelyingParty(appUrl);
-    if (relyingParty) {
-        plugins.push(
-            passkey({
-                rpID: relyingParty.rpID,
-                rpName: "Polaris",
-                // Pinned rather than left for the client to supply: an origin the
-                // caller chooses is an origin an attacker chooses.
-                origin: Array.from(new Set([relyingParty.origin, ...trusted]))
-            }) as BetterAuthPlugin
-        );
-    }
+    const webauthn = passkeyPlugin(address);
+    if (webauthn) plugins.push(webauthn);
     // Registered only when the app can send at all. Whether a channel is
     // nominated right now is the send callback's business.
     if (options.sendMail) {
@@ -193,7 +192,32 @@ export interface AuthOptions {
     }) => Promise<{ error?: string }>;
 }
 
-export function createAuth(options: AuthOptions = {}) {
+/** The addresses fixed at start-up: the published one and the local-network names
+ *  (homeassistant.local style), as bare hostnames - a port is not part of a
+ *  relying party, and the configured domains are stored without one either. */
+function fixedHosts(): string[] {
+    const env = loadEnv();
+    const localName = env.POLARIS_LOCAL_HOSTNAME;
+    const published = passkeyRelyingPartyId(env.POLARIS_APP_URL);
+    return [...(published ? [published] : []), `${localName}.local`, localName];
+}
+
+/**
+ * Every hostname this deployment answers on: the fixed ones plus the domains an
+ * operator configured after install. Resolved per call for the same reason the
+ * trusted origins are - a domain saved in the panel has to work without a restart.
+ */
+async function allowedHosts(options: AuthOptions): Promise<Set<string>> {
+    const configured = options.configuredHosts ? await options.configuredHosts().catch(() => []) : [];
+    return new Set([...fixedHosts(), ...configured]);
+}
+
+/**
+ * @param address The host the passkey relying party is bound to, as `host[:port]`.
+ *                Defaults to the published app URL, which is what every caller
+ *                outside the request handler wants.
+ */
+export function createAuth(options: AuthOptions = {}, address?: string) {
     const env = loadEnv();
     const localName = env.POLARIS_LOCAL_HOSTNAME;
     // Trust the public origin plus the local-network names (homeassistant.local
@@ -229,7 +253,7 @@ export function createAuth(options: AuthOptions = {}) {
             expiresIn: SESSION_MAX_AGE,
             updateAge: SESSION_UPDATE_AGE
         },
-        plugins: buildPlugins(options, env.POLARIS_APP_URL, fixedOrigins),
+        plugins: buildPlugins(options, address ?? new URL(env.POLARIS_APP_URL).host),
         user: {
             additionalFields: {
                 // Server-only flag; never accepted from client input.
@@ -252,3 +276,102 @@ export function createAuth(options: AuthOptions = {}) {
 }
 
 export type Auth = ReturnType<typeof createAuth>;
+
+/** How many address-bound instances to keep. The names a deployment answers on
+ *  are few and fixed by its configuration; the cap is only there so a forged Host
+ *  header cannot make the process hold on to an unbounded number of them. */
+const MAX_RELYING_PARTIES = 32;
+
+export interface RequestAuth {
+    /** The shared instance, bound to the published address. Session reads, server
+     *  actions, and anything else that is not a WebAuthn ceremony use this. */
+    readonly auth: Auth;
+
+    /** Serve one better-auth request with the instance for the address it arrived
+     *  on. This is what the catch-all route exports. */
+    readonly handle: (request: Request) => Promise<Response>;
+}
+
+/**
+ * A better-auth handler whose passkey relying party follows the address in the
+ * request, so a passkey can be registered and used on whichever of this
+ * deployment's names the browser is actually on.
+ *
+ * The address is only believed when it names a host already trusted for origins -
+ * a Host header is the caller's to set - and an unrecognized one falls back to the
+ * published address, which is what every non-WebAuthn endpoint would have used
+ * anyway. Instances are cached because building one is not free.
+ */
+export function createRequestAuth(options: AuthOptions = {}): RequestAuth {
+    const shared = createAuth(options);
+    const published = new URL(loadEnv().POLARIS_APP_URL).host;
+    const byAddress = new Map<string, Auth>();
+
+    function instanceFor(address: string | null): Auth {
+        // The shared instance is already bound to the published address, which is
+        // the address most requests arrive on.
+        if (!address || address === published) return shared;
+        const cached = byAddress.get(address);
+        if (cached) return cached;
+        if (byAddress.size >= MAX_RELYING_PARTIES) return shared;
+        const instance = createAuth(options, address);
+        byAddress.set(address, instance);
+        return instance;
+    }
+
+    return {
+        auth: shared,
+        handle: async (request) => {
+            const address = await resolvePasskeyAddress(request, options);
+            const response = await instanceFor(address).handler(request);
+            return address ? recordRelyingParty(request, response, address) : response;
+        }
+    };
+}
+
+/**
+ * The `host[:port]` a request arrived on, or null when this deployment does not
+ * answer on it, or it could never hold a passkey anyway.
+ *
+ * The header is only believed to the extent that it names a hostname already
+ * trusted for origins: a Host is the caller's to set, and it decides which
+ * relying party a credential is created under.
+ */
+export async function resolvePasskeyAddress(
+    request: Request,
+    options: AuthOptions
+): Promise<string | null> {
+    const header = request.headers.get("x-forwarded-host") ?? request.headers.get("host");
+    const address = header?.trim().toLowerCase() ?? "";
+    if (!/^[a-z0-9.-]+(:\d{1,5})?$/.test(address)) return null;
+    const rpID = passkeyRelyingPartyId(address);
+    if (!rpID) return null;
+    return (await allowedHosts(options)).has(rpID) ? address : null;
+}
+
+/**
+ * Record which address a newly registered passkey is bound to. The plugin's own
+ * row does not carry it, and without it the account page cannot say where a
+ * passkey works and the sign-in page cannot tell whether offering one here would
+ * do anything but raise a prompt that fails.
+ *
+ * Read from the response rather than reported by the browser afterwards, so the
+ * binding is whatever the server actually issued the challenge for.
+ */
+export async function recordRelyingParty(
+    request: Request,
+    response: Response,
+    address: string
+): Promise<Response> {
+    if (response.status !== 200) return response;
+    if (!new URL(request.url).pathname.endsWith("/passkey/verify-registration")) return response;
+    const created: unknown = await response.clone().json().catch(() => null);
+    const id = (created as { id?: unknown } | null)?.id;
+    if (typeof id !== "string") return response;
+    await prisma.passkey
+        .update({ where: { id }, data: { rpId: passkeyRelyingPartyId(address) } })
+        // The passkey exists and works either way; only the label for it is lost,
+        // so this must not turn a successful registration into a failed request.
+        .catch((error: unknown) => console.error("passkey address not recorded:", error));
+    return response;
+}

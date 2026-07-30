@@ -8,37 +8,48 @@
  * there is no server action here to add one. Removal does go through a server
  * action, because deleting a row is not the browser's business.
  *
- * WebAuthn ties a credential to one domain, so a passkey registered on the
- * deployment's public address does not work when the same Polaris is opened by
- * its local name. The card says so rather than letting a failed ceremony be the
- * explanation.
+ * WebAuthn ties a credential to one address. The server issues the challenge for
+ * whichever of this deployment's names the browser is on, so a passkey can be
+ * added anywhere it is reachable; the card names the address on each one and says
+ * when the address in hand cannot hold a passkey at all.
  */
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { KeyRound, Trash2 } from "lucide-react";
+import { passkeyRelyingPartyId } from "@polaris/core";
 import { Button, Card, CardBody, Input } from "@polaris/ui";
 import { useConfirm } from "@/components/confirm-dialog";
 import { authClient } from "@/lib/auth-client";
 import { removePasskeyAction, type PasskeyView } from "./passkey-actions";
 import { Feedback } from "./setting-card";
 
-export function PasskeysCard({
-    passkeys,
-    appHost
-}: {
-    passkeys: PasskeyView[];
-    /** The hostname passkeys are bound to, so the copy can name it. */
-    appHost: string;
-}) {
+/** The address this browser is on: the name a new passkey would be bound to, and
+ *  whether the page is served securely enough for the browser to create one. Read
+ *  after mount, since the server has no view of it. */
+interface Here {
+    host: string | null;
+    secure: boolean;
+}
+
+export function PasskeysCard({ passkeys }: { passkeys: PasskeyView[] }) {
     const router = useRouter();
     const [confirm, confirmElement] = useConfirm();
+    const [here, setHere] = useState<Here | null>(null);
     const [name, setName] = useState("");
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [removing, startRemove] = useTransition();
 
-    const onThisHost = typeof window !== "undefined" && window.location.hostname === appHost;
+    useEffect(() => {
+        setHere({
+            host: passkeyRelyingPartyId(window.location.hostname),
+            secure: window.isSecureContext
+        });
+    }, []);
+
+    const canAdd = Boolean(here?.host && here.secure);
+    const noneHere = canAdd && passkeys.length > 0 && !passkeys.some((key) => key.host === here?.host);
 
     async function add() {
         setBusy(true);
@@ -78,8 +89,8 @@ export function PasskeysCard({
                 <div>
                     <h2 className="text-sm font-medium">Passkeys</h2>
                     <p className="text-xs text-muted-foreground">
-                        Sign in with your device instead of a password. A passkey works on{" "}
-                        <code className="rounded bg-muted px-1">{appHost}</code> only.
+                        Sign in with your device instead of a password. Each passkey works on the
+                        address it was added from, so add one per address you use.
                     </p>
                 </div>
 
@@ -93,6 +104,9 @@ export function PasskeysCard({
                                 <div className="flex min-w-0 items-center gap-2">
                                     <KeyRound className="size-4 shrink-0 text-muted-foreground" />
                                     <span className="truncate text-sm">{passkey.name}</span>
+                                    <code className="shrink-0 rounded bg-muted px-1 text-xs text-muted-foreground">
+                                        {passkey.host}
+                                    </code>
                                     <span className="shrink-0 text-xs text-muted-foreground">
                                         added {new Date(passkey.addedAt).toLocaleDateString()}
                                     </span>
@@ -112,10 +126,21 @@ export function PasskeysCard({
                     </div>
                 )}
 
-                {!onThisHost && (
+                {here && !here.host && (
                     <p className="text-xs text-warning">
-                        You are not on {appHost} right now, so a passkey registered here would not
-                        be usable. Open Polaris on that address first.
+                        You are on an IP address. A passkey needs a hostname, so open Polaris on a
+                        domain or on its local name to add one.
+                    </p>
+                )}
+                {here?.host && !here.secure && (
+                    <p className="text-xs text-warning">
+                        This address is served over plain HTTP, and browsers only create passkeys
+                        over HTTPS. Open Polaris on {here.host} over HTTPS to add one.
+                    </p>
+                )}
+                {noneHere && (
+                    <p className="text-xs text-muted-foreground">
+                        None of these work on {here?.host}. Add one to sign in here with your device.
                     </p>
                 )}
 
@@ -125,7 +150,7 @@ export function PasskeysCard({
                         placeholder="Name this device (optional)"
                         onChange={(event) => setName(event.target.value)}
                     />
-                    <Button onClick={() => void add()} disabled={busy}>
+                    <Button onClick={() => void add()} disabled={busy || !canAdd}>
                         {busy ? "Waiting..." : "Add a passkey"}
                     </Button>
                 </div>

@@ -8,13 +8,17 @@
  * would mean handling WebAuthn material Polaris has no reason to touch.
  */
 
+import { loadEnv } from "@polaris/config";
 import { prisma } from "@polaris/db";
+import { passkeyRelyingPartyId } from "@polaris/core";
 import { recordAudit } from "@/lib/audit-service";
 import { requireUser } from "@/lib/session";
 
 export interface PasskeyView {
     id: string;
     name: string;
+    /** The address it signs in on. WebAuthn binds a credential to exactly one. */
+    host: string;
     /** ISO timestamp; the card renders it in the reader's locale. */
     addedAt: string;
 }
@@ -30,11 +34,15 @@ export async function listPasskeys(): Promise<PasskeyView[]> {
     const rows = await prisma.passkey.findMany({
         where: { userId: user.id },
         orderBy: { createdAt: "asc" },
-        select: { id: true, name: true, createdAt: true }
+        select: { id: true, name: true, rpId: true, createdAt: true }
     });
+    // Rows from before passkeys followed the address carry none: every one of
+    // them was issued under the published app URL.
+    const published = passkeyRelyingPartyId(loadEnv().POLARIS_APP_URL) ?? "";
     return rows.map((row) => ({
         id: row.id,
         name: row.name?.trim() || "Unnamed passkey",
+        host: row.rpId ?? published,
         addedAt: row.createdAt.toISOString()
     }));
 }

@@ -3,9 +3,9 @@
  * Edge-compatible. All sign-in/up/out/session traffic flows through here.
  */
 
-import { toNextJsHandler } from "better-auth/next-js";
-import { auth } from "@/lib/auth";
+import { handleAuthRequest } from "@/lib/auth";
 
 export const runtime = "nodejs";
 
-export const { GET, POST } = toNextJsHandler(auth);
+export const GET = handleAuthRequest;
+export const POST = handleAuthRequest;

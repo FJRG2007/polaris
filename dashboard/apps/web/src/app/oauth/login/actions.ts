@@ -7,7 +7,10 @@
  * confirms whether a given username exists.
  */
 
+import { headers } from "next/headers";
+import { loadEnv } from "@polaris/config";
 import { prisma } from "@polaris/db";
+import { passkeyRelyingPartyId } from "@polaris/core";
 import { getAuthMailStatus } from "@/lib/auth-mail";
 import { rateLimit } from "@/lib/rate-limit-service";
 
@@ -43,14 +46,37 @@ export async function magicLinkAvailable(): Promise<boolean> {
  * fact is observable from the WebAuthn ceremony itself. It is throttled per
  * address so it cannot be swept, and it never distinguishes "no account" from
  * "no passkey".
+ *
+ * Only passkeys bound to the address the page is open on count: WebAuthn will
+ * not offer any other, so a button here for one registered elsewhere would raise
+ * a prompt that finds nothing.
  */
 export async function accountHasPasskey(identifier: string): Promise<boolean> {
     const value = identifier.trim().toLowerCase();
     if (!value) return false;
+    const rpId = await currentRelyingPartyId();
+    if (!rpId) return false;
     const throttle = await rateLimit(`passkey-hint:${value}`, PASSKEY_HINT_LIMIT, PASSKEY_HINT_WINDOW_MS);
     if (!throttle.ok) return false;
     const email = await resolveIdentifier(value);
     if (!email) return false;
-    const count = await prisma.passkey.count({ where: { user: { email } } });
+    const count = await prisma.passkey.count({
+        where: { user: { email }, OR: boundHere(rpId) }
+    });
     return count > 0;
+}
+
+/** The address this request came in on, or null when it could not hold a passkey.
+ *  Unverified on purpose: it only decides whether to offer a button to the caller
+ *  about their own browser, and a forged header buys nothing but a useless one. */
+async function currentRelyingPartyId(): Promise<string | null> {
+    const store = await headers();
+    return passkeyRelyingPartyId(store.get("x-forwarded-host") ?? store.get("host"));
+}
+
+/** Matches the passkeys that sign in on an address, including the ones registered
+ *  before passkeys followed the address - those were all issued under the app URL. */
+function boundHere(rpId: string): { rpId: string | null }[] {
+    const published = passkeyRelyingPartyId(loadEnv().POLARIS_APP_URL);
+    return rpId === published ? [{ rpId }, { rpId: null }] : [{ rpId }];
 }

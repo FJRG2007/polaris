@@ -210,6 +210,9 @@ model Passkey {
     transports   String?
     // Identifies the authenticator model, for labelling it in the UI.
     aaguid       String?
+    // The address it was registered on, which is the only one it signs in on.
+    // Null on rows that predate this: those were all issued under the app URL.
+    rpId         String?
     createdAt    DateTime @default(now())
 
     user User @relation(fields: [userId], references: [id], onDelete: Cascade)

@@ -8,7 +8,6 @@
  */
 
 import { getUserPhone, getUserSecurity, listSecurityQuestions, twoFactorEnabled } from "@polaris/auth";
-import { loadEnv } from "@polaris/config";
 import { prisma } from "@polaris/db";
 import { requireUser } from "@/lib/session";
 import { describeTwoFactorMethods } from "@/lib/two-factor-delivery";
@@ -16,15 +15,6 @@ import { listPasskeys } from "./passkey-actions";
 import { SecurityView } from "./security-view";
 
 export const dynamic = "force-dynamic";
-
-/** The hostname passkeys are bound to. WebAuthn allows exactly one. */
-function appHost(): string {
-    try {
-        return new URL(loadEnv().POLARIS_APP_URL).hostname;
-    } catch {
-        return "";
-    }
-}
 
 export default async function SecurityPage() {
     const user = await requireUser();
@@ -60,7 +50,6 @@ export default async function SecurityPage() {
                 twoFactorEnabled={hasTwoFactor}
                 questions={questions.map((entry) => entry.question)}
                 passkeys={passkeys}
-                appHost={appHost()}
                 phone={phone}
                 canSendWhatsApp={whatsappChannel !== null}
                 twoFactorMethods={methods}

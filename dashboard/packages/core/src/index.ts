@@ -11,6 +11,7 @@
 export * from "./cidr.js";
 export * from "./geo.js";
 export * from "./hostnames.js";
+export * from "./passkeys.js";
 export * from "./paths.js";
 export * from "./format.js";
 export * from "./permissions.js";

@@ -48,7 +48,6 @@ export function SecurityView({
     twoFactorEnabled,
     questions,
     passkeys,
-    appHost,
     phone,
     canSendWhatsApp,
     twoFactorMethods,
@@ -61,7 +60,6 @@ export function SecurityView({
     twoFactorEnabled: boolean;
     questions: string[];
     passkeys: PasskeyView[];
-    appHost: string;
     phone: UserPhoneView | null;
     canSendWhatsApp: boolean;
     twoFactorMethods: TwoFactorMethodStatus[];
@@ -138,7 +136,7 @@ export function SecurityView({
                 </>
             ) : null}
 
-            <PasskeysCard passkeys={passkeys} appHost={appHost} />
+            <PasskeysCard passkeys={passkeys} />
 
             <SettingCard
                 title="Quick unlock PIN"

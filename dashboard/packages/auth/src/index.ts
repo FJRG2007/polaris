@@ -5,7 +5,7 @@
  * because they need its concrete auth instance and request headers.
  */
 
-export { createAuth, type Auth } from "./auth.js";
+export { createAuth, createRequestAuth, type Auth, type RequestAuth } from "./auth.js";
 export {
     seedDefaultRoles,
     getUserPermissions,
