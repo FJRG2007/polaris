@@ -6,9 +6,11 @@
  * everything else is an alternate the user can add, mark as a recovery contact,
  * or drop.
  *
- * Polaris does not send mail, so an alternate is a record of an address the
- * account owns rather than something that gets verified by a link. The copy says
- * as much instead of implying a message is on its way.
+ * An address is added without proof - an operator may want to record one they
+ * cannot receive at - and Verify is what upgrades it into something the account
+ * system will send a reset or a sign-in code to. With no email channel set up
+ * there is nothing to send with, so the control says so rather than failing on
+ * being pressed.
  */
 
 import { useState, type FormEvent } from "react";
@@ -31,15 +33,17 @@ import {
     addEmailAction,
     promoteEmailAction,
     removeEmailAction,
-    setEmailRecoveryAction
+    setEmailRecoveryAction,
+    verifyEmailAction
 } from "./actions";
 
-export function EmailsView({ emails }: { emails: UserEmailView[] }) {
+export function EmailsView({ emails, mailReady }: { emails: UserEmailView[]; mailReady: boolean }) {
     const router = useRouter();
     const [confirm, confirmElement] = useConfirm();
     const [adding, setAdding] = useState("");
     const [busy, setBusy] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [notice, setNotice] = useState<string | null>(null);
     const [promoting, setPromoting] = useState<UserEmailView | null>(null);
 
     const candidate = emailField.safeParse(adding);
@@ -49,11 +53,28 @@ export function EmailsView({ emails }: { emails: UserEmailView[] }) {
     async function run(key: string, action: () => Promise<{ error?: string }>) {
         setBusy(key);
         setError(null);
+        setNotice(null);
         const result = await action();
         setBusy(null);
         if (result.error) setError(result.error);
         else router.refresh();
         return !result.error;
+    }
+
+    /** Ask for a confirmation link. Nothing on the page changes until the link is
+     *  clicked, so the only feedback is saying where it went. */
+    async function verify(entry: UserEmailView) {
+        const key = entry.id ?? "primary";
+        setBusy(key);
+        setError(null);
+        setNotice(null);
+        const result = await verifyEmailAction(entry.email);
+        setBusy(null);
+        if (result.error) {
+            setError(result.error);
+            return;
+        }
+        setNotice(`Confirmation link sent to ${entry.email}.`);
     }
 
     async function onAdd(event: FormEvent<HTMLFormElement>) {
@@ -91,34 +112,60 @@ export function EmailsView({ emails }: { emails: UserEmailView[] }) {
                             <span className="truncate text-sm">{entry.email}</span>
                             {entry.primary ? <Badge variant="primary">Primary</Badge> : null}
                             {entry.recovery ? <Badge>Recovery</Badge> : null}
+                            {entry.verified ? (
+                                <Badge className="border-success/40 text-success">Verified</Badge>
+                            ) : (
+                                <Badge className="border-warning/40 text-warning">Unverified</Badge>
+                            )}
                         </div>
-                        {entry.primary ? null : (
-                            <div className="flex shrink-0 items-center gap-1">
+                        <div className="flex shrink-0 items-center gap-1">
+                            {entry.verified ? null : (
                                 <Button
                                     variant="ghost"
                                     size="sm"
-                                    disabled={busy === entry.id}
-                                    onClick={() =>
-                                        void run(entry.id ?? "", () =>
-                                            setEmailRecoveryAction(entry.id, !entry.recovery)
-                                        )
+                                    disabled={!mailReady || busy === (entry.id ?? "primary")}
+                                    title={
+                                        mailReady
+                                            ? undefined
+                                            : "No email channel is set up, so Polaris cannot send the link."
                                     }
+                                    onClick={() => void verify(entry)}
                                 >
-                                    {entry.recovery ? "Not for recovery" : "Use for recovery"}
+                                    Verify
                                 </Button>
-                                <Button variant="ghost" size="sm" onClick={() => setPromoting(entry)}>
-                                    Make primary
-                                </Button>
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    disabled={busy === entry.id}
-                                    onClick={() => void remove(entry)}
-                                >
-                                    Remove
-                                </Button>
-                            </div>
-                        )}
+                            )}
+                            {entry.primary ? null : (
+                                <>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        disabled={busy === entry.id}
+                                        onClick={() =>
+                                            void run(entry.id ?? "", () =>
+                                                setEmailRecoveryAction(entry.id, !entry.recovery)
+                                            )
+                                        }
+                                    >
+                                        {entry.recovery ? "Not for recovery" : "Use for recovery"}
+                                    </Button>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => setPromoting(entry)}
+                                    >
+                                        Make primary
+                                    </Button>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        disabled={busy === entry.id}
+                                        onClick={() => void remove(entry)}
+                                    >
+                                        Remove
+                                    </Button>
+                                </>
+                            )}
+                        </div>
                     </div>
                 ))}
             </div>
@@ -147,6 +194,7 @@ export function EmailsView({ emails }: { emails: UserEmailView[] }) {
             </form>
 
             {error ? <p className="text-sm text-danger">{error}</p> : null}
+            {notice ? <p className="text-sm text-success">{notice}</p> : null}
 
             <PromoteEmailDialog
                 entry={promoting}

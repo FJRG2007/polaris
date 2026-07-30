@@ -77,6 +77,9 @@ model User {
     twoFactors          TwoFactor[]
     sessionStates       SessionState[]
     emails              UserEmail[]
+    phone               UserPhone?
+    emailVerifications  EmailVerification[]
+    passkeys            Passkey[]
 }
 
 // Addresses a user owns besides the one they sign in with. The primary stays on
@@ -89,11 +92,55 @@ model UserEmail {
     userId    String   @db.Uuid
     email     String   @unique
     recovery  Boolean  @default(false)
+    // When the owner proved they can read mail at this address. Null means the
+    // address is claimed but unproven; the primary address records the same
+    // thing on User.emailVerified, which better-auth owns.
+    verifiedAt DateTime?
     createdAt DateTime @default(now())
 
     user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
     @@index([userId])
+}
+
+// A pending "click this to prove the address is yours" link. The raw token lives
+// only in the emailed URL; the row keeps its SHA-256 hash, so a database dump
+// yields no usable links. One row per outstanding request, replaced when a new
+// link is asked for, and deleted the moment it is spent.
+model EmailVerification {
+    id        String   @id @default(uuid(7)) @db.Uuid
+    userId    String   @db.Uuid
+    // The address being proved. Held here rather than resolved through UserEmail
+    // so a link keeps meaning the address it was sent to even if the row moves.
+    email     String
+    tokenHash String   @unique
+    expiresAt DateTime
+    createdAt DateTime @default(now())
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@index([userId])
+}
+
+// The number a second-factor code can be sent to. One per account, keyed by the
+// user, because it exists to reach one person rather than to be a directory:
+// there is nothing to choose between two numbers at the moment someone is
+// waiting on a code. Stored in international form, exactly as it will be dialled.
+//
+// The pending confirmation lives on the same row - a low-entropy code, hashed
+// with the password hasher like the quick-unlock PIN, with an expiry and a cap
+// on wrong guesses. A number is only usable as a factor once verifiedAt is set.
+model UserPhone {
+    userId        String    @id @db.Uuid
+    phone         String
+    verifiedAt    DateTime?
+    codeHash      String?
+    codeExpiresAt DateTime?
+    attempts      Int       @default(0)
+    createdAt     DateTime  @default(now())
+    updatedAt     DateTime  @updatedAt
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Session {
@@ -141,6 +188,34 @@ model Verification {
     updatedAt  DateTime @updatedAt
 
     @@index([identifier])
+}
+
+// A WebAuthn credential: a passkey held by the user's device or password
+// manager, proved by the device rather than typed. Every column here is the
+// passkey plugin's to decide; Polaris only stores them.
+model Passkey {
+    id           String   @id @default(uuid(7)) @db.Uuid
+    // What the user calls it, e.g. "iPhone". Set when it is registered.
+    name         String?
+    publicKey    String
+    userId       String   @db.Uuid
+    credentialID String
+    // Replay counter the authenticator reports on each assertion.
+    counter      Int
+    // singleDevice | multiDevice, as WebAuthn reports it.
+    deviceType   String
+    // Whether the credential is synced to the platform's keychain.
+    backedUp     Boolean
+    // Comma-separated transport hints (usb, nfc, ble, internal, hybrid).
+    transports   String?
+    // Identifies the authenticator model, for labelling it in the UI.
+    aaguid       String?
+    createdAt    DateTime @default(now())
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@index([userId])
+    @@index([credentialID])
 }
 
 model Role {
@@ -224,6 +299,18 @@ model UserSecurity {
     sessionMaxMinutes    Int       @default(0)
     // New sign-ins must be approved from an already-active session.
     requireLoginApproval Boolean   @default(false)
+    // Second-factor delivery methods the account accepts, beyond the
+    // authenticator, which is always accepted while the factor is on. JSON
+    // string array for SQLite portability; empty means authenticator only.
+    twoFactorMethods     String    @default("[]")
+    // Which method the challenge offers first. Null means the authenticator.
+    twoFactorPreferred   String?
+    // A short-lived, single-use pass for the approval gate above. Arming or
+    // disabling an authenticator replaces the session it was done from, and the
+    // replacement is the same person on the same device - not a new sign-in.
+    // Bound to the address that asked for it and consumed on first use.
+    rotationGraceUntil   DateTime?
+    rotationGraceIp      String?
     // Sign-in restrictions set directly on the account, on top of whatever the
     // attached access groups contribute. JSON string arrays for SQLite
     // portability; empty everywhere means no restriction.

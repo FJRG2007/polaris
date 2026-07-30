@@ -10,7 +10,16 @@
  * a hijacked session cannot quietly install its own way back in.
  */
 
-import { parseStringList, stringifyList, type AccessRulesInput } from "@polaris/core";
+import {
+    parseStringList,
+    stringifyList,
+    TWO_FACTOR_DELIVERY_METHODS,
+    TWO_FACTOR_METHODS,
+    type AccessRulesInput,
+    type TwoFactorDeliveryMethod,
+    type TwoFactorMethod,
+    type TwoFactorPreferencesInput
+} from "@polaris/core";
 import { prisma } from "@polaris/db";
 import type { Auth } from "./auth.js";
 
@@ -20,6 +29,10 @@ export interface UserSecuritySettings {
     idleLockMinutes: number;
     sessionMaxMinutes: number;
     requireLoginApproval: boolean;
+    /** Second-factor methods that send a code, beyond the authenticator. */
+    twoFactorMethods: TwoFactorDeliveryMethod[];
+    /** The method the challenge offers first. */
+    twoFactorPreferred: TwoFactorMethod;
     allowedCidrs: string[];
     allowedCountries: string[];
     allowedContinents: string[];
@@ -31,6 +44,8 @@ const DEFAULTS: UserSecuritySettings = {
     idleLockMinutes: 0,
     sessionMaxMinutes: 0,
     requireLoginApproval: false,
+    twoFactorMethods: [],
+    twoFactorPreferred: "totp",
     allowedCidrs: [],
     allowedCountries: [],
     allowedContinents: [],
@@ -54,10 +69,19 @@ async function verifyPassword(auth: Auth, userId: string, password: string): Pro
     return ctx.password.verify({ hash, password });
 }
 
-/** Hash a low-entropy secret (PIN, recovery answer) with the password hasher. */
-async function hashSecret(auth: Auth, value: string): Promise<string> {
+/**
+ * Hash a low-entropy secret (PIN, recovery answer, a sent code) with the password
+ * hasher, so everything short enough to be guessed is stored the same slow way.
+ */
+export async function hashSecret(auth: Auth, value: string): Promise<string> {
     const ctx = await auth.$context;
     return ctx.password.hash(value);
+}
+
+/** Check a value against a hash written by hashSecret. */
+export async function verifySecret(auth: Auth, hash: string, value: string): Promise<boolean> {
+    const ctx = await auth.$context;
+    return ctx.password.verify({ hash, password: value });
 }
 
 /** The user's effective security settings, including their attached groups. */
@@ -73,6 +97,8 @@ export async function getUserSecurity(userId: string): Promise<UserSecuritySetti
         idleLockMinutes: row.idleLockMinutes,
         sessionMaxMinutes: row.sessionMaxMinutes,
         requireLoginApproval: row.requireLoginApproval,
+        twoFactorMethods: parseDeliveryMethods(row.twoFactorMethods),
+        twoFactorPreferred: parsePreferredMethod(row.twoFactorPreferred),
         allowedCidrs: parseStringList(row.allowedCidrs),
         allowedCountries: parseStringList(row.allowedCountries),
         allowedContinents: parseStringList(row.allowedContinents),
@@ -103,6 +129,91 @@ export async function updateSessionLimits(
 /** Turn the "new sign-ins need approval" gate on or off. */
 export async function setLoginApprovalRequired(userId: string, required: boolean): Promise<void> {
     await upsertSecurity(userId, { requireLoginApproval: required });
+}
+
+// ---------------------------------------------------------------------------
+// Second-factor methods
+// ---------------------------------------------------------------------------
+
+/** Read the stored method list, dropping anything this build no longer knows. */
+function parseDeliveryMethods(stored: string): TwoFactorDeliveryMethod[] {
+    const known: readonly string[] = TWO_FACTOR_DELIVERY_METHODS;
+    return parseStringList(stored).filter((value): value is TwoFactorDeliveryMethod => known.includes(value));
+}
+
+/** An unknown or absent preference falls back to the authenticator, which is the
+ *  one method that is always accepted while the factor is on. */
+function parsePreferredMethod(stored: string | null): TwoFactorMethod {
+    const known: readonly string[] = TWO_FACTOR_METHODS;
+    return stored !== null && known.includes(stored) ? (stored as TwoFactorMethod) : "totp";
+}
+
+/**
+ * Replace which methods the account accepts and which it offers first.
+ *
+ * Turning a method on widens the ways into the account, so it re-verifies the
+ * password like every other control that does. Whether a method can actually
+ * deliver right now - a channel to send through, a proved address or number - is
+ * the caller's to check: this package knows the settings, not the deployment.
+ */
+export async function setTwoFactorPreferences(
+    auth: Auth,
+    userId: string,
+    input: TwoFactorPreferencesInput,
+    currentPassword: string
+): Promise<{ error?: string }> {
+    if (!(await verifyPassword(auth, userId, currentPassword))) {
+        return { error: "Current password is incorrect." };
+    }
+    await upsertSecurity(userId, {
+        twoFactorMethods: stringifyList(input.methods),
+        twoFactorPreferred: input.preferred
+    });
+    return {};
+}
+
+/**
+ * How long a rotation pass stays valid. Long enough to cover the round trip that
+ * replaces the session and the navigation that follows it, short enough that it
+ * is not a standing hole in the approval gate.
+ */
+const ROTATION_GRACE_MS = 2 * 60 * 1000;
+
+/**
+ * Issue a pass that lets the session replacing this one skip the approval gate.
+ *
+ * better-auth replaces the current session when an authenticator is armed or
+ * removed: it creates a new one, copies the old one's details onto it, and
+ * deletes the old. To the guard that is a session it has never seen, so with
+ * "Approve new sign-ins" on it was held pending and the user was asked to
+ * approve themselves from another session - with the session that would have
+ * done the approving already gone.
+ *
+ * The pass is bound to the address that asked for it and consumed on first use,
+ * so it only ever covers the continuation it was issued for.
+ */
+export async function beginSessionRotation(userId: string, ip: string | null): Promise<void> {
+    await upsertSecurity(userId, {
+        rotationGraceUntil: new Date(Date.now() + ROTATION_GRACE_MS),
+        rotationGraceIp: ip
+    });
+}
+
+/**
+ * Spend the rotation pass, if there is an unexpired one for this address.
+ * Always clears it, so a pass is good for exactly one session.
+ */
+export async function consumeSessionRotation(userId: string, ip: string | null): Promise<boolean> {
+    const row = await prisma.userSecurity.findUnique({
+        where: { userId },
+        select: { rotationGraceUntil: true, rotationGraceIp: true }
+    });
+    if (!row?.rotationGraceUntil) return false;
+    await prisma.userSecurity.update({
+        where: { userId },
+        data: { rotationGraceUntil: null, rotationGraceIp: null }
+    });
+    return row.rotationGraceUntil.getTime() > Date.now() && row.rotationGraceIp === ip;
 }
 
 /** Set the quick-unlock PIN after re-verifying the account password. */

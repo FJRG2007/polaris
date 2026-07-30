@@ -72,6 +72,8 @@ export interface UserEmailView {
     email: string;
     primary: boolean;
     recovery: boolean;
+    /** Whether the owner has proved they can read mail at this address. */
+    verified: boolean;
     addedAt: string | null;
 }
 
@@ -95,15 +97,26 @@ async function emailTaken(email: string, exceptUserId: string): Promise<boolean>
 /** Every address a user holds, primary first. */
 export async function listUserEmails(userId: string): Promise<UserEmailView[]> {
     const [user, alternates] = await Promise.all([
-        prisma.user.findUnique({ where: { id: userId }, select: { email: true } }),
+        prisma.user.findUnique({ where: { id: userId }, select: { email: true, emailVerified: true } }),
         prisma.userEmail.findMany({
             where: { userId },
             orderBy: { createdAt: "asc" },
-            select: { id: true, email: true, recovery: true, createdAt: true }
+            select: { id: true, email: true, recovery: true, verifiedAt: true, createdAt: true }
         })
     ]);
+    // The primary's verified flag lives on the user row, which better-auth owns;
+    // the alternates keep their own stamp.
     const primary: UserEmailView[] = user
-        ? [{ id: null, email: user.email, primary: true, recovery: false, addedAt: null }]
+        ? [
+              {
+                  id: null,
+                  email: user.email,
+                  primary: true,
+                  recovery: false,
+                  verified: user.emailVerified,
+                  addedAt: null
+              }
+          ]
         : [];
     return [
         ...primary,
@@ -112,6 +125,7 @@ export async function listUserEmails(userId: string): Promise<UserEmailView[]> {
             email: row.email,
             primary: false,
             recovery: row.recovery,
+            verified: row.verifiedAt !== null,
             addedAt: row.createdAt.toISOString()
         }))
     ];
@@ -164,21 +178,32 @@ export async function promoteUserEmail(
     currentPassword: string
 ): Promise<{ error?: string }> {
     const [user, alternate] = await Promise.all([
-        prisma.user.findUnique({ where: { id: userId }, select: { email: true } }),
-        prisma.userEmail.findFirst({ where: { id: emailId, userId }, select: { id: true, email: true } })
+        prisma.user.findUnique({ where: { id: userId }, select: { email: true, emailVerified: true } }),
+        prisma.userEmail.findFirst({
+            where: { id: emailId, userId },
+            select: { id: true, email: true, verifiedAt: true }
+        })
     ]);
     if (!user || !alternate) return { error: "That address is no longer on your account." };
     if (!(await verifyPassword(auth, userId, currentPassword))) {
         return { error: "Current password is incorrect." };
     }
+    // Both addresses keep whatever they had proved: verification says the owner
+    // can read mail there, which does not stop being true because the address
+    // swapped places with the one that signs in.
     await prisma.$transaction([
         prisma.userEmail.delete({ where: { id: alternate.id } }),
         prisma.user.update({
             where: { id: userId },
-            // The address is new to sign-in, so it starts unverified like any change.
-            data: { email: alternate.email, emailVerified: false }
+            data: { email: alternate.email, emailVerified: alternate.verifiedAt !== null }
         }),
-        prisma.userEmail.create({ data: { userId, email: user.email } })
+        prisma.userEmail.create({
+            data: {
+                userId,
+                email: user.email,
+                verifiedAt: user.emailVerified ? new Date() : null
+            }
+        })
     ]);
     return {};
 }

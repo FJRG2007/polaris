@@ -10,6 +10,11 @@
  * that last step, so a mis-copied secret cannot lock anyone out. Backup codes are
  * shown once, in the same breath, because that is the only moment they exist -
  * hence the copy, download and print controls sitting right next to them.
+ *
+ * Arming and removing the factor both end the current session and issue a fresh
+ * one, so both announce the replacement first; otherwise an account that asks
+ * for new sign-ins to be approved would send the user to the approval screen for
+ * their own, already-approved session.
  */
 
 import { useState, type FormEvent } from "react";
@@ -35,6 +40,7 @@ import {
     BACKUP_CODE_FORMATS,
     type BackupCodeFormat
 } from "@/lib/backup-codes";
+import { beginSessionRotationAction } from "./actions";
 import { Feedback } from "./setting-card";
 
 /** The `secret` query parameter of an otpauth:// URI, for manual entry. */
@@ -124,6 +130,8 @@ export function EnableTwoFactorDialog({
         const code = String(new FormData(event.currentTarget).get("code") ?? "");
         setBusy(true);
         setError(null);
+        // Arming the factor replaces this session; claim the continuation first.
+        await beginSessionRotationAction();
         const { error: verifyError } = await authClient.twoFactor.verifyTotp({ code });
         setBusy(false);
         if (verifyError) {
@@ -297,6 +305,8 @@ export function DisableTwoFactorDialog({
         const password = String(new FormData(event.currentTarget).get("password") ?? "");
         setBusy(true);
         setError(null);
+        // Removing the factor replaces this session too.
+        await beginSessionRotationAction();
         const { error: disableError } = await authClient.twoFactor.disable({ password });
         setBusy(false);
         if (disableError) {

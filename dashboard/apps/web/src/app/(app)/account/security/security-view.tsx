@@ -11,13 +11,24 @@
 import { useState } from "react";
 import { Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { IDLE_LOCK_CHOICES, SECURITY_QUESTION_COUNT, SESSION_MAX_CHOICES } from "@polaris/core";
+import type { UserPhoneView } from "@polaris/auth";
+import {
+    IDLE_LOCK_CHOICES,
+    SECURITY_QUESTION_COUNT,
+    SESSION_MAX_CHOICES,
+    type TwoFactorMethod
+} from "@polaris/core";
 import { Button, Card, CardBody, Select, Switch } from "@polaris/ui";
+import type { TwoFactorMethodStatus } from "@/lib/two-factor-delivery";
 import { setLoginApprovalAction, updateSessionLimitsAction } from "./actions";
 import { ChangePasswordDialog, RecoverPasswordDialog } from "./password-dialogs";
 import { DisableTwoFactorDialog, EnableTwoFactorDialog } from "./two-factor-dialogs";
 import { RemovePinDialog, SetPinDialog } from "./pin-dialogs";
 import { ClearQuestionsDialog, SecurityQuestionsDialog } from "./questions-dialog";
+import { TwoFactorMethodsCard } from "./two-factor-methods-card";
+import { PasskeysCard } from "./passkeys-card";
+import { PhoneCard } from "./phone-card";
+import type { PasskeyView } from "./passkey-actions";
 import { Feedback, SettingCard } from "./setting-card";
 
 /** Human label for a minute count used by both limit dropdowns. */
@@ -35,7 +46,13 @@ export function SecurityView({
     sessionMaxMinutes,
     requireLoginApproval,
     twoFactorEnabled,
-    questions
+    questions,
+    passkeys,
+    appHost,
+    phone,
+    canSendWhatsApp,
+    twoFactorMethods,
+    twoFactorPreferred
 }: {
     hasPin: boolean;
     idleLockMinutes: number;
@@ -43,6 +60,12 @@ export function SecurityView({
     requireLoginApproval: boolean;
     twoFactorEnabled: boolean;
     questions: string[];
+    passkeys: PasskeyView[];
+    appHost: string;
+    phone: UserPhoneView | null;
+    canSendWhatsApp: boolean;
+    twoFactorMethods: TwoFactorMethodStatus[];
+    twoFactorPreferred: TwoFactorMethod;
 }) {
     const router = useRouter();
     const [dialog, setDialog] = useState<string | null>(null);
@@ -108,6 +131,15 @@ export function SecurityView({
                 )}
             </SettingCard>
 
+            {twoFactorEnabled ? (
+                <>
+                    <TwoFactorMethodsCard statuses={twoFactorMethods} preferred={twoFactorPreferred} />
+                    <PhoneCard phone={phone} canSend={canSendWhatsApp} />
+                </>
+            ) : null}
+
+            <PasskeysCard passkeys={passkeys} appHost={appHost} />
+
             <SettingCard
                 title="Quick unlock PIN"
                 description={
@@ -153,9 +185,11 @@ export function SecurityView({
             <SettingCard
                 title="Approve new sign-ins"
                 description={
-                    hasPin
-                        ? "A new sign-in waits until you allow it with your PIN from a session that is already open."
-                        : "Needs a quick unlock PIN: allowing a sign-in asks for it."
+                    !hasPin
+                        ? "Needs a quick unlock PIN: allowing a sign-in asks for it."
+                        : twoFactorEnabled
+                          ? "After the code, a new sign-in still waits until you allow it with your PIN from a session that is already open."
+                          : "A new sign-in waits until you allow it with your PIN from a session that is already open."
                 }
                 status={approval ? "On" : "Off"}
                 statusTone={approval ? "on" : "off"}

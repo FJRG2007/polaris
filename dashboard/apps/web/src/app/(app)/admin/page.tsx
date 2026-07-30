@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Activity, Blocks, ChevronRight, Globe, Settings, ShieldCheck, Users, UsersRound } from "lucide-react";
+import { Activity, Blocks, ChevronRight, Globe, Mail, Settings, ShieldCheck, Users, UsersRound } from "lucide-react";
 import { PageHeader } from "@polaris/ui";
 import { requireAdmin } from "@/lib/session";
 
@@ -19,6 +19,12 @@ const SECTIONS = [
     },
     { href: "/admin/activity", icon: Activity, title: "Activity", description: "Audit log of actions across Polaris." },
     { href: "/admin/domains", icon: Globe, title: "Domains", description: "App and sharing domains, DuckDNS sync." },
+    {
+        href: "/admin/email",
+        icon: Mail,
+        title: "Account mail",
+        description: "The email channel that carries verification and sign-in messages."
+    },
     {
         href: "/integrations",
         icon: Blocks,

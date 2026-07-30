@@ -22,3 +22,5 @@ export * from "./schemas/file-request.js";
 export * from "./schemas/auth.js";
 export * from "./schemas/host.js";
 export * from "./schemas/account-security.js";
+export * from "./schemas/mail.js";
+export * from "./schemas/two-factor.js";

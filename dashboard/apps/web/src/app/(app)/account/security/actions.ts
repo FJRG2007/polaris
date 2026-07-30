@@ -14,6 +14,7 @@
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import {
+    beginSessionRotation,
     changeUserPassword,
     clearQuickPin,
     clearSecurityQuestions,
@@ -31,6 +32,7 @@ import { recoverPasswordSchema, securityQuestionsSchema, sessionLimitsSchema, se
 import { auth } from "@/lib/auth";
 import { recordAudit } from "@/lib/audit-service";
 import { rateLimit } from "@/lib/rate-limit-service";
+import { clientIp } from "@/lib/request-context";
 import { requireUser } from "@/lib/session";
 import { revokeOtherSessions } from "@/lib/session-directory";
 
@@ -81,6 +83,21 @@ export async function recoverPasswordAction(input: unknown): Promise<ActionResul
         await recordAudit({ actorId: user.id, action: "account.password.recovered" });
     }
     return result;
+}
+
+/**
+ * Announce that this session is about to be replaced, so its replacement is not
+ * mistaken for a new sign-in and held for approval.
+ *
+ * Arming or removing an authenticator ends the session it was done from and
+ * issues a fresh one; without this the user was sent to the approval screen and
+ * told to allow it from another session, which is exactly the session that had
+ * just been ended. Called by the authenticator dialogs immediately before the
+ * step that replaces the session.
+ */
+export async function beginSessionRotationAction(): Promise<void> {
+    const user = await requireUser();
+    await beginSessionRotation(user.id, (await clientIp()) ?? null);
 }
 
 export async function setPinAction(input: unknown): Promise<ActionResult> {

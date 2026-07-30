@@ -14,7 +14,7 @@
  * only when the activity stamp has gone stale.
  */
 
-import { resolveSignInRules } from "@polaris/auth";
+import { consumeSessionRotation, resolveSignInRules } from "@polaris/auth";
 import { prisma } from "@polaris/db";
 import { recordAudit } from "@/lib/audit-service";
 import { clientIp, clientUserAgent } from "@/lib/request-context";
@@ -153,6 +153,11 @@ export async function guardSession({
  * approvals AND there is another live, approved session that could grant one -
  * otherwise the requirement would strand them with no way in.
  *
+ * A session that continues an approved one is exempt: better-auth replaces the
+ * session when an authenticator is armed or removed, and the replacement is the
+ * same person on the same device. The session being replaced leaves a
+ * single-use, address-bound pass behind for it (see beginSessionRotation).
+ *
  * A single navigation resolves the session more than once (the layout and the
  * page render concurrently), so two callers can reach this at the same moment for
  * the same brand-new session. The loser of that race adopts the row the winner
@@ -166,7 +171,7 @@ async function createSessionState(input: {
     requireApproval: boolean;
 }): Promise<{ approval: string }> {
     let approval = "approved";
-    if (input.requireApproval) {
+    if (input.requireApproval && !(await consumeSessionRotation(input.userId, input.ip ?? null))) {
         const approver = await prisma.sessionState.findFirst({
             where: {
                 userId: input.userId,

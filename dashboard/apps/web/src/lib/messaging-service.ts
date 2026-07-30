@@ -6,6 +6,7 @@
  * master key as integrations and storage credentials.
  */
 
+import { EMAIL_PLATFORM } from "@polaris/core";
 import { loadEnv } from "@polaris/config";
 import { prisma } from "@polaris/db";
 import { decryptSecret, encryptSecret } from "@polaris/storage";
@@ -78,10 +79,11 @@ function parseCapabilities(config: string): ChannelCapabilities | null {
     }
 }
 
-/** The owner's channels. */
+/** The owner's channels. Email channels share the table but are not the bridge's
+ *  to run, so they are left to the mail service (see EMAIL_PLATFORM). */
 export async function listChannels(ownerId: string): Promise<ChannelView[]> {
     const rows = await prisma.channel.findMany({
-        where: { ownerId },
+        where: { ownerId, platform: { not: EMAIL_PLATFORM } },
         orderBy: { createdAt: "asc" }
     });
     return rows.map((row) => ({
@@ -521,7 +523,7 @@ export async function sendConversationMessage(
 /** Normalize a peer id to what the platform's adapter expects. WhatsApp wants a
  *  JID (<digits>@c.us) - a plain phone number is converted; other platforms take
  *  the id as entered. */
-function normalizePeerId(platform: string, raw: string): string {
+export function normalizePeerId(platform: string, raw: string): string {
     const value = raw.trim();
     if (platform === "whatsapp" && value && !value.includes("@")) {
         const digits = value.replace(/\D/g, "");
@@ -870,7 +872,7 @@ export async function channelState(ownerId: string, channelId: string): Promise<
 export async function reconcileChannels(): Promise<void> {
     const env = loadEnv();
     const channels = await prisma.channel.findMany({
-        where: { status: { in: ["connected", "connecting"] } }
+        where: { status: { in: ["connected", "connecting"] }, platform: { not: EMAIL_PLATFORM } }
     });
     for (const channel of channels) {
         try {

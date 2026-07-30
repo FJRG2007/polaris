@@ -6,14 +6,19 @@
  */
 
 import type { ReactElement } from "react";
-import { DiscordLogo, SlackLogo, TelegramLogo, WhatsAppLogo } from "./channel-logos";
+import { DiscordLogo, EmailLogo, SlackLogo, TelegramLogo, WhatsAppLogo } from "./channel-logos";
 
 export const PLATFORM_LABEL: Record<string, string> = {
     whatsapp: "WhatsApp",
     telegram: "Telegram",
     discord: "Discord",
-    slack: "Slack"
+    slack: "Slack",
+    email: "Email"
 };
+
+/** The email sender's mark, named separately so the Channels page can render it
+ *  without a lookup that may miss. */
+export const EMAIL_CHANNEL_MARK = { Logo: EmailLogo, color: "#8B5CF6" };
 
 /** Brand logo + color per platform, for distinguishing channels at a glance. */
 export const PLATFORM_LOGO: Record<
@@ -23,7 +28,8 @@ export const PLATFORM_LOGO: Record<
     whatsapp: { Logo: WhatsAppLogo, color: "#25D366" },
     telegram: { Logo: TelegramLogo, color: "#229ED9" },
     discord: { Logo: DiscordLogo, color: "#5865F2" },
-    slack: { Logo: SlackLogo, color: "#E01E5A" }
+    slack: { Logo: SlackLogo, color: "#E01E5A" },
+    email: EMAIL_CHANNEL_MARK
 };
 
 export const CHANNEL_STATUS_TONE: Record<string, string> = {

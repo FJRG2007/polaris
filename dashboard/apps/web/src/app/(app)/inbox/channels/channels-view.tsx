@@ -14,6 +14,7 @@ import Link from "next/link";
 import {
     CheckCircle2,
     Loader2,
+    Mail,
     MessagesSquare,
     Plus,
     QrCode,
@@ -33,15 +34,23 @@ import {
     Input,
     cn
 } from "@polaris/ui";
+import { MAIL_PROVIDER_INFO } from "@polaris/core";
 import type { ChannelView } from "@/lib/messaging-service";
+import type { EmailChannelView } from "@/lib/mail-service";
 import {
     channelStateAction,
     deleteChannelAction,
     reconnectChannelAction,
     updateChannelAction
 } from "../actions";
-import { CHANNEL_STATUS_TONE, PLATFORM_LABEL, PLATFORM_LOGO } from "../platform-meta";
+import {
+    CHANNEL_STATUS_TONE,
+    EMAIL_CHANNEL_MARK,
+    PLATFORM_LABEL,
+    PLATFORM_LOGO
+} from "../platform-meta";
 import { ConnectChannelDialog } from "../inbox-view";
+import { EmailChannelDialog } from "./email-channel-dialog";
 
 type ChannelKind = "telegram" | "whatsapp-cloud" | "whatsapp-web" | "discord" | "slack";
 
@@ -90,14 +99,19 @@ function channelKind(channel: ChannelView): ChannelKind {
 
 export function ChannelsView({
     initialChannels,
+    initialEmailChannels,
     bridgeReady
 }: {
     initialChannels: ChannelView[];
+    initialEmailChannels: EmailChannelView[];
     bridgeReady: boolean;
 }) {
     const [channels, setChannels] = useState(initialChannels);
     const [connecting, setConnecting] = useState(false);
     const [managing, setManaging] = useState<ChannelView | null>(null);
+    const [emailChannels, setEmailChannels] = useState(initialEmailChannels);
+    // null closes the dialog; a channel edits it, and "new" adds one.
+    const [emailDialog, setEmailDialog] = useState<EmailChannelView | "new" | null>(null);
 
     function patchChannel(id: string, patch: Partial<ChannelView>) {
         setChannels((prev) => prev.map((item) => (item.id === id ? { ...item, ...patch } : item)));
@@ -114,9 +128,15 @@ export function ChannelsView({
                         through these.
                     </p>
                 </div>
-                <Button onClick={() => setConnecting(true)} disabled={!bridgeReady}>
-                    <Plus className="size-4" /> Connect a channel
-                </Button>
+                <div className="flex flex-wrap gap-2">
+                    {/* Email needs no bridge, so it is never gated on one. */}
+                    <Button variant="secondary" onClick={() => setEmailDialog("new")}>
+                        <Mail className="size-4" /> Add email sender
+                    </Button>
+                    <Button onClick={() => setConnecting(true)} disabled={!bridgeReady}>
+                        <Plus className="size-4" /> Connect a channel
+                    </Button>
+                </div>
             </div>
 
             {!bridgeReady && (
@@ -134,8 +154,8 @@ export function ChannelsView({
             {channels.length === 0 ? (
                 <Card>
                     <CardBody className="text-sm text-muted-foreground">
-                        No channels connected yet. Connect one to start messaging and to target it
-                        from Watch alerts.
+                        No messaging channels connected yet. Connect one to start messaging and to
+                        target it from Watch alerts.
                     </CardBody>
                 </Card>
             ) : (
@@ -209,6 +229,55 @@ export function ChannelsView({
                 </div>
             )}
 
+            <div className="mt-2 flex flex-col gap-3">
+                <div>
+                    <h2 className="text-sm font-medium">Email senders</h2>
+                    <p className="text-xs text-muted-foreground">
+                        How Polaris sends mail: address verification, password resets, sign-in
+                        links and codes. An administrator picks which one carries them.
+                    </p>
+                </div>
+                {emailChannels.length === 0 ? (
+                    <Card>
+                        <CardBody className="text-sm text-muted-foreground">
+                            No email sender yet, so Polaris cannot send mail. Brevo and Mailjet both
+                            work from a personal address with no DNS to set up.
+                        </CardBody>
+                    </Card>
+                ) : (
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        {emailChannels.map((channel) => (
+                            <EmailChannelCard
+                                key={channel.id}
+                                channel={channel}
+                                onManage={() => setEmailDialog(channel)}
+                            />
+                        ))}
+                    </div>
+                )}
+            </div>
+
+            {emailDialog && (
+                <EmailChannelDialog
+                    channel={emailDialog === "new" ? null : emailDialog}
+                    onClose={() => setEmailDialog(null)}
+                    onSaved={(saved) => {
+                        setEmailChannels((prev) =>
+                            prev.some((item) => item.id === saved.id)
+                                ? prev.map((item) => (item.id === saved.id ? saved : item))
+                                : [...prev, saved]
+                        );
+                        // Keep the dialog on the saved channel so the test message
+                        // is available straight after adding it.
+                        setEmailDialog(saved);
+                    }}
+                    onRemoved={(id) => {
+                        setEmailChannels((prev) => prev.filter((item) => item.id !== id));
+                        setEmailDialog(null);
+                    }}
+                />
+            )}
+
             {connecting && (
                 <ConnectChannelDialog
                     bridgeReady={bridgeReady}
@@ -234,6 +303,50 @@ export function ChannelsView({
                 />
             )}
         </div>
+    );
+}
+
+/** An email sender, in the same card shape as a messaging channel. The status
+ *  reflects the last credential check or send, and the reason is shown when it
+ *  failed - a refused sending address is the usual cause and worth naming. */
+function EmailChannelCard({ channel, onManage }: { channel: EmailChannelView; onManage: () => void }) {
+    const { Logo, color } = EMAIL_CHANNEL_MARK;
+    return (
+        <Card>
+            <CardBody className="flex flex-col gap-3">
+                <div className="flex items-start gap-3">
+                    <div
+                        className="grid size-10 shrink-0 place-items-center rounded-md"
+                        style={{ color, backgroundColor: `${color}1a` }}
+                    >
+                        <Logo className="size-6" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                            <h3 className="truncate text-sm font-medium">{channel.name}</h3>
+                            <Badge className={cn(CHANNEL_STATUS_TONE[channel.status])}>
+                                {channel.status === "connected" ? "ready" : channel.status}
+                            </Badge>
+                        </div>
+                        <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                            {MAIL_PROVIDER_INFO[channel.provider].label}
+                            {channel.from ? ` - ${channel.from}` : ""}
+                        </p>
+                    </div>
+                </div>
+                {channel.error ? <p className="text-xs text-danger">{channel.error}</p> : null}
+                <div className="flex items-center justify-end gap-2">
+                    {channel.status === "connected" && !channel.error && (
+                        <span className="mr-auto inline-flex items-center gap-1 text-xs text-success">
+                            <CheckCircle2 className="size-3.5" /> Ready to send
+                        </span>
+                    )}
+                    <Button size="sm" variant="secondary" onClick={onManage}>
+                        <Settings2 className="size-4" /> Manage
+                    </Button>
+                </div>
+            </CardBody>
+        </Card>
     );
 }
 

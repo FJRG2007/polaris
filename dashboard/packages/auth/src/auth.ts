@@ -15,20 +15,30 @@
 
 import { randomUUID } from "node:crypto";
 import { betterAuth, type BetterAuthPlugin } from "better-auth";
-import { twoFactor } from "better-auth/plugins";
+import { magicLink, twoFactor } from "better-auth/plugins";
+import { passkey } from "@better-auth/passkey";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { loadEnv } from "@polaris/config";
 import { prisma } from "@polaris/db";
+import {
+    TWO_FACTOR_CODE_ATTEMPTS,
+    TWO_FACTOR_CODE_TTL_MINUTES,
+    TWO_FACTOR_METHOD_HEADER
+} from "@polaris/core";
 
 /** Session lifetime: 7 days, refreshed at most once per day. */
 const SESSION_MAX_AGE = 60 * 60 * 24 * 7;
 const SESSION_UPDATE_AGE = 60 * 60 * 24;
 
+/** How long an emailed sign-in link stays good. Short: it is a bearer credential
+ *  sitting in an inbox, and the user is asking to sign in right now. */
+const MAGIC_LINK_TTL_SECONDS = 10 * 60;
+
 /**
- * TOTP second factor with single-use backup codes. Verification is required
- * before the factor is armed, so a user who mis-scans the QR cannot lock
- * themselves out. Email OTP stays unconfigured on purpose (Polaris has no
- * outbound mail), which leaves those endpoints inert.
+ * The sign-in methods beyond a password: a TOTP second factor with single-use
+ * backup codes, passkeys, and - on a deployment that has a mail sender - sign-in
+ * by emailed link. Verification is required before the authenticator is armed,
+ * so a user who mis-scans the QR cannot lock themselves out.
  *
  * Typed as the plugin base rather than left inferred: the plugin's endpoint
  * types embed better-auth's own nested zod, which this package cannot name in
@@ -36,7 +46,99 @@ const SESSION_UPDATE_AGE = 60 * 60 * 24;
  * calls, so nothing loses type safety - the flow runs through @polaris/web's
  * auth client, not through auth.api here.
  */
-const PLUGINS: BetterAuthPlugin[] = [twoFactor({ issuer: "Polaris" })];
+/**
+ * WebAuthn binds a credential to one registrable domain, so a deployment reached
+ * on several names has to pick one. The app URL is that one: it is the address an
+ * operator publishes and the only one guaranteed to be reachable from outside.
+ *
+ * The practical consequence is worth stating plainly - a passkey registered on
+ * the domain does not work when the same Polaris is opened as polaris.local, and
+ * cannot be made to. Every other sign-in method still does.
+ */
+function passkeyRelyingParty(appUrl: string): { rpID: string; origin: string } | null {
+    try {
+        const url = new URL(appUrl);
+        return { rpID: url.hostname, origin: url.origin };
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * The two-factor plugin, with the code-by-message provider registered only when
+ * the app supplied a way to deliver one. Left out, its endpoints do not exist,
+ * so a build that cannot send never advertises a method it would fail at.
+ *
+ * The method the user picked arrives as a request header rather than in the body:
+ * the send-otp endpoint validates its body against a fixed shape of its own and
+ * would drop an extra field. It is only a routing hint - the delivery callback
+ * checks it against what the account actually accepts before sending anywhere.
+ */
+function twoFactorPlugin(options: AuthOptions): BetterAuthPlugin {
+    const send = options.sendTwoFactorCode;
+    if (!send) return twoFactor({ issuer: "Polaris" });
+    return twoFactor({
+        issuer: "Polaris",
+        otpOptions: {
+            period: TWO_FACTOR_CODE_TTL_MINUTES,
+            allowedAttempts: TWO_FACTOR_CODE_ATTEMPTS,
+            // The code is a short-lived, low-entropy secret; store it the way any
+            // other one is rather than in the clear next to the account it opens.
+            storeOTP: "hashed",
+            sendOTP: async ({ user, otp }, ctx) => {
+                const requested = ctx?.headers?.get(TWO_FACTOR_METHOD_HEADER) ?? null;
+                const result = await send({ userId: user.id, requested, code: otp });
+                // better-auth answers send-otp the same way whether or not this
+                // callback managed anything, so a failure is only ever recorded
+                // here. Telling the caller would say which methods an account
+                // has, to somebody who has not finished proving who they are.
+                if (result.error) console.error("two-factor code not sent:", result.error);
+            }
+        }
+    });
+}
+
+function buildPlugins(options: AuthOptions, appUrl: string, trusted: readonly string[]): BetterAuthPlugin[] {
+    const plugins: BetterAuthPlugin[] = [twoFactorPlugin(options)];
+    const relyingParty = passkeyRelyingParty(appUrl);
+    if (relyingParty) {
+        plugins.push(
+            passkey({
+                rpID: relyingParty.rpID,
+                rpName: "Polaris",
+                // Pinned rather than left for the client to supply: an origin the
+                // caller chooses is an origin an attacker chooses.
+                origin: Array.from(new Set([relyingParty.origin, ...trusted]))
+            }) as BetterAuthPlugin
+        );
+    }
+    // Registered only when the app can send at all. Whether a channel is
+    // nominated right now is the send callback's business.
+    if (options.sendMail) {
+        const send = options.sendMail;
+        plugins.push(
+            magicLink({
+                expiresIn: MAGIC_LINK_TTL_SECONDS,
+                // Registration is closed here as it is everywhere else: a link to
+                // an address with no account must not conjure one.
+                disableSignUp: true,
+                sendMagicLink: async ({ email, url }) => {
+                    const result = await send({
+                        to: email,
+                        subject: "Your Polaris sign-in link",
+                        text: `Sign in to Polaris:\n\n${url}\n\nThe link works once and expires in 10 minutes. If you did not ask to sign in, ignore this message.`,
+                        html: `<p>Sign in to Polaris:</p><p><a href="${url}">Sign in</a></p><p>The link works once and expires in 10 minutes. If you did not ask to sign in, ignore this message.</p>`
+                    });
+                    // Surfacing the reason would tell an unauthenticated caller
+                    // whether the address has an account; the endpoint answers the
+                    // same either way and the failure is logged instead.
+                    if (result.error) console.error("magic link not sent:", result.error);
+                }
+            }) as BetterAuthPlugin
+        );
+    }
+    return plugins;
+}
 
 /** Both schemes for a hostname: a deployment is reached over plain HTTP on the LAN
  *  and over HTTPS on its domain, often the same day. */
@@ -56,6 +158,39 @@ export interface AuthOptions {
      * are the caller's to swallow, and cost only the extra origins.
      */
     readonly configuredHosts?: () => Promise<readonly string[]>;
+
+    /**
+     * How to send an account message. Supplied by the app, which owns the channel
+     * that carries it; omitting it is what leaves the mail-backed sign-in methods
+     * unregistered, so a build that cannot send never exposes their endpoints.
+     *
+     * Whether a channel is actually nominated is resolved per send rather than
+     * here, so an operator configuring mail does not have to restart anything.
+     * Returns the reason it could not be sent rather than throwing, so a failure
+     * inside better-auth's request handling never fails the whole request.
+     */
+    readonly sendMail?: (message: {
+        to: string;
+        subject: string;
+        text: string;
+        html?: string;
+    }) => Promise<{ error?: string }>;
+
+    /**
+     * How to get a second-factor code to the person signing in. Supplied by the
+     * app, which owns the channels that carry it and knows which of them the
+     * account has turned on; omitting it leaves the code-by-message provider
+     * unregistered, so the authenticator stays the only second factor.
+     *
+     * `requested` is the method the challenge screen asked for, unvalidated. The
+     * implementation decides where the code actually goes and reports why it
+     * could not go rather than throwing - better-auth swallows a rejection here.
+     */
+    readonly sendTwoFactorCode?: (input: {
+        userId: string;
+        requested: string | null;
+        code: string;
+    }) => Promise<{ error?: string }>;
 }
 
 export function createAuth(options: AuthOptions = {}) {
@@ -94,7 +229,7 @@ export function createAuth(options: AuthOptions = {}) {
             expiresIn: SESSION_MAX_AGE,
             updateAge: SESSION_UPDATE_AGE
         },
-        plugins: PLUGINS,
+        plugins: buildPlugins(options, env.POLARIS_APP_URL, fixedOrigins),
         user: {
             additionalFields: {
                 // Server-only flag; never accepted from client input.

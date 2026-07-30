@@ -18,9 +18,10 @@
         "test": "vitest run --passWithNoTests"
     },
     "dependencies": {
+        "@better-auth/passkey": "1.6.25",
         "@polaris/config": "0.1.0",
         "@polaris/core": "0.1.0",
         "@polaris/db": "0.1.0",
-        "better-auth": "1.6.23"
+        "better-auth": "1.6.25"
     }
 }

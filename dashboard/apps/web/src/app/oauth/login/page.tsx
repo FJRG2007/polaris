@@ -2,11 +2,12 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import { KeyRound } from "lucide-react";
 import { loginSchema } from "@polaris/core";
 import { Button, Card, CardBody, CardHeader, CardTitle, Input, PolarisMark } from "@polaris/ui";
-import { signIn } from "@/lib/auth-client";
+import { authClient, signIn } from "@/lib/auth-client";
 import { useZodForm } from "@/lib/use-zod-form";
-import { resolveIdentifier } from "./actions";
+import { accountHasPasskey, magicLinkAvailable, resolveIdentifier } from "./actions";
 
 /** Where the last-used identifier is remembered so the field is prefilled. */
 const LAST_IDENTIFIER_KEY = "polaris:last-identifier";
@@ -45,6 +46,9 @@ export default function LoginPage() {
     const [error, setError] = useState<string | null>(null);
     const [notice, setNotice] = useState<string | null>(null);
     const [pending, setPending] = useState(false);
+    const [canEmailLink, setCanEmailLink] = useState(false);
+    const [linkSent, setLinkSent] = useState(false);
+    const [hasPasskey, setHasPasskey] = useState(false);
 
     // Prefill the identifier with the one used last on this device, and explain
     // why the last session ended if it ended for a reason.
@@ -52,7 +56,68 @@ export default function LoginPage() {
         const remembered = window.localStorage.getItem(LAST_IDENTIFIER_KEY);
         if (remembered) setValues((prev) => ({ ...prev, identifier: remembered }));
         setNotice(sessionNotice());
+        // Whether the instance can send at all. Nothing account-specific, so it
+        // is safe to ask for before anyone has identified themselves.
+        void magicLinkAvailable().then(setCanEmailLink);
     }, []);
+
+    // Look up whether the typed account has a passkey, so it is offered without
+    // the user having to remember they set one up. Debounced because it runs as
+    // they type, and re-checked from scratch whenever the identifier changes.
+    useEffect(() => {
+        const identifier = values.identifier.trim();
+        if (!identifier) {
+            setHasPasskey(false);
+            return;
+        }
+        let current = true;
+        const timer = setTimeout(() => {
+            void accountHasPasskey(identifier).then((found) => {
+                if (current) setHasPasskey(found);
+            });
+        }, 400);
+        return () => {
+            current = false;
+            clearTimeout(timer);
+        };
+    }, [values.identifier]);
+
+    /** Sign in with the device's passkey. The ceremony is the browser's; a
+     *  cancelled prompt just leaves the form as it was. */
+    async function signInWithPasskey() {
+        setPending(true);
+        setError(null);
+        const result = await authClient.signIn.passkey();
+        setPending(false);
+        if (result?.error) {
+            setError("That passkey did not work. Use your password instead.");
+            return;
+        }
+        window.localStorage.setItem(LAST_IDENTIFIER_KEY, values.identifier.trim());
+        router.push(postLoginTarget());
+        router.refresh();
+    }
+
+    /**
+     * Email a one-time sign-in link. The answer is the same whether or not the
+     * address has an account: the page must not become a way to find out which
+     * addresses are registered here.
+     */
+    async function sendLink() {
+        const identifier = values.identifier.trim();
+        if (!identifier) {
+            form.markTouched("identifier");
+            return;
+        }
+        setPending(true);
+        setError(null);
+        const email = await resolveIdentifier(identifier);
+        if (email) {
+            await authClient.signIn.magicLink({ email, callbackURL: postLoginTarget() });
+        }
+        setPending(false);
+        setLinkSent(true);
+    }
 
     function update(field: "identifier" | "password", value: string) {
         const next = { ...values, [field]: value };
@@ -135,6 +200,34 @@ export default function LoginPage() {
                         <Button type="submit" disabled={pending}>
                             {pending ? "Signing in..." : "Sign in"}
                         </Button>
+                        {hasPasskey ? (
+                            <Button
+                                type="button"
+                                variant="secondary"
+                                disabled={pending}
+                                onClick={() => void signInWithPasskey()}
+                            >
+                                <KeyRound className="size-4" />
+                                Use your passkey
+                            </Button>
+                        ) : null}
+                        {canEmailLink ? (
+                            linkSent ? (
+                                <p className="text-center text-xs text-muted-foreground">
+                                    If that account exists, a sign-in link is on its way. It works
+                                    once and expires in 10 minutes.
+                                </p>
+                            ) : (
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    disabled={pending}
+                                    onClick={() => void sendLink()}
+                                >
+                                    Email me a sign-in link
+                                </Button>
+                            )
+                        ) : null}
                     </form>
                     <p className="mt-4 text-center text-xs text-muted-foreground">
                         New accounts are by invitation. Setting up a new instance? Run{" "}

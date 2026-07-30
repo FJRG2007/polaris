@@ -27,5 +27,20 @@ export const auth = createAuth({
         ]);
         const tunnelHost = publicHostname(tunnel);
         return tunnelHost ? [...hosts, tunnelHost] : hosts;
+    },
+    // Lazily imported for the same reason as the domain modules: the mail service
+    // reaches the database and pulls in an SMTP client, and this module is loaded
+    // by everything. Resolved per send, so nominating a channel takes effect
+    // without a restart.
+    sendMail: async (message) => {
+        const { sendAuthEmail } = await import("./auth-mail");
+        return sendAuthEmail(message);
+    },
+    // Same reason, and the same per-send resolution: which methods an account
+    // accepts, and whether any of them can deliver, is decided at the moment a
+    // code is asked for rather than fixed when the server started.
+    sendTwoFactorCode: async (input) => {
+        const { sendTwoFactorCode } = await import("./two-factor-delivery");
+        return sendTwoFactorCode(input);
     }
 });

@@ -18,10 +18,36 @@ import {
 } from "@polaris/auth";
 import { emailField } from "@polaris/core";
 import { recordAudit } from "@/lib/audit-service";
+import { rateLimit } from "@/lib/rate-limit-service";
 import { requireUser } from "@/lib/session";
 import { auth } from "@/lib/auth";
+import { requestEmailVerification } from "@/lib/email-verification-service";
 
 const emailIdSchema = z.string().uuid();
+
+/** Verification links cost the provider's quota and land in someone's inbox, so
+ *  asking for one is throttled per account. */
+const VERIFY_LIMIT = 5;
+const VERIFY_WINDOW_MS = 15 * 60 * 1000;
+
+/**
+ * Send a confirmation link to one of the user's own addresses. The service
+ * checks the address really is theirs, so a forged id proves nothing.
+ */
+export async function verifyEmailAction(input: unknown): Promise<{ error?: string }> {
+    const user = await requireUser();
+    const parsed = emailField.safeParse(input);
+    if (!parsed.success) return { error: "Unknown address." };
+    const throttle = await rateLimit(`email-verify:${user.id}`, VERIFY_LIMIT, VERIFY_WINDOW_MS);
+    if (!throttle.ok) {
+        return { error: `Too many requests. Try again in ${Math.ceil(throttle.retryAfterMs / 60000)} minutes.` };
+    }
+    const result = await requestEmailVerification(user.id, parsed.data);
+    if (!result.error) {
+        await recordAudit({ actorId: user.id, action: "account.email.verification-sent" });
+    }
+    return result;
+}
 
 export async function updateProfileAction(input: {
     name?: string;

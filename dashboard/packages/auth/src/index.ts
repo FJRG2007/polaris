@@ -40,6 +40,9 @@ export {
     getUserSecurity,
     updateSessionLimits,
     setLoginApprovalRequired,
+    setTwoFactorPreferences,
+    beginSessionRotation,
+    consumeSessionRotation,
     setQuickPin,
     clearQuickPin,
     verifyQuickPin,
@@ -53,6 +56,14 @@ export {
     type UserSecuritySettings
 } from "./security.js";
 export { verifyTotpForSession, twoFactorEnabled } from "./two-factor.js";
+export {
+    getUserPhone,
+    setUserPhone,
+    removeUserPhone,
+    issuePhoneCode,
+    verifyPhoneCode,
+    type UserPhoneView
+} from "./phone.js";
 export {
     listAccessGroups,
     createAccessGroup,

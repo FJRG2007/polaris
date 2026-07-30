@@ -11,6 +11,19 @@ type LogoProps = SVGProps<SVGSVGElement>;
 
 const BASE = { viewBox: "0 0 24 24", role: "img" as const, "aria-hidden": true };
 
+/** Email is a protocol, not a brand, so this is a plain envelope rather than any
+ *  one provider's mark - the provider is named on the card beside it. */
+export function EmailLogo(props: LogoProps) {
+    return (
+        <svg {...BASE} {...props}>
+            <path
+                fill="currentColor"
+                d="M1.5 4.5h21A1.5 1.5 0 0 1 24 6v12a1.5 1.5 0 0 1-1.5 1.5h-21A1.5 1.5 0 0 1 0 18V6a1.5 1.5 0 0 1 1.5-1.5Zm.9 2.4v.63l9.6 6.24 9.6-6.24V6.9H2.4Zm19.2 3.09-8.94 5.81a1.5 1.5 0 0 1-1.62 0L2.4 9.99v7.11h19.2V9.99Z"
+            />
+        </svg>
+    );
+}
+
 export function WhatsAppLogo(props: LogoProps) {
     return (
         <svg {...BASE} {...props}>

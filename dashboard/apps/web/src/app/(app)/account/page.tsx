@@ -9,18 +9,20 @@
 import { listUserEmails } from "@polaris/auth";
 import { prisma } from "@polaris/db";
 import { requireUser } from "@/lib/session";
+import { getAuthMailStatus } from "@/lib/auth-mail";
 import { AccountView } from "./account-view";
 
 export const dynamic = "force-dynamic";
 
 export default async function AccountPage() {
     const session = await requireUser();
-    const [user, emails] = await Promise.all([
+    const [user, emails, mail] = await Promise.all([
         prisma.user.findUnique({
             where: { id: session.id },
             select: { name: true, username: true }
         }),
-        listUserEmails(session.id)
+        listUserEmails(session.id),
+        getAuthMailStatus()
     ]);
 
     return (
@@ -33,6 +35,7 @@ export default async function AccountPage() {
                 name={user?.name ?? session.name}
                 username={user?.username ?? ""}
                 emails={emails}
+                mailReady={mail.channelId !== null}
             />
         </div>
     );
