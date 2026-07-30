@@ -62,7 +62,7 @@ export function DomainsView({
     const [setupNonce, setSetupNonce] = useState(0);
 
     return (
-        <div className="flex max-w-2xl flex-col gap-4">
+        <div className="flex w-full flex-col gap-4">
             <DomainSetupWizard
                 onState={(next) => {
                     setConfig(next.domains);

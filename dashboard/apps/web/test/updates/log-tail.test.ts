@@ -19,7 +19,7 @@ process.env.POLARIS_UPDATE_LOG = logPath;
 vi.mock("@/lib/session", () => ({ getSession: async () => ({ user: { isAdmin: true } }) }));
 
 const { GET } = await import("../../src/app/api/updates/logs/route");
-const { isUpdateInFlight, STALE_LOG_MS } = await import("../../src/lib/update-log");
+const { isRecentRun, isUpdateInFlight, RECENT_RUN_MS, STALE_LOG_MS } = await import("../../src/lib/update-log");
 type UpdateLogTail = import("../../src/lib/update-log").UpdateLogTail;
 
 async function tail(offset = 0): Promise<UpdateLogTail> {
@@ -116,5 +116,64 @@ describe("re-attaching after a reload", () => {
         await writeFile(logPath, "pulling image...\n");
         const result = await tail();
         expect(isUpdateInFlight(result, Date.now() + STALE_LOG_MS + 1000)).toBe(false);
+    });
+
+    it("carries the host's clock, so the age of a run never depends on the browser's", async () => {
+        await writeFile(logPath, "pulling image...\n");
+        const result = await tail();
+        expect(result.now).toBeGreaterThan(0);
+        expect(isUpdateInFlight(result, result.now)).toBe(true);
+    });
+});
+
+/** A run that ended while the page was gone - the update restarts the web
+ *  container, so this is the normal case, not the exception. */
+describe("showing the run that just finished", () => {
+    it("shows a run that has just ended", async () => {
+        await writeFile(logPath, "done\nPOLARIS_UPDATE_EXIT=0\n");
+        expect(isRecentRun(await tail(), Date.now())).toBe(true);
+    });
+
+    it("shows nothing when the updater has never run", async () => {
+        expect(isRecentRun(await tail(), Date.now())).toBe(false);
+    });
+
+    it("drops a run old enough that the operator is no longer looking at it", async () => {
+        await writeFile(logPath, "done\nPOLARIS_UPDATE_EXIT=0\n");
+        const result = await tail();
+        expect(isRecentRun(result, Date.now() + RECENT_RUN_MS + 1000)).toBe(false);
+    });
+
+    it("reports the exit code from the first poll, however little of the log it read", async () => {
+        // Gated on `done`, this was null until the caller had walked the whole
+        // file - so a page opening on a failed build could not tell it from a
+        // live one, and offered neither the failure nor the report.
+        await writeFile(logPath, `${"step\n".repeat(40_000)}POLARIS_UPDATE_EXIT=1\n`);
+        const first = await tail();
+
+        expect(first.done).toBe(false);
+        expect(first.exitCode).toBe(1);
+        expect(first.finished).toBe(true);
+    });
+
+    it("says how much there is, so the end can be asked for without walking to it", async () => {
+        await writeFile(logPath, `${"step\n".repeat(40_000)}POLARIS_UPDATE_EXIT=1\n`);
+        const first = await tail();
+        expect(first.size).toBeGreaterThan(first.nextOffset);
+
+        const end = await tail(first.size - 1024);
+        expect(end.content).toContain("POLARIS_UPDATE_EXIT=1");
+        expect(end.nextOffset).toBe(first.size);
+    });
+
+    it("leaves a run that reported no code without one, rather than calling it a success", async () => {
+        // Quiet-but-live and cut-off look the same from here; the difference is
+        // not the log's to invent.
+        await writeFile(logPath, "pulling image...\n");
+        const result = await tail();
+
+        expect(result.finished).toBe(false);
+        expect(result.exitCode).toBeNull();
+        expect(isRecentRun(result, Date.now())).toBe(true);
     });
 });

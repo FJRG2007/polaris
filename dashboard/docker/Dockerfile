@@ -153,6 +153,12 @@ RUN chmod +x /usr/local/bin/polaris && ln -sf /usr/local/bin/polaris /usr/local/
 # overrides this with root ownership.
 RUN mkdir -p /var/lib/polaris /dynamic && chown -R node:node /var/lib/polaris /dynamic
 
+# Where the mDNS responder publishes the host's LAN address. Created and owned
+# here as well as in the responder's image: Docker seeds a fresh named volume
+# from whichever container mounts it first, and a root-owned mountpoint would
+# leave the responder unable to write the address at all.
+RUN mkdir -p /run/polaris-host && chown -R node:node /run/polaris-host
+
 # Run as the unprivileged `node` user shipped with the base image.
 RUN chown -R node:node /app
 USER node

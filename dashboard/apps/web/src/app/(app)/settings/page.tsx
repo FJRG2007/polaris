@@ -17,9 +17,9 @@ export default async function SettingsPage() {
     const status = await getUpdateStatus();
 
     return (
-        // Short page: centre it in the content area rather than leaving it stranded
-        // at the top. Taller content simply grows and scrolls as usual.
-        <div className="flex flex-1 flex-col justify-center">
+        // Narrow page: centre the column in the content area, header included, and
+        // keep it at the top so it does not shift as the update card grows.
+        <div className="mx-auto flex w-full max-w-2xl flex-col">
             <PageHeader title="Settings" description="General configuration for this Polaris deployment." />
             <SettingsView
                 initialStatus={status}

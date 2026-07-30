@@ -16,6 +16,7 @@
 
 import { prisma } from "@polaris/db";
 import type { ServerEnvironment } from "@polaris/core";
+import { getHostLanIp } from "./host-address";
 import { createNotification, type NotificationLevel } from "./notification-service";
 import { getSetting, setSetting } from "./setting-store";
 
@@ -34,6 +35,9 @@ export interface EdgeProbe {
      *  the `Server` header, which is the fastest way for an operator to recognize
      *  their own box - Polaris sends none. */
     readonly server: string | null;
+    /** The status it answered with, so the advice names the same error the operator
+     *  is looking at in their browser. Null when nothing answered. */
+    readonly status: number | null;
 }
 
 export interface RouterAdvice {
@@ -47,6 +51,15 @@ export interface RouterAdvice {
     /** Distinguishes one situation from another, so the same advice is not raised
      *  twice while it goes on being true. */
     readonly key: string;
+    /** Whether a port forward is what is missing, so the panel knows to walk the
+     *  operator through their router. False where no forward can help (a firewall
+     *  rule on a VPS, a carrier-NAT line). */
+    readonly forward: boolean;
+    /** How whatever answered named itself, carried through so the panel can start
+     *  on that brand's instructions. Null when nothing answered. */
+    readonly server: string | null;
+    /** This server's LAN address - what the forward has to point at. */
+    readonly lanIp: string | null;
 }
 
 /** The forward, worded once: both ports, and why :80 is not optional. */
@@ -68,12 +81,20 @@ function atHome(environment: ServerEnvironment): boolean {
  * a router that will not route its own public address back inward makes a working
  * domain look dead. So silence is reported as unconfirmed, while something *else*
  * answering is reported as certain - that one cannot be a measurement artifact.
+ *
+ * What it does not claim is why. A router answering its own public address from the
+ * inside looks the same whether it publishes that page to the internet or is merely
+ * bouncing the request back for want of a forward, and the second is far the commoner
+ * - so the forward comes first and remote management is what to check if it persists.
  */
 export function routerAdvice(
     environment: ServerEnvironment,
     hostname: string,
-    probe: EdgeProbe
+    probe: EdgeProbe,
+    lanIp: string | null = null
 ): RouterAdvice {
+    // Carried by every outcome: what answered, and what a forward would point at.
+    const facts = { server: probe.server, lanIp };
     if (probe.answer === "polaris") {
         return {
             ok: true,
@@ -81,36 +102,68 @@ export function routerAdvice(
             title: "Reachable from the internet",
             detail: `${hostname} reaches this server.`,
             steps: [],
-            key: "ok"
+            key: "ok",
+            forward: false,
+            ...facts
         };
     }
 
     if (probe.answer === "other") {
-        const named = probe.server ? ` It identifies itself as "${probe.server}".` : "";
+        // What answered, in the two terms the operator can match against their own
+        // browser: the status they are staring at, and the name in the header.
+        const status = probe.status ? ` It answers ${probe.status}` : " It answers";
+        const named = probe.server ? `, and calls itself "${probe.server}".` : ".";
+        // Carrier NAT first: it is a home line, but the forward the home branch asks
+        // for cannot be made on it, so the shared `atHome` answer would walk the
+        // operator through a router that has no inbound port to give them.
+        if (environment === "home-cgnat") {
+            return {
+                ok: false,
+                level: "danger",
+                title: "Your router is answering instead of Polaris",
+                detail:
+                    `${hostname} reaches your line, but the reply comes from the router.${status}${named}` +
+                    " Your provider shares one address between its customers, so no forward can bring the" +
+                    " request any further than this.",
+                steps: [
+                    "Use a tunnel to publish the site, which needs no open port.",
+                    "Or ask your provider for a public IP address, which some offer on request."
+                ],
+                key: "other:cgnat",
+                forward: false,
+                ...facts
+            };
+        }
         return atHome(environment)
             ? {
                   ok: false,
                   level: "danger",
                   title: "Your router is answering instead of Polaris",
                   detail:
-                      `${hostname} reaches your line, but the reply does not come from Polaris.${named}` +
-                      " This is the router's own admin page: it holds ports 80 and 443, so nothing gets through to this server.",
+                      `${hostname} reaches your line, but the reply comes from the router.${status}${named}` +
+                      " Ports 80 and 443 are not reaching this server, so the router answers on its own behalf -" +
+                      " which is the error you get in a browser.",
                   steps: [
-                      "In your router, turn off remote (WAN) management on ports 80 and 443, or move it to another port.",
-                      ...FORWARD_STEPS
+                      ...FORWARD_STEPS,
+                      "If the router still answers once the rules are saved, it is keeping 80 and 443 for its own" +
+                          " admin page: turn off remote (WAN) management, or move it to another port."
                   ],
-                  key: "other:home"
+                  key: "other:home",
+                  forward: true,
+                  ...facts
               }
             : {
                   ok: false,
                   level: "danger",
                   title: "Something else is answering on this domain",
-                  detail: `${hostname} reaches the server, but the reply does not come from Polaris.${named}`,
+                  detail: `${hostname} reaches the server, but the reply does not come from Polaris.${status}${named}`,
                   steps: [
                       "Find what is holding ports 80 and 443 on this server and stop it, or move it to another port.",
                       "Check that the domain points at this server and not at another host."
                   ],
-                  key: "other:datacenter"
+                  key: "other:datacenter",
+                  forward: false,
+                  ...facts
               };
     }
 
@@ -126,7 +179,9 @@ export function routerAdvice(
                 "Use a tunnel to publish the site, which needs no open port.",
                 "Or ask your provider for a public IP address, which some offer on request."
             ],
-            key: "silent:cgnat"
+            key: "silent:cgnat",
+            forward: false,
+            ...facts
         };
     }
 
@@ -140,7 +195,9 @@ export function routerAdvice(
                 " public address back inward, so this is not proof on its own - check it from outside the network," +
                 " on mobile data, to be sure.",
             steps: FORWARD_STEPS,
-            key: "silent:home"
+            key: "silent:home",
+            forward: true,
+            ...facts
         };
     }
 
@@ -153,7 +210,9 @@ export function routerAdvice(
             "Allow inbound 80 and 443 in your provider's firewall or security group.",
             "Port 80 is needed even for an HTTPS-only site: the certificate is issued over it."
         ],
-        key: "silent:datacenter"
+        key: "silent:datacenter",
+        forward: false,
+        ...facts
     };
 }
 
@@ -175,13 +234,14 @@ export async function probeEdge(hostname: string): Promise<EdgeProbe> {
             signal: controller.signal
         });
         const server = response.headers.get("server");
+        const status = response.status;
         if (response.ok) {
             const body = (await response.json().catch(() => null)) as { status?: string } | null;
-            if (body?.status === "ok") return { answer: "polaris", server };
+            if (body?.status === "ok") return { answer: "polaris", server, status };
         }
-        return { answer: "other", server };
+        return { answer: "other", server, status };
     } catch {
-        return { answer: "silent", server: null };
+        return { answer: "silent", server: null, status: null };
     } finally {
         clearTimeout(timer);
     }
@@ -202,7 +262,8 @@ export async function reportRouterAdvice(
     environment: ServerEnvironment,
     hostname: string
 ): Promise<RouterAdvice> {
-    const advice = routerAdvice(environment, hostname, await probeEdge(hostname));
+    const [probe, lanIp] = await Promise.all([probeEdge(hostname), getHostLanIp()]);
+    const advice = routerAdvice(environment, hostname, probe, lanIp);
     const previous = await getSetting(KEY);
     if (previous === advice.key) return advice;
     await setSetting(KEY, advice.key);

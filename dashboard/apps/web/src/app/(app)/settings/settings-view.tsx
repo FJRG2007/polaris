@@ -10,7 +10,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { Bug, CheckCircle2, DownloadCloud, RefreshCw, TriangleAlert } from "lucide-react";
 import { Button, Card, CardBody, CardHeader, CardTitle } from "@polaris/ui";
 import type { UpdateStatus } from "@/lib/update-service";
-import { isUpdateInFlight, type UpdateLogTail } from "@/lib/update-log";
+import { isRecentRun, isUpdateInFlight, type UpdateLogTail } from "@/lib/update-log";
 import { checkUpdatesAction, triggerHostUpdateAction, updateReportAction } from "./actions";
 
 interface Deployment {
@@ -30,6 +30,31 @@ function formatChecked(iso: string): string {
 // away and back within the session.
 let lastAutoCheck = 0;
 
+/** How much of a finished run's log to show. Matches the endpoint's chunk cap, so
+ *  the tail arrives in one read. */
+const TAIL_BYTES = 128 * 1024;
+
+/** How a run ended. A null code is a run that reported none - unknown, which is
+ *  neither a success nor a failure and must not be offered as a bug report. */
+interface UpdateResult {
+    readonly code: number | null;
+}
+
+/** Only a code the updater actually reported can be called a failure. */
+function isFailure(result: UpdateResult | null): boolean {
+    return result !== null && result.code !== null && result.code !== 0;
+}
+
+function outcomeLabel(result: UpdateResult): string {
+    if (result.code === null) return "no result reported";
+    return result.code === 0 ? "success" : `failed (exit ${result.code})`;
+}
+
+function outcomeTone(result: UpdateResult): string {
+    if (result.code === null) return "text-muted-foreground";
+    return result.code === 0 ? "text-success" : "text-danger";
+}
+
 export function SettingsView({
     initialStatus,
     deployment
@@ -44,7 +69,7 @@ export function SettingsView({
     const [showManual, setShowManual] = useState(false);
     // Live update log, streamed from the shared file the updater writes.
     const [logText, setLogText] = useState("");
-    const [logExit, setLogExit] = useState<number | null>(null);
+    const [logResult, setLogResult] = useState<UpdateResult | null>(null);
     const [reporting, setReporting] = useState(false);
     const logRef = useRef<HTMLPreElement>(null);
     const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -67,26 +92,70 @@ export function SettingsView({
     }, []);
 
     // An update runs on the host, not in this tab: reloading or navigating away
-    // drops the local state while the updater keeps going. The shared log file is
-    // the only truth, so on mount re-attach to a run that is still being written -
-    // otherwise the card looks idle while Polaris is mid-update.
+    // drops the local state while the updater keeps going, and the update itself
+    // restarts the web container, so the page that started one rarely survives it.
+    // The shared log file is the only truth - on mount, re-attach to a run still
+    // being written, and show the outcome of one that has just ended. Without the
+    // second case the card comes back idle after any update, offering the same one
+    // again with nothing to say it already ran.
     useEffect(() => {
         void (async () => {
             try {
-                const res = await fetch("/api/updates/logs?offset=0", { cache: "no-store" });
-                if (!res.ok) return;
-                const data = (await res.json()) as UpdateLogTail;
-                if (!isUpdateInFlight(data, Date.now())) return;
-                setUpdating(true);
-                setUpdateMsg("Update in progress - reconnecting automatically when Polaris is back.");
-                pollLogs();
-                waitForUpdate();
+                const data = await fetchTail(0);
+                if (!data) return;
+                if (isUpdateInFlight(data, data.now)) {
+                    setUpdating(true);
+                    setUpdateMsg("Update in progress - reconnecting automatically when Polaris is back.");
+                    pollLogs();
+                    waitForUpdate();
+                    return;
+                }
+                if (isRecentRun(data, data.now)) await showFinishedRun(data);
             } catch {
                 // No log to re-attach to; leave the card in its idle state.
             }
         })();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
+
+    /** One poll of the shared log. Null when it cannot be read right now. */
+    async function fetchTail(offset: number): Promise<UpdateLogTail | null> {
+        const res = await fetch(`/api/updates/logs?offset=${offset}`, { cache: "no-store" });
+        if (!res.ok) return null;
+        return (await res.json()) as UpdateLogTail;
+    }
+
+    /**
+     * Render a run that ended before this page loaded.
+     *
+     * The end of the log is what matters - the error that killed a build is its
+     * last lines - so it is asked for directly rather than walked to from the
+     * start, which on a long build ran out of reads before ever arriving and left
+     * the beginning of a successful compile on screen instead.
+     *
+     * A run that reported no exit code is shown as exactly that. It is either a
+     * build still running quietly or one that died, and the log cannot tell them
+     * apart, so it is not called either.
+     */
+    async function showFinishedRun(first: UpdateLogTail): Promise<void> {
+        let text = first.content;
+        if (first.size > first.nextOffset) {
+            const tail = await fetchTail(Math.max(0, first.size - TAIL_BYTES));
+            // Drop the partial first line: the offset is a byte count, so it lands
+            // wherever it lands.
+            if (tail?.exists) text = tail.content.slice(tail.content.indexOf("\n") + 1);
+        }
+        setLogText(text.replace(/POLARIS_UPDATE_EXIT=-?\d+\s*/g, ""));
+        setLogResult({ code: first.exitCode });
+        const at = new Date(first.updatedAt).toLocaleTimeString();
+        setUpdateMsg(
+            first.exitCode === 0
+                ? `Last update finished at ${at}.`
+                : first.exitCode === null
+                  ? `An update was running at ${at} and never reported a result. It may still be going, or it may have been cut off.`
+                  : `The last update failed (exit code ${first.exitCode}). See the log below.`
+        );
+    }
 
     /**
      * Open the prefilled issue. The tab is claimed before the await, because a
@@ -116,7 +185,7 @@ export function SettingsView({
         if (result === "started") {
             setUpdateMsg("Update started - streaming the log below. This page reconnects automatically when Polaris is back.");
             setLogText("");
-            setLogExit(null);
+            setLogResult(null);
             pollLogs();
             // Also watch health: the web restarts on the new build during the update,
             // which reloads the page even if the log marker is missed - so the card
@@ -198,9 +267,8 @@ export function SettingsView({
         stopPolling();
         pollRef.current = setInterval(async () => {
             try {
-                const res = await fetch(`/api/updates/logs?offset=${offset}`, { cache: "no-store" });
-                if (!res.ok) return; // transient (or web restarting); keep trying
-                const data = (await res.json()) as UpdateLogTail;
+                const data = await fetchTail(offset);
+                if (!data) return; // transient (or web restarting); keep trying
                 if (!data.exists) {
                     missing += 1;
                     if (missing >= 4 && !sawContent) {
@@ -219,7 +287,7 @@ export function SettingsView({
                 }
                 if (data.done) {
                     stopPolling();
-                    setLogExit(data.exitCode);
+                    setLogResult({ code: data.exitCode });
                     if (data.exitCode === 0) {
                         setUpdateMsg("Update complete - reloading...");
                         setTimeout(() => window.location.reload(), 1200);
@@ -255,7 +323,7 @@ export function SettingsView({
     const behind = typeof status.behindBy === "number" && status.behindBy > 0;
 
     return (
-        <div className="flex max-w-2xl flex-col gap-4">
+        <div className="flex w-full flex-col gap-4">
             <Card>
                 <CardHeader>
                     <div className="flex items-center justify-between gap-2">
@@ -331,19 +399,20 @@ export function SettingsView({
                                     latest image and redeploy.
                                 </p>
                             ) : null}
-                            {updating || logText ? (
+                            {/* Rendered on the outcome as well as the text: a run cut
+                                off before its first line of output has none, and
+                                hiding the block would take the report button with it. */}
+                            {updating || logText || logResult ? (
                                 <div className="flex flex-col gap-1">
                                     <div className="flex items-center gap-2">
                                         <span className="font-medium text-foreground">Update log</span>
-                                        {updating && logExit === null ? (
+                                        {updating && !logResult ? (
                                             <RefreshCw className="size-3 animate-spin text-muted-foreground" />
                                         ) : null}
-                                        {logExit !== null ? (
-                                            <span className={logExit === 0 ? "text-success" : "text-danger"}>
-                                                {logExit === 0 ? "success" : `failed (exit ${logExit})`}
-                                            </span>
+                                        {logResult ? (
+                                            <span className={outcomeTone(logResult)}>{outcomeLabel(logResult)}</span>
                                         ) : null}
-                                        {logExit !== null && logExit !== 0 ? (
+                                        {isFailure(logResult) ? (
                                             <Button
                                                 size="sm"
                                                 variant="secondary"
@@ -356,7 +425,7 @@ export function SettingsView({
                                             </Button>
                                         ) : null}
                                     </div>
-                                    {logExit !== null && logExit !== 0 ? (
+                                    {isFailure(logResult) ? (
                                         <p>
                                             Opens a prefilled issue with this log, your build, server type and domain.
                                             Nothing is sent until you submit it.
@@ -366,7 +435,7 @@ export function SettingsView({
                                         ref={logRef}
                                         className="max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-md border border-border bg-foreground/[0.04] p-2 font-mono text-[11px] leading-relaxed text-foreground"
                                     >
-                                        {logText || "Waiting for the updater to start..."}
+                                        {logText || (logResult ? "The updater wrote nothing." : "Waiting for the updater to start...")}
                                     </pre>
                                 </div>
                             ) : null}

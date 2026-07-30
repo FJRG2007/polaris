@@ -18,6 +18,7 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { serverEnvironmentSchema } from "@polaris/core";
 import { requireAdmin } from "@/lib/session";
+import { getHostLanIp } from "@/lib/host-address";
 import { recordAudit } from "@/lib/audit-service";
 import { checkZoneDns, provisionZoneDns, type ZoneDnsProvisionResult, type ZoneDnsReport } from "@/lib/domain-dns";
 import { detectDnsProvider, type DnsProviderInfo } from "@/lib/dns-provider";
@@ -65,6 +66,10 @@ export interface DomainSetupState {
     cloudflareConnected: boolean;
     /** Whether that token also reaches an account, which is what named tunnels need. */
     cloudflareTunnelReady: boolean;
+    /** This server's address on the LAN, which is what a port forward has to point at.
+     *  Null where it is not published, and then the router steps say so rather than
+     *  naming an address that would send the operator to the wrong machine. */
+    lanIp: string | null;
     /** The DNS records the current layout needs. */
     records: Array<{ host: string; wildcard: string; scope: string }>;
 }
@@ -83,13 +88,14 @@ async function domainSetupState(): Promise<DomainSetupState> {
     // operator to guess that a button on the last step is what unblocks their domain.
     const saved = await getDomainZones();
     if (saved.baseDomain && !(await zoneDnsVerified())) await checkZoneDns().catch(() => undefined);
-    const [environment, network, zones, domains, cloudflare, strategy] = await Promise.all([
+    const [environment, network, zones, domains, cloudflare, strategy, lanIp] = await Promise.all([
         getLocalEnvironment(),
         getNetworkStatus(),
         getDomainZones(),
         getDomainConfig(),
         getCloudflareAccountStatus(),
-        getSetting(STRATEGY_KEY)
+        getSetting(STRATEGY_KEY),
+        getHostLanIp()
     ]);
     return {
         environment,
@@ -104,6 +110,7 @@ async function domainSetupState(): Promise<DomainSetupState> {
         // as connected here even though it reaches no account.
         cloudflareConnected: cloudflare.dnsReady,
         cloudflareTunnelReady: cloudflare.connected,
+        lanIp,
         records: zoneRecords(zones).map((record) => ({
             host: record.host,
             wildcard: record.wildcard,

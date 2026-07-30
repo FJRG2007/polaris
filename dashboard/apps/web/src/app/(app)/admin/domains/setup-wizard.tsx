@@ -1,10 +1,10 @@
 "use client";
 
 /**
- * Guided domain setup. Four answers - where the server runs, how services should be
- * reachable, which domain and zones to use, and whether the DNS is actually there -
- * because each one changes what the next should even offer: a carrier-NAT line
- * cannot use a wildcard record, and a wildcard record makes tunnels unnecessary.
+ * Guided domain setup. Four answers - where the server runs, how traffic gets in,
+ * which domain and zones to use, and whether the DNS is actually there - because each
+ * one changes what the next should even offer: a carrier-NAT line cannot use a
+ * wildcard record, and a wildcard record makes tunnels unnecessary.
  *
  * The recommended option is always preselected, so finishing means pressing Continue.
  *
@@ -17,15 +17,17 @@
 
 import { useEffect, useState } from "react";
 import {
+    Cable,
     Check,
     CheckCircle2,
     ChevronLeft,
-    Copy,
     ExternalLink,
     Globe,
     Loader2,
+    Minus,
     Plus,
     RefreshCw,
+    Router,
     Sparkles,
     Trash2,
     TriangleAlert,
@@ -36,9 +38,19 @@ import type { ServerEnvironment } from "@polaris/core";
 import type { DnsProviderInfo } from "@/lib/dns-provider";
 import type { ZoneDnsProvisionResult, ZoneDnsReport } from "@/lib/domain-dns";
 import { CLOUDFLARE_DNS_TOKEN_URL } from "@/lib/integrations/cloudflare-token-link";
-import { strategiesFor, STRATEGY_META, type ExposureStrategy } from "@/lib/domain-strategies";
+import {
+    approachesFor,
+    approachOf,
+    strategiesFor,
+    STRATEGY_META,
+    type ApproachChoice,
+    type ExposureStrategy,
+    type StrategyChoice
+} from "@/lib/domain-strategies";
 import { ENVIRONMENT_CHOICES, ENVIRONMENT_META } from "../../apps/servers/environment-meta";
 import { connectCloudflareAccountAction } from "../../integrations/actions";
+import { CopyButton } from "./copy-button";
+import { RouterSteps } from "./router-steps";
 import { clearSetupDraft, isUntouched, readSetupDraft, savedAnswers, writeSetupDraft } from "./setup-draft";
 import {
     checkZoneDnsAction,
@@ -197,6 +209,7 @@ export function DomainSetupWizard({ onState }: { onState?: (state: DomainSetupSt
     }
 
     const choice = strategiesFor(environment);
+    const approaches = approachesFor(environment);
 
     function pickEnvironment(next: ServerEnvironment) {
         setEnvironment(next);
@@ -321,9 +334,12 @@ export function DomainSetupWizard({ onState }: { onState?: (state: DomainSetupSt
 
                 {step === 1 && (
                     <StrategyStep
+                        environment={environment}
                         choice={choice}
+                        approaches={approaches}
                         selected={strategy}
                         tunnelReady={state.cloudflareTunnelReady}
+                        lanIp={state.lanIp}
                         onSelect={setStrategy}
                     />
                 )}
@@ -373,7 +389,16 @@ export function DomainSetupWizard({ onState }: { onState?: (state: DomainSetupSt
                         <ChevronLeft className="size-4" /> Back
                     </Button>
                     {step < 2 && (
-                        <Button size="sm" onClick={() => setStep((current) => current + 1)}>
+                        // Nothing past here reads well without an answer: the exposure
+                        // step would rank for a server it knows nothing about, promise
+                        // forwarding rules and have no router to point at. Detection
+                        // preselects a real answer whenever it managed one, so this
+                        // only stops someone whose box could not be classified.
+                        <Button
+                            size="sm"
+                            onClick={() => setStep((current) => current + 1)}
+                            disabled={step === 0 && environment === "unknown"}
+                        >
                             Continue
                         </Button>
                     )}
@@ -405,7 +430,14 @@ function EnvironmentStep({
 }) {
     return (
         <div className="flex flex-col gap-3">
-            <StepTitle title="Where does this server run?" hint="It decides which ways of reaching it can work at all." />
+            <StepTitle
+                title="Where does this server run?"
+                hint={
+                    selected === "unknown"
+                        ? "Pick one to continue. It decides which ways of reaching it can work at all."
+                        : "It decides which ways of reaching it can work at all."
+                }
+            />
             <div className="grid gap-2 sm:grid-cols-2">
                 {ENVIRONMENT_CHOICES.map((option) => {
                     const meta = ENVIRONMENT_META[option];
@@ -434,64 +466,163 @@ function EnvironmentStep({
     );
 }
 
+/**
+ * How traffic reaches this server, asked as two questions rather than five options.
+ *
+ * The first is the one the operator has an opinion about: open the ports, or let a
+ * provider carry the traffic in. Both sides are stated with what they cost, because
+ * "recommended" is not an answer to someone who does not want to touch their router -
+ * and on a home line the router work is right there, brand and all, before they
+ * commit to it. The provider list follows from that answer, so the five strategies
+ * are never all on screen competing for a decision that has already been made.
+ */
 function StrategyStep({
+    environment,
     choice,
+    approaches,
     selected,
     tunnelReady,
+    lanIp,
     onSelect
 }: {
-    choice: ReturnType<typeof strategiesFor>;
+    environment: ServerEnvironment;
+    choice: StrategyChoice;
+    approaches: ApproachChoice;
     selected: ExposureStrategy;
     /** A token that reaches an account. A DNS-only one cannot create a tunnel. */
     tunnelReady: boolean;
+    /** What a forward would point at, for the router steps. */
+    lanIp: string | null;
     onSelect: (next: ExposureStrategy) => void;
 }) {
+    const approach = approachOf(selected);
+    const picked = approaches.options.find((option) => option.id === approach);
+    // Only this side's strategies, but the full list where a side somehow has none -
+    // an empty step would be a dead end with a Continue button.
+    const options = picked && picked.strategies.length > 0 ? picked.strategies : choice.options;
+    // Only where a forward can actually work. A carrier-NAT line is a home line too,
+    // and walking its operator through a router that cannot open a port for them is
+    // the one thing worse than not offering the steps at all.
+    const forwardable = environment === "home-nat";
+
     return (
-        <div className="flex flex-col gap-3">
-            <StepTitle
-                title="How should services be reachable?"
-                hint="Ordered by what costs least and depends on the fewest others."
-            />
-            <div className="flex flex-col gap-2">
-                {choice.options.map((option) => {
-                    const active = selected === option.id;
-                    return (
-                        <button
-                            key={option.id}
-                            type="button"
-                            disabled={!option.available}
-                            onClick={() => onSelect(option.id)}
-                            className={`flex flex-col gap-1 rounded-md border p-3 text-left transition-colors ${
-                                active ? "border-primary bg-primary/5" : "border-border/60 hover:bg-muted/40"
-                            } ${option.available ? "" : "cursor-not-allowed opacity-50"}`}
-                        >
-                            <span className="flex flex-wrap items-center gap-2 text-sm font-medium">
-                                {option.meta.label}
-                                {option.id === choice.recommended && (
-                                    <Badge variant="success">
-                                        <Sparkles className="size-3" /> Recommended
-                                    </Badge>
-                                )}
-                                {option.meta.wildcard && <Badge variant="neutral">Wildcard</Badge>}
-                                {option.id === "cloudflare-tunnel" && tunnelReady && (
-                                    <Badge variant="neutral">Token connected</Badge>
-                                )}
-                            </span>
-                            <span className="text-xs text-muted-foreground">{option.meta.summary}</span>
-                            <span className="text-xs text-muted-foreground">Depends on: {option.meta.dependency}</span>
-                            {option.meta.requires.length > 0 && (
+        <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-3">
+                <StepTitle
+                    title="How should traffic reach this server?"
+                    hint="Everything below follows from this answer, and either way can be changed later."
+                />
+                <div className="grid gap-2 sm:grid-cols-2">
+                    {approaches.options.map((option) => {
+                        const active = approach === option.id;
+                        return (
+                            <button
+                                key={option.id}
+                                type="button"
+                                // Re-selecting the side already chosen keeps the
+                                // strategy picked below it: the card is worth
+                                // re-reading, and doing so must not undo a choice.
+                                onClick={() => !active && onSelect(option.best)}
+                                className={`flex flex-col gap-2 rounded-md border p-3 text-left transition-colors ${
+                                    active ? "border-primary bg-primary/5" : "border-border/60 hover:bg-muted/40"
+                                }`}
+                            >
+                                <span className="flex flex-wrap items-center gap-2 text-sm font-medium">
+                                    {option.id === "tunnel" ? (
+                                        <Cable className="size-4 text-primary" />
+                                    ) : (
+                                        <Router className="size-4 text-primary" />
+                                    )}
+                                    {option.meta.label}
+                                    {option.id === approaches.recommended && (
+                                        <Badge variant="success">
+                                            <Sparkles className="size-3" /> Recommended
+                                        </Badge>
+                                    )}
+                                </span>
+                                <span className="text-xs text-muted-foreground">{option.meta.summary}</span>
+                                <span className="flex flex-col gap-1 text-xs">
+                                    {option.meta.pros.map((line) => (
+                                        <span key={line} className="flex items-start gap-1.5 text-muted-foreground">
+                                            <Check className="mt-0.5 size-3 shrink-0 text-success" /> {line}
+                                        </span>
+                                    ))}
+                                    {option.meta.cons.map((line) => (
+                                        <span key={line} className="flex items-start gap-1.5 text-muted-foreground">
+                                            <Minus className="mt-0.5 size-3 shrink-0 text-warning" /> {line}
+                                        </span>
+                                    ))}
+                                </span>
+                                {option.note && <span className="text-xs text-warning">{option.note}</span>}
+                            </button>
+                        );
+                    })}
+                </div>
+                {approach === "ports" && forwardable && (
+                    <div className="flex flex-col gap-2 rounded-md border border-border/60 bg-surface/40 px-3 py-2 text-xs text-muted-foreground">
+                        <p className="font-medium text-foreground">What you have to do in the router</p>
+                        <p>
+                            Forward ports 80 and 443 to this server. Pick your brand for the exact menu names and the
+                            values to type - the rest of the setup works either way, so this can be done afterwards.
+                        </p>
+                        <RouterSteps server={null} lanIp={lanIp} />
+                    </div>
+                )}
+            </div>
+
+            <div className="flex flex-col gap-3 border-t border-border/60 pt-3">
+                <StepTitle
+                    title={approach === "tunnel" ? "Which tunnel?" : "Which domain do the hostnames come from?"}
+                    hint="Ordered by what costs least and depends on the fewest others."
+                />
+                <div className="flex flex-col gap-2">
+                    {options.map((option) => {
+                        const active = selected === option.id;
+                        return (
+                            <button
+                                key={option.id}
+                                type="button"
+                                disabled={!option.available}
+                                onClick={() => onSelect(option.id)}
+                                className={`flex flex-col gap-1 rounded-md border p-3 text-left transition-colors ${
+                                    active ? "border-primary bg-primary/5" : "border-border/60 hover:bg-muted/40"
+                                } ${option.available ? "" : "cursor-not-allowed opacity-50"}`}
+                            >
+                                <span className="flex flex-wrap items-center gap-2 text-sm font-medium">
+                                    {option.meta.label}
+                                    {option.id === choice.recommended ? (
+                                        <Badge variant="success">
+                                            <Sparkles className="size-3" /> Recommended
+                                        </Badge>
+                                    ) : (
+                                        // The best on this side, said as such: the overall
+                                        // recommendation sits on the other one, and a list
+                                        // with no cue at all reads as five equal options.
+                                        option.id === picked?.best && <Badge variant="primary">Best of these</Badge>
+                                    )}
+                                    {option.meta.wildcard && <Badge variant="neutral">Wildcard</Badge>}
+                                    {option.id === "cloudflare-tunnel" && tunnelReady && (
+                                        <Badge variant="neutral">Token connected</Badge>
+                                    )}
+                                </span>
+                                <span className="text-xs text-muted-foreground">{option.meta.summary}</span>
                                 <span className="text-xs text-muted-foreground">
-                                    Needs: {option.meta.requires.join(" - ")}
+                                    Depends on: {option.meta.dependency}
                                 </span>
-                            )}
-                            {option.note && (
-                                <span className={`text-xs ${option.available ? "text-primary" : "text-warning"}`}>
-                                    {option.note}
-                                </span>
-                            )}
-                        </button>
-                    );
-                })}
+                                {option.meta.requires.length > 0 && (
+                                    <span className="text-xs text-muted-foreground">
+                                        Needs: {option.meta.requires.join(" - ")}
+                                    </span>
+                                )}
+                                {option.note && (
+                                    <span className={`text-xs ${option.available ? "text-primary" : "text-warning"}`}>
+                                        {option.note}
+                                    </span>
+                                )}
+                            </button>
+                        );
+                    })}
+                </div>
             </div>
         </div>
     );
@@ -1101,6 +1232,7 @@ function RouterAdviceNote({ advice }: { advice: NonNullable<ZoneDnsReport["route
                         ))}
                     </ol>
                 )}
+                {advice.forward && <RouterSteps server={advice.server} lanIp={advice.lanIp} />}
             </div>
         </div>
     );
@@ -1109,7 +1241,6 @@ function RouterAdviceNote({ advice }: { advice: NonNullable<ZoneDnsReport["route
 /** One record the zone needs. `done` means the check saw this zone's names answer
  *  with this server's address, so the record exists and is pointed correctly. */
 function RecordRow({ name, ip, done }: { name: string; ip: string | null; done: boolean }) {
-    const [copied, setCopied] = useState(false);
     return (
         <div className="flex items-center gap-2">
             <Badge variant={done ? "success" : "neutral"}>A</Badge>
@@ -1120,18 +1251,7 @@ function RecordRow({ name, ip, done }: { name: string; ip: string | null; done: 
                     <CheckCircle2 className="size-3.5 shrink-0 text-success" />
                 </span>
             )}
-            <button
-                type="button"
-                aria-label={`Copy ${name}`}
-                className="text-muted-foreground transition-colors hover:text-foreground"
-                onClick={() => {
-                    void navigator.clipboard?.writeText(name);
-                    setCopied(true);
-                    setTimeout(() => setCopied(false), 1500);
-                }}
-            >
-                {copied ? <Check className="size-3.5 text-success" /> : <Copy className="size-3.5" />}
-            </button>
+            <CopyButton value={name} />
         </div>
     );
 }

@@ -43,9 +43,7 @@ export function AppShell({
                         {sidebar}
                     </aside>
                 ) : null}
-                {/* A column so a page can claim the full content height (flex-1) and
-                    centre itself vertically; block pages are unaffected. */}
-                <main className="flex min-w-0 flex-1 flex-col p-4 md:p-6">{children}</main>
+                <main className="min-w-0 flex-1 p-4 md:p-6">{children}</main>
             </div>
         </div>
     );
