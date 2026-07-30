@@ -10,6 +10,13 @@ import { prisma } from "@polaris/db";
 
 export type NotificationLevel = "info" | "success" | "warning" | "danger";
 
+/**
+ * Who the alert went to. Deliberately coarse: a recipient learns that others
+ * were told, never which accounts, so the feed cannot be used to enumerate users.
+ * "group" carries the group name in audienceLabel.
+ */
+export type NotificationAudience = "you" | "admins" | "group" | "everyone";
+
 export interface NotificationInput {
     userId: string;
     type: string;
@@ -17,6 +24,9 @@ export interface NotificationInput {
     body?: string | null;
     href?: string | null;
     level?: NotificationLevel;
+    audience?: NotificationAudience;
+    audienceLabel?: string | null;
+    actionRequired?: boolean;
     metadata?: Record<string, unknown> | null;
 }
 
@@ -27,11 +37,29 @@ export interface NotificationView {
     body: string | null;
     href: string | null;
     level: NotificationLevel;
+    audience: NotificationAudience;
+    audienceLabel: string | null;
+    actionRequired: boolean;
     read: boolean;
     createdAt: string;
 }
 
 const LEVELS: ReadonlySet<string> = new Set(["info", "success", "warning", "danger"]);
+const AUDIENCES: ReadonlySet<string> = new Set(["you", "admins", "group", "everyone"]);
+
+const ROW_FIELDS = {
+    id: true,
+    type: true,
+    title: true,
+    body: true,
+    href: true,
+    level: true,
+    audience: true,
+    audienceLabel: true,
+    actionRequired: true,
+    readAt: true,
+    createdAt: true
+} as const;
 
 function toView(row: {
     id: string;
@@ -40,6 +68,9 @@ function toView(row: {
     body: string | null;
     href: string | null;
     level: string;
+    audience: string;
+    audienceLabel: string | null;
+    actionRequired: boolean;
     readAt: Date | null;
     createdAt: Date;
 }): NotificationView {
@@ -50,6 +81,9 @@ function toView(row: {
         body: row.body,
         href: row.href,
         level: (LEVELS.has(row.level) ? row.level : "info") as NotificationLevel,
+        audience: (AUDIENCES.has(row.audience) ? row.audience : "you") as NotificationAudience,
+        audienceLabel: row.audienceLabel,
+        actionRequired: row.actionRequired,
         read: row.readAt !== null,
         createdAt: row.createdAt.toISOString()
     };
@@ -66,6 +100,9 @@ export async function createNotification(input: NotificationInput): Promise<void
                 body: input.body ?? null,
                 href: input.href ?? null,
                 level: input.level ?? "info",
+                audience: input.audience ?? "you",
+                audienceLabel: input.audienceLabel ?? null,
+                actionRequired: input.actionRequired ?? false,
                 metadata: input.metadata ? JSON.stringify(input.metadata) : null
             }
         });
@@ -74,29 +111,19 @@ export async function createNotification(input: NotificationInput): Promise<void
     }
 }
 
+/** How many notifications the live feed carries. The bell and the page share it,
+ *  so there is a single list to keep in sync rather than two. */
+export const NOTIFICATION_FEED_LIMIT = 50;
+
 /** A user's notifications, newest first. */
-export async function listNotifications(userId: string, limit = 50): Promise<NotificationView[]> {
+export async function listNotifications(userId: string, limit = NOTIFICATION_FEED_LIMIT): Promise<NotificationView[]> {
     const rows = await prisma.notification.findMany({
         where: { userId },
         orderBy: { createdAt: "desc" },
         take: limit,
-        select: {
-            id: true,
-            type: true,
-            title: true,
-            body: true,
-            href: true,
-            level: true,
-            readAt: true,
-            createdAt: true
-        }
+        select: ROW_FIELDS
     });
     return rows.map(toView);
-}
-
-/** How many of a user's notifications are unread. */
-export async function countUnread(userId: string): Promise<number> {
-    return prisma.notification.count({ where: { userId, readAt: null } });
 }
 
 /** Mark one notification read (scoped to the owner). */

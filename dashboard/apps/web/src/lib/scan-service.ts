@@ -213,6 +213,7 @@ async function enforce(
             level: alert.level,
             title: alert.title,
             body: alert.body,
+            actionRequired: detected,
             href: verdict.permalink ?? "/drive/drop-points",
             metadata: {
                 connectionId: request.connectionId,

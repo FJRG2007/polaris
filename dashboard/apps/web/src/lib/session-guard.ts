@@ -214,7 +214,8 @@ async function createSessionState(input: {
             title: "A new sign-in is waiting for your approval",
             body: describeOrigin(input.ip, input.country, userAgent),
             href: "/account/sessions",
-            level: "warning"
+            level: "warning",
+            actionRequired: true
         });
     }
     return { approval };

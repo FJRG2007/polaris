@@ -12,6 +12,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
     Activity,
+    Bell,
     Blocks,
     Clock,
     Contact,
@@ -75,6 +76,7 @@ const APP_SIDEBARS: Record<string, SidebarItem[]> = {
     ],
     account: [
         { label: "Profile", href: "/account", icon: UserCog },
+        { label: "Notifications", href: "/account/notifications", icon: Bell },
         { label: "Security", href: "/account/security", icon: ShieldCheck },
         { label: "Sessions", href: "/account/sessions", icon: MonitorSmartphone },
         { label: "Access rules", href: "/account/access", icon: Network },

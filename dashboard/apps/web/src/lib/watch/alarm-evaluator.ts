@@ -111,6 +111,7 @@ async function notifyTransition(alarm: AlarmRow, kind: "triggered" | "resolved",
         title: triggered ? `Alarm: ${alarm.name}` : `Recovered: ${alarm.name}`,
         body: detail,
         level: triggered ? "danger" : "success",
+        actionRequired: triggered,
         href: "/watch",
         metadata: { alarmId: alarm.id }
     });

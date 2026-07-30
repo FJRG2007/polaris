@@ -289,6 +289,8 @@ async function notifyAdmins(advice: RouterAdvice): Promise<void> {
                 title: advice.title,
                 body,
                 level: advice.level,
+                audience: "admins",
+                actionRequired: !advice.ok,
                 href: "/admin/domains",
                 metadata: { key: advice.key }
             })

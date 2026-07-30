@@ -19,6 +19,9 @@ const nextConfig = {
     // Trace from the monorepo root so the standalone server lands at the path the
     // Docker image expects (apps/web/.next/standalone/apps/web/server.js).
     outputFileTracingRoot: workspaceRoot,
+    // Notifications live under the account app; keep the old top-level path working
+    // for anything already linking to it.
+    redirects: async () => [{ source: "/notifications", destination: "/account/notifications", permanent: true }],
     webpack: (config) => {
         // @polaris/ui is transpiled from TypeScript source and, like the rest of
         // the repo, uses explicit .js import specifiers. Map them back to .ts/.tsx

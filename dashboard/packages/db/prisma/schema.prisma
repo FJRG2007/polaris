@@ -962,20 +962,26 @@ model Integration {
 // drop-point upload scanned by an integration) and surfaced by the bell and the
 // notifications page. Cascades away with the user.
 model Notification {
-    id        String    @id @default(uuid(7)) @db.Uuid
-    userId    String    @db.Uuid
+    id             String    @id @default(uuid(7)) @db.Uuid
+    userId         String    @db.Uuid
     // Category slug driving the icon, e.g. "scan.malicious", "scan.clean".
-    type      String
-    title     String
-    body      String?
+    type           String
+    title          String
+    body           String?
     // Optional in-app deep link (e.g. "/drive/drop-points").
-    href      String?
+    href           String?
     // Styling severity: info | success | warning | danger.
-    level     String    @default("info")
+    level          String    @default("info")
+    // Who else received the same alert: you | admins | group | everyone. The
+    // group name goes in audienceLabel; individual recipients are never listed.
+    audience       String    @default("you")
+    audienceLabel  String?
+    // True when the alert is waiting on the user (approve, review, fix).
+    actionRequired Boolean   @default(false)
     // Stringified JSON metadata (connectionId, path, submissionId, ...).
-    metadata  String?
-    readAt    DateTime?
-    createdAt DateTime  @default(now())
+    metadata       String?
+    readAt         DateTime?
+    createdAt      DateTime  @default(now())
 
     user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 

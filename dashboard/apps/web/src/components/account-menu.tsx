@@ -45,7 +45,7 @@ export function AccountMenu({ name, email }: { name: string; email: string }) {
                     </a>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
-                    <a href="/notifications">
+                    <a href="/account/notifications">
                         <Bell className="size-4" />
                         Notifications
                     </a>

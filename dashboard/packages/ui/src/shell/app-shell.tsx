@@ -39,7 +39,9 @@ export function AppShell({
             </header>
             <div className="flex flex-1">
                 {sidebar ? (
-                    <aside className="hidden w-60 shrink-0 border-r border-border bg-surface/40 p-3 md:block">
+                    // Pinned under the sticky header and scrolling on its own, so the rail
+                    // stays reachable however far down the content the user is.
+                    <aside className="sticky top-14 hidden h-[calc(100vh-3.5rem)] w-60 shrink-0 self-start overflow-y-auto border-r border-border bg-surface/40 p-3 md:block">
                         {sidebar}
                     </aside>
                 ) : null}
