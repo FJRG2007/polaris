@@ -27,16 +27,36 @@ const TTL = 120;
  *  machine on the network can reach - so never the one to advertise. */
 const VIRTUAL = /^(docker|br-|veth|virbr|cni|flannel|kube|tailscale|zt)/;
 
-/** The host's primary non-internal IPv4, or an override from the environment. */
+/** Wireless interface names, across the naming schemes in use: wlan0, wlp2s0,
+ *  wlx.., and the older ath0 / ra0 of embedded drivers. */
+const WIRELESS = /^(wl|wifi|ath\d|ra\d)/;
+
+/**
+ * The host's LAN IPv4, with the CABLE always winning.
+ *
+ * A machine on both cable and WiFi has two LAN addresses and Polaris answers on
+ * both, but everything downstream treats this as THE address: the port forward,
+ * the DHCP reservation, the advice telling an operator what to type into their
+ * router. Handing them the WiFi address of a server that is plugged in sends them
+ * to reserve the wrong lease - and the wired link is the one that stays up, keeps
+ * its address, and is what a server is reached on. Taking whatever the OS listed
+ * first is how that happened; wired is now preferred explicitly.
+ *
+ * POLARIS_MDNS_IP still overrides everything, for a host whose interfaces this
+ * cannot reason about.
+ */
 function hostIpv4() {
     if (process.env.POLARIS_MDNS_IP) return process.env.POLARIS_MDNS_IP;
+    let wireless = null;
     for (const [name, addrs] of Object.entries(networkInterfaces())) {
         if (VIRTUAL.test(name)) continue;
         for (const addr of addrs ?? []) {
-            if (addr.family === "IPv4" && !addr.internal) return addr.address;
+            if (addr.family !== "IPv4" || addr.internal) continue;
+            if (!WIRELESS.test(name)) return addr.address;
+            wireless ??= addr.address;
         }
     }
-    return "127.0.0.1";
+    return wireless ?? "127.0.0.1";
 }
 
 /**
