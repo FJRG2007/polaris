@@ -75,6 +75,13 @@ export async function register(): Promise<void> {
     const { startAlarmEvaluator } = await import("./lib/watch/alarm-evaluator");
     startAlarmEvaluator();
 
+    // Probe the addresses this deployment itself is listed as reachable at, so a
+    // domain that stopped resolving is flagged rather than shown as a working link,
+    // and a quick tunnel whose sidecar died is dropped instead of staying on the
+    // sharing path.
+    const { startAddressWatcher } = await import("./lib/address-health");
+    startAddressWatcher();
+
     // Watch for a published Polaris build: tell the people who can install one, and
     // install it unattended when the deployment has been set to do that.
     const { startUpdateWatcher } = await import("./lib/update-watcher");

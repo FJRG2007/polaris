@@ -4,8 +4,8 @@ import { requireAdmin } from "@/lib/session";
 import { SettingsView } from "./settings-view";
 import { getUpdateSource } from "@/lib/update-source";
 import { getUpdateStatus } from "@/lib/update-service";
+import { checkedAddresses } from "@/lib/address-health";
 import { getAutoUpdatePolicy } from "@/lib/update-watcher";
-import { reachableAddresses } from "@/lib/deployment-addresses";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +21,7 @@ export default async function SettingsPage() {
         getUpdateStatus(),
         getAutoUpdatePolicy(),
         getUpdateSource(),
-        reachableAddresses()
+        checkedAddresses()
     ]);
 
     return (

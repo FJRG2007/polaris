@@ -21,11 +21,10 @@
  */
 
 import { prisma } from "@polaris/db";
-import { usersWithPermission } from "@polaris/auth";
-import { notify } from "@/lib/notifications/dispatch";
 import { getUpdateSource } from "@/lib/update-source";
 import { getUpdateStatus } from "@/lib/update-service";
 import { getSetting, setSetting } from "@/lib/setting-store";
+import { notifyOperators } from "@/lib/notifications/operators";
 import { lastUpdateOutcome, publishUpdateSource, startHostUpdate, updateTriggerReason, type UpdateTrigger } from "@/lib/update-runner";
 import {
     autoUpdateRunsAt,
@@ -90,21 +89,7 @@ async function tellOperators(input: {
     level?: NotificationLevel;
     actionRequired?: boolean;
 }): Promise<void> {
-    const recipients = await usersWithPermission(UPDATE_PERMISSION);
-    await Promise.allSettled(
-        recipients.map((userId) =>
-            notify({
-                userId,
-                event: input.event,
-                title: input.title,
-                body: input.body,
-                href: "/settings",
-                level: input.level,
-                audience: "admins",
-                actionRequired: input.actionRequired
-            })
-        )
-    );
+    await notifyOperators({ ...input, permission: UPDATE_PERMISSION, href: "/settings" });
 }
 
 /**

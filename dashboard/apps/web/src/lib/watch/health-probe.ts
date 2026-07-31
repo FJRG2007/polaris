@@ -11,11 +11,12 @@ import { prisma } from "@polaris/db";
 const PROBE_TIMEOUT_MS = 6000;
 const PROBE_CONCURRENCY = 6;
 
-interface ProbeTarget {
-    id: string;
+/** Everything a probe needs to dial something. Deliberately not a domain row:
+ *  the dashboard's own addresses are checked the same way and have no row. */
+export interface ProbeTarget {
     hostname: string;
     https: boolean;
-    pathPrefix: string | null;
+    pathPrefix?: string | null;
 }
 
 export interface DomainHealth {
@@ -53,7 +54,7 @@ export async function checkDomain(target: ProbeTarget): Promise<DomainHealth> {
 }
 
 /** Probe one domain by id and persist its health. */
-export async function probeDomain(target: ProbeTarget): Promise<DomainHealth> {
+export async function probeDomain(target: ProbeTarget & { id: string; }): Promise<DomainHealth> {
     const health = await checkDomain(target);
     await prisma.domain.update({
         where: { id: target.id },

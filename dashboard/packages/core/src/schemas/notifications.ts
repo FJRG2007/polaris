@@ -63,7 +63,7 @@ export interface NotificationEventInfo {
     /** Always reaches the bell, whatever the rule says. */
     critical?: boolean;
     /** Where the rule starts before anyone changes it. */
-    defaults: { inapp: boolean; email: boolean };
+    defaults: { inapp: boolean; email: boolean; };
 }
 
 export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
@@ -130,6 +130,14 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         group: "network",
         label: "Network needs attention",
         description: "Something outside Polaris is stopping your services being reached.",
+        level: "warning",
+        defaults: { inapp: true, email: false }
+    },
+    {
+        id: "network.address",
+        group: "network",
+        label: "An address stopped answering",
+        description: "One of the addresses this Polaris is reachable at went down, or came back.",
         level: "warning",
         defaults: { inapp: true, email: false }
     },

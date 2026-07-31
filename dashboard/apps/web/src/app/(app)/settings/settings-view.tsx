@@ -18,9 +18,9 @@
 import { LogViewer } from "@/components/log-viewer";
 import { CopyButton } from "@/components/copy-button";
 import type { UpdateStatus } from "@/lib/update-service";
+import type { CheckedAddress } from "@/lib/address-health";
 import { useDisplayFormat } from "@/components/display-format";
 import { useEffect, useRef, useState, useTransition } from "react";
-import type { DeploymentAddress } from "@/lib/deployment-addresses";
 import { isRecentRun, isUpdateInFlight, type UpdateLogTail } from "@/lib/update-log";
 import { Button, Card, CardBody, CardHeader, CardTitle, Input, Select } from "@polaris/ui";
 import type { AutoUpdateMode, AutoUpdatePolicy, DisplayFormat, UpdateSource } from "@polaris/core";
@@ -34,7 +34,7 @@ import {
 } from "./actions";
 
 interface Deployment {
-    readonly addresses: DeploymentAddress[];
+    readonly addresses: CheckedAddress[];
     readonly hostname: string;
     readonly repo: string;
     readonly branch: string;
@@ -42,12 +42,19 @@ interface Deployment {
 }
 
 /** What each kind of address is, said once next to it. */
-const ADDRESS_KINDS: Record<DeploymentAddress["kind"], string> = {
+const ADDRESS_KINDS: Record<CheckedAddress["kind"], string> = {
     app: "configured at install",
     local: "local network",
     domain: "domain",
     tunnel: "tunnel"
 };
+
+/** Why an address is marked down, and how long ago that was found out. */
+function downDetail(health: CheckedAddress["health"], format: DisplayFormat): string {
+    const checked = health.checkedAt ? new Date(health.checkedAt) : null;
+    const when = checked && !Number.isNaN(checked.getTime()) ? `, checked ${format.dateTime(checked)}` : "";
+    return `${health.detail ?? "Nothing answered"}${when}`;
+}
 
 const SOURCE_CHOICES: { value: UpdateSource; label: string; }[] = [
     { value: "image", label: "Published build" },
@@ -651,7 +658,9 @@ export function SettingsView({
                             deployment.addresses.map((address) => (
                                 <div key={address.host} className="flex items-center gap-2 text-sm">
                                     <a
-                                        className="truncate font-medium text-primary hover:underline"
+                                        className={`truncate font-medium hover:underline ${
+                                            address.health.state === "down" ? "text-muted-foreground" : "text-primary"
+                                        }`}
                                         href={address.url}
                                         target="_blank"
                                         rel="noreferrer"
@@ -662,6 +671,15 @@ export function SettingsView({
                                     <span className="shrink-0 text-xs text-muted-foreground">
                                         {ADDRESS_KINDS[address.kind]}
                                     </span>
+                                    {address.health.state === "down" ? (
+                                        <span
+                                            className="flex shrink-0 items-center gap-1 text-xs text-warning"
+                                            title={downDetail(address.health, format)}
+                                        >
+                                            <TriangleAlert className="size-3" />
+                                            not answering
+                                        </span>
+                                    ) : null}
                                     <CopyButton value={address.url} label={address.host} className="ml-auto" />
                                 </div>
                             ))
