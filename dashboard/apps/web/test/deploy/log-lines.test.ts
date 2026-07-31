@@ -8,6 +8,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+import { createDisplayFormat, DISPLAY_DEFAULTS } from "@polaris/core";
 import { formatLogTime, parseLog } from "../../src/lib/log-lines";
 
 describe("splitting the timestamp off", () => {
@@ -65,11 +66,19 @@ describe("grouping and severity", () => {
 });
 
 describe("showing the time", () => {
+    const format = createDisplayFormat(DISPLAY_DEFAULTS);
+
     it("renders a stamp as wall-clock to the second", () => {
-        expect(formatLogTime("2026-07-30T14:09:26.123456789Z")).toMatch(/^\d{2}:\d{2}:\d{2}$/);
+        expect(formatLogTime("2026-07-30T14:09:26.123456789Z", format)).toMatch(/^\d{2}:\d{2}:\d{2}$/);
+    });
+
+    it("writes it on the reader's own clock", () => {
+        const twelve = createDisplayFormat({ ...DISPLAY_DEFAULTS, clock: "12h" });
+
+        expect(formatLogTime("2026-07-30T14:09:26Z", twelve)).toMatch(/^\d{1,2}:\d{2}:\d{2} (AM|PM)$/);
     });
 
     it("passes through anything it cannot read", () => {
-        expect(formatLogTime("not-a-time")).toBe("not-a-time");
+        expect(formatLogTime("not-a-time", format)).toBe("not-a-time");
     });
 });
