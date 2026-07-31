@@ -8,7 +8,7 @@
  * allows `div`/`pre`/`code`/`span` and the `class`/`title` attributes.
  */
 
-import { loadHighlighter } from "./code-highlight";
+import { loadHighlighter } from "@/lib/code-highlight";
 
 // Register the link-hardening hook once (module-scoped): every anchor opens in a
 // new tab and cannot reach back into the opener.

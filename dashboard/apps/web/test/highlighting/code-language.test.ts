@@ -1,5 +1,5 @@
 /**
- * Which grammar a file or a Markdown fence gets. The viewer only highlights what
+ * Which grammar a file or a Markdown fence gets. Polaris only highlights what
  * this table resolves, so what matters is that the names people keep code under
  * resolve at all - including the ones with no extension to go on - that a fence
  * tag and an extension reach the same grammar, and that no two grammars quietly
@@ -11,7 +11,7 @@ import {
     CODE_LANGUAGES,
     languageForFile,
     languageForToken
-} from "../../../src/app/(app)/drive/viewer/code-language";
+} from "../../src/lib/code-language";
 
 describe("languageForFile", () => {
     it("resolves the everyday configuration and source extensions", () => {

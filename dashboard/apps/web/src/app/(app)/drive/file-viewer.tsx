@@ -21,7 +21,7 @@ import { formatBytes } from "@polaris/core";
 import { Button, Dialog, DialogContent, DialogHeader, DialogTitle } from "@polaris/ui";
 import { extensionOf } from "./file-categories";
 import { CodeView } from "./viewer/code-view";
-import { languageForFile } from "./viewer/code-language";
+import { languageForFile } from "@/lib/code-language";
 import { DocView } from "./viewer/doc-view";
 import { MarkdownView } from "./viewer/markdown-view";
 import { MediaView } from "./viewer/media-view";

@@ -1,13 +1,13 @@
 /**
- * The languages the viewer can highlight, and how a file name or a Markdown
- * fence tag resolves to one. Each entry names a highlight.js grammar and carries
- * its own loader, so opening a JSON file pulls in the JSON grammar and nothing
- * else - the import paths are static, which is what lets the bundler split them
- * into one chunk per language instead of shipping all 380 of them.
+ * The languages Polaris can highlight, and how a file name or a Markdown fence
+ * tag resolves to one. Each entry names a highlight.js grammar and carries its
+ * own loader, so opening a JSON file pulls in the JSON grammar and nothing else
+ * - the import paths are static, which is what lets the bundler split them into
+ * one chunk per language instead of shipping all 380 of them.
  */
 
 import type { LanguageFn } from "highlight.js";
-import { extensionOf } from "../file-categories";
+import { extName } from "@polaris/core";
 
 export interface CodeLanguage {
     /** highlight.js grammar id, and the module name under lib/languages. */
@@ -124,5 +124,5 @@ export function languageForFile(name: string): CodeLanguage | undefined {
     if (named) return BY_TOKEN.get(named);
     // .env, .env.local, .env.production: the name is all there is to go on.
     if (lowercased === ".env" || lowercased.startsWith(".env.")) return BY_TOKEN.get("ini");
-    return BY_TOKEN.get(extensionOf(lowercased));
+    return BY_TOKEN.get(extName(lowercased));
 }

@@ -2,7 +2,7 @@
 
 /**
  * Client view for policy management. Policies are authored as JSON documents, so
- * the editor is a plain textarea seeded with a working template; the server
+ * the editor is the shared JSON editor seeded with a working template; the server
  * validates the shape on save. Each policy card summarises its statements, lists
  * its attachments, and offers attach/detach and delete controls.
  */
@@ -11,6 +11,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronDown, Plus, Trash2, X } from "lucide-react";
 import { Badge, Button, Card, CardBody, CardHeader, CardTitle, Input, Select } from "@polaris/ui";
+import { JsonEditor, JsonView, prettyJson } from "@/components/json-view";
 import {
     attachPolicyAction,
     createPolicyAction,
@@ -53,16 +54,6 @@ const TEMPLATE = JSON.stringify(
 );
 
 /** One-line summary of a document's statements, tolerant of malformed JSON. */
-/** The editor works on indented JSON, so the stored document is compared in the
- *  same shape - reindenting is not what tells us the policy changed. */
-function pretty(document: string): string {
-    try {
-        return JSON.stringify(JSON.parse(document), null, 2);
-    } catch {
-        return document;
-    }
-}
-
 function summarize(document: string): string {
     try {
         const parsed = JSON.parse(document) as {
@@ -135,11 +126,11 @@ export function PoliciesAdmin({
                             onChange={(event) => setDescription(event.target.value)}
                         />
                     </div>
-                    <textarea
-                        className="min-h-40 rounded-md border border-input bg-surface p-3 font-mono text-xs"
+                    <JsonEditor
+                        label="Policy document"
+                        className="max-h-96"
                         value={document}
-                        onChange={(event) => setDocument(event.target.value)}
-                        spellCheck={false}
+                        onChange={setDocument}
                     />
                     <p className="text-xs text-muted-foreground">
                         Actions are capability keys (e.g. <code>drive.read</code>) or Drive verbs;
@@ -191,7 +182,7 @@ function PolicyCard({
     const [open, setOpen] = useState(false);
     const [name, setName] = useState(policy.name);
     const [description, setDescription] = useState(policy.description ?? "");
-    const [document, setDocument] = useState(() => pretty(policy.document));
+    const [document, setDocument] = useState(() => prettyJson(policy.document));
     const [attach, setAttach] = useState("");
     const [error, setError] = useState<string | null>(null);
 
@@ -199,7 +190,7 @@ function PolicyCard({
     const unchanged =
         name.trim() === policy.name &&
         description.trim() === (policy.description ?? "") &&
-        document === pretty(policy.document);
+        document === prettyJson(policy.document);
 
     function onSave() {
         setError(null);
@@ -334,11 +325,11 @@ function PolicyCard({
                                         onChange={(event) => setDescription(event.target.value)}
                                     />
                                 </div>
-                                <textarea
-                                    className="min-h-40 rounded-md border border-input bg-surface p-3 font-mono text-xs"
+                                <JsonEditor
+                                    label={`${policy.name} document`}
+                                    className="max-h-96"
                                     value={document}
-                                    onChange={(event) => setDocument(event.target.value)}
-                                    spellCheck={false}
+                                    onChange={setDocument}
                                 />
                                 {error ? <p className="text-sm text-danger">{error}</p> : null}
                                 <div>
@@ -348,9 +339,7 @@ function PolicyCard({
                                 </div>
                             </>
                         ) : (
-                            <pre className="overflow-auto rounded-md border border-border bg-muted/40 p-3 font-mono text-xs">
-                                {document}
-                            </pre>
+                            <JsonView value={document} label={`${policy.name} document`} className="max-h-96" />
                         )}
                     </div>
                 ) : null}

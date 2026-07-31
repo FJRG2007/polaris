@@ -10,7 +10,7 @@ import { describe, expect, it } from "vitest";
 import {
     HIGHLIGHT_LIMIT,
     loadHighlighter
-} from "../../../src/app/(app)/drive/viewer/code-highlight";
+} from "../../src/lib/code-highlight";
 
 describe("loadHighlighter", () => {
     it("marks up the languages it was asked for", async () => {

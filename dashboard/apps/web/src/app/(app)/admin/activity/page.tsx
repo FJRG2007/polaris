@@ -3,6 +3,7 @@ import { Badge, PageHeader } from "@polaris/ui";
 import { requireAdmin } from "@/lib/session";
 import { listActivity } from "@/lib/audit-service";
 import { getDisplayFormat } from "@/lib/display-prefs-service";
+import { ActivityDetails } from "./activity-details";
 
 export const dynamic = "force-dynamic";
 
@@ -53,8 +54,8 @@ export default async function ActivityPage() {
                                     <td className="px-3 py-2">
                                         <Badge variant="neutral">{event.action}</Badge>
                                     </td>
-                                    <td className="hidden max-w-md truncate px-3 py-2 text-xs text-muted-foreground md:table-cell">
-                                        {event.metadata ?? ""}
+                                    <td className="hidden px-3 py-2 align-top text-xs text-muted-foreground md:table-cell">
+                                        <ActivityDetails metadata={event.metadata ?? ""} />
                                     </td>
                                 </tr>
                             ))

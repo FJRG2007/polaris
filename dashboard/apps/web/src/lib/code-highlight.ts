@@ -1,5 +1,6 @@
 /**
- * Lazy syntax highlighting, shared by the code viewer and the Markdown fences.
+ * Lazy syntax highlighting, shared by the Drive code viewer, the Markdown
+ * fences, and every JSON document the dashboard shows.
  * highlight.js and each grammar are dynamically imported, so nothing reaches the
  * main bundle and a language only loads when a file (or a fence) asks for it.
  *
@@ -11,7 +12,7 @@
 
 import { useEffect, useState } from "react";
 import type { HLJSApi } from "highlight.js";
-import { languageForToken, type CodeLanguage } from "./code-language";
+import { languageForToken, type CodeLanguage } from "@/lib/code-language";
 
 /**
  * Highlighting is skipped past this many characters. Tokenizing a file this big
