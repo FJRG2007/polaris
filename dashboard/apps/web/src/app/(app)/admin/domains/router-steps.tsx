@@ -30,7 +30,7 @@ import {
     type RouterForwardRule,
     type RouterFormField
 } from "@/lib/router-guide";
-import { CopyButton } from "./copy-button";
+import { CopyButton } from "@/components/copy-button";
 
 /** A value to type elsewhere: shown verbatim, copied in one click. */
 function Value({ text }: { text: string }) {

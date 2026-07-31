@@ -3,11 +3,11 @@
 /**
  * Copy one value to the clipboard, with the check-mark acknowledgement.
  *
- * Everything the domains panels ask an operator to copy is a value they then type
- * somewhere Polaris cannot reach - a registrar's DNS form, a router's port-forward
- * form - so a check mark shown for a copy that did not happen is worse than no
- * check mark at all: they paste whatever was in the clipboard before. Hence the
- * acknowledgement waits for the write, and a refused one leaves the icon alone.
+ * A check mark shown for a copy that did not happen is worse than no check mark
+ * at all: whoever trusts it pastes whatever was in the clipboard before - the
+ * DNS record that never reached the registrar's form, the command that never
+ * reached the terminal. Hence the acknowledgement waits for the write, and a
+ * refused one leaves the icon alone.
  */
 
 import { useEffect, useRef, useState } from "react";

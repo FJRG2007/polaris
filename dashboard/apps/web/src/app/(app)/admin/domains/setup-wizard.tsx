@@ -47,9 +47,9 @@ import {
     type ExposureStrategy,
     type StrategyChoice
 } from "@/lib/domain-strategies";
+import { CopyButton } from "@/components/copy-button";
 import { ENVIRONMENT_CHOICES, ENVIRONMENT_META } from "../../apps/servers/environment-meta";
 import { connectCloudflareAccountAction } from "../../integrations/actions";
-import { CopyButton } from "./copy-button";
 import { RouterSteps } from "./router-steps";
 import { clearSetupDraft, isUntouched, readSetupDraft, savedAnswers, writeSetupDraft } from "./setup-draft";
 import {
