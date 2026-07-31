@@ -28,3 +28,4 @@ export * from "./schemas/two-factor.js";
 export * from "./schemas/display.js";
 export * from "./schemas/notifications.js";
 export * from "./schemas/sms.js";
+export * from "./schemas/updates.js";

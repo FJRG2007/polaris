@@ -1,11 +1,18 @@
 #!/bin/sh
 # Polaris dashboard updater.
 #
-# An update is a PULL, not a build. CI publishes every image on push, so the only
-# work here is fetching what it published and moving the deployment onto it. This
-# script never builds from source: a build in the update path took ten minutes and
-# raced CI, and the dashboard now offers an update only once the image it would pull
-# actually exists (see lib/update-service.ts), so there is nothing left to build.
+# An update is a PULL by default, not a build. CI publishes every image on push, so
+# the usual work here is fetching what it published and moving the deployment onto
+# it: a build in the update path takes ten minutes and races CI, and the dashboard
+# offers an update only once the image it would pull actually exists (see
+# lib/update-service.ts), so there is normally nothing to build.
+#
+# A deployment can ask for the other kind - Settings > Update with > "Build on this
+# host" - and then the checkout is the update: this script advances it and builds
+# the image here. That is what a fork, a patched deployment, or a machine that
+# cannot reach the registry needs. The choice is a single word on the shared volume
+# (see update_source below), because the dashboard cannot pass this script
+# arguments and should not be able to.
 #
 # The dashboard is rolled over with no downtime: the new container starts and has to
 # pass its healthcheck while the current one keeps serving, and only then is the old
@@ -58,6 +65,26 @@ POLARIS_INSTALL_LIB=1 . "$dash_dir/scripts/install.sh"
 # How long the new dashboard has to become healthy before the update is called off.
 # Generous: it applies pending migrations before it starts serving.
 READY_TIMEOUT=${POLARIS_UPDATE_TIMEOUT:-300}
+
+# Where the dashboard leaves the kind of update this deployment wants. It shares
+# this volume with the container running this script; the dashboard cannot pass an
+# argument to a command that runs as root on the host, so it writes one word here
+# and only the two words below are ever honoured.
+SOURCE_FILE=${POLARIS_UPDATE_SOURCE_FILE:-/run/polaris/update.source}
+
+# image - pull what CI published (the default, and what an unwritten file means).
+# build - fast-forward this checkout and build the image on this host.
+# POLARIS_UPDATE_SOURCE overrides the file, for a run started by hand.
+update_source() {
+    chosen=${POLARIS_UPDATE_SOURCE:-}
+    if [ -z "$chosen" ] && [ -r "$SOURCE_FILE" ]; then
+        chosen=$(head -n1 "$SOURCE_FILE" 2>/dev/null | tr -d '[:space:]')
+    fi
+    case "$chosen" in
+        build) echo build ;;
+        *) echo image ;;
+    esac
+}
 
 # On EXIT: hand the checkout back to whoever owns it, THEN emit a completion marker
 # with the exit code as the very last line, so the dashboard's live update log can
@@ -220,11 +247,18 @@ main() {
     need docker "install Docker Engine: https://docs.docker.com/engine/install/"
     compose="$(compose_cmd)"
 
-    # Keep the deployment's own files current - the compose stack and the settings
-    # template, which live in the checkout rather than in an image. This is a
-    # fast-forward of a checkout that is already here, not a clone, and the images
-    # are what carry the new code - so a checkout that cannot be advanced is
-    # reported and the update goes on with what CI published.
+    source=$(update_source)
+
+    # Keep the deployment's own files current. This is a fast-forward of a checkout
+    # that is already here, never a clone, and it is not how the new code arrives on
+    # an image update - the compose stack, the settings template and this script all
+    # live in the checkout rather than in any image, so a release that changes how
+    # the deployment is wired only reaches it through here.
+    #
+    # Which is why a checkout that cannot be advanced is only reported on an image
+    # update and goes on with what CI published, but is fatal on a source build:
+    # there, the checkout IS the update, and building an unchanged one would report
+    # success having installed nothing.
     if git -C "$dash_dir" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
         log "syncing the deployment files"
         before=$(git -C "$dash_dir" rev-parse HEAD 2>/dev/null || true)
@@ -240,9 +274,16 @@ main() {
                 trap - EXIT
                 exec sh "$dash_dir/scripts/update.sh" "$@"
             fi
+        elif [ "$source" = "build" ]; then
+            err "could not fast-forward the checkout, and this deployment builds its own image"
+            err "resolve the checkout at $repo_root, or switch Settings back to the published build"
+            exit 1
         else
             err "could not fast-forward the checkout; continuing with the published images"
         fi
+    elif [ "$source" = "build" ]; then
+        err "this deployment builds its own image, but $repo_root is not a git checkout"
+        exit 1
     fi
 
     cd "$dash_dir/docker"
@@ -279,26 +320,47 @@ main() {
     tag=$(sed -n 's/^POLARIS_IMAGE_TAG=//p' .env | head -n1)
     web_image="${WEB_IMAGE_REPO}:${tag:-latest}"
 
-    # The dashboard image is the update. Fetch it on its own first and stop here if
-    # it cannot be fetched - otherwise the rollover would find the image unchanged,
-    # correctly report nothing to do, and read as an update that succeeded and
-    # changed nothing.
-    log "pulling the published dashboard image"
-    if ! docker pull "$web_image"; then
-        err "could not fetch ${web_image}; nothing has been changed"
-        exit 1
+    # The dashboard image is the update, however it is obtained. Either way it is
+    # done on its own first and stops the run when it fails - otherwise the rollover
+    # would find the image unchanged, correctly report nothing to do, and read as an
+    # update that succeeded and changed nothing.
+    if [ "$source" = "build" ]; then
+        # Stamped with the commit being built, exactly as CI stamps a published
+        # image, so the deployment reports the build it is actually running and the
+        # update check can place it. Compose tags what it builds with the service's
+        # `image:`, so the rollover below finds it under the same name a pull would
+        # have left; `never` is what stops the following `up` replacing it with a
+        # registry `latest` that may lag this checkout.
+        target=$(head_sha)
+        [ -n "$target" ] && { POLARIS_BUILD_SHA="$target"; export POLARIS_BUILD_SHA; }
+        POLARIS_WEB_PULL_POLICY="never"; export POLARIS_WEB_PULL_POLICY
+        log "building the dashboard image from this checkout${target:+ (${target})}"
+        if ! $compose build web; then
+            err "the dashboard image could not be built; nothing has been changed"
+            exit 1
+        fi
+    else
+        log "pulling the published dashboard image"
+        if ! docker pull "$web_image"; then
+            err "could not fetch ${web_image}; nothing has been changed"
+            exit 1
+        fi
     fi
-
-    # The rest is best-effort: a supporting image the registry cannot serve right
-    # now must not abort an update whose point has already been fetched.
-    log "pulling the supporting images"
-    $compose pull || err "some supporting images could not be pulled; continuing with what is here"
 
     # Everything but the dashboard first, so the rollover is the last thing that
     # happens and nothing recreates the web container behind it. --no-deps keeps
     # `depends_on: web` from pulling the dashboard into this step.
     others=$($compose config --services 2>/dev/null | grep -v '^web$' | tr '\n' ' ')
+
+    # The supporting images, best-effort: one the registry cannot serve right now
+    # must not abort an update whose point has already been fetched or built. The
+    # dashboard is excluded by name - it has just been dealt with, and on a source
+    # build pulling it would fetch the very image the build replaced.
     if [ -n "$(printf '%s' "$others" | tr -d ' ')" ]; then
+        log "pulling the supporting images"
+        # shellcheck disable=SC2086 # deliberate word splitting: a service list
+        $compose pull $others || err "some supporting images could not be pulled; continuing with what is here"
+
         log "updating the supporting services"
         # shellcheck disable=SC2086 # deliberate word splitting: a service list
         $compose up -d --no-deps $others || err "some supporting services did not come up; the dashboard is updated below"

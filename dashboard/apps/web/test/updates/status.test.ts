@@ -28,7 +28,7 @@ const NEWER = "2222222222222222222222222222222222222222";
 interface Compare {
     readonly status: string;
     readonly ahead_by: number;
-    readonly files?: { filename: string }[];
+    readonly files?: { filename: string; }[];
 }
 
 /** One entry of a check-runs response. */
@@ -44,8 +44,15 @@ async function check(options: {
     compare?: Compare | null;
     /** What CI says about the newest commit; `null` is an outage. */
     checks?: CheckRun[] | null;
+    /** Where this deployment takes its updates from. Defaults to the image. */
+    source?: "image" | "build";
+    /** The commit the branch points at, for a deployment that builds its own. */
+    head?: string | null;
 }): Promise<UpdateStatus> {
     vi.resetModules();
+    vi.doMock("../../src/lib/update-source", () => ({
+        getUpdateSource: async () => options.source ?? "image"
+    }));
     vi.doMock("@polaris/config", () => ({
         loadEnv: () => ({
             POLARIS_REPO: "o/p",
@@ -61,9 +68,12 @@ async function check(options: {
     vi.stubGlobal(
         "fetch",
         vi.fn(async (url: string) => {
-            const answer = String(url).includes("/check-runs")
-                ? options.checks && { check_runs: options.checks }
-                : options.compare;
+            const path = String(url);
+            let answer: unknown;
+            if (path.includes("/check-runs")) answer = options.checks && { check_runs: options.checks };
+            else if (path.includes("/compare/")) answer = options.compare;
+            // A deployment that builds its own image asks what the branch points at.
+            else answer = options.head === undefined ? null : options.head && { sha: options.head };
             return answer
                 ? new Response(JSON.stringify(answer), { status: 200 })
                 : new Response("rate limited", { status: 403 });
@@ -83,6 +93,7 @@ afterEach(() => {
     vi.unstubAllGlobals();
     vi.doUnmock("@polaris/config");
     vi.doUnmock("../../src/lib/registry");
+    vi.doUnmock("../../src/lib/update-source");
 });
 
 describe("what counts as an update", () => {
@@ -217,5 +228,56 @@ describe("when GitHub cannot be reached", () => {
         const status = await check({ published: IMAGE(RUNNING), compare: null });
 
         expect(status.phase).toBe("up-to-date");
+    });
+});
+
+/**
+ * A deployment that builds its own image asks a different question: the branch is
+ * the target, so a commit can be installed the moment it lands and there is never
+ * anything "still building" to wait for. The registry has no say in it - what it
+ * serves is precisely what this deployment has chosen not to run.
+ */
+describe("a deployment that builds on the host", () => {
+    it("offers a commit as soon as it lands, whatever the registry serves", async () => {
+        const status = await check({
+            source: "build",
+            published: IMAGE(RUNNING),
+            head: NEWER,
+            compare: { status: "ahead", ahead_by: 4 }
+        });
+
+        expect(status.source).toBe("build");
+        expect(status.phase).toBe("available");
+        expect(status.latest).toBe("2222222");
+        expect(status.behindBy).toBe(4);
+    });
+
+    it("is up to date when the branch head is what it built", async () => {
+        const status = await check({ source: "build", published: IMAGE(NEWER), head: RUNNING });
+
+        expect(status.phase).toBe("up-to-date");
+        expect(status.upToDate).toBe(true);
+    });
+
+    it("does not offer a commit that failed its checks", async () => {
+        const status = await check({
+            source: "build",
+            published: IMAGE(RUNNING),
+            head: NEWER,
+            compare: { status: "ahead", ahead_by: 1 },
+            checks: [{ status: "completed", conclusion: "failure", html_url: "https://ci/run/9" }]
+        });
+
+        expect(status.phase).toBe("blocked");
+        expect(status.checksUrl).toBe("https://ci/run/9");
+    });
+
+    it("says it does not know when the branch cannot be read", async () => {
+        const status = await check({ source: "build", published: IMAGE(NEWER), head: null });
+
+        // Not "up to date": claiming that without having looked is how a
+        // deployment sits on an old build believing it is current.
+        expect(status.phase).toBe("unknown");
+        expect(status.upToDate).toBe(false);
     });
 });

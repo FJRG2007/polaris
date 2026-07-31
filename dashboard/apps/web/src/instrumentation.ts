@@ -75,6 +75,11 @@ export async function register(): Promise<void> {
     const { startAlarmEvaluator } = await import("./lib/watch/alarm-evaluator");
     startAlarmEvaluator();
 
+    // Watch for a published Polaris build: tell the people who can install one, and
+    // install it unattended when the deployment has been set to do that.
+    const { startUpdateWatcher } = await import("./lib/update-watcher");
+    startUpdateWatcher();
+
     // Re-establish messaging channels in the bridge after a bridge or web restart:
     // the bridge holds adapters in memory, so without this a channel stays
     // "connected" in the DB but dead at the bridge until manually reconnected.

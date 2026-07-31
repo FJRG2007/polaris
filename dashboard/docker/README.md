@@ -84,21 +84,34 @@ Set `POLARIS_SITE_ADDRESS` to your domain for automatic HTTPS via Caddy, and
 
 ## Updates
 
-Updating is the same one command as installing - re-run it and it pulls the
-latest source, adds any new settings to `.env` for you, rebuilds, and restarts
-(applying migrations). Nothing else to manage.
+Updating is one command - re-run it and it adds any new settings to `.env` for
+you, moves the deployment onto the new build, and restarts (applying migrations).
+The dashboard keeps serving throughout: the new container has to pass its
+healthcheck before the old one is retired, and a build that never becomes healthy
+is discarded rather than deployed.
 
-On the rolling `latest` tag, an update first waits (bounded to ~20 min, then
-deploys anyway) for the registry's web image to be rebuilt from the source it
-just pulled - CI takes a few minutes to publish `:latest` after a change lands.
-This keeps the running build from landing a commit behind `HEAD`, which is what
-left the dashboard showing "update available" after an update. A first install
-and a pinned `POLARIS_IMAGE_TAG` both skip the wait.
+Where the new build comes from is a choice, in Settings > Update with:
+
+- **Published build** (default) - download the image CI already made. Minutes of
+  build work the deployment does not repeat, and it is the build every other
+  deployment runs.
+- **Build on this host** - fast-forward the checkout and build the image here.
+  Slower and it needs room to build, but it installs the branch as it stands
+  rather than waiting on a publish, which is what a fork or a patched deployment
+  needs. The dashboard then offers a commit as soon as it lands, not once an
+  image exists for it.
+
+Either way the checkout is fast-forwarded first: the compose stack, the settings
+template and the updater itself live there rather than in any image, so that step
+is how a release's deployment changes reach the host. It is a fast-forward of a
+checkout that is already there, never a clone.
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/FJRG2007/polaris/main/dashboard/scripts/install.sh | sh
 # or, from a checkout:
 ./scripts/update.sh
+# forcing one kind for a single run, whatever the deployment is set to:
+POLARIS_UPDATE_SOURCE=build ./scripts/update.sh
 ```
 
 In the full edition the daemon can also update in-band via `POST /v1/update`,

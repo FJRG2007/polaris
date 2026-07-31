@@ -36,7 +36,7 @@ export const WEBHOOK_FORMATS = ["discord", "slack", "generic"] as const;
 export type WebhookFormat = (typeof WEBHOOK_FORMATS)[number];
 
 /** The groups the settings page renders events under. */
-export const NOTIFICATION_GROUPS = ["deploy", "watch", "security", "drive", "network"] as const;
+export const NOTIFICATION_GROUPS = ["deploy", "watch", "security", "drive", "network", "system"] as const;
 
 export type NotificationGroup = (typeof NOTIFICATION_GROUPS)[number];
 
@@ -45,7 +45,8 @@ export const NOTIFICATION_GROUP_LABEL: Record<NotificationGroup, string> = {
     watch: "Watch",
     security: "Security",
     drive: "Drive",
-    network: "Network"
+    network: "Network",
+    system: "Polaris"
 };
 
 /** Styling severity, mirrored by the in-app row and the webhook colour. */
@@ -131,6 +132,22 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         description: "Something outside Polaris is stopping your services being reached.",
         level: "warning",
         defaults: { inapp: true, email: false }
+    },
+    {
+        id: "system.update",
+        group: "system",
+        label: "Update available",
+        description: "A new Polaris build is published and ready to install.",
+        level: "info",
+        defaults: { inapp: true, email: true }
+    },
+    {
+        id: "system.updated",
+        group: "system",
+        label: "Update installed on its own",
+        description: "A scheduled or automatic update ran, and how it went.",
+        level: "success",
+        defaults: { inapp: true, email: true }
     }
 ] as const;
 

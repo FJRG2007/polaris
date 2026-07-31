@@ -61,3 +61,22 @@ export async function can(userId: string, permission: Permission | typeof ALL_PE
     const statements = await resolveGlobalStatements(userId);
     return isAllowed(statements, permission, GLOBAL_RESOURCE);
 }
+
+/**
+ * Everyone who currently holds a capability - the question a broadcast asks,
+ * where every other check asks about one user.
+ *
+ * It cannot be a query. Role grants and policy documents are stored as JSON, and
+ * a deny in a policy can take back what a role gave, so the only honest answer
+ * runs each candidate through the same decision point a request would take. A
+ * banned account is not a candidate: it cannot act on what it would be told.
+ *
+ * Meant for the rare fan-out (an update to announce), not for a request path.
+ */
+export async function usersWithPermission(permission: Permission): Promise<string[]> {
+    const users = await prisma.user.findMany({ where: { bannedAt: null }, select: { id: true } });
+    const decisions = await Promise.all(
+        users.map(async (user) => ((await can(user.id, permission)) ? user.id : null))
+    );
+    return decisions.filter((id): id is string => id !== null);
+}

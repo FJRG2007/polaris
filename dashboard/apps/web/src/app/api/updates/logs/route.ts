@@ -12,11 +12,11 @@ import { NextResponse, type NextRequest } from "next/server";
 import { open, stat } from "node:fs/promises";
 import { getSession } from "@/lib/session";
 import type { UpdateLogTail } from "@/lib/update-log";
+import { UPDATE_LOG_PATH as LOG_PATH } from "@/lib/update-runner";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const LOG_PATH = process.env.POLARIS_UPDATE_LOG ?? "/run/polaris/update.log";
 /** Cap per poll so one response can never be unbounded on a huge build log. */
 const MAX_CHUNK = 128 * 1024;
 const MARKER = /POLARIS_UPDATE_EXIT=(-?\d+)/;

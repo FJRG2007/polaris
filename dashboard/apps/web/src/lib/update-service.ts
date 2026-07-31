@@ -1,6 +1,13 @@
 /**
  * Update checker.
  *
+ * What counts as an update depends on where this deployment takes its updates
+ * from (see update-source). On the default - the image CI publishes - an update
+ * is a new IMAGE to pull, and everything below applies. On a deployment that
+ * builds on the host, the checkout is the update: a newer commit can be
+ * installed the moment it lands, so the branch head is the target and the
+ * registry has no say.
+ *
  * An update is a new IMAGE to pull, not a new commit. CI builds and publishes the
  * dashboard image minutes after a commit lands, so a checker that compares the
  * running build against the branch head offers an update that cannot be installed
@@ -29,6 +36,8 @@
 
 import { loadEnv } from "@polaris/config";
 import { readPublishedImage } from "./registry";
+import { getUpdateSource } from "./update-source";
+import { DEFAULT_UPDATE_SOURCE, type UpdateSource } from "@polaris/core";
 
 /** Where a deployment stands relative to what has been published. */
 export type UpdatePhase =
@@ -48,11 +57,14 @@ export type ChecksVerdict = "passed" | "failed" | "running";
 
 export interface UpdateStatus {
     readonly phase: UpdatePhase;
+    /** Where an update would come from, which is what `latest` describes. */
+    readonly source: UpdateSource;
     /** Short SHA the running build was made from, or null when unknown (dev). */
     readonly current: string | null;
-    /** Short SHA of the commit the PUBLISHED image was built from. */
+    /** Short SHA of the commit an update would install: the one the published
+     *  image was built from, or the branch head when this host builds its own. */
     readonly latest: string | null;
-    /** Commits between the running build and the published image, when countable. */
+    /** Commits between the running build and that commit, when countable. */
     readonly behindBy: number | null;
     /** True only when we can confirm the deployment runs the published image. */
     readonly upToDate: boolean;
@@ -82,7 +94,7 @@ const CACHE_TTL_MS = 10 * 60 * 1000;
 const WEB_IMAGE_PATHS =
     /^dashboard\/(apps|packages|cli|patches)\/|^dashboard\/docker\/(Dockerfile|entrypoint\.sh)|^dashboard\/package(-lock)?\.json$|^\.github\/workflows\/dashboard-publish\.yml$/;
 
-let cache: { status: UpdateStatus; at: number } | null = null;
+let cache: { status: UpdateStatus; at: number; } | null = null;
 let inflight: Promise<UpdateStatus> | null = null;
 
 function short(sha: string): string {
@@ -117,7 +129,7 @@ async function compare(repo: string, base: string, head: string): Promise<Compar
             ahead_by?: number;
             html_url?: string;
             permalink_url?: string;
-            files?: { filename?: string }[];
+            files?: { filename?: string; }[];
         };
         return {
             status: data.status ?? null,
@@ -149,7 +161,7 @@ interface ChecksResult {
 async function checksFor(repo: string, ref: string): Promise<ChecksResult | null> {
     try {
         const data = (await github(`/repos/${repo}/commits/${encodeURIComponent(ref)}/check-runs?per_page=100`)) as {
-            check_runs?: { status?: string; conclusion?: string | null; html_url?: string | null }[];
+            check_runs?: { status?: string; conclusion?: string | null; html_url?: string | null; }[];
         };
         const runs = data.check_runs ?? [];
         if (runs.length === 0) return null;
@@ -162,6 +174,69 @@ async function checksFor(repo: string, ref: string): Promise<ChecksResult | null
     }
 }
 
+/** The commit a branch points at, or null when GitHub cannot say. */
+async function branchHead(repo: string, branch: string): Promise<string | null> {
+    try {
+        const data = (await github(`/repos/${repo}/commits/${encodeURIComponent(branch)}`)) as { sha?: string; };
+        return data.sha ?? null;
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * Where a deployment that builds its own image stands. The branch is the target,
+ * so there is nothing to wait for: a commit that has landed can be installed,
+ * and GitHub is the only source of truth - unreachable means unknown rather than
+ * up to date, because claiming the latter without having looked is how a
+ * deployment sits on an old build believing it is current.
+ */
+async function buildQuery(input: {
+    repo: string;
+    branch: string;
+    running: string;
+    checkedAt: string;
+    branchUrl: string;
+}): Promise<UpdateStatus> {
+    const { repo, branch, running, checkedAt, branchUrl } = input;
+    const head = await branchHead(repo, branch);
+    const base = {
+        source: "build" as const,
+        current: running ? short(running) : null,
+        latest: head ? short(head) : null,
+        publishedAt: null,
+        checks: null as ChecksVerdict | null,
+        checksUrl: null as string | null,
+        buildingCount: null,
+        checkedAt
+    };
+
+    if (!running || !head) {
+        return { ...base, phase: "unknown", behindBy: null, upToDate: false, url: branchUrl };
+    }
+    if (running === head) {
+        return { ...base, phase: "up-to-date", behindBy: 0, upToDate: true, url: branchUrl };
+    }
+
+    // A host that built from a newer checkout than the branch is ahead, not behind.
+    const moved = await compare(repo, running, head);
+    if (moved && (moved.status === "behind" || moved.status === "identical")) {
+        return { ...base, phase: "up-to-date", behindBy: 0, upToDate: true, url: branchUrl };
+    }
+    // The suites still gate what is offered: building a commit that failed them
+    // on this host would only reproduce the failure locally.
+    const checks = await checksFor(repo, head);
+    return {
+        ...base,
+        phase: checks?.verdict === "failed" ? "blocked" : "available",
+        behindBy: moved?.aheadBy ?? null,
+        upToDate: false,
+        checks: checks?.verdict ?? null,
+        checksUrl: checks?.url ?? null,
+        url: moved?.url ?? branchUrl
+    };
+}
+
 async function query(): Promise<UpdateStatus> {
     const env = loadEnv();
     const repo = env.POLARIS_REPO;
@@ -170,12 +245,17 @@ async function query(): Promise<UpdateStatus> {
     const checkedAt = new Date().toISOString();
     const branchUrl = `https://github.com/${repo}/commits/${branch}`;
 
+    if ((await getUpdateSource()) === "build") {
+        return buildQuery({ repo, branch, running, checkedAt, branchUrl });
+    }
+
     // What a pull would fetch right now. This is the only call that may fail the
     // check: without it there is no honest answer, only a guess.
     const published = await readPublishedImage(env.POLARIS_WEB_IMAGE, env.POLARIS_IMAGE_TAG);
     const target = published.buildSha;
 
     const base = {
+        source: "image" as const,
         current: running ? short(running) : null,
         latest: target ? short(target) : null,
         publishedAt: published.createdAt,
@@ -235,6 +315,15 @@ async function query(): Promise<UpdateStatus> {
 }
 
 /**
+ * Forget the cached answer. Called when the update source changes: the cached
+ * status describes what an update meant a moment ago, and after the switch that
+ * is a different question with a different answer.
+ */
+export function resetUpdateStatus(): void {
+    cache = null;
+}
+
+/**
  * Current update status. Serves the cached result within the TTL; `force`
  * bypasses the cache (the settings "Check now" button). On a failed fetch it
  * keeps and returns the last good status, annotated with the error, rather than
@@ -255,6 +344,7 @@ export async function getUpdateStatus(force = false): Promise<UpdateStatus> {
             const message = caught instanceof Error ? caught.message : "Update check failed";
             const fallback: UpdateStatus = cache?.status ?? {
                 phase: "unknown",
+                source: DEFAULT_UPDATE_SOURCE,
                 current: env.POLARIS_BUILD_SHA ? short(env.POLARIS_BUILD_SHA) : null,
                 latest: null,
                 behindBy: null,

@@ -15,22 +15,50 @@
  * a new one has taken over.
  */
 
-import { useEffect, useRef, useState, useTransition } from "react";
-import { Bug, CheckCircle2, CircleDashed, DownloadCloud, Hammer, RefreshCw, TriangleAlert } from "lucide-react";
-import { Button, Card, CardBody, CardHeader, CardTitle } from "@polaris/ui";
-import type { DisplayFormat } from "@polaris/core";
+import { LogViewer } from "@/components/log-viewer";
+import { CopyButton } from "@/components/copy-button";
 import type { UpdateStatus } from "@/lib/update-service";
 import { useDisplayFormat } from "@/components/display-format";
+import { useEffect, useRef, useState, useTransition } from "react";
+import type { DeploymentAddress } from "@/lib/deployment-addresses";
 import { isRecentRun, isUpdateInFlight, type UpdateLogTail } from "@/lib/update-log";
-import { LogViewer } from "@/components/log-viewer";
-import { checkUpdatesAction, triggerHostUpdateAction, updateReportAction } from "./actions";
+import { Button, Card, CardBody, CardHeader, CardTitle, Input, Select } from "@polaris/ui";
+import type { AutoUpdateMode, AutoUpdatePolicy, DisplayFormat, UpdateSource } from "@polaris/core";
+import { Bug, CheckCircle2, CircleDashed, DownloadCloud, ExternalLink, Hammer, RefreshCw, TriangleAlert } from "lucide-react";
+import {
+    checkUpdatesAction,
+    saveAutoUpdateAction,
+    saveUpdateSourceAction,
+    triggerHostUpdateAction,
+    updateReportAction
+} from "./actions";
 
 interface Deployment {
-    readonly appUrl: string;
+    readonly addresses: DeploymentAddress[];
     readonly hostname: string;
     readonly repo: string;
     readonly branch: string;
     readonly autoUpdate: boolean;
+}
+
+/** What each kind of address is, said once next to it. */
+const ADDRESS_KINDS: Record<DeploymentAddress["kind"], string> = {
+    app: "configured at install",
+    local: "local network",
+    domain: "domain",
+    tunnel: "tunnel"
+};
+
+const SOURCE_CHOICES: { value: UpdateSource; label: string; }[] = [
+    { value: "image", label: "Published build" },
+    { value: "build", label: "Build on this host" }
+];
+
+function sourceHint(source: UpdateSource): string {
+    if (source === "build") {
+        return "Advances the checkout on the host and builds the image there. Slower, and it needs room to build, but it installs the branch as it stands instead of waiting for a published build.";
+    }
+    return "Downloads the build GitHub already made. Fastest, and it is the build every other deployment runs.";
 }
 
 function formatChecked(iso: string, format: DisplayFormat): string {
@@ -48,6 +76,25 @@ const TAIL_BYTES = 128 * 1024;
 
 /** The updater's completion marker, which is bookkeeping rather than output. */
 const MARKER_RE = /^.*POLARIS_UPDATE_EXIT=-?\d+.*$\n?/gm;
+
+const UPDATE_MODES: { value: AutoUpdateMode; label: string; }[] = [
+    { value: "off", label: "Only tell me" },
+    { value: "immediate", label: "As soon as one is published" },
+    { value: "daily", label: "Every day at" }
+];
+
+/** A complete 24-hour time. The time field reports "" until one is typed. */
+const TIME_OF_DAY = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+function scheduleHint(policy: AutoUpdatePolicy): string {
+    if (policy.mode === "immediate") {
+        return "A published build installs itself. The dashboard keeps serving while it rolls over.";
+    }
+    if (policy.mode === "daily") {
+        return `Installs at the first ${policy.at} after a build appears. If Polaris is off then, it installs when it comes back.`;
+    }
+    return "Everyone who can update Polaris is told when a build is ready. Nothing installs on its own.";
+}
 
 /** How a run ended. A null code is a run that reported none - unknown, which is
  *  neither a success nor a failure and must not be offered as a bug report. */
@@ -87,13 +134,24 @@ function currentStep(log: string): string | null {
 
 export function SettingsView({
     initialStatus,
+    initialPolicy,
+    initialSource,
     deployment
 }: {
     initialStatus: UpdateStatus;
+    initialPolicy: AutoUpdatePolicy;
+    initialSource: UpdateSource;
     deployment: Deployment;
 }) {
     const format = useDisplayFormat();
     const [status, setStatus] = useState(initialStatus);
+    const [policy, setPolicy] = useState(initialPolicy);
+    const [source, setSource] = useState(initialSource);
+    // What the time field shows. A time input empties itself between segments, so
+    // it cannot be driven straight from the saved schedule without fighting the
+    // person editing it.
+    const [timeDraft, setTimeDraft] = useState(initialPolicy.at);
+    const [policyError, setPolicyError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
     const [updating, setUpdating] = useState(false);
     const [updateMsg, setUpdateMsg] = useState<string | null>(null);
@@ -113,6 +171,43 @@ export function SettingsView({
         startTransition(async () => {
             setStatus(await checkUpdatesAction(force));
         });
+    }
+
+    /**
+     * Change when updates install themselves. Applied to the control at once and
+     * put back if the server refuses it, so the schedule never reads as saved
+     * when it is not - this one decides when the deployment restarts.
+     */
+    async function onSchedule(next: AutoUpdatePolicy) {
+        if (next.mode === policy.mode && next.at === policy.at) return;
+        const previous = policy;
+        setPolicy(next);
+        setPolicyError(null);
+        const { error } = await saveAutoUpdateAction(next);
+        if (error) {
+            setPolicy(previous);
+            setTimeDraft(previous.at);
+            setPolicyError(error);
+        }
+    }
+
+    /**
+     * Change where updates come from. The two answers do not describe the same
+     * thing - one tracks a published image, the other the branch - so the status
+     * is re-read rather than left saying what it meant a moment ago.
+     */
+    async function onSource(next: UpdateSource) {
+        if (next === source) return;
+        const previous = source;
+        setSource(next);
+        setPolicyError(null);
+        const { error } = await saveUpdateSourceAction(next);
+        if (error) {
+            setSource(previous);
+            setPolicyError(error);
+            return;
+        }
+        onCheck(true);
     }
 
     // Refresh on entering the page, throttled to once per 30s across visits so
@@ -420,10 +515,60 @@ export function SettingsView({
 
                     <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
                         <Row label="Running build" value={status.current ?? "unknown"} />
-                        <Row label="Published build" value={status.latest ?? "-"} />
-                        <Row label="Auto-update" value={deployment.autoUpdate ? "enabled" : "disabled"} />
+                        <Row
+                            label={status.source === "build" ? `Latest on ${deployment.branch}` : "Published build"}
+                            value={status.latest ?? "-"}
+                        />
+                        <Row label="Updates from here" value={deployment.autoUpdate ? "allowed" : "blocked on this host"} />
                         <Row label="Last checked" value={formatChecked(status.checkedAt, format)} />
                     </dl>
+
+                    <div className="flex flex-col gap-2 border-t border-border pt-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-sm">Update with</span>
+                            <Select
+                                aria-label="Where updates come from"
+                                value={source}
+                                onValueChange={(next) => void onSource(next as UpdateSource)}
+                                options={SOURCE_CHOICES}
+                                className="w-60"
+                                disabled={updating}
+                            />
+                        </div>
+                        <p className="text-xs text-muted-foreground">{sourceHint(source)}</p>
+                    </div>
+
+                    <div className="flex flex-col gap-2 border-t border-border pt-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-sm">Install updates</span>
+                            <Select
+                                aria-label="When updates install themselves"
+                                value={policy.mode}
+                                onValueChange={(mode) => void onSchedule({ ...policy, mode: mode as AutoUpdateMode })}
+                                options={UPDATE_MODES}
+                                className="w-60"
+                                disabled={updating}
+                            />
+                            {policy.mode === "daily" ? (
+                                <Input
+                                    type="time"
+                                    aria-label="Time of day updates install"
+                                    className="w-32"
+                                    value={timeDraft}
+                                    disabled={updating}
+                                    onChange={(event) => {
+                                        const at = event.target.value;
+                                        setTimeDraft(at);
+                                        // Only a complete time is a schedule; the
+                                        // half-typed states in between are not.
+                                        if (TIME_OF_DAY.test(at)) void onSchedule({ ...policy, at });
+                                    }}
+                                />
+                            ) : null}
+                        </div>
+                        <p className="text-xs text-muted-foreground">{scheduleHint(policy)}</p>
+                        {policyError ? <p className="text-xs text-danger">{policyError}</p> : null}
+                    </div>
 
                     {available || updating || logText ? (
                         <div className="flex flex-col gap-2 rounded-md border border-border bg-muted/30 p-3 text-xs text-muted-foreground">
@@ -497,9 +642,32 @@ export function SettingsView({
                 <CardHeader>
                     <CardTitle>Deployment</CardTitle>
                 </CardHeader>
-                <CardBody>
+                <CardBody className="flex flex-col gap-4">
+                    <div className="flex flex-col gap-1.5">
+                        <span className="text-sm text-muted-foreground">Reachable at</span>
+                        {deployment.addresses.length === 0 ? (
+                            <p className="text-sm">No address is configured for this deployment.</p>
+                        ) : (
+                            deployment.addresses.map((address) => (
+                                <div key={address.host} className="flex items-center gap-2 text-sm">
+                                    <a
+                                        className="truncate font-medium text-primary hover:underline"
+                                        href={address.url}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                    >
+                                        {address.url}
+                                    </a>
+                                    <ExternalLink className="size-3 shrink-0 text-muted-foreground" />
+                                    <span className="shrink-0 text-xs text-muted-foreground">
+                                        {ADDRESS_KINDS[address.kind]}
+                                    </span>
+                                    <CopyButton value={address.url} label={address.host} className="ml-auto" />
+                                </div>
+                            ))
+                        )}
+                    </div>
                     <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                        <Row label="App URL" value={deployment.appUrl} />
                         <Row label="Local hostname" value={`${deployment.hostname}.local`} />
                         <Row label="Repository" value={deployment.repo} />
                         <Row label="Release branch" value={deployment.branch} />
@@ -510,7 +678,7 @@ export function SettingsView({
     );
 }
 
-function Row({ label, value }: { label: string; value: string }) {
+function Row({ label, value }: { label: string; value: string; }) {
     return (
         <>
             <dt className="text-muted-foreground">{label}</dt>

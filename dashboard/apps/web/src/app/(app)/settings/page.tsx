@@ -1,8 +1,11 @@
-import { loadEnv } from "@polaris/config";
 import { PageHeader } from "@polaris/ui";
+import { loadEnv } from "@polaris/config";
 import { requireAdmin } from "@/lib/session";
-import { getUpdateStatus } from "@/lib/update-service";
 import { SettingsView } from "./settings-view";
+import { getUpdateSource } from "@/lib/update-source";
+import { getUpdateStatus } from "@/lib/update-service";
+import { getAutoUpdatePolicy } from "@/lib/update-watcher";
+import { reachableAddresses } from "@/lib/deployment-addresses";
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +17,12 @@ export const dynamic = "force-dynamic";
 export default async function SettingsPage() {
     await requireAdmin();
     const env = loadEnv();
-    const status = await getUpdateStatus();
+    const [status, policy, source, addresses] = await Promise.all([
+        getUpdateStatus(),
+        getAutoUpdatePolicy(),
+        getUpdateSource(),
+        reachableAddresses()
+    ]);
 
     return (
         // Narrow page: centre the column in the content area, header included, and
@@ -23,8 +31,10 @@ export default async function SettingsPage() {
             <PageHeader title="Settings" description="General configuration for this Polaris deployment." />
             <SettingsView
                 initialStatus={status}
+                initialPolicy={policy}
+                initialSource={source}
                 deployment={{
-                    appUrl: env.POLARIS_APP_URL,
+                    addresses,
                     hostname: env.POLARIS_LOCAL_HOSTNAME,
                     repo: env.POLARIS_REPO,
                     branch: env.POLARIS_UPDATE_BRANCH,

@@ -24,7 +24,7 @@ export {
     MAX_ALTERNATE_EMAILS,
     type UserEmailView
 } from "./account.js";
-export { can, resolveGlobalStatements } from "./authz.js";
+export { can, resolveGlobalStatements, usersWithPermission } from "./authz.js";
 export {
     createGroup,
     deleteGroup,
