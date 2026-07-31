@@ -41,6 +41,10 @@ model User {
     image         String?
     // Free-text organisation the account belongs to; shown on the profile only.
     company       String?
+    // How this account wants dates, times, temperatures and money written, as
+    // stringified JSON holding only the fields it actually chose. Absent fields
+    // (and a null column) follow the platform default.
+    displayPrefs  String?
     // Owned by the better-auth two-factor plugin; flipped on once the user has
     // verified their authenticator, and back off when they disable it.
     twoFactorEnabled Boolean @default(false)

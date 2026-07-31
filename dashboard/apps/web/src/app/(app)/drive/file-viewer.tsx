@@ -30,6 +30,7 @@ import { PptxView } from "./viewer/pptx-view";
 import { SheetEditor } from "./viewer/sheet-editor";
 import { PlainTextEditor } from "./viewer/text-editor";
 import type { ViewerKind, ViewerTarget, ViewerUrlFor } from "./viewer/types";
+import { useDisplayFormat } from "@/components/display-format";
 
 export type { ViewerTarget, ViewerUrlFor, ViewerKind } from "./viewer/types";
 
@@ -134,6 +135,7 @@ export function FileViewer({
     /** Read-only viewing: hide inline editing (a share visitor cannot write back). */
     readOnly?: boolean;
 }) {
+    const format = useDisplayFormat();
     const byteUrl = urlFor ?? driveByteUrl;
     const extension = target ? extensionOf(target.name) : "";
 
@@ -190,7 +192,7 @@ export function FileViewer({
                             {target.modifiedAt ? (
                                 <div className="flex flex-col gap-0.5">
                                     <span className="text-muted-foreground">Modified</span>
-                                    <span>{new Date(target.modifiedAt).toLocaleString()}</span>
+                                    <span>{format.dateTime(target.modifiedAt)}</span>
                                 </div>
                             ) : null}
                             <div className="flex flex-col gap-0.5">

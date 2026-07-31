@@ -109,6 +109,7 @@ import { ArchiveDialog } from "./archive-dialog";
 import { FolderTree } from "./folder-tree";
 import { fileIconFor } from "./file-icons";
 import { RelativeTime } from "@/components/relative-time";
+import { useDisplayFormat } from "@/components/display-format";
 import { UserProfileDialog } from "@/components/user-profile-dialog";
 import type { DriveEntry } from "./types";
 
@@ -263,6 +264,7 @@ export function FilesView({
     /** Connection-level actions (Access, Open console) rendered in the toolbar, left of the panel. */
     headerActions?: ReactNode;
 }) {
+    const format = useDisplayFormat();
     const [query, setQuery] = useState("");
     // Search scope: the current folder only, or a recursive walk from here.
     // Recursive by default so a search finds nested items without an extra click.
@@ -2311,11 +2313,11 @@ export function FilesView({
                         </div>
                         <div className="flex flex-col gap-0.5">
                             <dt className="text-muted-foreground">Created on</dt>
-                            <dd>{new Date(selectedEntries[0].createdAt).toLocaleString()}</dd>
+                            <dd>{format.dateTime(selectedEntries[0].createdAt)}</dd>
                         </div>
                         <div className="flex flex-col gap-0.5">
                             <dt className="text-muted-foreground">Last Modified</dt>
-                            <dd>{new Date(selectedEntries[0].modifiedAt).toLocaleString()}</dd>
+                            <dd>{format.dateTime(selectedEntries[0].modifiedAt)}</dd>
                         </div>
                     </dl>
                     <div className="grid grid-cols-2 gap-2">
@@ -2624,7 +2626,7 @@ export function FilesView({
                                     : `${formatBytes(BigInt(detailsTarget.size))} (${Number(detailsTarget.size).toLocaleString()} bytes)`}
                             </dd>
                             <dt className="text-muted-foreground">Modified</dt>
-                            <dd>{new Date(detailsTarget.modifiedAt).toLocaleString()}</dd>
+                            <dd>{format.dateTime(detailsTarget.modifiedAt)}</dd>
                         </dl>
                     ) : null}
                 </DialogContent>

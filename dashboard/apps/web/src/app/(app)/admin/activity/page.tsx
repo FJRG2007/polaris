@@ -2,12 +2,13 @@ import { prisma } from "@polaris/db";
 import { Badge, PageHeader } from "@polaris/ui";
 import { requireAdmin } from "@/lib/session";
 import { listActivity } from "@/lib/audit-service";
+import { getDisplayFormat } from "@/lib/display-prefs-service";
 
 export const dynamic = "force-dynamic";
 
 export default async function ActivityPage() {
     await requireAdmin();
-    const events = await listActivity(200);
+    const [events, format] = await Promise.all([listActivity(200), getDisplayFormat()]);
 
     // Resolve actor ids to names in one query.
     const actorIds = [...new Set(events.map((event) => event.actorId).filter((id): id is string => Boolean(id)))];
@@ -44,7 +45,7 @@ export default async function ActivityPage() {
                             events.map((event) => (
                                 <tr key={event.id} className="border-t border-border hover:bg-card-hover">
                                     <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">
-                                        {new Date(event.at).toLocaleString()}
+                                        {format.dateTime(event.at)}
                                     </td>
                                     <td className="px-3 py-2">
                                         {event.actorId ? (nameById.get(event.actorId) ?? "unknown") : "system"}

@@ -12,6 +12,7 @@ import { HardDrive, MemoryStick, TriangleAlert } from "lucide-react";
 import { formatBytes } from "@polaris/core";
 import { Badge, Card, CardBody, CardHeader, CardTitle, RadialGauge, type GaugeTone } from "@polaris/ui";
 import type { UnasMetrics as UnasMetricsData } from "@/lib/unifi-unas";
+import { useDisplayFormat } from "@/components/display-format";
 
 /** Pick a gauge color from a 0..1 ratio: calm, then warning, then danger. */
 function ratioTone(ratio: number, warn = 0.75, bad = 0.9): GaugeTone {
@@ -31,6 +32,7 @@ function formatUptime(seconds: number): string {
 }
 
 export function UnasMetrics({ metrics }: { metrics: UnasMetricsData }) {
+    const format = useDisplayFormat();
     const usedPct = metrics.totalBytes > 0 ? Math.round((metrics.usedBytes / metrics.totalBytes) * 100) : 0;
     const atRisk = metrics.health !== "healthy";
 
@@ -62,7 +64,7 @@ export function UnasMetrics({ metrics }: { metrics: UnasMetricsData }) {
                     />
                     <RadialGauge
                         value={(metrics.system.cpuTemp ?? 0) / 90}
-                        label={metrics.system.cpuTemp !== null ? `${metrics.system.cpuTemp} C` : "-"}
+                        label={format.temperature(metrics.system.cpuTemp)}
                         sublabel="CPU temp"
                         tone={ratioTone((metrics.system.cpuTemp ?? 0) / 90, 0.66, 0.83)}
                     />
@@ -155,7 +157,9 @@ export function UnasMetrics({ metrics }: { metrics: UnasMetricsData }) {
                                             {disk.type ? ` ${disk.type}` : ""}
                                             {disk.rpm ? ` - ${disk.rpm} rpm` : ""}
                                         </span>
-                                        {disk.temperature !== null ? <span>{disk.temperature} C</span> : null}
+                                        {disk.temperature !== null ? (
+                                            <span>{format.temperature(disk.temperature)}</span>
+                                        ) : null}
                                     </div>
                                 ) : null}
                             </div>

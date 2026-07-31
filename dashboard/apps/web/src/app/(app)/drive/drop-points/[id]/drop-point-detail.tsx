@@ -41,6 +41,7 @@ import {
 } from "@polaris/ui";
 import { GeoPicker } from "@/components/geo-picker";
 import { useConfirm } from "@/components/confirm-dialog";
+import { useDisplayFormat } from "@/components/display-format";
 import { useFormChanged } from "@/lib/use-form-changed";
 import { RequestDialog } from "../../request-dialog";
 import {
@@ -357,6 +358,7 @@ export function DropPointDetail({
 }
 
 function OverviewTab({ config }: { config: DropPointConfig }) {
+    const format = useDisplayFormat();
     return (
         <Card>
             <CardBody className="flex flex-col gap-3">
@@ -368,14 +370,10 @@ function OverviewTab({ config }: { config: DropPointConfig }) {
                     <Field label="Max files">{config.maxFiles ?? "No limit"}</Field>
                     <Field label="Collected">{config.submissionCount}</Field>
                     <Field label="Starts">
-                        {config.startsAt
-                            ? new Date(config.startsAt).toLocaleString()
-                            : "Immediately"}
+                        {config.startsAt ? format.dateTime(config.startsAt) : "Immediately"}
                     </Field>
                     <Field label="Expires">
-                        {config.expiresAt
-                            ? new Date(config.expiresAt).toLocaleDateString()
-                            : "Never"}
+                        {config.expiresAt ? format.date(config.expiresAt) : "Never"}
                     </Field>
                     <Field label="Sign-in">
                         {config.requireLogin ? "Required" : "Not required"}
@@ -429,6 +427,7 @@ function FilesTab({
     onDelete: (row: SubmissionRow) => void;
     pending: boolean;
 }) {
+    const format = useDisplayFormat();
     if (files.length === 0) {
         return (
             <Card>
@@ -469,7 +468,7 @@ function FilesTab({
                                         {row.uploader ?? "Anonymous"}
                                     </td>
                                     <td className="px-4 py-2 text-muted-foreground">
-                                        {new Date(row.at).toLocaleString()}
+                                        {format.dateTime(row.at)}
                                     </td>
                                     <td
                                         className={`px-4 py-2 capitalize ${statusTone(row.status)}`}
@@ -500,6 +499,7 @@ function FilesTab({
 function VisitorsTab({ visitors }: { visitors: VisitorRow[] }) {
     // Compute "live" and duration relative to now on the client at render time.
     const now = useMemo(() => Date.now(), []);
+    const format = useDisplayFormat();
     if (visitors.length === 0) {
         return (
             <Card>
@@ -542,7 +542,7 @@ function VisitorsTab({ visitors }: { visitors: VisitorRow[] }) {
                                             {row.user ?? "Anonymous"}
                                         </td>
                                         <td className="px-4 py-2 text-muted-foreground">
-                                            {new Date(row.firstSeenAt).toLocaleString()}
+                                            {format.dateTime(row.firstSeenAt)}
                                         </td>
                                         <td className="px-4 py-2">
                                             <span className="flex items-center gap-1.5">

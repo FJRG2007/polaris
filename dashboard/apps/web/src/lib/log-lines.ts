@@ -8,6 +8,8 @@
  * entry cannot be decided from the raw line alone.
  */
 
+import type { DisplayFormat } from "@polaris/core";
+
 export type LogLevel = "error" | "warn" | "info" | "default";
 
 export interface LogEntry {
@@ -61,12 +63,10 @@ export function parseLog(raw: string): LogEntry[] {
 
 /**
  * The stamp as it is shown: local wall-clock to the second, because a log is read
- * against the clock on the wall rather than against UTC. Anything unparseable is
- * left exactly as it arrived.
+ * against the clock on the wall rather than against UTC, and on the reader's own
+ * clock format. Anything unparseable is left exactly as it arrived.
  */
-export function formatLogTime(stamp: string): string {
+export function formatLogTime(stamp: string, format: DisplayFormat): string {
     const date = new Date(stamp);
-    return Number.isNaN(date.getTime())
-        ? stamp
-        : date.toLocaleTimeString(undefined, { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    return Number.isNaN(date.getTime()) ? stamp : format.time(date, { seconds: true });
 }

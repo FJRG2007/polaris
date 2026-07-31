@@ -25,3 +25,4 @@ export * from "./schemas/host.js";
 export * from "./schemas/account-security.js";
 export * from "./schemas/mail.js";
 export * from "./schemas/two-factor.js";
+export * from "./schemas/display.js";

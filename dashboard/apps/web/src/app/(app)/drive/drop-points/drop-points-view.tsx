@@ -13,6 +13,7 @@ import Link from "next/link";
 import { Ban, Inbox, Lock, RotateCcw, Search } from "lucide-react";
 import { Badge, Button, Card, CardBody, Input } from "@polaris/ui";
 import { useConfirm } from "@/components/confirm-dialog";
+import { useDisplayFormat } from "@/components/display-format";
 import { reopenFileRequestAction, revokeFileRequestAction } from "../request-actions";
 
 export interface DropPointRow {
@@ -47,6 +48,7 @@ function status(request: DropPointRow): {
 }
 
 export function DropPointsView({ requests }: { requests: DropPointRow[] }) {
+    const format = useDisplayFormat();
     const [rows, setRows] = useState(requests);
     const [query, setQuery] = useState("");
     const [pending, startTransition] = useTransition();
@@ -158,9 +160,9 @@ export function DropPointsView({ requests }: { requests: DropPointRow[] }) {
                                                     : ""}{" "}
                                                 uploaded
                                                 {scheduled && request.startsAt
-                                                    ? ` - opens ${new Date(request.startsAt).toLocaleDateString()}`
+                                                    ? ` - opens ${format.date(request.startsAt)}`
                                                     : request.expiresAt
-                                                      ? ` - until ${new Date(request.expiresAt).toLocaleDateString()}`
+                                                      ? ` - until ${format.date(request.expiresAt)}`
                                                       : ""}
                                             </p>
                                         </div>

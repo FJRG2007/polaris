@@ -26,6 +26,7 @@ import {
     Switch,
     cn
 } from "@polaris/ui";
+import { useDisplayFormat } from "@/components/display-format";
 import { alarmInputSchema } from "@/lib/watch/watch-schema";
 import { createAlarmAction, deleteAlarmAction, setAlarmEnabledAction } from "./actions";
 import type { AlarmEventView, AlarmTargets, AlarmView } from "@/lib/watch-service";
@@ -55,6 +56,7 @@ export function WatchView({
     targets: AlarmTargets;
 }) {
     const router = useRouter();
+    const format = useDisplayFormat();
     const [creating, setCreating] = useState(false);
 
     const targetName = useMemo(() => {
@@ -144,7 +146,7 @@ export function WatchView({
                                 <span className="font-medium">{event.alarmName}</span>
                                 <span className="truncate text-muted-foreground">{event.detail}</span>
                                 <span className="ml-auto shrink-0 text-xs text-muted-foreground">
-                                    {new Date(event.createdAt).toLocaleString()}
+                                    {format.dateTime(event.createdAt)}
                                 </span>
                             </div>
                         ))}

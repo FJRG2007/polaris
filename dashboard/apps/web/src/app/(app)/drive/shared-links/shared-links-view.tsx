@@ -31,6 +31,7 @@ import {
     type ShareLogRow
 } from "../share-actions";
 import { useConfirm } from "@/components/confirm-dialog";
+import { useDisplayFormat } from "@/components/display-format";
 import { useFormChanged } from "@/lib/use-form-changed";
 
 export interface ShareRow {
@@ -66,6 +67,7 @@ function status(share: ShareRow): { label: string; variant: "success" | "neutral
 }
 
 export function SharedView({ shares }: { shares: ShareRow[] }) {
+    const format = useDisplayFormat();
     const [rows, setRows] = useState(shares);
     const [pending, startTransition] = useTransition();
     const [busy, setBusy] = useState<string | null>(null);
@@ -131,7 +133,7 @@ export function SharedView({ shares }: { shares: ShareRow[] }) {
                                                     ? ` - ${share.downloadCount}/${share.maxDownloads} downloads`
                                                     : ` - ${share.downloadCount} downloads`}
                                                 {share.expiresAt
-                                                    ? ` - expires ${new Date(share.expiresAt).toLocaleDateString()}`
+                                                    ? ` - expires ${format.date(share.expiresAt)}`
                                                     : ""}
                                                 {share.allowedCidrs.length > 0 ? ` - IP-restricted` : ""}
                                             </p>
@@ -398,6 +400,7 @@ function EditShareDialog({
 }
 
 function ShareLogsDialog({ share, onOpenChange }: { share: ShareRow | null; onOpenChange: (open: boolean) => void }) {
+    const format = useDisplayFormat();
     const [logs, setLogs] = useState<ShareLogRow[] | null>(null);
     const shareId = share?.id ?? null;
 
@@ -449,7 +452,7 @@ function ShareLogsDialog({ share, onOpenChange }: { share: ShareRow | null; onOp
                                 {logs.map((row) => (
                                     <tr key={row.id} className="hover:bg-card-hover">
                                         <td className="py-1 pr-3 text-muted-foreground">
-                                            {new Date(row.at).toLocaleString()}
+                                            {format.dateTime(row.at)}
                                         </td>
                                         <td className="py-1 pr-3 font-mono text-xs">{row.ip ?? "-"}</td>
                                         <td className="py-1">

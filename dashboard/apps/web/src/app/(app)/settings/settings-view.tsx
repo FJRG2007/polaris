@@ -18,7 +18,9 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { Bug, CheckCircle2, CircleDashed, DownloadCloud, Hammer, RefreshCw, TriangleAlert } from "lucide-react";
 import { Button, Card, CardBody, CardHeader, CardTitle } from "@polaris/ui";
+import type { DisplayFormat } from "@polaris/core";
 import type { UpdateStatus } from "@/lib/update-service";
+import { useDisplayFormat } from "@/components/display-format";
 import { isRecentRun, isUpdateInFlight, type UpdateLogTail } from "@/lib/update-log";
 import { LogViewer } from "@/components/log-viewer";
 import { checkUpdatesAction, triggerHostUpdateAction, updateReportAction } from "./actions";
@@ -31,9 +33,9 @@ interface Deployment {
     readonly autoUpdate: boolean;
 }
 
-function formatChecked(iso: string): string {
+function formatChecked(iso: string, format: DisplayFormat): string {
     const date = new Date(iso);
-    return Number.isNaN(date.getTime()) ? "never" : date.toLocaleString();
+    return Number.isNaN(date.getTime()) ? "never" : format.dateTime(date);
 }
 
 // Last auto-check timestamp, module-level so the 30s throttle survives navigating
@@ -90,6 +92,7 @@ export function SettingsView({
     initialStatus: UpdateStatus;
     deployment: Deployment;
 }) {
+    const format = useDisplayFormat();
     const [status, setStatus] = useState(initialStatus);
     const [pending, startTransition] = useTransition();
     const [updating, setUpdating] = useState(false);
@@ -178,7 +181,7 @@ export function SettingsView({
         }
         setLogText(text.replace(MARKER_RE, ""));
         setLogResult({ code: first.exitCode });
-        const at = new Date(first.updatedAt).toLocaleTimeString();
+        const at = format.time(first.updatedAt);
         setUpdateMsg(
             first.exitCode === 0
                 ? `Last update finished at ${at}.`
@@ -402,7 +405,7 @@ export function SettingsView({
                         <Row label="Running build" value={status.current ?? "unknown"} />
                         <Row label="Published build" value={status.latest ?? "-"} />
                         <Row label="Auto-update" value={deployment.autoUpdate ? "enabled" : "disabled"} />
-                        <Row label="Last checked" value={formatChecked(status.checkedAt)} />
+                        <Row label="Last checked" value={formatChecked(status.checkedAt, format)} />
                     </dl>
 
                     {available || updating || logText ? (

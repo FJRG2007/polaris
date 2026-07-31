@@ -20,6 +20,7 @@ import { KeyRound, Trash2 } from "lucide-react";
 import { passkeyRelyingPartyId } from "@polaris/core";
 import { Button, Card, CardBody, Input } from "@polaris/ui";
 import { useConfirm } from "@/components/confirm-dialog";
+import { useDisplayFormat } from "@/components/display-format";
 import { authClient } from "@/lib/auth-client";
 import { removePasskeyAction, type PasskeyView } from "./passkey-actions";
 import { Feedback } from "./setting-card";
@@ -35,6 +36,7 @@ interface Here {
 export function PasskeysCard({ passkeys }: { passkeys: PasskeyView[] }) {
     const router = useRouter();
     const [confirm, confirmElement] = useConfirm();
+    const format = useDisplayFormat();
     const [here, setHere] = useState<Here | null>(null);
     const [name, setName] = useState("");
     const [busy, setBusy] = useState(false);
@@ -108,7 +110,7 @@ export function PasskeysCard({ passkeys }: { passkeys: PasskeyView[] }) {
                                         {passkey.host}
                                     </code>
                                     <span className="shrink-0 text-xs text-muted-foreground">
-                                        added {new Date(passkey.addedAt).toLocaleDateString()}
+                                        added {format.date(passkey.addedAt)}
                                     </span>
                                 </div>
                                 <Button

@@ -13,6 +13,7 @@ import { formatBytes } from "@polaris/core";
 import { Badge, Card, CardBody, CardHeader, CardTitle, PolarisMark } from "@polaris/ui";
 import { getSession } from "@/lib/session";
 import { clientIp } from "@/lib/request-context";
+import { getDisplayFormat } from "@/lib/display-prefs-service";
 import {
     fileRequestIpAllowed,
     fileRequestUnlockCookie,
@@ -58,6 +59,7 @@ function Notice({ title, message }: { title: string; message: string }) {
 
 export default async function DropPointPage({ params }: { params: Promise<{ token: string }> }) {
     const { token } = await params;
+    const format = await getDisplayFormat();
     const request = await resolveFileRequestByToken(token);
     if (!request)
         return (
@@ -70,9 +72,7 @@ export default async function DropPointPage({ params }: { params: Promise<{ toke
     const usable = fileRequestUsability(request);
     if (!usable.ok) {
         if (usable.reason === "scheduled") {
-            const when = request.startsAt
-                ? new Date(request.startsAt).toLocaleString()
-                : "a later date";
+            const when = request.startsAt ? format.dateTime(request.startsAt) : "a later date";
             return <Notice title="Not open yet" message={`This drop point opens on ${when}.`} />;
         }
         return (
@@ -181,7 +181,7 @@ export default async function DropPointPage({ params }: { params: Promise<{ toke
                         ) : null}
                         {request.expiresAt ? (
                             <Badge variant="neutral">
-                                Open until {new Date(request.expiresAt).toLocaleDateString()}
+                                Open until {format.date(request.expiresAt)}
                             </Badge>
                         ) : null}
                     </div>

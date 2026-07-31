@@ -33,6 +33,7 @@ import {
     Server,
     Settings,
     ShieldCheck,
+    SlidersHorizontal,
     Star,
     Store,
     Trash2,
@@ -76,6 +77,7 @@ const APP_SIDEBARS: Record<string, SidebarItem[]> = {
     ],
     account: [
         { label: "Profile", href: "/account", icon: UserCog },
+        { label: "Preferences", href: "/account/preferences", icon: SlidersHorizontal },
         { label: "Notifications", href: "/account/notifications", icon: Bell },
         { label: "Security", href: "/account/security", icon: ShieldCheck },
         { label: "Sessions", href: "/account/sessions", icon: MonitorSmartphone },
@@ -89,6 +91,7 @@ const APP_SIDEBARS: Record<string, SidebarItem[]> = {
         { label: "Policies", href: "/admin/policies", icon: ShieldCheck },
         { label: "Activity", href: "/admin/activity", icon: Activity },
         { label: "Domains", href: "/admin/domains", icon: Globe },
+        { label: "Display defaults", href: "/admin/display", icon: SlidersHorizontal },
         { label: "Integrations", href: "/integrations", icon: Blocks },
         { label: "Updates & settings", href: "/settings", icon: Settings }
     ]

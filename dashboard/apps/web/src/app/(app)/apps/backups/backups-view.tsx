@@ -12,9 +12,11 @@ import { Boxes, Database, Download, HardDriveDownload, Server, Trash2 } from "lu
 import { formatBytes } from "@polaris/core";
 import { Badge, Button, Card, CardBody, CardHeader, CardTitle } from "@polaris/ui";
 import type { BackupInfo } from "@/lib/backup-service";
+import { useDisplayFormat } from "@/components/display-format";
 import { createBackupAction, deleteBackupAction } from "./actions";
 
 export function BackupsView({ initialBackups }: { initialBackups: BackupInfo[] }) {
+    const format = useDisplayFormat();
     const [backups, setBackups] = useState(initialBackups);
     const [backingUp, setBackingUp] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -80,7 +82,7 @@ export function BackupsView({ initialBackups }: { initialBackups: BackupInfo[] }
                                             <p className="truncate font-medium">{backup.name}</p>
                                             <p className="text-xs text-muted-foreground">
                                                 {formatBytes(BigInt(backup.sizeBytes))} -{" "}
-                                                {new Date(backup.createdAt).toLocaleString()}
+                                                {format.dateTime(backup.createdAt)}
                                             </p>
                                         </div>
                                     </div>

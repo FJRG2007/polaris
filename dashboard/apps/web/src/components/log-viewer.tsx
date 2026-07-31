@@ -16,6 +16,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Check, Copy, Download, Search } from "lucide-react";
 import { Button, Input, cn } from "@polaris/ui";
+import { useDisplayFormat } from "./display-format";
 import { formatLogTime, parseLog, type LogEntry, type LogLevel } from "@/lib/log-lines";
 
 const LEVEL_CLASS: Record<LogLevel, string> = {
@@ -143,7 +144,8 @@ export function LogViewer({
 
 function LogRow({ entry, gutter }: { entry: LogEntry; gutter: boolean }) {
     const [copied, setCopied] = useState(false);
-    const time = entry.time ? formatLogTime(entry.time) : null;
+    const format = useDisplayFormat();
+    const time = entry.time ? formatLogTime(entry.time, format) : null;
 
     async function copy(): Promise<void> {
         try {

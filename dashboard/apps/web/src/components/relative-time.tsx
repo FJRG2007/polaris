@@ -9,13 +9,15 @@
  */
 
 import { createElement, useEffect, type ReactElement } from "react";
+import { useDisplayFormat } from "./display-format";
 
 export function RelativeTime({ iso }: { iso: string }): ReactElement {
+    const format = useDisplayFormat();
     useEffect(() => {
         void import("@github/relative-time-element");
     }, []);
 
-    const absolute = new Date(iso).toLocaleString();
+    const absolute = format.dateTime(iso);
     return createElement(
         "relative-time",
         { datetime: iso, tense: "past", title: absolute },
