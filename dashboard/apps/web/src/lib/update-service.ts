@@ -11,9 +11,16 @@
  * "something new is still being built", which is a fact worth showing and not one
  * to act on.
  *
+ * What CI made of a commit is the other half of the answer. Publishing is gated on
+ * the suites passing, but a tag can still carry an image from a commit that failed
+ * them - a manual run, or an image published before the gate existed - and
+ * installing that is how a red build reaches a box that was only told an update
+ * exists. So a failed commit is reported as such instead of being offered, and a
+ * branch waiting on a build that will never come is not called "building".
+ *
  * GitHub is best-effort throughout: the registry alone decides whether an update
- * exists, so a rate-limited or unreachable API costs the commit count and the
- * building hint, never the answer.
+ * exists, so a rate-limited or unreachable API costs the commit count, the
+ * building hint and the CI verdict, never the answer.
  *
  * The result is cached in-process (many tabs, one check) with a manual force path
  * for the settings button, and a single in-flight request is shared so concurrent
@@ -31,8 +38,13 @@ export type UpdatePhase =
     | "available"
     /** The branch moved ahead of the published image; CI has not published it yet. */
     | "building"
+    /** Something newer exists, but the commit behind it failed its checks. */
+    | "blocked"
     /** Not comparable - a source/dev run, or the check could not be completed. */
     | "unknown";
+
+/** How CI judged a commit. */
+export type ChecksVerdict = "passed" | "failed" | "running";
 
 export interface UpdateStatus {
     readonly phase: UpdatePhase;
@@ -48,6 +60,10 @@ export interface UpdateStatus {
     readonly buildingCount: number | null;
     /** When the published image was built (ISO 8601), when the registry records it. */
     readonly publishedAt: string | null;
+    /** How the newest commit fared in CI, or null when GitHub could not say. */
+    readonly checks: ChecksVerdict | null;
+    /** The run to look at, when the checks failed. */
+    readonly checksUrl: string | null;
     /** GitHub URL to view the difference (or the branch history). */
     readonly url: string;
     /** When this status was last fetched (ISO 8601). */
@@ -115,6 +131,37 @@ async function compare(repo: string, base: string, head: string): Promise<Compar
     }
 }
 
+interface ChecksResult {
+    readonly verdict: ChecksVerdict;
+    /** The failing run, when one failed. */
+    readonly url: string | null;
+}
+
+/**
+ * What CI made of a commit (or of a branch's head), or null when GitHub cannot
+ * say - no runs at all is also null, since "nobody checked" is not a verdict.
+ *
+ * Only a completed failure counts as failed: a run still going has not decided
+ * yet, and a skipped job is one the push did not need - most of a publish is
+ * skipped on any given commit, so treating that as anything but fine would call
+ * every commit broken.
+ */
+async function checksFor(repo: string, ref: string): Promise<ChecksResult | null> {
+    try {
+        const data = (await github(`/repos/${repo}/commits/${encodeURIComponent(ref)}/check-runs?per_page=100`)) as {
+            check_runs?: { status?: string; conclusion?: string | null; html_url?: string | null }[];
+        };
+        const runs = data.check_runs ?? [];
+        if (runs.length === 0) return null;
+        const failed = runs.find((run) => run.conclusion === "failure" || run.conclusion === "timed_out");
+        if (failed) return { verdict: "failed", url: failed.html_url ?? null };
+        return { verdict: runs.some((run) => run.status !== "completed") ? "running" : "passed", url: null };
+    } catch {
+        // Best-effort: an unanswered check leaves the phase where it was.
+        return null;
+    }
+}
+
 async function query(): Promise<UpdateStatus> {
     const env = loadEnv();
     const repo = env.POLARIS_REPO;
@@ -132,6 +179,8 @@ async function query(): Promise<UpdateStatus> {
         current: running ? short(running) : null,
         latest: target ? short(target) : null,
         publishedAt: published.createdAt,
+        checks: null as ChecksVerdict | null,
+        checksUrl: null as string | null,
         checkedAt
     };
 
@@ -147,12 +196,19 @@ async function query(): Promise<UpdateStatus> {
         const pending = await compare(repo, target, branch);
         const rebuilds = pending?.files.some((file) => WEB_IMAGE_PATHS.test(file)) ?? false;
         const building = (pending?.aheadBy ?? 0) > 0 && rebuilds;
+        // A commit that failed its suites is not a build on its way: publishing
+        // waits on them, so no image is coming and "still building" would be a
+        // wait with nothing at the end of it.
+        const checks = building ? await checksFor(repo, branch) : null;
+        const blocked = checks?.verdict === "failed";
         return {
             ...base,
-            phase: building ? "building" : "up-to-date",
+            phase: blocked ? "blocked" : building ? "building" : "up-to-date",
             behindBy: 0,
             upToDate: !building,
             buildingCount: building ? pending?.aheadBy ?? null : null,
+            checks: checks?.verdict ?? null,
+            checksUrl: checks?.url ?? null,
             url: building ? pending?.url ?? branchUrl : branchUrl
         };
     }
@@ -163,12 +219,17 @@ async function query(): Promise<UpdateStatus> {
     if (moved && (moved.status === "behind" || moved.status === "identical")) {
         return { ...base, phase: "up-to-date", behindBy: 0, upToDate: true, buildingCount: null, url: branchUrl };
     }
+    // There is something to install; whether it should be installed is the last
+    // question, and only a verdict that came back failed answers it no.
+    const checks = await checksFor(repo, target);
     return {
         ...base,
-        phase: "available",
+        phase: checks?.verdict === "failed" ? "blocked" : "available",
         behindBy: moved?.aheadBy ?? null,
         upToDate: false,
         buildingCount: null,
+        checks: checks?.verdict ?? null,
+        checksUrl: checks?.url ?? null,
         url: moved?.url ?? branchUrl
     };
 }
@@ -200,6 +261,8 @@ export async function getUpdateStatus(force = false): Promise<UpdateStatus> {
                 upToDate: false,
                 buildingCount: null,
                 publishedAt: null,
+                checks: null,
+                checksUrl: null,
                 url: `https://github.com/${env.POLARIS_REPO}/commits/${env.POLARIS_UPDATE_BRANCH}`,
                 checkedAt: new Date().toISOString()
             };

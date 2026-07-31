@@ -7,9 +7,14 @@
  * moved ahead of the registry is "building", not "available", and only an image
  * whose commit differs from the running one is an update.
  *
- * The other half is that GitHub is optional. It supplies the commit count and the
- * building hint; when it is rate-limited or unreachable the registry alone still
- * has to produce a correct answer.
+ * The second rule is that a commit which failed its checks is not an update. The
+ * image behind the tag can only come from a passing commit while publishing is
+ * gated on CI, but a manual run or an older image can still leave a red build
+ * there, and offering it is how a broken build reaches a box that pressed Update.
+ *
+ * The other half is that GitHub is optional. It supplies the commit count, the
+ * building hint and the CI verdict; when it is rate-limited or unreachable the
+ * registry alone still has to produce a correct answer.
  */
 
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -26,10 +31,19 @@ interface Compare {
     readonly files?: { filename: string }[];
 }
 
+/** One entry of a check-runs response. */
+interface CheckRun {
+    readonly status: string;
+    readonly conclusion: string | null;
+    readonly html_url?: string;
+}
+
 async function check(options: {
     running?: string;
     published: PublishedImage;
     compare?: Compare | null;
+    /** What CI says about the newest commit; `null` is an outage. */
+    checks?: CheckRun[] | null;
 }): Promise<UpdateStatus> {
     vi.resetModules();
     vi.doMock("@polaris/config", () => ({
@@ -46,11 +60,14 @@ async function check(options: {
     }));
     vi.stubGlobal(
         "fetch",
-        vi.fn(async () =>
-            options.compare
-                ? new Response(JSON.stringify(options.compare), { status: 200 })
-                : new Response("rate limited", { status: 403 })
-        )
+        vi.fn(async (url: string) => {
+            const answer = String(url).includes("/check-runs")
+                ? options.checks && { check_runs: options.checks }
+                : options.compare;
+            return answer
+                ? new Response(JSON.stringify(answer), { status: 200 })
+                : new Response("rate limited", { status: 403 });
+        })
     );
     const { getUpdateStatus } = await import("../../src/lib/update-service");
     return getUpdateStatus(true);
@@ -127,6 +144,62 @@ describe("what counts as an update", () => {
         expect(status.phase).toBe("unknown");
         expect(status.upToDate).toBe(false);
         expect(status.current).toBeNull();
+    });
+});
+
+describe("a commit that failed its checks", () => {
+    const PASSED: CheckRun[] = [
+        { status: "completed", conclusion: "success" },
+        { status: "completed", conclusion: "skipped" }
+    ];
+    const FAILED: CheckRun[] = [
+        { status: "completed", conclusion: "success" },
+        { status: "completed", conclusion: "failure", html_url: "https://github.com/o/p/actions/runs/1/job/2" }
+    ];
+
+    it("is not offered, even with the image already published", async () => {
+        const status = await check({
+            published: IMAGE(NEWER),
+            compare: { status: "ahead", ahead_by: 1 },
+            checks: FAILED
+        });
+
+        expect(status.phase).toBe("blocked");
+        expect(status.checks).toBe("failed");
+        expect(status.checksUrl).toBe("https://github.com/o/p/actions/runs/1/job/2");
+    });
+
+    it("is not called a build still on its way", async () => {
+        const status = await check({
+            published: IMAGE(RUNNING),
+            compare: { status: "ahead", ahead_by: 1, files: [{ filename: "dashboard/apps/web/src/page.tsx" }] },
+            checks: FAILED
+        });
+
+        expect(status.phase).toBe("blocked");
+        expect(status.upToDate).toBe(false);
+    });
+
+    it("is offered once the checks pass", async () => {
+        const status = await check({
+            published: IMAGE(NEWER),
+            compare: { status: "ahead", ahead_by: 1 },
+            checks: PASSED
+        });
+
+        expect(status.phase).toBe("available");
+        expect(status.checks).toBe("passed");
+    });
+
+    it("is still offered while a run is going - unfinished is not failed", async () => {
+        const status = await check({
+            published: IMAGE(NEWER),
+            compare: { status: "ahead", ahead_by: 1 },
+            checks: [{ status: "in_progress", conclusion: null }]
+        });
+
+        expect(status.phase).toBe("available");
+        expect(status.checks).toBe("running");
     });
 });
 

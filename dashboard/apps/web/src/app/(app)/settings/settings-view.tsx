@@ -377,6 +377,23 @@ export function SettingsView({
                                         : "."}
                                 </span>
                             </>
+                        ) : status.phase === "blocked" ? (
+                            <>
+                                <TriangleAlert className="size-4 text-warning" />
+                                <span>
+                                    The newest commit failed its checks, so it is not offered to install.{" "}
+                                    {status.checksUrl ? (
+                                        <a
+                                            className="text-primary hover:underline"
+                                            href={status.checksUrl}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                        >
+                                            See what failed
+                                        </a>
+                                    ) : null}
+                                </span>
+                            </>
                         ) : status.phase === "building" ? (
                             <>
                                 <Hammer className="size-4 text-muted-foreground" />
