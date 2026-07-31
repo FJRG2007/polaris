@@ -22,6 +22,15 @@ export interface ExecOptions {
     readonly onStderr?: (chunk: Buffer) => void;
     /** Allocate a PTY (needed so a remote `docker logs -f`/`exec` dies on hangup). */
     readonly pty?: boolean | PseudoTtyOptions;
+    /**
+     * Fed to the command's stdin, which is then closed.
+     *
+     * This is how a secret reaches a remote command. The command line itself is
+     * visible in `ps` to every user on the machine - sshd runs it through a login
+     * shell - so anything that must not be readable there arrives here instead and
+     * is read into a shell variable by the script.
+     */
+    readonly input?: string;
 }
 
 /** Run one command, streaming stdout/stderr; resolves with the remote exit code. */
@@ -35,6 +44,7 @@ export function execCommand(client: Client, command: string, options: ExecOption
                 resolve({ code: code ?? 0, signal: signal ?? undefined })
             );
             channel.once("error", reject);
+            if (options.input !== undefined) channel.end(options.input);
         };
         if (options.pty) client.exec(command, { pty: options.pty }, handler);
         else client.exec(command, handler);

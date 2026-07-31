@@ -69,11 +69,16 @@ RUN npm run build
 
 # Bundle the deploy terminal sidecar into one self-contained CJS file. It runs as
 # a separate process alongside the Next server, outside the standalone bundle, so
-# its imports (@polaris/hostd-client, ws) must be inlined or they resolve to
-# nothing at runtime (the old ERR_MODULE_NOT_FOUND). The optional native ws
-# accelerators stay external - ws degrades gracefully without them.
+# its imports (@polaris/hostd-client, @polaris/ssh, ws) must be inlined or they
+# resolve to nothing at runtime (the old ERR_MODULE_NOT_FOUND). The optional
+# native ws accelerators stay external - ws degrades gracefully without them.
+#
+# ssh2 stays external too, for a different reason: it reaches for an optional
+# native module by a path relative to its own directory, which a bundler cannot
+# resolve. It is already in the standalone node_modules (the SFTP driver pulls it
+# in), and the sidecar sits under that tree, so the plain require finds it.
 RUN node_modules/.bin/esbuild apps/web/ws-server.mjs --bundle --platform=node \
-    --format=cjs --external:bufferutil --external:utf-8-validate \
+    --format=cjs --external:bufferutil --external:utf-8-validate --external:ssh2 \
     --outfile=apps/web/ws-server.bundle.cjs
 
 # The standalone tracer omits an app that ships no public/ dir; guarantee the

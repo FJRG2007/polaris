@@ -115,7 +115,10 @@ export function ServiceDetail({ app, onChanged, onClose }: { app: ProjectApp; on
                     {tab === "Variables" && <VariablesTab app={app} />}
                     {tab === "Metrics" && <MetricsTab applicationId={app.id} />}
                     {tab === "Console" && (
-                        <TerminalPanel targetId={app.targetId} containerRef={app.containerRef} label={app.containerRef} />
+                        <TerminalPanel
+                            target={{ kind: "container", targetId: app.targetId, containerRef: app.containerRef }}
+                            label={app.containerRef}
+                        />
                     )}
                     {tab === "Files" && <FilesPanel applicationId={app.id} />}
                     {tab === "Volumes" && <VolumesTab app={app} />}

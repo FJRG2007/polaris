@@ -22,3 +22,4 @@ export {
     type ShellOptions
 } from "./exec.js";
 export { SshPool } from "./pool.js";
+export { generateSshKeyPair, publicKeyBlob, type SshKeyPair } from "./keygen.js";

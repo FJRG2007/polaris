@@ -1,15 +1,21 @@
 "use client";
 
 /**
- * Add a server (SSH host). On submit the server test-connects to validate the
- * credentials and captures the host key to pin (trust-on-add), so a registered
- * host is verified from the first real connection onward. Auth is a password or a
- * private key (with an optional passphrase for an encrypted key).
+ * Add a server, either way round.
+ *
+ * The quick way runs a generated command on the machine and lets it register
+ * itself; nothing secret is typed and Polaris pins the host key the machine
+ * committed to. The manual way is the original SSH form, for a box that cannot
+ * run the script (Windows, an appliance) or credentials that already exist: it
+ * test-connects to validate them and captures the host key to pin.
  */
 
-import { useState, type FormEvent } from "react";
-import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { QuickEnroll } from "./quick-enroll";
+import { createHostAction } from "./actions";
+import { useState, type FormEvent } from "react";
+import { ENVIRONMENT_CHOICES, ENVIRONMENT_META } from "./environment-meta";
 import {
     environmentFromAddress,
     SSH_AUTH_METHODS,
@@ -28,8 +34,6 @@ import {
     Input,
     Select
 } from "@polaris/ui";
-import { createHostAction } from "./actions";
-import { ENVIRONMENT_CHOICES, ENVIRONMENT_META } from "./environment-meta";
 
 const AUTH_LABELS: Record<SshAuthMethod, string> = {
     password: "Password",
@@ -41,9 +45,14 @@ const ENVIRONMENT_OPTIONS = [
     { value: "unknown", label: "Not sure yet" }
 ];
 
+/** Which way the operator is adding this one. Quick leads, because it is the one
+ *  that does not ask anybody to paste a private key into a browser. */
+type AddMode = "quick" | "manual";
+
 export function HostDialog() {
     const router = useRouter();
     const [open, setOpen] = useState(false);
+    const [mode, setMode] = useState<AddMode>("quick");
     const [authMethod, setAuthMethod] = useState<SshAuthMethod>("password");
     const [environment, setEnvironment] = useState<ServerEnvironment>("unknown");
     const [environmentPicked, setEnvironmentPicked] = useState(false);
@@ -89,6 +98,7 @@ export function HostDialog() {
                 // The form fields unmount with the dialog, so clear the derived
                 // location too instead of carrying it into the next server.
                 if (next) {
+                    setMode("quick");
                     setEnvironment("unknown");
                     setEnvironmentPicked(false);
                     setError(null);
@@ -109,6 +119,19 @@ export function HostDialog() {
                         An SSH host, reusable in Containers (Docker) and Drive (SFTP).
                     </DialogDescription>
                 </DialogHeader>
+
+                <div className="mb-1 flex gap-1 rounded-md bg-muted/40 p-1">
+                    <ModeTab active={mode === "quick"} onClick={() => setMode("quick")}>
+                        Run a command
+                    </ModeTab>
+                    <ModeTab active={mode === "manual"} onClick={() => setMode("manual")}>
+                        Enter SSH details
+                    </ModeTab>
+                </div>
+
+                {mode === "quick" ? <QuickEnroll onDone={() => setOpen(false)} /> : null}
+
+                {mode !== "manual" ? null : (
                 <form onSubmit={onSubmit} className="flex flex-col gap-3">
                     <label className="flex flex-col gap-1 text-sm">
                         Name
@@ -197,7 +220,32 @@ export function HostDialog() {
                         </Button>
                     </div>
                 </form>
+                )}
             </DialogContent>
         </Dialog>
+    );
+}
+
+/** One side of the segmented switch at the top of the dialog. */
+function ModeTab({
+    active,
+    onClick,
+    children
+}: {
+    active: boolean;
+    onClick: () => void;
+    children: React.ReactNode;
+}) {
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            aria-pressed={active}
+            className={`flex-1 rounded px-3 py-1.5 text-sm transition-colors ${
+                active ? "bg-surface font-medium text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+            }`}
+        >
+            {children}
+        </button>
     );
 }

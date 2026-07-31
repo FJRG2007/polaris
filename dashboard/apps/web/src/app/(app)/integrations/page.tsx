@@ -4,12 +4,13 @@
  */
 
 import { requireAdmin } from "@/lib/session";
-import { INTEGRATIONS, readDymoConfig, readVirusTotalConfig } from "@/lib/integrations/registry";
-import { listIntegrationStates } from "@/lib/integration-service";
 import { getDomainConfig } from "@/lib/domain-service";
 import { getGithubStatus } from "@/lib/github-service";
-import { getCloudflareAccountStatus } from "@/lib/integrations/cloudflare-account-service";
+import { getRunnerAccess } from "@/lib/github-runners";
+import { listIntegrationStates } from "@/lib/integration-service";
 import { IntegrationsView, type IntegrationCard } from "./integrations-view";
+import { getCloudflareAccountStatus } from "@/lib/integrations/cloudflare-account-service";
+import { INTEGRATIONS, readDymoConfig, readVirusTotalConfig } from "@/lib/integrations/registry";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +18,10 @@ export default async function IntegrationsPage() {
     await requireAdmin();
     const states = await listIntegrationStates();
     const github = await getGithubStatus();
+    // Whether that connection can also register self-hosted runners. Neither
+    // method asks for the permission by default, so this is where the operator
+    // finds out - before provisioning a machine, not after.
+    const runners = github.connected ? await getRunnerAccess() : null;
     // DuckDNS config lives with the domain settings (Setting keys), not an Integration row.
     const domains = await getDomainConfig();
     // Cloudflare's API tokens (DNS records and named tunnels) are separate from the
@@ -50,6 +55,8 @@ export default async function IntegrationsPage() {
             githubLogin: entry.slug === "github" ? github.login ?? undefined : undefined,
             githubInstallations: entry.slug === "github" ? github.installations : undefined,
             githubHtmlUrl: entry.slug === "github" ? github.htmlUrl ?? undefined : undefined,
+            githubRunnersReady: entry.slug === "github" ? runners?.ready : undefined,
+            githubRunnersAdvice: entry.slug === "github" ? runners?.advice ?? undefined : undefined,
             cloudflareApiConnected: entry.slug === "cloudflare" ? cloudflare.connected : undefined,
             cloudflareDnsConnected: entry.slug === "cloudflare" ? cloudflare.dnsReady : undefined,
             cloudflareAccountName: entry.slug === "cloudflare" ? cloudflare.accountName ?? undefined : undefined

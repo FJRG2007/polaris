@@ -300,7 +300,10 @@ function AppCard({
                         <DialogTitle>Terminal - {app.name}</DialogTitle>
                     </DialogHeader>
                     {showTerminal && (
-                        <TerminalPanel targetId={app.targetId} containerRef={app.containerRef} label={app.containerRef} />
+                        <TerminalPanel
+                            target={{ kind: "container", targetId: app.targetId, containerRef: app.containerRef }}
+                            label={app.containerRef}
+                        />
                     )}
                 </DialogContent>
             </Dialog>

@@ -9,13 +9,15 @@
  * WebSocket); the ticket is redeemed and burned here, and the authorized target
  * and container are derived server-side - the client never sends the exec command.
  *
- * This handles the local host (via polaris-hostd). Remote-server terminals over
- * SSH are wired in a follow-up (they need host-credential decryption shared with
- * the web app).
+ * Two kinds of terminal arrive here. A container terminal is opened through
+ * polaris-hostd on the local box. A server terminal is an SSH shell on a
+ * registered Host; the credentials for it come back from the redeem call, since
+ * only the web app can decrypt them.
  */
 
 import { WebSocketServer } from "ws";
 import { HostdClient } from "@polaris/hostd-client";
+import { clampDim, openShell, openSshClient } from "@polaris/ssh";
 
 const port = Number(process.env.POLARIS_WS_PORT || 3001);
 const appPort = Number(process.env.PORT || 3000);
@@ -33,31 +35,20 @@ wss.on("listening", () => console.error(`polaris deploy ws sidecar on :${port}`)
 wss.on("connection", async (ws, req) => {
     const token = (req.headers["sec-websocket-protocol"] || "").split(",")[0]?.trim();
     const ticket = token ? await redeem(token) : null;
-    if (!ticket || ticket.mode !== "terminal") {
+    if (!ticket || (ticket.mode !== "terminal" && ticket.mode !== "ssh")) {
         console.error(`polaris ws: rejecting connection - ${token ? "ticket redeem failed / wrong mode" : "no ticket"}`);
         ws.close(4001, "invalid ticket");
         return;
     }
 
-    // Local host only for now.
-    const client = new HostdClient();
-    let socket;
-    let execId;
-    try {
-        execId = await client.execCreate({ container: ticket.containerRef, cmd: ["/bin/sh"], tty: true });
-        socket = await client.execStart(execId);
-    } catch (error) {
-        console.error(`polaris ws: exec failed for ${ticket.containerRef}:`, error?.message ?? error);
-        ws.close(4002, "could not open terminal");
-        return;
-    }
-    console.error(`polaris ws: terminal open for ${ticket.containerRef}`);
+    const session = ticket.mode === "ssh" ? await openSshSession(ticket, ws) : await openContainerSession(ticket, ws);
+    if (!session) return;
 
-    socket.on("data", (chunk) => {
+    session.stream.on("data", (chunk) => {
         if (ws.readyState === ws.OPEN) ws.send(chunk);
     });
-    socket.on("close", () => ws.close());
-    socket.on("error", () => ws.close());
+    session.stream.on("close", () => ws.close());
+    session.stream.on("error", () => ws.close());
 
     ws.on("message", (data, isBinary) => {
         if (!isBinary) {
@@ -65,7 +56,7 @@ wss.on("connection", async (ws, req) => {
             try {
                 const msg = JSON.parse(data.toString());
                 if (msg && msg.resize) {
-                    client.execResize(execId, msg.resize.cols, msg.resize.rows).catch(() => undefined);
+                    session.resize(msg.resize.cols, msg.resize.rows);
                     return;
                 }
                 if (msg && msg.ping) return;
@@ -73,11 +64,72 @@ wss.on("connection", async (ws, req) => {
                 // Not JSON: fall through and treat as input bytes.
             }
         }
-        socket.write(data);
+        session.stream.write(data);
     });
 
-    ws.on("close", () => socket.destroy());
+    ws.on("close", () => session.close());
 });
+
+/** A container terminal, opened through the host daemon on the local box. */
+async function openContainerSession(ticket, ws) {
+    const client = new HostdClient();
+    try {
+        const execId = await client.execCreate({ container: ticket.containerRef, cmd: ["/bin/sh"], tty: true });
+        const stream = await client.execStart(execId);
+        console.error(`polaris ws: terminal open for ${ticket.containerRef}`);
+        return {
+            stream,
+            resize: (cols, rows) => client.execResize(execId, cols, rows).catch(() => undefined),
+            close: () => stream.destroy()
+        };
+    } catch (error) {
+        console.error(`polaris ws: exec failed for ${ticket.containerRef}:`, error?.message ?? error);
+        ws.close(4002, "could not open terminal");
+        return null;
+    }
+}
+
+/**
+ * A shell on a registered server. The pinned host key travels with the ticket, so
+ * the sidecar verifies the server exactly as the rest of Polaris does rather than
+ * connecting blind - a terminal is the one place where trusting the wrong machine
+ * means typing at it.
+ */
+async function openSshSession(ticket, ws) {
+    const target = ticket.ssh;
+    if (!target) {
+        ws.close(4004, "server unavailable");
+        return null;
+    }
+    try {
+        const client = await openSshClient({
+            host: target.host,
+            port: target.port,
+            username: target.username,
+            auth: target.privateKey
+                ? { method: "key", privateKey: target.privateKey, passphrase: target.passphrase }
+                : { method: "password", password: target.password },
+            // An empty array means "pinning required, nothing known", which the
+            // client refuses. A host with no pinned key is a bug, and a terminal
+            // is the last place to paper over it by trusting whatever answers.
+            pinnedHostKey: target.hostKey ?? []
+        });
+        const channel = await openShell(client);
+        console.error(`polaris ws: shell open on ${target.username}@${target.host}`);
+        return {
+            stream: channel,
+            resize: (cols, rows) => channel.setWindow(clampDim(rows, 24, 300), clampDim(cols, 80, 500), 0, 0),
+            close: () => {
+                channel.end();
+                client.end();
+            }
+        };
+    } catch (error) {
+        console.error(`polaris ws: ssh failed for ${target.host}:`, error?.message ?? error);
+        ws.close(4003, "could not open a shell on the server");
+        return null;
+    }
+}
 
 async function redeem(token) {
     // Redeem via the web app's internal loopback route: this process runs outside

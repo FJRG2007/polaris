@@ -5,22 +5,26 @@
  * sidecar presenting the token over Sec-WebSocket-Protocol, and wires xterm.js to
  * it: server output -> terminal, keystrokes -> server, and a resize control frame
  * on fit. xterm is imported dynamically so it stays out of the server bundle.
+ *
+ * The same panel serves a container on a deploy target and a shell on a
+ * registered server; which one is decided server-side from the ticket, so the
+ * only difference here is what the ticket is minted for.
  */
 
-import { useEffect, useRef, useState } from "react";
 import "@xterm/xterm/css/xterm.css";
+import { useEffect, useRef, useState } from "react";
 
-export function TerminalPanel({
-    targetId,
-    containerRef,
-    label
-}: {
-    targetId: string;
-    containerRef: string;
-    label: string;
-}) {
+/** What to attach to: a container on a target, or a registered server. */
+export type TerminalTarget =
+    | { kind: "container"; targetId: string; containerRef: string }
+    | { kind: "host"; hostId: string };
+
+export function TerminalPanel({ target, label }: { target: TerminalTarget; label: string }) {
     const mountRef = useRef<HTMLDivElement>(null);
     const [status, setStatus] = useState("connecting...");
+    // The object identity of `target` would restart the session on every parent
+    // render; its contents are what actually decide the connection.
+    const key = target.kind === "host" ? `host:${target.hostId}` : `${target.targetId}:${target.containerRef}`;
 
     useEffect(() => {
         let disposed = false;
@@ -44,7 +48,11 @@ export function TerminalPanel({
             const res = await fetch("/api/deploy/terminal/ticket", {
                 method: "POST",
                 headers: { "content-type": "application/json" },
-                body: JSON.stringify({ targetId, containerRef, mode: "terminal" })
+                body: JSON.stringify(
+                    target.kind === "host"
+                        ? { hostId: target.hostId }
+                        : { targetId: target.targetId, containerRef: target.containerRef, mode: "terminal" }
+                )
             });
             if (!res.ok) {
                 setStatus("could not authorize terminal");
@@ -90,7 +98,10 @@ export function TerminalPanel({
             socket?.close();
             cleanup?.();
         };
-    }, [targetId, containerRef]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- `key` stands in
+        // for the target's contents; depending on the object would reconnect on
+        // every parent render.
+    }, [key]);
 
     return (
         <div className="flex flex-col gap-2">

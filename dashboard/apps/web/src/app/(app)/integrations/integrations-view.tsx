@@ -7,8 +7,18 @@
  * the admin-gated server actions.
  */
 
+import { runAction } from "@/lib/run-action";
 import { useState, useTransition } from "react";
+import * as integrationActions from "./actions";
+import { IntegrationLogo } from "@/components/logos";
+import { DYMO_IP_RULES, SCAN_ACTIONS, type ScanAction } from "@/lib/integrations/registry";
 import { CheckCircle2, Circle, ExternalLink, Loader2, RefreshCw, ShieldCheck } from "lucide-react";
+import { isTunnelToken, tunnelTokenHint, type TunnelProviderSlug } from "@/lib/integrations/tunnel-token";
+import {
+    CLOUDFLARE_TOKEN_LINKS,
+    CLOUDFLARE_TOKEN_PERMISSIONS,
+    type CloudflareTokenScope
+} from "@/lib/integrations/cloudflare-token-link";
 import {
     Badge,
     Button,
@@ -24,30 +34,6 @@ import {
     Switch,
     cn
 } from "@polaris/ui";
-import { runAction } from "@/lib/run-action";
-import { DYMO_IP_RULES, SCAN_ACTIONS, type ScanAction } from "@/lib/integrations/registry";
-import { isTunnelToken, tunnelTokenHint, type TunnelProviderSlug } from "@/lib/integrations/tunnel-token";
-import {
-    CLOUDFLARE_TOKEN_LINKS,
-    CLOUDFLARE_TOKEN_PERMISSIONS,
-    type CloudflareTokenScope
-} from "@/lib/integrations/cloudflare-token-link";
-import { IntegrationLogo } from "@/components/logos";
-import {
-    connectCloudflareAccountAction,
-    connectGithubAction,
-    connectGithubAppAction,
-    disconnectCloudflareAccountAction,
-    disconnectGithubAction,
-    refreshGithubInstallationsAction,
-    saveDuckdnsAction,
-    saveDymoAction,
-    saveTunnelAction,
-    saveVirusTotalAction,
-    syncDuckdnsAction,
-    testDymoKeyAction,
-    testVirusTotalKeyAction
-} from "./actions";
 
 export interface IntegrationCard {
     slug: string;
@@ -83,6 +69,10 @@ export interface IntegrationCard {
     githubInstallations?: string[];
     /** GitHub App: the app's GitHub page, for the Install button. */
     githubHtmlUrl?: string;
+    /** GitHub: whether this connection can also register self-hosted runners. */
+    githubRunnersReady?: boolean;
+    /** GitHub: what to change so it can, when it cannot. */
+    githubRunnersAdvice?: string;
 }
 
 export function IntegrationsView({ cards }: { cards: IntegrationCard[] }) {
@@ -164,7 +154,7 @@ function TunnelDialog({ card, onClose }: { card: IntegrationCard; onClose: () =>
         setError(null);
         startTransition(async () => {
             const result = await runAction(
-                () => saveTunnelAction({ provider, enabled, token: entered || undefined }),
+                () => integrationActions.saveTunnelAction({ provider, enabled, token: entered || undefined }),
                 setError
             );
             if (!result) return;
@@ -258,7 +248,7 @@ function CloudflareApiTokenSection({ card }: { card: IntegrationCard }) {
         setNote(null);
         startTransition(async () => {
             const result = await runAction(
-                () => connectCloudflareAccountAction({ token, scope, accountId: chosen }),
+                () => integrationActions.connectCloudflareAccountAction({ token, scope, accountId: chosen }),
                 setError
             );
             if (!result) return;
@@ -294,7 +284,7 @@ function CloudflareApiTokenSection({ card }: { card: IntegrationCard }) {
         setError(null);
         setNote(null);
         startTransition(async () => {
-            const result = await runAction(() => disconnectCloudflareAccountAction({ scope: which }), setError);
+            const result = await runAction(() => integrationActions.disconnectCloudflareAccountAction({ scope: which }), setError);
             if (!result) return;
             if (result.error) {
                 setError(result.error);
@@ -464,7 +454,7 @@ function DuckDnsDialog({ card, onClose }: { card: IntegrationCard; onClose: () =
         setSynced(null);
         startSave(async () => {
             const result = await runAction(
-                () => saveDuckdnsAction({ subdomain, token: token || undefined }),
+                () => integrationActions.saveDuckdnsAction({ subdomain, token: token || undefined }),
                 setError
             );
             if (!result) return;
@@ -477,7 +467,7 @@ function DuckDnsDialog({ card, onClose }: { card: IntegrationCard; onClose: () =
         setError(null);
         setSynced(null);
         startSync(async () => {
-            const result = await runAction(() => syncDuckdnsAction(), setError);
+            const result = await runAction(() => integrationActions.syncDuckdnsAction(), setError);
             if (!result) return;
             if (result.ok) setSynced(result.detail);
             else setError(result.detail);
@@ -578,7 +568,7 @@ function DymoDialog({ card, onClose }: { card: IntegrationCard; onClose: () => v
         setError(null);
         setTested(null);
         startTest(async () => {
-            const result = await runAction(() => testDymoKeyAction(apiKey), setError);
+            const result = await runAction(() => integrationActions.testDymoKeyAction(apiKey), setError);
             if (!result) return;
             if (result.ok) setTested("The key works.");
             else setError(result.error ?? "The key was rejected");
@@ -589,7 +579,7 @@ function DymoDialog({ card, onClose }: { card: IntegrationCard; onClose: () => v
         setError(null);
         startSave(async () => {
             const result = await runAction(
-                () => saveDymoAction({ enabled, verifyAccessIp, deny: [...deny], apiKey }),
+                () => integrationActions.saveDymoAction({ enabled, verifyAccessIp, deny: [...deny], apiKey }),
                 setError
             );
             if (!result) return;
@@ -694,6 +684,32 @@ function DymoDialog({ card, onClose }: { card: IntegrationCard; onClose: () => v
     );
 }
 
+/**
+ * Whether this connection can register self-hosted runners. Neither method asks
+ * for the permission by default, so saying nothing would leave the operator to
+ * discover it as a 403 after they have already set a machine up.
+ */
+function RunnerAccessNote({ card }: { card: IntegrationCard }) {
+    if (card.githubRunnersReady === undefined) return null;
+    if (card.githubRunnersReady && !card.githubRunnersAdvice) {
+        return (
+            <p className="flex items-start gap-2 text-xs text-muted-foreground">
+                <ShieldCheck className="mt-0.5 size-3.5 shrink-0 text-success" />
+                This connection can also register self-hosted runners.
+            </p>
+        );
+    }
+    return (
+        <p className="flex items-start gap-2 rounded-md border border-warning/30 bg-warning/5 px-3 py-2 text-xs text-muted-foreground">
+            <ShieldCheck className="mt-0.5 size-3.5 shrink-0 text-warning" />
+            <span>
+                <span className="block font-medium text-foreground">Self-hosted runners</span>
+                {card.githubRunnersAdvice}
+            </span>
+        </p>
+    );
+}
+
 function GitHubDialog({ card, onClose }: { card: IntegrationCard; onClose: () => void }) {
     const connected = Boolean(card.githubLogin);
     if (connected) return <GitHubConnected card={card} onClose={onClose} />;
@@ -723,6 +739,8 @@ function GitHubConnected({ card, onClose }: { card: IntegrationCard; onClose: ()
                         Connected via {isApp ? "GitHub App" : "token"} as{" "}
                         <span className="font-medium">{card.githubLogin}</span>
                     </div>
+
+                    <RunnerAccessNote card={card} />
 
                     {isApp ? (
                         <div className="flex flex-col gap-2 text-sm">
@@ -759,7 +777,7 @@ function GitHubConnected({ card, onClose }: { card: IntegrationCard; onClose: ()
                                     onClick={() =>
                                         startBusy(async () => {
                                             const result = await runAction(
-                                                () => refreshGithubInstallationsAction(),
+                                                () => integrationActions.refreshGithubInstallationsAction(),
                                                 setError
                                             );
                                             if (result?.error) setError(result.error);
@@ -784,7 +802,7 @@ function GitHubConnected({ card, onClose }: { card: IntegrationCard; onClose: ()
                             disabled={busy}
                             onClick={() =>
                                 startBusy(async () => {
-                                    const result = await runAction(() => disconnectGithubAction(), setError);
+                                    const result = await runAction(() => integrationActions.disconnectGithubAction(), setError);
                                     if (!result) return;
                                     if (result.error) setError(result.error);
                                     else onClose();
@@ -814,7 +832,7 @@ function GitHubConnect({ card, onClose }: { card: IntegrationCard; onClose: () =
     function onConnectToken() {
         setError(null);
         startSave(async () => {
-            const result = await runAction(() => connectGithubAction(token), setError);
+            const result = await runAction(() => integrationActions.connectGithubAction(token), setError);
             if (!result) return;
             if (result.error) setError(result.error);
             else onClose();
@@ -824,7 +842,7 @@ function GitHubConnect({ card, onClose }: { card: IntegrationCard; onClose: () =
     function onConnectExisting() {
         setError(null);
         startSave(async () => {
-            const result = await runAction(() => connectGithubAppAction({ appId, pem }), setError);
+            const result = await runAction(() => integrationActions.connectGithubAppAction({ appId, pem }), setError);
             if (!result) return;
             if (result.error) setError(result.error);
             else onClose();
@@ -955,7 +973,7 @@ function VirusTotalDialog({ card, onClose }: { card: IntegrationCard; onClose: (
         setError(null);
         setTested(null);
         startTest(async () => {
-            const result = await runAction(() => testVirusTotalKeyAction(apiKey), setError);
+            const result = await runAction(() => integrationActions.testVirusTotalKeyAction(apiKey), setError);
             if (!result) return;
             if (result.ok) setTested("The key works.");
             else setError(result.error ?? "The key was rejected");
@@ -966,7 +984,7 @@ function VirusTotalDialog({ card, onClose }: { card: IntegrationCard; onClose: (
         setError(null);
         startSave(async () => {
             const result = await runAction(
-                () => saveVirusTotalAction({ enabled, scanDropPoints, onDetection, apiKey }),
+                () => integrationActions.saveVirusTotalAction({ enabled, scanDropPoints, onDetection, apiKey }),
                 setError
             );
             if (!result) return;

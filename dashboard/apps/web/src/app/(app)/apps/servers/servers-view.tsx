@@ -9,15 +9,25 @@
  * confirm (no native dialog).
  */
 
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
-import { MapPin, Server, Trash2, TriangleAlert } from "lucide-react";
-import type { ServerEnvironment } from "@polaris/core";
-import { Badge, Button } from "@polaris/ui";
-import { deleteHostAction } from "./actions";
+import Link from "next/link";
 import { HostDialog } from "./host-dialog";
+import { useRouter } from "next/navigation";
+import { deleteHostAction } from "./actions";
+import { useState, useTransition } from "react";
 import { ENVIRONMENT_META } from "./environment-meta";
+import type { ServerEnvironment } from "@polaris/core";
+import { TerminalPanel } from "../deploy/terminal-panel";
 import { EnvironmentDialog, type EnvironmentTarget } from "./environment-dialog";
+import { FolderOpen, MapPin, Server, SquareTerminal, Trash2, TriangleAlert } from "lucide-react";
+import {
+    Badge,
+    Button,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle
+} from "@polaris/ui";
 
 export interface ServerRow {
     /** "local" for the Polaris box, otherwise the Host id. */
@@ -43,6 +53,7 @@ export function ServersView({ servers }: { servers: ServerRow[] }) {
     const [pending, startTransition] = useTransition();
     const [confirmId, setConfirmId] = useState<string | null>(null);
     const [target, setTarget] = useState<EnvironmentTarget | null>(null);
+    const [shell, setShell] = useState<ServerRow | null>(null);
 
     const unset = servers.filter((server) => server.environment === "unknown");
     const remotes = servers.filter((server) => server.kind === "host");
@@ -125,6 +136,28 @@ export function ServersView({ servers }: { servers: ServerRow[] }) {
                                 </td>
                                 <td className="px-3 py-2">
                                     <div className="flex justify-end gap-1">
+                                        {server.kind === "host" && confirmId !== server.id ? (
+                                            <>
+                                                <Button
+                                                    size="icon"
+                                                    variant="ghost"
+                                                    aria-label={`Open a shell on ${server.name}`}
+                                                    title="Open a shell"
+                                                    onClick={() => setShell(server)}
+                                                >
+                                                    <SquareTerminal className="size-4" />
+                                                </Button>
+                                                <Button size="icon" variant="ghost" asChild>
+                                                    <Link
+                                                        href={`/drive?c=host:${server.id}`}
+                                                        aria-label={`Browse the files on ${server.name}`}
+                                                        title="Browse its files"
+                                                    >
+                                                        <FolderOpen className="size-4" />
+                                                    </Link>
+                                                </Button>
+                                            </>
+                                        ) : null}
                                         {server.kind === "local" ? null : confirmId === server.id ? (
                                             <>
                                                 <Button
@@ -163,12 +196,36 @@ export function ServersView({ servers }: { servers: ServerRow[] }) {
 
             {remotes.length === 0 ? (
                 <p className="text-xs text-muted-foreground">
-                    Add an SSH host to manage another server from Containers (Docker) and Drive (SFTP).
+                    Add a server to reach it from Containers (Docker), Drive (SFTP) and a shell here.
                 </p>
             ) : null}
 
             <EnvironmentDialog target={target} onClose={() => setTarget(null)} />
+            <ShellDialog server={shell} onClose={() => setShell(null)} />
         </div>
+    );
+}
+
+/** A shell on one server. Mounted only while open so closing the dialog tears the
+ *  SSH session down rather than leaving it attached in the background. */
+function ShellDialog({ server, onClose }: { server: ServerRow | null; onClose: () => void }) {
+    return (
+        <Dialog open={server !== null} onOpenChange={(next) => !next && onClose()}>
+            <DialogContent className="max-w-3xl">
+                <DialogHeader>
+                    <DialogTitle>{server?.name}</DialogTitle>
+                    <DialogDescription>
+                        {server ? `Signed in as ${server.detail} over SSH.` : null}
+                    </DialogDescription>
+                </DialogHeader>
+                {server ? (
+                    <TerminalPanel
+                        target={{ kind: "host", hostId: server.id }}
+                        label={`${server.detail}@${server.address}`}
+                    />
+                ) : null}
+            </DialogContent>
+        </Dialog>
     );
 }
 

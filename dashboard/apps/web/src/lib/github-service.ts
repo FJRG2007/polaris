@@ -38,6 +38,14 @@ export interface GithubRepo {
 interface Installation {
     id: number;
     login: string;
+    /** The permissions this installation was granted, as GitHub reports them.
+     *  Recorded so Polaris can say which capability is missing before a call
+     *  fails, rather than surfacing a bare 403. Absent on rows written before
+     *  runner support existed; a refresh fills them in. */
+    permissions?: Record<string, string>;
+    /** "Organization" or "User", which decides whether org-level runner
+     *  registration is even possible for it. */
+    accountType?: string;
 }
 
 interface AppSecrets {
@@ -136,8 +144,17 @@ async function fetchInstallations(appId: string, pem: string): Promise<Installat
     });
     if (res.status === 401) throw new Error("GitHub rejected the app credentials (check the App ID and private key)");
     if (!res.ok) throw new Error(`GitHub returned ${res.status} listing installations`);
-    const body = (await res.json()) as Array<{ id: number; account?: { login?: string } }>;
-    return body.map((row) => ({ id: row.id, login: row.account?.login ?? "" }));
+    const body = (await res.json()) as Array<{
+        id: number;
+        account?: { login?: string; type?: string };
+        permissions?: Record<string, string>;
+    }>;
+    return body.map((row) => ({
+        id: row.id,
+        login: row.account?.login ?? "",
+        permissions: row.permissions ?? {},
+        accountType: row.account?.type
+    }));
 }
 
 /** The manifest describing the app GitHub will create for this Polaris instance. */
@@ -265,6 +282,25 @@ export async function getGithubStatus(): Promise<GithubStatus> {
     };
 }
 
+/**
+ * The App installations as last recorded, with the permissions each was granted.
+ * Runner registration reads these to say which capability is missing before it
+ * makes a call that would 403. Empty for the PAT method, which has no
+ * installations.
+ */
+export async function listGithubInstallations(): Promise<
+    Array<{ login: string; accountType?: string; permissions: Record<string, string> }>
+> {
+    const state = await getIntegrationState(PROVIDER);
+    if (state?.config.method !== "app") return [];
+    const installs = Array.isArray(state.config.installations) ? (state.config.installations as Installation[]) : [];
+    return installs.map((install) => ({
+        login: install.login,
+        accountType: install.accountType,
+        permissions: install.permissions ?? {}
+    }));
+}
+
 /** Forget the GitHub connection and its secret(s). */
 export async function disconnectGithub(): Promise<void> {
     await upsertIntegration(PROVIDER, { enabled: false, config: {}, secret: null });
@@ -331,7 +367,13 @@ export async function listGithubRepos(): Promise<GithubRepo[]> {
 }
 
 /** An API token for REST calls scoped to `owner` (installation token for the App
- *  method, the PAT otherwise), or null when not connected / for a public call. */
+ *  method, the PAT otherwise), or null when not connected / for a public call.
+ *  Exported so sibling modules (runner registration) authenticate the same way
+ *  instead of each learning which method is in use. */
+export async function githubApiToken(owner?: string): Promise<string | null> {
+    return apiToken(owner);
+}
+
 async function apiToken(owner?: string): Promise<string | null> {
     const state = await getIntegrationState(PROVIDER);
     if (!state?.hasSecret) return null;

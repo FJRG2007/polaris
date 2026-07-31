@@ -87,6 +87,12 @@ export async function register(): Promise<void> {
     const { startUpdateWatcher } = await import("./lib/update-watcher");
     startUpdateWatcher();
 
+    // Keep each runner pool's ephemeral runners up: replace the ones that took a
+    // job and exited, and remove the registrations left behind by a machine that
+    // died mid-job, which GitHub would otherwise keep queueing work onto.
+    const { startRunnerReconciler } = await import("./lib/runners/runner-reconciler");
+    startRunnerReconciler();
+
     // Re-establish messaging channels in the bridge after a bridge or web restart:
     // the bridge holds adapters in memory, so without this a channel stays
     // "connected" in the DB but dead at the bridge until manually reconnected.

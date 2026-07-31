@@ -92,6 +92,8 @@ model User {
     passkeys            Passkey[]
     notifyDestinations  NotificationDestination[]
     notifyDeliveries    NotificationDelivery[]
+    enrollments         Enrollment[]
+    runnerPools         RunnerPool[]
 }
 
 // Addresses a user owns besides the one they sign in with. The primary stays on
@@ -756,8 +758,140 @@ model Host {
 
     owner         User           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
     deployTargets DeployTarget[]
+    enrollments   Enrollment[]
+    runnerPools   RunnerPool[]
 
     @@index([ownerId])
+}
+
+// An offer to let one machine join Polaris, redeemed by a script run on it.
+//
+// The alternative to this row is asking an operator to type an SSH password into
+// a dashboard, which is the thing worth avoiding: here Polaris mints the key pair
+// up front, keeps the private half encrypted (`encryptedKey`, same envelope as
+// every other stored credential), and the script installs only `publicKey`. No
+// secret travels to the machine and none comes back, so a script intercepted in
+// transit yields an attacker nothing but a token that expires in minutes and
+// works exactly once.
+//
+// `hostKeys` is what the machine reported about itself while the script was still
+// running as root. Polaris pins against that list on its first connect, which
+// closes the window trust-on-add leaves open.
+model Enrollment {
+    id           String    @id @default(uuid(7)) @db.Uuid
+    // server | runner - what the machine becomes once it claims this.
+    kind         String    @default("server")
+    tokenHash    String    @unique
+    createdById  String    @db.Uuid
+    // Proposed name; the machine's real hostname replaces it when it reports one.
+    name         String
+    // Carried onto the Host, so the operator answers "where does it live" once.
+    environment  String    @default("unknown")
+    // The login the script provisions and Polaris authenticates as.
+    username     String
+    // The authorized_keys line installed on the machine.
+    publicKey    String
+    encryptedKey Bytes
+    keyNonce     Bytes
+    keyKeyId     String
+    // Newline-separated public host keys the machine reported, pinned on connect.
+    hostKeys     String    @default("")
+    // Where Polaris reached it: the claim's source address, not one the script chose.
+    address      String?
+    port         Int       @default(22)
+    claimedAt    DateTime?
+    // The Host this produced. Null while pending, and after a failed claim.
+    hostId       String?   @db.Uuid
+    // Why the claim did not finish, shown next to the command so the operator can
+    // fix the machine rather than guess.
+    error        String?
+    expiresAt    DateTime
+    createdAt    DateTime  @default(now())
+
+    createdBy User  @relation(fields: [createdById], references: [id], onDelete: Cascade)
+    host      Host? @relation(fields: [hostId], references: [id], onDelete: SetNull)
+
+    @@index([createdById])
+    @@index([expiresAt])
+}
+
+// A standing offer of compute to GitHub: keep `maxConcurrent` self-hosted runners
+// alive on one registered server, so workflows selecting these labels have
+// somewhere to land.
+//
+// The pool is configuration, not state. Nothing here records a running process,
+// because a process on somebody else's machine is not something a row can be the
+// truth about - RunnerJob tracks the ones Polaris started, and the machine and
+// GitHub are both re-read on every reconcile pass rather than believed.
+//
+// There is no "keep this runner around" column. Every runner a pool starts is
+// registered just-in-time and de-registers itself after one job: a runner that
+// outlives its job keeps a credential on disk and carries one workflow's leftovers
+// into the next, which is the failure this whole design exists to avoid.
+model RunnerPool {
+    id            String   @id @default(uuid(7)) @db.Uuid
+    ownerId       String   @db.Uuid
+    hostId        String   @db.Uuid
+    name          String
+    // repo | org - org-level covers every repository in the organization at once
+    // and needs a far narrower App permission, so it is the one to prefer.
+    scope         String
+    // The GitHub account the runners are registered against, and the repository
+    // when the scope is `repo`. Stored as typed, since GitHub is case-preserving.
+    targetOwner   String
+    targetRepo    String?
+    // Labels a workflow selects with `runs-on`, as a stringified JSON array.
+    labels        String
+    // How many runners are kept waiting at once. Each is a real process on the
+    // machine, so it is bounded (see MAX_RUNNER_CONCURRENCY in @polaris/core).
+    maxConcurrent Int      @default(1)
+    // container | workspace - whether a job is thrown away with a container, or
+    // only given an empty directory on the machine itself.
+    isolation     String
+    enabled       Boolean  @default(true)
+    // Why the pool last failed to keep its runners up, shown on the pool rather
+    // than left in a log the operator has no reason to open.
+    error         String?
+    createdAt     DateTime @default(now())
+    updatedAt     DateTime @updatedAt
+
+    owner User        @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+    host  Host        @relation(fields: [hostId], references: [id], onDelete: Cascade)
+    jobs  RunnerJob[]
+
+    @@index([ownerId])
+    @@index([hostId])
+}
+
+// One ephemeral runner: registered, started, given a single job, gone.
+//
+// It is kept after it finishes because it is the only account of what ran on the
+// machine and how it ended - the runner itself de-registers, so GitHub stops being
+// able to answer that question moments after the job does.
+model RunnerJob {
+    id             String    @id @default(uuid(7)) @db.Uuid
+    poolId         String    @db.Uuid
+    // The name registered with GitHub, unique per target.
+    name           String
+    // GitHub's id for the runner row, so one that never started can still be
+    // removed. Null between creating the row and minting the registration.
+    githubRunnerId Int?
+    // starting | idle | busy | finished | failed
+    state          String    @default("starting")
+    // What this one actually got, which can differ from the pool's setting if the
+    // machine changed under it.
+    isolation      String
+    // How to find the runner again on the machine: the container name, or the pid
+    // of the detached process. Advisory - liveness is probed, never assumed.
+    handle         String?
+    error          String?
+    startedAt      DateTime  @default(now())
+    finishedAt     DateTime?
+
+    pool RunnerPool @relation(fields: [poolId], references: [id], onDelete: Cascade)
+
+    @@index([poolId, state])
+    @@index([startedAt])
 }
 
 model StorageMount {

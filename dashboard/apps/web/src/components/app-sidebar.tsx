@@ -9,7 +9,9 @@
  */
 
 import Link from "next/link";
+import { cn } from "@polaris/ui";
 import { usePathname } from "next/navigation";
+import { resolveActiveApp } from "@/lib/apps";
 import {
     Activity,
     Bell,
@@ -40,10 +42,9 @@ import {
     UserCog,
     Users,
     UsersRound,
+    Workflow,
     type LucideIcon
 } from "lucide-react";
-import { cn } from "@polaris/ui";
-import { resolveActiveApp } from "@/lib/apps";
 
 interface SidebarItem {
     label: string;
@@ -66,6 +67,7 @@ const APP_SIDEBARS: Record<string, SidebarItem[]> = {
         { label: "Deploy", href: "/apps/deploy", icon: Rocket },
         { label: "Marketplace", href: "/apps/marketplace", icon: Store },
         { label: "Servers", href: "/apps/servers", icon: Server },
+        { label: "Runners", href: "/apps/runners", icon: Workflow },
         { label: "Containers", href: "/apps/containers", icon: Container },
         { label: "Backups", href: "/apps/backups", icon: Database }
     ],

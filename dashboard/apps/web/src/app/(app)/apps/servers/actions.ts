@@ -9,11 +9,18 @@
 
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
-import { createHostSchema, setServerEnvironmentSchema } from "@polaris/core";
 import { requirePermission } from "@/lib/session";
 import { recordAudit } from "@/lib/audit-service";
 import { setLocalEnvironment } from "@/lib/network-service";
+import { createEnrollmentSchema, createHostSchema, setServerEnvironmentSchema } from "@polaris/core";
 import { createHost, deleteHost, setHostEnvironment, setHostWildcardDomain } from "@/lib/host-service";
+import {
+    cancelEnrollment,
+    getEnrollmentStatus,
+    openEnrollment,
+    type EnrollmentStatus,
+    type OpenedEnrollment
+} from "@/lib/enrollment-service";
 
 const SERVERS_PATH = "/apps/servers";
 
@@ -94,6 +101,39 @@ export async function setServerWildcardAction(input: unknown): Promise<{ error?:
     });
     revalidatePath(SERVERS_PATH);
     return {};
+}
+
+/**
+ * Open a quick enrollment and hand back the command to run on the machine. The
+ * command carries a token that is live for minutes, so it is generated when the
+ * operator asks for it rather than kept on the page.
+ */
+export async function openEnrollmentAction(
+    input: unknown
+): Promise<{ enrollment?: OpenedEnrollment; error?: string }> {
+    const user = await requirePermission("system.manage");
+    const parsed = createEnrollmentSchema.safeParse(input);
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid enrollment" };
+    try {
+        return { enrollment: await openEnrollment(user.id, parsed.data) };
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not start the enrollment" };
+    }
+}
+
+/** Polled by the dialog while it waits for the machine to call home. */
+export async function enrollmentStatusAction(id: string): Promise<EnrollmentStatus | null> {
+    const user = await requirePermission("system.manage");
+    const status = await getEnrollmentStatus(id, user.id);
+    // A finished enrollment added a row the list does not know about yet.
+    if (status?.state === "claimed") revalidatePath(SERVERS_PATH);
+    return status;
+}
+
+/** Kill a command that was generated and should not be used after all. */
+export async function cancelEnrollmentAction(id: string): Promise<void> {
+    const user = await requirePermission("system.manage");
+    await cancelEnrollment(id, user.id);
 }
 
 export async function deleteHostAction(hostId: string): Promise<void> {
