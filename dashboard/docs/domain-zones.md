@@ -45,6 +45,18 @@ Services on a **remote** server never get a Polaris zone hostname: the zone's
 wildcard points at the Polaris host. They use their own server's domain instead -
 see below.
 
+## Hostnames outside a zone
+
+A zone hostname rides its wildcard, so the zones bound what the picker can offer. Any
+other name - `app.example.com` straight on the base domain, or a name on a completely
+different domain - is added as a custom domain instead, which needs no wildcard behind
+it: `provisionHostnameDns()` (domain-dns) writes that one A record through the
+connected Cloudflare token, and the panel reports what to do by hand when it cannot.
+
+A record already pointing somewhere else is never repointed - the name may be a live
+site - and the domain is added either way, since DNS that is not there yet only
+delays the certificate.
+
 ## Per-server wildcards
 
 Each registered server carries an optional `wildcardDomain` (`Host.wildcardDomain`,

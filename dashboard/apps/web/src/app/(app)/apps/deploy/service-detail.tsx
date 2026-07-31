@@ -1539,7 +1539,7 @@ const EXPOSURE_OPTIONS: { value: ExposureKind; label: string; icon: ReactNode }[
     { value: "zone", label: "Your domain (zone subdomain)", icon: <Globe className="size-4 text-primary" /> },
     { value: "subdomain", label: "Free subdomain (auto)", icon: <Globe className="size-4 text-muted-foreground" /> },
     { value: "local", label: "Local subdomain (LAN)", icon: <MapPin className="size-4 text-muted-foreground" /> },
-    { value: "le", label: "Custom domain - Let's Encrypt", icon: <Globe className="size-4 text-muted-foreground" /> },
+    { value: "le", label: "Custom domain (any hostname)", icon: <Globe className="size-4 text-muted-foreground" /> },
     { value: "cf-named", label: "Cloudflare tunnel - custom domain", icon: <CloudflareMark className="size-4" /> },
     { value: "cf-quick", label: "Cloudflare quick link (free)", icon: <CloudflareMark className="size-4" /> },
     { value: "ngrok", label: "ngrok tunnel", icon: <NgrokMark className="size-4" /> },
@@ -1558,6 +1558,21 @@ type ZoneSubdomainCheck = Awaited<ReturnType<typeof deployActions.zoneSubdomainA
 /** A URL-safe label from the app name, the default for a local/DuckDNS subdomain. */
 function defaultLabel(name: string): string {
     return name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "app";
+}
+
+/** What the server did about a custom hostname's DNS, when it did anything. */
+type AddDomainDns = Awaited<ReturnType<typeof deployActions.addDomainAction>>["dns"];
+
+/** What is left to do about a custom hostname's DNS, in one line. Null when the name
+ *  already answers here, which is the case that needs saying nothing. */
+function dnsAdvice(dns: AddDomainDns, hostname: string): string | null {
+    if (!dns || dns.status === "unchanged") return null;
+    if (dns.status === "created") return `${hostname} now points at ${dns.ip}. It may take a few minutes to spread.`;
+    if (dns.status === "conflict") {
+        return `${hostname} already points at ${dns.content}, so Polaris left it alone. Repoint it at ${dns.ip} to serve this app here.`;
+    }
+    const target = dns.ip ? ` at ${dns.ip}` : "";
+    return `Point ${hostname}${target} in your DNS provider${dns.detail ? ` - ${dns.detail}` : "."}`;
 }
 
 function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolean; onChanged: () => void }) {
@@ -1580,6 +1595,9 @@ function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
     const [cfConnected, setCfConnected] = useState(false);
     const [duckSub, setDuckSub] = useState<string | null>(null);
     const [zones, setZones] = useState<Array<{ label: string; host: string; primary: boolean }>>([]);
+    // The operator's own domain, offered as the suggested custom hostname so a name
+    // straight on it (app.example.com) is as obvious a choice as one in a zone.
+    const [baseDomain, setBaseDomain] = useState("");
     const [zoneLabel, setZoneLabel] = useState<string | null>(null);
     const [randomName, setRandomName] = useState(false);
     // The subdomain the zone hostname takes. Empty means "not chosen yet": the server
@@ -1593,6 +1611,9 @@ function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
     const checkedSubdomain = useRef<string | null>(null);
     const [tunnelNonce, setTunnelNonce] = useState(0);
     const [error, setError] = useState<string | null>(null);
+    // Kept after a successful add: a custom domain works only once its DNS points here,
+    // and whether Polaris managed that itself is the one thing the operator has to know.
+    const [dnsNote, setDnsNote] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
 
     useEffect(() => {
@@ -1604,8 +1625,9 @@ function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
         // server's domain instead.
         if (app.serverId !== "local") return;
         void deployActions.deployZonesAction()
-            .then((result) => {
+            .then(({ baseDomain: base, zones: result }) => {
                 setZones(result);
+                setBaseDomain(base);
                 // A configured domain is the best default: it is the only option that
                 // yields a stable, public hostname without a third party in the path.
                 // The layout's own default zone wins, not merely the first stored one.
@@ -1687,6 +1709,10 @@ function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
     const usesLabel = exposure === "local" || exposure === "duckdns";
     const needsHostname = exposure === "le" || exposure === "proxy" || exposure === "cf-named";
     const labelSuffix = exposure === "local" ? ".plr.local" : exposure === "duckdns" && duckSub ? `.${duckSub}.duckdns.org` : "";
+    // Suggest a name straight on the operator's own domain, since that is the one
+    // people reach for first and the zone picker cannot offer it. Any other domain is
+    // just as valid - the field takes whatever is typed.
+    const hostnameHint = baseDomain ? `${defaultLabel(app.name)}.${baseDomain}` : "app.example.com";
     const duckMissing = exposure === "duckdns" && !duckSub;
     // A tunnel URL is already exposed by its tunnel; adding it as a domain only makes a
     // duplicate, dead route. Flag it as the user types (the server rejects it too).
@@ -1705,9 +1731,10 @@ function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
     // in the list above via the row components once the nonce bumps.
     function submitExposure() {
         setError(null);
+        setDnsNote(null);
         const labelValue = label.trim() || defaultLabel(app.name);
         startTransition(async () => {
-            let result: { error?: string } = {};
+            let result: { error?: string; hostname?: string | null; dns?: AddDomainDns } = {};
             if (exposure === "zone") {
                 result = await deployActions.addDomainAction({
                     applicationId: app.id,
@@ -1743,6 +1770,7 @@ function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
             }
             if (result.error) setError(result.error);
             else {
+                setDnsNote(dnsAdvice(result.dns, result.hostname ?? hostname.trim()));
                 // Reset the add-a-domain form to a clean state after a successful add.
                 setHostname("");
                 setLabel("");
@@ -1904,6 +1932,7 @@ function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
                                 onValueChange={(value) => {
                                     exposureTouched.current = true;
                                     setExposure(value as ExposureKind);
+                                    setDnsNote(null);
                                 }}
                                 options={EXPOSURE_OPTIONS.filter((option) => option.value !== "zone" || zones.length > 0)}
                                 aria-label="Exposure method"
@@ -1966,7 +1995,7 @@ function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
                             <Input
                                 value={hostname}
                                 onChange={(event) => setHostname(event.target.value)}
-                                placeholder="app.example.com"
+                                placeholder={hostnameHint}
                                 aria-invalid={hostnameIsTunnel}
                             />
                         )}
@@ -1986,13 +2015,13 @@ function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
                         )}
                         <p className="text-xs text-muted-foreground">
                             {exposure === "zone"
-                                ? "A hostname on your own domain, covered by the zone's wildcard record - no DNS to add, with a Let's Encrypt certificate. Choose the subdomain, or take a random one for an unguessable URL. Each build also gets this name with its commit added."
+                                ? `A hostname on your own domain, covered by the zone's wildcard record - no DNS to add, with a Let's Encrypt certificate. Choose the subdomain, or take a random one for an unguessable URL. Each build also gets this name with its commit added. For a name outside these zones${baseDomain ? `, like ${hostnameHint}` : ""}, or one on another domain, pick Custom domain.`
                                 : exposure === "subdomain"
                                 ? "Always reachable: a free sslip.io subdomain that resolves on any device (a public Let's Encrypt name on a reachable box). Behind NAT, Polaris also starts a free Cloudflare quick link so it works from outside. Connect a Cloudflare account or a custom domain for a stable public URL."
                                 : exposure === "local"
                                   ? "A friendly <name>.plr.local address, LOCAL only - it resolves on your LAN via mDNS (works on macOS/iOS and most modern devices; Windows may not resolve it, use the free subdomain there). Trusted HTTPS once you install the CA root (Admin - Domains)."
                                   : exposure === "le"
-                                    ? "Point the domain's DNS at this server's public IP (port-forward / DuckDNS). Traefik gets a Let's Encrypt certificate automatically."
+                                    ? `Any hostname on any domain - ${hostnameHint} on your own, or a different domain entirely. Polaris writes the DNS record itself when the domain sits in your connected Cloudflare account; otherwise point it at this server. The certificate is issued automatically either way.`
                                     : exposure === "duckdns"
                                       ? duckMissing
                                           ? "Configure DuckDNS under Integrations first, then pick a subdomain here."
@@ -2039,6 +2068,7 @@ function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
                                 )}
                             </div>
                         )}
+                        {dnsNote && <p className="text-xs text-muted-foreground">{dnsNote}</p>}
                         <div className="flex justify-end">
                             <Button variant="outline" onClick={submitExposure} disabled={submitDisabled}>
                                 {pending && <Loader2 className="size-4 animate-spin" />} {submitLabel}

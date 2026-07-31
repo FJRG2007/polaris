@@ -279,3 +279,72 @@ export async function provisionZoneDns(options: { overwrite?: boolean } = {}): P
     }
     return result;
 }
+
+/** What became of the DNS for one custom hostname, so the caller can say whether
+ *  anything is still left to do by hand. */
+export interface HostnameDnsResult {
+    /**
+     * `created` - a record now points the name at this server.
+     * `unchanged` - it already resolved here, or its record already pointed here.
+     * `conflict` - a record exists and answers elsewhere; it was left alone.
+     * `manual` - nothing was written, and `detail` says why.
+     */
+    status: "created" | "unchanged" | "conflict" | "manual";
+    /** The address the name should answer with, when this server knows its own. */
+    ip: string | null;
+    /** Where the existing record points, for `conflict`. */
+    content?: string;
+    /** Why nothing was written, for `manual`. */
+    detail?: string;
+}
+
+/**
+ * Point one hostname at this server through the connected Cloudflare account, so a
+ * custom domain needs no visit to a DNS panel. This is what lets a service take any
+ * name at all - one directly on the operator's own domain as readily as one on a
+ * different domain entirely - without the wildcard record a deploy zone relies on.
+ *
+ * A record pointing somewhere else is never overwritten: the name may be a live site,
+ * and repointing it would take it offline. It is reported back instead. Nothing here
+ * throws - the domain is added either way, and DNS that is not there yet only delays
+ * the certificate.
+ */
+export async function provisionHostnameDns(hostname: string): Promise<HostnameDnsResult> {
+    const name = hostname.trim().toLowerCase();
+    const [token, ip] = await Promise.all([loadCloudflareToken(), detectPublicIp()]);
+    if (!ip) {
+        return {
+            status: "manual",
+            ip: null,
+            detail: "Polaris could not detect this server's public IP, so it does not know what to point DNS at."
+        };
+    }
+    // Asked of DNS before Cloudflare: a name a wildcard already covers needs no record
+    // of its own, and one lookup is cheaper than a round trip to the API.
+    if ((await resolveOrEmpty(name)).includes(ip)) return { status: "unchanged", ip };
+    if (!token) {
+        return {
+            status: "manual",
+            ip,
+            detail: "No Cloudflare API token is connected, so Polaris cannot write the record for you."
+        };
+    }
+    try {
+        const zone = await resolveZoneForHostname(token, name);
+        const existing = await findDnsRecords(token, zone.id, "A", name);
+        const elsewhere = existing.filter((entry) => entry.content !== ip);
+        if (existing.length > 0 && elsewhere.length === 0) return { status: "unchanged", ip };
+        if (elsewhere.length > 0) {
+            return { status: "conflict", ip, content: elsewhere.map((entry) => entry.content).join(", ") };
+        }
+        const recordId = await upsertARecord(token, zone.id, name, ip);
+        await pruneDnsRecords(token, zone.id, recordId, existing);
+        return { status: "created", ip };
+    } catch (caught) {
+        return {
+            status: "manual",
+            ip,
+            detail: caught instanceof Error ? caught.message : "Cloudflare rejected the record."
+        };
+    }
+}

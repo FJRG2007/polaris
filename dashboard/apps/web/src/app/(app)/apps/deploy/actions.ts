@@ -11,7 +11,8 @@ import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { requirePermission } from "@/lib/session";
 import { ensurePublicIp, getDomainConfig } from "@/lib/domain-service";
-import { listDeployZones } from "@/lib/domain-zones";
+import { getDomainZones, listDeployZones } from "@/lib/domain-zones";
+import { provisionHostnameDns, type HostnameDnsResult } from "@/lib/domain-dns";
 import { getNetworkStatus } from "@/lib/network-service";
 import { recordAudit } from "@/lib/audit-service";
 import { getOrCreateLocalTarget, getOrCreateHostTarget } from "@/lib/deploy-target-service";
@@ -449,7 +450,7 @@ export async function addDomainAction(input: {
     zoneLabel?: string;
     random?: boolean;
     subdomain?: string;
-}): Promise<{ error?: string; hostname?: string }> {
+}): Promise<{ error?: string; hostname?: string; dns?: HostnameDnsResult }> {
     const user = await requirePermission("deploy.manage");
     const port = Number(input.targetPort);
     if (!Number.isInteger(port) || port < 1 || port > 65535) return { error: "A valid target port is required" };
@@ -466,7 +467,13 @@ export async function addDomainAction(input: {
         });
         await recordAudit({ actorId: user.id, action: "deploy.domain.add", targetType: "application", targetId: input.applicationId });
         revalidatePath(DEPLOY_PATH);
-        return { hostname };
+        // A hostname the operator typed is the only one whose DNS is not already
+        // handled: a zone name rides its wildcard, and a LAN or proxied name is not
+        // Polaris's to point. Best-effort, and reported rather than thrown - the
+        // domain is added either way, and missing DNS only delays the certificate.
+        const dns =
+            input.hostname && (input.cert ?? "le") === "le" ? await provisionHostnameDns(hostname) : undefined;
+        return { hostname, dns };
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Could not add the domain" };
     }
@@ -520,11 +527,20 @@ export async function duckdnsSubdomainAction(): Promise<{ subdomain: string | nu
     return { subdomain: config.duckdnsSubdomain || null };
 }
 
-/** The deploy zones a service can get a hostname in, for the exposure picker. Empty
- *  when no domain is configured, so the form offers the free-subdomain path instead. */
-export async function deployZonesAction(): Promise<Array<{ label: string; host: string; primary: boolean }>> {
+/**
+ * What the exposure picker offers: the deploy zones a service can get a hostname in -
+ * empty when no domain is configured, so the form falls back to the free-subdomain
+ * path - plus the base domain on its own. The base domain comes back even when no zone
+ * is proven, because it is what the custom-domain field suggests a name on, and that
+ * path writes the record for the exact hostname rather than riding a wildcard.
+ */
+export async function deployZonesAction(): Promise<{
+    baseDomain: string;
+    zones: Array<{ label: string; host: string; primary: boolean }>;
+}> {
     await requirePermission("deploy.manage");
-    return listDeployZones();
+    const [config, zones] = await Promise.all([getDomainZones(), listDeployZones()]);
+    return { baseDomain: config.baseDomain, zones };
 }
 
 const zoneSubdomainSchema = z.object({
