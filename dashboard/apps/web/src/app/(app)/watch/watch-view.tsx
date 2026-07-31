@@ -8,8 +8,9 @@
  */
 
 import { useMemo, useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Activity, Loader2, Plus, Trash2 } from "lucide-react";
+import { Activity, Bell, BellOff, Loader2, Plus, Trash2 } from "lucide-react";
 import {
     Badge,
     Button,
@@ -49,11 +50,14 @@ function stateTone(state: string): string | undefined {
 export function WatchView({
     initialAlarms,
     initialEvents,
-    targets
+    targets,
+    routes
 }: {
     initialAlarms: AlarmView[];
     initialEvents: AlarmEventView[];
     targets: AlarmTargets;
+    /** Where a firing alarm is currently sent, by the account's rules. */
+    routes: string[];
 }) {
     const router = useRouter();
     const format = useDisplayFormat();
@@ -84,6 +88,23 @@ export function WatchView({
                     </Button>
                 }
             />
+
+            <p className="flex flex-wrap items-center gap-1.5 text-sm text-muted-foreground">
+                {routes.length === 0 ? (
+                    <>
+                        <BellOff className="size-4 shrink-0 text-warning" />
+                        A firing alarm is not sent anywhere.
+                    </>
+                ) : (
+                    <>
+                        <Bell className="size-4 shrink-0" />
+                        A firing alarm is sent to {routes.join(", ")}.
+                    </>
+                )}
+                <Link href="/account/notifications" className="text-primary hover:underline">
+                    Change
+                </Link>
+            </p>
 
             <section className="flex flex-col gap-3">
                 <h2 className="text-sm font-medium text-muted-foreground">Alarms</h2>

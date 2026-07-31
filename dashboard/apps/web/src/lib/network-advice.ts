@@ -19,7 +19,8 @@ import type { TLSSocket } from "node:tls";
 import { prisma } from "@polaris/db";
 import type { ServerEnvironment } from "@polaris/core";
 import { getHostLanIp } from "./host-address";
-import { createNotification, type NotificationLevel } from "./notification-service";
+import { notify } from "./notifications/dispatch";
+import type { NotificationLevel } from "./notification-service";
 import { getSetting, setSetting } from "./setting-store";
 
 /** What answered on the public hostname, if anything. */
@@ -423,9 +424,9 @@ async function notifyAdmins(advice: RouterAdvice): Promise<void> {
     const body = advice.steps.length > 0 ? `${advice.detail}\n\n${advice.steps.join("\n")}` : advice.detail;
     await Promise.all(
         admins.map((admin) =>
-            createNotification({
+            notify({
                 userId: admin.id,
-                type: "network.router",
+                event: "network.router",
                 title: advice.title,
                 body,
                 level: advice.level,

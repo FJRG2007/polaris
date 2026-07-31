@@ -1,14 +1,17 @@
 /**
- * In-app notifications. Server-side events (a scanned drop-point upload, for now)
- * write a row here; the bell and the notifications page read it. Reads and
- * mutations are always scoped to the owning user, so one user can never see or
- * clear another's notifications. Metadata is stored as a JSON string for the same
- * SQLite-portability reason as the rest of the schema.
+ * In-app notifications: the bell's storage layer. Rows here are written by the
+ * dispatcher (see notifications/dispatch), never directly by feature code, so
+ * that an alert cannot skip the account's routing rules. The bell and the
+ * notifications page read it. Reads and mutations are always scoped to the
+ * owning user, so one user can never see or clear another's notifications.
+ * Metadata is stored as a JSON string for the same SQLite-portability reason as
+ * the rest of the schema.
  */
 
 import { prisma } from "@polaris/db";
+import type { NotificationLevel } from "@polaris/core";
 
-export type NotificationLevel = "info" | "success" | "warning" | "danger";
+export type { NotificationLevel };
 
 /**
  * Who the alert went to. Deliberately coarse: a recipient learns that others
@@ -124,6 +127,85 @@ export async function listNotifications(userId: string, limit = NOTIFICATION_FEE
         select: ROW_FIELDS
     });
     return rows.map(toView);
+}
+
+/** How many rows one page of the history holds. */
+export const NOTIFICATION_PAGE_SIZE = 40;
+
+/** One page of history, oldest cursor last. */
+export interface NotificationPage {
+    items: NotificationView[];
+    /** Pass back as `before` to get the next page. Null when the list ended. */
+    cursor: string | null;
+}
+
+/**
+ * A page of a user's notifications, newest first. Unlike the live feed this
+ * reaches back through everything ever raised, so the page can answer "what
+ * happened last Tuesday" rather than only "what is recent".
+ */
+export async function listNotificationHistory(
+    userId: string,
+    options: { before?: string | null; event?: string | null; unreadOnly?: boolean } = {}
+): Promise<NotificationPage> {
+    const rows = await prisma.notification.findMany({
+        where: {
+            userId,
+            ...(options.before ? { createdAt: { lt: new Date(options.before) } } : {}),
+            ...(options.event ? { type: options.event } : {}),
+            ...(options.unreadOnly ? { readAt: null } : {})
+        },
+        orderBy: { createdAt: "desc" },
+        take: NOTIFICATION_PAGE_SIZE + 1,
+        select: ROW_FIELDS
+    });
+    const page = rows.slice(0, NOTIFICATION_PAGE_SIZE);
+    return {
+        items: page.map(toView),
+        cursor: rows.length > NOTIFICATION_PAGE_SIZE ? (page.at(-1)?.createdAt.toISOString() ?? null) : null
+    };
+}
+
+/** One attempt to get one alert somewhere, as the history renders it. */
+export interface DeliveryView {
+    id: string;
+    event: string;
+    kind: string;
+    destinationHint: string | null;
+    status: string;
+    detail: string | null;
+    createdAt: string;
+}
+
+/**
+ * The recent delivery attempts for a user. This is what answers "the alarm
+ * fired, so why did nobody get a text" - the bell alone cannot distinguish a
+ * muted rule from a webhook that has been 404ing for a week.
+ */
+export async function listDeliveries(userId: string, limit = 100): Promise<DeliveryView[]> {
+    const rows = await prisma.notificationDelivery.findMany({
+        where: { userId },
+        orderBy: { createdAt: "desc" },
+        take: limit,
+        select: {
+            id: true,
+            event: true,
+            kind: true,
+            destinationHint: true,
+            status: true,
+            detail: true,
+            createdAt: true
+        }
+    });
+    return rows.map((row) => ({
+        id: row.id,
+        event: row.event,
+        kind: row.kind,
+        destinationHint: row.destinationHint,
+        status: row.status,
+        detail: row.detail,
+        createdAt: row.createdAt.toISOString()
+    }));
 }
 
 /** Mark one notification read (scoped to the owner). */

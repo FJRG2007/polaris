@@ -45,6 +45,10 @@ model User {
     // stringified JSON holding only the fields it actually chose. Absent fields
     // (and a null column) follow the platform default.
     displayPrefs  String?
+    // Which events this account wants told about and how, as stringified JSON
+    // keyed by event id. Events absent here (and a null column) follow the
+    // catalogue default, so a newly added event never arrives muted.
+    notifyPrefs   String?
     // Owned by the better-auth two-factor plugin; flipped on once the user has
     // verified their authenticator, and back off when they disable it.
     twoFactorEnabled Boolean @default(false)
@@ -86,6 +90,8 @@ model User {
     phone               UserPhone?
     emailVerifications  EmailVerification[]
     passkeys            Passkey[]
+    notifyDestinations  NotificationDestination[]
+    notifyDeliveries    NotificationDelivery[]
 }
 
 // Addresses a user owns besides the one they sign in with. The primary stays on
@@ -1082,6 +1088,67 @@ model Notification {
     user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
     @@index([userId, readAt])
+    @@index([userId, createdAt])
+}
+
+// Somewhere an alert can be sent besides the bell and the account's mailbox: a
+// chat webhook (Discord, Slack, or an endpoint of your own) or a phone number.
+//
+// The target is envelope-encrypted like every other credential in the schema.
+// For a webhook that is not caution but necessity - the URL *is* the credential,
+// and anyone holding it can post as you - and a phone number gets the same
+// treatment so one column has one meaning. targetHint is the masked form the UI
+// renders, so listing destinations never needs the master key.
+model NotificationDestination {
+    id              String    @id @default(uuid(7)) @db.Uuid
+    userId          String    @db.Uuid
+    // webhook | sms
+    kind            String
+    name            String
+    // Body shape for a webhook: discord | slack | generic. Null for sms.
+    format          String?
+    // Masked target for display, e.g. "discord.com/api/webhooks/..." or "+34***22".
+    targetHint      String
+    encryptedTarget Bytes
+    targetNonce     Bytes
+    targetKeyId     String?
+    enabled         Boolean   @default(true)
+    // ok | error | untested - the result of the last send or test.
+    status          String    @default("untested")
+    lastError       String?
+    lastUsedAt      DateTime?
+    createdAt       DateTime  @default(now())
+    updatedAt       DateTime  @updatedAt
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@index([userId])
+}
+
+// One attempt to get one event to one place. Kept so the notifications page can
+// answer "was I actually told?" - a muted rule, a webhook that 404s and a text
+// that never sent all look identical from the bell otherwise.
+model NotificationDelivery {
+    id              String   @id @default(uuid(7)) @db.Uuid
+    userId          String   @db.Uuid
+    // Catalogue event id, e.g. "deploy.failed".
+    event           String
+    // inapp | email | webhook | sms
+    kind            String
+    // Set for webhook/sms; null for the built-in kinds. Soft pointer, so the
+    // record survives the destination being deleted.
+    destinationId   String?  @db.Uuid
+    // Masked destination as it was at the time, for a row that still reads
+    // sensibly after the destination is gone.
+    destinationHint String?
+    // sent | failed | skipped
+    status          String
+    // Why it failed, or why it was skipped.
+    detail          String?
+    createdAt       DateTime @default(now())
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
     @@index([userId, createdAt])
 }
 

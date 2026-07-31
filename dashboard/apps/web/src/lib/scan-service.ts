@@ -17,7 +17,8 @@ import type { StorageDriver } from "@polaris/storage";
 import { getIntegrationState, getIntegrationSecret } from "@/lib/integration-service";
 import { readVirusTotalConfig, type ScanAction } from "@/lib/integrations/registry";
 import { lookupBySha256, uploadAndScan, VT_MAX_UPLOAD_BYTES, type VtVerdict } from "@/lib/integrations/virustotal";
-import { createNotification, type NotificationLevel } from "@/lib/notification-service";
+import { notify } from "@/lib/notifications/dispatch";
+import type { NotificationLevel } from "@/lib/notification-service";
 import { QUARANTINE_DIR } from "@/lib/system-paths";
 
 export interface ScanOutcome {
@@ -153,10 +154,9 @@ export async function scanDropPointUpload(request: ScanRequest): Promise<ScanOut
         // Scanner failure: fail open, but still tell the owner it did not complete.
         const detail = caught instanceof Error ? caught.message : "scan failed";
         await recordScan(request, { kind: "error", malicious: 0, suspicious: 0, detail }, "none", null);
-        await createNotification({
+        await notify({
             userId: request.ownerId,
-            type: "scan.error",
-            level: "info",
+            event: "scan.error",
             title: "Upload could not be scanned",
             body: `"${request.fileName}" uploaded to "${request.dropPointTitle}" could not be scanned (${detail}). It was kept.`,
             href: "/drive/drop-points",
@@ -207,9 +207,12 @@ async function enforce(
     // complete - but stay quiet on a clean pass so drop points do not spam the bell.
     if (verdict.kind !== "clean") {
         const alert = buildAlert(request, verdict, action);
-        await createNotification({
+        // One event covers every non-clean verdict; the verdict itself rides in
+        // the metadata and sets the severity, so a rule is "tell me when a drop
+        // point catches something" rather than one rule per verdict word.
+        await notify({
             userId: request.ownerId,
-            type: `scan.${verdict.kind}`,
+            event: verdict.kind === "error" ? "scan.error" : "scan.detection",
             level: alert.level,
             title: alert.title,
             body: alert.body,

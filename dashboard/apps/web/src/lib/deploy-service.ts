@@ -27,6 +27,7 @@ import { gitBuildContext, type GitSource } from "./git-build-service";
 import { getLatestCommit, githubCloneAuthHeader } from "./github-service";
 import { resolveRegistryLogin } from "./registry-credential-service";
 import { quickTunnelAppIds, tunnelHostForApp, stopQuickTunnel } from "./deploy/quick-tunnel-service";
+import { notifyDeployFinished } from "./notifications/deploy-events";
 import { resolveWaf, resolveWafBatch } from "./waf-service";
 
 /** A locally-installed messaging hub (this catalog app) joins a dedicated web<->hub
@@ -1590,6 +1591,7 @@ export async function executeDeployment(
         });
         if (result.ok) await promoteDeployment(deploymentId);
         else await dropReleaseDomain(deploymentId);
+        await notifyDeployFinished({ deploymentId, ownerId, ok: result.ok });
     } catch (error) {
         log(Buffer.from(`\n[error] ${error instanceof Error ? error.message : String(error)}\n`));
         await prisma.deployment.update({
@@ -1597,6 +1599,7 @@ export async function executeDeployment(
             data: { status: "failed", error: error instanceof Error ? error.message : "deploy failed", finishedAt: new Date() }
         });
         await dropReleaseDomain(deploymentId);
+        await notifyDeployFinished({ deploymentId, ownerId, ok: false });
     } finally {
         await ports.dispose();
         logStream.end();

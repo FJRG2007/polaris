@@ -2,13 +2,14 @@
  * Watch alarm evaluator. On an interval, evaluates each enabled alarm against
  * recent metrics (CPU/memory from MetricSample) or reachability (domain health,
  * app running state), tracks a breach streak so a blip does not fire, and on a
- * state transition (ok <-> alarm) records an AlarmEvent, raises an in-app
- * notification, and optionally messages a channel. Same poller shape as
- * auto-deploy-poller: idempotent start, unref'd interval, delayed first pass.
+ * state transition (ok <-> alarm) records an AlarmEvent, raises the alert through
+ * the account's notification rules, and optionally messages a channel. Same
+ * poller shape as auto-deploy-poller: idempotent start, unref'd interval,
+ * delayed first pass.
  */
 
 import { prisma } from "@polaris/db";
-import { createNotification } from "@/lib/notification-service";
+import { notify } from "@/lib/notifications/dispatch";
 import { bridgeSend } from "@/lib/messaging/bridge-client";
 
 const INTERVAL_MS = Number(process.env.POLARIS_ALARM_POLL_MS) || 60_000;
@@ -105,12 +106,11 @@ async function evaluateCondition(alarm: AlarmRow): Promise<Evaluation> {
 
 async function notifyTransition(alarm: AlarmRow, kind: "triggered" | "resolved", detail: string): Promise<void> {
     const triggered = kind === "triggered";
-    await createNotification({
+    await notify({
         userId: alarm.ownerId,
-        type: triggered ? "watch.alarm" : "watch.ok",
+        event: triggered ? "watch.alarm" : "watch.ok",
         title: triggered ? `Alarm: ${alarm.name}` : `Recovered: ${alarm.name}`,
         body: detail,
-        level: triggered ? "danger" : "success",
         actionRequired: triggered,
         href: "/watch",
         metadata: { alarmId: alarm.id }

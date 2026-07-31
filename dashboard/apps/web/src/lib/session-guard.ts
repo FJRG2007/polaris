@@ -18,7 +18,7 @@ import { consumeSessionRotation, resolveSignInRules } from "@polaris/auth";
 import { prisma } from "@polaris/db";
 import { recordAudit } from "@/lib/audit-service";
 import { clientIp, clientUserAgent } from "@/lib/request-context";
-import { createNotification } from "@/lib/notification-service";
+import { notify } from "@/lib/notifications/dispatch";
 import { describeOrigin } from "@/lib/session-directory";
 import { evaluateNetworkRules } from "@/lib/network-rules";
 
@@ -222,13 +222,12 @@ async function createSessionState(input: {
             targetType: "session",
             targetId: input.sessionId
         });
-        await createNotification({
+        await notify({
             userId: input.userId,
-            type: "account.signin",
+            event: "account.signin",
             title: "A new sign-in is waiting for your approval",
             body: describeOrigin(input.ip, input.country, userAgent),
             href: "/account/sessions",
-            level: "warning",
             actionRequired: true
         });
     }
