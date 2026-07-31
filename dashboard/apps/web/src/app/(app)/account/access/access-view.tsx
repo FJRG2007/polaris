@@ -61,11 +61,14 @@ function summarize(value: {
 export function AccessView({
     groups,
     signInRules,
-    currentIp
+    currentIp,
+    enforced
 }: {
     groups: AccessGroupView[];
     signInRules: AccessRulesValue;
     currentIp: string | null;
+    /** Limits an administrator set on the account, which it cannot edit away. */
+    enforced: { allowedCidrs: string[]; allowedCountries: string[]; allowedContinents: string[] };
 }) {
     const router = useRouter();
     const [confirm, confirmElement] = useConfirm();
@@ -74,6 +77,7 @@ export function AccessView({
         null
     );
     const [error, setError] = useState<string | null>(null);
+    const enforcedSummary = accessRulesAreEmpty({ ...enforced, groupIds: [] }) ? null : summarize(enforced);
 
     async function removeGroup(group: AccessGroupView) {
         const ok = await confirm({
@@ -103,6 +107,13 @@ export function AccessView({
                         {currentIp ? (
                             <p className="pt-1 text-xs text-muted-foreground">
                                 You are connecting from <span className="font-mono">{currentIp}</span>
+                            </p>
+                        ) : null}
+                        {/* Not editable here, but a sign-in it refuses is otherwise
+                            unexplainable from this page. */}
+                        {enforcedSummary ? (
+                            <p className="pt-1 text-xs text-warning">
+                                An administrator also limits this account: {enforcedSummary}.
                             </p>
                         ) : null}
                     </div>

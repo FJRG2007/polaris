@@ -84,11 +84,15 @@ export async function verifySecret(auth: Auth, hash: string, value: string): Pro
     return ctx.password.verify({ hash, password: value });
 }
 
-/** The user's effective security settings, including their attached groups. */
+/**
+ * The user's effective security settings, including the groups they attached
+ * themselves. Groups an administrator enforced are deliberately absent: this
+ * feeds the account's own editor, and what it does not show it cannot detach.
+ */
 export async function getUserSecurity(userId: string): Promise<UserSecuritySettings> {
     const [row, bindings] = await Promise.all([
         prisma.userSecurity.findUnique({ where: { userId } }),
-        prisma.userAccessGroup.findMany({ where: { userId }, select: { groupId: true } })
+        prisma.userAccessGroup.findMany({ where: { userId, enforced: false }, select: { groupId: true } })
     ]);
     const groupIds = bindings.map((binding) => binding.groupId);
     if (!row) return { ...DEFAULTS, groupIds };
@@ -387,9 +391,69 @@ export async function updateSignInRules(userId: string, rules: AccessRulesInput)
         select: { id: true }
     });
     await prisma.$transaction([
-        prisma.userAccessGroup.deleteMany({ where: { userId } }),
+        // Enforced bindings are an administrator's, not this editor's, so they
+        // survive a save that never offered them in the first place.
+        prisma.userAccessGroup.deleteMany({ where: { userId, enforced: false } }),
         prisma.userAccessGroup.createMany({
-            data: owned.map((group) => ({ userId, groupId: group.id }))
+            data: owned.map((group) => ({ userId, groupId: group.id })),
+            // A group an administrator already enforced stays theirs: the binding
+            // is one row, and re-attaching it here would only demote it.
+            skipDuplicates: true
         })
     ]);
+}
+
+/**
+ * Replace the restrictions an administrator imposes on an account. The rules are
+ * judged separately from the account's own (a sign-in must satisfy both), so
+ * this is the only way to narrow where someone may connect from and the user
+ * cannot undo it from their own security page.
+ *
+ * Groups are resolved against the administrator who is attaching them: an access
+ * group belongs to its creator, and a foreign id is dropped rather than
+ * rejected, so a stale client cannot bind rules it was never shown.
+ */
+export async function updateEnforcedRules(
+    userId: string,
+    imposedBy: string,
+    rules: AccessRulesInput
+): Promise<void> {
+    await upsertSecurity(userId, {
+        adminCidrs: stringifyList(rules.allowedCidrs),
+        adminCountries: stringifyList(rules.allowedCountries),
+        adminContinents: stringifyList(rules.allowedContinents)
+    });
+    const owned = await prisma.accessGroup.findMany({
+        where: { ownerId: imposedBy, id: { in: rules.groupIds } },
+        select: { id: true }
+    });
+    const groupIds = owned.map((group) => group.id);
+    await prisma.$transaction([
+        // A binding is one row per pair, so a group the user had attached
+        // themselves is taken over rather than duplicated - an enforced rule has
+        // to outrank whatever the account chose for itself.
+        prisma.userAccessGroup.deleteMany({
+            where: { userId, OR: [{ enforced: true }, { groupId: { in: groupIds } }] }
+        }),
+        prisma.userAccessGroup.createMany({
+            data: groupIds.map((groupId) => ({ userId, groupId, enforced: true }))
+        })
+    ]);
+}
+
+/** The restrictions an administrator has imposed, as their editor shows them. */
+export async function getEnforcedRules(userId: string): Promise<AccessRulesInput> {
+    const [row, bindings] = await Promise.all([
+        prisma.userSecurity.findUnique({
+            where: { userId },
+            select: { adminCidrs: true, adminCountries: true, adminContinents: true }
+        }),
+        prisma.userAccessGroup.findMany({ where: { userId, enforced: true }, select: { groupId: true } })
+    ]);
+    return {
+        groupIds: bindings.map((binding) => binding.groupId),
+        allowedCidrs: parseStringList(row?.adminCidrs),
+        allowedCountries: parseStringList(row?.adminCountries),
+        allowedContinents: parseStringList(row?.adminContinents)
+    };
 }

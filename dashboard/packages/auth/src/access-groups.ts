@@ -113,11 +113,43 @@ export async function resolveSignInRules(userId: string): Promise<EffectiveAcces
             select: { allowedCidrs: true, allowedCountries: true, allowedContinents: true }
         }),
         prisma.userAccessGroup.findMany({
-            where: { userId },
+            where: { userId, enforced: false },
             select: {
                 group: { select: { allowedCidrs: true, allowedCountries: true, allowedContinents: true } }
             }
         })
     ]);
     return unionRules([inline, ...bindings.map((binding) => binding.group)]);
+}
+
+/**
+ * The allowlist an administrator imposed on the account, resolved the same way
+ * from the enforced columns and the enforced group bindings.
+ *
+ * This set is judged on its own, not folded into the one above: union semantics
+ * would let the account widen an imposed limit simply by adding a rule of its
+ * own, which is the opposite of what imposing one means. A request must satisfy
+ * both sets, and an empty one restricts nothing.
+ */
+export async function resolveEnforcedRules(userId: string): Promise<EffectiveAccessRules> {
+    const [inline, bindings] = await Promise.all([
+        prisma.userSecurity.findUnique({
+            where: { userId },
+            select: { adminCidrs: true, adminCountries: true, adminContinents: true }
+        }),
+        prisma.userAccessGroup.findMany({
+            where: { userId, enforced: true },
+            select: {
+                group: { select: { allowedCidrs: true, allowedCountries: true, allowedContinents: true } }
+            }
+        })
+    ]);
+    const own = inline
+        ? {
+              allowedCidrs: inline.adminCidrs,
+              allowedCountries: inline.adminCountries,
+              allowedContinents: inline.adminContinents
+          }
+        : null;
+    return unionRules([own, ...bindings.map((binding) => binding.group)]);
 }

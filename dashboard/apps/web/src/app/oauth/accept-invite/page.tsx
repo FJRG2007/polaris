@@ -1,6 +1,9 @@
+import { INVITE_REFUSALS } from "@polaris/core";
 import { Card, CardBody, CardHeader, CardTitle, PolarisMark } from "@polaris/ui";
-import { findValidInvite } from "@/lib/invite-service";
+import { clientIp } from "@/lib/request-context";
+import { resolveInvite } from "@/lib/invite-service";
 import { AcceptInviteForm } from "./accept-invite-form";
+import { InviteCodeForm } from "./invite-code-form";
 
 export const dynamic = "force-dynamic";
 
@@ -11,8 +14,12 @@ export default async function AcceptInvitePage({
 }) {
     const params = await searchParams;
     const token = typeof params.token === "string" ? params.token : "";
-    const invite = token ? await findValidInvite(token) : null;
 
+    // No token means the recipient was handed a code instead of a link: ask for
+    // it rather than telling them their invite is unusable.
+    if (!token) return <InviteCodeForm />;
+
+    const { invite, refusal } = await resolveInvite({ token }, await clientIp());
     if (!invite) {
         return (
             <main className="grid min-h-screen place-items-center p-4">
@@ -22,10 +29,7 @@ export default async function AcceptInvitePage({
                         <CardTitle>Invite unavailable</CardTitle>
                     </CardHeader>
                     <CardBody>
-                        <p className="text-sm text-muted-foreground">
-                            This invite link is invalid, expired, or already used. Ask an
-                            administrator for a new one.
-                        </p>
+                        <p className="text-sm text-muted-foreground">{INVITE_REFUSALS[refusal ?? "unavailable"]}</p>
                         <a href="/oauth/login" className="mt-4 block text-center text-sm text-primary hover:underline">
                             Go to sign in
                         </a>
@@ -35,5 +39,5 @@ export default async function AcceptInvitePage({
         );
     }
 
-    return <AcceptInviteForm token={token} email={invite.email} />;
+    return <AcceptInviteForm token={token} email={invite.email} needsPassword={invite.needsPassword} />;
 }

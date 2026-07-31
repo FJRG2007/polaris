@@ -4,7 +4,7 @@
  * offered when scoping an API key, so an allowlist is written once.
  */
 
-import { getUserSecurity, listAccessGroups } from "@polaris/auth";
+import { getUserSecurity, listAccessGroups, resolveEnforcedRules } from "@polaris/auth";
 import { clientIp } from "@/lib/request-context";
 import { requireUser } from "@/lib/session";
 import { AccessView } from "./access-view";
@@ -13,7 +13,12 @@ export const dynamic = "force-dynamic";
 
 export default async function AccessPage() {
     const user = await requireUser();
-    const [settings, groups, ip] = await Promise.all([getUserSecurity(user.id), listAccessGroups(user.id), clientIp()]);
+    const [settings, groups, ip, enforced] = await Promise.all([
+        getUserSecurity(user.id),
+        listAccessGroups(user.id),
+        clientIp(),
+        resolveEnforcedRules(user.id)
+    ]);
 
     return (
         <div className="mx-auto flex max-w-2xl flex-col gap-4">
@@ -26,6 +31,7 @@ export default async function AccessPage() {
             <AccessView
                 groups={groups}
                 currentIp={ip ?? null}
+                enforced={enforced}
                 signInRules={{
                     groupIds: settings.groupIds,
                     allowedCidrs: settings.allowedCidrs,

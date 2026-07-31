@@ -12,7 +12,7 @@
 
 import { touchApiKey, verifyApiKey } from "@polaris/auth";
 import type { Permission } from "@polaris/core";
-import { evaluateNetworkRules } from "@/lib/network-rules";
+import { evaluateAccountAccess } from "@/lib/network-rules";
 import { clientIp } from "@/lib/request-context";
 
 export interface ApiKeyPrincipal {
@@ -43,7 +43,9 @@ export async function authenticateApiKey(request: Request): Promise<ApiKeyPrinci
     if (!verified) return null;
 
     const ip = await clientIp();
-    const decision = await evaluateNetworkRules(verified.rules, ip);
+    // The key's own allowlist, and whatever an administrator imposed on the
+    // account behind it: a key must not be a way around a limit set on its owner.
+    const decision = await evaluateAccountAccess(verified.userId, ip, verified.rules);
     if (!decision.allowed) return null;
 
     await touchApiKey(verified.id, ip);

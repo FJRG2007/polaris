@@ -5,6 +5,7 @@
  */
 
 import { z } from "zod";
+import { accessRulesSchema } from "./account-security.js";
 
 export const emailField = z.string().trim().min(1, "Email is required").email("Enter a valid email");
 export const nameField = z.string().trim().min(1, "Name is required").max(120);
@@ -45,12 +46,89 @@ export const acceptInviteSchema = z.object({
 
 export const INVITE_ROLES = ["admin", "member", "viewer"] as const;
 
-export const createInviteSchema = z.object({
+/**
+ * How an invite travels and what its recipient presents to claim it:
+ *   link  - the administrator hands the URL over themselves.
+ *   magic - Polaris emails the URL to the address being invited.
+ *   code  - a short code, typed on the join page instead of following a link.
+ */
+export const INVITE_METHODS = ["link", "magic", "code"] as const;
+export type InviteMethod = (typeof INVITE_METHODS)[number];
+
+/** Characters an invitation code is made of, and how it is grouped when shown.
+ *  The alphabet excludes 0/O/1/I/L, so a code read out loud survives the trip. */
+export const INVITE_CODE_LENGTH = 12;
+const INVITE_CODE_GROUP = 4;
+
+/** Strip a typed code back to its characters: case, spaces and dashes are how
+ *  people write it down, not part of what they were given. */
+export function normalizeInviteCode(value: string): string {
+    return value.toUpperCase().replace(/[^A-Z0-9]/g, "");
+}
+
+/** The grouped form shown to whoever has to read or retype it. */
+export function formatInviteCode(code: string): string {
+    const normalized = normalizeInviteCode(code);
+    const groups: string[] = [];
+    for (let at = 0; at < normalized.length; at += INVITE_CODE_GROUP) {
+        groups.push(normalized.slice(at, at + INVITE_CODE_GROUP));
+    }
+    return groups.join("-");
+}
+
+export const inviteCodeField = z
+    .string()
+    .trim()
+    .min(1, "Enter your invitation code")
+    .transform(normalizeInviteCode)
+    .refine((value) => value.length === INVITE_CODE_LENGTH, "That code is not the right length");
+
+/** A one-time password an invite may carry, communicated out of band. Short by
+ *  design - it is single-use, rate-limited, and only ever a second factor on a
+ *  token that is already unguessable. */
+export const inviteOneTimePasswordField = z
+    .string()
+    .trim()
+    .min(6, "Use at least 6 characters")
+    .max(256, "Too long");
+
+/**
+ * Creating an invite. The access rules are the invitee's future limits and the
+ * bounds on the claim itself: the same allowlist decides where the invite may be
+ * accepted from and where the account may sign in from afterwards.
+ */
+export const createInviteSchema = accessRulesSchema.extend({
     email: emailField,
-    role: z.enum(INVITE_ROLES).default("member")
+    role: z.enum(INVITE_ROLES).default("member"),
+    method: z.enum(INVITE_METHODS).default("link"),
+    oneTimePassword: inviteOneTimePasswordField.optional()
+});
+
+/**
+ * Why an invite cannot be claimed, and what the join page says about it. Every
+ * reason is something the recipient can act on: ask for a new invite, or come
+ * back from somewhere the invite allows. Which one they are told is deliberately
+ * coarse - an invite that never existed and one already claimed read alike, so
+ * a stranger holding a token learns nothing from the difference.
+ */
+export const INVITE_REFUSALS = {
+    unavailable: "This invite is invalid, expired, or already used. Ask an administrator for a new one.",
+    location: "This invite cannot be accepted from your network. Ask whoever sent it which addresses it allows.",
+    password: "That one-time password did not match.",
+    throttled: "Too many attempts from your network. Wait a few minutes and try again."
+} as const;
+
+export type InviteRefusal = keyof typeof INVITE_REFUSALS;
+
+/** Claiming an invite: who is joining, and what proves they may. */
+export const claimInviteSchema = acceptInviteSchema.extend({
+    token: z.string().trim().default(""),
+    code: z.string().trim().default(""),
+    oneTimePassword: z.string().trim().default("")
 });
 
 export type LoginInput = z.infer<typeof loginSchema>;
 export type SetupInput = z.infer<typeof setupSchema>;
 export type AcceptInviteInput = z.infer<typeof acceptInviteSchema>;
 export type CreateInviteInput = z.infer<typeof createInviteSchema>;
+export type ClaimInviteInput = z.infer<typeof claimInviteSchema>;

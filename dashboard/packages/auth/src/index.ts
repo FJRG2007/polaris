@@ -53,6 +53,8 @@ export {
     verifySecurityAnswers,
     resetUserPassword,
     updateSignInRules,
+    updateEnforcedRules,
+    getEnforcedRules,
     type UserSecuritySettings
 } from "./security.js";
 export { verifyTotpForSession, twoFactorEnabled } from "./two-factor.js";
@@ -70,6 +72,7 @@ export {
     updateAccessGroup,
     deleteAccessGroup,
     resolveSignInRules,
+    resolveEnforcedRules,
     type AccessGroupView
 } from "./access-groups.js";
 export {

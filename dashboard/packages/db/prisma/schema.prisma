@@ -264,6 +264,26 @@ model Invite {
     expiresAt   DateTime
     acceptedAt  DateTime?
     createdAt   DateTime  @default(now())
+    // How the invite travels and what the recipient presents to claim it:
+    // "link" (the admin hands the URL over), "magic" (Polaris emails the URL),
+    // or "code" (a short code typed on the join page).
+    method      String    @default("link")
+    // SHA-256 of the invitation code, for the "code" method. The code itself is
+    // shown once at creation and never stored.
+    codeHash    String?   @unique
+    // Slow hash of an optional one-time password the recipient must also present.
+    // Communicated out of band, so a leaked link alone claims nothing.
+    passwordHash String?
+    // When Polaris sent the invite itself, so the list can report delivery.
+    sentAt      DateTime?
+    // Where the invite may be claimed from, and the restrictions the account
+    // carries afterwards - the same rules, enforced at both moments. JSON string
+    // arrays; empty everywhere means no restriction. accessGroupIds names access
+    // groups owned by the inviter, resolved when the invite is claimed.
+    allowedCidrs      String @default("[]")
+    allowedCountries  String @default("[]")
+    allowedContinents String @default("[]")
+    accessGroupIds    String @default("[]")
 
     invitedBy User @relation("InviteInviter", fields: [invitedById], references: [id], onDelete: Cascade)
 
@@ -332,6 +352,13 @@ model UserSecurity {
     allowedCidrs         String    @default("[]")
     allowedCountries     String    @default("[]")
     allowedContinents    String    @default("[]")
+    // Restrictions an administrator imposed on the account. Held apart from the
+    // account's own rules above because the two are judged independently: a
+    // sign-in must satisfy both, so nothing the user does under Account >
+    // Security can widen or drop what an administrator set.
+    adminCidrs           String    @default("[]")
+    adminCountries       String    @default("[]")
+    adminContinents      String    @default("[]")
     createdAt            DateTime  @default(now())
     updatedAt            DateTime  @updatedAt
 
@@ -377,10 +404,13 @@ model AccessGroup {
     @@index([ownerId])
 }
 
-// Access groups applied to a user's own sign-ins.
+// Access groups applied to a user's own sign-ins. An enforced binding was made
+// by an administrator: it counts towards the admin rule set rather than the
+// account's own, and only an administrator can detach it.
 model UserAccessGroup {
-    userId  String @db.Uuid
-    groupId String @db.Uuid
+    userId   String  @db.Uuid
+    groupId  String  @db.Uuid
+    enforced Boolean @default(false)
 
     user  User        @relation(fields: [userId], references: [id], onDelete: Cascade)
     group AccessGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)

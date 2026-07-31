@@ -3,13 +3,13 @@
 /**
  * Actions behind the clickable actor in the activity feed: look up a user's
  * profile, and (for admins) ban or unban them. Email and ban details are only
- * returned to admins; a ban records the time, drops the user's sessions so it is
- * immediate, and is enforced on their next request by requireUser.
+ * returned to admins; banning itself belongs to the user-administration service,
+ * so a ban means the same thing here as it does in the people directory.
  */
 
 import { prisma } from "@polaris/db";
 import { requireAdmin, requireUser } from "@/lib/session";
-import { recordAudit } from "@/lib/audit-service";
+import { banUser, unbanUser } from "@/lib/user-admin-service";
 
 export interface UserProfile {
     id: string;
@@ -50,22 +50,10 @@ export async function getUserProfileAction(userId: string): Promise<{ profile?: 
 
 export async function banUserAction(userId: string, reason: string): Promise<{ error?: string }> {
     const viewer = await requireAdmin();
-    if (userId === viewer.id) return { error: "You can't ban yourself." };
-    const target = await prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
-    if (!target) return { error: "User not found." };
-    await prisma.user.update({
-        where: { id: userId },
-        data: { bannedAt: new Date(), banReason: reason.trim() || null }
-    });
-    // Drop existing sessions so the ban is immediate, not just on next login.
-    await prisma.session.deleteMany({ where: { userId } });
-    await recordAudit({ actorId: viewer.id, action: "user.ban", targetType: "user", targetId: userId });
-    return {};
+    return banUser(viewer.id, userId, reason);
 }
 
 export async function unbanUserAction(userId: string): Promise<{ error?: string }> {
     const viewer = await requireAdmin();
-    await prisma.user.update({ where: { id: userId }, data: { bannedAt: null, banReason: null } });
-    await recordAudit({ actorId: viewer.id, action: "user.unban", targetType: "user", targetId: userId });
-    return {};
+    return unbanUser(viewer.id, userId);
 }

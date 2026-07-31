@@ -8,10 +8,23 @@ import { signIn } from "@/lib/auth-client";
 import { useZodForm } from "@/lib/use-zod-form";
 import { acceptInviteAction } from "./actions";
 
-export function AcceptInviteForm({ token, email }: { token: string; email: string }) {
+export function AcceptInviteForm({
+    token,
+    code,
+    email,
+    needsPassword
+}: {
+    /** The invite arrived either as a link or as a code. */
+    token?: string;
+    code?: string;
+    email: string;
+    /** It also asks for a one-time password, handed over separately. */
+    needsPassword: boolean;
+}) {
     const router = useRouter();
     const form = useZodForm(acceptInviteSchema);
     const [values, setValues] = useState({ name: "", username: "", password: "" });
+    const [oneTimePassword, setOneTimePassword] = useState("");
     const [error, setError] = useState<string | null>(null);
     const [pending, setPending] = useState(false);
 
@@ -28,17 +41,19 @@ export function AcceptInviteForm({ token, email }: { token: string; email: strin
         setPending(true);
         setError(null);
         const result = await acceptInviteAction({
-            token,
+            token: token ?? "",
+            code: code ?? "",
+            oneTimePassword,
             name: parsed.name,
             username: parsed.username,
             password: parsed.password
         });
-        if (result.error) {
+        if (result.error || !result.email) {
             setPending(false);
-            setError(result.error);
+            setError(result.error ?? "Could not accept the invite");
             return;
         }
-        await signIn.email({ email, password: parsed.password });
+        await signIn.email({ email: result.email, password: parsed.password });
         router.push("/drive");
         router.refresh();
     }
@@ -95,8 +110,22 @@ export function AcceptInviteForm({ token, email }: { token: string; email: strin
                                 <p className="text-xs text-danger">{form.error("password")}</p>
                             ) : null}
                         </div>
+                        {needsPassword ? (
+                            <div className="flex flex-col gap-1">
+                                <label className="text-sm">One-time password</label>
+                                <Input
+                                    type="password"
+                                    autoComplete="off"
+                                    value={oneTimePassword}
+                                    onChange={(event) => setOneTimePassword(event.target.value)}
+                                />
+                                <p className="text-xs text-muted-foreground">
+                                    Whoever invited you sent this separately from the invite itself.
+                                </p>
+                            </div>
+                        ) : null}
                         {error ? <p className="text-sm text-danger">{error}</p> : null}
-                        <Button type="submit" disabled={pending}>
+                        <Button type="submit" disabled={pending || (needsPassword && oneTimePassword === "")}>
                             {pending ? "Joining..." : "Join Polaris"}
                         </Button>
                     </form>

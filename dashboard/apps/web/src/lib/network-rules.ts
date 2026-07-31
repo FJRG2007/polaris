@@ -9,6 +9,7 @@
  * location, because a geolocation provider outage must not lock people out.
  */
 
+import { resolveEnforcedRules } from "@polaris/auth";
 import { geoAllowed, ipAllowed, type EffectiveAccessRules } from "@polaris/core";
 import { resolveGeo } from "@/lib/geo-service";
 
@@ -51,4 +52,24 @@ export async function evaluateNetworkRules(
     const { countryCode } = ip ? await resolveGeo(ip) : { countryCode: null };
     const allowed = geoAllowed(countryCode, rules.allowedCountries, rules.allowedContinents);
     return { allowed, reason: allowed ? null : "geo", country: countryCode };
+}
+
+/**
+ * Judge one address against everything that governs an account: the limits an
+ * administrator imposed, and the account's own rules. Both are allowlists in
+ * their own right and both must pass - an account cannot widen an imposed limit
+ * by adding rules of its own, and an administrator who imposed nothing leaves
+ * the account exactly as free as it was.
+ */
+export async function evaluateAccountAccess(
+    userId: string,
+    ip: string | undefined,
+    ownRules: EffectiveAccessRules
+): Promise<NetworkDecision> {
+    const enforced = await evaluateNetworkRules(await resolveEnforcedRules(userId), ip);
+    if (!enforced.allowed) return enforced;
+    const own = await evaluateNetworkRules(ownRules, ip);
+    // Either pass may have been the one that resolved the location; the caller
+    // stores it against the session and should not have to look it up again.
+    return { ...own, country: own.country ?? enforced.country };
 }

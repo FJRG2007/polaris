@@ -20,7 +20,7 @@ import { recordAudit } from "@/lib/audit-service";
 import { clientIp, clientUserAgent } from "@/lib/request-context";
 import { notify } from "@/lib/notifications/dispatch";
 import { describeOrigin } from "@/lib/session-directory";
-import { evaluateNetworkRules } from "@/lib/network-rules";
+import { evaluateAccountAccess } from "@/lib/network-rules";
 
 /** Where a refused session is sent, or null when the session may proceed. */
 export type SessionVerdict = { ok: true } | { ok: false; redirect: string };
@@ -97,7 +97,7 @@ export async function guardSession({
     // 2. First sight of this session, or a move to a new address: re-run the
     //    account's network rules rather than trusting an old verdict forever.
     if (!state || state.ip !== (ip ?? null)) {
-        const decision = await evaluateNetworkRules(await resolveSignInRules(userId), ip);
+        const decision = await evaluateAccountAccess(userId, ip, await resolveSignInRules(userId));
         if (!decision.allowed) {
             await revokeSession(sessionId);
             await recordAudit({
