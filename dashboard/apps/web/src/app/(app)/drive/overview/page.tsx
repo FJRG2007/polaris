@@ -2,7 +2,7 @@ import type { StorageProviderKind } from "@polaris/core";
 import { PageHeader } from "@polaris/ui";
 import { requireUser } from "@/lib/session";
 import { connectionWebUrl, listConnections } from "@/lib/storage-service";
-import type { ConnectionSummary } from "../drive/types";
+import type { ConnectionSummary } from "../types";
 import { OverviewView } from "./overview-view";
 
 export const dynamic = "force-dynamic";
@@ -19,7 +19,7 @@ export default async function OverviewPage() {
 
     return (
         <>
-            <PageHeader title="Overview" description="Your connected NAS devices and their health." />
+            <PageHeader title="Overview" description="Your connected storage devices and their health." />
             <OverviewView connections={connections} />
         </>
     );

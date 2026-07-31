@@ -1,8 +1,8 @@
 "use client";
 
 /**
- * Overview: one section per connected NAS with its device metrics - storage,
- * health, disks (UniFi UNAS) or properties and usage (other backends). This is
+ * Overview: one section per connected device with its metrics - storage, health
+ * and disks (UniFi UNAS) or properties and usage (any other backend). This is
  * the "manage the devices" view; the Files page is purely for browsing files.
  * Metrics load on the client behind a skeleton so a slow device never blocks the
  * page, and each section links straight to that device's files.
@@ -14,9 +14,9 @@ import { FolderOpen, HardDrive } from "lucide-react";
 import { Button, Card, CardBody, Skeleton } from "@polaris/ui";
 import type { UnasMetrics as UnasMetricsData } from "@/lib/unifi-unas";
 import { MetricsHistory, percent, ratioPercent, temp, type MetricSpec } from "@/components/metrics-history";
-import { HardwarePanel } from "../drive/hardware-panel";
-import { UnasMetrics } from "../drive/unas-metrics";
-import type { ConnectionSummary } from "../drive/types";
+import { HardwarePanel } from "../hardware-panel";
+import { UnasMetrics } from "../unas-metrics";
+import type { ConnectionSummary } from "../types";
 
 /** Charts for a rich UniFi UNAS device: CPU, temperature, memory, storage. */
 const UNAS_METRICS: MetricSpec[] = [

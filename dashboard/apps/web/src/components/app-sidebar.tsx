@@ -53,7 +53,7 @@ interface SidebarItem {
 /** Options per app id. Apps not listed here render no rail. */
 const APP_SIDEBARS: Record<string, SidebarItem[]> = {
     drive: [
-        { label: "Overview", href: "/overview", icon: LayoutDashboard },
+        { label: "Overview", href: "/drive/overview", icon: LayoutDashboard },
         { label: "Files", href: "/drive", icon: FolderOpen },
         { label: "Favorites", href: "/favorites", icon: Star },
         { label: "Recent", href: "/drive/recent", icon: Clock },
