@@ -2,61 +2,25 @@
 
 /**
  * Markdown viewer: sanitized rendered ("pretty") or raw source, plus inline
- * editing that writes back through the shared save actions.
+ * editing that writes back through the shared save actions. The rendering rules
+ * live in ./markdown-render, the copy affordances in ./markdown-content.
  */
 
 import { useEffect, useState } from "react";
 import { Pencil } from "lucide-react";
 import { Button, cn } from "@polaris/ui";
 import { EditorActions } from "./editor-actions";
+import { MarkdownContent } from "./markdown-content";
+import { renderMarkdown } from "./markdown-render";
 import { Loading, ViewerError } from "./status";
 import { readOnlyReason, useTextFile } from "./text-file";
 import type { ViewerTarget } from "./types";
 
-// Register the link-hardening hook once (module-scoped): every anchor opens in a
-// new tab and cannot reach back into the opener.
-let purifyHooked = false;
-
 /**
- * Render Markdown to sanitized HTML. Parsing (marked) and sanitizing (DOMPurify)
- * are dynamically imported so they never touch the main bundle. The sanitizer is
- * deliberately strict: style/link/iframe/script/form/object and inline `style`
- * attributes are stripped, so a document can never inject CSS, exfiltrate, or run
- * script - only formatting, links, and images survive. All same-origin.
+ * Tailwind styling for rendered Markdown (no typography plugin needed). The last
+ * three lines dress the copy affordances: the button sits over the block and
+ * fades in on hover or when it takes focus, and inline code reads as clickable.
  */
-async function renderMarkdown(markdown: string): Promise<string> {
-    const [{ marked }, purifyModule] = await Promise.all([import("marked"), import("dompurify")]);
-    const DOMPurify = purifyModule.default;
-    if (!purifyHooked) {
-        DOMPurify.addHook("afterSanitizeAttributes", (node) => {
-            if (node.tagName === "A") {
-                node.setAttribute("target", "_blank");
-                node.setAttribute("rel", "noopener noreferrer nofollow");
-            }
-        });
-        purifyHooked = true;
-    }
-    const dirty = marked.parse(markdown, { async: false, gfm: true }) as string;
-    return DOMPurify.sanitize(dirty, {
-        FORBID_TAGS: [
-            "style",
-            "link",
-            "iframe",
-            "script",
-            "form",
-            "input",
-            "button",
-            "meta",
-            "base",
-            "object",
-            "embed"
-        ],
-        FORBID_ATTR: ["style", "srcset", "onerror", "onload"],
-        ADD_ATTR: ["target", "rel"]
-    });
-}
-
-/** Tailwind styling for rendered Markdown (no typography plugin needed). */
 const MARKDOWN_PROSE = cn(
     "max-w-none space-y-3 p-6 text-sm leading-relaxed",
     "[&_h1]:mt-2 [&_h1]:text-2xl [&_h1]:font-bold [&_h2]:mt-2 [&_h2]:text-xl [&_h2]:font-semibold",
@@ -67,7 +31,10 @@ const MARKDOWN_PROSE = cn(
     "[&_pre]:overflow-auto [&_pre]:rounded-md [&_pre]:bg-muted [&_pre]:p-3 [&_pre_code]:bg-transparent [&_pre_code]:p-0",
     "[&_blockquote]:border-l-2 [&_blockquote]:border-border [&_blockquote]:pl-3 [&_blockquote]:text-muted-foreground",
     "[&_hr]:my-4 [&_hr]:border-border [&_img]:max-w-full [&_img]:rounded",
-    "[&_table]:w-full [&_table]:text-left [&_th]:border-b [&_th]:border-border [&_th]:p-2 [&_td]:border-b [&_td]:border-border [&_td]:p-2"
+    "[&_table]:w-full [&_table]:text-left [&_th]:border-b [&_th]:border-border [&_th]:p-2 [&_td]:border-b [&_td]:border-border [&_td]:p-2",
+    "[&_.code-block]:relative [&_.copy-host]:opacity-0 [&_.code-block:hover_.copy-host]:opacity-100",
+    "[&_.copy-host:focus-within]:opacity-100",
+    "[&_.copy-inline]:cursor-pointer [&_.copy-inline:hover]:bg-primary/20"
 );
 
 export function MarkdownView({
@@ -194,7 +161,7 @@ export function MarkdownView({
                 ) : mode === "raw" ? (
                     <pre className="overflow-auto p-4 text-xs leading-relaxed">{file.text}</pre>
                 ) : (
-                    <div className={MARKDOWN_PROSE} dangerouslySetInnerHTML={{ __html: html }} />
+                    <MarkdownContent html={html} className={MARKDOWN_PROSE} />
                 )}
             </div>
         </div>

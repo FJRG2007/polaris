@@ -21,3 +21,107 @@ body {
     -webkit-font-smoothing: antialiased;
     font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
+
+/*
+ * Syntax highlighting palette. highlight.js only emits class names, never
+ * colors, so the theme lives here instead of in one of its stylesheets: these
+ * hues are the Polaris tokens, and they follow the light/dark switch like
+ * everything else. Muted and desaturated on purpose - a file preview is read,
+ * not decorated.
+ */
+:root {
+    --code-comment: 250 9% 48%;
+    --code-keyword: 285 78% 76%;
+    --code-string: 152 50% 60%;
+    --code-number: 32 88% 68%;
+    --code-function: 212 90% 74%;
+    --code-type: 190 66% 68%;
+    --code-attr: 330 72% 74%;
+}
+
+:root.light {
+    --code-comment: 250 8% 46%;
+    --code-keyword: 285 64% 44%;
+    --code-string: 152 58% 30%;
+    --code-number: 26 82% 40%;
+    --code-function: 214 78% 44%;
+    --code-type: 191 72% 32%;
+    --code-attr: 330 62% 44%;
+}
+
+.hljs-comment,
+.hljs-quote {
+    color: hsl(var(--code-comment));
+    font-style: italic;
+}
+
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-literal,
+.hljs-doctag,
+.hljs-formula {
+    color: hsl(var(--code-keyword));
+}
+
+.hljs-string,
+.hljs-regexp,
+.hljs-symbol,
+.hljs-bullet,
+.hljs-meta .hljs-string {
+    color: hsl(var(--code-string));
+}
+
+.hljs-number,
+.hljs-variable,
+.hljs-template-variable,
+.hljs-link,
+.hljs-selector-pseudo {
+    color: hsl(var(--code-number));
+}
+
+.hljs-title,
+.hljs-title.function_,
+.hljs-section,
+.hljs-name,
+.hljs-selector-id {
+    color: hsl(var(--code-function));
+}
+
+.hljs-type,
+.hljs-title.class_,
+.hljs-built_in,
+.hljs-builtin-name {
+    color: hsl(var(--code-type));
+}
+
+.hljs-attr,
+.hljs-attribute,
+.hljs-property,
+.hljs-selector-class,
+.hljs-selector-attr,
+.hljs-variable.language_ {
+    color: hsl(var(--code-attr));
+}
+
+.hljs-meta,
+.hljs-tag,
+.hljs-punctuation,
+.hljs-operator {
+    color: hsl(var(--muted-foreground));
+}
+
+.hljs-addition {
+    color: hsl(var(--success));
+}
+
+.hljs-deletion {
+    color: hsl(var(--danger));
+}
+
+.hljs-emphasis {
+    font-style: italic;
+}
+
+.hljs-strong {
+    font-weight: 600;
+}

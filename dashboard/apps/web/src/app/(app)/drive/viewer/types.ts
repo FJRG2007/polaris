@@ -30,6 +30,7 @@ export type ViewerKind =
     | "doc"
     | "slides"
     | "markdown"
+    | "code"
     | "text"
     | "none";
 

@@ -7,8 +7,8 @@
  * By type: images natively, audio/video through a Polaris-themed Plyr, PDFs in
  * the browser's native viewer (with pdf.js behind an Edit mode), spreadsheets/CSV in
  * an editable grid, .docx read-only through mammoth, .pptx read-only as scaled
- * slides, and anything else as editable plain text (Notepad-style), binary or
- * oversized files read-only.
+ * slides, source files as editable highlighted code, and anything else as
+ * editable plain text (Notepad-style), binary or oversized files read-only.
  * Each viewer lives in ./viewer and pulls its heavy library in dynamically, so
  * nothing runs during SSR and a library only loads when a file of that type is
  * opened. Bytes are streamed from the drive route with an inline disposition
@@ -20,6 +20,8 @@ import { Download, Share2 } from "lucide-react";
 import { formatBytes } from "@polaris/core";
 import { Button, Dialog, DialogContent, DialogHeader, DialogTitle } from "@polaris/ui";
 import { extensionOf } from "./file-categories";
+import { CodeView } from "./viewer/code-view";
+import { languageForFile } from "./viewer/code-language";
 import { DocView } from "./viewer/doc-view";
 import { MarkdownView } from "./viewer/markdown-view";
 import { MediaView } from "./viewer/media-view";
@@ -40,8 +42,9 @@ const SLIDES = new Set(["pptx", "ppsx", "potx"]);
 const MARKDOWN = new Set(["md", "markdown", "mdown", "mkd"]);
 
 /**
- * Which viewer renders a file by its extension. Anything without a richer viewer
- * falls back to "text" - the Notepad-style editor opens it as plain text.
+ * Which viewer renders a file by its extension. A file the highlighter has a
+ * grammar for opens as code; anything without a richer viewer falls back to
+ * "text" - the Notepad-style editor opens it as plain text.
  */
 export function viewerKind(name: string): ViewerKind {
     const ext = extensionOf(name);
@@ -53,6 +56,7 @@ export function viewerKind(name: string): ViewerKind {
     if (DOC.has(ext)) return "doc";
     if (SLIDES.has(ext)) return "slides";
     if (MARKDOWN.has(ext)) return "markdown";
+    if (languageForFile(name)) return "code";
     return "text";
 }
 
@@ -107,6 +111,8 @@ export function FilePreview({
     if (kind === "slides") return <PptxView src={src} />;
     if (kind === "markdown")
         return <MarkdownView src={src} target={target} readOnly={readOnly} onSaved={onSaved} />;
+    if (kind === "code")
+        return <CodeView src={src} target={target} readOnly={readOnly} onSaved={onSaved} />;
     return <PlainTextEditor src={src} target={target} readOnly={readOnly} onSaved={onSaved} />;
 }
 
