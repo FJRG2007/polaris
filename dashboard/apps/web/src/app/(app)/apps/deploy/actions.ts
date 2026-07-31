@@ -6,6 +6,7 @@
  * the owner's local target lazily, so a first deploy works with no server setup.
  */
 
+import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { requirePermission } from "@/lib/session";
@@ -15,31 +16,7 @@ import { getNetworkStatus } from "@/lib/network-service";
 import { recordAudit } from "@/lib/audit-service";
 import { getOrCreateLocalTarget, getOrCreateHostTarget } from "@/lib/deploy-target-service";
 import { listHosts } from "@/lib/host-service";
-import {
-    addApplicationDomain,
-    createApplication,
-    createEnvironment,
-    createProject,
-    deleteApplication,
-    deleteEnvironment,
-    deleteProject,
-    deployApplication,
-    duplicateApplication,
-    ensureApplicationDomain,
-    listDeployments,
-    redeployForEnvScope,
-    removeApplicationDeployment,
-    removeApplicationDomain,
-    restartApplication,
-    setApplicationDomainEnabled,
-    setApplicationPort,
-    setApplicationServer,
-    setApplicationRunning,
-    saveEnvironmentLayout,
-    syncAppRoutes,
-    updateAutoDeploy,
-    type DeploymentSummary
-} from "@/lib/deploy-service";
+import * as deployService from "@/lib/deploy-service";
 import { getWafRule, setWafRule, type WafRuleView } from "@/lib/waf-service";
 import type { WafScopeType } from "@polaris/core";
 import { createDatabase, deployDatabase, type DbEngine } from "@/lib/database-service";
@@ -109,7 +86,7 @@ export async function createProjectAction(input: { name: string }): Promise<{ er
     const name = input.name?.trim();
     if (!name) return { error: "A project name is required" };
     try {
-        const project = await createProject(user.id, name);
+        const project = await deployService.createProject(user.id, name);
         await recordAudit({ actorId: user.id, action: "deploy.project.create", targetType: "project", targetId: project.id });
         revalidatePath(DEPLOY_PATH);
         return { id: project.id };
@@ -120,7 +97,7 @@ export async function createProjectAction(input: { name: string }): Promise<{ er
 
 export async function deleteProjectAction(projectId: string): Promise<void> {
     const user = await requirePermission("deploy.manage");
-    await deleteProject(projectId, user.id);
+    await deployService.deleteProject(projectId, user.id);
     await recordAudit({ actorId: user.id, action: "deploy.project.delete", targetType: "project", targetId: projectId });
     revalidatePath(DEPLOY_PATH);
 }
@@ -130,7 +107,7 @@ export async function createEnvironmentAction(input: { projectId: string; name: 
     const name = input.name?.trim();
     if (!name) return { error: "An environment name is required" };
     try {
-        const environment = await createEnvironment(input.projectId, user.id, name);
+        const environment = await deployService.createEnvironment(input.projectId, user.id, name);
         await recordAudit({ actorId: user.id, action: "deploy.env.create", targetType: "environment", targetId: environment.id });
         revalidatePath(`${DEPLOY_PATH}/${input.projectId}`);
         return { id: environment.id };
@@ -142,7 +119,7 @@ export async function createEnvironmentAction(input: { projectId: string; name: 
 export async function saveLayoutAction(input: { environmentId: string; layout: string }): Promise<{ error?: string }> {
     const user = await requirePermission("deploy.manage");
     try {
-        await saveEnvironmentLayout(input.environmentId, user.id, input.layout);
+        await deployService.saveEnvironmentLayout(input.environmentId, user.id, input.layout);
         return {};
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Could not save the layout" };
@@ -152,7 +129,7 @@ export async function saveLayoutAction(input: { environmentId: string; layout: s
 export async function deleteEnvironmentAction(input: { environmentId: string; projectId: string }): Promise<{ error?: string }> {
     const user = await requirePermission("deploy.manage");
     try {
-        await deleteEnvironment(input.environmentId, user.id);
+        await deployService.deleteEnvironment(input.environmentId, user.id);
         await recordAudit({ actorId: user.id, action: "deploy.env.delete", targetType: "environment", targetId: input.environmentId });
         revalidatePath(`${DEPLOY_PATH}/${input.projectId}`);
         return {};
@@ -231,7 +208,7 @@ export async function createApplicationAction(input: {
         // Git sources track their branch and auto-deploy on new commits by default,
         // Vercel-style (a poller picks them up even without a public webhook).
         const branch = input.branch?.trim() || undefined;
-        const app = await createApplication(user.id, {
+        const app = await deployService.createApplication(user.id, {
             environmentId: input.environmentId,
             targetId: target.id,
             name,
@@ -248,13 +225,13 @@ export async function createApplicationAction(input: {
         await ensurePublicIp(requestHeaders.get("x-server-ip") ?? requestHeaders.get("host"));
         const targetPort = Number.isInteger(input.port) ? Number(input.port) : isGit ? 3000 : 80;
         try {
-            await addApplicationDomain(app.id, user.id, { targetPort });
+            await deployService.addApplicationDomain(app.id, user.id, { targetPort });
         } catch {
             // No public IP / free-subdomain base configured; the user can add a domain.
         }
         let deploymentId: string | undefined;
         try {
-            deploymentId = await deployApplication(app.id, user.id, user.id);
+            deploymentId = await deployService.deployApplication(app.id, user.id, user.id);
             await recordAudit({ actorId: user.id, action: "deploy.app.deploy", targetType: "application", targetId: app.id });
         } catch {
             // Surfaced on the app's next manual deploy; creation still succeeds.
@@ -275,7 +252,7 @@ export async function setAutoDeployAction(input: {
 }): Promise<{ error?: string }> {
     const user = await requirePermission("deploy.manage");
     try {
-        await updateAutoDeploy(input.applicationId, user.id, {
+        await deployService.updateAutoDeploy(input.applicationId, user.id, {
             autoDeploy: input.autoDeploy,
             deployBranch: input.deployBranch,
             commitFilter: input.commitFilter,
@@ -304,7 +281,7 @@ export async function saveEnvVarAction(input: {
     const user = await requirePermission("deploy.manage");
     try {
         await setEnvVar(input.scope, input.scopeId, user.id, { key: input.key, value: input.value, isSecret: input.isSecret });
-        void redeployForEnvScope(input.scope, input.scopeId, user.id).catch(() => undefined);
+        void deployService.redeployForEnvScope(input.scope, input.scopeId, user.id).catch(() => undefined);
         revalidatePath(DEPLOY_PATH);
         return {};
     } catch (caught) {
@@ -324,7 +301,7 @@ export async function importEnvVarsAction(input: {
         const parsed = parseDotEnv(input.text).map((item) => ({ ...item, isSecret: input.isSecret }));
         if (parsed.length === 0) return { error: "No KEY=value lines found" };
         const count = await setEnvVars(input.scope, input.scopeId, user.id, parsed);
-        void redeployForEnvScope(input.scope, input.scopeId, user.id).catch(() => undefined);
+        void deployService.redeployForEnvScope(input.scope, input.scopeId, user.id).catch(() => undefined);
         revalidatePath(DEPLOY_PATH);
         return { count };
     } catch (caught) {
@@ -344,15 +321,15 @@ export async function revealEnvVarAction(id: string): Promise<{ value?: string |
 export async function deleteEnvVarAction(id: string): Promise<{ error?: string }> {
     const user = await requirePermission("deploy.manage");
     const scope = await deleteEnvVar(id, user.id);
-    if (scope) void redeployForEnvScope(scope.scope, scope.scopeId, user.id).catch(() => undefined);
+    if (scope) void deployService.redeployForEnvScope(scope.scope, scope.scopeId, user.id).catch(() => undefined);
     revalidatePath(DEPLOY_PATH);
     return {};
 }
 
 /** An application's deployment history. */
-export async function listDeploymentsAction(applicationId: string): Promise<DeploymentSummary[]> {
+export async function listDeploymentsAction(applicationId: string): Promise<deployService.DeploymentSummary[]> {
     const user = await requirePermission("deploy.manage");
-    return listDeployments(applicationId, user.id);
+    return deployService.listDeployments(applicationId, user.id);
 }
 
 export async function deployApplicationAction(applicationId: string): Promise<{ error?: string; deploymentId?: string }> {
@@ -363,11 +340,11 @@ export async function deployApplicationAction(applicationId: string): Promise<{ 
         const requestHeaders = await headers();
         await ensurePublicIp(requestHeaders.get("x-server-ip") ?? requestHeaders.get("host"));
         try {
-            await ensureApplicationDomain(applicationId, user.id);
+            await deployService.ensureApplicationDomain(applicationId, user.id);
         } catch {
             // No public IP / free-subdomain base; the app can still deploy without one.
         }
-        const deploymentId = await deployApplication(applicationId, user.id, user.id);
+        const deploymentId = await deployService.deployApplication(applicationId, user.id, user.id);
         await recordAudit({ actorId: user.id, action: "deploy.app.deploy", targetType: "application", targetId: applicationId });
         revalidatePath(DEPLOY_PATH);
         return { deploymentId };
@@ -379,7 +356,7 @@ export async function deployApplicationAction(applicationId: string): Promise<{ 
 export async function setAppPortAction(applicationId: string, port: number): Promise<{ error?: string }> {
     const user = await requirePermission("deploy.manage");
     try {
-        await setApplicationPort(applicationId, user.id, port);
+        await deployService.setApplicationPort(applicationId, user.id, port);
         revalidatePath(DEPLOY_PATH);
         return {};
     } catch (caught) {
@@ -390,7 +367,7 @@ export async function setAppPortAction(applicationId: string, port: number): Pro
 export async function setAppServerAction(applicationId: string, serverId: string): Promise<{ error?: string }> {
     const user = await requirePermission("deploy.manage");
     try {
-        await setApplicationServer(applicationId, user.id, serverId);
+        await deployService.setApplicationServer(applicationId, user.id, serverId);
         await recordAudit({ actorId: user.id, action: "deploy.app.move", targetType: "application", targetId: applicationId, metadata: { serverId } });
         revalidatePath(DEPLOY_PATH);
         return {};
@@ -402,7 +379,7 @@ export async function setAppServerAction(applicationId: string, serverId: string
 export async function restartApplicationAction(applicationId: string): Promise<{ error?: string }> {
     const user = await requirePermission("deploy.manage");
     try {
-        await restartApplication(applicationId, user.id);
+        await deployService.restartApplication(applicationId, user.id);
         await recordAudit({ actorId: user.id, action: "deploy.app.restart", targetType: "application", targetId: applicationId });
         revalidatePath(DEPLOY_PATH);
         return {};
@@ -414,7 +391,7 @@ export async function restartApplicationAction(applicationId: string): Promise<{
 export async function setApplicationRunningAction(applicationId: string, running: boolean): Promise<{ error?: string }> {
     const user = await requirePermission("deploy.manage");
     try {
-        await setApplicationRunning(applicationId, user.id, running);
+        await deployService.setApplicationRunning(applicationId, user.id, running);
         await recordAudit({
             actorId: user.id,
             action: running ? "deploy.app.start" : "deploy.app.stop",
@@ -431,7 +408,7 @@ export async function setApplicationRunningAction(applicationId: string, running
 export async function removeApplicationDeploymentAction(applicationId: string): Promise<{ error?: string }> {
     const user = await requirePermission("deploy.manage");
     try {
-        await removeApplicationDeployment(applicationId, user.id);
+        await deployService.removeApplicationDeployment(applicationId, user.id);
         await recordAudit({ actorId: user.id, action: "deploy.app.remove", targetType: "application", targetId: applicationId });
         revalidatePath(DEPLOY_PATH);
         return {};
@@ -443,7 +420,7 @@ export async function removeApplicationDeploymentAction(applicationId: string): 
 export async function deleteApplicationAction(applicationId: string): Promise<{ error?: string }> {
     const user = await requirePermission("deploy.manage");
     try {
-        await deleteApplication(applicationId, user.id);
+        await deployService.deleteApplication(applicationId, user.id);
         await recordAudit({ actorId: user.id, action: "deploy.app.delete", targetType: "application", targetId: applicationId });
         revalidatePath(DEPLOY_PATH);
         return {};
@@ -455,7 +432,7 @@ export async function deleteApplicationAction(applicationId: string): Promise<{ 
 export async function duplicateApplicationAction(applicationId: string): Promise<{ error?: string; id?: string }> {
     const user = await requirePermission("deploy.manage");
     try {
-        const id = await duplicateApplication(applicationId, user.id);
+        const id = await deployService.duplicateApplication(applicationId, user.id);
         await recordAudit({ actorId: user.id, action: "deploy.app.duplicate", targetType: "application", targetId: applicationId });
         revalidatePath(DEPLOY_PATH);
         return { id };
@@ -471,6 +448,7 @@ export async function addDomainAction(input: {
     cert?: "internal" | "le" | "none";
     zoneLabel?: string;
     random?: boolean;
+    subdomain?: string;
 }): Promise<{ error?: string; hostname?: string }> {
     const user = await requirePermission("deploy.manage");
     const port = Number(input.targetPort);
@@ -478,12 +456,13 @@ export async function addDomainAction(input: {
     const requestHeaders = await headers();
     await ensurePublicIp(requestHeaders.get("x-server-ip") ?? requestHeaders.get("host"));
     try {
-        const hostname = await addApplicationDomain(input.applicationId, user.id, {
+        const hostname = await deployService.addApplicationDomain(input.applicationId, user.id, {
             hostname: input.hostname,
             targetPort: port,
             cert: input.cert,
             zoneLabel: input.zoneLabel,
-            random: input.random
+            random: input.random,
+            subdomain: input.subdomain
         });
         await recordAudit({ actorId: user.id, action: "deploy.domain.add", targetType: "application", targetId: input.applicationId });
         revalidatePath(DEPLOY_PATH);
@@ -511,7 +490,7 @@ export async function autoExposeAction(input: {
     const requestHeaders = await headers();
     await ensurePublicIp(requestHeaders.get("x-server-ip") ?? requestHeaders.get("host"));
     try {
-        const hostname = await addApplicationDomain(input.applicationId, user.id, { targetPort: port });
+        const hostname = await deployService.addApplicationDomain(input.applicationId, user.id, { targetPort: port });
         await recordAudit({ actorId: user.id, action: "deploy.domain.add", targetType: "application", targetId: input.applicationId });
         const status = await getNetworkStatus();
         if (status.autoSubdomainsPublic) {
@@ -548,9 +527,43 @@ export async function deployZonesAction(): Promise<Array<{ label: string; host: 
     return listDeployZones();
 }
 
+const zoneSubdomainSchema = z.object({
+    applicationId: z.string().uuid(),
+    zoneLabel: z.string().max(63).optional(),
+    subdomain: z.string().max(120).optional()
+});
+
+/**
+ * The subdomain a zone hostname would take, and whether it is still free. Called as
+ * the operator types, so it answers with what to show rather than throwing: an
+ * unusable name and a taken one are both a normal state of the field. A zone that
+ * cannot mint at all reports the reason, which is what the picker already handles.
+ */
+export async function zoneSubdomainAction(input: {
+    applicationId: string;
+    zoneLabel?: string;
+    subdomain?: string;
+}): Promise<{ subdomain: string; hostname: string; available: boolean; invalid?: boolean; error?: string }> {
+    const user = await requirePermission("deploy.manage");
+    const parsed = zoneSubdomainSchema.safeParse(input);
+    if (!parsed.success) return { subdomain: "", hostname: "", available: false, error: "Invalid request" };
+    try {
+        const result = await deployService.checkZoneSubdomain(parsed.data.applicationId, user.id, {
+            zoneLabel: parsed.data.zoneLabel,
+            subdomain: parsed.data.subdomain
+        });
+        if (typeof result === "string") {
+            return { subdomain: "", hostname: "", available: false, error: result };
+        }
+        return result;
+    } catch {
+        return { subdomain: "", hostname: "", available: false, error: "Could not check that subdomain" };
+    }
+}
+
 export async function removeDomainAction(domainId: string): Promise<void> {
     const user = await requirePermission("deploy.manage");
-    await removeApplicationDomain(domainId, user.id);
+    await deployService.removeApplicationDomain(domainId, user.id);
     revalidatePath(DEPLOY_PATH);
 }
 
@@ -558,7 +571,7 @@ export async function removeDomainAction(domainId: string): Promise<void> {
 export async function setDomainEnabledAction(domainId: string, enabled: boolean): Promise<{ error?: string }> {
     const user = await requirePermission("deploy.manage");
     try {
-        await setApplicationDomainEnabled(domainId, user.id, enabled);
+        await deployService.setApplicationDomainEnabled(domainId, user.id, enabled);
         await recordAudit({ actorId: user.id, action: "deploy.domain.toggle", targetType: "domain", targetId: domainId });
         revalidatePath(DEPLOY_PATH);
         return {};
@@ -880,7 +893,7 @@ export async function setWafRuleAction(input: {
         await recordAudit({ actorId: user.id, action: "deploy.waf.set", targetType: scopeType, targetId: scopeId || "global" });
         // The local edge applies instantly via the file provider; remote-server apps
         // pick up the change on their next deploy (their rules ride on container labels).
-        await syncAppRoutes().catch(() => undefined);
+        await deployService.syncAppRoutes().catch(() => undefined);
         revalidatePath(DEPLOY_PATH);
         return {};
     } catch (caught) {
@@ -895,7 +908,7 @@ export async function createVolumeAction(input: DeployVolumeInput): Promise<{ er
         await recordAudit({ actorId: user.id, action: "deploy.volume.add", targetType: "application", targetId: input.applicationId });
         // Apply on the running service (a volume takes effect on container recreate),
         // only if it is currently deployed - same Vercel-style flow as env vars.
-        void redeployForEnvScope("application", input.applicationId, user.id).catch(() => undefined);
+        void deployService.redeployForEnvScope("application", input.applicationId, user.id).catch(() => undefined);
         revalidatePath(DEPLOY_PATH);
         return {};
     } catch (caught) {
@@ -911,7 +924,7 @@ export async function updateVolumeAction(
         const { applicationId, ...patch } = input;
         await updateVolume(user.id, patch);
         await recordAudit({ actorId: user.id, action: "deploy.volume.update", targetType: "application", targetId: applicationId });
-        void redeployForEnvScope("application", applicationId, user.id).catch(() => undefined);
+        void deployService.redeployForEnvScope("application", applicationId, user.id).catch(() => undefined);
         revalidatePath(DEPLOY_PATH);
         return {};
     } catch (caught) {
@@ -924,7 +937,7 @@ export async function deleteVolumeAction(input: { id: string; applicationId: str
     try {
         await deleteVolume(input.id, user.id);
         await recordAudit({ actorId: user.id, action: "deploy.volume.remove", targetType: "application", targetId: input.applicationId });
-        void redeployForEnvScope("application", input.applicationId, user.id).catch(() => undefined);
+        void deployService.redeployForEnvScope("application", input.applicationId, user.id).catch(() => undefined);
         revalidatePath(DEPLOY_PATH);
         return {};
     } catch (caught) {

@@ -12,7 +12,7 @@ import { join } from "node:path";
 import { loadEnv } from "@polaris/config";
 import { isTunnelHostname } from "@polaris/core";
 import { prisma } from "@polaris/db";
-import { bucketHttpMetrics, parseHttpLogs, releaseDomain, shortHash, slugify, type AppDeployPlan, type DeployResult, type HttpLogEntry, type HttpMetricPoint, type RuntimeContext, type RuntimeDriver } from "@polaris/deploy";
+import { bucketHttpMetrics, normalizeZoneName, parseHttpLogs, releaseDomain, shortHash, slugify, type AppDeployPlan, type DeployResult, type HttpLogEntry, type HttpMetricPoint, type RuntimeContext, type RuntimeDriver } from "@polaris/deploy";
 import { decryptSecret } from "@polaris/storage";
 import { resolveMountTarget } from "./storage-service";
 import { getDriver, getPorts, toTargetInfo, type TargetRow } from "./deploy/runtime";
@@ -20,7 +20,7 @@ import { KEPT_RELEASES, currentReleaseRef, keepsReleases, portSubject, releaseMa
 import { LocalRouter, type AppRoute } from "./deploy/router";
 import { getOrCreateHostTarget, getOrCreateLocalTarget } from "./deploy-target-service";
 import { getPublicIp } from "./domain-service";
-import { deployHostname } from "./domain-zones";
+import { deployHostname, type ZoneMintFailure } from "./domain-zones";
 import { resolveAutoDomain } from "./network-service";
 import { ensureLocalCa } from "./local-ca-service";
 import { gitBuildContext, type GitSource } from "./git-build-service";
@@ -227,6 +227,60 @@ async function findAutoDomain(
     });
 }
 
+/** Whether a hostname is already routed somewhere - including to this same service,
+ *  which holds it just as firmly. A zone subdomain is first come, first served. */
+async function hostnameTaken(hostname: string): Promise<boolean> {
+    return (await prisma.domain.count({ where: { hostname } })) > 0;
+}
+
+export interface ZoneSubdomainCheck {
+    /** The label the field should hold: what was asked for, or a free default. */
+    subdomain: string;
+    /** The hostname it produces, so the operator sees the whole name. */
+    hostname: string;
+    available: boolean;
+    /** Set when what was typed leaves no usable DNS label. */
+    invalid?: boolean;
+}
+
+/**
+ * Resolve the subdomain of a zone hostname before it is created. With nothing typed
+ * it proposes the service's own name - the address people would guess - and falls
+ * back to a disambiguated one when that is already answering, so the default offered
+ * is always free. With something typed it reports whether that name is still
+ * available, which is what lets the field say so while the operator types.
+ *
+ * A release keeps adding its commit to the right of whichever name is chosen here
+ * (see `releaseDomain`), so per-build URLs follow the service's address rather than
+ * competing with it.
+ */
+export async function checkZoneSubdomain(
+    applicationId: string,
+    ownerId: string,
+    opts: { zoneLabel?: string; subdomain?: string }
+): Promise<ZoneSubdomainCheck | ZoneMintFailure> {
+    const app = await prisma.application.findFirst({
+        where: { id: applicationId, environment: { project: { ownerId } } },
+        select: { slug: true }
+    });
+    if (!app) throw new Error("Application not found");
+    const typed = opts.subdomain?.trim() ?? "";
+    const base = slugify(app.slug) || "app";
+    // The id suffix, not a counter: two services can slug to the same thing, and the
+    // fallback has to stay the same name every time this is asked.
+    const candidates = typed ? [typed] : [base, `${base}-${shortHash(applicationId, 4)}`];
+    let result: ZoneSubdomainCheck = { subdomain: base, hostname: "", available: false };
+    for (const candidate of candidates) {
+        const minted = await deployHostname(app.slug, { zoneLabel: opts.zoneLabel, subdomain: candidate });
+        if (minted === "bad-name") return { subdomain: typed, hostname: "", available: false, invalid: true };
+        if (typeof minted === "string") return minted;
+        const taken = await hostnameTaken(minted.hostname);
+        result = { subdomain: normalizeZoneName(candidate), hostname: minted.hostname, available: !taken };
+        if (!taken) break;
+    }
+    return result;
+}
+
 /**
  * Attach a domain to an application. With no hostname the app's free auto
  * subdomain is used - minted the first time and reused unchanged after that, so a
@@ -245,6 +299,8 @@ export async function addApplicationDomain(
         zoneLabel?: string;
         /** Mint an unguessable hostname rather than one derived from the name. */
         random?: boolean;
+        /** The subdomain to take in the zone, instead of one derived from the name. */
+        subdomain?: string;
     }
 ): Promise<string> {
     const app = await prisma.application.findFirst({
@@ -275,7 +331,14 @@ export async function addApplicationDomain(
         );
     }
     if (!hostname && (opts.zoneLabel !== undefined || opts.random)) {
-        const minted = await deployHostname(app.slug, { zoneLabel: opts.zoneLabel, random: opts.random });
+        const minted = await deployHostname(app.slug, {
+            zoneLabel: opts.zoneLabel,
+            random: opts.random,
+            subdomain: opts.subdomain
+        });
+        if (minted === "bad-name") {
+            throw new Error("Use letters, digits and dashes for the subdomain.");
+        }
         if (minted === "no-domain") {
             throw new Error("No domain is configured yet. Run the guided setup under Domains first.");
         }

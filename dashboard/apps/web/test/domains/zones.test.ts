@@ -156,6 +156,22 @@ describe("hostnames minted from the layout", () => {
         expect(minted).toHaveProperty("hostname", expect.stringMatching(/^[a-z0-9-]+\.example\.com$/));
     });
 
+    it("mints the subdomain the operator picked, untouched", async () => {
+        expect(await deployHostname("invoices", { subdomain: "Billing App" })).toMatchObject({
+            hostname: "billing-app.plr.example.com",
+            zoneHost: "plr.example.com"
+        });
+    });
+
+    it("refuses a picked name with no DNS label in it, rather than substituting one", async () => {
+        expect(await deployHostname("invoices", { subdomain: "!!!" })).toBe("bad-name");
+    });
+
+    it("ignores a picked name when an unguessable one was asked for", async () => {
+        const random = await deployHostname("invoices", { random: true, subdomain: "billing" });
+        expect(random).toHaveProperty("hostname", expect.not.stringContaining("billing"));
+    });
+
     it("mints an unguessable hostname on request", async () => {
         const random = await deployHostname("invoices", { random: true });
         expect(random).toHaveProperty("hostname", expect.stringMatching(/\.plr\.example\.com$/));

@@ -1551,6 +1551,10 @@ const EXPOSURE_OPTIONS: { value: ExposureKind; label: string; icon: ReactNode }[
  *  empty select value, and "@" is how a DNS zone's own record is written anyway. */
 const ZONE_ROOT = "@";
 
+/** What the server says about the subdomain in the field: the name, the hostname it
+ *  makes, and whether anything already answers on it. */
+type ZoneSubdomainCheck = Awaited<ReturnType<typeof deployActions.zoneSubdomainAction>>;
+
 /** A URL-safe label from the app name, the default for a local/DuckDNS subdomain. */
 function defaultLabel(name: string): string {
     return name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "app";
@@ -1578,6 +1582,15 @@ function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
     const [zones, setZones] = useState<Array<{ label: string; host: string; primary: boolean }>>([]);
     const [zoneLabel, setZoneLabel] = useState<string | null>(null);
     const [randomName, setRandomName] = useState(false);
+    // The subdomain the zone hostname takes. Empty means "not chosen yet": the server
+    // then proposes the service's own name, or a free variant of it, and the field
+    // adopts what it answers so what is shown is what will be created.
+    const [subdomain, setSubdomain] = useState("");
+    const [subdomainCheck, setSubdomainCheck] = useState<ZoneSubdomainCheck | null>(null);
+    const [checkingSubdomain, setCheckingSubdomain] = useState(false);
+    /** Zone + name the check already answered for, so adopting its answer or
+     *  re-rendering does not ask again for a name nothing changed about. */
+    const checkedSubdomain = useRef<string | null>(null);
     const [tunnelNonce, setTunnelNonce] = useState(0);
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
@@ -1606,6 +1619,37 @@ function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
             })
             .catch(() => undefined);
     }, [app.serverId]);
+
+    // Resolve the subdomain field: with nothing typed the server proposes a free name,
+    // and with something typed it says whether that one is still free. Debounced only
+    // once there is something typed - the first proposal should not make the field
+    // sit empty for half a second.
+    const zoneKey = zoneLabel ?? zones[0]?.label ?? "";
+    useEffect(() => {
+        if (exposure !== "zone" || randomName || zones.length === 0) return;
+        const typed = subdomain.trim();
+        const key = `${zoneKey}|${typed}`;
+        if (checkedSubdomain.current === key) return;
+        let active = true;
+        setCheckingSubdomain(true);
+        const timer = setTimeout(() => {
+            void deployActions.zoneSubdomainAction({ applicationId: app.id, zoneLabel: zoneKey, subdomain: typed || undefined })
+                .then((result) => {
+                    if (!active) return;
+                    checkedSubdomain.current = `${zoneKey}|${result.subdomain}`;
+                    setCheckingSubdomain(false);
+                    setSubdomainCheck(result);
+                    if (!typed && result.subdomain) setSubdomain(result.subdomain);
+                })
+                .catch(() => {
+                    if (active) setCheckingSubdomain(false);
+                });
+        }, typed ? 400 : 0);
+        return () => {
+            active = false;
+            clearTimeout(timer);
+        };
+    }, [app.id, exposure, randomName, subdomain, zoneKey, zones.length]);
 
     function saveSettings() {
         setError(null);
@@ -1668,8 +1712,9 @@ function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
                 result = await deployActions.addDomainAction({
                     applicationId: app.id,
                     targetPort: targetPort(),
-                    zoneLabel: zoneLabel ?? zones[0]?.label ?? "",
-                    random: randomName
+                    zoneLabel: zoneKey,
+                    random: randomName,
+                    subdomain: randomName ? undefined : subdomain.trim() || undefined
                 });
             } else if (exposure === "subdomain") {
                 // Auto = always reachable: a universally-resolvable sslip.io LAN name,
@@ -1701,6 +1746,11 @@ function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
                 // Reset the add-a-domain form to a clean state after a successful add.
                 setHostname("");
                 setLabel("");
+                // The name just created is taken now, so the next proposal has to be
+                // asked for again rather than kept from before.
+                setSubdomain("");
+                setSubdomainCheck(null);
+                checkedSubdomain.current = null;
                 setConnectorToken("");
                 setAdvanced(false);
                 setPort(app.port != null ? String(app.port) : "");
@@ -1718,10 +1768,22 @@ function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
                   ? "Set up"
                   : "Connect"
               : "Add domain";
+    // The zone the name goes in, for the suffix beside the field.
+    const zoneHost = zones.find((zone) => zone.label === zoneKey)?.host ?? zones[0]?.host ?? "";
+    // Only a checked answer about the name itself blocks the add: while a check is in
+    // flight the operator is still typing, and a zone that cannot mint at all is the
+    // add's error to report, not something to blame the typed name for.
+    const subdomainTaken =
+        exposure === "zone" &&
+        !randomName &&
+        !checkingSubdomain &&
+        !subdomainCheck?.error &&
+        subdomainCheck?.available === false;
     const submitDisabled =
         pending ||
         duckMissing ||
         hostnameIsTunnel ||
+        subdomainTaken ||
         (needsHostname && !hostname.trim()) ||
         (exposure === "cf-named" && !cfConnected && !connectorToken.trim());
 
@@ -1851,16 +1913,41 @@ function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
                             <div className="flex flex-col gap-2">
                                 <Select
                                     value={(zoneLabel ?? zones[0]?.label) || ZONE_ROOT}
-                                    onValueChange={(value) => setZoneLabel(value === ZONE_ROOT ? "" : value)}
+                                    onValueChange={(value) => {
+                                        setZoneLabel(value === ZONE_ROOT ? "" : value);
+                                        setSubdomainCheck(null);
+                                    }}
                                     options={zones.map((zone) => ({ value: zone.label || ZONE_ROOT, label: `*.${zone.host}` }))}
                                     aria-label="Zone"
                                 />
+                                {!randomName && (
+                                    <div className="flex flex-col gap-1">
+                                        <div className="flex items-center gap-2">
+                                            <Input
+                                                value={subdomain}
+                                                onChange={(event) => setSubdomain(event.target.value)}
+                                                placeholder={defaultLabel(app.name)}
+                                                autoComplete="off"
+                                                aria-invalid={subdomainTaken}
+                                                aria-label="Subdomain"
+                                            />
+                                            <span className="shrink-0 text-xs text-muted-foreground">.{zoneHost}</span>
+                                        </div>
+                                        {subdomainTaken && (
+                                            <p className="text-xs text-danger">
+                                                {subdomainCheck?.invalid
+                                                    ? "Use letters, digits and dashes."
+                                                    : "That subdomain is already in use."}
+                                            </p>
+                                        )}
+                                    </div>
+                                )}
                                 <label className="flex items-center gap-2 text-xs text-muted-foreground">
                                     <Checkbox
                                         checked={randomName}
                                         onChange={(event) => setRandomName(event.target.checked)}
                                     />
-                                    Use a random name instead of the service&apos;s
+                                    Use a random name instead
                                 </label>
                             </div>
                         )}
@@ -1899,7 +1986,7 @@ function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
                         )}
                         <p className="text-xs text-muted-foreground">
                             {exposure === "zone"
-                                ? "A hostname on your own domain, covered by the zone's wildcard record - no DNS to add, with a Let's Encrypt certificate. The name is derived from the service, or random if you prefer an unguessable URL."
+                                ? "A hostname on your own domain, covered by the zone's wildcard record - no DNS to add, with a Let's Encrypt certificate. Choose the subdomain, or take a random one for an unguessable URL. Each build also gets this name with its commit added."
                                 : exposure === "subdomain"
                                 ? "Always reachable: a free sslip.io subdomain that resolves on any device (a public Let's Encrypt name on a reachable box). Behind NAT, Polaris also starts a free Cloudflare quick link so it works from outside. Connect a Cloudflare account or a custom domain for a stable public URL."
                                 : exposure === "local"

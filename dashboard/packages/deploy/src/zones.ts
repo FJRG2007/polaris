@@ -8,6 +8,7 @@
  */
 
 import { randomBytes } from "node:crypto";
+import { slugify } from "./naming.js";
 import { magicDomain } from "./subdomain.js";
 
 /** What a zone's hostnames are for: the Polaris control plane, or deployed services. */
@@ -79,6 +80,27 @@ export function zoneWildcard(zone: Pick<DomainZone, "label">, base: string): str
  */
 export function zoneHostname(name: string, zone: Pick<DomainZone, "label">, base: string): string {
     return magicDomain(name, "", zoneHost(zone, base));
+}
+
+/**
+ * A typed subdomain reduced to the one DNS label it can be, or "" when nothing
+ * usable is left. Slugging alone is not enough: truncating at the 63-character
+ * limit can leave a trailing dash, which no DNS label may end with.
+ */
+export function normalizeZoneName(value: string): string {
+    const label = slugify(value).replace(/-+$/, "");
+    return LABEL_PATTERN.test(label) ? label : "";
+}
+
+/**
+ * A hostname in the zone under the exact name the operator chose
+ * (`invoices.plr.example.com`). Unlike `zoneHostname` nothing is appended: the name
+ * is theirs, so uniqueness is the caller's to check rather than a hash's to
+ * guarantee. Empty when the name holds no usable DNS label.
+ */
+export function namedZoneHostname(name: string, zone: Pick<DomainZone, "label">, base: string): string {
+    const label = normalizeZoneName(name);
+    return label ? `${label}.${zoneHost(zone, base)}` : "";
 }
 
 /** A random DNS label, for throwaway or unguessable hostnames. */

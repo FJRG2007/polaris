@@ -20,8 +20,10 @@ import {
     defaultZones,
     isBaseDomain,
     zoneHostname,
-    normalizeBaseDomain,
+    namedZoneHostname,
+    normalizeZoneName,
     randomZoneHostname,
+    normalizeBaseDomain,
     type DomainZone,
     type ZoneScope
 } from "@polaris/deploy";
@@ -213,7 +215,7 @@ export async function polarisZoneHost(): Promise<string | null> {
 
 /** Why a hostname could not be minted, so the caller can say which of the two it is
  *  instead of sending the operator back to a setup that is actually fine. */
-export type ZoneMintFailure = "no-domain" | "unknown-zone" | "unverified";
+export type ZoneMintFailure = "no-domain" | "unknown-zone" | "unverified" | "bad-name";
 
 export interface MintedHostname {
     hostname: string;
@@ -222,12 +224,15 @@ export interface MintedHostname {
 }
 
 /**
- * A hostname for a service inside a deploy zone: deterministic from the name (so a
- * redeploy keeps the URL) or random when the caller wants an unguessable one.
+ * A hostname for a service inside a deploy zone: the subdomain the operator picked,
+ * else deterministic from the name (so a redeploy keeps the URL), or random when the
+ * caller wants an unguessable one. A picked subdomain is taken literally - whether
+ * anything else already answers on it is the caller's to check, since only it knows
+ * which service is asking.
  */
 export async function deployHostname(
     name: string,
-    options: { zoneLabel?: string; random?: boolean } = {}
+    options: { zoneLabel?: string; random?: boolean; subdomain?: string } = {}
 ): Promise<MintedHostname | ZoneMintFailure> {
     const config = await getDomainZones();
     if (!config.baseDomain) return "no-domain";
@@ -237,10 +242,17 @@ export async function deployHostname(
     if (!(await zoneDnsVerified())) return "unverified";
     const zone = pickZone(config.zones, "deploy", options.zoneLabel);
     if (!zone) return "unknown-zone";
+    const picked = options.random ? "" : normalizeZoneName(options.subdomain ?? "");
+    // Something was typed but nothing of it survives as a DNS label. Refused rather
+    // than quietly replaced by the derived name: the operator would then be looking
+    // at a URL they never asked for.
+    if (!picked && options.subdomain?.trim() && !options.random) return "bad-name";
     return {
         hostname: options.random
             ? randomZoneHostname(zone, config.baseDomain)
-            : zoneHostname(name, zone, config.baseDomain),
+            : picked
+              ? namedZoneHostname(picked, zone, config.baseDomain)
+              : zoneHostname(name, zone, config.baseDomain),
         zoneHost: zoneHost(zone, config.baseDomain)
     };
 }
