@@ -12,10 +12,10 @@
  * account system will send a reset or a sign-in code to.
  */
 
-import { loadEnv } from "@polaris/config";
-import { generateToken, hashToken } from "@polaris/core/tokens";
 import { prisma } from "@polaris/db";
 import { sendAuthEmail } from "./auth-mail";
+import { appBaseUrl } from "./domain-service";
+import { generateToken, hashToken } from "@polaris/core/tokens";
 
 /** How long a verification link stays good. Long enough to survive a mail queue
  *  and a night's sleep, short enough that an old message is not a live key. */
@@ -27,8 +27,10 @@ export interface VerifiedAddress {
     primary: boolean;
 }
 
-function verificationUrl(token: string): string {
-    return `${loadEnv().POLARIS_APP_URL}/oauth/verify-email?token=${encodeURIComponent(token)}`;
+/** Built on the reachable address rather than the LAN-only name: the link is read
+ *  from a mailbox, which may well be opened from outside the network. */
+async function verificationUrl(token: string): Promise<string> {
+    return `${await appBaseUrl()}/oauth/verify-email?token=${encodeURIComponent(token)}`;
 }
 
 function messageBody(url: string): { text: string; html: string } {
@@ -82,7 +84,7 @@ export async function requestEmailVerification(
         })
     ]);
 
-    const { text, html } = messageBody(verificationUrl(token));
+    const { text, html } = messageBody(await verificationUrl(token));
     const result = await sendAuthEmail({ to: address, subject: "Confirm your address", text, html });
     if (result.error) {
         // Nothing was delivered, so leave no live token behind.

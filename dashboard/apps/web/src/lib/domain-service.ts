@@ -11,12 +11,12 @@
  */
 
 import { loadEnv } from "@polaris/config";
-import { magicDomain, DEFAULT_SUBDOMAIN_BASE } from "@polaris/deploy";
-import { decryptSecret, encryptSecret } from "@polaris/storage";
-import { polarisZoneHost, zoneReachable } from "./domain-zones";
 import { syncDashboardRoute } from "./domain-edge";
 import { getSetting, setSetting } from "./setting-store";
 import { getPolarisPublicUrl } from "./polaris-tunnel-service";
+import { decryptSecret, encryptSecret } from "@polaris/storage";
+import { polarisZoneHost, zoneReachable } from "./domain-zones";
+import { magicDomain, DEFAULT_SUBDOMAIN_BASE } from "@polaris/deploy";
 
 const KEYS = {
     app: "domain.app",
@@ -116,22 +116,16 @@ export async function autoSubdomainUrl(name: string): Promise<string | null> {
     return `https://${magicDomain(name, ip, await deployBase())}`;
 }
 
-/** Base URL for the dashboard/app: the configured app domain, else POLARIS_APP_URL. */
-export async function appBaseUrl(): Promise<string> {
-    return normalizeUrl(await getSetting(KEYS.app)) ?? loadEnv().POLARIS_APP_URL;
-}
-
 /**
- * Base URL for share links and drop points. Prefers an explicitly configured
- * sharing domain, then the operator's own Polaris zone, then a running Polaris
- * Cloudflare tunnel (the NAT fallback, since a DuckDNS/auto name is not reachable
- * from outside a NATed box), then a DuckDNS subdomain, then a free auto subdomain,
- * and finally the app domain / env fallback.
+ * The best address Polaris is actually reachable at from outside the LAN, or null
+ * when none is known. In order: the operator's own Polaris zone, a running Polaris
+ * Cloudflare tunnel (the NAT fallback, since a DuckDNS/auto name does not resolve
+ * to a reachable box behind NAT), a DuckDNS subdomain, then a free auto subdomain.
+ *
+ * `autoName` is the label the free subdomain is built from, so the app and the
+ * sharing surface get distinguishable hostnames.
  */
-export async function sharingBaseUrl(): Promise<string> {
-    const configured = normalizeUrl(await getSetting(KEYS.sharing));
-    if (configured) return configured;
-
+async function reachableBaseUrl(autoName: string): Promise<string | null> {
     // A configured zone beats an ephemeral tunnel URL - but only once its DNS has been
     // seen resolving here. Saving the layout in the wizard is an intention; until the
     // records exist, a link on that hostname resolves nowhere, and the tunnel below
@@ -141,16 +135,42 @@ export async function sharingBaseUrl(): Promise<string> {
         if (zone) return `https://${zone}`;
     }
 
-    // A Polaris Cloudflare tunnel, when running, is a working public URL - prefer it
-    // over the DuckDNS/auto names, which do not resolve to a reachable box behind NAT.
     const tunnel = normalizeUrl(await getPolarisPublicUrl());
     if (tunnel) return tunnel;
 
     const duckSub = await getSetting(KEYS.duckSub);
     if (duckSub) return `https://${duckSub}.duckdns.org`;
 
-    const auto = await autoSubdomainUrl("share");
-    if (auto) return auto;
+    return autoSubdomainUrl(autoName);
+}
+
+/**
+ * Base URL for anything Polaris hands to a person or a machine that is not on this
+ * LAN: an invite, a verification link, a notification link, an enrollment command.
+ *
+ * The configured app domain wins, then whatever Polaris is genuinely reachable at.
+ * POLARIS_APP_URL is deliberately last: the installer sets it to `http://polaris.local`,
+ * a name that only resolves over mDNS on this network, so preferring it would mint
+ * links nobody outside the house can open.
+ */
+export async function appBaseUrl(): Promise<string> {
+    const configured = normalizeUrl(await getSetting(KEYS.app));
+    if (configured) return configured;
+    return (await reachableBaseUrl("app")) ?? loadEnv().POLARIS_APP_URL;
+}
+
+/**
+ * Base URL for share links and drop points. Same chain as the app URL, except an
+ * explicitly configured sharing domain wins and the app domain is consulted only
+ * after the reachable addresses - sharing is where a throwaway or free hostname
+ * belongs, while the dashboard's own domain is expected to be stable.
+ */
+export async function sharingBaseUrl(): Promise<string> {
+    const configured = normalizeUrl(await getSetting(KEYS.sharing));
+    if (configured) return configured;
+
+    const reachable = await reachableBaseUrl("share");
+    if (reachable) return reachable;
 
     return normalizeUrl(await getSetting(KEYS.app)) ?? loadEnv().POLARIS_APP_URL;
 }

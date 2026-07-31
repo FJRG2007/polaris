@@ -17,9 +17,15 @@
  * inviting someone is what governs the account afterwards.
  */
 
-import { loadEnv } from "@polaris/config";
+import { auth } from "@/lib/auth";
+import { prisma } from "@polaris/db";
+import { sendAuthEmail } from "@/lib/auth-mail";
+import { appBaseUrl } from "@/lib/domain-service";
+import { rateLimit } from "@/lib/rate-limit-service";
+import { evaluateNetworkRules } from "@/lib/network-rules";
 import { generateShortCode, generateToken, hashToken } from "@polaris/core/tokens";
 import { hashLinkPassword, verifyLinkPassword } from "@polaris/core/link-password";
+import { assignRole, provisionUser, seedDefaultRoles, updateEnforcedRules } from "@polaris/auth";
 import {
     INVITE_CODE_LENGTH,
     normalizeInviteCode,
@@ -32,12 +38,6 @@ import {
     type InviteMethod,
     type InviteRefusal
 } from "@polaris/core";
-import { prisma } from "@polaris/db";
-import { assignRole, provisionUser, seedDefaultRoles, updateEnforcedRules } from "@polaris/auth";
-import { auth } from "@/lib/auth";
-import { sendAuthEmail } from "@/lib/auth-mail";
-import { evaluateNetworkRules } from "@/lib/network-rules";
-import { rateLimit } from "@/lib/rate-limit-service";
 
 /** Seven days, the invite lifetime. */
 const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -87,9 +87,11 @@ const INVITE_FIELDS = {
     accessGroupIds: true
 } as const;
 
-/** The URL a link or magic invite is claimed at. */
-export function inviteUrl(token: string): string {
-    return `${loadEnv().POLARIS_APP_URL}/oauth/accept-invite?token=${encodeURIComponent(token)}`;
+/** The URL a link or magic invite is claimed at. Built on the address Polaris is
+ *  reachable at from outside, not the LAN-only name the installer configures - an
+ *  invite is by definition handed to somebody who is not on this network. */
+export async function inviteUrl(token: string): Promise<string> {
+    return `${await appBaseUrl()}/oauth/accept-invite?token=${encodeURIComponent(token)}`;
 }
 
 function inviteMessage(url: string): { text: string; html: string } {
@@ -153,7 +155,7 @@ export async function createInvite(
         select: { id: true }
     });
 
-    const url = inviteUrl(token);
+    const url = await inviteUrl(token);
     if (input.method === "magic") {
         const sent = await sendAuthEmail({ to: email, subject: "You have been invited to Polaris", ...inviteMessage(url) });
         if (sent.error) return { id: invite.id, url, sendError: sent.error };
