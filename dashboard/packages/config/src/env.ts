@@ -5,6 +5,7 @@
  * repo-wide POLARIS_ prefix.
  */
 
+import { randomBytes } from "node:crypto";
 import { z } from "zod";
 
 /** Accept the usual truthy spellings for boolean flags coming from a shell. */
@@ -142,11 +143,15 @@ let cached: PolarisEnv | undefined;
  * environment exists; without these the build would fail on missing secrets even
  * though nothing is actually served. Runtime never sees these - NEXT_PHASE is
  * unset then, so validation stays strict.
+ *
+ * The two secrets are drawn fresh per build rather than being fixed strings: a
+ * throwaway key nothing signs with should still be a real key, and a short,
+ * guessable one makes better-auth warn on every page it prerenders.
  */
 const BUILD_PLACEHOLDERS: Record<string, string> = {
     POLARIS_DATABASE_URL: "postgresql://build:build@localhost:5432/build",
-    POLARIS_AUTH_SECRET: "build-time-placeholder-secret",
-    POLARIS_MASTER_KEY: "build-time-placeholder"
+    POLARIS_AUTH_SECRET: randomBytes(32).toString("base64"),
+    POLARIS_MASTER_KEY: randomBytes(32).toString("base64")
 };
 
 /**
