@@ -15,7 +15,7 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { LifeBuoy, Mail, Plus } from "lucide-react";
+import { LifeBuoy, Mail, Plus, Star, Trash2 } from "lucide-react";
 import type { UserEmailView } from "@polaris/auth";
 import { emailField } from "@polaris/core";
 import {
@@ -26,7 +26,8 @@ import {
     DialogDescription,
     DialogHeader,
     DialogTitle,
-    Input
+    Input,
+    cn
 } from "@polaris/ui";
 import { useConfirm } from "@/components/confirm-dialog";
 import {
@@ -101,15 +102,15 @@ export function EmailsView({ emails, mailReady }: { emails: UserEmailView[]; mai
                 {emails.map((entry) => (
                     <div
                         key={entry.email}
-                        className="flex items-center justify-between gap-3 border-t border-border px-3 py-2 first:border-t-0"
+                        className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-border px-3 py-2 first:border-t-0"
                     >
-                        <div className="flex min-w-0 items-center gap-2">
-                            {entry.recovery ? (
-                                <LifeBuoy className="size-4 shrink-0 text-muted-foreground" />
-                            ) : (
-                                <Mail className="size-4 shrink-0 text-muted-foreground" />
-                            )}
-                            <span className="truncate text-sm">{entry.email}</span>
+                        <div className="flex min-w-0 flex-1 basis-64 items-center gap-2">
+                            <Mail className="size-4 shrink-0 text-muted-foreground" />
+                            <span className="truncate text-sm" title={entry.email}>
+                                {entry.email}
+                            </span>
+                        </div>
+                        <div className="ml-auto flex shrink-0 items-center gap-1.5">
                             {entry.primary ? <Badge variant="primary">Primary</Badge> : null}
                             {entry.recovery ? <Badge>Recovery</Badge> : null}
                             {entry.verified ? (
@@ -117,8 +118,6 @@ export function EmailsView({ emails, mailReady }: { emails: UserEmailView[]; mai
                             ) : (
                                 <Badge className="border-warning/40 text-warning">Unverified</Badge>
                             )}
-                        </div>
-                        <div className="flex shrink-0 items-center gap-1">
                             {entry.verified ? null : (
                                 <Button
                                     variant="ghost"
@@ -138,7 +137,13 @@ export function EmailsView({ emails, mailReady }: { emails: UserEmailView[]; mai
                                 <>
                                     <Button
                                         variant="ghost"
-                                        size="sm"
+                                        size="icon"
+                                        aria-label={
+                                            entry.recovery
+                                                ? `Stop using ${entry.email} for recovery`
+                                                : `Use ${entry.email} for recovery`
+                                        }
+                                        title={entry.recovery ? "Not for recovery" : "Use for recovery"}
                                         disabled={busy === entry.id}
                                         onClick={() =>
                                             void run(entry.id ?? "", () =>
@@ -146,22 +151,26 @@ export function EmailsView({ emails, mailReady }: { emails: UserEmailView[]; mai
                                             )
                                         }
                                     >
-                                        {entry.recovery ? "Not for recovery" : "Use for recovery"}
+                                        <LifeBuoy className={cn("size-4", entry.recovery && "text-primary")} />
                                     </Button>
                                     <Button
                                         variant="ghost"
-                                        size="sm"
+                                        size="icon"
+                                        aria-label={`Make ${entry.email} primary`}
+                                        title="Make primary"
                                         onClick={() => setPromoting(entry)}
                                     >
-                                        Make primary
+                                        <Star className="size-4" />
                                     </Button>
                                     <Button
                                         variant="ghost"
-                                        size="sm"
+                                        size="icon"
+                                        aria-label={`Remove ${entry.email}`}
+                                        title="Remove"
                                         disabled={busy === entry.id}
                                         onClick={() => void remove(entry)}
                                     >
-                                        Remove
+                                        <Trash2 className="size-4" />
                                     </Button>
                                 </>
                             )}
