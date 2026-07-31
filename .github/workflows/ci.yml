@@ -1,8 +1,12 @@
 name: CI
 
+# Also callable, so dashboard-publish.yml can gate the host-daemon image on it
+# rather than publishing whatever the last commit happened to leave behind.
+
 on:
   push:
   pull_request:
+  workflow_call:
 
 jobs:
   rust:

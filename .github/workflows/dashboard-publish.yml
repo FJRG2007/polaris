@@ -9,6 +9,13 @@ name: Publish dashboard image
 # web-only push does not rebuild the multi-arch Rust host daemon (the slowest
 # step by far). Jobs also run in parallel, so wall-clock is the slowest single
 # image, not the sum of all four.
+#
+# An image is also gated on its suite passing. `latest` is what every deployment
+# pulls, and the update card offers whatever commit that tag was built from - so
+# publishing from a commit whose tests failed is how a broken build reaches every
+# box that presses Update. The suites are called here rather than watched for:
+# they run standalone on every push too (that is the signal on branches and pull
+# requests), and this call is the one an image waits on.
 
 on:
   push:
@@ -72,10 +79,23 @@ jobs:
           has '^dashboard/docker/updater/' && out updater true || out updater false
           has '^dashboard/services/messaging-bridge/|^dashboard/packages/messaging/|^dashboard/package(-lock)?\.json$' && out bridge true || out bridge false
 
+  # The gates. Skipped when nothing they cover is being rebuilt, which also skips
+  # the image jobs that need them - they would have been skipped by their own
+  # filter anyway.
+  dashboard-ci:
+    needs: changes
+    if: ${{ needs.changes.outputs.web == 'true' || needs.changes.outputs.bridge == 'true' || github.event_name == 'workflow_dispatch' }}
+    uses: ./.github/workflows/dashboard-ci.yml
+
+  rust-ci:
+    needs: changes
+    if: ${{ needs.changes.outputs.hostd == 'true' || github.event_name == 'workflow_dispatch' }}
+    uses: ./.github/workflows/ci.yml
+
   # Next.js dashboard. amd64 only (the runtime servers are x86). Layer caching in
   # the Dockerfile keeps `npm ci` cached across source-only changes.
   web:
-    needs: changes
+    needs: [changes, dashboard-ci]
     if: ${{ needs.changes.outputs.web == 'true' || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     steps:
@@ -122,7 +142,7 @@ jobs:
   # emulating arm64 under QEMU (which made this the ~7-minute bottleneck). Each arch
   # pushes by digest; the manifest job below stitches them into the :latest tag.
   hostd:
-    needs: changes
+    needs: [changes, rust-ci]
     if: ${{ needs.changes.outputs.hostd == 'true' || github.event_name == 'workflow_dispatch' }}
     strategy:
       fail-fast: false
@@ -213,7 +233,7 @@ jobs:
   # installs to pull. amd64 only, matching the runtime servers. Its build context
   # is the dashboard root so the workspace and @polaris/messaging are available.
   bridge:
-    needs: changes
+    needs: [changes, dashboard-ci]
     if: ${{ needs.changes.outputs.bridge == 'true' || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     steps:
