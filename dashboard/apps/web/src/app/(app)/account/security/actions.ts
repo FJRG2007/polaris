@@ -143,6 +143,11 @@ export async function updateSessionLimitsAction(input: unknown): Promise<ActionR
  * the quick-unlock PIN, so the gate cannot be armed without one: otherwise the
  * approval would rest on nothing more than the open session it is decided from.
  *
+ * It is also the alternative to a second factor rather than an addition to it: an
+ * account that answers a code at sign-in is not held for approval as well, so
+ * arming the gate while the authenticator is on is refused instead of quietly
+ * storing a setting that would never be used.
+ *
  * Taking the gate down widens the ways in, so it is verified the same way the
  * other second-factor settings are - a stolen session cannot quietly disarm it.
  */
@@ -150,6 +155,9 @@ export async function setLoginApprovalAction(required: boolean, password: string
     const user = await requireUser();
     if (!(await verifyAccountPassword(auth, user.id, String(password)))) {
         return { error: "Current password is incorrect." };
+    }
+    if (required === true && (await twoFactorEnabled(user.id))) {
+        return { error: "Turn the authenticator app off first - a sign-in asks for one of the two, not both." };
     }
     if (required === true && !(await getUserSecurity(user.id)).hasPin) {
         return { error: "Set a quick unlock PIN first - approving a sign-in asks for it." };

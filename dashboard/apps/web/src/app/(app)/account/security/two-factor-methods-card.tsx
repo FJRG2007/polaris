@@ -13,7 +13,10 @@
  * Sign-in approval sits in the same list because it is one of the ways the
  * account is proven, and a control kept somewhere else is a control nobody
  * finds. It is the one gate here that works with no second factor set up at all,
- * which is why the card is shown either way.
+ * which is why the card is shown either way - and it is an alternative to a
+ * second factor rather than an addition to it: an account that answers a code at
+ * sign-in is not held for approval as well, so the row can only be armed while
+ * the authenticator is off. Turning it off is always allowed.
  *
  * A method that cannot deliver right now says why instead of being hidden, so a
  * missing channel reads as something to fix rather than as a feature that never
@@ -27,6 +30,7 @@ import Link from "next/link";
 import {
     TWO_FACTOR_DELIVERY_METHODS,
     TWO_FACTOR_METHOD_INFO,
+    TWO_FACTOR_METHODS,
     type TwoFactorDeliveryMethod,
     type TwoFactorMethod
 } from "@polaris/core";
@@ -86,10 +90,6 @@ export function TwoFactorMethodsCard({
         savedMethods.some((method) => !methods.includes(method));
     const changed = preferencesChanged || approve !== approval.enabled;
 
-    /** Only the authenticator and the methods that are on can be the default; a
-     *  default nobody can use would just be a slower way to reach the fallback. */
-    const preferrable: TwoFactorMethod[] = ["totp", ...methods];
-
     function toggle(method: TwoFactorDeliveryMethod, next: boolean) {
         const updated = next ? [...methods, method] : methods.filter((entry) => entry !== method);
         setMethods(updated);
@@ -148,7 +148,12 @@ export function TwoFactorMethodsCard({
                                 A new sign-in waits until you allow it with your PIN from a session
                                 that is already open.
                             </p>
-                            {!approval.hasPin ? (
+                            {twoFactorEnabled ? (
+                                <p className="text-xs text-warning">
+                                    A sign-in asks for one of the two. Turn the authenticator app
+                                    off to use this instead.
+                                </p>
+                            ) : !approval.hasPin ? (
                                 <p className="text-xs text-warning">
                                     Set a quick unlock PIN first - allowing a sign-in asks for it.
                                 </p>
@@ -165,7 +170,7 @@ export function TwoFactorMethodsCard({
                         </div>
                         <Switch
                             checked={approve}
-                            disabled={!approval.hasPin && !approve}
+                            disabled={(twoFactorEnabled || !approval.hasPin) && !approve}
                             aria-label="Require approval for new sign-ins"
                             onChange={setApprove}
                         />
@@ -175,13 +180,22 @@ export function TwoFactorMethodsCard({
                 {twoFactorEnabled ? (
                     <label className="flex flex-col gap-1 text-sm">
                         Offer first
+                        {/* Every method is listed, including the ones that are off: a list
+                            with one entry looks like the account has one way in, when what
+                            it means is that nothing else has been turned on yet. */}
                         <Select
                             value={choice}
                             onValueChange={(value) => setChoice(value as TwoFactorMethod)}
-                            options={preferrable.map((method) => ({
-                                value: method,
-                                label: TWO_FACTOR_METHOD_INFO[method].label
-                            }))}
+                            options={TWO_FACTOR_METHODS.map((method) => {
+                                const off =
+                                    method !== "totp" &&
+                                    !methods.includes(method as TwoFactorDeliveryMethod);
+                                return {
+                                    value: method,
+                                    label: `${TWO_FACTOR_METHOD_INFO[method].label}${off ? " - off" : ""}`,
+                                    disabled: off
+                                };
+                            })}
                         />
                     </label>
                 ) : null}

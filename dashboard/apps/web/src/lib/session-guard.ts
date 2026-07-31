@@ -58,6 +58,9 @@ export async function guardSession({
             where: { id: userId },
             select: {
                 bannedAt: true,
+                // The other way a sign-in proves itself. The approval gate stands
+                // in for a second factor rather than stacking on top of one.
+                twoFactorEnabled: true,
                 security: {
                     select: {
                         idleLockMinutes: true,
@@ -112,7 +115,8 @@ export async function guardSession({
                 sessionId,
                 ip,
                 country: decision.country,
-                requireApproval: settings?.requireLoginApproval === true
+                requireApproval:
+                    settings?.requireLoginApproval === true && record.twoFactorEnabled !== true
             });
             if (created.approval === "pending") return { ok: false, redirect: "/oauth/pending" };
             return ALLOWED;
@@ -152,6 +156,11 @@ export async function guardSession({
  * Record a newly seen session. It starts pending only when the user asked for
  * approvals AND there is another live, approved session that could grant one -
  * otherwise the requirement would strand them with no way in.
+ *
+ * An account with an authenticator armed is never held: the sign-in already
+ * answered a challenge, and asking a second session to allow it as well would
+ * gate one sign-in twice for one proof of identity. Which of the two an account
+ * uses is its own choice, made in Account > Security.
  *
  * A session that continues an approved one is exempt: better-auth replaces the
  * session when an authenticator is armed or removed, and the replacement is the
