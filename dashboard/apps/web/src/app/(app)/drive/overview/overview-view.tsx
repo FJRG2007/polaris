@@ -8,37 +8,75 @@
  * page, and each section links straight to that device's files.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { FolderOpen, HardDrive } from "lucide-react";
 import { Button, Card, CardBody, Skeleton } from "@polaris/ui";
+import { formatBytes, temperatureSuffix, toDisplayTemperature, type TemperatureUnit } from "@polaris/core";
 import type { UnasMetrics as UnasMetricsData } from "@/lib/unifi-unas";
-import { MetricsHistory, percent, ratioPercent, temp, type MetricSpec } from "@/components/metrics-history";
+import { useDisplayPreferences } from "@/components/display-format";
+import { MetricsHistory, percent, ratioPercent, type MetricSpec } from "@/components/metrics-history";
 import { HardwarePanel } from "../hardware-panel";
 import { UnasMetrics } from "../unas-metrics";
 import type { ConnectionSummary } from "../types";
 
-/** Charts for a rich UniFi UNAS device: CPU, temperature, memory, storage. */
-const UNAS_METRICS: MetricSpec[] = [
-    { key: "cpu", label: "CPU", value: (point) => point.cpuPercent, format: percent, tone: "primary", max: 100 },
-    { key: "temp", label: "CPU temperature", value: (point) => point.cpuTempC, format: temp, tone: "warning" },
-    { key: "mem", label: "Memory", value: (point) => ratioPercent(point.memUsedBytes, point.memTotalBytes), format: percent, tone: "success", max: 100 },
-    { key: "disk", label: "Storage", value: (point) => ratioPercent(point.diskUsedBytes, point.diskTotalBytes), format: percent, tone: "primary", max: 100 }
-];
+/** "6.7 GB / 16 GB", or nothing when the device reported neither side. */
+function amountOf(used: number | null, total: number | null): string | null {
+    if (used === null) return null;
+    return total === null ? formatBytes(used) : `${formatBytes(used)} / ${formatBytes(total)}`;
+}
+
+/** Charts for a rich UniFi UNAS device: CPU, temperature, memory, storage. The
+ *  temperature series is converted up front so the axis, not just the label,
+ *  is in the unit the reader chose. */
+function unasMetrics(unit: TemperatureUnit): MetricSpec[] {
+    return [
+        { key: "cpu", label: "CPU", value: (point) => point.cpuPercent, format: percent, tone: "primary", max: 100 },
+        {
+            key: "temp",
+            label: "CPU temperature",
+            value: (point) => (point.cpuTempC === null ? null : toDisplayTemperature(point.cpuTempC, unit)),
+            format: (value) => `${Math.round(value)} ${temperatureSuffix(unit)}`,
+            tone: "warning"
+        },
+        {
+            key: "mem",
+            label: "Memory",
+            value: (point) => ratioPercent(point.memUsedBytes, point.memTotalBytes),
+            describe: (point) => amountOf(point.memUsedBytes, point.memTotalBytes),
+            format: percent,
+            tone: "success",
+            max: 100
+        },
+        storageMetric
+    ];
+}
 
 /** Any other backend reports disk usage only. */
-const STORAGE_METRICS: MetricSpec[] = [
-    { key: "disk", label: "Storage", value: (point) => ratioPercent(point.diskUsedBytes, point.diskTotalBytes), format: percent, tone: "primary", max: 100 }
-];
+const storageMetric: MetricSpec = {
+    key: "disk",
+    label: "Storage",
+    value: (point) => ratioPercent(point.diskUsedBytes, point.diskTotalBytes),
+    describe: (point) => amountOf(point.diskUsedBytes, point.diskTotalBytes),
+    format: percent,
+    tone: "primary",
+    max: 100
+};
 
 /** Consumption history for a device, below its live panel. */
 function DeviceHistory({ connection }: { connection: ConnectionSummary }) {
+    const { temperature } = useDisplayPreferences();
+    const metrics = useMemo(
+        () => (connection.kind === "unifi-unas" ? unasMetrics(temperature) : [storageMetric]),
+        [connection.kind, temperature]
+    );
+
     return (
         <div>
             <h3 className="mb-1 text-sm font-medium">History</h3>
             <MetricsHistory
                 endpoint={`/api/drive/metrics-history?c=${encodeURIComponent(connection.id)}`}
-                metrics={connection.kind === "unifi-unas" ? UNAS_METRICS : STORAGE_METRICS}
+                metrics={metrics}
             />
         </div>
     );

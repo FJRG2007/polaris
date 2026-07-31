@@ -1,3 +1,5 @@
+"use client";
+
 /**
  * Lightweight, dependency-free chart primitives drawn with plain SVG - no
  * charting library, in keeping with a minimal bundle. RadialGauge shows a single
@@ -6,7 +8,7 @@
  * tokens so they theme automatically.
  */
 
-import { useId } from "react";
+import { useId, useMemo, useRef, useState, type PointerEvent } from "react";
 import { cn } from "../lib/cn.js";
 
 export type GaugeTone = "primary" | "success" | "warning" | "danger";
@@ -84,6 +86,9 @@ export function RadialGauge({
 export interface TimePoint {
     t: number;
     v: number | null;
+    /** What the value stands for in its own units, e.g. "6.7 GB / 16 GB" behind a
+     *  percentage. Shown in the hover readout when present. */
+    note?: string;
 }
 
 /**
@@ -91,6 +96,8 @@ export interface TimePoint {
  * stretched SVG (viewBox scaled to fill its box, strokes kept crisp with
  * non-scaling-stroke), while every label is HTML around it so text never
  * distorts. Nulls break the line into gaps rather than drawing through them.
+ * Pointing at the plot snaps a crosshair to the nearest sample and reads out its
+ * value and time.
  */
 export function TimeSeriesChart({
     points,
@@ -99,6 +106,7 @@ export function TimeSeriesChart({
     max,
     tone = "primary",
     format = (value) => String(Math.round(value)),
+    formatTime,
     summary = "last",
     label,
     height = 132,
@@ -113,6 +121,9 @@ export function TimeSeriesChart({
     tone?: GaugeTone;
     /** Formats the header value and the axis ceiling. */
     format?: (value: number) => string;
+    /** Formats the hovered point's stamp. Defaults to the browser's own clock;
+     *  pass one to honor a chosen date/time format. */
+    formatTime?: (at: number) => string;
     /** How the header number summarizes the window: the latest bucket ("last", the
      *  default, for a level like CPU), the total ("sum", for a count like requests),
      *  the mean ("avg", for a rate), or the peak ("max"). */
@@ -123,6 +134,8 @@ export function TimeSeriesChart({
 }) {
     const color = TONE_VAR[tone];
     const gradientId = useId();
+    const plotRef = useRef<HTMLDivElement>(null);
+    const [hoverIndex, setHoverIndex] = useState<number | null>(null);
     const width = 600;
     const span = Math.max(1, to - from);
     const present = points.filter((point): point is { t: number; v: number } => point.v != null);
@@ -167,6 +180,39 @@ export function TimeSeriesChart({
         return `M${start} ${height} ${segment.map((point) => `L${x(point.t).toFixed(1)} ${y(point.v).toFixed(1)}`).join(" ")} L${end} ${height} Z`;
     };
 
+    // Windows longer than a day need the day in the readout; shorter ones would
+    // only repeat the same date on every point.
+    const fallbackTime = useMemo(
+        () =>
+            new Intl.DateTimeFormat(undefined, {
+                ...(span > 36 * 3_600_000 ? { month: "short", day: "numeric" } : {}),
+                hour: "2-digit",
+                minute: "2-digit"
+            }),
+        [span]
+    );
+    const stamp = formatTime ?? ((at: number) => fallbackTime.format(at));
+
+    // Snap to the nearest sample so the readout is a measured value, never an
+    // interpolation of the line between two points.
+    function trackPointer(event: PointerEvent<HTMLDivElement>): void {
+        const rect = plotRef.current?.getBoundingClientRect();
+        if (!rect || rect.width === 0 || points.length === 0) return;
+        const ratio = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
+        const target = from + ratio * span;
+        let nearest = 0;
+        for (let index = 1; index < points.length; index += 1) {
+            if (Math.abs(points[index]!.t - target) < Math.abs(points[nearest]!.t - target)) nearest = index;
+        }
+        setHoverIndex(nearest);
+    }
+
+    const hovered = hoverIndex == null ? null : (points[hoverIndex] ?? null);
+    const hoverLeft = hovered ? Math.max(0, Math.min(100, ((hovered.t - from) / span) * 100)) : 0;
+    const hoverTop = hovered && hovered.v != null ? y(hovered.v) : null;
+    // Keep the readout inside the plot at both edges.
+    const readoutShift = hoverLeft < 22 ? "translateX(0)" : hoverLeft > 78 ? "translateX(-100%)" : "translateX(-50%)";
+
     return (
         <div className={cn("rounded-lg border border-border/60 p-3", className)}>
             <div className="flex items-baseline justify-between">
@@ -181,51 +227,91 @@ export function TimeSeriesChart({
                     No data in this range
                 </div>
             ) : (
-                <svg
-                    className="mt-2 w-full"
-                    width="100%"
-                    height={height}
-                    viewBox={`0 0 ${width} ${height}`}
-                    preserveAspectRatio="none"
-                    role="img"
-                    aria-label={label ?? "History"}
+                <div
+                    ref={plotRef}
+                    className="relative mt-2 touch-none"
+                    style={{ height }}
+                    onPointerMove={trackPointer}
+                    onPointerDown={trackPointer}
+                    onPointerLeave={() => setHoverIndex(null)}
+                    onPointerCancel={() => setHoverIndex(null)}
                 >
-                    <defs>
-                        <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor={color} stopOpacity={0.35} />
-                            <stop offset="100%" stopColor={color} stopOpacity={0} />
-                        </linearGradient>
-                    </defs>
-                    {[0.25, 0.5, 0.75].map((fraction) => (
-                        <line
-                            key={fraction}
-                            x1={0}
-                            x2={width}
-                            y1={height * fraction}
-                            y2={height * fraction}
-                            stroke="hsl(var(--border))"
-                            strokeWidth={1}
-                            strokeDasharray="3 4"
-                            vectorEffect="non-scaling-stroke"
-                            opacity={0.5}
-                        />
-                    ))}
-                    {runs.map((segment, index) => (
-                        <path key={`a${index}`} d={areaPath(segment)} fill={`url(#${gradientId})`} />
-                    ))}
-                    {runs.map((segment, index) => (
-                        <path
-                            key={`l${index}`}
-                            d={linePath(segment)}
-                            fill="none"
-                            stroke={color}
-                            strokeWidth={1.75}
-                            strokeLinejoin="round"
-                            strokeLinecap="round"
-                            vectorEffect="non-scaling-stroke"
-                        />
-                    ))}
-                </svg>
+                    <svg
+                        className="block w-full"
+                        width="100%"
+                        height={height}
+                        viewBox={`0 0 ${width} ${height}`}
+                        preserveAspectRatio="none"
+                        role="img"
+                        aria-label={label ?? "History"}
+                    >
+                        <defs>
+                            <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stopColor={color} stopOpacity={0.35} />
+                                <stop offset="100%" stopColor={color} stopOpacity={0} />
+                            </linearGradient>
+                        </defs>
+                        {[0.25, 0.5, 0.75].map((fraction) => (
+                            <line
+                                key={fraction}
+                                x1={0}
+                                x2={width}
+                                y1={height * fraction}
+                                y2={height * fraction}
+                                stroke="hsl(var(--border))"
+                                strokeWidth={1}
+                                strokeDasharray="3 4"
+                                vectorEffect="non-scaling-stroke"
+                                opacity={0.5}
+                            />
+                        ))}
+                        {runs.map((segment, index) => (
+                            <path key={`a${index}`} d={areaPath(segment)} fill={`url(#${gradientId})`} />
+                        ))}
+                        {runs.map((segment, index) => (
+                            <path
+                                key={`l${index}`}
+                                d={linePath(segment)}
+                                fill="none"
+                                stroke={color}
+                                strokeWidth={1.75}
+                                strokeLinejoin="round"
+                                strokeLinecap="round"
+                                vectorEffect="non-scaling-stroke"
+                            />
+                        ))}
+                    </svg>
+                    {hovered && (
+                        <div className="pointer-events-none absolute inset-0" aria-hidden>
+                            <div className="absolute inset-y-0 w-px bg-foreground/25" style={{ left: `${hoverLeft}%` }} />
+                            {hoverTop != null && (
+                                <div
+                                    className="absolute size-2.5 rounded-full border-2 bg-card"
+                                    style={{
+                                        left: `${hoverLeft}%`,
+                                        top: hoverTop,
+                                        borderColor: color,
+                                        transform: "translate(-50%, -50%)"
+                                    }}
+                                />
+                            )}
+                            <div
+                                className="absolute top-1 z-10 flex flex-col whitespace-nowrap rounded-md border border-border bg-card px-2 py-1 text-xs shadow-lg"
+                                style={{ left: `${hoverLeft}%`, transform: readoutShift }}
+                            >
+                                <span className="flex items-baseline gap-2">
+                                    <span className="font-medium text-foreground">
+                                        {hovered.v != null ? format(hovered.v) : "No data"}
+                                    </span>
+                                    <span className="text-muted-foreground">{stamp(hovered.t)}</span>
+                                </span>
+                                {hovered.note ? (
+                                    <span className="text-muted-foreground">{hovered.note}</span>
+                                ) : null}
+                            </div>
+                        </div>
+                    )}
+                </div>
             )}
         </div>
     );

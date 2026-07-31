@@ -47,11 +47,12 @@ import {
     Switch,
     cn
 } from "@polaris/ui";
-import { isTunnelHostname } from "@polaris/core";
+import { isTunnelHostname, type DisplayFormat } from "@polaris/core";
 import { CloudflareMark, NgrokMark } from "@/components/brand-icons";
+import { useDisplayFormat } from "@/components/display-format";
 import { ServiceIcon, StatusPill, dbTone, serviceKindOf, type ProjectApp } from "./deploy-view";
 import { isLocalDomain, primaryDomain } from "./domain-rank";
-import { MetricsHistory, percent, type MetricSpec } from "@/components/metrics-history";
+import { MetricsHistory, percent, ratioPercent, type MetricSpec } from "@/components/metrics-history";
 import { LogViewer } from "@/components/log-viewer";
 import type { HttpLogEntry } from "@polaris/deploy";
 import { TerminalPanel } from "./terminal-panel";
@@ -134,13 +135,13 @@ export function ServiceDetail({ app, onChanged, onClose }: { app: ProjectApp; on
 
 type DepSummary = Awaited<ReturnType<typeof deployActions.listDeploymentsAction>>[number];
 
-function relativeTime(iso: string): string {
+function relativeTime(iso: string, format: DisplayFormat): string {
     const minutes = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
     if (minutes < 1) return "just now";
     if (minutes < 60) return `${minutes}m ago`;
     if (minutes < 1440) return `${Math.floor(minutes / 60)}h ago`;
     if (minutes < 10080) return `${Math.floor(minutes / 1440)}d ago`;
-    return new Date(iso).toLocaleDateString();
+    return format.date(iso);
 }
 
 function depBadge(deployment: DepSummary): { label: string; cls: string } {
@@ -184,9 +185,9 @@ function DeployAvatar({ app, deployment }: { app: ProjectApp; deployment?: DepSu
 }
 
 /** Deployment subtitle: relative time, optional author, and the source. */
-function deploySubtitle(deployment: DepSummary, app: ProjectApp): string {
+function deploySubtitle(deployment: DepSummary, app: ProjectApp, format: DisplayFormat): string {
     const by = deployment.authorName ? ` by ${deployment.authorName}` : "";
-    return `${relativeTime(deployment.createdAt)}${by} via ${sourceLabel(app)}`;
+    return `${relativeTime(deployment.createdAt, format)}${by} via ${sourceLabel(app)}`;
 }
 
 /** The address one kept version answers on, beside the service's own. Only a
@@ -273,6 +274,7 @@ function DeploymentMenu({
 }
 
 function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => void }) {
+    const format = useDisplayFormat();
     const [items, setItems] = useState<DepSummary[] | null>(null);
     const [logsFor, setLogsFor] = useState<string | null>(null);
     const [historyOpen, setHistoryOpen] = useState(true);
@@ -389,7 +391,7 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
                                 <DeployAvatar app={app} deployment={active} />
                                 <div className="min-w-0 flex-1">
                                     <p className="truncate text-sm font-medium text-foreground">{depTitle(active)}</p>
-                                    <p className="truncate text-xs text-muted-foreground">{deploySubtitle(active, app)}</p>
+                                    <p className="truncate text-xs text-muted-foreground">{deploySubtitle(active, app, format)}</p>
                                 </div>
                                 <Button
                                     variant="outline"
@@ -423,7 +425,7 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
                                         "Manual deploy"
                                     )}
                                     {" - "}
-                                    {new Date(active.createdAt).toLocaleString()}
+                                    {format.dateTime(active.createdAt)}
                                 </div>
                             )}
                         </div>
@@ -461,7 +463,7 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
                                                 <DeployAvatar app={app} deployment={deployment} />
                                                 <div className="min-w-0 flex-1">
                                                     <p className="truncate font-medium text-foreground">{depTitle(deployment)}</p>
-                                                    <p className="truncate text-xs text-muted-foreground">{deploySubtitle(deployment, app)}</p>
+                                                    <p className="truncate text-xs text-muted-foreground">{deploySubtitle(deployment, app, format)}</p>
                                                 </div>
                                                 <ReleaseLink deployment={deployment} />
                                                 <DeploymentMenu app={app} deployment={deployment} onAct={reload} onChanged={onChanged} />
@@ -492,6 +494,7 @@ function DeploymentLogsView({
     onDone: () => void;
 }) {
     const CATS = ["Details", "Build Logs", "Deploy Logs", "HTTP Logs", "Network Flow Logs"] as const;
+    const format = useDisplayFormat();
     const [cat, setCat] = useState<(typeof CATS)[number]>("Deploy Logs");
     const badge = deployment ? depBadge(deployment) : null;
 
@@ -516,7 +519,7 @@ function DeploymentLogsView({
                 )}
                 {badge && <span className={`shrink-0 rounded px-2 py-0.5 text-xs font-medium ${badge.cls}`}>{badge.label}</span>}
                 {deployment && (
-                    <span className="ml-auto text-xs text-muted-foreground">{new Date(deployment.createdAt).toLocaleString()}</span>
+                    <span className="ml-auto text-xs text-muted-foreground">{format.dateTime(deployment.createdAt)}</span>
                 )}
             </div>
 
@@ -553,11 +556,12 @@ function DeploymentLogsView({
 }
 
 function DetailsPanel({ app, deployment }: { app: ProjectApp; deployment: DepSummary | null }) {
+    const format = useDisplayFormat();
     const rows: Array<[string, ReactNode]> = [
         ["Status", deployment?.status ?? "-"],
         ["Commit", deployment?.commitSha ? deployment.commitSha.slice(0, 12) : "-"],
         ["Message", deployment?.commitMessage ?? "-"],
-        ["Started", deployment ? new Date(deployment.createdAt).toLocaleString() : "-"],
+        ["Started", deployment ? format.dateTime(deployment.createdAt) : "-"],
         ["Domain", (primaryDomain(app.domains) ?? app.domains[0])?.hostname ?? "-"]
     ];
     return (
@@ -709,6 +713,7 @@ const HTTP_PAGE = 100;
  * infinite-scroll window so a large log renders only what is on screen.
  */
 function HttpLogsView({ appId, deploymentStart }: { appId: string; deploymentStart: string | null }) {
+    const format = useDisplayFormat();
     const [entries, setEntries] = useState<HttpLogEntry[] | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [search, setSearch] = useState("");
@@ -919,7 +924,7 @@ function HttpLogsView({ appId, deploymentStart }: { appId: string; deploymentSta
                     <div className="flex h-40 flex-col items-center justify-center gap-2 text-center text-sm text-muted-foreground">
                         <p>
                             No requests since this deployment started
-                            {deploymentStart ? ` (${new Date(deploymentStart).toLocaleString()})` : ""}.
+                            {deploymentStart ? ` (${format.dateTime(deploymentStart)})` : ""}.
                         </p>
                         <p className="text-xs">
                             {all.length} earlier request{all.length === 1 ? "" : "s"} in the log.
@@ -954,7 +959,7 @@ function HttpLogsView({ appId, deploymentStart }: { appId: string; deploymentSta
                             {shown.map((entry, index) => (
                                 <tr key={index} className="hover:bg-muted/40">
                                     <td className="whitespace-nowrap px-3 py-1.5 text-muted-foreground" title={entry.time ?? undefined}>
-                                        {entry.time ? new Date(entry.time).toLocaleTimeString() : "-"}
+                                        {entry.time ? format.time(entry.time, { seconds: true }) : "-"}
                                     </td>
                                     <td className="px-3 py-1.5 font-mono">{entry.method}</td>
                                     <td className="px-3 py-1.5">
@@ -1224,11 +1229,10 @@ function MetricsTab({ applicationId }: { applicationId: string }) {
                 <Loading />
             ) : data?.state ? (
                 <div className="grid gap-3 sm:grid-cols-2">
-                    <Meter label="CPU" value={data.cpuPercent} unit="%" />
+                    <Meter label="CPU" value={data.cpuPercent} />
                     <Meter
                         label="Memory"
                         value={data.memPercent}
-                        unit="%"
                         text={
                             typeof data.memUsedBytes === "number"
                                 ? `${formatBytes(data.memUsedBytes)}${typeof data.memTotalBytes === "number" ? ` / ${formatBytes(data.memTotalBytes)}` : ""}`
@@ -1263,6 +1267,14 @@ const DEPLOY_METRICS: MetricSpec[] = [
         key: "mem",
         label: "Memory",
         value: (point) => point.memUsedBytes,
+        // The absolute figure is the honest one here, but "of 16 GB" is what makes
+        // it mean anything.
+        describe: (point) => {
+            const share = ratioPercent(point.memUsedBytes, point.memTotalBytes);
+            return share === null || point.memTotalBytes === null
+                ? null
+                : `${percent(share)} of ${formatBytes(point.memTotalBytes)}`;
+        },
         format: formatBytes,
         tone: "success"
     }
@@ -1297,25 +1309,33 @@ const HTTP_METRICS: MetricSpec<HttpPoint>[] = [
     { key: "net", label: "Public network traffic", value: (point) => point.bytesPerSec, format: formatRate, tone: "success", summary: "avg" }
 ];
 
+/**
+ * A percentage with the reading behind it. A container's memory is a sliver of
+ * host RAM, so rounding the percentage to a whole number printed "0%" for a
+ * service that was very much running - the percentage keeps its digits, and the
+ * absolute figure sits beside it.
+ */
 function Meter({
     label,
     value,
-    unit,
     text
 }: {
     label: string;
     value: number | null | undefined;
-    unit: string;
-    /** Overrides the displayed value text (e.g. absolute memory); the bar still uses value. */
+    /** The same reading in its own units (e.g. absolute memory), shown beside the
+     *  percentage. The bar always uses value. */
     text?: string;
 }) {
     const pct = typeof value === "number" ? Math.max(0, Math.min(100, value)) : 0;
-    const display = text ?? (typeof value === "number" ? `${value.toFixed(0)}${unit}` : "-");
+    const display = typeof value === "number" ? percent(value) : "-";
     return (
         <div className="rounded-lg border border-border/60 p-4">
-            <div className="flex items-center justify-between text-sm">
+            <div className="flex items-center justify-between gap-2 text-sm">
                 <span className="font-medium">{label}</span>
-                <span className="text-muted-foreground">{display}</span>
+                <span className="text-muted-foreground">
+                    {display}
+                    {text ? <span className="ml-2 text-xs">{text}</span> : null}
+                </span>
             </div>
             <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted">
                 <div className="h-full rounded-full bg-primary" style={{ width: `${pct}%` }} />

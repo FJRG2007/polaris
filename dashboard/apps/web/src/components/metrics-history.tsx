@@ -10,6 +10,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { Button, TimeSeriesChart, cn, type GaugeTone, type TimePoint } from "@polaris/ui";
+import { useDisplayFormat } from "@/components/display-format";
 import { RANGE_ORDER, RANGE_PRESETS, type RangePreset } from "@/lib/metrics-shared";
 
 /** One series returned by the history endpoint. Percentages are derived here. */
@@ -32,6 +33,9 @@ export interface MetricSpec<T = Point> {
     value: (point: T) => number | null;
     format: (value: number) => string;
     tone?: GaugeTone;
+    /** The same reading in its own units, shown beside a percentage on hover, e.g.
+     *  "6.7 GB / 16 GB" - a percentage alone hides how much that actually is. */
+    describe?: (point: T) => string | null;
     /** Fixed Y ceiling (e.g. 100 for a percentage). */
     max?: number;
     /** How the header number summarizes the window (default "last"): "sum" for a
@@ -60,6 +64,7 @@ export function MetricsHistory<T extends { t: number } = Point>({
     endpoint: string;
     metrics: MetricSpec<T>[];
 }) {
+    const display = useDisplayFormat();
     const [window, setWindow] = useState<Window>({ kind: "preset", preset: "1d" });
     const [customOpen, setCustomOpen] = useState(false);
     const [customFrom, setCustomFrom] = useState(() => toLocalInput(Date.now() - 24 * 3_600_000));
@@ -94,6 +99,14 @@ export function MetricsHistory<T extends { t: number } = Point>({
             setWindow({ kind: "custom", from: fromMs, to: toMs });
         }
     }
+
+    // The hovered point's stamp: on a window longer than a day the time alone
+    // would not say which day it belongs to.
+    const stampOf = useCallback(
+        (at: number): string =>
+            to - from > 36 * 3_600_000 ? `${display.date(at)} ${display.time(at)}` : display.time(at),
+        [display, from, to]
+    );
 
     return (
         <div className="flex flex-col gap-3 py-2">
@@ -166,12 +179,17 @@ export function MetricsHistory<T extends { t: number } = Point>({
                     <TimeSeriesChart
                         key={metric.key}
                         label={metric.label}
-                        points={(points ?? []).map<TimePoint>((point) => ({ t: point.t, v: metric.value(point) }))}
+                        points={(points ?? []).map<TimePoint>((point) => ({
+                            t: point.t,
+                            v: metric.value(point),
+                            note: metric.describe?.(point) ?? undefined
+                        }))}
                         from={from}
                         to={to}
                         max={metric.max}
                         tone={metric.tone}
                         format={metric.format}
+                        formatTime={stampOf}
                         summary={metric.summary}
                     />
                 ))}
@@ -180,9 +198,19 @@ export function MetricsHistory<T extends { t: number } = Point>({
     );
 }
 
-/** Value/format helpers so callers stay declarative. */
-export const percent = (value: number): string => `${Math.round(value)}%`;
-export const temp = (value: number): string => `${Math.round(value)} C`;
+/**
+ * A percentage as it should read at any magnitude. Rounding to whole numbers
+ * turned a container using a sliver of host memory into a flat "0%", which reads
+ * as "nothing running" rather than "not much" - so anything under 10% keeps the
+ * digits that make it a number, and a non-zero value never renders as zero.
+ */
+export function percent(value: number): string {
+    if (!Number.isFinite(value) || value <= 0) return "0%";
+    if (value < 0.01) return "<0.01%";
+    if (value < 1) return `${value.toFixed(2)}%`;
+    if (value < 10) return `${value.toFixed(1)}%`;
+    return `${Math.round(value)}%`;
+}
 
 /** Percentage of used/total, or null when either side is missing. */
 export function ratioPercent(used: number | null, total: number | null): number | null {
