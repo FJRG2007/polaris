@@ -10,6 +10,7 @@
 
 import { useId, useMemo, useRef, useState, type PointerEvent } from "react";
 import { cn } from "../lib/cn.js";
+import { summarizeSeries, type SeriesSummary } from "../lib/series-summary.js";
 
 export type GaugeTone = "primary" | "success" | "warning" | "danger";
 
@@ -127,7 +128,7 @@ export function TimeSeriesChart({
     /** How the header number summarizes the window: the latest bucket ("last", the
      *  default, for a level like CPU), the total ("sum", for a count like requests),
      *  the mean ("avg", for a rate), or the peak ("max"). */
-    summary?: "last" | "sum" | "avg" | "max";
+    summary?: SeriesSummary;
     label?: string;
     height?: number;
     className?: string;
@@ -141,19 +142,13 @@ export function TimeSeriesChart({
     const present = points.filter((point): point is { t: number; v: number } => point.v != null);
     const dataMax = present.reduce((peak, point) => Math.max(peak, point.v), 0);
     const yMax = max ?? Math.max(1, dataMax * 1.15);
-    // The header number: a trailing empty bucket (e.g. no requests in the last minutes)
-    // must not read as the window's value, so a count sums and a rate averages instead
-    // of taking the last bucket.
-    const headerValue =
-        present.length === 0
-            ? null
-            : summary === "sum"
-              ? present.reduce((total, point) => total + point.v, 0)
-              : summary === "avg"
-                ? present.reduce((total, point) => total + point.v, 0) / present.length
-                : summary === "max"
-                  ? present.reduce((peak, point) => Math.max(peak, point.v), present[0]!.v)
-                  : present[present.length - 1]!.v;
+    // The header numbers: the headline per the chosen summary (a trailing empty
+    // bucket must not read as the window's value, so a count sums and a rate
+    // averages), plus the window's mean and peak beside it.
+    const { headline: headerValue, stats } = summarizeSeries(
+        present.map((point) => point.v),
+        summary
+    );
 
     const x = (t: number): number => ((t - from) / span) * width;
     const y = (v: number): number => height - Math.max(0, Math.min(1, v / yMax)) * height;
@@ -215,9 +210,18 @@ export function TimeSeriesChart({
 
     return (
         <div className={cn("rounded-lg border border-border/60 p-3", className)}>
-            <div className="flex items-baseline justify-between">
+            <div className="flex items-baseline justify-between gap-2">
                 {label ? <span className="text-sm font-medium">{label}</span> : <span />}
-                <span className="text-sm text-muted-foreground">{headerValue != null ? format(headerValue) : "-"}</span>
+                <span className="flex items-baseline gap-2">
+                    {stats.map((stat) => (
+                        <span key={stat.label} className="text-xs text-muted-foreground/70">
+                            {stat.label} {format(stat.value)}
+                        </span>
+                    ))}
+                    <span className="text-sm text-muted-foreground">
+                        {headerValue != null ? format(headerValue) : "-"}
+                    </span>
+                </span>
             </div>
             {present.length === 0 ? (
                 <div

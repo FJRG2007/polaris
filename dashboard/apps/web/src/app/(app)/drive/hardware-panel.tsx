@@ -6,10 +6,10 @@
  * connections render their richer device dashboard instead (see UnasMetrics).
  */
 
-import { useEffect, useState } from "react";
 import { Database, HardDrive } from "lucide-react";
 import { formatBytes } from "@polaris/core";
 import { Badge, Card, CardBody, CardHeader, CardTitle, RadialGauge, Skeleton } from "@polaris/ui";
+import { useLiveResource } from "@/components/use-live-resource";
 import type { ConnectionSummary } from "./types";
 
 const KIND_LABELS: Record<string, string> = {
@@ -31,29 +31,18 @@ interface Usage {
     free: string | null;
 }
 
-export function HardwarePanel({ connection }: { connection: ConnectionSummary }) {
-    const [usage, setUsage] = useState<Usage | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+/** How often usage is re-read. Disk usage moves slowly, so this is gentle. */
+const USAGE_POLL_MS = 60_000;
 
-    useEffect(() => {
-        const controller = new AbortController();
-        setLoading(true);
-        setError(null);
-        fetch(`/api/drive/usage?c=${encodeURIComponent(connection.id)}`, { signal: controller.signal })
-            .then(async (res) => {
-                const body = await res.json();
-                if (!res.ok) throw new Error(body.error ?? "Unable to read usage");
-                setUsage(body as Usage);
-            })
-            .catch((caught) => {
-                if (!controller.signal.aborted) setError(caught instanceof Error ? caught.message : "Unable to read usage");
-            })
-            .finally(() => {
-                if (!controller.signal.aborted) setLoading(false);
-            });
-        return () => controller.abort();
-    }, [connection.id]);
+export function HardwarePanel({ connection }: { connection: ConnectionSummary }) {
+    // Seeded from the last snapshot so revisiting the page paints the gauge at
+    // once, then kept current without a reload.
+    const { data: usage, loading, error } = useLiveResource<Usage>({
+        url: `/api/drive/usage?c=${encodeURIComponent(connection.id)}`,
+        cacheKey: `usage.${connection.id}`,
+        intervalMs: USAGE_POLL_MS,
+        select: (body) => body as Usage
+    });
 
     const total = usage?.total ? Number(usage.total) : 0;
     const used = usage?.used ? Number(usage.used) : 0;

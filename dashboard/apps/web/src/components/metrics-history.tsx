@@ -11,7 +11,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { Button, TimeSeriesChart, cn, type GaugeTone, type TimePoint } from "@polaris/ui";
 import { useDisplayFormat } from "@/components/display-format";
-import { RANGE_ORDER, RANGE_PRESETS, type RangePreset } from "@/lib/metrics-shared";
+import { LIVE_INTERVAL_MS, RANGE_ORDER, RANGE_PRESETS, type RangePreset } from "@/lib/metrics-shared";
 
 /** One series returned by the history endpoint. Percentages are derived here. */
 interface Point {
@@ -71,26 +71,81 @@ export function MetricsHistory<T extends { t: number } = Point>({
     const [customTo, setCustomTo] = useState(() => toLocalInput(Date.now()));
     const [points, setPoints] = useState<T[] | null>(null);
     const [loading, setLoading] = useState(true);
+    // When the shown data was fetched. A preset window is relative to "now", so
+    // it has to move with each refresh - otherwise the points keep arriving while
+    // the X axis stays where it was and the newest ones fall off the right edge.
+    const [fetchedAt, setFetchedAt] = useState(() => Date.now());
 
     const { from, to } = useMemo(() => {
         if (window.kind === "custom") return { from: window.from, to: window.to };
-        const now = Date.now();
-        return { from: now - RANGE_PRESETS[window.preset], to: now };
-    }, [window]);
+        return { from: fetchedAt - RANGE_PRESETS[window.preset], to: fetchedAt };
+    }, [window, fetchedAt]);
 
-    const load = useCallback(() => {
-        setLoading(true);
-        const separator = endpoint.includes("?") ? "&" : "?";
-        const controller = new AbortController();
-        void fetch(`${endpoint}${separator}${queryFor(window)}`, { cache: "no-store", signal: controller.signal })
-            .then((res) => (res.ok ? res.json() : null))
-            .then((body) => setPoints(body?.points ?? []))
-            .catch(() => undefined)
-            .finally(() => setLoading(false));
-        return () => controller.abort();
-    }, [endpoint, window]);
+    /** One fetch. `quiet` refreshes in place: a periodic tick must not blank the
+     *  charts into a loading state every time it runs. */
+    const load = useCallback(
+        (quiet = false) => {
+            if (!quiet) setLoading(true);
+            const separator = endpoint.includes("?") ? "&" : "?";
+            const controller = new AbortController();
+            const at = Date.now();
+            void fetch(`${endpoint}${separator}${queryFor(window)}`, { cache: "no-store", signal: controller.signal })
+                .then((res) => (res.ok ? res.json() : null))
+                .then((body) => {
+                    setPoints(body?.points ?? []);
+                    setFetchedAt(at);
+                })
+                .catch(() => undefined)
+                .finally(() => {
+                    if (!quiet) setLoading(false);
+                });
+            return () => controller.abort();
+        },
+        [endpoint, window]
+    );
 
     useEffect(() => load(), [load]);
+
+    /**
+     * Keep the window current without a reload. A live window is re-fetched on a
+     * cadence proportional to its own resolution - a 30-day chart gains nothing
+     * from a poll every 15 seconds - and a custom window pinned to the past is
+     * not polled at all, because it cannot change.
+     *
+     * Polling stops while the tab is hidden and catches up on return, so a
+     * dashboard left open overnight is not still asking every 15 seconds.
+     */
+    useEffect(() => {
+        if (window.kind === "custom") return;
+        const every = LIVE_INTERVAL_MS[window.preset];
+        if (!every) return;
+
+        let timer: ReturnType<typeof setInterval> | null = null;
+        const start = (): void => {
+            if (timer === null) timer = setInterval(() => load(true), every);
+        };
+        const stop = (): void => {
+            if (timer !== null) {
+                clearInterval(timer);
+                timer = null;
+            }
+        };
+        const onVisibility = (): void => {
+            if (document.visibilityState === "visible") {
+                load(true);
+                start();
+            } else {
+                stop();
+            }
+        };
+
+        if (document.visibilityState === "visible") start();
+        document.addEventListener("visibilitychange", onVisibility);
+        return () => {
+            stop();
+            document.removeEventListener("visibilitychange", onVisibility);
+        };
+    }, [window, load]);
 
     function applyCustom() {
         const fromMs = new Date(customFrom).getTime();

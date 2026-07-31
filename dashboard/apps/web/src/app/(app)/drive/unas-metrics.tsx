@@ -8,7 +8,7 @@
  */
 
 import type { ReactNode } from "react";
-import { HardDrive, MemoryStick, TriangleAlert } from "lucide-react";
+import { Clock, HardDrive, RefreshCw, TriangleAlert } from "lucide-react";
 import { formatBytes } from "@polaris/core";
 import { Badge, Card, CardBody, CardHeader, CardTitle, RadialGauge, type GaugeTone } from "@polaris/ui";
 import type { UnasMetrics as UnasMetricsData } from "@/lib/unifi-unas";
@@ -31,13 +31,36 @@ function formatUptime(seconds: number): string {
     return `${minutes}m`;
 }
 
-export function UnasMetrics({ metrics }: { metrics: UnasMetricsData }) {
+export function UnasMetrics({
+    metrics,
+    refreshing = false,
+    updatedAt = null,
+    stale = null
+}: {
+    metrics: UnasMetricsData;
+    /** A reading is in flight over the one on screen. */
+    refreshing?: boolean;
+    /** When this reading arrived, or null while it is still the cached one. */
+    updatedAt?: number | null;
+    /** Why these readings stopped updating, when the device stopped answering. */
+    stale?: string | null;
+}) {
     const format = useDisplayFormat();
-    const usedPct = metrics.totalBytes > 0 ? Math.round((metrics.usedBytes / metrics.totalBytes) * 100) : 0;
     const atRisk = metrics.health !== "healthy";
 
     return (
         <div className="flex flex-col gap-4">
+            {/* These readings are the last ones that arrived, so say so rather
+                than letting a device that went offline keep looking healthy. */}
+            {stale ? (
+                <div className="flex items-start gap-2 rounded-md border border-warning/40 bg-warning/10 p-3 text-sm text-warning">
+                    <TriangleAlert className="mt-0.5 size-4 shrink-0" />
+                    <span>
+                        Showing the last reading{updatedAt !== null ? ` from ${format.time(updatedAt)}` : ""}. {stale}
+                    </span>
+                </div>
+            ) : null}
+
             {atRisk ? (
                 <div className="flex items-start gap-2 rounded-md border border-warning/40 bg-warning/10 p-3 text-sm text-warning">
                     <TriangleAlert className="mt-0.5 size-4 shrink-0" />
@@ -48,14 +71,12 @@ export function UnasMetrics({ metrics }: { metrics: UnasMetricsData }) {
                 </div>
             ) : null}
 
+            {/* Storage totals are the pool section's job and memory is the memory
+                chart's, so neither is repeated here. What is left is what nothing
+                else shows: the two live readings, how full the bays are, and how
+                long the box has been up. */}
             <Card>
-                <CardBody className="grid grid-cols-3 gap-2 py-5">
-                    <RadialGauge
-                        value={usedPct / 100}
-                        label={`${usedPct}%`}
-                        sublabel="Storage used"
-                        tone={ratioTone(usedPct / 100)}
-                    />
+                <CardBody className="grid grid-cols-2 gap-2 py-5">
                     <RadialGauge
                         value={metrics.system.cpuLoad ?? 0}
                         label={metrics.system.cpuLoad !== null ? `${Math.round(metrics.system.cpuLoad * 100)}%` : "-"}
@@ -74,15 +95,15 @@ export function UnasMetrics({ metrics }: { metrics: UnasMetricsData }) {
             <div className="grid grid-cols-2 gap-3">
                 <Stat
                     icon={<HardDrive className="size-4" />}
-                    label="Slots"
+                    label="Bays in use"
                     value={`${metrics.slotsPopulated} / ${metrics.slotsTotal}`}
-                    hint={`${formatBytes(metrics.usedBytes)} / ${formatBytes(metrics.totalBytes)}`}
+                    hint={`${metrics.slotsTotal - metrics.slotsPopulated} free`}
                 />
                 <Stat
-                    icon={<MemoryStick className="size-4" />}
-                    label="Memory"
-                    value={`${formatBytes(metrics.system.memoryUsedBytes)} / ${formatBytes(metrics.system.memoryTotalBytes)}`}
-                    hint={`up ${formatUptime(metrics.system.uptimeSeconds)}`}
+                    icon={<Clock className="size-4" />}
+                    label="Uptime"
+                    value={formatUptime(metrics.system.uptimeSeconds)}
+                    hint={`since ${format.dateTime(Date.now() - metrics.system.uptimeSeconds * 1000)}`}
                 />
             </div>
 
@@ -168,9 +189,16 @@ export function UnasMetrics({ metrics }: { metrics: UnasMetricsData }) {
                 </CardBody>
             </Card>
 
-            <p className="text-xs text-muted-foreground">
-                {metrics.system.name} - {metrics.system.model}
-                {metrics.system.firmware ? ` - firmware ${metrics.system.firmware}` : ""}
+            <p className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                <span>
+                    {metrics.system.name} - {metrics.system.model}
+                    {metrics.system.firmware ? ` - firmware ${metrics.system.firmware}` : ""}
+                </span>
+                {refreshing ? (
+                    <RefreshCw className="size-3 animate-spin" aria-label="Refreshing" />
+                ) : updatedAt !== null ? (
+                    <span>- updated {format.time(updatedAt)}</span>
+                ) : null}
             </p>
         </div>
     );

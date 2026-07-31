@@ -56,6 +56,22 @@ export type RangePreset = keyof typeof RANGE_PRESETS;
 export const RANGE_ORDER: RangePreset[] = ["1h", "6h", "1d", "7d", "30d"];
 
 /**
+ * How often a live chart re-fetches its window, per range.
+ *
+ * Paced against the collection cadence above rather than against how fresh it
+ * would be nice to look: nothing new exists until the collector runs, so a
+ * faster poll would only cost queries to redraw identical points. The wide
+ * ranges read hourly rollups, which is why they back off so far.
+ */
+export const LIVE_INTERVAL_MS: Record<RangePreset, number> = {
+    "1h": 30_000,
+    "6h": 60_000,
+    "1d": 2 * 60_000,
+    "7d": 5 * 60_000,
+    "30d": 15 * 60_000
+};
+
+/**
  * Resolve a requested window from query params: an explicit from/to (epoch ms,
  * custom range) wins when valid, otherwise a named preset (defaulting to 1d).
  * The window is clamped to the rollup retention so a custom range can never ask

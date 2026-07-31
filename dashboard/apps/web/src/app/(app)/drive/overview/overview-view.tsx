@@ -8,17 +8,22 @@
  * page, and each section links straight to that device's files.
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import Link from "next/link";
 import { FolderOpen, HardDrive } from "lucide-react";
 import { Button, Card, CardBody, Skeleton } from "@polaris/ui";
 import { formatBytes, temperatureSuffix, toDisplayTemperature, type TemperatureUnit } from "@polaris/core";
 import type { UnasMetrics as UnasMetricsData } from "@/lib/unifi-unas";
 import { useDisplayPreferences } from "@/components/display-format";
+import { useLiveResource } from "@/components/use-live-resource";
 import { MetricsHistory, percent, ratioPercent, type MetricSpec } from "@/components/metrics-history";
 import { HardwarePanel } from "../hardware-panel";
 import { UnasMetrics } from "../unas-metrics";
 import type { ConnectionSummary } from "../types";
+
+/** How often the live panel re-reads the device. Matched to the collector's own
+ *  storage cadence: asking faster only re-renders the same numbers. */
+const UNAS_POLL_MS = 30_000;
 
 /** "6.7 GB / 16 GB", or nothing when the device reported neither side. */
 function amountOf(used: number | null, total: number | null): string | null {
@@ -82,31 +87,18 @@ function DeviceHistory({ connection }: { connection: ConnectionSummary }) {
     );
 }
 
+/**
+ * The device's live panel. Seeded from the last snapshot so a revisit paints at
+ * once, then kept current on its own: a NAS reports the same seven bays and the
+ * same firmware every time, so only the readings that actually moved re-render.
+ */
 function UnasSection({ connection }: { connection: ConnectionSummary }) {
-    const [metrics, setMetrics] = useState<UnasMetricsData | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-
-    useEffect(() => {
-        const controller = new AbortController();
-        setLoading(true);
-        setError(null);
-        fetch(`/api/drive/unas-metrics?c=${encodeURIComponent(connection.id)}`, { signal: controller.signal })
-            .then(async (res) => {
-                const body = await res.json();
-                if (!res.ok) throw new Error(body.error ?? "Unable to reach the device");
-                setMetrics(body.metrics as UnasMetricsData);
-            })
-            .catch((caught) => {
-                if (!controller.signal.aborted) {
-                    setError(caught instanceof Error ? caught.message : "Unable to reach the device");
-                }
-            })
-            .finally(() => {
-                if (!controller.signal.aborted) setLoading(false);
-            });
-        return () => controller.abort();
-    }, [connection.id]);
+    const { data, loading, error, stale, refreshing, updatedAt } = useLiveResource<UnasMetricsData>({
+        url: `/api/drive/unas-metrics?c=${encodeURIComponent(connection.id)}`,
+        cacheKey: `unas.${connection.id}`,
+        intervalMs: UNAS_POLL_MS,
+        select: (body) => (body as { metrics: UnasMetricsData }).metrics
+    });
 
     if (loading) {
         return (
@@ -125,7 +117,9 @@ function UnasSection({ connection }: { connection: ConnectionSummary }) {
             <div className="rounded-md border border-danger/40 bg-danger/10 p-3 text-sm text-danger">{error}</div>
         );
     }
-    return metrics ? <UnasMetrics metrics={metrics} /> : null;
+    return data ? (
+        <UnasMetrics metrics={data} refreshing={refreshing} updatedAt={updatedAt} stale={stale} />
+    ) : null;
 }
 
 export function OverviewView({ connections }: { connections: ConnectionSummary[] }) {

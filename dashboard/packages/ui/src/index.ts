@@ -27,6 +27,7 @@ export {
     type SelectProps
 } from "./components/select.js";
 export { RadialGauge, TimeSeriesChart, type GaugeTone, type TimePoint } from "./components/charts.js";
+export { summarizeSeries, type SeriesStats, type SeriesSummary } from "./lib/series-summary.js";
 export * from "./components/dropdown-menu.js";
 export * from "./components/context-menu.js";
 export * from "./components/dialog.js";
