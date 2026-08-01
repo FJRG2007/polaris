@@ -16,17 +16,23 @@ export const dynamic = "force-dynamic";
 
 export default async function IntegrationsPage() {
     await requireAdmin();
-    const states = await listIntegrationStates();
-    const github = await getGithubStatus();
+    // Three of these reach outside the box (GitHub twice, Cloudflare once), so
+    // they are awaited together rather than one after another - in sequence the
+    // page took as long as all of them added up.
+    const [states, github, domains, cloudflare] = await Promise.all([
+        listIntegrationStates(),
+        getGithubStatus(),
+        // DuckDNS config lives with the domain settings (Setting keys), not an Integration row.
+        getDomainConfig(),
+        // Cloudflare's API tokens (DNS records and named tunnels) are separate from the
+        // marketplace connector token that runs the server-wide tunnel.
+        getCloudflareAccountStatus()
+    ]);
     // Whether that connection can also register self-hosted runners. Neither
     // method asks for the permission by default, so this is where the operator
-    // finds out - before provisioning a machine, not after.
+    // finds out - before provisioning a machine, not after. It needs the status
+    // above, so it is the one call that cannot join the batch.
     const runners = github.connected ? await getRunnerAccess() : null;
-    // DuckDNS config lives with the domain settings (Setting keys), not an Integration row.
-    const domains = await getDomainConfig();
-    // Cloudflare's API tokens (DNS records and named tunnels) are separate from the
-    // marketplace connector token that runs the server-wide tunnel.
-    const cloudflare = await getCloudflareAccountStatus();
 
     const cards: IntegrationCard[] = INTEGRATIONS.map((entry) => {
         const state = states.get(entry.slug);
