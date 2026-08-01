@@ -17,10 +17,10 @@
  * expressed with `value=""` plus a `placeholder` rather than a blank option.
  */
 
-import * as RadixSelect from "@radix-ui/react-select";
-import { Check, ChevronDown } from "lucide-react";
-import { forwardRef, type ComponentPropsWithoutRef, type ElementRef, type ReactNode } from "react";
 import { cn } from "../lib/cn.js";
+import { Check, ChevronDown } from "lucide-react";
+import * as RadixSelect from "@radix-ui/react-select";
+import { forwardRef, type ComponentPropsWithoutRef, type ElementRef, type ReactNode } from "react";
 
 export const SelectRoot = RadixSelect.Root;
 export const SelectGroup = RadixSelect.Group;
@@ -33,7 +33,9 @@ export const SelectTrigger = forwardRef<
     <RadixSelect.Trigger
         ref={ref}
         className={cn(
-            "group flex h-9 w-full items-center justify-between gap-2 rounded-md border border-input bg-surface px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground hover:border-border focus:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 data-[placeholder]:text-muted-foreground [&>span]:line-clamp-1 [&>span]:flex [&>span]:items-center [&>span]:gap-2",
+            // The value renders as a flex row (icon beside label), which is why the
+            // label carries the truncation: `line-clamp` cannot apply to a flex box.
+            "group flex h-9 w-full items-center justify-between gap-2 rounded-md border border-input bg-surface px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground hover:border-border focus:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 data-[placeholder]:text-muted-foreground [&>span]:flex [&>span]:min-w-0 [&>span]:items-center [&>span]:gap-2",
             className
         )}
         {...props}
@@ -169,7 +171,7 @@ export function Select({
                     {selected && (
                         <>
                             {selected.icon}
-                            {selected.label}
+                            <span className="truncate">{selected.label}</span>
                         </>
                     )}
                 </RadixSelect.Value>
