@@ -1,61 +1,38 @@
-import { hostname } from "node:os";
 import { PageHeader } from "@polaris/ui";
-import { environmentFromAddress, serverEnvironmentSchema } from "@polaris/core";
-import { requirePermission } from "@/lib/session";
+import type { ServerRow } from "./types";
+import { ServersView } from "./servers-view";
 import { listHosts } from "@/lib/host-service";
+import { requirePermission } from "@/lib/session";
 import { getPublicIp } from "@/lib/domain-service";
-import { localDockerDriver } from "@/lib/docker-service";
 import { getLocalEnvironment } from "@/lib/network-service";
-import { ServersView, type ServerRow } from "./servers-view";
+import { environmentFromAddress, serverEnvironmentSchema } from "@polaris/core";
+import { getLocalServerName, LOCAL_SERVER_FALLBACK_NAME, LOCAL_SERVER_ID } from "@/lib/local-server";
 
 export const dynamic = "force-dynamic";
 
-/** How long the Engine gets to answer before the page settles for os.hostname(). */
-const NAME_TIMEOUT_MS = 2000;
-
 /**
- * The machine name to show for the local box. Inside a container `os.hostname()`
- * is the container id, so the Engine's own host name is preferred - it is the name
- * the operator knows the box by. Best-effort and time-boxed: a wedged Docker daemon
- * answers neither success nor error, and this label is not worth a page that hangs.
+ * Everything here is a database or settings read, so the table is on screen at
+ * once. What the local machine calls itself needs the container engine, and
+ * whether each server answers needs a socket per server; both arrive from
+ * /api/servers/status after the page has painted.
  */
-async function localMachineName(): Promise<string> {
-    try {
-        const driver = localDockerDriver();
-        try {
-            // The losing info() promise is abandoned but still settles when dispose()
-            // tears the transport down; without its own catch that rejection lands
-            // unhandled (fatal in Node) every time the daemon is slow.
-            const info = await Promise.race([
-                driver.info().catch(() => null),
-                new Promise<null>((resolve) => setTimeout(() => resolve(null), NAME_TIMEOUT_MS))
-            ]);
-            return info?.name || hostname();
-        } finally {
-            await driver.dispose();
-        }
-    } catch {
-        return hostname();
-    }
-}
-
 export default async function ServersPage() {
     const user = await requirePermission("system.manage");
-    const [hosts, local, localIp, machineName] = await Promise.all([
+    const [hosts, local, localIp, localName] = await Promise.all([
         listHosts(user.id),
         getLocalEnvironment(),
         getPublicIp(),
-        localMachineName()
+        getLocalServerName()
     ]);
 
     // The box Polaris runs on is a managed server too - it just needs no SSH
     // credentials, so it is listed from detection instead of a Host row.
     const servers: ServerRow[] = [
         {
-            id: "local",
+            id: LOCAL_SERVER_ID,
             kind: "local",
-            name: "This server",
-            detail: machineName,
+            name: localName || LOCAL_SERVER_FALLBACK_NAME,
+            detail: "",
             address: localIp ?? "127.0.0.1",
             port: null,
             authMethod: null,

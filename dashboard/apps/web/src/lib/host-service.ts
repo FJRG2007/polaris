@@ -7,12 +7,12 @@
  * same crypto the storage/docker connections use.
  */
 
-import { loadEnv } from "@polaris/config";
-import type { CreateHostInput, HostCredentials, ServerEnvironment } from "@polaris/core";
 import { prisma } from "@polaris/db";
-import { isBaseDomain, normalizeBaseDomain } from "@polaris/deploy";
+import { loadEnv } from "@polaris/config";
 import { testAndCaptureHostKey, type SshAuth } from "@polaris/ssh";
+import { isBaseDomain, normalizeBaseDomain } from "@polaris/deploy";
 import { decryptCredentials, encryptCredentials } from "@polaris/storage";
+import type { CreateHostInput, HostCredentials, ServerEnvironment } from "@polaris/core";
 
 /** Non-secret fields safe to show in listings. */
 export async function listHosts(ownerId: string) {
@@ -100,6 +100,13 @@ export async function createHost(ownerId: string, input: CreateHostInput): Promi
         },
         select: { id: true }
     });
+}
+
+/** Rename a host. Owner-scoped: false when no host of this owner matched, so a
+ *  caller never reports a change that did not happen. */
+export async function renameHost(ownerId: string, hostId: string, name: string): Promise<boolean> {
+    const { count } = await prisma.host.updateMany({ where: { id: hostId, ownerId }, data: { name } });
+    return count > 0;
 }
 
 /** Record where a host lives, which decides how a domain can be pointed at it.

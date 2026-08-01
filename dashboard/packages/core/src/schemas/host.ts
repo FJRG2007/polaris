@@ -19,6 +19,19 @@ export const SSH_AUTH_METHODS = ["password", "key"] as const;
 export type SshAuthMethod = (typeof SSH_AUTH_METHODS)[number];
 
 /**
+ * The id the box Polaris runs on carries wherever a server is picked. It has no
+ * Host row - there are no credentials to store for the machine serving the
+ * request - so this literal stands in for one, as it already does in Deploy and
+ * the marketplace.
+ */
+export const LOCAL_SERVER_ID = "local";
+
+/** A server picker's value: the local box, or a registered Host's id. */
+export const serverIdSchema = z.union([z.literal(LOCAL_SERVER_ID), z.string().uuid()], {
+    errorMap: () => ({ message: "Choose a server" })
+});
+
+/**
  * Where a server physically lives. This is not cosmetic: it decides how a domain
  * can be pointed at the server and whether it can serve public traffic at all.
  * - `home-nat`   : home/office LAN behind a router; inbound needs port forwarding.
@@ -99,3 +112,13 @@ export const setServerEnvironmentSchema = z.object({
 });
 
 export type SetServerEnvironmentInput = z.infer<typeof setServerEnvironmentSchema>;
+
+/** Payload for renaming a server. A null `hostId` targets the box Polaris runs
+ *  on, whose name is a setting rather than a Host row; blank clears it back to
+ *  the machine's own name. */
+export const renameServerSchema = z.object({
+    hostId: z.string().uuid().nullable(),
+    name: z.string().trim().max(120)
+});
+
+export type RenameServerInput = z.infer<typeof renameServerSchema>;

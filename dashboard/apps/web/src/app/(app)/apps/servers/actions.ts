@@ -11,9 +11,10 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/session";
 import { recordAudit } from "@/lib/audit-service";
+import { setLocalServerName } from "@/lib/local-server";
 import { setLocalEnvironment } from "@/lib/network-service";
-import { createEnrollmentSchema, createHostSchema, setServerEnvironmentSchema } from "@polaris/core";
-import { createHost, deleteHost, setHostEnvironment, setHostWildcardDomain } from "@/lib/host-service";
+import { createHost, deleteHost, renameHost, setHostEnvironment, setHostWildcardDomain } from "@/lib/host-service";
+import { createEnrollmentSchema, createHostSchema, renameServerSchema, setServerEnvironmentSchema } from "@polaris/core";
 import {
     cancelEnrollment,
     getEnrollmentStatus,
@@ -65,6 +66,33 @@ export async function setServerEnvironmentAction(input: unknown): Promise<{ erro
         targetType: hostId ? "host" : "system",
         targetId: hostId ?? "local",
         metadata: { environment }
+    });
+    revalidatePath(SERVERS_PATH);
+    return {};
+}
+
+/**
+ * Rename a server. A null `hostId` means the box Polaris runs on: it has no Host
+ * row, so its name is a setting, and clearing it puts the machine's own name back
+ * rather than leaving a server with no label.
+ */
+export async function renameServerAction(input: unknown): Promise<{ error?: string }> {
+    const user = await requirePermission("system.manage");
+    const parsed = renameServerSchema.safeParse(input);
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid name" };
+    const { hostId, name } = parsed.data;
+    if (hostId) {
+        if (!name) return { error: "Name this server" };
+        if (!(await renameHost(user.id, hostId, name))) return { error: "Server not found" };
+    } else {
+        await setLocalServerName(name);
+    }
+    await recordAudit({
+        actorId: user.id,
+        action: "server.rename",
+        targetType: hostId ? "host" : "system",
+        targetId: hostId ?? "local",
+        metadata: { name }
     });
     revalidatePath(SERVERS_PATH);
     return {};

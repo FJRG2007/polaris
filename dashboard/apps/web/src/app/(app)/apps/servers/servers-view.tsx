@@ -7,18 +7,25 @@
  * domain is pointed at it; a server Polaris could not classify is flagged so the
  * operator answers before exposing anything. Delete uses an inline two-step
  * confirm (no native dialog).
+ *
+ * Whether a server is answering is not part of the page render. It is a TCP
+ * handshake per server, so it is polled from the client and folded in as it
+ * arrives - the table is on screen either way, and the local machine's own name
+ * comes back on the same poll.
  */
 
 import Link from "next/link";
 import { HostDialog } from "./host-dialog";
 import { useRouter } from "next/navigation";
 import { deleteHostAction } from "./actions";
+import { ServerDialog } from "./server-dialog";
 import { useState, useTransition } from "react";
 import { ENVIRONMENT_META } from "./environment-meta";
-import type { ServerEnvironment } from "@polaris/core";
 import { TerminalPanel } from "../deploy/terminal-panel";
+import { useLiveResource } from "@/components/use-live-resource";
+import type { ServerRow, ServerStatus, ServerStatusPayload } from "./types";
 import { EnvironmentDialog, type EnvironmentTarget } from "./environment-dialog";
-import { FolderOpen, MapPin, Server, SquareTerminal, Trash2, TriangleAlert } from "lucide-react";
+import { FolderOpen, MapPin, Server, Settings2, SquareTerminal, Trash2, TriangleAlert } from "lucide-react";
 import {
     Badge,
     Button,
@@ -26,27 +33,13 @@ import {
     DialogContent,
     DialogDescription,
     DialogHeader,
-    DialogTitle
+    DialogTitle,
+    Skeleton
 } from "@polaris/ui";
 
-export interface ServerRow {
-    /** "local" for the Polaris box, otherwise the Host id. */
-    id: string;
-    kind: "local" | "host";
-    name: string;
-    /** Hostname for the local box, the SSH user for a registered host. */
-    detail: string;
-    address: string;
-    port: number | null;
-    authMethod: string | null;
-    environment: ServerEnvironment;
-    /** Wildcard domain pointed at this server, empty when none is configured. */
-    wildcardDomain: string;
-    /** What Polaris detected, offered as the default when the environment is unset. */
-    suggested: ServerEnvironment;
-    /** False while the value is only Polaris's guess, not the operator's answer. */
-    confirmed: boolean;
-}
+/** How often reachability is re-checked. A server going down is worth noticing
+ *  while the page is open, and each pass is one short-lived socket per server. */
+const STATUS_POLL_MS = 30_000;
 
 export function ServersView({ servers }: { servers: ServerRow[] }) {
     const router = useRouter();
@@ -54,6 +47,16 @@ export function ServersView({ servers }: { servers: ServerRow[] }) {
     const [confirmId, setConfirmId] = useState<string | null>(null);
     const [target, setTarget] = useState<EnvironmentTarget | null>(null);
     const [shell, setShell] = useState<ServerRow | null>(null);
+    const [details, setDetails] = useState<ServerRow | null>(null);
+
+    const { data: live } = useLiveResource<ServerStatusPayload>({
+        url: "/api/servers/status",
+        cacheKey: "servers.status",
+        intervalMs: STATUS_POLL_MS,
+        select: (body) => body as ServerStatusPayload
+    });
+    const statusOf = (id: string): ServerStatus | null =>
+        live?.servers.find((entry) => entry.id === id) ?? null;
 
     const unset = servers.filter((server) => server.environment === "unknown");
     const remotes = servers.filter((server) => server.kind === "host");
@@ -98,12 +101,13 @@ export function ServersView({ servers }: { servers: ServerRow[] }) {
                 </p>
             ) : null}
 
-            <div className="overflow-hidden rounded-lg border border-border">
+            <div className="overflow-x-auto rounded-lg border border-border">
                 <table className="w-full text-sm">
                     <thead className="bg-surface/60 text-left text-xs text-muted-foreground">
                         <tr>
                             <th className="px-3 py-2 font-medium">Server</th>
                             <th className="px-3 py-2 font-medium">Address</th>
+                            <th className="px-3 py-2 font-medium">Answering</th>
                             <th className="px-3 py-2 font-medium">Location</th>
                             <th className="px-3 py-2 font-medium">Auth</th>
                             <th className="px-3 py-2" />
@@ -113,16 +117,34 @@ export function ServersView({ servers }: { servers: ServerRow[] }) {
                         {servers.map((server) => (
                             <tr key={server.id} className="border-t border-border hover:bg-card-hover">
                                 <td className="px-3 py-2">
-                                    <span className="flex items-center gap-2 font-medium">
+                                    <button
+                                        type="button"
+                                        onClick={() => setDetails(server)}
+                                        aria-label={`Open ${server.name}`}
+                                        className="flex items-center gap-2 font-medium hover:underline"
+                                    >
                                         <Server className="size-4 text-muted-foreground" />
                                         {server.name}
                                         {server.kind === "local" ? <Badge variant="primary">This machine</Badge> : null}
+                                    </button>
+                                    <span className="block text-xs text-muted-foreground">
+                                        {server.kind === "host" ? (
+                                            server.detail
+                                        ) : live?.machineName ? (
+                                            live.machineName
+                                        ) : (
+                                            // Its own name is on the way; hold the line's
+                                            // height so the row does not jump when it lands.
+                                            <Skeleton className="mt-0.5 inline-block h-3 w-24 align-middle" />
+                                        )}
                                     </span>
-                                    <span className="block text-xs text-muted-foreground">{server.detail}</span>
                                 </td>
                                 <td className="px-3 py-2 text-muted-foreground">
                                     {server.address}
                                     {server.port ? `:${server.port}` : ""}
+                                </td>
+                                <td className="px-3 py-2">
+                                    <StatusCell kind={server.kind} status={statusOf(server.id)} />
                                 </td>
                                 <td className="px-3 py-2">
                                     <EnvironmentCell server={server} onPick={() => askEnvironment(server)} />
@@ -136,29 +158,7 @@ export function ServersView({ servers }: { servers: ServerRow[] }) {
                                 </td>
                                 <td className="px-3 py-2">
                                     <div className="flex justify-end gap-1">
-                                        {server.kind === "host" && confirmId !== server.id ? (
-                                            <>
-                                                <Button
-                                                    size="icon"
-                                                    variant="ghost"
-                                                    aria-label={`Open a shell on ${server.name}`}
-                                                    title="Open a shell"
-                                                    onClick={() => setShell(server)}
-                                                >
-                                                    <SquareTerminal className="size-4" />
-                                                </Button>
-                                                <Button size="icon" variant="ghost" asChild>
-                                                    <Link
-                                                        href={`/drive?c=host:${server.id}`}
-                                                        aria-label={`Browse the files on ${server.name}`}
-                                                        title="Browse its files"
-                                                    >
-                                                        <FolderOpen className="size-4" />
-                                                    </Link>
-                                                </Button>
-                                            </>
-                                        ) : null}
-                                        {server.kind === "local" ? null : confirmId === server.id ? (
+                                        {confirmId === server.id ? (
                                             <>
                                                 <Button
                                                     size="sm"
@@ -168,23 +168,55 @@ export function ServersView({ servers }: { servers: ServerRow[] }) {
                                                 >
                                                     Cancel
                                                 </Button>
-                                                <Button
-                                                    size="sm"
-                                                    onClick={() => onDelete(server.id)}
-                                                    disabled={pending}
-                                                >
+                                                <Button size="sm" onClick={() => onDelete(server.id)} disabled={pending}>
                                                     Remove
                                                 </Button>
                                             </>
                                         ) : (
-                                            <Button
-                                                size="icon"
-                                                variant="ghost"
-                                                aria-label={`Remove ${server.name}`}
-                                                onClick={() => setConfirmId(server.id)}
-                                            >
-                                                <Trash2 className="size-4" />
-                                            </Button>
+                                            <>
+                                                {server.kind === "host" ? (
+                                                    <>
+                                                        <Button
+                                                            size="icon"
+                                                            variant="ghost"
+                                                            aria-label={`Open a shell on ${server.name}`}
+                                                            title="Open a shell"
+                                                            onClick={() => setShell(server)}
+                                                        >
+                                                            <SquareTerminal className="size-4" />
+                                                        </Button>
+                                                        <Button size="icon" variant="ghost" asChild>
+                                                            <Link
+                                                                href={`/drive?c=host:${server.id}`}
+                                                                aria-label={`Browse the files on ${server.name}`}
+                                                                title="Browse its files"
+                                                            >
+                                                                <FolderOpen className="size-4" />
+                                                            </Link>
+                                                        </Button>
+                                                    </>
+                                                ) : null}
+                                                <Button
+                                                    size="icon"
+                                                    variant="ghost"
+                                                    aria-label={`Rename ${server.name} and see how to connect to it`}
+                                                    title="Name and connection details"
+                                                    onClick={() => setDetails(server)}
+                                                >
+                                                    <Settings2 className="size-4" />
+                                                </Button>
+                                                {server.kind === "host" ? (
+                                                    <Button
+                                                        size="icon"
+                                                        variant="ghost"
+                                                        aria-label={`Remove ${server.name}`}
+                                                        title="Remove"
+                                                        onClick={() => setConfirmId(server.id)}
+                                                    >
+                                                        <Trash2 className="size-4" />
+                                                    </Button>
+                                                ) : null}
+                                            </>
                                         )}
                                     </div>
                                 </td>
@@ -202,8 +234,33 @@ export function ServersView({ servers }: { servers: ServerRow[] }) {
 
             <EnvironmentDialog target={target} onClose={() => setTarget(null)} />
             <ShellDialog server={shell} onClose={() => setShell(null)} />
+            <ServerDialog
+                server={details}
+                status={details ? statusOf(details.id) : null}
+                machineName={live?.machineName ?? null}
+                onRenamed={() => {
+                    setDetails(null);
+                    router.refresh();
+                }}
+                onClose={() => setDetails(null)}
+            />
         </div>
     );
+}
+
+/** Reachability, or the fact that it has not been checked yet. The local box is
+ *  the machine answering the request, so it is stated rather than probed. */
+function StatusCell({ kind, status }: { kind: ServerRow["kind"]; status: ServerStatus | null }) {
+    if (kind === "local") return <Badge variant="success">Up</Badge>;
+    if (!status) return <span className="text-xs text-muted-foreground">Checking...</span>;
+    if (status.state === "down") {
+        return (
+            <Badge variant="danger" title={status.detail ?? undefined}>
+                No answer
+            </Badge>
+        );
+    }
+    return <Badge variant="success">{status.latencyMs === null ? "Up" : `${status.latencyMs} ms`}</Badge>;
 }
 
 /** A shell on one server. Mounted only while open so closing the dialog tears the

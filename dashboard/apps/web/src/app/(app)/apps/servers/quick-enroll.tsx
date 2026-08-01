@@ -37,7 +37,9 @@ interface Opened {
 export function QuickEnroll({ onDone }: { onDone: () => void }) {
     const router = useRouter();
     const [environment, setEnvironment] = useState<ServerEnvironment>("unknown");
-    const [grantDocker, setGrantDocker] = useState(false);
+    // On by default: without it the server can be reached but not deployed to and
+    // not given CI jobs, which is what almost everybody is adding one for.
+    const [grantDocker, setGrantDocker] = useState(true);
     const [name, setName] = useState("");
     const [opened, setOpened] = useState<Opened | null>(null);
     const [pending, setPending] = useState(false);
@@ -184,8 +186,9 @@ export function QuickEnroll({ onDone }: { onDone: () => void }) {
                 <span>
                     Let Polaris manage containers on this server
                     <span className="block text-xs text-muted-foreground">
-                        Adds the login to the docker group, which on most systems is the same as giving
-                        it root. Leave it off unless you plan to deploy there.
+                        Needed to deploy there or run CI jobs on it. Adds the login to the docker
+                        group, which on most systems is the same as giving it root - turn it off for a
+                        server you only want a shell and files on.
                     </span>
                 </span>
             </label>
