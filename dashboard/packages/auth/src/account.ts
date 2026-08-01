@@ -7,9 +7,9 @@
  * first; profile edits (name, username, company) do not touch credentials.
  */
 
-import { companyField } from "@polaris/core";
 import { prisma } from "@polaris/db";
 import type { Auth } from "./auth.js";
+import { companyField, normalizePersonName } from "@polaris/core";
 
 /** Read the credential password hash for a user, or null if they have none. */
 async function credentialHash(userId: string): Promise<string | null> {
@@ -36,7 +36,9 @@ export async function updateUserProfile(
 ): Promise<{ error?: string }> {
     const data: { name?: string; username?: string | null; company?: string | null } = {};
     if (input.name !== undefined) {
-        const name = input.name.trim();
+        // Normalized here rather than only in the form: this is the copy that
+        // decides what is stored, and an API key posting a name never sees a blur.
+        const name = normalizePersonName(input.name);
         if (!name) return { error: "Name cannot be empty." };
         data.name = name;
     }

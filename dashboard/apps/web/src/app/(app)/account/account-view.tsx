@@ -10,14 +10,14 @@
  * editing a field and putting it back is not offered as a change to make.
  */
 
-import { useState, type FormEvent, type ReactNode } from "react";
-import { useRouter } from "next/navigation";
-import { MAX_COMPANY_LENGTH } from "@polaris/core";
-import type { UserEmailView, UserPhoneView } from "@polaris/auth";
-import { Card, CardBody, Button, Input } from "@polaris/ui";
-import { EmailsView } from "./emails-view";
 import { PhoneCard } from "./phone-card";
+import { EmailsView } from "./emails-view";
+import { useRouter } from "next/navigation";
 import { updateProfileAction } from "./actions";
+import { Card, CardBody, Button, Input } from "@polaris/ui";
+import { useState, type FormEvent, type ReactNode } from "react";
+import type { UserEmailView, UserPhoneView } from "@polaris/auth";
+import { MAX_COMPANY_LENGTH, normalizePersonName } from "@polaris/core";
 
 type Result = { ok?: string; error?: string } | null;
 
@@ -110,7 +110,14 @@ export function AccountView({
                             value={profile.name}
                             required
                             autoComplete="name"
+                            autoCapitalize="words"
+                            autoCorrect="off"
+                            spellCheck={false}
                             onChange={(event) => setProfile({ ...profile, name: event.target.value })}
+                            // On blur rather than on every keystroke: normalizing as
+                            // somebody types moves the caret and breaks composing a
+                            // name on an IME. The server normalizes it again.
+                            onBlur={() => setProfile((current) => ({ ...current, name: normalizePersonName(current.name) }))}
                         />
                     </label>
                     <label className="flex flex-col gap-1 text-sm">
