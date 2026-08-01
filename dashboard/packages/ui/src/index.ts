@@ -33,4 +33,5 @@ export * from "./components/context-menu.js";
 export * from "./components/dialog.js";
 export * from "./shell/capabilities.js";
 export { AppSwitcher, type PolarisApp } from "./shell/app-switcher.js";
+export { MobileNav } from "./shell/mobile-nav.js";
 export { AppShell, PolarisMark, PageHeader } from "./shell/app-shell.js";

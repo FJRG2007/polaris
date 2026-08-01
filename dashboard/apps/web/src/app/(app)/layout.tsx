@@ -4,6 +4,7 @@ import { AppNav } from "@/components/app-nav";
 import { getCapabilities } from "@polaris/config";
 import { AppSidebar } from "@/components/app-sidebar";
 import { AccountMenu } from "@/components/account-menu";
+import { AppNavDrawer } from "@/components/app-nav-drawer";
 import { CommandPalette } from "@/components/command-palette";
 import { listNotifications } from "@/lib/notification-service";
 import { UpdateIndicator } from "@/components/update-indicator";
@@ -35,13 +36,18 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
                 <NotificationsProvider initial={notifications}>
                     <AppShell
                         switcher={<AppNav isAdmin={user.isAdmin} />}
+                        navButton={<AppNavDrawer />}
                         search={<CommandPalette isAdmin={user.isAdmin} />}
                         sidebar={<AppSidebar />}
                         account={
                             <>
                                 {user.isAdmin ? <UpdateIndicator /> : null}
                                 <NotificationBell />
-                                <EditionBadge />
+                                {/* The edition reads as a sentence, so it waits for a bar
+                                    wide enough to carry it next to the controls. */}
+                                <span className="hidden lg:inline-flex">
+                                    <EditionBadge />
+                                </span>
                                 <AccountMenu name={user.name} email={user.email} />
                             </>
                         }

@@ -8,8 +8,8 @@
  * the limited edition; clicking one routes to its unlock explainer.
  */
 
-import { Check, ChevronDown, Lock, type LucideIcon } from "lucide-react";
 import { cn } from "../lib/cn.js";
+import { Check, ChevronDown, Lock, type LucideIcon } from "lucide-react";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -46,12 +46,14 @@ export function AppSwitcher({
     const CurrentIcon = current.icon;
     return (
         <DropdownMenu>
-            <DropdownMenuTrigger className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium transition-colors hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                <span className="grid size-6 place-items-center rounded bg-primary/15 text-primary">
+            {/* On a phone the bar also carries the page's own controls, so the
+                trigger keeps its glyph and drops the app name and the chevron. */}
+            <DropdownMenuTrigger className="flex shrink-0 items-center gap-2 rounded-md px-1.5 py-1.5 text-sm font-medium transition-colors hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:px-2">
+                <span className="grid size-6 shrink-0 place-items-center rounded bg-primary/15 text-primary">
                     <CurrentIcon className="size-4" />
                 </span>
-                <span>{current.label}</span>
-                <ChevronDown className="size-4 text-muted-foreground" />
+                <span className="sr-only sm:not-sr-only">{current.label}</span>
+                <ChevronDown className="hidden size-4 text-muted-foreground sm:block" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="min-w-[16rem]">
                 <DropdownMenuLabel>Polaris apps</DropdownMenuLabel>

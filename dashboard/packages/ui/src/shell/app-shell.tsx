@@ -1,8 +1,10 @@
 /**
  * The dashboard chrome: a slim top bar carrying the app switcher on the left and
  * account/edition controls on the right, an optional left navigation rail, and
- * the scrolling content area. Kept presentational and responsive - the rail
- * collapses on narrow viewports; callers supply the actual nav and account menu.
+ * the scrolling content area. Kept presentational and responsive - on narrow
+ * viewports the rail moves into a drawer behind the header's menu button, and
+ * the bar sheds the wordmark and the search field before its controls collide;
+ * callers supply the actual nav and account menu.
  */
 
 import { cn } from "../lib/cn.js";
@@ -10,12 +12,16 @@ import type { ReactNode } from "react";
 
 export function AppShell({
     switcher,
+    navButton,
     search,
     account,
     sidebar,
     children
 }: {
     switcher: ReactNode;
+    /** Opens the rail on viewports too narrow to show it beside the content
+     *  (see MobileNav). Callers pass nothing for a section-less app. */
+    navButton?: ReactNode;
     /** Global search, centered in the top bar. */
     search?: ReactNode;
     account: ReactNode;
@@ -30,41 +36,47 @@ export function AppShell({
                 className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[420px]"
                 style={{ background: "radial-gradient(60% 100% at 50% 0%, hsl(var(--primary) / 0.16), transparent 70%)" }}
             />
-            <header className="sticky top-0 z-40 flex h-14 shrink-0 items-center justify-between gap-4 border-b border-border bg-surface/80 px-4 backdrop-blur">
-                <div className="flex min-w-0 items-center gap-3">
-                    <PolarisMark />
+            <header className="sticky top-0 z-40 flex h-14 shrink-0 items-center justify-between gap-2 border-b border-border bg-surface/80 px-3 backdrop-blur sm:gap-4 sm:px-4">
+                <div className="flex min-w-0 items-center gap-1.5 sm:gap-3">
+                    {navButton}
+                    <PolarisMark className="shrink-0" nameClassName="hidden sm:inline" />
                     {switcher}
                     {/* Pages portal contextual controls here (e.g. the Deploy project +
                         environment selectors), to the right of the app switcher. */}
-                    <div id="polaris-header-slot" className="flex min-w-0 items-center gap-2" />
+                    <div id="polaris-header-slot" className="flex min-w-0 items-center gap-1 sm:gap-2" />
                 </div>
-                {search ? <div className="flex min-w-0 flex-1 justify-center px-2">{search}</div> : null}
-                <div className="flex shrink-0 items-center gap-2">{account}</div>
+                {/* The field only earns the middle of the bar once it renders as a
+                    field; below that it is an icon and sits with the account controls. */}
+                {search ? <div className="flex min-w-0 shrink-0 justify-end px-0 lg:flex-1 lg:shrink lg:justify-center lg:px-2">{search}</div> : null}
+                <div className="flex shrink-0 items-center gap-1 sm:gap-2">{account}</div>
             </header>
             <div className="flex flex-1">
                 {sidebar ? (
                     // Pinned under the sticky header and scrolling on its own, so the rail
-                    // stays reachable however far down the content the user is.
-                    <aside className="sticky top-14 hidden h-[calc(100vh-3.5rem)] w-60 shrink-0 self-start overflow-y-auto border-r border-border bg-surface/40 p-3 md:block">
+                    // stays reachable however far down the content the user is. An app
+                    // with no sections renders nothing, and `empty:hidden` keeps that
+                    // from leaving a bare column beside the content.
+                    <aside className="sticky top-14 hidden h-[calc(100vh-3.5rem)] w-60 shrink-0 self-start overflow-y-auto border-r border-border bg-surface/40 p-3 empty:hidden md:block">
                         {sidebar}
                     </aside>
                 ) : null}
-                <main className="min-w-0 flex-1 p-4 md:p-6">{children}</main>
+                <main className="min-w-0 flex-1 p-3 sm:p-4 md:p-6">{children}</main>
             </div>
         </div>
     );
 }
 
-/** The Polaris wordmark: a compact star glyph plus the name. */
-export function PolarisMark({ className }: { className?: string }) {
+/** The Polaris wordmark: a compact star glyph plus the name. `nameClassName`
+ *  lets a cramped bar drop the name and keep the glyph. */
+export function PolarisMark({ className, nameClassName }: { className?: string; nameClassName?: string }) {
     return (
         <span className={cn("flex items-center gap-2", className)}>
-            <span className="grid size-7 place-items-center rounded-md bg-gradient-to-br from-primary to-accent text-primary-foreground">
+            <span className="grid size-7 shrink-0 place-items-center rounded-md bg-gradient-to-br from-primary to-accent text-primary-foreground">
                 <svg viewBox="0 0 24 24" className="size-4" fill="currentColor" aria-hidden="true">
                     <path d="M12 2l1.9 6.6L20 10l-6.1 1.4L12 18l-1.9-6.6L4 10l6.1-1.4L12 2z" />
                 </svg>
             </span>
-            <span className="text-sm font-semibold tracking-tight">Polaris</span>
+            <span className={cn("text-sm font-semibold tracking-tight", nameClassName)}>Polaris</span>
         </span>
     );
 }

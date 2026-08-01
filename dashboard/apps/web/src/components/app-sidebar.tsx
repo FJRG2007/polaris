@@ -4,8 +4,8 @@
  * Per-app left sidebar. Shows the options for whichever app the user is in
  * (resolved from the path), so the rail's contents follow the top-left app
  * switcher. Presentational and path-driven; the AppShell handles the responsive
- * behavior (the rail is hidden on narrow viewports, where the top switcher and
- * account menu still provide navigation).
+ * behavior (on narrow viewports the same list is rendered inside the header's
+ * navigation drawer instead of beside the content).
  */
 
 import Link from "next/link";
