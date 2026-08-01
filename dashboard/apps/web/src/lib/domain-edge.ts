@@ -13,10 +13,10 @@
  * dashboard's own labels do for the local names.
  */
 
-import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { polarisZoneHost } from "./domain-zones";
+import { writeFile } from "node:fs/promises";
 import { getSetting } from "./setting-store";
+import { polarisZoneHost } from "./domain-zones";
 
 /** Traefik's file-provider directory, the volume both containers mount. */
 function dynamicDir(): string {
@@ -103,20 +103,36 @@ export function renderDashboardConfig(hosts: readonly string[]): string {
 /**
  * Every public hostname the dashboard answers on: the configured app domain, the
  * sharing domain (share links and drop points are served by the dashboard itself, so
- * a route it lacks is a link that 404s), and the Polaris zone from the guided setup.
+ * a route it lacks is a link that 404s), any extra domains an operator added, and the
+ * Polaris zone from the guided setup.
  *
  * The zone is included on its own account rather than waiting for the setup to move
  * the app domain onto it: that move only happens once the zone has been seen answering
  * here, which it cannot do until the edge serves it.
  */
 export async function dashboardHosts(): Promise<string[]> {
-    const [app, sharing, zone] = await Promise.all([
+    const [app, sharing, extra, zone] = await Promise.all([
         getSetting("domain.app"),
         getSetting("domain.sharing"),
+        getSetting("domain.extra"),
         polarisZoneHost()
     ]);
-    const hosts = [app, sharing, zone].map(publicHostname).filter((host): host is string => host !== null);
+    const hosts = [app, sharing, ...parseExtra(extra), zone]
+        .map(publicHostname)
+        .filter((host): host is string => host !== null);
     return [...new Set(hosts)];
+}
+
+/** The extra-domain list as stored by domain-service. Read here rather than imported
+ *  from there, which imports this module for the edge sync. */
+function parseExtra(raw: string | null): string[] {
+    if (!raw) return [];
+    try {
+        const parsed: unknown = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed.filter((value): value is string => typeof value === "string") : [];
+    } catch {
+        return [];
+    }
 }
 
 /**

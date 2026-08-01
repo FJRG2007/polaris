@@ -4,7 +4,8 @@
  * Domains admin panel. The guided setup owns the decisions - where the box runs, how
  * it is exposed, which domain and zones - and everything else on the page is either a
  * separate question it does not answer (the dashboard's own address, the sharing
- * domain, trusting the LAN certificate) or the manual controls behind it.
+ * domain, the full list of names it answers on, trusting the LAN certificate) or the
+ * manual controls behind it.
  *
  * Those manual controls sit under Advanced rather than beside the setup, because they
  * are the same settings a second time: an exposure mode the setup already stored and a
@@ -12,7 +13,15 @@
  * setting is the fastest way to leave an operator unsure which one won.
  */
 
+import { DomainSetupWizard } from "./setup-wizard";
+import { AddressList } from "@/components/address-list";
+import type { DomainConfig } from "@/lib/domain-service";
+import type { DomainZoneConfig } from "@/lib/domain-zones";
+import type { CheckedAddress } from "@/lib/address-health";
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import type { NetworkMode, NetworkStatus } from "@/lib/network-service";
+import { domainSuggestions, type DomainSuggestions } from "@/lib/domain-suggestions";
+import { Badge, Button, Card, CardBody, CardHeader, CardTitle, Input, Select } from "@polaris/ui";
 import {
     CheckCircle2,
     ChevronDown,
@@ -26,16 +35,12 @@ import {
     ShieldCheck,
     TriangleAlert
 } from "lucide-react";
-import { Badge, Button, Card, CardBody, CardHeader, CardTitle, Input, Select } from "@polaris/ui";
-import type { DomainConfig } from "@/lib/domain-service";
-import type { DomainZoneConfig } from "@/lib/domain-zones";
-import type { NetworkMode, NetworkStatus } from "@/lib/network-service";
-import { domainSuggestions, type DomainSuggestions } from "@/lib/domain-suggestions";
-import { DomainSetupWizard } from "./setup-wizard";
 import {
     clearDuckdnsTokenAction,
+    deploymentAddressesAction,
     networkStatusAction,
     saveDomainsAction,
+    saveExtraDomainsAction,
     saveNetworkConfigAction,
     syncDuckDnsAction
 } from "./actions";
@@ -43,13 +48,16 @@ import {
 export function DomainsView({
     initialConfig,
     initialZones,
+    initialAddresses,
     effectiveAppUrl
 }: {
     initialConfig: DomainConfig;
     initialZones: DomainZoneConfig;
+    initialAddresses: CheckedAddress[];
     effectiveAppUrl: string;
 }) {
     const [config, setConfig] = useState(initialConfig);
+    const [addresses, setAddresses] = useState(initialAddresses);
     // Followed rather than read once: the setup edits the zone layout on the same page,
     // so the addresses it feeds would otherwise keep proposing the domain the operator
     // had configured when they opened the page.
@@ -76,6 +84,13 @@ export function DomainsView({
                 suggestions={domainSuggestions(zones)}
                 effectiveAppUrl={effectiveAppUrl}
                 onSaved={setConfig}
+            />
+
+            <DashboardDomains
+                config={config}
+                addresses={addresses}
+                onConfig={setConfig}
+                onAddresses={setAddresses}
             />
 
             <LocalCertificate />
@@ -232,6 +247,103 @@ function AppDomains({
                         {saving ? "Saving..." : "Save"}
                     </Button>
                 </div>
+            </CardBody>
+        </Card>
+    );
+}
+
+/**
+ * Every name the dashboard answers on, in one place, and the way to add another.
+ *
+ * The two fields above decide which domain Polaris calls its own; this is the whole
+ * list, including the ones nothing on this page put there - the address the
+ * deployment was installed with, the zone hostname the guided setup created, a quick
+ * tunnel. Settings showed those and this page did not, which left an operator with a
+ * name they could see, could not manage, and (for a tunnel) could never get back.
+ *
+ * Extra domains are anything else pointed here: a second brand, an old domain kept
+ * answering, a name a proxy forwards. They are routed at the edge and trusted as
+ * sign-in origins exactly like the app domain, which is why they are added one at a
+ * time and shown with whether they actually answer.
+ */
+function DashboardDomains({
+    config,
+    addresses,
+    onConfig,
+    onAddresses
+}: {
+    config: DomainConfig;
+    addresses: CheckedAddress[];
+    onConfig: (next: DomainConfig) => void;
+    onAddresses: (next: CheckedAddress[]) => void;
+}) {
+    const [draft, setDraft] = useState("");
+    const [adding, setAdding] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    const candidate = draft.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+    const known = addresses.some((address) => address.host === candidate);
+    const valid = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/.test(candidate);
+
+    /**
+     * Add one name to the stored list and re-read the addresses, so the row appears
+     * with its health rather than as an entry the page invented. The list is saved
+     * whole because that is how it is stored and published.
+     */
+    async function add() {
+        if (!valid || known) return;
+        setAdding(true);
+        setError(null);
+        try {
+            const result = await saveExtraDomainsAction([...config.extraDomains, candidate]);
+            onConfig(result.config);
+            setDraft("");
+            onAddresses(await deploymentAddressesAction());
+        } catch (caught) {
+            setError(caught instanceof Error ? caught.message : "Could not add the domain");
+        } finally {
+            setAdding(false);
+        }
+    }
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                    <Globe className="size-4 text-primary" /> Where Polaris answers
+                </CardTitle>
+            </CardHeader>
+            <CardBody className="flex flex-col gap-4">
+                <AddressList addresses={addresses} onChanged={onAddresses} />
+
+                <div className="flex flex-col gap-1 border-t border-border pt-4 text-sm">
+                    Add a domain
+                    <div className="flex gap-2">
+                        <Input
+                            value={draft}
+                            onChange={(event) => setDraft(event.target.value)}
+                            onKeyDown={(event) => event.key === "Enter" && void add()}
+                            // Not the app domain's example: two fields on one page
+                            // showing the same name reads as the same field twice.
+                            placeholder="another.example.com"
+                            autoComplete="off"
+                            aria-invalid={draft.trim() !== "" && !valid}
+                        />
+                        <Button onClick={() => void add()} disabled={adding || !valid || known}>
+                            {adding ? <Loader2 className="size-4 animate-spin" /> : null} Add
+                        </Button>
+                    </div>
+                    <span className="text-xs text-muted-foreground">
+                        Point the name at this server first. Polaris then routes it, orders a certificate for it, and
+                        accepts sign-ins on it.
+                    </span>
+                    {draft.trim() !== "" && !valid ? (
+                        <span className="text-xs text-danger">That is not a domain name.</span>
+                    ) : null}
+                    {known ? <span className="text-xs text-muted-foreground">Already on the list.</span> : null}
+                </div>
+
+                {error ? <ErrorNote message={error} /> : null}
             </CardBody>
         </Card>
     );

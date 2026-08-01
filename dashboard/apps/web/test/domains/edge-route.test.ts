@@ -130,6 +130,22 @@ describe("which hostnames are collected", () => {
         expect(await dashboardHosts()).toEqual(["polaris.fjrg2007.com"]);
     });
 
+    it("serves the extra domains an operator added", async () => {
+        stored({
+            "domain.app": "polaris.fjrg2007.com",
+            "domain.extra": JSON.stringify(["old.example.com", "www.example.com"])
+        });
+
+        expect(await dashboardHosts()).toEqual(["polaris.fjrg2007.com", "old.example.com", "www.example.com"]);
+    });
+
+    it("keeps serving the app domain when the extra list is unreadable", async () => {
+        // One malformed value must not take the dashboard's own route with it.
+        stored({ "domain.app": "polaris.fjrg2007.com", "domain.extra": "{not json" });
+
+        expect(await dashboardHosts()).toEqual(["polaris.fjrg2007.com"]);
+    });
+
     it("collects nothing on a LAN-only install", async () => {
         stored({ "domain.app": "polaris.local" });
 

@@ -9,10 +9,13 @@
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/session";
+import { recordAudit } from "@/lib/audit-service";
+import { checkedAddresses, removeAddress, type CheckedAddress } from "@/lib/address-health";
 import {
     clearDuckdnsToken,
     getDomainConfig,
     setDomainConfig,
+    setExtraDomains,
     syncDuckDns,
     type DomainConfig
 } from "@/lib/domain-service";
@@ -25,7 +28,6 @@ import {
     type NetworkMode,
     type NetworkStatus
 } from "@/lib/network-service";
-import { recordAudit } from "@/lib/audit-service";
 
 /**
  * The four settings this page edits, and nothing else. `setDomainConfig` also writes the
@@ -57,6 +59,59 @@ export async function saveDomainsAction(input: z.input<typeof domainsSchema>): P
     await recordAudit({ actorId: user.id, action: "domains.configure", targetType: "setting", targetId: "domains" });
     revalidatePath("/admin/domains");
     return { config: await getDomainConfig() };
+}
+
+/** At most this many names in one save, so a pasted document cannot become a router
+ *  rule. The service caps the stored list as well; this only keeps the payload sane. */
+const extraDomainsSchema = z.array(z.string().max(253)).max(64);
+
+/**
+ * Replace the extra hostnames the dashboard answers on. The list is saved whole
+ * rather than one entry at a time: it is stored as one value and published to the
+ * edge as one rule, so a per-entry action would only be two round trips to the same
+ * write. Anything that is not a public hostname is dropped by the service, and what
+ * it stored comes back - so the page shows what is in force, not what was typed.
+ */
+export async function saveExtraDomainsAction(input: unknown): Promise<{ config: DomainConfig }> {
+    const user = await requireAdmin();
+    const parsed = extraDomainsSchema.safeParse(input);
+    if (!parsed.success) throw new Error("Invalid domain list");
+    await setExtraDomains(parsed.data);
+    await recordAudit({ actorId: user.id, action: "domains.configure", targetType: "setting", targetId: "domains" });
+    revalidatePath("/admin/domains");
+    return { config: await getDomainConfig() };
+}
+
+/** The deployment's addresses with the last health sweep's result. */
+export async function deploymentAddressesAction(): Promise<CheckedAddress[]> {
+    await requireAdmin();
+    return checkedAddresses();
+}
+
+/** What went wrong when an address could not be taken off the list, in the words the
+ *  page shows. Each case is a different thing to do next, so none of them is "failed". */
+const REMOVAL_ERRORS: Record<string, string> = {
+    unknown: "That address is no longer listed.",
+    "built-in": "This is the address the deployment was installed with. It changes with the installation, not here.",
+    managed: "This name comes from the guided setup above. Change the zone layout there to stop using it."
+};
+
+/**
+ * Stop listing an address: tear a tunnel down, or clear a configured domain from
+ * wherever it was set. Admin-only - both change where Polaris answers. Returns the
+ * list as it now stands, so a page never has to predict what the removal left.
+ */
+export async function removeAddressAction(host: unknown): Promise<{ addresses: CheckedAddress[]; error?: string }> {
+    const user = await requireAdmin();
+    if (typeof host !== "string" || !host.trim()) {
+        return { addresses: await checkedAddresses(), error: "No address given." };
+    }
+    const result = await removeAddress(host);
+    if (result === "removed") {
+        await recordAudit({ actorId: user.id, action: "domains.remove", targetType: "setting", targetId: host });
+        revalidatePath("/admin/domains");
+    }
+    return { addresses: await checkedAddresses(), error: REMOVAL_ERRORS[result] };
 }
 
 export async function clearDuckdnsTokenAction(): Promise<{ config: DomainConfig }> {

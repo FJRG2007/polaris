@@ -27,6 +27,7 @@ import { prisma } from "@polaris/db";
 import type { Permission } from "@polaris/core";
 import { publicHostname } from "@/lib/domain-edge";
 import { checkDomain } from "@/lib/watch/health-probe";
+import { removeDashboardDomain } from "@/lib/domain-service";
 import { notifyOperators } from "@/lib/notifications/operators";
 import { reachableAddresses, type DeploymentAddress } from "@/lib/deployment-addresses";
 import { getPolarisTunnelStatus, stopPolarisTunnel } from "@/lib/polaris-tunnel-service";
@@ -119,6 +120,34 @@ export async function checkedAddresses(): Promise<CheckedAddress[]> {
         storedHealth().catch(() => new Map<string, AddressHealth>())
     ]);
     return addresses.map((address) => ({ ...address, health: health.get(address.host) ?? UNKNOWN }));
+}
+
+/** Why an address could not be taken off the list, when it could not. */
+export type AddressRemoval = "removed" | "unknown" | "built-in" | "managed";
+
+/**
+ * Take an address off this deployment's list, on the operator's word rather than a
+ * probe's. The list is assembled from four places and says nothing about which, so
+ * the lookup happens here:
+ *
+ * - a tunnel is torn down, which is what makes the URL stop being handed out (a
+ *   quick tunnel's URL is minted per run, so there is nothing to keep anyway);
+ * - a configured domain is cleared from whichever setting holds it;
+ * - the install URL and the LAN name come from the deployment itself, and the zone
+ *   host from the guided setup, so neither is a list entry to delete.
+ */
+export async function removeAddress(host: string): Promise<AddressRemoval> {
+    const address = (await reachableAddresses()).find((entry) => entry.host === host.trim().toLowerCase());
+    if (!address) return "unknown";
+    if (address.kind === "app" || address.kind === "local") return "built-in";
+    if (address.kind === "tunnel") {
+        await stopPolarisTunnel();
+        await prisma.setting.deleteMany({ where: { key: keyFor(address.host) } });
+        return "removed";
+    }
+    if (!(await removeDashboardDomain(address.host))) return "managed";
+    await prisma.setting.deleteMany({ where: { key: keyFor(address.host) } });
+    return "removed";
 }
 
 /**

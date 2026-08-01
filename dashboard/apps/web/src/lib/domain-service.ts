@@ -11,16 +11,17 @@
  */
 
 import { loadEnv } from "@polaris/config";
-import { syncDashboardRoute } from "./domain-edge";
 import { getSetting, setSetting } from "./setting-store";
 import { getPolarisPublicUrl } from "./polaris-tunnel-service";
 import { decryptSecret, encryptSecret } from "@polaris/storage";
 import { polarisZoneHost, zoneReachable } from "./domain-zones";
+import { publicHostname, syncDashboardRoute } from "./domain-edge";
 import { magicDomain, DEFAULT_SUBDOMAIN_BASE } from "@polaris/deploy";
 
 const KEYS = {
     app: "domain.app",
     sharing: "domain.sharing",
+    extra: "domain.extra",
     duckSub: "domain.duckdns.subdomain",
     duckToken: "domain.duckdns.token",
     deployBase: "domain.deploy.base",
@@ -31,6 +32,8 @@ const KEYS = {
 export interface DomainConfig {
     appDomain: string;
     sharingDomain: string;
+    /** Further hostnames the dashboard answers on, beyond those two. */
+    extraDomains: string[];
     duckdnsSubdomain: string;
     hasDuckdnsToken: boolean;
     /** Wildcard-DNS base for free auto subdomains (sslip.io by default). */
@@ -47,10 +50,83 @@ function normalizeUrl(value: string | null): string | null {
     return url;
 }
 
-export async function getDomainConfig(): Promise<DomainConfig> {
-    const [app, sharing, sub, token, base, ip] = await Promise.all([
+/** How many extra hostnames one deployment may route, so the generated edge rule
+ *  stays a rule and not a wall of `Host()` clauses. */
+const EXTRA_DOMAIN_MAX = 32;
+
+/**
+ * The hostnames added on top of the app and sharing domain. Stored as a JSON list
+ * in one setting rather than a row each: they are read together on every edge sync
+ * and never addressed individually. A malformed value reads as none - the dashboard
+ * still answers on its own domains, which is the safer half of the failure.
+ */
+export async function getExtraDomains(): Promise<string[]> {
+    const raw = await getSetting(KEYS.extra);
+    if (!raw) return [];
+    try {
+        const parsed: unknown = JSON.parse(raw);
+        if (!Array.isArray(parsed)) return [];
+        return parsed.filter((value): value is string => typeof value === "string");
+    } catch {
+        return [];
+    }
+}
+
+/**
+ * Replace the extra hostnames. Each is normalized the way the edge reads it and
+ * anything that is not a public name is dropped, so a typo cannot become a router
+ * rule or an ACME order that retries until it is rate-limited. Returns what was
+ * stored, which is what the caller should show.
+ */
+export async function setExtraDomains(input: readonly string[]): Promise<string[]> {
+    const hosts: string[] = [];
+    for (const entry of input) {
+        const host = publicHostname(entry);
+        if (host && !hosts.includes(host)) hosts.push(host);
+        if (hosts.length >= EXTRA_DOMAIN_MAX) break;
+    }
+    await setSetting(KEYS.extra, hosts.length > 0 ? JSON.stringify(hosts) : null);
+    await syncDashboardRoute();
+    return hosts;
+}
+
+/**
+ * Stop answering on a hostname, wherever it was configured. Settings lists the
+ * addresses without knowing which setting each came from, so the lookup happens
+ * here: a name can be the app domain, the sharing domain, an extra one, or several
+ * at once. Returns true when something was actually cleared - a zone hostname is
+ * owned by the guided setup and is not removable from a list.
+ */
+export async function removeDashboardDomain(value: string): Promise<boolean> {
+    const host = publicHostname(value);
+    if (!host) return false;
+    const [app, sharing, extra] = await Promise.all([
         getSetting(KEYS.app),
         getSetting(KEYS.sharing),
+        getExtraDomains()
+    ]);
+    let removed = false;
+    if (publicHostname(app) === host) {
+        await setSetting(KEYS.app, null);
+        removed = true;
+    }
+    if (publicHostname(sharing) === host) {
+        await setSetting(KEYS.sharing, null);
+        removed = true;
+    }
+    if (extra.includes(host)) {
+        await setSetting(KEYS.extra, extra.length > 1 ? JSON.stringify(extra.filter((entry) => entry !== host)) : null);
+        removed = true;
+    }
+    if (removed) await syncDashboardRoute();
+    return removed;
+}
+
+export async function getDomainConfig(): Promise<DomainConfig> {
+    const [app, sharing, extra, sub, token, base, ip] = await Promise.all([
+        getSetting(KEYS.app),
+        getSetting(KEYS.sharing),
+        getExtraDomains(),
         getSetting(KEYS.duckSub),
         getSetting(KEYS.duckToken),
         getSetting(KEYS.deployBase),
@@ -59,6 +135,7 @@ export async function getDomainConfig(): Promise<DomainConfig> {
     return {
         appDomain: app ?? "",
         sharingDomain: sharing ?? "",
+        extraDomains: extra,
         duckdnsSubdomain: sub ?? "",
         hasDuckdnsToken: Boolean(token),
         deployBase: base ?? DEFAULT_SUBDOMAIN_BASE,
