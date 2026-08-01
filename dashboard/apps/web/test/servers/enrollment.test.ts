@@ -68,6 +68,13 @@ describe("enrollmentScript", () => {
         expect(script).toContain('"hostKeys":[%s]');
     });
 
+    // A Mac that has never had Remote Login on has no host keys at all, and the
+    // enrollment used to die on that last step with the login already created.
+    it("mints host keys when the machine has none rather than giving up", () => {
+        expect(script).toContain("ssh-keygen -A");
+        expect(script).toContain("collect_host_keys");
+    });
+
     it("locks the login it creates out of password authentication", () => {
         expect(script).toContain('passwd -l "$POLARIS_USER"');
     });

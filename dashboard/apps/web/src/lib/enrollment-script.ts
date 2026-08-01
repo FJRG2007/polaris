@@ -184,10 +184,13 @@ if command -v docker >/dev/null 2>&1; then
 fi
 
 if [ "\$GRANT_DOCKER" = "1" ]; then
-    if [ "\$DOCKER_PRESENT" != "true" ]; then
+    # Checked before "is one installed", because on a Mac the answer does not
+    # change what happens: Docker Desktop runs per-user and the Polaris login
+    # cannot reach it, so installing one would not help either.
+    if [ "\$PLATFORM" = "darwin" ]; then
+        say "WARNING: --docker does nothing on macOS; Docker Desktop is per-user, so jobs here run in a directory rather than a container"
+    elif [ "\$DOCKER_PRESENT" != "true" ]; then
         say "WARNING: --docker was passed but no container engine is installed"
-    elif [ "\$PLATFORM" = "darwin" ]; then
-        say "WARNING: --docker does nothing on macOS; Docker Desktop is per-user"
     else
         # Membership of this group is root-equivalent on most systems. It is here
         # because it was explicitly asked for, and it is printed for that reason.
@@ -213,13 +216,29 @@ SSH_PORT=\$(awk '/^[[:space:]]*Port[[:space:]]+[0-9]+/ { print \$2; exit }' /etc
 # it. Polaris refuses to trust any other key later, which is what stops something
 # else on the network from answering in its place.
 HOST_KEYS=""
-for pub in /etc/ssh/ssh_host_*_key.pub; do
-    [ -f "\$pub" ] || continue
-    line=\$(cut -d' ' -f1,2 < "\$pub")
-    [ -n "\$line" ] || continue
-    if [ -z "\$HOST_KEYS" ]; then HOST_KEYS="\\"\$line\\""; else HOST_KEYS="\$HOST_KEYS,\\"\$line\\""; fi
-done
-[ -n "\$HOST_KEYS" ] || die "this machine has no SSH host keys; is an SSH server installed?"
+collect_host_keys() {
+    HOST_KEYS=""
+    for pub in /etc/ssh/ssh_host_*_key.pub; do
+        [ -f "\$pub" ] || continue
+        line=\$(cut -d' ' -f1,2 < "\$pub")
+        [ -n "\$line" ] || continue
+        if [ -z "\$HOST_KEYS" ]; then HOST_KEYS="\\"\$line\\""; else HOST_KEYS="\$HOST_KEYS,\\"\$line\\""; fi
+    done
+}
+
+collect_host_keys
+if [ -z "\$HOST_KEYS" ]; then
+    # A Mac that has never had Remote Login switched on has no host keys yet -
+    # sshd mints them the first time it starts. Doing it here, the same way, lets
+    # the machine commit to the keys it will still be answering with later:
+    # 'ssh-keygen -A' only fills in what is missing and never replaces a key.
+    command -v ssh-keygen >/dev/null 2>&1 \\
+        || die "this machine has no SSH host keys and no ssh-keygen to make them; is an SSH server installed?"
+    ssh-keygen -A >/dev/null 2>&1 || true
+    collect_host_keys
+    [ -n "\$HOST_KEYS" ] || die "this machine has no SSH host keys and they could not be generated; is an SSH server installed?"
+    say "this machine had no SSH host keys yet; generated them"
+fi
 
 # Candidates only - Polaris prefers the address it sees this request come from.
 if [ "\$PLATFORM" = "darwin" ]; then
