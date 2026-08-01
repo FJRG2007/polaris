@@ -7,11 +7,38 @@
 
 import {
     Activity,
+    Bell,
+    Blocks,
+    Clock,
+    Contact,
+    Container,
+    Database,
+    FolderOpen,
+    Globe,
     HardDrive,
+    Inbox,
+    KeyRound,
+    LayoutDashboard,
     LayoutGrid,
+    Link2,
+    Mail,
     MessagesSquare,
+    MonitorSmartphone,
+    Network,
+    Radio,
+    Rocket,
+    ScrollText,
+    Server,
+    Settings,
+    ShieldCheck,
     SlidersHorizontal,
+    Star,
+    Store,
+    Trash2,
     UserCog,
+    Users,
+    UsersRound,
+    Workflow,
     type LucideIcon
 } from "lucide-react";
 
@@ -88,6 +115,70 @@ export const POLARIS_APPS: AppEntry[] = [
         hidden: true
     }
 ];
+
+export interface AppSection {
+    label: string;
+    href: string;
+    icon: LucideIcon;
+    /** Extra terms the global search matches on, for sections whose label is not
+     *  what a user would think to type ("logs" for Activity, "2FA" for Security). */
+    keywords?: string[];
+    /** Reachable, but not one of the app's primary sections: kept out of the left
+     *  rail while still being findable from search. */
+    hidden?: boolean;
+}
+
+/**
+ * The sections of each app, keyed by app id. Drives the left rail and the global
+ * search index, so a page added here becomes navigable and findable at once.
+ * Apps with no entry render no rail.
+ */
+export const APP_SECTIONS: Record<string, AppSection[]> = {
+    drive: [
+        { label: "Overview", href: "/drive/overview", icon: LayoutDashboard, keywords: ["usage", "storage"] },
+        { label: "Files", href: "/drive", icon: FolderOpen, keywords: ["browse", "folders"] },
+        { label: "Favorites", href: "/favorites", icon: Star, keywords: ["starred"] },
+        { label: "Recent", href: "/drive/recent", icon: Clock },
+        { label: "Shared links", href: "/drive/shared-links", icon: Link2, keywords: ["shares", "public"] },
+        { label: "Drop points", href: "/drive/drop-points", icon: Inbox, keywords: ["file requests", "uploads"] },
+        { label: "Trash", href: "/trash", icon: Trash2, keywords: ["deleted", "bin"] }
+    ],
+    apps: [
+        { label: "Deploy", href: "/apps/deploy", icon: Rocket, keywords: ["projects", "services", "docker"] },
+        { label: "Marketplace", href: "/apps/marketplace", icon: Store, keywords: ["install", "catalog"] },
+        { label: "Servers", href: "/apps/servers", icon: Server, keywords: ["hosts", "machines", "ssh"] },
+        { label: "Runners", href: "/apps/runners", icon: Workflow, keywords: ["github actions", "ci"] },
+        { label: "Containers", href: "/apps/containers", icon: Container, keywords: ["docker"] },
+        { label: "Backups", href: "/apps/backups", icon: Database, keywords: ["restore", "snapshots"] }
+    ],
+    inbox: [
+        { label: "Conversations", href: "/inbox", icon: MessagesSquare, keywords: ["chats", "messages"] },
+        { label: "Contacts", href: "/inbox/contacts", icon: Contact, keywords: ["people"] },
+        { label: "Channels", href: "/inbox/channels", icon: Radio, keywords: ["whatsapp", "telegram", "slack", "discord"] },
+        { label: "Logs", href: "/inbox/logs", icon: ScrollText }
+    ],
+    account: [
+        { label: "Profile", href: "/account", icon: UserCog, keywords: ["name", "email", "avatar"] },
+        { label: "Preferences", href: "/account/preferences", icon: SlidersHorizontal, keywords: ["units", "language", "timezone"] },
+        { label: "Notifications", href: "/account/notifications", icon: Bell, keywords: ["alerts", "email"] },
+        { label: "Security", href: "/account/security", icon: ShieldCheck, keywords: ["password", "2fa", "two-factor", "passkey"] },
+        { label: "Sessions", href: "/account/sessions", icon: MonitorSmartphone, keywords: ["devices", "sign out"] },
+        { label: "Access rules", href: "/account/access", icon: Network, keywords: ["ip", "country", "geo"] },
+        { label: "API keys", href: "/account/api-keys", icon: KeyRound, keywords: ["tokens"] }
+    ],
+    admin: [
+        { label: "Overview", href: "/admin", icon: LayoutDashboard },
+        { label: "Users", href: "/admin/users", icon: Users, keywords: ["accounts", "invites"] },
+        { label: "Groups", href: "/admin/groups", icon: UsersRound, keywords: ["teams", "roles"] },
+        { label: "Policies", href: "/admin/policies", icon: ShieldCheck, keywords: ["permissions", "access"] },
+        { label: "Activity", href: "/admin/activity", icon: Activity, keywords: ["audit", "logs"] },
+        { label: "Domains", href: "/admin/domains", icon: Globe, keywords: ["dns", "tunnels", "certificates"] },
+        { label: "Email delivery", href: "/admin/email", icon: Mail, keywords: ["smtp", "sender"], hidden: true },
+        { label: "Display defaults", href: "/admin/display", icon: SlidersHorizontal, keywords: ["units", "formats"] },
+        { label: "Integrations", href: "/integrations", icon: Blocks, keywords: ["github", "cloudflare", "connect"] },
+        { label: "Updates & settings", href: "/settings", icon: Settings, keywords: ["version", "upgrade"] }
+    ]
+};
 
 /** Whether a path belongs to an app: its own subtree, or one of its extra
  *  `match` prefixes (exact segment or a nested path under it). */

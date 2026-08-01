@@ -5,16 +5,19 @@
  * collapses on narrow viewports; callers supply the actual nav and account menu.
  */
 
-import type { ReactNode } from "react";
 import { cn } from "../lib/cn.js";
+import type { ReactNode } from "react";
 
 export function AppShell({
     switcher,
+    search,
     account,
     sidebar,
     children
 }: {
     switcher: ReactNode;
+    /** Global search, centered in the top bar. */
+    search?: ReactNode;
     account: ReactNode;
     sidebar?: ReactNode;
     children: ReactNode;
@@ -35,7 +38,8 @@ export function AppShell({
                         environment selectors), to the right of the app switcher. */}
                     <div id="polaris-header-slot" className="flex min-w-0 items-center gap-2" />
                 </div>
-                <div className="flex items-center gap-2">{account}</div>
+                {search ? <div className="flex min-w-0 flex-1 justify-center px-2">{search}</div> : null}
+                <div className="flex shrink-0 items-center gap-2">{account}</div>
             </header>
             <div className="flex flex-1">
                 {sidebar ? (

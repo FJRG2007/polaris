@@ -2,10 +2,10 @@
 
 /** Modal dialog built on Radix, used for connection/share/request forms. */
 
-import * as RadixDialog from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
-import { forwardRef, type ComponentPropsWithoutRef, type ElementRef } from "react";
 import { cn } from "../lib/cn.js";
+import * as RadixDialog from "@radix-ui/react-dialog";
+import { forwardRef, type ComponentPropsWithoutRef, type ElementRef } from "react";
 
 export const Dialog = RadixDialog.Root;
 export const DialogTrigger = RadixDialog.Trigger;
@@ -13,8 +13,10 @@ export const DialogClose = RadixDialog.Close;
 
 export const DialogContent = forwardRef<
     ElementRef<typeof RadixDialog.Content>,
-    ComponentPropsWithoutRef<typeof RadixDialog.Content>
->(({ className, children, ...props }, ref) => (
+    /** `showClose` drops the corner X for dialogs whose own content reaches into
+     *  that corner (the search palette); Escape still closes them. */
+    ComponentPropsWithoutRef<typeof RadixDialog.Content> & { showClose?: boolean }
+>(({ className, children, showClose = true, ...props }, ref) => (
     <RadixDialog.Portal>
         <RadixDialog.Overlay className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm data-[state=open]:animate-in data-[state=open]:fade-in-0" />
         <RadixDialog.Content
@@ -26,10 +28,12 @@ export const DialogContent = forwardRef<
             {...props}
         >
             {children}
-            <RadixDialog.Close className="absolute right-4 top-4 rounded-sm text-muted-foreground transition-colors hover:text-foreground focus:outline-none">
-                <X className="size-4" />
-                <span className="sr-only">Close</span>
-            </RadixDialog.Close>
+            {showClose ? (
+                <RadixDialog.Close className="absolute right-4 top-4 rounded-sm text-muted-foreground transition-colors hover:text-foreground focus:outline-none">
+                    <X className="size-4" />
+                    <span className="sr-only">Close</span>
+                </RadixDialog.Close>
+            ) : null}
         </RadixDialog.Content>
     </RadixDialog.Portal>
 ));

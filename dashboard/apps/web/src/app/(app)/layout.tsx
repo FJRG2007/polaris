@@ -1,16 +1,17 @@
 import type { ReactNode } from "react";
-import { getCapabilities } from "@polaris/config";
-import { AppShell, CapabilityProvider, EditionBadge } from "@polaris/ui";
-import { AccountMenu } from "@/components/account-menu";
-import { AppNav } from "@/components/app-nav";
-import { AppSidebar } from "@/components/app-sidebar";
-import { DisplayFormatProvider } from "@/components/display-format";
-import { NotificationBell } from "@/components/notification-bell";
-import { NotificationsProvider } from "@/components/notifications/notifications-provider";
-import { UpdateIndicator } from "@/components/update-indicator";
-import { resolveDisplayPreferencesFor } from "@/lib/display-prefs-service";
-import { listNotifications } from "@/lib/notification-service";
 import { requireUser } from "@/lib/session";
+import { AppNav } from "@/components/app-nav";
+import { getCapabilities } from "@polaris/config";
+import { AppSidebar } from "@/components/app-sidebar";
+import { AccountMenu } from "@/components/account-menu";
+import { CommandPalette } from "@/components/command-palette";
+import { listNotifications } from "@/lib/notification-service";
+import { UpdateIndicator } from "@/components/update-indicator";
+import { NotificationBell } from "@/components/notification-bell";
+import { DisplayFormatProvider } from "@/components/display-format";
+import { AppShell, CapabilityProvider, EditionBadge } from "@polaris/ui";
+import { resolveDisplayPreferencesFor } from "@/lib/display-prefs-service";
+import { NotificationsProvider } from "@/components/notifications/notifications-provider";
 
 /**
  * Authenticated dashboard chrome. Resolves the session server-side (redirecting
@@ -34,6 +35,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
                 <NotificationsProvider initial={notifications}>
                     <AppShell
                         switcher={<AppNav isAdmin={user.isAdmin} />}
+                        search={<CommandPalette isAdmin={user.isAdmin} />}
                         sidebar={<AppSidebar />}
                         account={
                             <>

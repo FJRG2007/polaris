@@ -11,93 +11,7 @@
 import Link from "next/link";
 import { cn } from "@polaris/ui";
 import { usePathname } from "next/navigation";
-import { resolveActiveApp } from "@/lib/apps";
-import {
-    Activity,
-    Bell,
-    Blocks,
-    Clock,
-    Contact,
-    Container,
-    Database,
-    FolderOpen,
-    Globe,
-    Inbox,
-    KeyRound,
-    LayoutDashboard,
-    Link2,
-    MessagesSquare,
-    MonitorSmartphone,
-    Network,
-    Radio,
-    Rocket,
-    ScrollText,
-    Server,
-    Settings,
-    ShieldCheck,
-    SlidersHorizontal,
-    Star,
-    Store,
-    Trash2,
-    UserCog,
-    Users,
-    UsersRound,
-    Workflow,
-    type LucideIcon
-} from "lucide-react";
-
-interface SidebarItem {
-    label: string;
-    href: string;
-    icon: LucideIcon;
-}
-
-/** Options per app id. Apps not listed here render no rail. */
-const APP_SIDEBARS: Record<string, SidebarItem[]> = {
-    drive: [
-        { label: "Overview", href: "/drive/overview", icon: LayoutDashboard },
-        { label: "Files", href: "/drive", icon: FolderOpen },
-        { label: "Favorites", href: "/favorites", icon: Star },
-        { label: "Recent", href: "/drive/recent", icon: Clock },
-        { label: "Shared links", href: "/drive/shared-links", icon: Link2 },
-        { label: "Drop points", href: "/drive/drop-points", icon: Inbox },
-        { label: "Trash", href: "/trash", icon: Trash2 }
-    ],
-    apps: [
-        { label: "Deploy", href: "/apps/deploy", icon: Rocket },
-        { label: "Marketplace", href: "/apps/marketplace", icon: Store },
-        { label: "Servers", href: "/apps/servers", icon: Server },
-        { label: "Runners", href: "/apps/runners", icon: Workflow },
-        { label: "Containers", href: "/apps/containers", icon: Container },
-        { label: "Backups", href: "/apps/backups", icon: Database }
-    ],
-    inbox: [
-        { label: "Conversations", href: "/inbox", icon: MessagesSquare },
-        { label: "Contacts", href: "/inbox/contacts", icon: Contact },
-        { label: "Channels", href: "/inbox/channels", icon: Radio },
-        { label: "Logs", href: "/inbox/logs", icon: ScrollText }
-    ],
-    account: [
-        { label: "Profile", href: "/account", icon: UserCog },
-        { label: "Preferences", href: "/account/preferences", icon: SlidersHorizontal },
-        { label: "Notifications", href: "/account/notifications", icon: Bell },
-        { label: "Security", href: "/account/security", icon: ShieldCheck },
-        { label: "Sessions", href: "/account/sessions", icon: MonitorSmartphone },
-        { label: "Access rules", href: "/account/access", icon: Network },
-        { label: "API keys", href: "/account/api-keys", icon: KeyRound }
-    ],
-    admin: [
-        { label: "Overview", href: "/admin", icon: LayoutDashboard },
-        { label: "Users", href: "/admin/users", icon: Users },
-        { label: "Groups", href: "/admin/groups", icon: UsersRound },
-        { label: "Policies", href: "/admin/policies", icon: ShieldCheck },
-        { label: "Activity", href: "/admin/activity", icon: Activity },
-        { label: "Domains", href: "/admin/domains", icon: Globe },
-        { label: "Display defaults", href: "/admin/display", icon: SlidersHorizontal },
-        { label: "Integrations", href: "/integrations", icon: Blocks },
-        { label: "Updates & settings", href: "/settings", icon: Settings }
-    ]
-};
+import { APP_SECTIONS, resolveActiveApp } from "@/lib/apps";
 
 /** Section roots that must match their own path exactly, so they do not stay
  *  highlighted while a sibling sub-route is open. */
@@ -106,7 +20,7 @@ const EXACT_MATCH = new Set(["/drive", "/admin", "/inbox", "/account"]);
 export function AppSidebar() {
     const pathname = usePathname();
     const app = resolveActiveApp(pathname);
-    const items = APP_SIDEBARS[app.id] ?? [];
+    const items = (APP_SECTIONS[app.id] ?? []).filter((section) => !section.hidden);
     if (items.length === 0) return null;
 
     return (
