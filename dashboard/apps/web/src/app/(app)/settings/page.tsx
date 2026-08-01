@@ -5,6 +5,7 @@ import { SettingsView } from "./settings-view";
 import { getUpdateSource } from "@/lib/update-source";
 import { getUpdateStatus } from "@/lib/update-service";
 import { checkedAddresses } from "@/lib/address-health";
+import { getNetworkStatus } from "@/lib/network-service";
 import { getAutoUpdatePolicy } from "@/lib/update-watcher";
 
 export const dynamic = "force-dynamic";
@@ -17,11 +18,12 @@ export const dynamic = "force-dynamic";
 export default async function SettingsPage() {
     await requireAdmin();
     const env = loadEnv();
-    const [status, policy, source, addresses] = await Promise.all([
+    const [status, policy, source, addresses, network] = await Promise.all([
         getUpdateStatus(),
         getAutoUpdatePolicy(),
         getUpdateSource(),
-        checkedAddresses()
+        checkedAddresses(),
+        getNetworkStatus()
     ]);
 
     return (
@@ -38,7 +40,9 @@ export default async function SettingsPage() {
                     hostname: env.POLARIS_LOCAL_HOSTNAME,
                     repo: env.POLARIS_REPO,
                     branch: env.POLARIS_UPDATE_BRANCH,
-                    autoUpdate: env.POLARIS_AUTO_UPDATE
+                    autoUpdate: env.POLARIS_AUTO_UPDATE,
+                    publicIp: network.publicIp,
+                    serverIp: network.subdomainIp
                 }}
             />
         </div>

@@ -13,10 +13,14 @@
  * of this is kept in local state: the shared log file says whether a run is in
  * flight, and the build reported by whichever container answers the poll says when
  * a new one has taken over.
+ *
+ * The page also asks on its own while it stays open, so a build published after it
+ * was loaded is offered without anyone pressing anything. The button remains for the
+ * case the automatic answer is not wanted: it forces past the shared cache.
  */
 
 import { LogViewer } from "@/components/log-viewer";
-import { CopyButton } from "@/components/copy-button";
+import { AddressList } from "@/components/address-list";
 import type { UpdateStatus } from "@/lib/update-service";
 import type { CheckedAddress } from "@/lib/address-health";
 import { useDisplayFormat } from "@/components/display-format";
@@ -24,7 +28,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { isRecentRun, isUpdateInFlight, type UpdateLogTail } from "@/lib/update-log";
 import { Button, Card, CardBody, CardHeader, CardTitle, Input, Select } from "@polaris/ui";
 import type { AutoUpdateMode, AutoUpdatePolicy, DisplayFormat, UpdateSource } from "@polaris/core";
-import { Bug, CheckCircle2, CircleDashed, DownloadCloud, ExternalLink, Hammer, RefreshCw, TriangleAlert } from "lucide-react";
+import { Bug, CheckCircle2, CircleDashed, DownloadCloud, Hammer, RefreshCw, TriangleAlert } from "lucide-react";
 import {
     checkUpdatesAction,
     saveAutoUpdateAction,
@@ -39,21 +43,10 @@ interface Deployment {
     readonly repo: string;
     readonly branch: string;
     readonly autoUpdate: boolean;
-}
-
-/** What each kind of address is, said once next to it. */
-const ADDRESS_KINDS: Record<CheckedAddress["kind"], string> = {
-    app: "configured at install",
-    local: "local network",
-    domain: "domain",
-    tunnel: "tunnel"
-};
-
-/** Why an address is marked down, and how long ago that was found out. */
-function downDetail(health: CheckedAddress["health"], format: DisplayFormat): string {
-    const checked = health.checkedAt ? new Date(health.checkedAt) : null;
-    const when = checked && !Number.isNaN(checked.getTime()) ? `, checked ${format.dateTime(checked)}` : "";
-    return `${health.detail ?? "Nothing answered"}${when}`;
+    /** The box's external address, and the one it answers on itself. Either can be
+     *  unknown: a container behind NAT cannot always see either from the inside. */
+    readonly publicIp: string | null;
+    readonly serverIp: string | null;
 }
 
 const SOURCE_CHOICES: { value: UpdateSource; label: string; }[] = [
@@ -76,6 +69,16 @@ function formatChecked(iso: string, format: DisplayFormat): string {
 // Last auto-check timestamp, module-level so the 30s throttle survives navigating
 // away and back within the session.
 let lastAutoCheck = 0;
+
+/** Floor between two automatic checks, so returning to the tab a few times in a row
+ *  does not re-ask on every one. */
+const AUTO_CHECK_FLOOR_MS = 30_000;
+
+/** How often the open page re-asks on its own. The answer is cached server-side for
+ *  ten minutes and shared by every tab, so this costs a request rather than a GitHub
+ *  call, and a build published while the page is open shows up without being asked
+ *  for. */
+const AUTO_CHECK_MS = 5 * 60_000;
 
 /** How much of a finished run's log to show. Matches the endpoint's chunk cap, so
  *  the tail arrives in one read. */
@@ -167,6 +170,9 @@ export function SettingsView({
     const [logText, setLogText] = useState("");
     const [logResult, setLogResult] = useState<UpdateResult | null>(null);
     const [reporting, setReporting] = useState(false);
+    // Followed rather than read once: removing an address changes the list, and the
+    // page that did it must not keep offering the entry it has just taken away.
+    const [addresses, setAddresses] = useState(deployment.addresses);
     // The build that was serving when this run started. A different one answering
     // later means the new dashboard has taken over - the completion signal that
     // survives the updater being cut off by the restart it is performing.
@@ -217,13 +223,39 @@ export function SettingsView({
         onCheck(true);
     }
 
-    // Refresh on entering the page, throttled to once per 30s across visits so
-    // opening Settings always shows a current result without a manual click.
+    // Whether asking again right now would be pointless. Kept in a ref because the
+    // timer below is installed once and would otherwise keep testing the values of
+    // the render that installed it.
+    const busy = useRef(false);
     useEffect(() => {
-        if (Date.now() - lastAutoCheck > 30_000) {
-            lastAutoCheck = Date.now();
-            onCheck(false);
-        }
+        busy.current = pending || updating;
+    });
+
+    /** Ask again, unless one has just been asked or an update is running. Unforced:
+     *  the server holds one answer for every tab, so this costs a request rather than
+     *  a call to GitHub. */
+    function autoCheck(): void {
+        if (busy.current || Date.now() - lastAutoCheck < AUTO_CHECK_FLOOR_MS) return;
+        lastAutoCheck = Date.now();
+        onCheck(false);
+    }
+
+    // Ask on arrival, on a timer while the page stays open, and when the tab is looked
+    // at again - a machine that slept through several intervals is exactly the case
+    // where the timer on its own comes back with an answer from before it slept.
+    useEffect(() => {
+        autoCheck();
+        const timer = setInterval(() => {
+            if (document.visibilityState === "visible") autoCheck();
+        }, AUTO_CHECK_MS);
+        const onVisible = (): void => {
+            if (document.visibilityState === "visible") autoCheck();
+        };
+        document.addEventListener("visibilitychange", onVisible);
+        return () => {
+            clearInterval(timer);
+            document.removeEventListener("visibilitychange", onVisible);
+        };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
@@ -652,42 +684,17 @@ export function SettingsView({
                 <CardBody className="flex flex-col gap-4">
                     <div className="flex flex-col gap-1.5">
                         <span className="text-sm text-muted-foreground">Reachable at</span>
-                        {deployment.addresses.length === 0 ? (
-                            <p className="text-sm">No address is configured for this deployment.</p>
-                        ) : (
-                            deployment.addresses.map((address) => (
-                                <div key={address.host} className="flex items-center gap-2 text-sm">
-                                    <a
-                                        className={`truncate font-medium hover:underline ${
-                                            address.health.state === "down" ? "text-muted-foreground" : "text-primary"
-                                        }`}
-                                        href={address.url}
-                                        target="_blank"
-                                        rel="noreferrer"
-                                    >
-                                        {address.url}
-                                    </a>
-                                    <ExternalLink className="size-3 shrink-0 text-muted-foreground" />
-                                    <span className="shrink-0 text-xs text-muted-foreground">
-                                        {ADDRESS_KINDS[address.kind]}
-                                    </span>
-                                    {address.health.state === "down" ? (
-                                        <span
-                                            className="flex shrink-0 items-center gap-1 text-xs text-warning"
-                                            title={downDetail(address.health, format)}
-                                        >
-                                            <TriangleAlert className="size-3" />
-                                            not answering
-                                        </span>
-                                    ) : null}
-                                    <CopyButton value={address.url} label={address.host} className="ml-auto" />
-                                </div>
-                            ))
-                        )}
+                        <AddressList addresses={addresses} onChanged={setAddresses} manageHref="/admin/domains" />
                     </div>
                     <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
                         <Row label="Local hostname" value={`${deployment.hostname}.local`} />
-                        <Row label="Repository" value={deployment.repo} />
+                        <Row label="Server IP" value={deployment.serverIp ?? "unknown"} />
+                        <Row label="Public IP" value={deployment.publicIp ?? "not detected"} />
+                        <Row
+                            label="Repository"
+                            value={deployment.repo}
+                            href={`https://github.com/${deployment.repo}`}
+                        />
                         <Row label="Release branch" value={deployment.branch} />
                     </dl>
                 </CardBody>
@@ -696,11 +703,19 @@ export function SettingsView({
     );
 }
 
-function Row({ label, value }: { label: string; value: string; }) {
+function Row({ label, value, href }: { label: string; value: string; href?: string; }) {
     return (
         <>
             <dt className="text-muted-foreground">{label}</dt>
-            <dd className="truncate font-medium">{value}</dd>
+            <dd className="truncate font-medium">
+                {href ? (
+                    <a className="text-primary hover:underline" href={href} target="_blank" rel="noreferrer">
+                        {value}
+                    </a>
+                ) : (
+                    value
+                )}
+            </dd>
         </>
     );
 }
