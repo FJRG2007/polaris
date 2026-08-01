@@ -8,8 +8,11 @@
  * so it needs no wiring from the parent beyond the selection.
  */
 
-import { useState, type FormEvent } from "react";
+import type { DriveEntry } from "./types";
 import { useRouter } from "next/navigation";
+import { generateZipAction } from "./actions";
+import { useState, type FormEvent } from "react";
+import { createShareAction } from "./share-actions";
 import { Check, Copy, FileArchive } from "lucide-react";
 import {
     Button,
@@ -25,9 +28,6 @@ import {
     DropdownMenuTrigger,
     Input
 } from "@polaris/ui";
-import type { DriveEntry } from "./types";
-import { generateZipAction } from "./actions";
-import { createShareAction } from "./share-actions";
 
 export function SelectionZipMenu({
     connectionId,
@@ -103,9 +103,9 @@ export function SelectionZipMenu({
         <Dialog open={open} onOpenChange={setOpen}>
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                    <Button size="sm" variant="ghost">
+                    <Button size="sm" variant="ghost" title="Zip" aria-label="Zip">
                         <FileArchive className="size-4" />
-                        Zip
+                        <span className="hidden sm:inline">Zip</span>
                     </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
@@ -152,6 +152,10 @@ export function SelectionZipMenu({
                         </label>
                         <label className="flex flex-col gap-1 text-sm">
                             Password (optional, encrypts the zip)
+                            {/* enigma:allow-no-breach-check enigma:allow-identity-password -
+                                this is the archive's own passphrase, not a credential: it
+                                authenticates nothing and there is no account behind it to
+                                compare against or to stuff a leaked list into. */}
                             <Input name="password" type="password" autoComplete="new-password" />
                         </label>
                         {error ? <p className="text-sm text-danger">{error}</p> : null}

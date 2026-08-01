@@ -441,7 +441,7 @@ function FilesTab({
         <Card>
             <CardBody className="p-0">
                 <div className="max-h-[55vh] overflow-auto">
-                    <table className="w-full text-sm">
+                    <table className="w-full min-w-[42rem] text-sm">
                         <thead className="sticky top-0 bg-card text-left text-xs text-muted-foreground">
                             <tr>
                                 <th className="px-4 py-2 font-medium">File</th>
@@ -513,7 +513,7 @@ function VisitorsTab({ visitors }: { visitors: VisitorRow[] }) {
         <Card>
             <CardBody className="p-0">
                 <div className="max-h-[55vh] overflow-auto">
-                    <table className="w-full text-sm">
+                    <table className="w-full min-w-[42rem] text-sm">
                         <thead className="sticky top-0 bg-card text-left text-xs text-muted-foreground">
                             <tr>
                                 <th className="px-4 py-2 font-medium">IP</th>

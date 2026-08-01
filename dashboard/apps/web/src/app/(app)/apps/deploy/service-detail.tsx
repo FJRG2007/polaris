@@ -1169,7 +1169,7 @@ function VariablesTab({ app }: { app: ProjectApp }) {
                                 <button
                                     type="button"
                                     onClick={() => toggleReveal(item)}
-                                    className="text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100"
+                                    className="text-muted-foreground transition-opacity hover:text-foreground md:opacity-0 md:group-hover:opacity-100"
                                     aria-label={shown ? "Hide value" : "Reveal value"}
                                 >
                                     {shown ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
@@ -1178,7 +1178,7 @@ function VariablesTab({ app }: { app: ProjectApp }) {
                                     type="button"
                                     title="Remove"
                                     onClick={() => startTransition(async () => { await deployActions.deleteEnvVarAction(item.id); reload(); })}
-                                    className="text-muted-foreground opacity-0 transition-opacity hover:text-danger group-hover:opacity-100"
+                                    className="text-muted-foreground transition-opacity hover:text-danger md:opacity-0 md:group-hover:opacity-100"
                                 >
                                     <Trash2 className="size-4" />
                                 </button>
@@ -1427,7 +1427,7 @@ function ExposureRow({
                         title={removeLabel ?? "Remove"}
                         onClick={onRemove}
                         disabled={pending}
-                        className="text-muted-foreground opacity-0 transition-opacity hover:text-danger group-hover:opacity-100 disabled:opacity-50"
+                        className="text-muted-foreground transition-opacity hover:text-danger disabled:opacity-50 md:opacity-0 md:group-hover:opacity-100"
                     >
                         {pending ? <Loader2 className="size-3.5 animate-spin" /> : <X className="size-3.5" />}
                     </button>
@@ -1911,7 +1911,7 @@ function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
                                     type="button"
                                     title="Remove domain"
                                     onClick={() => startTransition(async () => { await deployActions.removeDomainAction(domain.id); onChanged(); })}
-                                    className="text-muted-foreground opacity-0 transition-opacity hover:text-danger group-hover:opacity-100"
+                                    className="text-muted-foreground transition-opacity hover:text-danger md:opacity-0 md:group-hover:opacity-100"
                                 >
                                     <Trash2 className="size-3.5" />
                                 </button>

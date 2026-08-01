@@ -6,16 +6,16 @@
  * shows an "N/M services online" status. Clicking a card opens the project.
  */
 
-import { useMemo, useState, useTransition } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
 import Fuse from "fuse.js";
-import { LayoutGrid, List, Loader2, Plus, Rocket, Search, ShieldCheck } from "lucide-react";
-import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, Input } from "@polaris/ui";
+import Link from "next/link";
+import { WafDialog } from "./waf-editor";
+import { useRouter } from "next/navigation";
+import { createProjectAction } from "./actions";
+import { useMemo, useState, useTransition } from "react";
 import { ServiceIcon, type ServiceKind } from "./deploy-view";
 import { RegistryCredentialsButton } from "./registry-credentials";
-import { WafDialog } from "./waf-editor";
-import { createProjectAction } from "./actions";
+import { LayoutGrid, List, Loader2, Plus, Rocket, Search, ShieldCheck } from "lucide-react";
+import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, Input } from "@polaris/ui";
 
 export interface ProjectCardData {
     id: string;
@@ -46,10 +46,10 @@ export function ProjectsGrid({
 
     return (
         <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
-            <div className="flex items-center justify-between gap-4">
+            <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
                 <h1 className="text-2xl font-semibold">Projects</h1>
                 {canManage && (
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                         {canManageGlobal && (
                             <Button variant="ghost" size="icon" title="Global firewall rules" onClick={() => setShowFirewall(true)}>
                                 <ShieldCheck className="size-4" />

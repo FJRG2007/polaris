@@ -84,7 +84,7 @@ export function ServersView({ servers }: { servers: ServerRow[] }) {
 
     return (
         <div className="flex flex-col gap-4">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-2">
                 <h2 className="text-sm font-medium text-muted-foreground">Servers</h2>
                 <HostDialog />
             </div>
@@ -104,7 +104,9 @@ export function ServersView({ servers }: { servers: ServerRow[] }) {
             ) : null}
 
             <div className="overflow-x-auto rounded-lg border border-border">
-                <table className="w-full text-sm">
+                {/* Six columns of address, status and auth do not compress into a phone,
+                    so the table keeps its width and the wrapper scrolls instead. */}
+                <table className="w-full min-w-[46rem] text-sm">
                     <thead className="bg-surface/60 text-left text-xs text-muted-foreground">
                         <tr>
                             <th className="px-3 py-2 font-medium">Server</th>

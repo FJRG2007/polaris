@@ -12,6 +12,30 @@
  * every keystroke.
  */
 
+import Fuse from "fuse.js";
+import Link from "next/link";
+import type { DriveEntry } from "./types";
+import { FolderTree } from "./folder-tree";
+import { fileIconFor } from "./file-icons";
+import { useRouter } from "next/navigation";
+import { formatBytes } from "@polaris/core";
+import { ArchiveDialog } from "./archive-dialog";
+import { useDriveInsights } from "./use-drive-insights";
+import { SelectionZipMenu } from "./selection-zip-menu";
+import { useVirtualizer } from "@tanstack/react-virtual";
+import { RelativeTime } from "@/components/relative-time";
+import { matchShortcut, SHORTCUT_HINTS } from "./shortcuts";
+import { useDisplayFormat } from "@/components/display-format";
+import { matchesStructured, parseSearch } from "./search-query";
+import { UserProfileDialog } from "@/components/user-profile-dialog";
+import { FilePreview, isViewable, type ViewerTarget } from "./file-viewer";
+import { ITEM_ICONS, ITEM_ICON_COLORS, iconColorClass, iconComponent } from "./item-icons";
+import {
+    FILE_CATEGORIES,
+    categoryOfExtension,
+    extensionOf,
+    type FileCategory
+} from "./file-categories";
 import {
     useEffect,
     useMemo,
@@ -21,10 +45,32 @@ import {
     type MouseEvent,
     type ReactNode
 } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useVirtualizer } from "@tanstack/react-virtual";
-import Fuse from "fuse.js";
+import {
+    Badge,
+    Button,
+    Checkbox,
+    ContextMenu,
+    ContextMenuContent,
+    ContextMenuItem,
+    ContextMenuLabel,
+    ContextMenuSeparator,
+    ContextMenuSub,
+    ContextMenuSubContent,
+    ContextMenuSubTrigger,
+    ContextMenuTrigger,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+    Input,
+    Skeleton,
+    cn
+} from "@polaris/ui";
 import {
     ArrowDownAZ,
     ArrowUpAZ,
@@ -66,52 +112,6 @@ import {
     X,
     type LucideIcon
 } from "lucide-react";
-import { formatBytes } from "@polaris/core";
-import {
-    Badge,
-    Button,
-    Checkbox,
-    ContextMenu,
-    ContextMenuContent,
-    ContextMenuItem,
-    ContextMenuLabel,
-    ContextMenuSeparator,
-    ContextMenuSub,
-    ContextMenuSubContent,
-    ContextMenuSubTrigger,
-    ContextMenuTrigger,
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle,
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuTrigger,
-    Input,
-    Skeleton,
-    cn
-} from "@polaris/ui";
-import {
-    FILE_CATEGORIES,
-    categoryOfExtension,
-    extensionOf,
-    type FileCategory
-} from "./file-categories";
-import { FilePreview, isViewable, type ViewerTarget } from "./file-viewer";
-import { ITEM_ICONS, ITEM_ICON_COLORS, iconColorClass, iconComponent } from "./item-icons";
-import { matchesStructured, parseSearch } from "./search-query";
-import { matchShortcut, SHORTCUT_HINTS } from "./shortcuts";
-import { useDriveInsights } from "./use-drive-insights";
-import { SelectionZipMenu } from "./selection-zip-menu";
-import { ArchiveDialog } from "./archive-dialog";
-import { FolderTree } from "./folder-tree";
-import { fileIconFor } from "./file-icons";
-import { RelativeTime } from "@/components/relative-time";
-import { useDisplayFormat } from "@/components/display-format";
-import { UserProfileDialog } from "@/components/user-profile-dialog";
-import type { DriveEntry } from "./types";
 
 type SortKey = "name" | "created" | "modified" | "size";
 type SortDir = "asc" | "desc";
@@ -780,6 +780,11 @@ export function FilesView({
 
     const selectedEntries = visible.filter((entry) => selected.has(entry.path));
     const allSelected = visible.length > 0 && selectedEntries.length === visible.length;
+    // Anything but a single file comes down as an archive, and the button says so.
+    const zipLabel =
+        selectedEntries.length > 1 || selectedEntries.some((entry) => entry.kind === "dir")
+            ? "Download ZIP"
+            : "Download";
     const searchError = useMemo(() => parseSearch(query).error, [query]);
 
     // Items marked for a cut are shown dimmed until pasted, the way a file
@@ -1341,7 +1346,7 @@ export function FilesView({
                 )}
             >
                 <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                    <div className="flex min-w-0 items-center gap-1 text-sm text-muted-foreground">
+                    <div className="flex min-w-0 flex-wrap items-center gap-1 text-sm text-muted-foreground">
                         <Link
                             href={href(connectionId, "")}
                             {...segmentDropProps("")}
@@ -1373,12 +1378,23 @@ export function FilesView({
                             );
                         })}
                     </div>
-                    <div className="flex items-center gap-2">
+                    {/* Below `sm` these are the icons alone: the row carries up to six
+                        actions, and their labels together are wider than a phone. */}
+                    <div className="flex flex-wrap items-center justify-end gap-1.5 sm:gap-2">
                         {headerActions}
                         {clipboard ? (
-                            <Button size="sm" variant="ghost" onClick={paste} disabled={pending}>
+                            <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={paste}
+                                disabled={pending}
+                                title={`Paste ${clipboard.entries.length} items`}
+                                aria-label={`Paste ${clipboard.entries.length} items`}
+                            >
                                 <ClipboardPaste className="size-4" />
-                                Paste ({clipboard.entries.length})
+                                <span className="hidden sm:inline">
+                                    Paste ({clipboard.entries.length})
+                                </span>
                             </Button>
                         ) : null}
                         <Button
@@ -1389,9 +1405,10 @@ export function FilesView({
                             }
                             disabled={pending}
                             title={`Request files (${SHORTCUT_HINTS["request-files"]})`}
+                            aria-label="Request files"
                         >
                             <Inbox className="size-4" />
-                            Request files
+                            <span className="hidden sm:inline">Request files</span>
                         </Button>
                         <Button
                             size="sm"
@@ -1399,15 +1416,24 @@ export function FilesView({
                             onClick={onNewFolder}
                             disabled={pending}
                             title={`New folder (${SHORTCUT_HINTS["new-folder"]})`}
+                            aria-label="New folder"
                         >
                             <FolderPlus className="size-4" />
-                            New folder
+                            <span className="hidden sm:inline">New folder</span>
                         </Button>
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                                <Button size="sm" variant="secondary" disabled={uploading}>
+                                <Button
+                                    size="sm"
+                                    variant="secondary"
+                                    disabled={uploading}
+                                    title="Upload"
+                                    aria-label="Upload"
+                                >
                                     <Upload className="size-4" />
-                                    {uploading ? "Uploading..." : "Upload"}
+                                    <span className="hidden sm:inline">
+                                        {uploading ? "Uploading..." : "Upload"}
+                                    </span>
                                 </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
@@ -1686,18 +1712,19 @@ export function FilesView({
                 >
                     {selectedEntries.length > 0 ? (
                         <>
-                            <span className="font-medium">{selectedEntries.length} selected</span>
+                            <span className="shrink-0 font-medium">
+                                {selectedEntries.length} selected
+                            </span>
                             <div className="ml-auto flex items-center gap-1">
                                 <Button
                                     size="sm"
                                     variant="ghost"
                                     onClick={() => downloadSelection(connectionId, selectedEntries)}
+                                    title={zipLabel}
+                                    aria-label={zipLabel}
                                 >
                                     <Download className="size-4" />
-                                    {selectedEntries.length > 1 ||
-                                    selectedEntries.some((entry) => entry.kind === "dir")
-                                        ? "Download ZIP"
-                                        : "Download"}
+                                    <span className="hidden sm:inline">{zipLabel}</span>
                                 </Button>
                                 <SelectionZipMenu
                                     connectionId={connectionId}
@@ -1709,17 +1736,21 @@ export function FilesView({
                                     variant="ghost"
                                     onClick={() => onDelete(selectedEntries)}
                                     disabled={pending}
+                                    title="Delete"
+                                    aria-label="Delete"
                                 >
                                     <Trash2 className="size-4" />
-                                    Delete
+                                    <span className="hidden sm:inline">Delete</span>
                                 </Button>
                                 <Button
                                     size="sm"
                                     variant="ghost"
                                     onClick={() => setSelected(new Set())}
+                                    title="Clear selection"
+                                    aria-label="Clear selection"
                                 >
                                     <X className="size-4" />
-                                    Clear
+                                    <span className="hidden sm:inline">Clear</span>
                                 </Button>
                             </div>
                         </>

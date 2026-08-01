@@ -8,8 +8,26 @@
  * (rendered as native buttons or a poll per the channel's capabilities).
  */
 
+import type { Platform } from "@polaris/messaging";
+import { DiscordPeerFields } from "./discord-peer-fields";
+import { ConnectChannelDialog } from "./connect-channel-dialog";
+import { ChevronLeft, Loader2, MessagesSquare, Plus, Send, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { Loader2, MessagesSquare, Plus, Send, Trash2 } from "lucide-react";
+import {
+    PEER_HINT,
+    PLATFORM_LABEL,
+    PLATFORM_LOGO,
+    editablePeer,
+    humanPeerId
+} from "./platform-meta";
+import type {
+    AgentView,
+    ChannelView,
+    ContactIdentityView,
+    ContactView,
+    ConversationView,
+    MessageView
+} from "@/lib/messaging-service";
 import {
     Badge,
     Button,
@@ -35,24 +53,6 @@ import {
     sendMessageAction,
     startConversationAction
 } from "./actions";
-import type { Platform } from "@polaris/messaging";
-import type {
-    AgentView,
-    ChannelView,
-    ContactIdentityView,
-    ContactView,
-    ConversationView,
-    MessageView
-} from "@/lib/messaging-service";
-import { ConnectChannelDialog } from "./connect-channel-dialog";
-import {
-    PEER_HINT,
-    PLATFORM_LABEL,
-    PLATFORM_LOGO,
-    editablePeer,
-    humanPeerId
-} from "./platform-meta";
-import { DiscordPeerFields } from "./discord-peer-fields";
 
 export function InboxView({
     initialChannels,
@@ -103,9 +103,9 @@ export function InboxView({
 
     return (
         <div className="flex h-[calc(100vh-8rem)] flex-col gap-3">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-2">
                 <h1 className="text-lg font-semibold tracking-tight">Inbox</h1>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                     <Button
                         size="sm"
                         variant="secondary"
@@ -120,8 +120,16 @@ export function InboxView({
                 </div>
             </div>
 
+            {/* Two panes side by side once there is room for both. On a phone they
+                take turns: the list until a conversation is picked, the thread after,
+                with the thread's own back arrow returning to the list. */}
             <div className="flex min-h-0 flex-1 gap-3">
-                <Card className="flex w-72 shrink-0 flex-col overflow-hidden">
+                <Card
+                    className={cn(
+                        "flex w-full shrink-0 flex-col overflow-hidden md:w-72",
+                        active && "hidden md:flex"
+                    )}
+                >
                     <CardBody className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto p-2">
                         {conversations.length === 0 ? (
                             <div className="flex flex-col items-start gap-2 p-3">
@@ -195,12 +203,18 @@ export function InboxView({
                     </CardBody>
                 </Card>
 
-                <Card className="flex min-w-0 flex-1 flex-col overflow-hidden">
+                <Card
+                    className={cn(
+                        "flex min-w-0 flex-1 flex-col overflow-hidden",
+                        !active && "hidden md:flex"
+                    )}
+                >
                     {active ? (
                         <Thread
                             key={active.id}
                             conversation={active}
                             agents={agents}
+                            onBack={() => setActiveId(null)}
                             onSent={refreshConversations}
                             onDeleted={() => {
                                 setActiveId(null);
@@ -246,11 +260,14 @@ export function InboxView({
 function Thread({
     conversation,
     agents,
+    onBack,
     onSent,
     onDeleted
 }: {
     conversation: ConversationView;
     agents: AgentView[];
+    /** Returns to the conversation list, on viewports showing one pane at a time. */
+    onBack: () => void;
     onSent: () => void;
     onDeleted: () => void;
 }) {
@@ -344,15 +361,27 @@ function Thread({
 
     return (
         <div className="flex min-h-0 flex-1 flex-col">
-            <div className="flex items-center justify-between gap-2 border-b border-border p-3">
-                <div className="min-w-0">
-                    <p className="truncate text-sm font-medium">
-                        {conversation.peerName ??
-                            humanPeerId(conversation.platform, conversation.peerId)}
-                    </p>
-                    <p className="truncate text-xs text-muted-foreground">
-                        {conversation.channelName}
-                    </p>
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border p-3">
+                <div className="flex min-w-0 flex-1 items-center gap-2">
+                    <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={onBack}
+                        aria-label="Back to conversations"
+                        title="Back to conversations"
+                        className="-ml-1 shrink-0 md:hidden"
+                    >
+                        <ChevronLeft className="size-4" />
+                    </Button>
+                    <div className="min-w-0">
+                        <p className="truncate text-sm font-medium">
+                            {conversation.peerName ??
+                                humanPeerId(conversation.platform, conversation.peerId)}
+                        </p>
+                        <p className="truncate text-xs text-muted-foreground">
+                            {conversation.channelName}
+                        </p>
+                    </div>
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
                     <Select
@@ -367,7 +396,7 @@ function Thread({
                             { value: "none", label: "Unassigned" },
                             ...agents.map((agent) => ({ value: agent.id, label: agent.name }))
                         ]}
-                        className="h-8 w-40"
+                        className="h-8 w-32 sm:w-40"
                         aria-label="Assign agent"
                     />
                     <Button

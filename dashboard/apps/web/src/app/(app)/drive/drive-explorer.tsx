@@ -10,9 +10,17 @@
  * and (being a UniFi device) it also offers a shortcut to its own console.
  */
 
-import { useCallback, useEffect, useRef, useState, useTransition, type FormEvent } from "react";
 import Link from "next/link";
+import { FilesView } from "./files-view";
+import * as driveActions from "./actions";
 import { useRouter } from "next/navigation";
+import { UnifiConsoleButton } from "./unifi-console-button";
+import type { ConnectionSummary, DriveEntry } from "./types";
+import { ShareDialog, type ShareTarget } from "./share-dialog";
+import { RequestDialog, type RequestTarget } from "./request-dialog";
+import { ConnectionDialog, EditConnectionDialog } from "./connection-dialog";
+import { AccessDialog, UnlockPanel, type AccessTarget } from "./access-dialog";
+import { useCallback, useEffect, useRef, useState, useTransition, type FormEvent } from "react";
 import {
     AlertTriangle,
     Folder,
@@ -40,30 +48,6 @@ import {
     Skeleton,
     cn
 } from "@polaris/ui";
-import {
-    copyAction,
-    createFileAction,
-    deleteConnectionAction,
-    deleteEntryAction,
-    emptyFolderAction,
-    discoverUnasSharesAction,
-    mkdirAction,
-    moveToTrashAction,
-    renameAction,
-    scheduleDeleteAction,
-    setItemFavoriteAction,
-    setItemHiddenAction,
-    setItemIconAction,
-    setItemNoteAction,
-    setUnasShareAction
-} from "./actions";
-import { AccessDialog, UnlockPanel, type AccessTarget } from "./access-dialog";
-import { ConnectionDialog, EditConnectionDialog } from "./connection-dialog";
-import { FilesView } from "./files-view";
-import { RequestDialog, type RequestTarget } from "./request-dialog";
-import { ShareDialog, type ShareTarget } from "./share-dialog";
-import { UnifiConsoleButton } from "./unifi-console-button";
-import type { ConnectionSummary, DriveEntry } from "./types";
 
 /** Parent path of a relative path ("a/b/c" -> "a/b", "a" -> ""). */
 function parentOf(path: string): string {
@@ -250,7 +234,7 @@ export function DriveExplorer({
         if (!connectionId || !name) return;
         setNewFolderOpen(false);
         setNewFolderName("");
-        runOp(`Creating ${name}`, () => mkdirAction(connectionId, path, name));
+        runOp(`Creating ${name}`, () => driveActions.mkdirAction(connectionId, path, name));
     }
 
     function onRename(entry: DriveEntry, nextName: string) {
@@ -264,7 +248,7 @@ export function DriveExplorer({
         );
         setOpError(null);
         startTransition(async () => {
-            const result = await renameAction(connectionId, entry.path, to);
+            const result = await driveActions.renameAction(connectionId, entry.path, to);
             if (result?.error) setOpError(result.error);
             void load();
         });
@@ -277,7 +261,7 @@ export function DriveExplorer({
             prev.map((row) => (row.path === entry.path ? { ...row, hidden: next } : row))
         );
         startTransition(async () => {
-            await setItemHiddenAction(connectionId, entry.path, next);
+            await driveActions.setItemHiddenAction(connectionId, entry.path, next);
             void load();
         });
     }
@@ -288,7 +272,7 @@ export function DriveExplorer({
             prev.map((row) => (row.path === entry.path ? { ...row, favorite } : row))
         );
         startTransition(async () => {
-            await setItemFavoriteAction(connectionId, entry.path, favorite);
+            await driveActions.setItemFavoriteAction(connectionId, entry.path, favorite);
             void load();
         });
     }
@@ -299,7 +283,7 @@ export function DriveExplorer({
             prev.map((row) => (row.path === entry.path ? { ...row, icon, iconColor: color } : row))
         );
         startTransition(async () => {
-            await setItemIconAction(connectionId, entry.path, icon, color);
+            await driveActions.setItemIconAction(connectionId, entry.path, icon, color);
             void load();
         });
     }
@@ -310,14 +294,14 @@ export function DriveExplorer({
         if (!connectionId || !name) return;
         setNewFileOpen(false);
         setNewFileName("Untitled.txt");
-        runOp(`Creating ${name}`, () => createFileAction(connectionId, path, name));
+        runOp(`Creating ${name}`, () => driveActions.createFileAction(connectionId, path, name));
     }
 
     function onSetNote(entry: DriveEntry, note: string | null) {
         if (!connectionId) return;
         setEntries((prev) => prev.map((row) => (row.path === entry.path ? { ...row, note } : row)));
         startTransition(async () => {
-            await setItemNoteAction(connectionId, entry.path, note);
+            await driveActions.setItemNoteAction(connectionId, entry.path, note);
             void load();
         });
     }
@@ -329,12 +313,12 @@ export function DriveExplorer({
         // or its own parent would otherwise flash the row out and back).
         if (to === entry.path) return;
         setEntries((prev) => prev.filter((row) => row.path !== entry.path));
-        runOp(`Moving ${entry.name}`, () => renameAction(connectionId, entry.path, to));
+        runOp(`Moving ${entry.name}`, () => driveActions.renameAction(connectionId, entry.path, to));
     }
 
     function onCopy(entry: DriveEntry, destFolderPath: string) {
         if (!connectionId) return;
-        runOp(`Copying ${entry.name}`, () => copyAction(connectionId, entry.path, destFolderPath));
+        runOp(`Copying ${entry.name}`, () => driveActions.copyAction(connectionId, entry.path, destFolderPath));
     }
 
     function confirmDelete() {
@@ -349,7 +333,7 @@ export function DriveExplorer({
                 : `Moving ${targets.length} items to Trash`;
         runOp(label, async () => {
             for (const entry of targets) {
-                await moveToTrashAction(connectionId, entry.path);
+                await driveActions.moveToTrashAction(connectionId, entry.path);
             }
         });
     }
@@ -366,7 +350,7 @@ export function DriveExplorer({
                 : `Deleting ${targets.length} items permanently`;
         runOp(label, async () => {
             for (const entry of targets) {
-                await deleteEntryAction(connectionId, entry.path);
+                await driveActions.deleteEntryAction(connectionId, entry.path);
             }
         });
     }
@@ -376,7 +360,7 @@ export function DriveExplorer({
         const { entry, permanent } = emptyTarget;
         setEmptyTarget(null);
         const label = permanent ? `Emptying ${entry.name}` : `Emptying ${entry.name} to Trash`;
-        runOp(label, () => emptyFolderAction(connectionId, entry.path, permanent));
+        runOp(label, () => driveActions.emptyFolderAction(connectionId, entry.path, permanent));
     }
 
     function confirmDeleteConnection() {
@@ -384,7 +368,7 @@ export function DriveExplorer({
         const target = deleteConn;
         setDeleteConn(null);
         startTransition(async () => {
-            await deleteConnectionAction(target.id);
+            await driveActions.deleteConnectionAction(target.id);
             router.push("/drive");
             router.refresh();
         });
@@ -440,7 +424,7 @@ export function DriveExplorer({
                                     <button
                                         type="button"
                                         onClick={() => setEditConn(connection)}
-                                        className="rounded-md p-1 text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100"
+                                        className="rounded-md p-1 text-muted-foreground transition-opacity hover:text-foreground md:opacity-0 md:group-hover:opacity-100"
                                         aria-label={`Edit ${connection.name}`}
                                     >
                                         <Pencil className="size-4" />
@@ -450,7 +434,7 @@ export function DriveExplorer({
                                     <button
                                         type="button"
                                         onClick={() => setDeleteConn(connection)}
-                                        className="rounded-md p-1 text-muted-foreground opacity-0 transition-opacity hover:text-danger group-hover:opacity-100"
+                                        className="rounded-md p-1 text-muted-foreground transition-opacity hover:text-danger md:opacity-0 md:group-hover:opacity-100"
                                         aria-label={`Remove ${connection.name}`}
                                     >
                                         <Trash2 className="size-4" />
@@ -575,9 +559,11 @@ export function DriveExplorer({
                                                         "This folder"
                                                 })
                                             }
+                                            title="Access"
+                                            aria-label="Access"
                                         >
                                             <ShieldCheck className="size-4" />
-                                            Access
+                                            <span className="hidden sm:inline">Access</span>
                                         </Button>
                                     ) : null}
                                     {selectedConnection?.kind === "unifi-unas" ? (
@@ -876,7 +862,7 @@ function ScheduleDeleteDialog({
         const iso = new Date(when).toISOString();
         let failure: string | null = null;
         for (const entry of targets) {
-            const result = await scheduleDeleteAction(connectionId, entry.path, iso, permanent);
+            const result = await driveActions.scheduleDeleteAction(connectionId, entry.path, iso, permanent);
             if (result.error) {
                 failure = result.error;
                 break;
@@ -963,7 +949,7 @@ function UnasSmbSetup({ connectionId, onSaved }: { connectionId: string; onSaved
         let active = true;
         setDiscovering(true);
         setError(null);
-        discoverUnasSharesAction(connectionId).then((result) => {
+        driveActions.discoverUnasSharesAction(connectionId).then((result) => {
             if (!active) return;
             setDiscovering(false);
             if (result.error) setError(result.error);
@@ -978,7 +964,7 @@ function UnasSmbSetup({ connectionId, onSaved }: { connectionId: string; onSaved
         if (!name.trim()) return;
         setPending(true);
         setError(null);
-        const result = await setUnasShareAction(connectionId, name);
+        const result = await driveActions.setUnasShareAction(connectionId, name);
         setPending(false);
         if (result.error) {
             setError(result.error);

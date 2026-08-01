@@ -145,7 +145,7 @@ export function InstalledAppDashboard({ app }: { app: InstalledAppDetail }) {
 
             <Card>
                 <CardBody className="flex flex-col gap-2">
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
                         <button
                             type="button"
                             onClick={() => setShowLogs((value) => !value)}

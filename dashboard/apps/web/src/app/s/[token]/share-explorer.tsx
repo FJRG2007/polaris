@@ -1056,7 +1056,7 @@ export function ShareExplorer({
                                                     <span className="w-20 text-right text-xs text-muted-foreground">
                                                         {entry.kind === "dir" ? "-" : formatBytes(BigInt(entry.size))}
                                                     </span>
-                                                    <span className="flex w-16 items-center justify-end gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                                                    <span className="flex w-16 items-center justify-end gap-0.5 transition-opacity md:opacity-0 md:group-hover:opacity-100">
                                                         {rowActions(entry)}
                                                     </span>
                                                 </div>

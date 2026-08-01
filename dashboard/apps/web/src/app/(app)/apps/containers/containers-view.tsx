@@ -8,16 +8,16 @@
  * permission before touching Docker.
  */
 
-import { useEffect, useState, useTransition, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Boxes, Cpu, MemoryStick, Play, RefreshCw, RotateCw, Server, Square, Trash2 } from "lucide-react";
 import { formatBytes } from "@polaris/core";
-import { Badge, Button, Card, CardBody, cn } from "@polaris/ui";
-import { containerAction, deleteDockerConnectionAction } from "./actions";
-import { DockerConnectionDialog } from "./docker-connection-dialog";
 import { useConfirm } from "@/components/confirm-dialog";
+import { Badge, Button, Card, CardBody, cn } from "@polaris/ui";
+import { DockerConnectionDialog } from "./docker-connection-dialog";
+import { containerAction, deleteDockerConnectionAction } from "./actions";
+import { useEffect, useState, useTransition, type ReactNode } from "react";
 import type { ContainerRow, DockerConnectionSummary, LocalHostDiagnostic, OverviewData } from "./types";
+import { Boxes, Cpu, MemoryStick, Play, RefreshCw, RotateCw, Server, Square, Trash2 } from "lucide-react";
 
 const REFRESH_MS = 5000;
 
@@ -68,7 +68,7 @@ export function ContainersView({
     return (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-[16rem_1fr]">
             <aside className="flex flex-col gap-3">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-wrap items-center justify-between gap-2">
                     <h2 className="text-sm font-medium text-muted-foreground">Docker hosts</h2>
                     <DockerConnectionDialog sshEnabled={sshEnabled} />
                 </div>
@@ -95,7 +95,7 @@ export function ContainersView({
                                         variant="ghost"
                                         onClick={() => onDeleteConnection(connection.id)}
                                         aria-label={`Remove ${connection.name}`}
-                                        className="opacity-0 group-hover:opacity-100"
+                                        className="md:opacity-0 md:group-hover:opacity-100"
                                     >
                                         <Trash2 className="size-4" />
                                     </Button>
@@ -163,8 +163,8 @@ export function ContainersView({
                             </div>
                         </div>
 
-                        <div className="overflow-hidden rounded-lg border border-border">
-                            <table className="w-full text-sm">
+                        <div className="overflow-x-auto rounded-lg border border-border">
+                            <table className="w-full min-w-[38rem] text-sm">
                                 <thead className="bg-surface/60 text-left text-xs text-muted-foreground">
                                     <tr>
                                         <th className="px-3 py-2 font-medium">Container</th>

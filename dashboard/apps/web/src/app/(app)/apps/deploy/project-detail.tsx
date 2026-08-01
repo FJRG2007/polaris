@@ -7,15 +7,15 @@
  * project itself are in-app, confirmation-gated actions.
  */
 
-import { useEffect, useState, useTransition, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { WafDialog } from "./waf-editor";
 import { useRouter } from "next/navigation";
+import { DeployCanvas } from "./deploy-canvas";
+import { ServiceDetail } from "./service-detail";
+import { useEffect, useState, useTransition, type ReactNode } from "react";
 import { List, Loader2, Plus, ShieldCheck, Trash2, Waypoints } from "lucide-react";
 import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, Input, Select } from "@polaris/ui";
 import { EnvironmentServices, NewServiceButton, type ProjectApp, type ProjectSummary } from "./deploy-view";
-import { DeployCanvas } from "./deploy-canvas";
-import { ServiceDetail } from "./service-detail";
-import { WafDialog } from "./waf-editor";
 import { createEnvironmentAction, createProjectAction, deleteEnvironmentAction, deleteProjectAction } from "./actions";
 
 // Sentinel option values: picking one opens a create dialog instead of switching.
@@ -65,26 +65,43 @@ export function ProjectDetail({
         ? [{ value: NEW_ENV, label: "New environment", icon: <Plus className="size-3.5 text-muted-foreground" /> }]
         : [];
 
+    const projectSelect = (
+        <Select
+            value={project.id}
+            onValueChange={(id) => (id === NEW_PROJECT ? setShowNewProject(true) : router.push(`/apps/deploy/${id}`))}
+            options={[...projects.map((item) => ({ value: item.id, label: item.name })), ...newProjectOption]}
+            className="h-8 min-w-0 flex-1 font-medium md:w-44 md:min-w-[11rem] md:flex-none"
+            aria-label="Project"
+        />
+    );
+    const environmentSelect = (
+        <Select
+            value={active?.id ?? ""}
+            onValueChange={(id) => (id === NEW_ENV ? setShowNewEnv(true) : setActiveId(id))}
+            options={[...environments.map((env) => ({ value: env.id, label: env.name })), ...newEnvOption]}
+            className="h-8 min-w-0 flex-1 md:w-52 md:min-w-[13rem] md:flex-none"
+            aria-label="Environment"
+        />
+    );
+
     return (
         <div className="flex w-full flex-col gap-4">
+            {/* The two switchers sit in the top bar where there is room for them
+                beside the app switcher, and at the top of the page where there is
+                not - the same controls, never both visible at once. */}
             <HeaderPortal>
-                <span className="text-muted-foreground/40">/</span>
-                <Select
-                    value={project.id}
-                    onValueChange={(id) => (id === NEW_PROJECT ? setShowNewProject(true) : router.push(`/apps/deploy/${id}`))}
-                    options={[...projects.map((item) => ({ value: item.id, label: item.name })), ...newProjectOption]}
-                    className="h-8 w-44 min-w-[11rem] shrink-0 font-medium"
-                    aria-label="Project"
-                />
-                <span className="text-muted-foreground/40">/</span>
-                <Select
-                    value={active?.id ?? ""}
-                    onValueChange={(id) => (id === NEW_ENV ? setShowNewEnv(true) : setActiveId(id))}
-                    options={[...environments.map((env) => ({ value: env.id, label: env.name })), ...newEnvOption]}
-                    className="h-8 w-52 min-w-[13rem] shrink-0"
-                    aria-label="Environment"
-                />
+                <span className="hidden text-muted-foreground/40 md:inline">/</span>
+                <span className="hidden items-center gap-2 md:flex">
+                    {projectSelect}
+                    <span className="text-muted-foreground/40">/</span>
+                    {environmentSelect}
+                </span>
             </HeaderPortal>
+
+            <div className="flex items-center gap-2 md:hidden">
+                {projectSelect}
+                {environmentSelect}
+            </div>
 
             {!localReady && canManage && (
                 <div className="rounded-lg border border-warning/30 bg-warning/5 px-4 py-3 text-sm text-muted-foreground">
@@ -93,8 +110,8 @@ export function ProjectDetail({
                 </div>
             )}
 
-            <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex min-w-0 items-center gap-2">
                     {active && <EnvSummary environment={active} />}
                     {canManage && active && !active.isDefault && (
                         <DeleteEnvironmentButton
@@ -107,7 +124,7 @@ export function ProjectDetail({
                         />
                     )}
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                     {canManage && active && <NewServiceButton environmentId={active.id} onChanged={refresh} />}
                     {canManage && (
                         <Button variant="ghost" size="icon" title="Firewall rules" onClick={() => setShowFirewall(true)}>

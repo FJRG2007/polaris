@@ -85,7 +85,7 @@ export function JsonView({
                 <CopyButton
                     value={code}
                     label={label}
-                    className="absolute right-2 top-2 z-10 opacity-0 transition-opacity focus-visible:opacity-100 group-hover:opacity-100"
+                    className="absolute right-2 top-2 z-10 transition-opacity focus-visible:opacity-100 md:opacity-0 md:group-hover:opacity-100"
                 />
             ) : null}
             <Painted code={code} />
