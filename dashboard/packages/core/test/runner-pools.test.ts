@@ -9,7 +9,7 @@ import { describe, expect, it } from "vitest";
 import { createRunnerPoolSchema, updateRunnerPoolSchema } from "../src/schemas/runners.js";
 
 const valid = {
-    hostId: "0195f0a1-2b3c-7d4e-8f90-1a2b3c4d5e6f",
+    serverId: "0195f0a1-2b3c-7d4e-8f90-1a2b3c4d5e6f",
     name: "Build",
     scope: "repo" as const,
     targetOwner: "fjrg2007",
@@ -75,10 +75,24 @@ describe("createRunnerPoolSchema", () => {
     });
 });
 
+describe("the server a pool runs on", () => {
+    it("accepts the box Polaris runs on", () => {
+        expect(createRunnerPoolSchema.parse({ ...valid, serverId: "local" }).serverId).toBe("local");
+    });
+
+    it.each([
+        ["a name that is not an id", "lirio-0"],
+        ["a path traversal", "../local"],
+        ["nothing", ""]
+    ])("refuses %s as a server", (_case, serverId) => {
+        expect(createRunnerPoolSchema.safeParse({ ...valid, serverId }).success).toBe(false);
+    });
+});
+
 describe("updateRunnerPoolSchema", () => {
     it("cannot move a pool to another target", () => {
         const parsed = updateRunnerPoolSchema.parse({
-            id: valid.hostId,
+            id: valid.serverId,
             name: "Renamed",
             targetOwner: "somebody-else",
             scope: "org"
@@ -88,6 +102,6 @@ describe("updateRunnerPoolSchema", () => {
     });
 
     it("leaves absent fields absent rather than defaulting them", () => {
-        expect(updateRunnerPoolSchema.parse({ id: valid.hostId })).toEqual({ id: valid.hostId });
+        expect(updateRunnerPoolSchema.parse({ id: valid.serverId })).toEqual({ id: valid.serverId });
     });
 });

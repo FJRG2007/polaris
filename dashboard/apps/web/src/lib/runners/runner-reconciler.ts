@@ -20,9 +20,9 @@
 
 import { prisma } from "@polaris/db";
 import { randomUUID } from "node:crypto";
-import { RunnerHost } from "./runner-host";
-import { parseLabels } from "./runner-service";
+import { liveRunnerNames, parseLabels } from "./runner-service";
 import { resolveRunnerRelease, runnerPlatform } from "./runner-release";
+import { openRunnerMachine, poolServerId, type RunnerMachine } from "./runner-machine";
 import {
     createRunnerJitConfig,
     deleteGithubRunner,
@@ -80,19 +80,22 @@ async function reconcilePool(pool: PoolRow): Promise<void> {
     const registered = await listGithubRunners(target);
     const byName = new Map(registered.map((runner) => [runner.name, runner]));
 
-    const host = await RunnerHost.open(pool.hostId, pool.ownerId);
+    const machine = await openRunnerMachine(poolServerId(pool.hostId), pool.ownerId);
     try {
         const alive: string[] = [];
         for (const job of pool.jobs) {
-            const still = await settleJob(host, target, job, byName.get(job.name));
+            const still = await settleJob(machine, target, job, byName.get(job.name));
             if (still) alive.push(job.name);
         }
 
-        await fillSlots(host, pool, target, pool.maxConcurrent - alive.length, alive);
+        await fillSlots(machine, pool, target, pool.maxConcurrent - alive.length, alive);
         await dropOrphans(target, pool.name, registered, alive);
-        await host.sweep(alive);
+        // Swept against every pool's runners on this machine, not just this one's:
+        // two pools can share a server, and each row is written before its runner
+        // is started, so this set is never missing one that is about to appear.
+        await machine.sweep(await liveRunnerNames(pool.hostId));
     } finally {
-        host.close();
+        machine.close();
     }
 }
 
@@ -105,19 +108,19 @@ async function reconcilePool(pool: PoolRow): Promise<void> {
  * log, which is read here before the machine is cleaned.
  */
 async function settleJob(
-    host: RunnerHost,
+    machine: RunnerMachine,
     target: RunnerTarget,
     job: PoolRow["jobs"][number],
     registration: GithubRunner | undefined
 ): Promise<boolean> {
     const handle = job.handle ? { isolation: job.isolation as RunnerIsolation, handle: job.handle } : null;
-    if (handle && (await host.isAlive(handle))) {
+    if (handle && (await machine.isAlive(handle))) {
         const state: RunnerJobState = registration ? (registration.busy ? "busy" : "idle") : "starting";
         if (state !== job.state) await prisma.runnerJob.update({ where: { id: job.id }, data: { state } });
         return true;
     }
 
-    const log = handle ? await host.reap(job.name, handle).catch(() => "") : "";
+    const log = handle ? await machine.reap(job.name, handle).catch(() => "") : "";
     // "starting" means it never showed up in a GitHub listing, so it never
     // connected: this one did not run a job, it fell over.
     const failed = job.state === "starting";
@@ -138,7 +141,7 @@ async function settleJob(
 
 /** Start runners until the pool is back at its concurrency. */
 async function fillSlots(
-    host: RunnerHost,
+    machine: RunnerMachine,
     pool: PoolRow,
     target: RunnerTarget,
     missing: number,
@@ -146,21 +149,23 @@ async function fillSlots(
 ): Promise<void> {
     if (missing <= 0) return;
 
-    const probed = await host.probe();
+    const probed = await machine.probe();
     const platform = runnerPlatform(probed.platform, probed.arch);
     if (!platform) throw new Error(`GitHub publishes no runner for ${probed.platform} on ${probed.arch}`);
 
     const isolation = pool.isolation as RunnerIsolation;
     if (isolation === "container" && !probed.containerEngine) {
         throw new Error(
-            "This pool runs jobs in containers, and the Polaris login on the machine can no longer reach the container engine."
+            machine.reach === "engine"
+                ? "Polaris can no longer reach this machine's container engine, which is the only way it runs jobs here."
+                : "This pool runs jobs in containers, and the Polaris login on the machine can no longer reach the container engine."
         );
     }
 
     const release = await resolveRunnerRelease(platform);
     // Before any registration is minted: a machine that cannot get the runner
     // would otherwise leave a registered runner nothing will ever come for.
-    await host.prepare(release, isolation);
+    await machine.prepare(release, isolation);
 
     const labels = parseLabels(pool.labels);
     for (let slot = 0; slot < missing; slot += 1) {
@@ -176,7 +181,7 @@ async function fillSlots(
         await prisma.runnerJob.update({ where: { id: job.id }, data: { githubRunnerId: jit.runnerId } });
 
         try {
-            const handle = await host.start({ name, isolation, release, jitConfig: jit.encodedConfig });
+            const handle = await machine.start({ name, isolation, release, jitConfig: jit.encodedConfig });
             await prisma.runnerJob.update({ where: { id: job.id }, data: { handle: handle.handle } });
             alive.push(name);
         } catch (caught) {

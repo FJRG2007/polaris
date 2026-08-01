@@ -27,6 +27,7 @@ import type { RunnerIsolation } from "@polaris/core";
 import type { RunnerRelease } from "./runner-release";
 import { execCommand, openSshClient } from "@polaris/ssh";
 import { getHostConnection, type HostConnection } from "@/lib/host-service";
+import type { RunnerHandle, RunnerMachine, RunnerProbe } from "./runner-machine";
 
 /** Everything Polaris puts on a machine lives under one directory, so removing a
  *  server from Polaris leaves one thing to delete. */
@@ -51,18 +52,15 @@ export interface RunResult {
     readonly stderr: string;
 }
 
-/** Where one ephemeral runner can be found again on the machine. */
-export interface RunnerHandle {
-    readonly isolation: RunnerIsolation;
-    /** Container name, or the pid of the detached process. */
-    readonly handle: string;
-}
-
 /**
  * An open session on a machine that runs jobs. Held for the length of one
  * reconcile pass over a pool, so filling four slots costs one SSH handshake.
  */
-export class RunnerHost {
+export class RunnerHost implements RunnerMachine {
+    /** A registered server is driven through a login, which is what makes a
+     *  workspace job - a directory on the machine itself - possible at all. */
+    public readonly reach = "login" as const;
+
     private constructor(private readonly client: Client) {}
 
     /** Connect to a registered server. Fails closed on the host key, like every
@@ -107,17 +105,37 @@ export class RunnerHost {
     /**
      * What the machine can actually offer right now. Asked rather than remembered:
      * a container engine can be installed, removed, or have its group membership
-     * revoked long after the machine was enrolled.
+     * revoked long after the machine was enrolled, and the disk it would build in
+     * fills up without anybody telling Polaris.
+     *
+     * Every reading is optional. Each one falls back to the next way of asking and
+     * then to nothing, because a machine that will not say how much memory it has
+     * is still a machine that can run a job - it just cannot be sized.
      */
-    public async probe(): Promise<{ platform: string; arch: string; containerEngine: boolean }> {
+    public async probe(): Promise<RunnerProbe> {
         const result = await this.run(`echo "platform=$(uname -s | tr "[:upper:]" "[:lower:]")"
 echo "arch=$(uname -m)"
-if docker info >/dev/null 2>&1; then echo engine=yes; else echo engine=no; fi`);
+if docker info >/dev/null 2>&1; then echo engine=yes; else echo engine=no; fi
+echo "cpus=$(getconf _NPROCESSORS_ONLN 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 0)"
+MEM=$(awk '/^MemTotal:/ {print $2 * 1024}' /proc/meminfo 2>/dev/null || true)
+[ -n "$MEM" ] || MEM=$(sysctl -n hw.memsize 2>/dev/null || echo 0)
+echo "memory=$MEM"
+echo "disk=$(df -Pk "$HOME" 2>/dev/null | awk 'NR == 2 {print $4 * 1024}')"`);
+
         const read = (key: string): string => new RegExp(`^${key}=(.*)$`, "m").exec(result.stdout)?.[1]?.trim() ?? "";
+        const count = (key: string): number => {
+            const value = Number(read(key));
+            return Number.isFinite(value) && value > 0 ? value : 0;
+        };
         return {
             platform: read("platform"),
             arch: read("arch"),
-            containerEngine: read("engine") === "yes"
+            containerEngine: read("engine") === "yes",
+            resources: {
+                cpus: count("cpus"),
+                memoryBytes: count("memory"),
+                diskFreeBytes: count("disk") || null
+            }
         };
     }
 

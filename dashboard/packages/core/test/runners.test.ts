@@ -7,7 +7,9 @@
 
 import { describe, expect, it } from "vitest";
 import {
+    estimateRunnerCapacity,
     evaluateRunnerAccess,
+    MAX_RUNNER_CONCURRENCY,
     normalizeRunnerLabels,
     resolveRunnerIsolation,
     runnerName,
@@ -159,6 +161,70 @@ describe("resolveRunnerIsolation", () => {
         const resolved = resolveRunnerIsolation("workspace", { platform: "linux", containerEngine: true });
         expect(resolved.refusal).toBeNull();
         expect(resolved.note).toContain("not a boundary");
+    });
+
+    // The box Polaris runs on is reached through the host daemon's container
+    // engine. There is no login there to run a job under, and widening one to
+    // exist would undo the boundary the control plane sits behind.
+    it("refuses a workspace on the machine Polaris runs on", () => {
+        const resolved = resolveRunnerIsolation("workspace", {
+            platform: "linux",
+            containerEngine: true,
+            reach: "engine"
+        });
+        expect(resolved.refusal).toContain("containers");
+    });
+
+    it("still grants containers there", () => {
+        const resolved = resolveRunnerIsolation("container", {
+            platform: "linux",
+            containerEngine: true,
+            reach: "engine"
+        });
+        expect(resolved).toMatchObject({ isolation: "container", refusal: null });
+    });
+});
+
+const GB = 1024 ** 3;
+
+describe("estimateRunnerCapacity", () => {
+    it("sizes a pool from the tightest of what the machine has", () => {
+        // 8 processors and 33 GB of memory would allow more; 45 GB of free disk,
+        // minus what is left spare, is what actually decides it.
+        const capacity = estimateRunnerCapacity({ cpus: 8, memoryBytes: 33 * GB, diskFreeBytes: 45 * GB });
+        expect(capacity.recommended).toBe(4);
+        expect(capacity.refusal).toBeNull();
+        expect(capacity.note).toContain("4 jobs");
+    });
+
+    it("refuses a machine with nothing left to run a job with", () => {
+        const capacity = estimateRunnerCapacity({ cpus: 4, memoryBytes: 2 * GB, diskFreeBytes: 40 * GB });
+        expect(capacity.recommended).toBe(0);
+        expect(capacity.refusal).toContain("not enough");
+    });
+
+    it("counts free disk, not the size of the disk", () => {
+        expect(estimateRunnerCapacity({ cpus: 8, memoryBytes: 32 * GB, diskFreeBytes: 6 * GB }).refusal).toContain(
+            "not enough"
+        );
+    });
+
+    // A probe that could not read something must never read as a machine with
+    // none of it, or an unreadable disk becomes an unusable server.
+    it("lets an unmeasured value impose no limit", () => {
+        const capacity = estimateRunnerCapacity({ cpus: 4, memoryBytes: 16 * GB, diskFreeBytes: null });
+        expect(capacity.recommended).toBe(4);
+        expect(capacity.note).not.toContain("free");
+    });
+
+    it("offers one job when the machine said nothing at all", () => {
+        const capacity = estimateRunnerCapacity({ cpus: 0, memoryBytes: 0, diskFreeBytes: null });
+        expect(capacity).toMatchObject({ recommended: 1, refusal: null });
+    });
+
+    it("never offers more than a pool is allowed to start", () => {
+        const capacity = estimateRunnerCapacity({ cpus: 64, memoryBytes: 512 * GB, diskFreeBytes: 4000 * GB });
+        expect(capacity.recommended).toBe(MAX_RUNNER_CONCURRENCY);
     });
 });
 

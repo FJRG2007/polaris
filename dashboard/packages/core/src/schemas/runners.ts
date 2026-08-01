@@ -16,6 +16,7 @@
  */
 
 import { z } from "zod";
+import { serverIdSchema } from "./host.js";
 import {
     MAX_RUNNER_CONCURRENCY,
     normalizeRunnerLabels,
@@ -61,8 +62,9 @@ export const DEFAULT_RUNNER_LABELS = ["self-hosted"];
 
 export const createRunnerPoolSchema = z
     .object({
-        /** The registered server the runners run on. */
-        hostId: z.string().uuid("Choose a server"),
+        /** The server the runners run on: a registered Host, or the box Polaris
+         *  itself runs on. */
+        serverId: serverIdSchema,
         name: z.string().trim().min(1, "Name this pool").max(80),
         scope: runnerScopeSchema,
         targetOwner: githubLoginSchema,

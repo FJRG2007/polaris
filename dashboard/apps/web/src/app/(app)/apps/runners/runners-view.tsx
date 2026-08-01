@@ -12,30 +12,25 @@
  * far more common reason to stop a pool than not wanting it any more.
  */
 
-import Link from "next/link";
+import { Notice } from "./notice";
 import { PoolDialog } from "./pool-dialog";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import type { ServerOption } from "./pool-dialog";
 import type { RunnerJobView, RunnerPoolView } from "@/lib/runners/runner-service";
 import { Badge, Button, Card, CardBody, CardHeader, CardTitle } from "@polaris/ui";
+import { Box, FolderOpen, Github, Pause, Play, RefreshCw, Trash2 } from "lucide-react";
 import { deleteRunnerPoolAction, reconcileRunnersAction, updateRunnerPoolAction } from "./actions";
-import { Box, FolderOpen, Github, Pause, Play, RefreshCw, Trash2, TriangleAlert } from "lucide-react";
-
-interface ServerOption {
-    id: string;
-    name: string;
-}
 
 export function RunnersView({
     pools,
     servers,
-    accessReady,
-    accessAdvice
+    accessNotice
 }: {
     pools: RunnerPoolView[];
     servers: ServerOption[];
-    accessReady: boolean;
-    accessAdvice: string | null;
+    /** What the GitHub connection is missing, streamed in after the page paints. */
+    accessNotice: React.ReactNode;
 }) {
     const router = useRouter();
     const [pending, startTransition] = useTransition();
@@ -68,27 +63,11 @@ export function RunnersView({
                             <RefreshCw className="size-4" />
                         </Button>
                     ) : null}
-                    <PoolDialog servers={servers} disabled={!accessReady || servers.length === 0} />
+                    <PoolDialog servers={servers} />
                 </div>
             </div>
 
-            {accessReady ? null : (
-                <Notice>
-                    {accessAdvice ?? "Connect GitHub before adding runners."}{" "}
-                    <Link href="/integrations" className="underline">
-                        Open Integrations
-                    </Link>
-                </Notice>
-            )}
-
-            {accessReady && servers.length === 0 ? (
-                <Notice>
-                    Runners run on a server you have registered.{" "}
-                    <Link href="/apps/servers" className="underline">
-                        Add one first
-                    </Link>
-                </Notice>
-            ) : null}
+            {accessNotice}
 
             {error ? <p className="text-sm text-danger">{error}</p> : null}
 
@@ -249,14 +228,5 @@ function JobRow({ job }: { job: RunnerJobView }) {
                 {JOB_STATE_LABELS[job.state]}
             </Badge>
         </li>
-    );
-}
-
-function Notice({ children }: { children: React.ReactNode }) {
-    return (
-        <p className="flex items-start gap-2 rounded-md border border-warning/30 bg-warning/5 px-3 py-2 text-xs text-muted-foreground">
-            <TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-warning" />
-            {children}
-        </p>
     );
 }

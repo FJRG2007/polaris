@@ -831,7 +831,9 @@ model Enrollment {
 model RunnerPool {
     id            String   @id @default(uuid(7)) @db.Uuid
     ownerId       String   @db.Uuid
-    hostId        String   @db.Uuid
+    // The registered server the runners run on. Null is the box Polaris itself
+    // runs on, which has no Host row and is reached through polaris-hostd.
+    hostId        String?  @db.Uuid
     name          String
     // repo | org - org-level covers every repository in the organization at once
     // and needs a far narrower App permission, so it is the one to prefer.
@@ -856,7 +858,7 @@ model RunnerPool {
     updatedAt     DateTime @updatedAt
 
     owner User        @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-    host  Host        @relation(fields: [hostId], references: [id], onDelete: Cascade)
+    host  Host?       @relation(fields: [hostId], references: [id], onDelete: Cascade)
     jobs  RunnerJob[]
 
     @@index([ownerId])

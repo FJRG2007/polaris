@@ -10,7 +10,7 @@
 import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/session";
 import { reconcileRunnerPools } from "@/lib/runners/runner-reconciler";
-import { createRunnerPoolSchema, updateRunnerPoolSchema } from "@polaris/core";
+import { createRunnerPoolSchema, serverIdSchema, updateRunnerPoolSchema } from "@polaris/core";
 import {
     createRunnerPool,
     deleteRunnerPool,
@@ -38,7 +38,13 @@ export async function updateRunnerPoolAction(input: unknown): Promise<{ error?: 
     const user = await requirePermission("system.manage");
     const parsed = updateRunnerPoolSchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the pool settings" };
-    if (!(await updateRunnerPool(user.id, parsed.data))) return { error: "Pool not found" };
+    try {
+        // Raising the concurrency re-checks the machine, so this can refuse with
+        // something worth reading rather than only "not found".
+        if (!(await updateRunnerPool(user.id, parsed.data))) return { error: "Pool not found" };
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not change the pool" };
+    }
     revalidatePath(RUNNERS_PATH);
     return {};
 }
@@ -56,14 +62,16 @@ export async function deleteRunnerPoolAction(poolId: string): Promise<{ error?: 
     return {};
 }
 
-/** Asked by the form when a server is picked, so the isolation choice reflects
- *  what that machine can actually do instead of what it could when it was added. */
+/** Asked by the form when a server is picked, so the isolation choice and the
+ *  concurrency reflect what that machine can actually do rather than what it
+ *  could when it was added. */
 export async function probeRunnerHostAction(
-    hostId: string
+    serverId: string
 ): Promise<{ readiness?: RunnerHostReadiness; error?: string }> {
     const user = await requirePermission("system.manage");
+    if (!serverIdSchema.safeParse(serverId).success) return { error: "Choose a server" };
     try {
-        return { readiness: await probeRunnerHost(user.id, hostId) };
+        return { readiness: await probeRunnerHost(user.id, serverId) };
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Could not reach that server" };
     }

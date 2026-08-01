@@ -201,6 +201,13 @@ export interface RunnerHostCapability {
      *  most systems that group is root-equivalent, so it is granted explicitly at
      *  enrollment and never assumed. */
     readonly containerEngine: boolean;
+    /**
+     * How Polaris drives this machine. `login` is a registered server, reached
+     * over SSH, where a job can be given a directory on the machine itself.
+     * `engine` is the box Polaris runs on, which it reaches only through the
+     * host daemon's container engine - there is no login to run a job under.
+     */
+    readonly reach?: "login" | "engine";
 }
 
 export interface ResolvedIsolation {
@@ -238,6 +245,17 @@ export function resolveRunnerIsolation(
         return { isolation: "container", refusal: null, note: "Each job runs in its own container and leaves nothing behind." };
     }
 
+    // Nothing runs directly on the box Polaris runs on: it is reached through the
+    // host daemon, which starts containers and nothing else. That is a boundary
+    // worth keeping, so the request is refused rather than widened.
+    if (capability.reach === "engine") {
+        return {
+            isolation: "workspace",
+            refusal: "Jobs on this machine can only run in containers - Polaris reaches it through its container engine, not through a login.",
+            note: ""
+        };
+    }
+
     return {
         isolation: "workspace",
         refusal: null,
@@ -245,6 +263,101 @@ export function resolveRunnerIsolation(
             capability.platform === "darwin"
                 ? "Each job gets an empty directory on the Mac itself. It is a clean slate, not a boundary: a job can reach anything the Polaris login can."
                 : "Each job gets an empty directory on the machine itself. It is a clean slate, not a boundary: a job can reach anything the Polaris login can."
+    };
+}
+
+/**
+ * What a machine has, as read off the machine itself. Any field can be 0 or null
+ * when it did not answer - a probe that could not measure something must not read
+ * as a machine with none of it.
+ */
+export interface MachineResources {
+    /** Logical processors. */
+    readonly cpus: number;
+    /** Total memory in bytes. */
+    readonly memoryBytes: number;
+    /** Free bytes where the runner would work. Null when it could not be read. */
+    readonly diskFreeBytes: number | null;
+}
+
+export interface RunnerCapacity {
+    /** How many jobs at once this machine is worth offering. 0 means none. */
+    readonly recommended: number;
+    /** Why it cannot host a single job, or null when it can. */
+    readonly refusal: string | null;
+    /** What was found, in one line, for the form to show under the picker. */
+    readonly note: string;
+}
+
+/** What one job is budgeted, roughly matching a GitHub-hosted standard runner
+ *  (2 vCPU / 7 GB / 14 GB of disk) once the runner's own overhead is taken out. */
+const PER_JOB_MEMORY = 2 * 1024 ** 3;
+const PER_JOB_DISK = 10 * 1024 ** 3;
+
+/** Left for the machine's own work. A server that gives every last byte to CI is
+ *  a server whose other services start failing during a build. */
+const SPARE_MEMORY = 1024 ** 3;
+const SPARE_DISK = 5 * 1024 ** 3;
+
+function gigabytes(bytes: number): string {
+    return `${Math.round((bytes / 1024 ** 3) * 10) / 10} GB`;
+}
+
+/**
+ * How many jobs a machine can reasonably take at once, and whether it should be
+ * offered runners at all.
+ *
+ * The estimate is deliberately conservative and each limit is reported in the
+ * terms that produced it: a pool sized past what the machine has does not fail
+ * when it is created, it fails hours later as a build that ran out of memory or
+ * filled the disk, on a machine that is probably also serving something else.
+ *
+ * An unmeasured value never contributes a limit. Refusing a machine because a
+ * probe could not read its disk would be a Polaris bug reported as an unsuitable
+ * server.
+ */
+export function estimateRunnerCapacity(resources: MachineResources): RunnerCapacity {
+    const { cpus, memoryBytes, diskFreeBytes } = resources;
+    const limits: number[] = [];
+    const found: string[] = [];
+
+    if (cpus > 0) {
+        limits.push(cpus);
+        found.push(`${cpus} ${cpus === 1 ? "processor" : "processors"}`);
+    }
+    if (memoryBytes > 0) {
+        limits.push(Math.floor((memoryBytes - SPARE_MEMORY) / PER_JOB_MEMORY));
+        found.push(`${gigabytes(memoryBytes)} of memory`);
+    }
+    if (diskFreeBytes !== null && diskFreeBytes > 0) {
+        limits.push(Math.floor((diskFreeBytes - SPARE_DISK) / PER_JOB_DISK));
+        found.push(`${gigabytes(diskFreeBytes)} free`);
+    }
+
+    // Nothing measurable came back: say so rather than inventing a number. One
+    // runner is the cautious offer, and the machine reports the real refusal
+    // itself when it cannot start it.
+    if (limits.length === 0) {
+        return {
+            recommended: 1,
+            refusal: null,
+            note: "This machine did not report what it has, so start with one job and watch it."
+        };
+    }
+
+    const recommended = Math.min(...limits, MAX_RUNNER_CONCURRENCY);
+    const summary = found.join(", ");
+    if (recommended < 1) {
+        return {
+            recommended: 0,
+            refusal: `${summary} is not enough to run a job here. One job needs about ${gigabytes(PER_JOB_MEMORY)} of memory and ${gigabytes(PER_JOB_DISK)} of free disk, on top of what the machine is already doing.`,
+            note: summary
+        };
+    }
+    return {
+        recommended,
+        refusal: null,
+        note: `${summary}: room for about ${recommended} ${recommended === 1 ? "job" : "jobs"} at once.`
     };
 }
 

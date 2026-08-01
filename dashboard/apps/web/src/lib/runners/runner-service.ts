@@ -15,14 +15,19 @@
  */
 
 import { prisma } from "@polaris/db";
-import { RunnerHost } from "./runner-host";
 import { recordAudit } from "@/lib/audit-service";
 import { runnerPlatform } from "./runner-release";
+import { openRunnerMachine, poolServerId } from "./runner-machine";
+import { getLocalServerName, LOCAL_SERVER_FALLBACK_NAME } from "@/lib/local-server";
 import { deleteGithubRunner, getRunnerAccess, type RunnerTarget } from "@/lib/github-runners";
 import {
+    estimateRunnerCapacity,
+    LOCAL_SERVER_ID,
     resolveRunnerIsolation,
+    RUNNER_JOB_LIVE_STATES,
     runnerTargetRefusal,
     type CreateRunnerPoolInput,
+    type MachineResources,
     type RunnerIsolation,
     type RunnerJobState,
     type RunnerScope,
@@ -33,7 +38,8 @@ import {
 export interface RunnerPoolView {
     id: string;
     name: string;
-    hostId: string;
+    /** The server it runs on: a Host id, or "local" for the Polaris box. */
+    serverId: string;
     hostName: string;
     scope: RunnerScope;
     targetOwner: string;
@@ -74,20 +80,23 @@ export function parseLabels(raw: string): string[] {
 }
 
 export async function listRunnerPools(ownerId: string): Promise<RunnerPoolView[]> {
-    const pools = await prisma.runnerPool.findMany({
-        where: { ownerId },
-        include: {
-            host: { select: { name: true } },
-            jobs: { orderBy: { startedAt: "desc" }, take: JOB_HISTORY }
-        },
-        orderBy: { createdAt: "asc" }
-    });
+    const [pools, localName] = await Promise.all([
+        prisma.runnerPool.findMany({
+            where: { ownerId },
+            include: {
+                host: { select: { name: true } },
+                jobs: { orderBy: { startedAt: "desc" }, take: JOB_HISTORY }
+            },
+            orderBy: { createdAt: "asc" }
+        }),
+        getLocalServerName()
+    ]);
 
     return pools.map((pool) => ({
         id: pool.id,
         name: pool.name,
-        hostId: pool.hostId,
-        hostName: pool.host.name,
+        serverId: poolServerId(pool.hostId),
+        hostName: pool.host?.name ?? localName ?? LOCAL_SERVER_FALLBACK_NAME,
         scope: pool.scope as RunnerScope,
         targetOwner: pool.targetOwner,
         targetRepo: pool.targetRepo,
@@ -108,29 +117,73 @@ export async function listRunnerPools(ownerId: string): Promise<RunnerPoolView[]
     }));
 }
 
+/**
+ * Every runner Polaris still expects to find on one machine, whichever pool
+ * started it.
+ *
+ * A sweep removes what no live runner accounts for, and it is the machine that is
+ * being swept, not the pool: two pools can share a server, and a sweep that only
+ * knew about its own pool's runners would take another pool's job down with it.
+ * `exceptPoolId` leaves out a pool being deleted, whose runners have already been
+ * reaped by the time the machine is swept.
+ */
+export async function liveRunnerNames(hostId: string | null, exceptPoolId?: string): Promise<string[]> {
+    const jobs = await prisma.runnerJob.findMany({
+        where: {
+            state: { in: [...RUNNER_JOB_LIVE_STATES] },
+            pool: { hostId, ...(exceptPoolId === undefined ? {} : { id: { not: exceptPoolId } }) }
+        },
+        select: { name: true }
+    });
+    return jobs.map((job) => job.name);
+}
+
 /** What a machine can be asked to do, read off the machine itself. The pool form
  *  asks for this before it offers isolation choices, so nobody picks one the
- *  machine cannot honour. */
+ *  machine cannot honour, or a concurrency the machine cannot carry. */
 export interface RunnerHostReadiness {
     platform: string;
     arch: string;
     containerEngine: boolean;
-    /** Null when this machine can run runners at all. */
+    /** How Polaris drives it: over a login, or only through its container engine. */
+    reach: "login" | "engine";
+    resources: MachineResources;
+    /** Jobs this machine is worth being offered at once, 0 when it cannot take one. */
+    recommended: number;
+    /** What the machine has, in one line for the form. */
+    capacityNote: string;
+    /** Null when this machine can run runners at all - a platform GitHub does not
+     *  publish a runner for, or one with nothing left to run a job with. */
     unsupported: string | null;
 }
 
-export async function probeRunnerHost(ownerId: string, hostId: string): Promise<RunnerHostReadiness> {
-    const host = await RunnerHost.open(hostId, ownerId);
+export async function probeRunnerHost(ownerId: string, serverId: string): Promise<RunnerHostReadiness> {
+    const machine = await openRunnerMachine(serverId, ownerId);
     try {
-        const probed = await host.probe();
+        const probed = await machine.probe();
+        const capacity = estimateRunnerCapacity(probed.resources);
+        const platform = runnerPlatform(probed.platform, probed.arch)
+            ? null
+            : `GitHub publishes no runner for ${probed.platform || "this system"} on ${probed.arch || "this processor"}.`;
+        // The local box answers through the host daemon, so an engine that does
+        // not reply is a daemon to look at - not an unsupported processor, which
+        // is what the platform message above would otherwise claim.
+        const unreachable =
+            machine.reach === "engine" && !probed.containerEngine
+                ? "Polaris cannot reach this machine's container engine, which is the only way it runs jobs here. Check that the host daemon is running."
+                : null;
         return {
-            ...probed,
-            unsupported: runnerPlatform(probed.platform, probed.arch)
-                ? null
-                : `GitHub publishes no runner for ${probed.platform || "this system"} on ${probed.arch || "this processor"}.`
+            platform: probed.platform,
+            arch: probed.arch,
+            containerEngine: probed.containerEngine,
+            reach: machine.reach,
+            resources: probed.resources,
+            recommended: capacity.recommended,
+            capacityNote: capacity.note,
+            unsupported: unreachable ?? platform ?? capacity.refusal
         };
     } finally {
-        host.close();
+        machine.close();
     }
 }
 
@@ -139,20 +192,30 @@ export async function createRunnerPool(ownerId: string, input: CreateRunnerPoolI
     if (refusal) throw new Error(refusal);
 
     // The machine is asked, not the enrollment record: a container engine can be
-    // installed or its group membership revoked long after a server was added.
-    const readiness = await probeRunnerHost(ownerId, input.hostId);
+    // installed or its group membership revoked long after a server was added,
+    // and the disk it builds in fills up without anybody telling Polaris.
+    const readiness = await probeRunnerHost(ownerId, input.serverId);
     if (readiness.unsupported) throw new Error(readiness.unsupported);
 
     const isolation = resolveRunnerIsolation(input.isolation, {
         platform: readiness.platform === "darwin" ? "darwin" : "linux",
-        containerEngine: readiness.containerEngine
+        containerEngine: readiness.containerEngine,
+        reach: readiness.reach
     });
     if (isolation.refusal) throw new Error(isolation.refusal);
+
+    // The form caps this at the same number, but the form is not the gate: a pool
+    // sized past the machine fails as a build that ran out of memory hours later.
+    if (input.maxConcurrent > readiness.recommended) {
+        throw new Error(
+            `This machine is worth about ${readiness.recommended} ${readiness.recommended === 1 ? "job" : "jobs"} at once (${readiness.capacityNote}).`
+        );
+    }
 
     const pool = await prisma.runnerPool.create({
         data: {
             ownerId,
-            hostId: input.hostId,
+            hostId: input.serverId === LOCAL_SERVER_ID ? null : input.serverId,
             name: input.name,
             scope: input.scope,
             targetOwner: input.targetOwner,
@@ -183,6 +246,26 @@ export async function createRunnerPool(ownerId: string, input: CreateRunnerPoolI
  *  another repository would strand runners registered against the old one, so it
  *  is not something an edit can do. */
 export async function updateRunnerPool(ownerId: string, input: UpdateRunnerPoolInput): Promise<boolean> {
+    // Asking for more runners is the one edit that puts more work on the machine,
+    // so it is held to the same estimate creating the pool was. Lowering it, or
+    // pausing, never pays for a probe - a machine that is off must still be
+    // possible to turn a pool off on.
+    if (input.maxConcurrent !== undefined) {
+        const stored = await prisma.runnerPool.findFirst({
+            where: { id: input.id, ownerId },
+            select: { hostId: true, maxConcurrent: true }
+        });
+        if (!stored) return false;
+        if (input.maxConcurrent > stored.maxConcurrent) {
+            const readiness = await probeRunnerHost(ownerId, poolServerId(stored.hostId));
+            if (input.maxConcurrent > readiness.recommended) {
+                throw new Error(
+                    `This machine is worth about ${readiness.recommended} ${readiness.recommended === 1 ? "job" : "jobs"} at once (${readiness.capacityNote}).`
+                );
+            }
+        }
+    }
+
     const { count } = await prisma.runnerPool.updateMany({
         where: { id: input.id, ownerId },
         data: {
@@ -218,15 +301,17 @@ export async function deleteRunnerPool(ownerId: string, poolId: string): Promise
     const target: RunnerTarget = { scope: pool.scope as RunnerScope, owner: pool.targetOwner, repo: pool.targetRepo ?? undefined };
     if (pool.jobs.length > 0) {
         try {
-            const host = await RunnerHost.open(pool.hostId, ownerId);
+            const machine = await openRunnerMachine(poolServerId(pool.hostId), ownerId);
             try {
                 for (const job of pool.jobs) {
                     if (!job.handle) continue;
-                    await host.reap(job.name, { isolation: job.isolation as RunnerIsolation, handle: job.handle });
+                    await machine.reap(job.name, { isolation: job.isolation as RunnerIsolation, handle: job.handle });
                 }
-                await host.sweep([]);
+                // Everything this pool had is reaped above; what is left on the
+                // machine belongs to other pools and is not this delete's to take.
+                await machine.sweep(await liveRunnerNames(pool.hostId, pool.id));
             } finally {
-                host.close();
+                machine.close();
             }
         } catch {
             // The machine may be off, which is not a reason to keep a pool nobody
