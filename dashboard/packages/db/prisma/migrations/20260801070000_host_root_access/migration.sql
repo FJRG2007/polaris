@@ -1,0 +1,13 @@
+-- Whether Polaris may act as root on a machine.
+--
+-- Until now the enrollment script granted no sudo at all, so every registered
+-- server could do exactly what an ordinary login can. The script can now be run
+-- with --root, which installs a validated /etc/sudoers.d/polaris, and this column
+-- records what the machine reported it ended up with - not what was asked for. A
+-- grant can be asked for and still not happen (no sudo installed, a rule that
+-- would not validate), and a server recorded as root-capable when it is not means
+-- offering a root shell that refuses every command.
+--
+-- Default false: every server that exists today was enrolled by a script that
+-- granted nothing, and inferring otherwise would be inventing a capability.
+ALTER TABLE "Host" ADD COLUMN "sudo" BOOLEAN NOT NULL DEFAULT false;

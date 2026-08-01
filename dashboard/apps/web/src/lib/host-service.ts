@@ -25,6 +25,7 @@ export async function listHosts(ownerId: string) {
             port: true,
             username: true,
             authMethod: true,
+            sudo: true,
             environment: true,
             wildcardDomain: true,
             status: true,

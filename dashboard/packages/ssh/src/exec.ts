@@ -70,6 +70,33 @@ export function openShell(client: Client, options: ShellOptions = {}): Promise<C
     });
 }
 
+/**
+ * Open an interactive PTY shell as root, through the login's password-less sudo.
+ *
+ * `sudo -i` rather than `sudo -s`, so what comes back is a login shell with root's
+ * environment and home rather than the calling account's - the difference shows up
+ * later as a command that cannot find a tool on root's PATH.
+ *
+ * `-n` never prompts. A machine whose sudo would ask for a password fails here
+ * immediately instead of presenting a password prompt into a terminal nobody can
+ * answer it from, since the login has no password to begin with.
+ */
+export function openRootShell(client: Client, options: ShellOptions = {}): Promise<ClientChannel> {
+    return new Promise((resolve, reject) => {
+        client.exec(
+            "sudo -n -i",
+            {
+                pty: {
+                    term: options.term ?? "xterm-256color",
+                    cols: clampDim(options.cols, 80, MAX_COLS),
+                    rows: clampDim(options.rows, 24, MAX_ROWS)
+                }
+            },
+            (error, channel) => (error ? reject(error) : resolve(channel))
+        );
+    });
+}
+
 /** Open an SFTP session on the client (used by the storage SFTP driver and the
  *  host file browser). */
 export function openSftp(client: Client): Promise<SFTPWrapper> {

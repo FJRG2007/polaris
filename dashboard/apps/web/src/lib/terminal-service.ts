@@ -19,8 +19,12 @@ import { generateToken, hashToken } from "@polaris/core/tokens";
 
 const TICKET_TTL_MS = 60_000;
 
-/** What a ticket authorizes. `ssh` is a shell on a registered server. */
-export type TerminalMode = "terminal" | "logs" | "ssh";
+/** What a ticket authorizes. `ssh` is a shell on a registered server as the Polaris
+ *  login; `ssh-root` is one as root, which only a server whose enrollment granted
+ *  sudo can offer. Kept as separate modes rather than a flag on the ticket because
+ *  the mode is what the sidecar turns into a command, and the client never gets to
+ *  name that command. */
+export type TerminalMode = "terminal" | "logs" | "ssh" | "ssh-root";
 
 export interface MintTicketInput {
     targetId: string;
@@ -79,7 +83,9 @@ export async function redeemTerminalTicket(token: string): Promise<RedeemedTicke
     await prisma.deployTicket.update({ where: { id: ticket.id }, data: { usedAt: new Date() } });
 
     const mode = resolveMode(ticket.mode);
-    if (mode !== "ssh") return { targetId: ticket.targetId, containerRef: ticket.containerRef, mode };
+    if (mode !== "ssh" && mode !== "ssh-root") {
+        return { targetId: ticket.targetId, containerRef: ticket.containerRef, mode };
+    }
 
     try {
         const connection = await getHostConnection(ticket.targetId, ticket.userId);
@@ -107,12 +113,25 @@ export async function redeemTerminalTicket(token: string): Promise<RedeemedTicke
 function resolveMode(value: string): TerminalMode {
     if (value === "logs") return "logs";
     if (value === "ssh") return "ssh";
+    if (value === "ssh-root") return "ssh-root";
     return "terminal";
 }
 
-/** Whether a user may open a shell on this server. Owner-scoped, checked before a
- *  ticket exists so an unauthorized request never mints one. */
-export async function canOpenHostShell(userId: string, hostId: string): Promise<boolean> {
-    const row = await prisma.host.findFirst({ where: { id: hostId, ownerId: userId }, select: { id: true } });
-    return row !== null;
+/**
+ * Whether a user may open a shell on this server, and as root if they asked for
+ * one. Owner-scoped and checked before a ticket exists, so an unauthorized request
+ * never mints one.
+ *
+ * A root shell is refused on a server whose enrollment did not grant sudo. The
+ * refusal is here rather than at the far end because the alternative is a terminal
+ * that opens and then answers every command with a sudo error, which reads as
+ * Polaris being broken rather than as a capability that was never granted.
+ */
+export async function canOpenHostShell(userId: string, hostId: string, asRoot = false): Promise<boolean> {
+    const row = await prisma.host.findFirst({
+        where: { id: hostId, ownerId: userId },
+        select: { id: true, sudo: true }
+    });
+    if (!row) return false;
+    return asRoot ? row.sudo : true;
 }

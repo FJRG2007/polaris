@@ -8,7 +8,7 @@ import { LOCAL_SERVER_ID } from "@polaris/core";
 import { requirePermission } from "@/lib/session";
 import { getRunnerAccess } from "@/lib/github-runners";
 import { listRunnerPools } from "@/lib/runners/runner-service";
-import { getLocalServerName, LOCAL_SERVER_FALLBACK_NAME } from "@/lib/local-server";
+import { getLocalHostId, getLocalServerName, LOCAL_SERVER_FALLBACK_NAME } from "@/lib/local-server";
 
 export const dynamic = "force-dynamic";
 
@@ -20,17 +20,26 @@ export const dynamic = "force-dynamic";
  */
 export default async function RunnersPage() {
     const user = await requirePermission("system.manage");
-    const [pools, hosts, localName] = await Promise.all([
+    const [pools, hosts, localName, localHostId] = await Promise.all([
         listRunnerPools(user.id),
         listHosts(user.id),
-        getLocalServerName()
+        getLocalServerName(),
+        getLocalHostId()
     ]);
 
     // The box Polaris runs on is always available to run jobs on, the same way it
-    // is always an option in Deploy - it just runs them in containers only.
+    // is always an option in Deploy. Which id it is offered under decides what it
+    // can be asked to do: enrolled, it is a Host with a login, so a job can be
+    // given a directory on it; unenrolled, Polaris reaches it only through the
+    // container engine and it runs contained jobs or none.
+    const localHost = localHostId ? (hosts.find((host) => host.id === localHostId) ?? null) : null;
     const servers = [
-        { id: LOCAL_SERVER_ID, name: localName || LOCAL_SERVER_FALLBACK_NAME, local: true },
-        ...hosts.map((host) => ({ id: host.id, name: host.name, local: false }))
+        {
+            id: localHost?.id ?? LOCAL_SERVER_ID,
+            name: localName || localHost?.name || LOCAL_SERVER_FALLBACK_NAME,
+            local: true
+        },
+        ...hosts.filter((host) => host.id !== localHostId).map((host) => ({ id: host.id, name: host.name, local: false }))
     ];
 
     return (

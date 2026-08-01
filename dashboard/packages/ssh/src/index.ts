@@ -14,6 +14,7 @@ export {
 export {
     execCommand,
     openShell,
+    openRootShell,
     openSftp,
     forwardOut,
     clampDim,

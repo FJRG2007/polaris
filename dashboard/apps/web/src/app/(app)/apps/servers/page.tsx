@@ -6,7 +6,12 @@ import { requirePermission } from "@/lib/session";
 import { getPublicIp } from "@/lib/domain-service";
 import { getLocalEnvironment } from "@/lib/network-service";
 import { environmentFromAddress, serverEnvironmentSchema } from "@polaris/core";
-import { getLocalServerName, LOCAL_SERVER_FALLBACK_NAME, LOCAL_SERVER_ID } from "@/lib/local-server";
+import {
+    getLocalHostId,
+    getLocalServerName,
+    LOCAL_SERVER_FALLBACK_NAME,
+    LOCAL_SERVER_ID
+} from "@/lib/local-server";
 
 export const dynamic = "force-dynamic";
 
@@ -18,24 +23,33 @@ export const dynamic = "force-dynamic";
  */
 export default async function ServersPage() {
     const user = await requirePermission("system.manage");
-    const [hosts, local, localIp, localName] = await Promise.all([
+    const [hosts, local, localIp, localName, localHostId] = await Promise.all([
         listHosts(user.id),
         getLocalEnvironment(),
         getPublicIp(),
-        getLocalServerName()
+        getLocalServerName(),
+        getLocalHostId()
     ]);
 
-    // The box Polaris runs on is a managed server too - it just needs no SSH
-    // credentials, so it is listed from detection instead of a Host row.
+    // The machine Polaris runs on, once somebody has enrolled it. Until then there
+    // is no login to reach it by, and the row is built from detection alone.
+    const localHost = localHostId ? (hosts.find((host) => host.id === localHostId) ?? null) : null;
+
+    // The box Polaris runs on is a managed server too. Enrolled, it is a Host like
+    // any other and can offer a shell and its files; unenrolled, it is listed from
+    // detection because there are no credentials to store for the machine that is
+    // serving this request.
     const servers: ServerRow[] = [
         {
             id: LOCAL_SERVER_ID,
             kind: "local",
-            name: localName || LOCAL_SERVER_FALLBACK_NAME,
-            detail: "",
-            address: localIp ?? "127.0.0.1",
-            port: null,
-            authMethod: null,
+            name: localName || localHost?.name || LOCAL_SERVER_FALLBACK_NAME,
+            detail: localHost?.username ?? "",
+            address: localHost?.address ?? localIp ?? "127.0.0.1",
+            port: localHost?.port ?? null,
+            authMethod: localHost?.authMethod ?? null,
+            sudo: localHost?.sudo ?? false,
+            hostId: localHost?.id ?? null,
             environment: local.environment,
             // The Polaris box's own zones are richer than one wildcard and are set up
             // under Domains, so this column is for registered servers only.
@@ -43,27 +57,33 @@ export default async function ServersPage() {
             suggested: local.detected,
             confirmed: local.confirmed
         },
-        ...hosts.map((host) => {
-            // The column is free-form TEXT: an unrecognised value reads as unset
-            // rather than taking the page down on a missing copy entry.
-            const environment = serverEnvironmentSchema.catch("unknown").parse(host.environment);
-            return {
-                id: host.id,
-                kind: "host" as const,
-                name: host.name,
-                detail: host.username,
-                address: host.address,
-                port: host.port,
-                authMethod: host.authMethod,
-                environment,
-                wildcardDomain: host.wildcardDomain ?? "",
-                suggested: environmentFromAddress(host.address),
-                // The add-server form prefills this from the address, but shows the
-                // value and its routing note before submit - so a stored value was
-                // at least seen and accepted, unlike the local box's silent guess.
-                confirmed: environment !== "unknown"
-            };
-        })
+        // Everything else, minus the one that turned out to be this machine.
+        ...hosts
+            .filter((host) => host.id !== localHostId)
+            .map((host) => {
+                // The column is free-form TEXT: an unrecognised value reads as unset
+                // rather than taking the page down on a missing copy entry.
+                const environment = serverEnvironmentSchema.catch("unknown").parse(host.environment);
+                return {
+                    id: host.id,
+                    kind: "host" as const,
+                    name: host.name,
+                    detail: host.username,
+                    address: host.address,
+                    port: host.port,
+                    authMethod: host.authMethod,
+                    sudo: host.sudo,
+                    hostId: host.id,
+                    environment,
+                    wildcardDomain: host.wildcardDomain ?? "",
+                    suggested: environmentFromAddress(host.address),
+                    // The add-server form prefills this from the address, but shows
+                    // the value and its routing note before submit - so a stored
+                    // value was at least seen and accepted, unlike the local box's
+                    // silent guess.
+                    confirmed: environment !== "unknown"
+                };
+            })
     ];
 
     return (

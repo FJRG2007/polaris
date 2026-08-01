@@ -21,6 +21,7 @@ export { LOCAL_SERVER_ID } from "@polaris/core";
 export const LOCAL_SERVER_FALLBACK_NAME = "This server";
 
 const NAME_KEY = "server.localName";
+const HOST_KEY = "server.localHostId";
 
 /** How long the engine gets to answer before the caller settles for os.hostname().
  *  A wedged daemon answers neither success nor error, and a label is not worth
@@ -35,6 +36,25 @@ export async function getLocalServerName(): Promise<string | null> {
 /** Name the local box. Blank forgets the name, so it reads as the default again. */
 export async function setLocalServerName(name: string): Promise<void> {
     await setSetting(NAME_KEY, name.trim() || null);
+}
+
+/**
+ * The Host row for the box Polaris runs on, once somebody has enrolled it, or null.
+ *
+ * Polaris runs in a container and reaches its own machine only through the host
+ * daemon, which starts containers and nothing else - so a shell on it, or its
+ * filesystem in Drive, needs a way in that the daemon deliberately does not offer.
+ * Enrolling the machine the same way as any other gives it one, and this is the
+ * pointer that keeps the result from showing up as a second server: the Servers
+ * app folds that host into the row it already shows for this machine.
+ */
+export async function getLocalHostId(): Promise<string | null> {
+    return getSetting(HOST_KEY);
+}
+
+/** Point the local row at the host that just claimed the local enrollment. */
+export async function setLocalHostId(hostId: string | null): Promise<void> {
+    await setSetting(HOST_KEY, hostId);
 }
 
 /** The name the machine calls itself. Best-effort and time-boxed. */

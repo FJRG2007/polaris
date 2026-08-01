@@ -23,13 +23,16 @@ export async function POST(request: Request): Promise<Response> {
     } | null;
 
     if (body?.hostId) {
-        if (!(await canOpenHostShell(user.id, body.hostId))) {
+        const asRoot = body.mode === "ssh-root";
+        if (!(await canOpenHostShell(user.id, body.hostId, asRoot))) {
+            // One answer for "no such server" and "that server never granted root",
+            // since the caller has no business telling the two apart.
             return NextResponse.json({ error: "server not found" }, { status: 404 });
         }
         const token = await mintTerminalTicket(user.id, {
             targetId: body.hostId,
             containerRef: "",
-            mode: "ssh"
+            mode: asRoot ? "ssh-root" : "ssh"
         });
         return NextResponse.json({ token });
     }

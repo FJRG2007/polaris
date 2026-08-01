@@ -6,8 +6,13 @@
  *
  * The panel is deliberately explicit about what the command does. It runs as root
  * on somebody's server, so "trust me" is not an acceptable interface: the account
- * it creates, the fact that it grants no sudo, and the separate opt-in for
- * container access are all on screen before the command is generated.
+ * it creates, and the separate opt-ins for container access and for root, are all
+ * on screen with what each of them concedes before the command is generated.
+ *
+ * The same panel enrolls the machine Polaris itself runs on. Nothing about the
+ * exchange differs - the box is reached over SSH like any other - so the only
+ * difference is the kind, which is what tells the Servers app to fold the result
+ * into the row it already shows for this machine.
  */
 
 import { useEffect, useState } from "react";
@@ -34,12 +39,16 @@ interface Opened {
     insecureTransport: boolean;
 }
 
-export function QuickEnroll({ onDone }: { onDone: () => void }) {
+export function QuickEnroll({ onDone, kind = "server" }: { onDone: () => void; kind?: "server" | "local" }) {
     const router = useRouter();
+    const isLocal = kind === "local";
     const [environment, setEnvironment] = useState<ServerEnvironment>("unknown");
     // On by default: without it the server can be reached but not deployed to and
     // not given CI jobs, which is what almost everybody is adding one for.
     const [grantDocker, setGrantDocker] = useState(true);
+    // Off by default, unlike containers: this one is not needed to deploy or to run
+    // jobs, and it is the widest thing the command can grant.
+    const [grantRoot, setGrantRoot] = useState(false);
     const [name, setName] = useState("");
     const [opened, setOpened] = useState<Opened | null>(null);
     const [pending, setPending] = useState(false);
@@ -81,10 +90,13 @@ export function QuickEnroll({ onDone }: { onDone: () => void }) {
         setPending(true);
         setError(null);
         const result = await openEnrollmentAction({
-            kind: "server",
-            name: name.trim() || "New server",
-            environment,
-            grantDocker
+            kind,
+            name: name.trim() || (isLocal ? "This server" : "New server"),
+            // This machine's location is already settled elsewhere (it is where
+            // Polaris runs), so enrolling it never re-asks.
+            environment: isLocal ? "unknown" : environment,
+            grantDocker,
+            grantRoot
         });
         setPending(false);
         if (result.error || !result.enrollment) {
@@ -153,30 +165,46 @@ export function QuickEnroll({ onDone }: { onDone: () => void }) {
     return (
         <div className="flex flex-col gap-3">
             <p className="text-sm text-muted-foreground">
-                Polaris generates a command you run on the server. It creates a dedicated{" "}
-                <code className="font-mono text-xs">polaris</code> login with no password and no sudo,
-                authorizes one key Polaris keeps, and registers the machine. No credential of yours is
-                typed anywhere.
+                {isLocal ? (
+                    <>
+                        Polaris runs in a container, so it reaches this machine through its container
+                        engine and nothing else - which is why it has no shell here. Run this command on
+                        the machine itself and it joins like any other server: a dedicated{" "}
+                        <code className="font-mono text-xs">polaris</code> login with no password,
+                        authorized for one key Polaris keeps.
+                    </>
+                ) : (
+                    <>
+                        Polaris generates a command you run on the server. It creates a dedicated{" "}
+                        <code className="font-mono text-xs">polaris</code> login with no password,
+                        authorizes one key Polaris keeps, and registers the machine. No credential of
+                        yours is typed anywhere.
+                    </>
+                )}
             </p>
 
-            <label className="flex flex-col gap-1 text-sm">
-                Name (optional)
-                <Input
-                    value={name}
-                    onChange={(event) => setName(event.target.value)}
-                    placeholder="Its hostname is used when you leave this empty"
-                />
-            </label>
+            {isLocal ? null : (
+                <label className="flex flex-col gap-1 text-sm">
+                    Name (optional)
+                    <Input
+                        value={name}
+                        onChange={(event) => setName(event.target.value)}
+                        placeholder="Its hostname is used when you leave this empty"
+                    />
+                </label>
+            )}
 
-            <label className="flex flex-col gap-1 text-sm">
-                Where it lives
-                <Select
-                    value={environment}
-                    onValueChange={(value) => setEnvironment(value as ServerEnvironment)}
-                    options={ENVIRONMENT_OPTIONS}
-                />
-                <span className="text-xs text-muted-foreground">{ENVIRONMENT_META[environment].routing}</span>
-            </label>
+            {isLocal ? null : (
+                <label className="flex flex-col gap-1 text-sm">
+                    Where it lives
+                    <Select
+                        value={environment}
+                        onValueChange={(value) => setEnvironment(value as ServerEnvironment)}
+                        options={ENVIRONMENT_OPTIONS}
+                    />
+                    <span className="text-xs text-muted-foreground">{ENVIRONMENT_META[environment].routing}</span>
+                </label>
+            )}
 
             <label className="flex items-start gap-2 text-sm">
                 <Checkbox
@@ -189,6 +217,19 @@ export function QuickEnroll({ onDone }: { onDone: () => void }) {
                         Needed to deploy there or run CI jobs on it. Adds the login to the docker
                         group, which on most systems is the same as giving it root - turn it off for a
                         server you only want a shell and files on.
+                    </span>
+                </span>
+            </label>
+
+            <label className="flex items-start gap-2 text-sm">
+                <Checkbox checked={grantRoot} onChange={(event) => setGrantRoot(event.target.checked)} />
+                <span>
+                    Let Polaris act as root on this server
+                    <span className="block text-xs text-muted-foreground">
+                        Password-less sudo for the login. You get a root shell and the whole filesystem
+                        in Drive, and the key Polaris holds becomes a root credential for this machine -
+                        so whoever can reach Polaris can reach root here. Undo it later by deleting
+                        /etc/sudoers.d/polaris.
                     </span>
                 </span>
             </label>

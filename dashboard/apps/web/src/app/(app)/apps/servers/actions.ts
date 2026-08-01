@@ -11,8 +11,8 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/session";
 import { recordAudit } from "@/lib/audit-service";
-import { setLocalServerName } from "@/lib/local-server";
 import { setLocalEnvironment } from "@/lib/network-service";
+import { getLocalHostId, setLocalHostId, setLocalServerName } from "@/lib/local-server";
 import { createHost, deleteHost, renameHost, setHostEnvironment, setHostWildcardDomain } from "@/lib/host-service";
 import { createEnrollmentSchema, createHostSchema, renameServerSchema, setServerEnvironmentSchema } from "@polaris/core";
 import {
@@ -167,6 +167,9 @@ export async function cancelEnrollmentAction(id: string): Promise<void> {
 export async function deleteHostAction(hostId: string): Promise<void> {
     const user = await requirePermission("system.manage");
     await deleteHost(user.id, hostId);
+    // Removing the host Polaris reaches its own machine by leaves the pointer to
+    // it dangling, and the local row would then show a server that is gone.
+    if ((await getLocalHostId()) === hostId) await setLocalHostId(null);
     await recordAudit({ actorId: user.id, action: "host.delete", targetType: "host", targetId: hostId });
     revalidatePath(SERVERS_PATH);
 }

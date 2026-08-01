@@ -22,13 +22,21 @@ const DARWIN_UID_FLOOR = 300;
  * The one-liner an operator pastes. `sh` rather than `bash`, so it runs on a
  * minimal Alpine box and on a Mac without assuming a shell either one ships.
  *
- * Container-engine access is a separate, visible argument rather than something
- * the script decides for itself: on most systems the docker group is root, and
- * that is not a thing to grant because a socket happened to be present.
+ * Container-engine access and root are separate, visible arguments rather than
+ * things the script decides for itself. Both are effectively root on the machine,
+ * and neither is a thing to grant because a socket happened to be present or
+ * because it would be convenient - they stay in the command where whoever runs it
+ * can read what they are agreeing to.
  */
-export function enrollmentCommand(baseUrl: string, token: string, grantDocker = false): string {
+export function enrollmentCommand(
+    baseUrl: string,
+    token: string,
+    grantDocker = false,
+    grantRoot = false
+): string {
     const url = `${baseUrl}/api/servers/enroll/${token}`;
-    return grantDocker ? `curl -fsSL ${url} | sudo sh -s -- --docker` : `curl -fsSL ${url} | sudo sh`;
+    const flags = [grantDocker ? "--docker" : null, grantRoot ? "--root" : null].filter(Boolean);
+    return flags.length > 0 ? `curl -fsSL ${url} | sudo sh -s -- ${flags.join(" ")}` : `curl -fsSL ${url} | sudo sh`;
 }
 
 export interface EnrollmentScriptInput {
@@ -52,16 +60,23 @@ export function enrollmentScript(input: EnrollmentScriptInput): string {
 #
 # This adds a dedicated, password-less login called '${input.username}' to this
 # machine and authorizes one SSH key for it - the key Polaris generated and kept.
-# It grants no sudo. Pass --docker to also let that login use the container
-# engine, which on most systems is equivalent to root, so it is opt-in.
+#
+# On its own that login can do no more than any ordinary account. Two arguments
+# widen it, and both are opt-in because both amount to root:
+#   --docker  lets the login use the container engine, which on most systems is
+#             equivalent to root
+#   --root    lets the login run any command as root without a password, which
+#             makes the key Polaris holds a root credential for this machine
 #
 # Everything it changes:
 #   - the '${input.username}' user and its home directory
 #   - ~${input.username}/.ssh/authorized_keys
 #   - the docker group membership, only with --docker
+#   - /etc/sudoers.d/${input.username}, only with --root
 #
 # Undo it with:  sudo userdel -r ${input.username}   (Linux)
 #                sudo dscl . -delete /Users/${input.username}   (macOS)
+#                sudo rm -f /etc/sudoers.d/${input.username}    (drops root only)
 
 set -eu
 
@@ -70,10 +85,12 @@ POLARIS_TOKEN=${shellQuote(input.token)}
 POLARIS_USER=${shellQuote(input.username)}
 POLARIS_KEY=${shellQuote(input.publicKey)}
 GRANT_DOCKER=0
+GRANT_ROOT=0
 
 for arg in "\$@"; do
     case "\$arg" in
         --docker) GRANT_DOCKER=1 ;;
+        --root) GRANT_ROOT=1 ;;
         *) echo "polaris: unknown option \$arg" >&2; exit 2 ;;
     esac
 done
@@ -96,6 +113,8 @@ ${createUserSection()}
 ${authorizeKeySection()}
 
 ${dockerSection()}
+
+${rootSection()}
 
 ${reportSection()}
 
@@ -205,6 +224,56 @@ elif [ "\$DOCKER_PRESENT" = "true" ]; then
 fi`;
 }
 
+/**
+ * Password-less sudo, only when it was asked for.
+ *
+ * This is the widest thing the script does, and the two ways it can go wrong are
+ * both worse than not doing it:
+ *
+ *   - A sudoers file with a syntax error is refused by sudo *wholesale*, which
+ *     takes root away from every account on the machine including the operator's.
+ *     So it is written to a temporary path, validated with `visudo -c`, and only
+ *     moved into place if it validates. A machine whose sudo cannot be repaired by
+ *     the person standing in front of it is a far worse outcome than an enrollment
+ *     that reports one missing capability.
+ *   - Silently succeeding. What was granted is printed, and what was granted is
+ *     also reported back, so Polaris records what the machine actually has rather
+ *     than what it was asked for.
+ */
+function rootSection(): string {
+    return `HAS_ROOT=false
+if [ "\$GRANT_ROOT" = "1" ]; then
+    if ! command -v sudo >/dev/null 2>&1; then
+        say "WARNING: --root was passed but sudo is not installed"
+    else
+        SUDOERS="/etc/sudoers.d/\$POLARIS_USER"
+        TMP="\$SUDOERS.polaris-tmp"
+        mkdir -p /etc/sudoers.d
+        printf '%s ALL=(ALL) NOPASSWD:ALL\\n' "\$POLARIS_USER" > "\$TMP"
+        chmod 0440 "\$TMP"
+        # visudo -c on the candidate file, never on the live one: an invalid
+        # sudoers in place is what locks everybody out.
+        if command -v visudo >/dev/null 2>&1 && ! visudo -c -f "\$TMP" >/dev/null 2>&1; then
+            rm -f "\$TMP"
+            say "WARNING: the sudo rule did not validate, so it was not installed"
+        else
+            mv "\$TMP" "\$SUDOERS"
+            chown root "\$SUDOERS" 2>/dev/null || true
+            say "granted '\$POLARIS_USER' password-less sudo (root on this machine)"
+        fi
+    fi
+fi
+
+# Asked rather than assumed: the grant above can be skipped, can fail to validate,
+# or can already be there from an earlier run. This script is root, so it can ask
+# sudo what a DIFFERENT account is allowed - which is the question that matters.
+if command -v sudo >/dev/null 2>&1 && sudo -l -U "\$POLARIS_USER" >/dev/null 2>&1; then
+    HAS_ROOT=true
+elif [ -f "/etc/sudoers.d/\$POLARIS_USER" ]; then
+    HAS_ROOT=true
+fi`;
+}
+
 /** Everything Polaris is told about the machine, gathered here so the payload is
  *  assembled in one place and every field is visible. */
 function reportSection(): string {
@@ -258,8 +327,8 @@ done`;
  *  see, because the machine is already configured and only the call home broke. */
 function claimSection(): string {
     return `say "telling Polaris about this machine..."
-BODY=\$(printf '{"hostname":"%s","platform":"%s","arch":"%s","username":"%s","port":%s,"docker":%s,"hostKeys":[%s],"addresses":[%s]}' \\
-    "\$HOSTNAME_VALUE" "\$PLATFORM" "\$ARCH" "\$POLARIS_USER" "\$SSH_PORT" "\$DOCKER_PRESENT" "\$HOST_KEYS" "\$ADDRESSES")
+BODY=\$(printf '{"hostname":"%s","platform":"%s","arch":"%s","username":"%s","port":%s,"docker":%s,"root":%s,"hostKeys":[%s],"addresses":[%s]}' \\
+    "\$HOSTNAME_VALUE" "\$PLATFORM" "\$ARCH" "\$POLARIS_USER" "\$SSH_PORT" "\$DOCKER_PRESENT" "\$HAS_ROOT" "\$HOST_KEYS" "\$ADDRESSES")
 
 # No -f: a refusal from Polaris carries a body explaining itself, and -f would
 # throw it away and leave the operator with nothing but an exit code.

@@ -17,11 +17,12 @@
 import Link from "next/link";
 import { HostDialog } from "./host-dialog";
 import { useRouter } from "next/navigation";
+import { QuickEnroll } from "./quick-enroll";
 import { deleteHostAction } from "./actions";
 import { ServerDialog } from "./server-dialog";
-import { useState, useTransition } from "react";
 import { ENVIRONMENT_META } from "./environment-meta";
 import { TerminalPanel } from "../deploy/terminal-panel";
+import { useEffect, useState, useTransition } from "react";
 import { useLiveResource } from "@/components/use-live-resource";
 import type { ServerRow, ServerStatus, ServerStatusPayload } from "./types";
 import { EnvironmentDialog, type EnvironmentTarget } from "./environment-dialog";
@@ -48,6 +49,7 @@ export function ServersView({ servers }: { servers: ServerRow[] }) {
     const [target, setTarget] = useState<EnvironmentTarget | null>(null);
     const [shell, setShell] = useState<ServerRow | null>(null);
     const [details, setDetails] = useState<ServerRow | null>(null);
+    const [enrollLocal, setEnrollLocal] = useState(false);
 
     const { data: live } = useLiveResource<ServerStatusPayload>({
         url: "/api/servers/status",
@@ -150,11 +152,17 @@ export function ServersView({ servers }: { servers: ServerRow[] }) {
                                     <EnvironmentCell server={server} onPick={() => askEnvironment(server)} />
                                 </td>
                                 <td className="px-3 py-2">
-                                    {server.authMethod ? (
-                                        <Badge variant="neutral">{server.authMethod}</Badge>
-                                    ) : (
-                                        <span className="text-xs text-muted-foreground">Local</span>
-                                    )}
+                                    <div className="flex flex-wrap items-center gap-1">
+                                        {server.authMethod ? (
+                                            <Badge variant="neutral">{server.authMethod}</Badge>
+                                        ) : (
+                                            <span className="text-xs text-muted-foreground">Local</span>
+                                        )}
+                                        {/* Root is worth its own badge: it is the widest thing a
+                                            server can have granted, and a server that has it should
+                                            never be one anybody has to go and check. */}
+                                        {server.sudo ? <Badge variant="warning">Root</Badge> : null}
+                                    </div>
                                 </td>
                                 <td className="px-3 py-2">
                                     <div className="flex justify-end gap-1">
@@ -168,13 +176,20 @@ export function ServersView({ servers }: { servers: ServerRow[] }) {
                                                 >
                                                     Cancel
                                                 </Button>
-                                                <Button size="sm" onClick={() => onDelete(server.id)} disabled={pending}>
+                                                {/* The Host, not the row: the local row's own id is
+                                                    a placeholder, and what is being given up is the
+                                                    login behind it. */}
+                                                <Button
+                                                    size="sm"
+                                                    onClick={() => onDelete(server.hostId ?? server.id)}
+                                                    disabled={pending}
+                                                >
                                                     Remove
                                                 </Button>
                                             </>
                                         ) : (
                                             <>
-                                                {server.kind === "host" ? (
+                                                {server.hostId ? (
                                                     <>
                                                         <Button
                                                             size="icon"
@@ -187,7 +202,7 @@ export function ServersView({ servers }: { servers: ServerRow[] }) {
                                                         </Button>
                                                         <Button size="icon" variant="ghost" asChild>
                                                             <Link
-                                                                href={`/drive?c=host:${server.id}`}
+                                                                href={`/drive?c=host:${server.hostId}`}
                                                                 aria-label={`Browse the files on ${server.name}`}
                                                                 title="Browse its files"
                                                             >
@@ -195,6 +210,13 @@ export function ServersView({ servers }: { servers: ServerRow[] }) {
                                                             </Link>
                                                         </Button>
                                                     </>
+                                                ) : server.kind === "local" ? (
+                                                    // Polaris reaches its own machine through the container
+                                                    // engine only, so a shell there has to be granted the
+                                                    // same way any other server grants one.
+                                                    <Button size="sm" variant="secondary" onClick={() => setEnrollLocal(true)}>
+                                                        <SquareTerminal className="size-3.5" /> Enable shell and files
+                                                    </Button>
                                                 ) : null}
                                                 <Button
                                                     size="icon"
@@ -205,12 +227,19 @@ export function ServersView({ servers }: { servers: ServerRow[] }) {
                                                 >
                                                     <Settings2 className="size-4" />
                                                 </Button>
-                                                {server.kind === "host" ? (
+                                                {/* The local machine is never removed - it is the
+                                                    box Polaris runs on - but the login it was
+                                                    reached by can be given back. */}
+                                                {server.kind === "host" || server.hostId ? (
                                                     <Button
                                                         size="icon"
                                                         variant="ghost"
-                                                        aria-label={`Remove ${server.name}`}
-                                                        title="Remove"
+                                                        aria-label={
+                                                            server.kind === "local"
+                                                                ? `Stop reaching ${server.name} over SSH`
+                                                                : `Remove ${server.name}`
+                                                        }
+                                                        title={server.kind === "local" ? "Give up the login" : "Remove"}
                                                         onClick={() => setConfirmId(server.id)}
                                                     >
                                                         <Trash2 className="size-4" />
@@ -234,6 +263,18 @@ export function ServersView({ servers }: { servers: ServerRow[] }) {
 
             <EnvironmentDialog target={target} onClose={() => setTarget(null)} />
             <ShellDialog server={shell} onClose={() => setShell(null)} />
+            <Dialog open={enrollLocal} onOpenChange={setEnrollLocal}>
+                <DialogContent className="max-w-lg">
+                    <DialogHeader>
+                        <DialogTitle>Reach this machine</DialogTitle>
+                        <DialogDescription>
+                            Run this on the machine Polaris runs on to give it a shell, its files, and a login to
+                            run jobs under.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <QuickEnroll kind="local" onDone={() => setEnrollLocal(false)} />
+                </DialogContent>
+            </Dialog>
             <ServerDialog
                 server={details}
                 status={details ? statusOf(details.id) : null}
@@ -263,22 +304,53 @@ function StatusCell({ kind, status }: { kind: ServerRow["kind"]; status: ServerS
     return <Badge variant="success">{status.latencyMs === null ? "Up" : `${status.latencyMs} ms`}</Badge>;
 }
 
-/** A shell on one server. Mounted only while open so closing the dialog tears the
- *  SSH session down rather than leaving it attached in the background. */
+/**
+ * A shell on one server. Mounted only while open so closing the dialog tears the
+ * SSH session down rather than leaving it attached in the background.
+ *
+ * Root is offered only where the enrollment granted it, and switching restarts the
+ * session rather than escalating an open one - the panel is keyed on which of the
+ * two it is, so there is never a terminal whose prompt disagrees with its label.
+ */
 function ShellDialog({ server, onClose }: { server: ServerRow | null; onClose: () => void }) {
+    const [asRoot, setAsRoot] = useState(false);
+
+    // A different server may not offer root at all; starting each one as the login
+    // means the widest option is never the one that opens by default.
+    useEffect(() => {
+        setAsRoot(false);
+    }, [server?.id]);
+
     return (
         <Dialog open={server !== null} onOpenChange={(next) => !next && onClose()}>
             <DialogContent className="max-w-3xl">
                 <DialogHeader>
-                    <DialogTitle>{server?.name}</DialogTitle>
+                    <DialogTitle className="flex items-center gap-2">
+                        {server?.name}
+                        {asRoot ? <Badge variant="warning">root</Badge> : null}
+                    </DialogTitle>
                     <DialogDescription>
-                        {server ? `Signed in as ${server.detail} over SSH.` : null}
+                        {server
+                            ? asRoot
+                                ? `Signed in as ${server.detail} over SSH, elevated with sudo.`
+                                : `Signed in as ${server.detail} over SSH.`
+                            : null}
                     </DialogDescription>
                 </DialogHeader>
+
+                {server?.sudo ? (
+                    <div className="flex justify-end">
+                        <Button size="sm" variant="ghost" onClick={() => setAsRoot((current) => !current)}>
+                            {asRoot ? `Back to ${server.detail}` : "Open as root"}
+                        </Button>
+                    </div>
+                ) : null}
+
                 {server ? (
                     <TerminalPanel
-                        target={{ kind: "host", hostId: server.id }}
-                        label={`${server.detail}@${server.address}`}
+                        key={asRoot ? "root" : "login"}
+                        target={{ kind: "host", hostId: server.hostId ?? server.id, asRoot }}
+                        label={`${asRoot ? "root" : server.detail}@${server.address}`}
                     />
                 ) : null}
             </DialogContent>

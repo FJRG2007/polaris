@@ -17,7 +17,7 @@
 
 import { WebSocketServer } from "ws";
 import { HostdClient } from "@polaris/hostd-client";
-import { clampDim, openShell, openSshClient } from "@polaris/ssh";
+import { clampDim, openRootShell, openShell, openSshClient } from "@polaris/ssh";
 
 const port = Number(process.env.POLARIS_WS_PORT || 3001);
 const appPort = Number(process.env.PORT || 3000);
@@ -35,13 +35,14 @@ wss.on("listening", () => console.error(`polaris deploy ws sidecar on :${port}`)
 wss.on("connection", async (ws, req) => {
     const token = (req.headers["sec-websocket-protocol"] || "").split(",")[0]?.trim();
     const ticket = token ? await redeem(token) : null;
-    if (!ticket || (ticket.mode !== "terminal" && ticket.mode !== "ssh")) {
+    if (!ticket || (ticket.mode !== "terminal" && ticket.mode !== "ssh" && ticket.mode !== "ssh-root")) {
         console.error(`polaris ws: rejecting connection - ${token ? "ticket redeem failed / wrong mode" : "no ticket"}`);
         ws.close(4001, "invalid ticket");
         return;
     }
 
-    const session = ticket.mode === "ssh" ? await openSshSession(ticket, ws) : await openContainerSession(ticket, ws);
+    const overSsh = ticket.mode === "ssh" || ticket.mode === "ssh-root";
+    const session = overSsh ? await openSshSession(ticket, ws) : await openContainerSession(ticket, ws);
     if (!session) return;
 
     session.stream.on("data", (chunk) => {
@@ -114,8 +115,14 @@ async function openSshSession(ticket, ws) {
             // is the last place to paper over it by trusting whatever answers.
             pinnedHostKey: target.hostKey ?? []
         });
-        const channel = await openShell(client);
-        console.error(`polaris ws: shell open on ${target.username}@${target.host}`);
+        // Which of the two the ticket says, never what the client asked for: the
+        // web app already refused a root ticket for a server that was never granted
+        // sudo, and that decision is not one to re-take here on weaker information.
+        const asRoot = ticket.mode === "ssh-root";
+        const channel = asRoot ? await openRootShell(client) : await openShell(client);
+        console.error(
+            `polaris ws: ${asRoot ? "root shell" : "shell"} open on ${target.username}@${target.host}`
+        );
         return {
             stream: channel,
             resize: (cols, rows) => channel.setWindow(clampDim(rows, 24, 300), clampDim(cols, 80, 500), 0, 0),

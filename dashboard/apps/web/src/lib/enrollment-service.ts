@@ -31,6 +31,7 @@ import { prisma } from "@polaris/db";
 import { loadEnv } from "@polaris/config";
 import { recordAudit } from "@/lib/audit-service";
 import { appBaseUrl } from "@/lib/domain-service";
+import { setLocalHostId } from "@/lib/local-server";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { enrollmentCommand } from "@/lib/enrollment-script";
 import { generateToken, hashToken } from "@polaris/core/tokens";
@@ -113,7 +114,7 @@ export async function openEnrollment(
     const base = await appBaseUrl();
     return {
         id: row.id,
-        command: enrollmentCommand(base, token, input.grantDocker),
+        command: enrollmentCommand(base, token, input.grantDocker, input.grantRoot),
         expiresAt: expiresAt.toISOString(),
         insecureTransport: base.startsWith("http://")
     };
@@ -259,6 +260,7 @@ export async function claimEnrollment(
             port: payload.port,
             username: payload.username,
             authMethod: "key",
+            sudo: payload.root,
             environment: resolveEnvironment(row.environment, address),
             hostKey,
             encryptedCredential: credentials.ciphertext,
@@ -272,12 +274,26 @@ export async function claimEnrollment(
         where: { id: row.id },
         data: { hostId: host.id, address, name: payload.hostname, error: null }
     });
+
+    // The machine Polaris itself runs on gets folded into the row the Servers app
+    // already shows for it, rather than appearing a second time as a stranger that
+    // happens to have the same name.
+    if (row.kind === "local") await setLocalHostId(host.id);
+
     await recordAudit({
         actorId: row.createdById,
         action: "enrollment.claim",
         targetType: "host",
         targetId: host.id,
-        metadata: { address, platform: payload.platform, arch: payload.arch, docker: payload.docker }
+        metadata: {
+            address,
+            platform: payload.platform,
+            arch: payload.arch,
+            docker: payload.docker,
+            // Worth having in the log on its own: this is the moment a machine
+            // started trusting Polaris as root.
+            root: payload.root
+        }
     });
 
     return { ok: true };

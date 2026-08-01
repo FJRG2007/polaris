@@ -39,6 +39,13 @@ describe("enrollmentCommand", () => {
     it("keeps container access visible as an argument rather than hiding it", () => {
         expect(enrollmentCommand("https://polaris.example.com", "tok", true)).toContain("-- --docker");
     });
+
+    // Both are root on the machine in practice, so neither is ever conceded by a
+    // command that does not say so on its face.
+    it("keeps root visible too, alongside or without container access", () => {
+        expect(enrollmentCommand("https://polaris.example.com", "tok", false, true)).toContain("-- --root");
+        expect(enrollmentCommand("https://polaris.example.com", "tok", true, true)).toContain("-- --docker --root");
+    });
 });
 
 describe("enrollmentScript", () => {
@@ -54,9 +61,28 @@ describe("enrollmentScript", () => {
         expect(script).not.toContain("PRIVATE KEY");
     });
 
-    it("grants no sudo, and asks before granting container access", () => {
+    it("asks before granting container access or root", () => {
         expect(script).not.toMatch(/usermod -aG (sudo|wheel|admin)/);
         expect(script).toContain('if [ "$GRANT_DOCKER" = "1" ]');
+        expect(script).toContain('if [ "$GRANT_ROOT" = "1" ]');
+    });
+
+    // A sudoers file with a syntax error is refused wholesale, which takes root
+    // away from everybody on the machine - including whoever is standing in front
+    // of it. So the candidate is validated before it is ever in place.
+    it("validates the sudo rule on a temporary file before installing it", () => {
+        const sudoers = script.slice(script.indexOf('if [ "$GRANT_ROOT" = "1" ]'));
+        const validate = sudoers.indexOf("visudo -c -f");
+        const install = sudoers.indexOf('mv "$TMP"');
+        expect(validate).toBeGreaterThan(-1);
+        expect(install).toBeGreaterThan(validate);
+        expect(sudoers).toContain('visudo -c -f "$TMP"');
+        expect(sudoers).not.toContain('visudo -c -f "$SUDOERS"');
+    });
+
+    it("reports what the login ended up able to do, not what was asked for", () => {
+        expect(script).toContain('"root":%s');
+        expect(script).toContain('sudo -l -U "$POLARIS_USER"');
     });
 
     it("refuses to run unprivileged rather than failing halfway through", () => {

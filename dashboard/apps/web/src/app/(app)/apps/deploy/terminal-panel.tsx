@@ -14,17 +14,21 @@
 import "@xterm/xterm/css/xterm.css";
 import { useEffect, useRef, useState } from "react";
 
-/** What to attach to: a container on a target, or a registered server. */
+/** What to attach to: a container on a target, or a registered server - as the
+ *  Polaris login, or as root where that server granted it. */
 export type TerminalTarget =
     | { kind: "container"; targetId: string; containerRef: string }
-    | { kind: "host"; hostId: string };
+    | { kind: "host"; hostId: string; asRoot?: boolean };
 
 export function TerminalPanel({ target, label }: { target: TerminalTarget; label: string }) {
     const mountRef = useRef<HTMLDivElement>(null);
     const [status, setStatus] = useState("connecting...");
     // The object identity of `target` would restart the session on every parent
     // render; its contents are what actually decide the connection.
-    const key = target.kind === "host" ? `host:${target.hostId}` : `${target.targetId}:${target.containerRef}`;
+    const key =
+        target.kind === "host"
+            ? `host:${target.hostId}:${target.asRoot ? "root" : "login"}`
+            : `${target.targetId}:${target.containerRef}`;
 
     useEffect(() => {
         let disposed = false;
@@ -50,7 +54,7 @@ export function TerminalPanel({ target, label }: { target: TerminalTarget; label
                 headers: { "content-type": "application/json" },
                 body: JSON.stringify(
                     target.kind === "host"
-                        ? { hostId: target.hostId }
+                        ? { hostId: target.hostId, mode: target.asRoot ? "ssh-root" : "ssh" }
                         : { targetId: target.targetId, containerRef: target.containerRef, mode: "terminal" }
                 )
             });

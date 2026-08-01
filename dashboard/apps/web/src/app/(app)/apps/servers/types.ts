@@ -13,6 +13,13 @@ export interface ServerRow {
     address: string;
     port: number | null;
     authMethod: string | null;
+    /** Whether Polaris may act as root here, which decides whether a root shell
+     *  and a root file view are offered. */
+    sudo: boolean;
+    /** The Host backing this row. Null for the local box until it has been enrolled;
+     *  once it has, the local row carries the host it resolved to and gains
+     *  everything a registered server can do. */
+    hostId: string | null;
     environment: ServerEnvironment;
     /** Wildcard domain pointed at this server, empty when none is configured. */
     wildcardDomain: string;
