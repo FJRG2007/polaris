@@ -7,29 +7,27 @@
  */
 
 import { z } from "zod";
-import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
-import { requirePermission } from "@/lib/session";
-import { ensurePublicIp, getDomainConfig } from "@/lib/domain-service";
-import { getDomainZones, listDeployZones } from "@/lib/domain-zones";
-import { provisionHostnameDns, type HostnameDnsResult } from "@/lib/domain-dns";
-import { getNetworkStatus } from "@/lib/network-service";
-import { recordAudit } from "@/lib/audit-service";
-import { getOrCreateLocalTarget, getOrCreateHostTarget } from "@/lib/deploy-target-service";
+import { revalidatePath } from "next/cache";
 import { listHosts } from "@/lib/host-service";
-import * as deployService from "@/lib/deploy-service";
-import { getWafRule, setWafRule, type WafRuleView } from "@/lib/waf-service";
+import { requirePermission } from "@/lib/session";
+import { recordAudit } from "@/lib/audit-service";
 import type { WafScopeType } from "@polaris/core";
-import { createDatabase, deployDatabase, type DbEngine } from "@/lib/database-service";
-import { listVolumes, createVolume, updateVolume, deleteVolume, type VolumeView } from "@/lib/deploy-volume-service";
+import * as deployService from "@/lib/deploy-service";
+import { parseGithubRepo } from "@/lib/repo-reference";
+import { getNetworkStatus } from "@/lib/network-service";
 import { listConnections, getDriver } from "@/lib/storage-service";
+import { getDomainZones, listDeployZones } from "@/lib/domain-zones";
+import { ensurePublicIp, getDomainConfig } from "@/lib/domain-service";
+import { getWafRule, setWafRule, type WafRuleView } from "@/lib/waf-service";
+import { provisionHostnameDns, type HostnameDnsResult } from "@/lib/domain-dns";
+import { createDatabase, deployDatabase, type DbEngine } from "@/lib/database-service";
+import { getOrCreateLocalTarget, getOrCreateHostTarget } from "@/lib/deploy-target-service";
+import { listVolumes, createVolume, updateVolume, deleteVolume, type VolumeView } from "@/lib/deploy-volume-service";
 import {
-    canHostMount,
-    normalizeRelPath,
-    type DeployVolumeInput,
-    type DeployVolumeUpdateInput,
-    type StorageProviderKind
-} from "@polaris/core";
+    getCloudflareAccountStatus,
+    type CloudflareAccountStatus
+} from "@/lib/integrations/cloudflare-account-service";
 import {
     getQuickTunnelStatus,
     startQuickTunnel,
@@ -43,17 +41,18 @@ import {
     type NgrokTunnelStatus
 } from "@/lib/deploy/ngrok-tunnel-service";
 import {
-    getNamedTunnelStatus,
-    provisionNamedTunnel,
-    setNamedTunnelEnabled,
-    startNamedTunnel,
-    stopNamedTunnel,
-    type NamedTunnelStatus
-} from "@/lib/deploy/named-tunnel-service";
+    canHostMount,
+    normalizeRelPath,
+    type DeployVolumeInput,
+    type DeployVolumeUpdateInput,
+    type StorageProviderKind
+} from "@polaris/core";
 import {
-    getCloudflareAccountStatus,
-    type CloudflareAccountStatus
-} from "@/lib/integrations/cloudflare-account-service";
+    deleteRegistryCredential,
+    listRegistryCredentials,
+    upsertRegistryCredential,
+    type RegistryCredentialView
+} from "@/lib/registry-credential-service";
 import {
     deleteEnvVar,
     listEnvVars,
@@ -68,15 +67,19 @@ import {
     getGithubStatus,
     inspectGithubRepo,
     listGithubRepos,
+    resolveGithubRepo,
+    searchGithubRepos,
     type GithubRepo,
     type RepoInspection
 } from "@/lib/github-service";
 import {
-    deleteRegistryCredential,
-    listRegistryCredentials,
-    upsertRegistryCredential,
-    type RegistryCredentialView
-} from "@/lib/registry-credential-service";
+    getNamedTunnelStatus,
+    provisionNamedTunnel,
+    setNamedTunnelEnabled,
+    startNamedTunnel,
+    stopNamedTunnel,
+    type NamedTunnelStatus
+} from "@/lib/deploy/named-tunnel-service";
 
 const DB_ENGINES: DbEngine[] = ["postgres", "mysql", "mariadb", "mongo", "redis"];
 
@@ -972,5 +975,33 @@ export async function githubReposAction(): Promise<{ connected: boolean; login: 
         return { connected: true, login: status.login, repos };
     } catch {
         return { connected: true, login: status.login, repos: [] };
+    }
+}
+
+const repoQuerySchema = z.string().trim().min(2).max(200);
+
+/**
+ * Repositories matching what was typed in the Deploy picker, beyond the connected
+ * account's own list: the exact repository when the input names one (a pasted URL,
+ * an SSH remote, `owner/repo`), and GitHub's public search otherwise.
+ *
+ * Called as the operator types, so a query GitHub will not answer - too short,
+ * rate limited, no such repository - is an empty list rather than an error; the
+ * field keeps showing whatever the local list already matched. Gated on
+ * deploy.manage.
+ */
+export async function searchGithubReposAction(query: string): Promise<{ repos: GithubRepo[] }> {
+    await requirePermission("deploy.manage");
+    const parsed = repoQuerySchema.safeParse(query);
+    if (!parsed.success) return { repos: [] };
+    try {
+        const reference = parseGithubRepo(parsed.data);
+        if (reference) {
+            const repo = await resolveGithubRepo(reference.owner, reference.repo);
+            if (repo) return { repos: [repo] };
+        }
+        return { repos: await searchGithubRepos(parsed.data) };
+    } catch {
+        return { repos: [] };
     }
 }

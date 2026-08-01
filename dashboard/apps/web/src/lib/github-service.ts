@@ -65,6 +65,18 @@ function apiHeaders(token: string): HeadersInit {
     };
 }
 
+/** Headers for a call that also works signed out. The stored credentials are used
+ *  when there are any, which both reaches private repositories and lifts the far
+ *  lower anonymous rate limit. */
+function optionalAuthHeaders(token: string | null): HeadersInit {
+    if (token) return apiHeaders(token);
+    return {
+        Accept: "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "User-Agent": "polaris"
+    };
+}
+
 // --- Personal Access Token method ------------------------------------------
 
 /** Validate a token and return the login it authenticates as, or throw. */
@@ -366,6 +378,48 @@ export async function listGithubRepos(): Promise<GithubRepo[]> {
     }));
 }
 
+/**
+ * One repository by name, or null when GitHub does not serve it to this Polaris -
+ * which is the same answer for "no such repository" and "private, and not one of
+ * ours", exactly as GitHub reports it. Stored credentials are used when there are
+ * any, so a private repository the connection can reach resolves like a public one.
+ */
+export async function resolveGithubRepo(owner: string, repo: string): Promise<GithubRepo | null> {
+    const token = await apiToken(owner);
+    const url = `${API}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`;
+    const res = await fetch(url, { headers: optionalAuthHeaders(token), cache: "no-store" });
+    if (!res.ok) return null;
+    const body = (await res.json()) as { full_name: string; default_branch: string; private: boolean };
+    return {
+        fullName: body.full_name,
+        defaultBranch: body.default_branch || "main",
+        private: body.private
+    };
+}
+
+/**
+ * Public repositories matching a phrase, best match first. GitHub's search index
+ * only covers public repositories however the call is authenticated, so private
+ * ones are reached through the connected account's own list instead; the token is
+ * still passed because it triples the searches allowed per minute.
+ */
+export async function searchGithubRepos(query: string, limit = 8): Promise<GithubRepo[]> {
+    const term = query.trim();
+    if (term.length < 2) return [];
+    const token = await apiToken();
+    const url = `${API}/search/repositories?q=${encodeURIComponent(term)}&per_page=${limit}`;
+    const res = await fetch(url, { headers: optionalAuthHeaders(token), cache: "no-store" });
+    if (!res.ok) return [];
+    const body = (await res.json()) as {
+        items?: Array<{ full_name: string; default_branch: string; private: boolean }>;
+    };
+    return (body.items ?? []).map((item) => ({
+        fullName: item.full_name,
+        defaultBranch: item.default_branch || "main",
+        private: item.private
+    }));
+}
+
 /** An API token for REST calls scoped to `owner` (installation token for the App
  *  method, the PAT otherwise), or null when not connected / for a public call.
  *  Exported so sibling modules (runner registration) authenticate the same way
@@ -418,10 +472,7 @@ const JS_FRAMEWORKS: Array<[string, string]> = [
  * returns nulls on any API hiccup and defaults to a nixpacks (auto) build.
  */
 export async function inspectGithubRepo(owner: string, repo: string, branch: string): Promise<RepoInspection> {
-    const token = await apiToken(owner);
-    const headers: HeadersInit = token
-        ? apiHeaders(token)
-        : { Accept: "application/vnd.github+json", "User-Agent": "polaris", "X-GitHub-Api-Version": "2022-11-28" };
+    const headers = optionalAuthHeaders(await apiToken(owner));
 
     let paths: string[] = [];
     try {
