@@ -549,7 +549,7 @@ pub fn compose_up(
     let dir = project_dir(config, project)?;
     std::fs::create_dir_all(&dir)?;
     let file = dir.join("compose.yml");
-    std::fs::write(&file, compose_yaml)?;
+    write_private(&file, compose_yaml)?;
     let mut cmd = Command::new("docker");
     cmd.arg("compose")
         .arg("-p")
@@ -587,7 +587,7 @@ pub fn stack_up(
     let dir = project_dir(config, project)?;
     std::fs::create_dir_all(&dir)?;
     let file = dir.join("compose.yml");
-    std::fs::write(&file, compose_yaml)?;
+    write_private(&file, compose_yaml)?;
     let mut cmd = Command::new("docker");
     cmd.arg("stack")
         .arg("deploy")
@@ -738,6 +738,29 @@ pub fn logs(container: &str, follow: bool, tail: Option<u32>) -> io::Result<Box<
     }
     cmd.arg(container).stdin(Stdio::null());
     stream_command(cmd)
+}
+
+/// Write a rendered compose file readable only by this daemon (mode 0600 on
+/// unix). The file carries whatever the service was given - a database password,
+/// an API key, a runner's registration - and the default mask would leave it
+/// world-readable to every local account on the host. `docker compose` runs as
+/// this same user, so nothing else needs to read it.
+#[cfg(unix)]
+fn write_private(path: &std::path::Path, contents: &str) -> io::Result<()> {
+    use std::io::Write;
+    use std::os::unix::fs::OpenOptionsExt;
+    let mut file = std::fs::OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .mode(0o600)
+        .open(path)?;
+    file.write_all(contents.as_bytes())
+}
+
+#[cfg(not(unix))]
+fn write_private(path: &std::path::Path, contents: &str) -> io::Result<()> {
+    std::fs::write(path, contents)
 }
 
 /// Resolve and confine a project's directory under the deploy root.
