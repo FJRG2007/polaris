@@ -1,28 +1,45 @@
 import { describe, expect, it } from "vitest";
-import { decodeGuardRule, encodeGuardRule, signEdgeToken, verifyEdgeToken } from "../src/waf.js";
 import { wafRuleInputSchema, WAF_LIST_MAX } from "../src/schemas/deploy.js";
+import { decodeGuardRule, encodeGuardRule, signEdgeToken, verifyEdgeToken } from "../src/waf.js";
 
 const SECRET = "unit-test-secret-16chars";
 const HOST = "app.example.com";
 const NOW = 1_800_000_000;
 
+/** A custom rule as the editor produces one. */
+const CUSTOM_RULE = {
+    name: "Block the admin path",
+    enabled: true,
+    action: "block" as const,
+    conditions: [{ field: "path" as const, operator: "starts_with" as const, values: ["/wp-admin"] }]
+};
+
 describe("guard rule codec", () => {
     it("round-trips a rule", () => {
-        const rule = { deny: ["10.0.0.0/8", "203.0.113.5"], requireLogin: true };
+        const rule = { deny: ["10.0.0.0/8", "203.0.113.5"], requireLogin: true, rules: [CUSTOM_RULE] };
         expect(decodeGuardRule(encodeGuardRule(rule))).toEqual(rule);
     });
 
     it("treats an absent header as a no-op", () => {
-        expect(decodeGuardRule(undefined)).toEqual({ deny: [], requireLogin: false });
+        expect(decodeGuardRule(undefined)).toEqual({ deny: [], requireLogin: false, rules: [] });
     });
 
     it("fails closed on a malformed header (requires login)", () => {
-        expect(decodeGuardRule("###not-valid###")).toEqual({ deny: [], requireLogin: true });
+        expect(decodeGuardRule("###not-valid###")).toEqual({ deny: [], requireLogin: true, rules: [] });
     });
 
     it("drops non-string denylist entries", () => {
         const header = Buffer.from(JSON.stringify({ d: ["10.0.0.1", 5, null], l: false })).toString("base64");
-        expect(decodeGuardRule(header)).toEqual({ deny: ["10.0.0.1"], requireLogin: false });
+        expect(decodeGuardRule(header)).toEqual({ deny: ["10.0.0.1"], requireLogin: false, rules: [] });
+    });
+
+    it("drops one unreadable custom rule and keeps the rest", () => {
+        // A rule set survives a schema change; the ones that still parse must keep
+        // running rather than the whole route losing its rules.
+        const header = Buffer.from(
+            JSON.stringify({ d: [], l: false, r: [{ name: "broken" }, CUSTOM_RULE] })
+        ).toString("base64");
+        expect(decodeGuardRule(header).rules).toEqual([CUSTOM_RULE]);
     });
 });
 
@@ -67,7 +84,23 @@ describe("edge token", () => {
 describe("wafRuleInputSchema", () => {
     it("accepts a valid rule and applies defaults", () => {
         const parsed = wafRuleInputSchema.parse({ ipAllowlist: ["10.0.0.0/8"] });
-        expect(parsed).toEqual({ ipAllowlist: ["10.0.0.0/8"], ipDenylist: [], requireLogin: false });
+        expect(parsed).toEqual({ ipAllowlist: ["10.0.0.0/8"], ipDenylist: [], requireLogin: false, rules: [] });
+    });
+
+    it("rejects a custom rule with no conditions", () => {
+        // A rule that tests nothing matches everything, which for a block is the
+        // whole site and for an allow is the firewall switched off.
+        const result = wafRuleInputSchema.safeParse({
+            rules: [{ name: "empty", action: "block", conditions: [] }]
+        });
+        expect(result.success).toBe(false);
+    });
+
+    it("rejects a condition with no values", () => {
+        const result = wafRuleInputSchema.safeParse({
+            rules: [{ name: "empty", action: "block", conditions: [{ field: "path", operator: "equals", values: [] }] }]
+        });
+        expect(result.success).toBe(false);
     });
 
     it("rejects an entry present in both allow and deny", () => {

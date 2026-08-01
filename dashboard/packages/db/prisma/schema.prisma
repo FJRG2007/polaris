@@ -1902,15 +1902,18 @@ model EnvVar {
 // the rules keep enforcing when the Polaris control plane is down.
 model WafRule {
     id           String   @id @default(uuid(7)) @db.Uuid
-    // global | project | environment | application
+    // polaris | global | project | environment | application
     scopeType    String
-    // "" for global scope; otherwise the Project/Environment/Application id. Not a
-    // uuid column because the global row's scopeId is the empty string.
+    // "" for the polaris and global scopes; otherwise the Project/Environment/
+    // Application id. Not a uuid column because those two carry the empty string.
     scopeId      String
     // JSON string arrays of CIDR/IP, SQLite-portable like FileRequest.allowedCidrs.
     ipAllowlist  String   @default("[]")
     ipDenylist   String   @default("[]")
     requireLogin Boolean  @default(false)
+    // Ordered custom rules as a JSON array (conditions -> block | allow), evaluated
+    // first-match-wins after the IP lists.
+    rules        String   @default("[]")
     createdAt    DateTime @default(now())
     updatedAt    DateTime @updatedAt
 

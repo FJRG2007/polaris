@@ -5,8 +5,8 @@
  * forwardAuth check, so Traefik can point at `/authz` (or any path) uniformly.
  */
 
-import { createServer, type IncomingMessage, type Server } from "node:http";
 import { evaluate, type GuardConfig } from "./authz.js";
+import { createServer, type IncomingMessage, type Server } from "node:http";
 
 /** First value of a request header (Node lower-cases header names). */
 function header(req: IncomingMessage, name: string): string | undefined {
@@ -31,6 +31,10 @@ export function createGuardServer(config: () => GuardConfig): Server {
                 forwardedProto: header(req, "x-forwarded-proto"),
                 forwardedHost: header(req, "x-forwarded-host"),
                 forwardedUri: header(req, "x-forwarded-uri"),
+                // Traefik forwards the original method as a header; the guard's own
+                // request is always a GET, so `req.method` would say nothing.
+                forwardedMethod: header(req, "x-forwarded-method"),
+                userAgent: header(req, "user-agent"),
                 cookie: header(req, "cookie")
             },
             config()

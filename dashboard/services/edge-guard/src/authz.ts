@@ -5,9 +5,12 @@
  * intentionally I/O-free and deterministic so it can be unit-tested exhaustively -
  * the HTTP wrapper in server.ts only marshals headers in and a status out.
  *
- * The per-route rule (denylist + require-login) arrives in the `X-Polaris-Waf`
- * header, which a Traefik `headers` middleware stamps on the request, so a client
- * cannot forge it. Deny is checked first: a denied IP is blocked even if logged in.
+ * The per-route rule (denylist, custom rules, require-login) arrives in the
+ * `X-Polaris-Waf` header, which a Traefik `headers` middleware stamps on the request,
+ * so a client cannot forge it. Deny is checked first: a denied IP is blocked even if
+ * logged in. The custom rules run next, in order, and the first one to match decides
+ * - which is what lets a narrow `allow` sit above a broad `block` without the two
+ * contradicting each other.
  *
  * Require-login uses a cross-domain handoff, because Polaris (which owns the login
  * session) and the app usually sit on different domains and cannot share a cookie:
@@ -20,7 +23,7 @@
  *      against another app even if it leaks via the callback URL.
  */
 
-import { ipAllowed } from "@polaris/core";
+import { evaluateWafRules, ipAllowed } from "@polaris/core";
 import { decodeGuardRule, verifyEdgeToken } from "@polaris/core/waf";
 
 /** Path (on the app's own domain) the login handoff returns to. */
@@ -33,6 +36,8 @@ export interface GuardRequest {
     readonly forwardedProto?: string;
     readonly forwardedHost?: string;
     readonly forwardedUri?: string;
+    readonly forwardedMethod?: string;
+    readonly userAgent?: string;
     readonly cookie?: string;
 }
 
@@ -123,6 +128,23 @@ export function evaluate(req: GuardRequest, cfg: GuardConfig): GuardDecision {
         const ip = clientIp(req.forwardedFor);
         if (!ip) return { status: 403, reason: "client ip unknown" };
         if (ipAllowed(ip, rule.deny)) return { status: 403, reason: "denied ip" };
+    }
+
+    // Custom rules next, before the login handoff: a rule that admits a request is
+    // meant to admit it, and one that blocks it should not first be sent round a
+    // login it was never going to be allowed past.
+    if (rule.rules.length > 0) {
+        const uri = parseUri(req.forwardedUri, proto, host);
+        const verdict = evaluateWafRules(rule.rules, {
+            ip: clientIp(req.forwardedFor),
+            host,
+            path: uri?.pathname ?? req.forwardedUri ?? null,
+            method: req.forwardedMethod,
+            userAgent: req.userAgent,
+            query: uri?.search.replace(/^\?/, "") ?? null
+        });
+        if (verdict?.action === "block") return { status: 403, reason: `rule: ${verdict.rule.name}` };
+        if (verdict?.action === "allow") return { status: 200 };
     }
 
     if (rule.requireLogin) {

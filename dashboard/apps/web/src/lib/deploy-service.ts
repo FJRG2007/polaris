@@ -6,29 +6,29 @@
  * in-memory queue - no external broker - so two deploys of one app never race.
  */
 
-import { createWriteStream } from "node:fs";
-import { mkdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { loadEnv } from "@polaris/config";
-import { isTunnelHostname } from "@polaris/core";
 import { prisma } from "@polaris/db";
-import { bucketHttpMetrics, normalizeZoneName, parseHttpLogs, releaseDomain, shortHash, slugify, type AppDeployPlan, type DeployResult, type HttpLogEntry, type HttpMetricPoint, type RuntimeContext, type RuntimeDriver } from "@polaris/deploy";
-import { decryptSecret } from "@polaris/storage";
-import { resolveMountTarget } from "./storage-service";
-import { getDriver, getPorts, toTargetInfo, type TargetRow } from "./deploy/runtime";
-import { KEPT_RELEASES, currentReleaseRef, keepsReleases, portSubject, releaseMarker, releaseRef, serviceRef } from "./deploy/releases";
-import { LocalRouter, type AppRoute } from "./deploy/router";
-import { getOrCreateHostTarget, getOrCreateLocalTarget } from "./deploy-target-service";
+import { loadEnv } from "@polaris/config";
+import { createWriteStream } from "node:fs";
 import { getPublicIp } from "./domain-service";
-import { deployHostname, type ZoneMintFailure } from "./domain-zones";
-import { resolveAutoDomain } from "./network-service";
+import { isTunnelHostname } from "@polaris/core";
+import { decryptSecret } from "@polaris/storage";
+import { mkdir, readFile } from "node:fs/promises";
 import { ensureLocalCa } from "./local-ca-service";
+import { resolveAutoDomain } from "./network-service";
+import { resolveMountTarget } from "./storage-service";
+import { resolveWaf, resolveWafBatch } from "./waf-service";
+import { LocalRouter, type AppRoute } from "./deploy/router";
+import { resolveRegistryLogin } from "./registry-credential-service";
+import { notifyDeployFinished } from "./notifications/deploy-events";
+import { deployHostname, type ZoneMintFailure } from "./domain-zones";
 import { gitBuildContext, type GitSource } from "./git-build-service";
 import { getLatestCommit, githubCloneAuthHeader } from "./github-service";
-import { resolveRegistryLogin } from "./registry-credential-service";
+import { getDriver, getPorts, toTargetInfo, type TargetRow } from "./deploy/runtime";
+import { getOrCreateHostTarget, getOrCreateLocalTarget } from "./deploy-target-service";
 import { quickTunnelAppIds, tunnelHostForApp, stopQuickTunnel } from "./deploy/quick-tunnel-service";
-import { notifyDeployFinished } from "./notifications/deploy-events";
-import { resolveWaf, resolveWafBatch } from "./waf-service";
+import { KEPT_RELEASES, currentReleaseRef, keepsReleases, portSubject, releaseMarker, releaseRef, serviceRef } from "./deploy/releases";
+import { bucketHttpMetrics, normalizeZoneName, parseHttpLogs, releaseDomain, shortHash, slugify, type AppDeployPlan, type DeployResult, type HttpLogEntry, type HttpMetricPoint, type RuntimeContext, type RuntimeDriver } from "@polaris/deploy";
 
 /** A locally-installed messaging hub (this catalog app) joins a dedicated web<->hub
  *  network and POSTs inbound events to the web by service DNS - the public app URL
@@ -542,7 +542,7 @@ export async function syncAppRoutes(): Promise<void> {
             ...localDomains.map((domain) => domain.applicationId),
             ...localTunnelApps.map((app) => app.id)
         ]);
-        const emptyWaf = { allowLists: [], deny: [], requireLogin: false };
+        const emptyWaf = { allowLists: [], deny: [], requireLogin: false, rules: [] };
         for (const domain of localDomains) {
             const rule = waf.get(domain.applicationId) ?? emptyWaf;
             localRoutes.push({
@@ -553,6 +553,7 @@ export async function syncAppRoutes(): Promise<void> {
                 dialPort: hostPortForApp(dialTarget(domain, isolated)),
                 allowLists: rule.allowLists,
                 deny: rule.deny,
+                rules: rule.rules,
                 requireLogin: rule.requireLogin
             });
         }
@@ -566,6 +567,7 @@ export async function syncAppRoutes(): Promise<void> {
                 dialPort: hostPortForApp(app.id),
                 allowLists: rule.allowLists,
                 deny: rule.deny,
+                rules: rule.rules,
                 requireLogin: rule.requireLogin
             });
         }
@@ -1027,7 +1029,10 @@ async function buildAppPlan(
     // a remote server's own Traefik enforces them without the control plane.
     const resolvedWaf = await resolveWaf(app.id);
     const waf =
-        resolvedWaf.allowLists.length > 0 || resolvedWaf.deny.length > 0 || resolvedWaf.requireLogin
+        resolvedWaf.allowLists.length > 0 ||
+        resolvedWaf.deny.length > 0 ||
+        resolvedWaf.rules.length > 0 ||
+        resolvedWaf.requireLogin
             ? resolvedWaf
             : undefined;
 

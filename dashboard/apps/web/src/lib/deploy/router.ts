@@ -18,6 +18,7 @@
  */
 
 import { writeFile } from "node:fs/promises";
+import type { WafCustomRule } from "@polaris/core";
 import { encodeGuardRule } from "@polaris/core/waf";
 
 /** One app hostname to route, with the origin the edge should dial. */
@@ -35,9 +36,11 @@ export interface AppRoute {
      *  list, so each becomes a chained `ipAllowList` middleware. Empty/omitted =
      *  no allowlist restriction. */
     readonly allowLists?: readonly (readonly string[])[];
-    /** WAF denylist / require-login: when either is set, the route gets the header +
-     *  forwardAuth guard middlewares carrying this rule to the edge guard. */
+    /** WAF denylist / custom rules / require-login: when any is set, the route gets
+     *  the header + forwardAuth guard middlewares carrying this rule to the edge
+     *  guard. */
     readonly deny?: readonly string[];
+    readonly rules?: readonly WafCustomRule[];
     readonly requireLogin?: boolean;
 }
 
@@ -52,9 +55,10 @@ function guardUrl(): string {
     return process.env.POLARIS_EDGE_GUARD_URL ?? "http://polaris-edge-guard:8080";
 }
 
-/** True if this route needs the forwardAuth guard (has a denylist or requires login). */
+/** True if this route needs the forwardAuth guard (has a denylist, custom rules, or
+ *  requires login). An allowlist alone does not: Traefik enforces that natively. */
 function needsGuard(route: AppRoute): boolean {
-    return (route.deny?.length ?? 0) > 0 || route.requireLogin === true;
+    return (route.deny?.length ?? 0) > 0 || (route.rules?.length ?? 0) > 0 || route.requireLogin === true;
 }
 
 /** The middleware names to attach to a route's primary (app-serving) router, adding
@@ -70,7 +74,11 @@ function routeMiddlewares(route: AppRoute, name: string, defs: Map<string, strin
     });
     if (needsGuard(route)) {
         const ctx = `${name}-waf-ctx`;
-        const rule = encodeGuardRule({ deny: route.deny ?? [], requireLogin: route.requireLogin === true });
+        const rule = encodeGuardRule({
+            deny: route.deny ?? [],
+            requireLogin: route.requireLogin === true,
+            rules: route.rules ?? []
+        });
         defs.set(
             ctx,
             `    ${ctx}:\n      headers:\n        customRequestHeaders:\n          X-Polaris-Waf: "${rule}"`

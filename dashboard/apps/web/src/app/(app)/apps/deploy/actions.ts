@@ -12,10 +12,11 @@ import { revalidatePath } from "next/cache";
 import { listHosts } from "@/lib/host-service";
 import { requirePermission } from "@/lib/session";
 import { recordAudit } from "@/lib/audit-service";
-import type { WafScopeType } from "@polaris/core";
 import * as deployService from "@/lib/deploy-service";
 import { parseGithubRepo } from "@/lib/repo-reference";
+import { syncDashboardRoute } from "@/lib/domain-edge";
 import { getNetworkStatus } from "@/lib/network-service";
+import type { WafCustomRule, WafScopeType } from "@polaris/core";
 import { listConnections, getDriver } from "@/lib/storage-service";
 import { getDomainZones, listDeployZones } from "@/lib/domain-zones";
 import { ensurePublicIp, getDomainConfig } from "@/lib/domain-service";
@@ -881,15 +882,17 @@ export async function listNasFoldersAction(
     }
 }
 
+/** The two scopes nobody owns: they reach every service on the instance, or the
+ *  dashboard itself, so `deploy.manage` (which an ordinary member holds) is not
+ *  enough to read or write them - only `system.manage`. */
+const OPERATOR_SCOPES = new Set<WafScopeType>(["global", "polaris"]);
+
 export async function getWafRuleAction(input: {
     scopeType: WafScopeType;
     scopeId: string;
 }): Promise<{ rule?: WafRuleView; error?: string }> {
     const user = await requirePermission("deploy.manage");
-    // The global rule is instance-wide and applies to every owner's services, so it
-    // is an operator control - deploy.manage alone (which the default member holds)
-    // must not read or write it, only system.manage / admin.
-    if (input.scopeType === "global") await requirePermission("system.manage");
+    if (OPERATOR_SCOPES.has(input.scopeType)) await requirePermission("system.manage");
     try {
         return { rule: await getWafRule(user.id, input.scopeType, input.scopeId) };
     } catch (caught) {
@@ -903,16 +906,23 @@ export async function setWafRuleAction(input: {
     ipAllowlist: string[];
     ipDenylist: string[];
     requireLogin: boolean;
+    rules: WafCustomRule[];
 }): Promise<{ error?: string }> {
     const user = await requirePermission("deploy.manage");
-    if (input.scopeType === "global") await requirePermission("system.manage");
+    if (OPERATOR_SCOPES.has(input.scopeType)) await requirePermission("system.manage");
     try {
         const { scopeType, scopeId, ...rule } = input;
         await setWafRule(user.id, scopeType, scopeId, rule);
         await recordAudit({ actorId: user.id, action: "deploy.waf.set", targetType: scopeType, targetId: scopeId || "global" });
-        // The local edge applies instantly via the file provider; remote-server apps
-        // pick up the change on their next deploy (their rules ride on container labels).
-        await deployService.syncAppRoutes().catch(() => undefined);
+        // Polaris's own rule lives on the dashboard's route rather than an app's, so
+        // it is the dashboard route that has to be republished for it to take effect.
+        if (scopeType === "polaris") {
+            await syncDashboardRoute();
+        } else {
+            // The local edge applies instantly via the file provider; remote-server apps
+            // pick up the change on their next deploy (their rules ride on container labels).
+            await deployService.syncAppRoutes().catch(() => undefined);
+        }
         revalidatePath(DEPLOY_PATH);
         return {};
     } catch (caught) {

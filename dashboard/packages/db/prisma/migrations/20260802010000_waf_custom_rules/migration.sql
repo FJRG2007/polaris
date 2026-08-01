@@ -1,0 +1,12 @@
+-- Custom firewall rules, alongside the IP lists a rule already held.
+--
+-- The two lists answer "which addresses", which is the only question the firewall
+-- could be asked until now. A rule set answers the rest of them - a path, a method,
+-- a user agent, a hostname - in order, with the first match deciding, so a narrow
+-- allow can sit above a broad block. They are stored as a JSON array in one column
+-- for the same reason the lists are: they are read together, published to the edge
+-- together, and never addressed one at a time.
+--
+-- Default "[]": every rule that exists today has none, and the resolver treats an
+-- empty set as no opinion, so nothing that is running changes.
+ALTER TABLE "WafRule" ADD COLUMN "rules" TEXT NOT NULL DEFAULT '[]';

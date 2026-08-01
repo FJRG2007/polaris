@@ -8,7 +8,6 @@
 
 import Fuse from "fuse.js";
 import Link from "next/link";
-import { WafDialog } from "./waf-editor";
 import { useRouter } from "next/navigation";
 import { createProjectAction } from "./actions";
 import { useMemo, useState, useTransition } from "react";
@@ -39,7 +38,6 @@ export function ProjectsGrid({
 }) {
     const [layout, setLayout] = useState<"grid" | "list">("grid");
     const [search, setSearch] = useState("");
-    const [showFirewall, setShowFirewall] = useState(false);
     const fuse = useMemo(() => new Fuse(projects, { keys: ["name"], threshold: 0.4 }), [projects]);
     const filtered = search.trim() ? fuse.search(search.trim()).map((result) => result.item) : projects;
     const count = projects.length;
@@ -51,30 +49,20 @@ export function ProjectsGrid({
                 {canManage && (
                     <div className="flex flex-wrap items-center gap-2">
                         {canManageGlobal && (
-                            <Button variant="ghost" size="icon" title="Global firewall rules" onClick={() => setShowFirewall(true)}>
+                            <Link
+                                href="/apps/deploy/firewall"
+                                aria-label="Firewall"
+                                title="Firewall"
+                                className="inline-flex size-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                            >
                                 <ShieldCheck className="size-4" />
-                            </Button>
+                            </Link>
                         )}
                         <RegistryCredentialsButton />
                         <CreateProjectButton />
                     </div>
                 )}
             </div>
-
-            <WafDialog
-                open={showFirewall}
-                onOpenChange={setShowFirewall}
-                title="Global firewall rules"
-                scopes={[
-                    {
-                        type: "global",
-                        id: "",
-                        label: "Global",
-                        description:
-                            "Applies to every deployed service across all projects. A service or project can only add further restrictions on top, never loosen these."
-                    }
-                ]}
-            />
 
             {!localReady && canManage && (
                 <div className="rounded-lg border border-warning/30 bg-warning/5 px-4 py-3 text-sm text-muted-foreground">

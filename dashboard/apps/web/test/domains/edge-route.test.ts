@@ -95,6 +95,63 @@ describe("what the edge is told to serve", () => {
     });
 });
 
+describe("guarding the dashboard itself", () => {
+    const RULE = {
+        name: "no scanners",
+        enabled: true,
+        action: "block" as const,
+        conditions: [{ field: "path" as const, operator: "contains" as const, values: [".env"] }]
+    };
+
+    it("adds no middleware when nothing is configured", () => {
+        const config = renderDashboardConfig(["polaris.fjrg2007.com"], { allow: [], deny: [], rules: [] });
+
+        expect(config).not.toContain("ipAllowList");
+        expect(config).not.toContain("X-Polaris-Waf");
+    });
+
+    it("narrows the route to an allowlist natively", () => {
+        // Traefik enforces this one itself, so it keeps working with the guard down.
+        const config = renderDashboardConfig(["polaris.fjrg2007.com"], { allow: ["192.168.1.0/24"] });
+
+        expect(config).toContain("      ipAllowList:\n        sourceRange: [\"192.168.1.0/24\"]");
+        expect(config).toContain("middlewares: [polaris-dashboard-allow]");
+    });
+
+    it("keeps the allowlist on the :80 redirect router as well", () => {
+        // Otherwise a blocked address still reaches the redirect and learns the name
+        // is served here.
+        const config = renderDashboardConfig(["polaris.fjrg2007.com"], { allow: ["192.168.1.0/24"] });
+
+        expect(config).toContain("middlewares: [polaris-dashboard-allow, polaris-dashboard-redirect-https]");
+    });
+
+    it("carries a denylist and the custom rules to the guard", () => {
+        const config = renderDashboardConfig(["polaris.fjrg2007.com"], { deny: ["203.0.113.9"], rules: [RULE] });
+
+        expect(config).toContain("X-Polaris-Waf:");
+        expect(config).toContain("polaris-dashboard-waf-guard");
+        expect(config).toContain("forwardAuth:");
+    });
+
+    it("names its guard middlewares apart from the app routes' shared ones", () => {
+        // Every file in the directory merges into one config, so a repeated name is a
+        // duplicate definition and one of the two is dropped.
+        const config = renderDashboardConfig(["polaris.fjrg2007.com"], { deny: ["203.0.113.9"] });
+
+        expect(config).not.toContain("    polaris-waf-guard:");
+        expect(config).not.toContain("    polaris-app-");
+    });
+
+    it("never asks the guard to require a login for the dashboard", () => {
+        // Polaris has a login of its own; the guard's handoff in front of it is a loop.
+        const config = renderDashboardConfig(["polaris.fjrg2007.com"], { deny: ["203.0.113.9"] });
+        const header = /X-Polaris-Waf: "([^"]+)"/.exec(config)?.[1] ?? "";
+
+        expect(JSON.parse(Buffer.from(header, "base64").toString("utf8"))).toMatchObject({ l: false });
+    });
+});
+
 describe("which hostnames are collected", () => {
     it("serves the app domain, the sharing domain and the configured zone", async () => {
         stored({

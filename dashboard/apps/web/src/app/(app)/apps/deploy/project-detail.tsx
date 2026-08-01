@@ -7,8 +7,8 @@
  * project itself are in-app, confirmation-gated actions.
  */
 
+import Link from "next/link";
 import { createPortal } from "react-dom";
-import { WafDialog } from "./waf-editor";
 import { useRouter } from "next/navigation";
 import { DeployCanvas } from "./deploy-canvas";
 import { ServiceDetail } from "./service-detail";
@@ -46,7 +46,6 @@ export function ProjectDetail({
     const [detailApp, setDetailApp] = useState<ProjectApp | null>(null);
     const [showNewProject, setShowNewProject] = useState(false);
     const [showNewEnv, setShowNewEnv] = useState(false);
-    const [showFirewall, setShowFirewall] = useState(false);
     const [pending, startTransition] = useTransition();
 
     // Keep the open service panel in sync with refreshed data: after a change
@@ -127,9 +126,14 @@ export function ProjectDetail({
                 <div className="flex flex-wrap items-center gap-2">
                     {canManage && active && <NewServiceButton environmentId={active.id} onChanged={refresh} />}
                     {canManage && (
-                        <Button variant="ghost" size="icon" title="Firewall rules" onClick={() => setShowFirewall(true)}>
+                        <Link
+                            href={`/apps/deploy/${project.id}/firewall`}
+                            aria-label="Firewall"
+                            title="Firewall"
+                            className="inline-flex size-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                        >
                             <ShieldCheck className="size-4" />
-                        </Button>
+                        </Link>
                     )}
                     <div className="flex items-center gap-1 rounded-md border border-border p-0.5">
                         <button
@@ -200,30 +204,6 @@ export function ProjectDetail({
                     onClose={() => setDetailApp(null)}
                 />
             )}
-
-            <WafDialog
-                open={showFirewall}
-                onOpenChange={setShowFirewall}
-                title="Firewall rules"
-                scopes={[
-                    {
-                        type: "project",
-                        id: project.id,
-                        label: "Project",
-                        description: "Applies to every service in this project. Stacks with each service's own rules."
-                    },
-                    ...(active
-                        ? [
-                              {
-                                  type: "environment" as const,
-                                  id: active.id,
-                                  label: "Environment",
-                                  description: `Applies to every service in the ${active.name} environment.`
-                              }
-                          ]
-                        : [])
-                ]}
-            />
 
             <NewProjectDialog open={showNewProject} onOpenChange={setShowNewProject} />
             <NewEnvironmentDialog

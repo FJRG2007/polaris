@@ -10,8 +10,8 @@
  */
 
 import { z } from "zod";
-import { normalizeRelPath, UnsafePathError } from "../paths.js";
 import { cidrOrIp } from "./file-request.js";
+import { normalizeRelPath, UnsafePathError } from "../paths.js";
 
 export const DEPLOY_VOLUME_KINDS = ["volume", "bind", "nas"] as const;
 export type DeployVolumeKind = (typeof DEPLOY_VOLUME_KINDS)[number];
@@ -116,7 +116,12 @@ export function normalizeVolumeSource(kind: DeployVolumeKind, source: string): s
  * layer; each server's edge (Traefik) enforces the merged result, so the controls
  * keep working when the Polaris control plane is down.
  */
-export const WAF_SCOPE_TYPES = ["global", "project", "environment", "application"] as const;
+/**
+ * `polaris` is the dashboard's own ingress rather than a deployed service: it is not
+ * part of any project and never takes part in a service's merge, so blocking the
+ * public internet there cannot reach an app, and blocking an app cannot reach it.
+ */
+export const WAF_SCOPE_TYPES = ["polaris", "global", "project", "environment", "application"] as const;
 export type WafScopeType = (typeof WAF_SCOPE_TYPES)[number];
 
 /** Max entries per list, so one rule can never bloat the generated edge config. */
@@ -125,11 +130,57 @@ export const WAF_LIST_MAX = 256;
 /** A list of IP/CIDR entries, each validated the same way as a drop-point allowlist. */
 const wafCidrList = z.array(cidrOrIp).max(WAF_LIST_MAX, `At most ${WAF_LIST_MAX} entries`);
 
+/**
+ * What a custom rule can look at. Every one of these is a fact the edge already
+ * forwards to the guard, so a rule never needs a lookup to decide - which is what
+ * lets the whole set travel in the route's own config and keep enforcing while
+ * Polaris is down.
+ */
+export const WAF_RULE_FIELDS = ["ip", "host", "path", "method", "user_agent", "query"] as const;
+export type WafRuleField = (typeof WAF_RULE_FIELDS)[number];
+
+/** How a field is compared against the values. `ip` accepts an address or a CIDR
+ *  range and ignores the string operators. */
+export const WAF_RULE_OPERATORS = ["equals", "not_equals", "contains", "not_contains", "starts_with", "ends_with"] as const;
+export type WafRuleOperator = (typeof WAF_RULE_OPERATORS)[number];
+
+/** What happens to a request the rule matches. `allow` stops evaluation and admits
+ *  it, so a narrow exception can sit above a broad block. */
+export const WAF_RULE_ACTIONS = ["block", "allow"] as const;
+export type WafRuleAction = (typeof WAF_RULE_ACTIONS)[number];
+
+/** Caps, so the rule set stays something the edge carries in a header. */
+export const WAF_RULES_MAX = 32;
+const CONDITIONS_MAX = 8;
+const VALUES_MAX = 64;
+
+export const wafConditionSchema = z.object({
+    field: z.enum(WAF_RULE_FIELDS),
+    operator: z.enum(WAF_RULE_OPERATORS),
+    /** Matched as an OR: any value satisfying the operator satisfies the condition.
+     *  A negative operator is the inverse - none of them may match. */
+    values: z.array(z.string().trim().min(1).max(512)).min(1).max(VALUES_MAX)
+});
+
+export type WafCondition = z.infer<typeof wafConditionSchema>;
+
+export const wafCustomRuleSchema = z.object({
+    /** Names the rule in the list and in the block reason; not an identifier. */
+    name: z.string().trim().min(1).max(80),
+    enabled: z.boolean().default(true),
+    action: z.enum(WAF_RULE_ACTIONS),
+    /** All must match, so a rule reads as one sentence with "and" in it. */
+    conditions: z.array(wafConditionSchema).min(1).max(CONDITIONS_MAX)
+});
+
+export type WafCustomRule = z.infer<typeof wafCustomRuleSchema>;
+
 export const wafRuleInputSchema = z
     .object({
         ipAllowlist: wafCidrList.default([]),
         ipDenylist: wafCidrList.default([]),
-        requireLogin: z.boolean().default(false)
+        requireLogin: z.boolean().default(false),
+        rules: z.array(wafCustomRuleSchema).max(WAF_RULES_MAX).default([])
     })
     .superRefine((value, ctx) => {
         // A best-effort UX guard against contradictory rules (exact-string match, so
@@ -158,4 +209,6 @@ export interface ResolvedWaf {
     readonly deny: readonly string[];
     /** True if any scope requires a Polaris login. */
     readonly requireLogin: boolean;
+    /** Every scope's custom rules, broadest scope first, evaluated in order. */
+    readonly rules: readonly WafCustomRule[];
 }

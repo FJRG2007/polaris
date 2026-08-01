@@ -9,17 +9,21 @@
  */
 
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { wafCustomRuleSchema, type WafCustomRule } from "./schemas/deploy.js";
 
-/** The per-route rule the guard enforces. Empty denylist + no login = a no-op. */
+/** The per-route rule the guard enforces. Empty denylist, no custom rules and no
+ *  login = a no-op. */
 export interface GuardRule {
     readonly deny: readonly string[];
     readonly requireLogin: boolean;
+    /** Custom rules in evaluation order, broadest scope first. */
+    readonly rules: readonly WafCustomRule[];
 }
 
 /** Encode a guard rule for the X-Polaris-Waf header (base64 of compact JSON:
- *  `d` = denylist, `l` = require-login). */
+ *  `d` = denylist, `l` = require-login, `r` = custom rules). */
 export function encodeGuardRule(rule: GuardRule): string {
-    return Buffer.from(JSON.stringify({ d: rule.deny, l: rule.requireLogin })).toString("base64");
+    return Buffer.from(JSON.stringify({ d: rule.deny, l: rule.requireLogin, r: rule.rules })).toString("base64");
 }
 
 /**
@@ -28,20 +32,36 @@ export function encodeGuardRule(rule: GuardRule): string {
  * corrupted rule demands a login rather than silently dropping protection. An
  * absent header means the guard was reached with no rule attached and is treated as
  * a no-op (the header/forwardAuth pair is only chained when a rule exists).
+ *
+ * The custom rules are re-validated rather than trusted as shapes: they are executed
+ * against every request on the route, and a half-decoded rule would either throw in
+ * the guard's hot path or silently match nothing. One unreadable rule is dropped and
+ * the rest still run.
  */
 export function decodeGuardRule(header: string | undefined | null): GuardRule {
-    if (!header) return { deny: [], requireLogin: false };
+    if (!header) return { deny: [], requireLogin: false, rules: [] };
     try {
         const raw: unknown = JSON.parse(Buffer.from(header, "base64").toString("utf8"));
         if (raw && typeof raw === "object") {
-            const obj = raw as { d?: unknown; l?: unknown };
+            const obj = raw as { d?: unknown; l?: unknown; r?: unknown };
             const deny = Array.isArray(obj.d) ? obj.d.filter((v): v is string => typeof v === "string") : [];
-            return { deny, requireLogin: obj.l === true };
+            return { deny, requireLogin: obj.l === true, rules: parseRules(obj.r) };
         }
     } catch {
         // Fall through to the fail-closed default below.
     }
-    return { deny: [], requireLogin: true };
+    return { deny: [], requireLogin: true, rules: [] };
+}
+
+/** The custom rules that survive validation, in the order they were encoded. */
+function parseRules(value: unknown): WafCustomRule[] {
+    if (!Array.isArray(value)) return [];
+    const rules: WafCustomRule[] = [];
+    for (const entry of value) {
+        const parsed = wafCustomRuleSchema.safeParse(entry);
+        if (parsed.success) rules.push(parsed.data);
+    }
+    return rules;
 }
 
 /**

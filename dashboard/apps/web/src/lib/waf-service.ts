@@ -1,16 +1,23 @@
 /**
- * WAF rule resolution and persistence for Deploy. Rules live at four scopes
- * (global, project, environment, application) and are merged least-privilege:
- * allowlists AND (each scope can only narrow, never widen), denylists union, and
- * requireLogin ORs. The merged result is materialized into each server's edge
- * (Traefik) by the router generators, so the controls keep enforcing when the
- * Polaris control plane is down. Every read/write is ownership-checked.
+ * WAF rule resolution and persistence. Rules live at four scopes for a deployed
+ * service (global, project, environment, application) and are merged least-privilege:
+ * allowlists AND (each scope can only narrow, never widen), denylists union,
+ * requireLogin ORs, and custom rules concatenate broadest-scope-first so a global
+ * rule is tried before a project's. The merged result is materialized into each
+ * server's edge (Traefik) by the router generators, so the controls keep enforcing
+ * when the Polaris control plane is down. Every read/write is ownership-checked.
+ *
+ * The fifth scope, `polaris`, is the dashboard's own ingress. It stands apart: it is
+ * not part of any project, takes no part in a service's merge, and is materialized
+ * into the dashboard's own edge route rather than an app's.
  */
 
 import { prisma } from "@polaris/db";
 import {
+    wafCustomRuleSchema,
     wafRuleInputSchema,
     type ResolvedWaf,
+    type WafCustomRule,
     type WafRuleInput,
     type WafScopeType
 } from "@polaris/core";
@@ -25,12 +32,40 @@ function parseList(json: string): string[] {
     }
 }
 
+/**
+ * Custom rules as stored. Validated on read rather than cast: they were written by a
+ * validated action, but a rule that survived a schema change is a rule the edge would
+ * run against every request, and one bad entry must not take the rest with it.
+ */
+function parseCustomRules(json: string): WafCustomRule[] {
+    try {
+        const parsed: unknown = JSON.parse(json);
+        if (!Array.isArray(parsed)) return [];
+        return parsed.flatMap((entry) => {
+            const rule = wafCustomRuleSchema.safeParse(entry);
+            return rule.success ? [rule.data] : [];
+        });
+    } catch {
+        return [];
+    }
+}
+
 interface RuleRow {
     readonly scopeType: string;
     readonly ipAllowlist: string;
     readonly ipDenylist: string;
     readonly requireLogin: boolean;
+    readonly rules: string;
 }
+
+/** The columns every resolver reads, named once so the three queries cannot drift. */
+const RULE_SELECT = {
+    scopeType: true,
+    ipAllowlist: true,
+    ipDenylist: true,
+    requireLogin: true,
+    rules: true
+} as const;
 
 /** Rank scopes broadest-first so a merge applies parents before children. */
 const SCOPE_ORDER: Record<string, number> = { global: 0, project: 1, environment: 2, application: 3 };
@@ -40,18 +75,23 @@ function mergeRules(rows: readonly RuleRow[]): ResolvedWaf {
     const ordered = [...rows].sort((a, b) => (SCOPE_ORDER[a.scopeType] ?? 99) - (SCOPE_ORDER[b.scopeType] ?? 99));
     const allowLists: string[][] = [];
     const deny = new Set<string>();
+    const rules: WafCustomRule[] = [];
     let requireLogin = false;
     for (const row of ordered) {
         const allow = parseList(row.ipAllowlist);
         if (allow.length > 0) allowLists.push(allow);
         for (const entry of parseList(row.ipDenylist)) deny.add(entry);
         if (row.requireLogin) requireLogin = true;
+        // Concatenated, not merged: a rule set is ordered and first-match-wins, so a
+        // broader scope's rules have to be offered the request first - otherwise a
+        // project could write an `allow` that overrides an instance-wide block.
+        rules.push(...parseCustomRules(row.rules));
     }
-    return { allowLists, deny: [...deny], requireLogin };
+    return { allowLists, deny: [...deny], requireLogin, rules };
 }
 
-/** An empty decision: allow all, deny none, no login required. */
-const EMPTY_WAF: ResolvedWaf = { allowLists: [], deny: [], requireLogin: false };
+/** An empty decision: allow all, deny none, no login required, no rules. */
+const EMPTY_WAF: ResolvedWaf = { allowLists: [], deny: [], requireLogin: false, rules: [] };
 
 /**
  * Resolve the effective WAF decision for one application by merging its own rule
@@ -73,10 +113,23 @@ export async function resolveWaf(applicationId: string): Promise<ResolvedWaf> {
                 { scopeType: "application", scopeId: applicationId }
             ]
         },
-        select: { scopeType: true, ipAllowlist: true, ipDenylist: true, requireLogin: true }
+        select: RULE_SELECT
     });
     if (rows.length === 0) return EMPTY_WAF;
     return mergeRules(rows);
+}
+
+/**
+ * The dashboard's own decision, which no deployed service takes part in. Read on the
+ * edge-sync path rather than per request: it is materialized into the dashboard's
+ * router, so it is consulted when the route is written, not when it is used.
+ */
+export async function resolvePolarisWaf(): Promise<ResolvedWaf> {
+    const row = await prisma.wafRule.findUnique({
+        where: { scopeType_scopeId: { scopeType: "polaris", scopeId: "" } },
+        select: RULE_SELECT
+    });
+    return row ? mergeRules([row]) : EMPTY_WAF;
 }
 
 /**
@@ -109,7 +162,7 @@ export async function resolveWafBatch(applicationIds: readonly string[]): Promis
                 { scopeType: "application", scopeId: { in: ids } }
             ]
         },
-        select: { scopeType: true, scopeId: true, ipAllowlist: true, ipDenylist: true, requireLogin: true }
+        select: { ...RULE_SELECT, scopeId: true }
     });
     const globalRows = rows.filter((row) => row.scopeType === "global");
     const byScope = new Map<string, RuleRow[]>();
@@ -137,16 +190,18 @@ export interface WafRuleView {
     readonly ipAllowlist: string[];
     readonly ipDenylist: string[];
     readonly requireLogin: boolean;
+    readonly rules: WafCustomRule[];
 }
 
 /**
  * Verify the caller owns the scope, so a rule is only readable/writable by the
- * owner of the underlying project/service. Global scope carries no owner - it is an
- * instance-wide operator control the server action gates on `system.manage` (not the
- * member-held `deploy.manage`) - so ownership always passes here.
+ * owner of the underlying project/service. The global and polaris scopes carry no
+ * owner - they are instance-wide operator controls the server action gates on
+ * `system.manage` (not the member-held `deploy.manage`) - so ownership always passes
+ * here for them.
  */
 async function assertScopeOwner(ownerId: string, scopeType: WafScopeType, scopeId: string): Promise<void> {
-    if (scopeType === "global") return;
+    if (scopeType === "global" || scopeType === "polaris") return;
     if (scopeType === "project") {
         if ((await prisma.project.count({ where: { id: scopeId, ownerId } })) === 0) {
             throw new Error("Project not found");
@@ -173,13 +228,14 @@ export async function getWafRule(
     await assertScopeOwner(ownerId, scopeType, scopeId);
     const row = await prisma.wafRule.findUnique({
         where: { scopeType_scopeId: { scopeType, scopeId } },
-        select: { ipAllowlist: true, ipDenylist: true, requireLogin: true }
+        select: { ipAllowlist: true, ipDenylist: true, requireLogin: true, rules: true }
     });
-    if (!row) return { ipAllowlist: [], ipDenylist: [], requireLogin: false };
+    if (!row) return { ipAllowlist: [], ipDenylist: [], requireLogin: false, rules: [] };
     return {
         ipAllowlist: parseList(row.ipAllowlist),
         ipDenylist: parseList(row.ipDenylist),
-        requireLogin: row.requireLogin
+        requireLogin: row.requireLogin,
+        rules: parseCustomRules(row.rules)
     };
 }
 
@@ -196,14 +252,20 @@ export async function setWafRule(
 ): Promise<void> {
     await assertScopeOwner(ownerId, scopeType, scopeId);
     const parsed = wafRuleInputSchema.parse(input);
-    if (parsed.ipAllowlist.length === 0 && parsed.ipDenylist.length === 0 && !parsed.requireLogin) {
+    if (
+        parsed.ipAllowlist.length === 0 &&
+        parsed.ipDenylist.length === 0 &&
+        parsed.rules.length === 0 &&
+        !parsed.requireLogin
+    ) {
         await prisma.wafRule.deleteMany({ where: { scopeType, scopeId } });
         return;
     }
     const data = {
         ipAllowlist: JSON.stringify(parsed.ipAllowlist),
         ipDenylist: JSON.stringify(parsed.ipDenylist),
-        requireLogin: parsed.requireLogin
+        requireLogin: parsed.requireLogin,
+        rules: JSON.stringify(parsed.rules)
     };
     await prisma.wafRule.upsert({
         where: { scopeType_scopeId: { scopeType, scopeId } },
