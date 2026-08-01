@@ -826,6 +826,8 @@ function GitHubConnect({ card, onClose }: { card: IntegrationCard; onClose: () =
     const [token, setToken] = useState("");
     const [appId, setAppId] = useState("");
     const [pem, setPem] = useState("");
+    const [clientId, setClientId] = useState("");
+    const [clientSecret, setClientSecret] = useState("");
     const [error, setError] = useState<string | null>(null);
     const [saving, startSave] = useTransition();
 
@@ -842,7 +844,10 @@ function GitHubConnect({ card, onClose }: { card: IntegrationCard; onClose: () =
     function onConnectExisting() {
         setError(null);
         startSave(async () => {
-            const result = await runAction(() => integrationActions.connectGithubAppAction({ appId, pem }), setError);
+            const result = await runAction(
+                () => integrationActions.connectGithubAppAction({ appId, pem, clientId, clientSecret }),
+                setError
+            );
             if (!result) return;
             if (result.error) setError(result.error);
             else onClose();
@@ -910,10 +915,34 @@ function GitHubConnect({ card, onClose }: { card: IntegrationCard; onClose: () =
                                 <textarea
                                     value={pem}
                                     onChange={(event) => setPem(event.target.value)}
-                                    placeholder="-----BEGIN RSA PRIVATE KEY-----"
+                                    placeholder="Paste the contents of the app's .pem file"
                                     rows={4}
                                     className="rounded-md border border-input bg-surface px-3 py-2 font-mono text-xs shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                 />
+                            </label>
+                            <label className="flex flex-col gap-1">
+                                <span className="font-medium">Client ID</span>
+                                <Input
+                                    value={clientId}
+                                    onChange={(event) => setClientId(event.target.value)}
+                                    placeholder="Iv1.0123456789abcdef"
+                                    autoCapitalize="none"
+                                    autoCorrect="off"
+                                    spellCheck={false}
+                                />
+                            </label>
+                            <label className="flex flex-col gap-1">
+                                <span className="font-medium">Client secret</span>
+                                <Input
+                                    type="password"
+                                    value={clientSecret}
+                                    onChange={(event) => setClientSecret(event.target.value)}
+                                    placeholder="Optional"
+                                />
+                                <span className="text-xs text-muted-foreground">
+                                    Only needed so people can link their own GitHub account to their Polaris one. An app
+                                    created above already carries these.
+                                </span>
                             </label>
                             <div className="flex justify-end">
                                 <Button type="button" onClick={onConnectExisting} disabled={saving || !appId.trim() || !pem.trim()}>

@@ -17,9 +17,37 @@
  * pure so it can be exercised without a GitHub account.
  */
 
-/** Where a runner is registered. Org-level covers every repo in the org at once. */
-export const RUNNER_SCOPES = ["repo", "org"] as const;
+/**
+ * Where one runner is registered. This is GitHub's own vocabulary and it is the
+ * whole of it: a runner belongs to a single repository or to a whole organization,
+ * and there is no third option. "These four repositories" is four registrations,
+ * which is why a pool holds a set of targets rather than one.
+ */
+export const RUNNER_TARGET_KINDS = ["repo", "org"] as const;
+export type RunnerTargetKind = (typeof RUNNER_TARGET_KINDS)[number];
+
+/**
+ * What a pool was asked to serve, which is a question about intent rather than
+ * about registrations. Each of these resolves to a set of targets, and only `repo`
+ * and `org` resolve to exactly one:
+ *
+ *   - `repo`    one repository.
+ *   - `repos`   the repositories that were picked.
+ *   - `account` every repository of one GitHub account, re-read as it gains and
+ *               loses them. For an organization this differs from `org` below: it
+ *               registers per repository, so it needs no organization permission.
+ *   - `org`     one organization-level registration, which covers every repository
+ *               at once and is the cheapest way to serve a whole organization.
+ *   - `users`   the repositories of the chosen Polaris users, through the GitHub
+ *               account each of them linked.
+ *   - `group`   the same, for whoever is in a Polaris group at the time.
+ */
+export const RUNNER_SCOPES = ["repo", "repos", "account", "org", "users", "group"] as const;
 export type RunnerScope = (typeof RUNNER_SCOPES)[number];
+
+/** Scopes whose target list is read from GitHub or from the user directory, and so
+ *  changes without anybody editing the pool. */
+export const RESOLVED_RUNNER_SCOPES: readonly RunnerScope[] = ["account", "users", "group"];
 
 /** The App permission that grants repository-level runner registration. */
 export const RUNNER_REPO_PERMISSION = "administration";
@@ -168,6 +196,14 @@ export const RUNNER_JOB_LIVE_STATES: readonly RunnerJobState[] = ["starting", "i
 export const MAX_RUNNER_CONCURRENCY = 8;
 
 /**
+ * Ceiling on the repositories one pool serves. Each target is polled and swept on
+ * every pass, so this is what keeps a pool pointed at a large account from
+ * spending the connection's whole rate limit on one machine's worth of runners.
+ * A scope that resolves to more than this serves the first of them and says so.
+ */
+export const MAX_RUNNER_TARGETS = 50;
+
+/**
  * Whether this connection may register runners on a target, and why not when it
  * may not. Read before a pool is offered, so an operator finds out here rather
  * than after wiring up a machine.
@@ -176,14 +212,14 @@ export const MAX_RUNNER_CONCURRENCY = 8;
  * (`access.unknown`); that is allowed through and fails later with GitHub's own
  * refusal, which is more honest than blocking on a guess.
  */
-export function runnerTargetRefusal(access: RunnerAccess, scope: RunnerScope, owner: string): string | null {
+export function runnerTargetRefusal(access: RunnerAccess, kind: RunnerTargetKind, owner: string): string | null {
     if (!access.method) return "Connect GitHub under Integrations before adding runners.";
     if (access.unknown) return null;
     if (access.method === "pat") return access.ready ? null : access.advice;
 
     const account = access.accounts.find((entry) => entry.login.toLowerCase() === owner.trim().toLowerCase());
     if (!account) return `The GitHub App is not installed on ${owner}.`;
-    if (scope === "org") {
+    if (kind === "org") {
         return account.org
             ? null
             : `The connection cannot register organization runners for ${owner}. Grant it Organization permissions > Self-hosted runners: Read and write.`;

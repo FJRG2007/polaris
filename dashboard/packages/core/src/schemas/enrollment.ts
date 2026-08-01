@@ -14,8 +14,11 @@
 import { z } from "zod";
 import { serverEnvironmentSchema } from "./host.js";
 
-/** What a machine becomes when it claims an enrollment. */
-export const ENROLLMENT_KINDS = ["server", "runner"] as const;
+/** What a machine becomes when it claims an enrollment. `local` is the box Polaris
+ *  itself runs on: the same exchange, and the reason it is told apart is that the
+ *  Servers app folds the resulting host into the row it already shows for it
+ *  instead of listing the machine twice. */
+export const ENROLLMENT_KINDS = ["server", "runner", "local"] as const;
 export type EnrollmentKind = (typeof ENROLLMENT_KINDS)[number];
 export const enrollmentKindSchema = z.enum(ENROLLMENT_KINDS);
 
@@ -39,7 +42,13 @@ export const createEnrollmentSchema = z.object({
     /** Whether the printed command also grants the login container-engine access.
      *  On most systems that is equivalent to root, so it is asked for rather than
      *  inferred, and it stays visible as an argument in the command itself. */
-    grantDocker: z.boolean().default(false)
+    grantDocker: z.boolean().default(false),
+    /** Whether the login may act as root through password-less sudo. This is the
+     *  widest thing an enrollment can grant - it makes the key Polaris holds a root
+     *  credential for the machine - so like container access it is an explicit
+     *  argument in the command rather than something inferred, and the script says
+     *  out loud when it grants it. */
+    grantRoot: z.boolean().default(false)
 });
 
 export type CreateEnrollmentInput = z.infer<typeof createEnrollmentSchema>;
@@ -70,7 +79,13 @@ export const claimEnrollmentSchema = z.object({
     addresses: z.array(z.string().trim().min(1).max(253)).max(16).default([]),
     /** Whether a container engine is present, which decides what the machine can
      *  be asked to do before anything is deployed to it. */
-    docker: z.boolean().default(false)
+    docker: z.boolean().default(false),
+    /** Whether the login ended up able to act as root. Reported rather than
+     *  assumed from what was asked for: the script can be told to grant it and
+     *  still fail to (no sudo installed, a sudoers file that would not validate),
+     *  and a server recorded as root-capable when it is not would have Polaris
+     *  offering a root shell that refuses every command. */
+    root: z.boolean().default(false)
 });
 
 export type ClaimEnrollmentInput = z.infer<typeof claimEnrollmentSchema>;

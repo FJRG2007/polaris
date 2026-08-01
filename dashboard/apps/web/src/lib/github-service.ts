@@ -169,17 +169,29 @@ async function fetchInstallations(appId: string, pem: string): Promise<Installat
     }));
 }
 
+/** Where GitHub sends somebody back after they authorize Polaris as themselves.
+ *  Registered on the app at creation, because a user authorization with no
+ *  callback registered is one GitHub refuses. */
+export function githubLinkCallbackUrl(baseUrl: string): string {
+    return `${baseUrl}/api/integrations/github/link/callback`;
+}
+
 /** The manifest describing the app GitHub will create for this Polaris instance. */
 export function buildAppManifest(baseUrl: string, name: string): Record<string, unknown> {
     return {
         name,
         url: baseUrl,
+        // Where a person is returned to after linking their own GitHub account to
+        // their Polaris one, which is what lets a runner pool serve "these
+        // people's repositories" without anybody typing a login for them.
+        callback_urls: [githubLinkCallbackUrl(baseUrl)],
         // Webhooks are inactive until the build system needs them; the URL is set so
         // enabling them later needs no app edit.
-        // Push events drive auto-deploy. GitHub must be able to reach this URL, so
-        // it only fires for instances with a public domain (LAN installs use polling).
+        // Push events drive auto-deploy; workflow_job tells the runner pools which
+        // repository has work waiting. GitHub must be able to reach this URL, so it
+        // only fires for instances with a public domain (LAN installs use polling).
         hook_attributes: { url: `${baseUrl}/api/deploy/github/webhook`, active: true },
-        default_events: ["push"],
+        default_events: ["push", "workflow_job"],
         redirect_url: `${baseUrl}/api/integrations/github/callback`,
         setup_url: `${baseUrl}/api/integrations/github/callback`,
         setup_on_update: true,
@@ -239,6 +251,7 @@ export async function connectGithubApp(input: {
     pem: string;
     appName?: string;
     htmlUrl?: string;
+    clientId?: string;
     clientSecret?: string;
     webhookSecret?: string;
 }): Promise<{ installations: number }> {
@@ -253,11 +266,71 @@ export async function connectGithubApp(input: {
             appId,
             appName: input.appName?.trim() || `App ${appId}`,
             htmlUrl: input.htmlUrl,
+            clientId: input.clientId?.trim() || undefined,
             installations
         },
         secret: JSON.stringify({ pem, clientSecret: input.clientSecret, webhookSecret: input.webhookSecret })
     });
     return { installations: installations.length };
+}
+
+// --- Authorizing as a person, rather than as the installation ----------------
+
+/**
+ * The app's OAuth client, which is what lets somebody prove to Polaris which
+ * GitHub account is theirs. Present only for the App method, and only when the app
+ * was created through Polaris or its client credentials were pasted in - an app
+ * connected with nothing but an id and a private key can act on repositories but
+ * cannot ask anybody who they are.
+ */
+export async function getGithubUserAuth(): Promise<{ clientId: string; clientSecret: string } | null> {
+    const state = await getIntegrationState(PROVIDER);
+    if (state?.config.method !== "app") return null;
+    const clientId = typeof state.config.clientId === "string" ? state.config.clientId : "";
+    const secrets = await getAppSecrets();
+    if (!clientId || !secrets?.clientSecret) return null;
+    return { clientId, clientSecret: secrets.clientSecret };
+}
+
+/** One GitHub account, as GitHub describes it to a token issued for that person. */
+export interface GithubAccount {
+    /** GitHub's numeric id. The identity that survives a rename. */
+    id: number;
+    login: string;
+    avatarUrl: string | null;
+}
+
+/**
+ * Turn the code GitHub handed back into the account that authorized it.
+ *
+ * The access token is used once, here, and never stored: Polaris needs to know who
+ * somebody is, not to act as them afterwards. Everything a pool does with their
+ * repositories it does with the installation's own credentials.
+ */
+export async function identifyGithubUser(code: string, redirectUri: string): Promise<GithubAccount> {
+    const auth = await getGithubUserAuth();
+    if (!auth) throw new Error("This GitHub connection cannot verify accounts");
+
+    const exchange = await fetch("https://github.com/login/oauth/access_token", {
+        method: "POST",
+        headers: { Accept: "application/json", "content-type": "application/json", "User-Agent": "polaris" },
+        body: JSON.stringify({
+            client_id: auth.clientId,
+            client_secret: auth.clientSecret,
+            code,
+            redirect_uri: redirectUri
+        }),
+        cache: "no-store"
+    });
+    if (!exchange.ok) throw new Error(`GitHub returned ${exchange.status} verifying the account`);
+    const granted = (await exchange.json()) as { access_token?: string; error_description?: string; error?: string };
+    if (!granted.access_token) throw new Error(granted.error_description ?? granted.error ?? "GitHub declined the authorization");
+
+    const res = await fetch(`${API}/user`, { headers: apiHeaders(granted.access_token), cache: "no-store" });
+    if (!res.ok) throw new Error(`GitHub returned ${res.status} reading the account`);
+    const body = (await res.json()) as { id?: number; login?: string; avatar_url?: string };
+    if (typeof body.id !== "number" || !body.login) throw new Error("GitHub did not return an account");
+    return { id: body.id, login: body.login, avatarUrl: body.avatar_url ?? null };
 }
 
 /** Refresh the stored installation list (call after the user installs the app). */
@@ -376,6 +449,69 @@ export async function listGithubRepos(): Promise<GithubRepo[]> {
         defaultBranch: repo.default_branch || "main",
         private: repo.private
     }));
+}
+
+/**
+ * Every repository one account owns, as far as this connection can see it.
+ *
+ * Where the App is installed on that account this is the installation's own list,
+ * which includes the private repositories it was given. Otherwise it falls back to
+ * the account's public repositories, authenticated when there are credentials only
+ * because the rate limit is higher - the answer is the same either way.
+ *
+ * Ordered most recently pushed first and capped, so a scope pointed at an account
+ * with hundreds of repositories takes the ones anybody is actually working in.
+ */
+export async function listReposForOwner(login: string, limit = 100): Promise<GithubRepo[]> {
+    const owner = login.trim();
+    if (!owner) return [];
+    const state = await getIntegrationState(PROVIDER);
+
+    if (state?.config.method === "app") {
+        const secrets = await getAppSecrets();
+        const installs = Array.isArray(state.config.installations) ? (state.config.installations as Installation[]) : [];
+        const install = installs.find((row) => row.login.toLowerCase() === owner.toLowerCase());
+        if (secrets && install) {
+            const token = await installationToken(install.id, secrets.appId, secrets.pem);
+            const res = await fetch(`${API}/installation/repositories?per_page=100`, {
+                headers: apiHeaders(token),
+                cache: "no-store"
+            });
+            if (res.ok) {
+                const body = (await res.json()) as {
+                    repositories?: Array<{ full_name: string; default_branch: string; private: boolean }>;
+                };
+                return (body.repositories ?? [])
+                    .filter((repo) => repo.full_name.split("/")[0]?.toLowerCase() === owner.toLowerCase())
+                    .slice(0, limit)
+                    .map((repo) => ({
+                        fullName: repo.full_name,
+                        defaultBranch: repo.default_branch || "main",
+                        private: repo.private
+                    }));
+            }
+        }
+    }
+
+    const res = await fetch(
+        `${API}/users/${encodeURIComponent(owner)}/repos?per_page=100&type=owner&sort=pushed`,
+        { headers: optionalAuthHeaders(await apiToken(owner)), cache: "no-store" }
+    );
+    if (!res.ok) return [];
+    const body = (await res.json()) as Array<{
+        full_name: string;
+        default_branch: string;
+        private: boolean;
+        archived?: boolean;
+    }>;
+    return body
+        .filter((repo) => repo.archived !== true)
+        .slice(0, limit)
+        .map((repo) => ({
+            fullName: repo.full_name,
+            defaultBranch: repo.default_branch || "main",
+            private: repo.private
+        }));
 }
 
 /**

@@ -6,17 +6,19 @@
  * editable fields and hands them to the client view.
  */
 
-import { getUserPhone, listUserEmails } from "@polaris/auth";
 import { prisma } from "@polaris/db";
 import { requireUser } from "@/lib/session";
-import { getAuthMailStatus } from "@/lib/auth-mail";
 import { AccountView } from "./account-view";
+import { getAuthMailStatus } from "@/lib/auth-mail";
+import { getGithubUserAuth } from "@/lib/github-service";
+import { getGithubIdentity } from "@/lib/github-identity";
+import { getUserPhone, listUserEmails } from "@polaris/auth";
 
 export const dynamic = "force-dynamic";
 
 export default async function AccountPage() {
     const session = await requireUser();
-    const [user, emails, mail, phone, whatsappChannel] = await Promise.all([
+    const [user, emails, mail, phone, whatsappChannel, identity, userAuth] = await Promise.all([
         prisma.user.findUnique({
             where: { id: session.id },
             select: { name: true, username: true, company: true }
@@ -29,7 +31,11 @@ export default async function AccountPage() {
         prisma.channel.findFirst({
             where: { ownerId: session.id, platform: "whatsapp", status: "connected" },
             select: { id: true }
-        })
+        }),
+        getGithubIdentity(session.id),
+        // Linking needs the connection to hold an OAuth client, which only the App
+        // method has. Asked here so the card offers it or explains itself.
+        getGithubUserAuth()
     ]);
 
     return (
@@ -46,6 +52,11 @@ export default async function AccountPage() {
                 mailReady={mail.channelId !== null}
                 phone={phone}
                 canSendWhatsApp={whatsappChannel !== null}
+                github={{
+                    login: identity?.login ?? null,
+                    avatarUrl: identity?.avatarUrl ?? null,
+                    canLink: userAuth !== null
+                }}
             />
         </div>
     );

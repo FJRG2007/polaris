@@ -11,22 +11,21 @@
  * jobs it offers is one the machine can actually carry - a pool sized past it does
  * not fail here, it fails hours later as a build that ran out of memory.
  *
+ * The scope is asked the same way (see scope-field): what it comes to is looked up
+ * while the rest of the form is being filled in, because a pool pointed at an
+ * account is a promise about repositories nobody has listed.
+ *
  * It validates against the same schema the action does, so a value the form
  * accepts is never one the server refuses on shape.
  */
 
-import { Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { ChevronRight, Plus } from "lucide-react";
+import { RunsOnSnippet } from "./runs-on-snippet";
+import { useCallback, useEffect, useState } from "react";
 import type { RunnerHostReadiness } from "@/lib/runners/runner-service";
 import { createRunnerPoolAction, probeRunnerHostAction } from "./actions";
-import {
-    createRunnerPoolSchema,
-    DEFAULT_RUNNER_LABELS,
-    MAX_RUNNER_CONCURRENCY,
-    type RunnerIsolation,
-    type RunnerScope
-} from "@polaris/core";
+import { EMPTY_SCOPE, ScopeField, toScope, type ScopeState } from "./scope-field";
 import {
     Button,
     Dialog,
@@ -38,6 +37,15 @@ import {
     Input,
     Select
 } from "@polaris/ui";
+import {
+    createRunnerPoolSchema,
+    DEFAULT_RUNNER_LABELS,
+    MAX_RUNNER_CONCURRENCY,
+    normalizeRunnerLabels,
+    type RunnerExhaustedAction,
+    type RunnerIsolation,
+    type RunnerWindow
+} from "@polaris/core";
 
 export interface ServerOption {
     id: string;
@@ -47,22 +55,32 @@ export interface ServerOption {
     local: boolean;
 }
 
-const SCOPE_OPTIONS = [
-    { value: "repo", label: "One repository" },
-    { value: "org", label: "A whole organization" }
-];
+/** A limit field is empty when there is no limit of that kind, which is not the
+ *  same as zero - zero would mean "may never run". */
+function optional(value: string): number | null {
+    const trimmed = value.trim();
+    return trimmed === "" ? null : Number(trimmed);
+}
 
 export function PoolDialog({ servers }: { servers: ServerOption[] }) {
     const router = useRouter();
     const [open, setOpen] = useState(false);
     const [name, setName] = useState("");
     const [serverId, setServerId] = useState("");
-    const [scope, setScope] = useState<RunnerScope>("repo");
-    const [targetOwner, setTargetOwner] = useState("");
-    const [targetRepo, setTargetRepo] = useState("");
+    const [scope, setScope] = useState<ScopeState>(EMPTY_SCOPE);
+    const [scopeCount, setScopeCount] = useState(0);
     const [labels, setLabels] = useState(DEFAULT_RUNNER_LABELS.join(", "));
     const [maxConcurrent, setMaxConcurrent] = useState("1");
+    // Once somebody has set this themselves, picking another server stops
+    // overwriting it with what that machine is worth.
+    const [touchedConcurrency, setTouchedConcurrency] = useState(false);
     const [isolation, setIsolation] = useState<RunnerIsolation>("container");
+    const [advanced, setAdvanced] = useState(false);
+    const [perTarget, setPerTarget] = useState("");
+    const [minutes, setMinutes] = useState("");
+    const [window, setWindow] = useState<RunnerWindow>("month");
+    const [jobsPerDay, setJobsPerDay] = useState("");
+    const [onExhausted, setOnExhausted] = useState<RunnerExhaustedAction>("pause");
     const [readiness, setReadiness] = useState<RunnerHostReadiness | null>(null);
     const [probing, setProbing] = useState(false);
     const [probeError, setProbeError] = useState<string | null>(null);
@@ -70,15 +88,26 @@ export function PoolDialog({ servers }: { servers: ServerOption[] }) {
     const [pending, setPending] = useState(false);
 
     const server = servers.find((entry) => entry.id === serverId) ?? null;
+    // Normalized the way the schema will, so the summary and the runs-on line show
+    // what the pool will actually register with rather than what was typed.
+    const poolLabels = normalizeRunnerLabels(labels.split(","));
+    // Named after what it serves when nobody bothered: a pool called "acme/website"
+    // beats one called "New pool", and it is still theirs to change under Advanced.
+    const proposedName = name.trim() || scope.repos[0]?.split("/")[1] || scope.owner || "Build";
     const draft = {
         serverId,
-        name,
-        scope,
-        targetOwner,
-        targetRepo: scope === "repo" ? targetRepo : undefined,
+        name: proposedName,
+        scope: toScope(scope),
         labels: labels.split(","),
         maxConcurrent,
-        isolation
+        isolation,
+        limits: {
+            perTargetConcurrent: optional(perTarget),
+            minutesBudget: optional(minutes),
+            minutesWindow: window,
+            jobsPerDay: optional(jobsPerDay),
+            onExhausted
+        }
     };
     const checked = createRunnerPoolSchema.safeParse(draft);
     const issue = (field: string): string | null =>
@@ -102,16 +131,23 @@ export function PoolDialog({ servers }: { servers: ServerOption[] }) {
             }
             setReadiness(machine);
             if (!machine.containerEngine && machine.reach === "login") setIsolation("workspace");
-            // Never offer more than the machine can carry, including when the
-            // operator already typed a bigger number for a different server.
+            // What the machine is worth, not the smallest number that works. A pool
+            // created on a 16-processor box and left at one runner is a box doing a
+            // sixteenth of what it was offered for, and nobody goes back to change
+            // it. Anything the operator typed themselves is left alone, and the
+            // ceiling still applies.
             setMaxConcurrent((current) =>
-                Number(current) > machine.recommended ? String(machine.recommended) : current
+                touchedConcurrency || Number(current) > machine.recommended
+                    ? String(Math.min(Number(current) || 1, machine.recommended))
+                    : String(Math.max(1, machine.recommended))
             );
         });
         return () => {
             live = false;
         };
     }, [serverId]);
+
+    const onPreview = useCallback((result: { count: number }) => setScopeCount(result.count), []);
 
     const containersAvailable = readiness !== null && readiness.platform === "linux" && readiness.containerEngine;
     // The local box has no login to give a job a directory under, so a clean
@@ -123,6 +159,48 @@ export function PoolDialog({ servers }: { servers: ServerOption[] }) {
     ];
     const ceiling = readiness?.recommended ?? MAX_RUNNER_CONCURRENCY;
     const overCapacity = readiness !== null && Number(maxConcurrent) > readiness.recommended;
+    // More repositories than slots is normal and is what the queue exists for, but
+    // it is worth saying once rather than leaving somebody to notice.
+    const spread = scopeCount > Number(maxConcurrent || 1);
+
+    function reset() {
+        setName("");
+        // One server and nothing to choose: pick it, so the machine is probed while
+        // the rest of the form is still being filled in.
+        setServerId(servers.length === 1 ? (servers[0]?.id ?? "") : "");
+        setScope(EMPTY_SCOPE);
+        setScopeCount(0);
+        setLabels(DEFAULT_RUNNER_LABELS.join(", "));
+        setMaxConcurrent("1");
+        setTouchedConcurrency(false);
+        setIsolation("container");
+        setAdvanced(false);
+        setPerTarget("");
+        setMinutes("");
+        setWindow("month");
+        setJobsPerDay("");
+        setOnExhausted("pause");
+        setReadiness(null);
+        setProbeError(null);
+        setError(null);
+    }
+
+    /** What is folded away, in one line, so nobody has to open it to find out
+     *  whether anything in there needs their attention. */
+    function advancedSummary(): string {
+        const parts = [
+            poolLabels.join(", ") || "no labels",
+            `${maxConcurrent} ${Number(maxConcurrent) === 1 ? "job" : "jobs"} at once`,
+            isolation === "container" ? "contained" : "a directory on the machine"
+        ];
+        const limits = [
+            perTarget.trim() ? `${perTarget} each` : null,
+            minutes.trim() ? `${minutes} min a ${window}` : null,
+            jobsPerDay.trim() ? `${jobsPerDay} jobs a day` : null
+        ].filter(Boolean);
+        parts.push(limits.length > 0 ? limits.join(", ") : "no limits");
+        return parts.join(", ");
+    }
 
     async function submit() {
         if (!checked.success) return;
@@ -142,21 +220,7 @@ export function PoolDialog({ servers }: { servers: ServerOption[] }) {
         <Dialog
             open={open}
             onOpenChange={(next) => {
-                if (next) {
-                    setName("");
-                    // One server and nothing to choose: pick it, so the machine is
-                    // probed while the rest of the form is still being filled in.
-                    setServerId(servers.length === 1 ? (servers[0]?.id ?? "") : "");
-                    setScope("repo");
-                    setTargetOwner("");
-                    setTargetRepo("");
-                    setLabels(DEFAULT_RUNNER_LABELS.join(", "));
-                    setMaxConcurrent("1");
-                    setIsolation("container");
-                    setReadiness(null);
-                    setProbeError(null);
-                    setError(null);
-                }
+                if (next) reset();
                 setOpen(next);
             }}
         >
@@ -165,7 +229,7 @@ export function PoolDialog({ servers }: { servers: ServerOption[] }) {
                     <Plus className="size-4" /> Add a pool
                 </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-lg">
+            <DialogContent className="max-h-[85vh] max-w-lg overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle>New runner pool</DialogTitle>
                     <DialogDescription>
@@ -175,11 +239,7 @@ export function PoolDialog({ servers }: { servers: ServerOption[] }) {
                 </DialogHeader>
 
                 <div className="flex flex-col gap-3">
-                    <Field label="Name" error={name ? issue("name") : null}>
-                        <Input value={name} onChange={(event) => setName(event.target.value)} placeholder="Build" />
-                    </Field>
-
-                    <Field label="Server" error={probeError}>
+                    <Field label="Runs on" error={probeError}>
                         <Select
                             value={serverId}
                             onValueChange={setServerId}
@@ -192,42 +252,45 @@ export function PoolDialog({ servers }: { servers: ServerOption[] }) {
                         <MachineNote probing={probing} readiness={readiness} local={server?.local ?? false} />
                     </Field>
 
-                    <Field label="Runners serve">
-                        <Select
-                            value={scope}
-                            onValueChange={(value) => setScope(value as RunnerScope)}
-                            options={SCOPE_OPTIONS}
+                    <ScopeField state={scope} onChange={setScope} onPreview={onPreview} />
+
+                    {spread ? (
+                        <Hint>
+                            {scopeCount} repositories share {maxConcurrent}{" "}
+                            {Number(maxConcurrent) === 1 ? "runner" : "runners"}. Whoever has a job queued gets them
+                            first; the rest wait.
+                        </Hint>
+                    ) : null}
+
+                    {/* Everything below is already answered from what the machine
+                        reported, so it is folded away - but the summary says what it
+                        was answered with, because a default nobody can see is a
+                        default nobody can disagree with. */}
+                    <div className="rounded-md border border-border/60">
+                        <button
+                            type="button"
+                            onClick={() => setAdvanced((current) => !current)}
+                            aria-expanded={advanced}
+                            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-muted/40"
+                        >
+                            <ChevronRight className={`size-4 shrink-0 transition-transform ${advanced ? "rotate-90" : ""}`} />
+                            <span className="font-medium">Advanced</span>
+                            {advanced ? null : (
+                                <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
+                                    {advancedSummary()}
+                                </span>
+                            )}
+                        </button>
+
+                        {advanced ? (
+                            <div className="flex flex-col gap-3 border-t border-border/60 p-3">
+                    <Field label="Name" error={name ? issue("name") : null}>
+                        <Input
+                            value={name}
+                            onChange={(event) => setName(event.target.value)}
+                            placeholder={proposedName}
                         />
                     </Field>
-
-                    <div className="flex gap-2">
-                        <Field
-                            label={scope === "org" ? "Organization" : "Account"}
-                            error={targetOwner ? issue("targetOwner") : null}
-                            className="flex-1"
-                        >
-                            <Input
-                                value={targetOwner}
-                                onChange={(event) => setTargetOwner(event.target.value)}
-                                placeholder="acme"
-                                autoCapitalize="none"
-                                autoCorrect="off"
-                                spellCheck={false}
-                            />
-                        </Field>
-                        {scope === "repo" ? (
-                            <Field label="Repository" error={targetRepo ? issue("targetRepo") : null} className="flex-1">
-                                <Input
-                                    value={targetRepo}
-                                    onChange={(event) => setTargetRepo(event.target.value)}
-                                    placeholder="website"
-                                    autoCapitalize="none"
-                                    autoCorrect="off"
-                                    spellCheck={false}
-                                />
-                            </Field>
-                        ) : null}
-                    </div>
 
                     <Field label="Labels" error={issue("labels")}>
                         <Input value={labels} onChange={(event) => setLabels(event.target.value)} />
@@ -253,7 +316,10 @@ export function PoolDialog({ servers }: { servers: ServerOption[] }) {
                                 max={Math.min(ceiling, MAX_RUNNER_CONCURRENCY)}
                                 inputMode="numeric"
                                 value={maxConcurrent}
-                                onChange={(event) => setMaxConcurrent(event.target.value)}
+                                onChange={(event) => {
+                                    setTouchedConcurrency(true);
+                                    setMaxConcurrent(event.target.value);
+                                }}
                             />
                         </Field>
                         <Field label="Each job runs in" className="flex-1">
@@ -271,12 +337,77 @@ export function PoolDialog({ servers }: { servers: ServerOption[] }) {
                         </Field>
                     </div>
 
+                    <div className="flex flex-col gap-2">
+                        <span className="text-sm font-medium">Limits</span>
+                        <Hint>Per repository. Leave a field empty for no limit of that kind.</Hint>
+
+                        <div className="flex gap-2">
+                            <Field label="At once" className="w-24" error={issue("limits")}>
+                                <Input
+                                    type="number"
+                                    min={1}
+                                    max={MAX_RUNNER_CONCURRENCY}
+                                    inputMode="numeric"
+                                    value={perTarget}
+                                    placeholder="Any"
+                                    onChange={(event) => setPerTarget(event.target.value)}
+                                />
+                            </Field>
+                            <Field label="Minutes" className="w-28">
+                                <Input
+                                    type="number"
+                                    min={1}
+                                    inputMode="numeric"
+                                    value={minutes}
+                                    placeholder="Any"
+                                    onChange={(event) => setMinutes(event.target.value)}
+                                />
+                            </Field>
+                            <Field label="Per" className="w-28">
+                                <Select
+                                    value={window}
+                                    onValueChange={(value) => setWindow(value as RunnerWindow)}
+                                    options={[
+                                        { value: "day", label: "Day" },
+                                        { value: "month", label: "Month" }
+                                    ]}
+                                />
+                            </Field>
+                            <Field label="Jobs a day" className="flex-1">
+                                <Input
+                                    type="number"
+                                    min={1}
+                                    inputMode="numeric"
+                                    value={jobsPerDay}
+                                    placeholder="Any"
+                                    onChange={(event) => setJobsPerDay(event.target.value)}
+                                />
+                            </Field>
+                        </div>
+
+                        <Field label="When a repository runs out">
+                            <Select
+                                value={onExhausted}
+                                onValueChange={(value) => setOnExhausted(value as RunnerExhaustedAction)}
+                                options={[
+                                    { value: "pause", label: "Stop serving it until the window turns over" },
+                                    { value: "warn", label: "Keep serving it, and say so on the pool" }
+                                ]}
+                            />
+                        </Field>
+                                </div>
+                            </div>
+                        ) : null}
+                    </div>
+
+                    <RunsOnSnippet labels={poolLabels} />
+
                     {error ? <p className="text-sm text-danger">{error}</p> : null}
 
                     <div className="mt-1 flex justify-end">
                         <Button
                             onClick={() => void submit()}
-                            disabled={pending || !checked.success || probing || overCapacity}
+                            disabled={pending || !checked.success || probing || overCapacity || scopeCount === 0}
                         >
                             {pending ? "Creating..." : "Create the pool"}
                         </Button>

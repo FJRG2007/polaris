@@ -18,6 +18,7 @@ export * from "./format.js";
 export * from "./permissions.js";
 export * from "./authz.js";
 export * from "./runners.js";
+export * from "./runner-placement.js";
 export * from "./schemas/storage.js";
 export * from "./schemas/deploy.js";
 export * from "./schemas/share.js";

@@ -1,27 +1,44 @@
 /**
- * Keeping each pool's runners up, by comparing three accounts of the world rather
- * than trusting any one of them.
+ * Keeping each pool's runners up, and pointed at whoever is waiting.
  *
- * Polaris has a row per runner it started. The machine has a process, or does not.
- * GitHub has a registration, or does not. All three disagree routinely - a machine
- * reboots mid-job, a runner exits before it ever connects, a network drops between
- * the two - and the pass below is written so that each of those ends in a runner
- * being replaced rather than in a pool that quietly stopped answering.
+ * Three accounts of the world disagree routinely and none of them is trusted on
+ * its own. Polaris has a row per runner it started; the machine has a process, or
+ * does not; GitHub has a registration, or does not. A machine reboots mid-job, a
+ * runner exits before it ever connects, a network drops between the two - and the
+ * pass below is written so each of those ends in a runner being replaced rather
+ * than in a pool that quietly stopped answering.
  *
- * The part worth being careful about is the registration. An ephemeral runner
- * de-registers itself after its job, but one that never got that far leaves a row
- * GitHub will keep queueing work onto, and that work goes nowhere. Anything GitHub
- * still holds under this pool's name that Polaris cannot account for is removed.
+ * On top of that, a pool now serves a set of repositories rather than one, which
+ * turns "keep N runners up" into "keep N runners up in the right places". Each
+ * pass therefore:
+ *
+ *   1. re-reads what the pool's scope comes to, and stands down anything running
+ *      for a repository that has left it;
+ *   2. works out what each repository has spent, and stops serving the ones that
+ *      are over their budget;
+ *   3. finds out who has work waiting, from the webhook or by asking;
+ *   4. asks @polaris/core where the runners should be, and moves them.
+ *
+ * The part worth being careful about is still the registration. An ephemeral
+ * runner de-registers itself after its job, but one that never got that far leaves
+ * a row GitHub will keep queueing work onto, and that work goes nowhere. Anything
+ * GitHub still holds under this pool's name that Polaris cannot account for is
+ * removed.
  *
  * A pass never throws. A pool that cannot be reconciled records why on itself, so
- * the operator reads it on the pool instead of in a log they have no reason to open,
- * and the next pool is still tried.
+ * the operator reads it on the pool instead of in a log they have no reason to
+ * open, and the next pool is still tried.
  */
 
 import { prisma } from "@polaris/db";
 import { randomUUID } from "node:crypto";
-import { liveRunnerNames, parseLabels } from "./runner-service";
+import { targetKey } from "./runner-scope";
+import { parseLabels } from "./runner-labels";
+import { liveRunnerNames } from "./runner-service";
+import { syncPoolTargets } from "./runner-targets";
+import { poolUsage, usageFor } from "./runner-usage";
 import { resolveRunnerRelease, runnerPlatform } from "./runner-release";
+import { describeDropped, markServed, refreshDemand } from "./runner-demand";
 import { openRunnerMachine, poolServerId, type RunnerMachine } from "./runner-machine";
 import {
     createRunnerJitConfig,
@@ -31,12 +48,15 @@ import {
     type RunnerTarget
 } from "@/lib/github-runners";
 import {
+    budgetVerdict,
+    placeRunners,
     runnerName,
     runnerNamePrefix,
     RUNNER_JOB_LIVE_STATES,
     type RunnerIsolation,
     type RunnerJobState,
-    type RunnerScope
+    type RunnerWindow,
+    type TargetState
 } from "@polaris/core";
 
 const INTERVAL_MS = Number(process.env.POLARIS_RUNNER_RECONCILE_MS) || 30_000;
@@ -44,6 +64,8 @@ let started = false;
 let running = false;
 
 type PoolRow = Awaited<ReturnType<typeof loadPools>>[number];
+type JobRow = PoolRow["jobs"][number];
+type StoredTarget = Awaited<ReturnType<typeof syncPoolTargets>>["targets"][number];
 
 function loadPools() {
     return prisma.runnerPool.findMany({
@@ -57,46 +79,142 @@ function loadPools() {
 export async function reconcileRunnerPools(): Promise<void> {
     for (const pool of await loadPools()) {
         try {
-            await reconcilePool(pool);
-            if (pool.error !== null) await prisma.runnerPool.update({ where: { id: pool.id }, data: { error: null } });
+            const note = await reconcilePool(pool);
+            if (pool.error !== note) {
+                await prisma.runnerPool.update({ where: { id: pool.id }, data: { error: note } });
+            }
         } catch (caught) {
             const error = caught instanceof Error ? caught.message : "Could not reconcile this pool";
-            await prisma.runnerPool
-                .update({ where: { id: pool.id }, data: { error } })
-                .catch(() => undefined);
+            await prisma.runnerPool.update({ where: { id: pool.id }, data: { error } }).catch(() => undefined);
         }
     }
 }
 
-async function reconcilePool(pool: PoolRow): Promise<void> {
-    const target: RunnerTarget = {
-        scope: pool.scope as RunnerScope,
-        owner: pool.targetOwner,
-        repo: pool.targetRepo ?? undefined
+/** What a job was registered against, from the job's own record of it. */
+function jobTarget(job: JobRow): RunnerTarget {
+    return {
+        scope: job.targetRepo ? "repo" : "org",
+        owner: job.targetOwner,
+        repo: job.targetRepo ?? undefined
     };
+}
 
-    // GitHub's view first: it is the only one that says whether a runner is
-    // actually taking work, and it is needed to decide what to clean up.
-    const registered = await listGithubRunners(target);
-    const byName = new Map(registered.map((runner) => [runner.name, runner]));
+function storedTarget(target: StoredTarget): RunnerTarget {
+    return { scope: target.kind, owner: target.owner, repo: target.repo ?? undefined };
+}
 
+/**
+ * Reconcile one pool, returning what the operator should be told about it - or
+ * null when there is nothing to say. Returning the note rather than writing it
+ * keeps "what happened" in one place instead of spread across every early return.
+ */
+async function reconcilePool(pool: PoolRow): Promise<string | null> {
+    const { targets, dropped, note } = await syncPoolTargets(pool);
+    if (targets.length === 0) {
+        // Nothing to serve. Anything still running belongs to a repository that has
+        // left, and is stood down below by the same path as any other departure.
+        const machine = await openRunnerMachine(poolServerId(pool.hostId), pool.ownerId);
+        try {
+            for (const job of pool.jobs) await standDown(machine, job, "The pool no longer serves this repository.");
+            await machine.sweep(await liveRunnerNames(pool.hostId));
+        } finally {
+            machine.close();
+        }
+        return note ?? "This pool serves no repositories.";
+    }
+
+    const serving = new Set(targets.map((target) => target.key));
     const machine = await openRunnerMachine(poolServerId(pool.hostId), pool.ownerId);
+
     try {
-        const alive: string[] = [];
-        for (const job of pool.jobs) {
-            const still = await settleJob(machine, target, job, byName.get(job.name));
-            if (still) alive.push(job.name);
+        // A runner registered somewhere the pool has stopped serving is work being
+        // done on somebody's machine for a repository nobody asked it to serve.
+        const departed = pool.jobs.filter((job) => !serving.has(targetKey(job.targetOwner, job.targetRepo)));
+        for (const job of departed) {
+            await standDown(machine, job, "The pool no longer serves this repository.");
         }
 
-        await fillSlots(machine, pool, target, pool.maxConcurrent - alive.length, alive);
-        await dropOrphans(target, pool.name, registered, alive);
+        // GitHub's view, but only where there is something to compare it against:
+        // asking about a repository this pool has no runner on would be one call
+        // per repository per pass to learn nothing.
+        const current = pool.jobs.filter((job) => serving.has(targetKey(job.targetOwner, job.targetRepo)));
+        const registered = await listRegistrations(current);
+
+        const alive: JobRow[] = [];
+        for (const job of current) {
+            const key = targetKey(job.targetOwner, job.targetRepo);
+            const still = await settleJob(machine, jobTarget(job), job, registered.get(key)?.get(job.name));
+            if (still) alive.push(job);
+        }
+
+        const blocked = await applyBudgets(pool, targets);
+
+        // Only worth asking who is waiting when the pool has to choose. With a slot
+        // for every repository, every repository gets one regardless.
+        await refreshDemand(targets, { needed: targets.length > pool.maxConcurrent });
+        const demanded = await prisma.runnerPoolTarget.findMany({
+            where: { poolId: pool.id },
+            select: { key: true, queued: true }
+        });
+        const queued = new Map(demanded.map((row) => [row.key, row.queued]));
+        const states = buildStates(targets, alive, queued);
+
+        const plan = placeRunners({
+            free: pool.maxConcurrent - alive.length,
+            perTargetConcurrent: pool.perTargetConcurrent,
+            targets: states
+        });
+
+        // Released first: each one pays for a start below, and starting before
+        // freeing the slot would put the pool over its own concurrency.
+        for (const key of plan.release) {
+            const idle = alive.find(
+                (job) => targetKey(job.targetOwner, job.targetRepo) === key && job.state === "idle"
+            );
+            if (!idle) continue;
+            await standDown(machine, idle, null);
+            alive.splice(alive.indexOf(idle), 1);
+        }
+
+        if (plan.start.length > 0) {
+            // Asked once for the whole pass, not once per runner: each of these is
+            // a round trip to a machine that may be on the other side of an SSH
+            // connection, and eight runners would be eight of them.
+            const ready = await prepareMachine(machine, pool);
+            const byKey = new Map(targets.map((target) => [target.key, target]));
+            for (const key of plan.start) {
+                const target = byKey.get(key);
+                if (!target) continue;
+                await startRunner(machine, pool, target, ready);
+            }
+        }
+
         // Swept against every pool's runners on this machine, not just this one's:
         // two pools can share a server, and each row is written before its runner
         // is started, so this set is never missing one that is about to appear.
         await machine.sweep(await liveRunnerNames(pool.hostId));
+        await dropOrphans(targets, pool.name, registered, alive);
+
+        // A scope that lost repositories is worth saying once, because from the
+        // outside it looks like runners disappearing for no reason.
+        return note ?? describeDropped(dropped) ?? overBudgetNote(blocked);
     } finally {
         machine.close();
     }
+}
+
+/** GitHub's runner list for each target this pool currently has runners on. */
+async function listRegistrations(jobs: readonly JobRow[]): Promise<Map<string, Map<string, GithubRunner>>> {
+    const byTarget = new Map<string, RunnerTarget>();
+    for (const job of jobs) {
+        byTarget.set(targetKey(job.targetOwner, job.targetRepo), jobTarget(job));
+    }
+    const listings = new Map<string, Map<string, GithubRunner>>();
+    for (const [key, target] of byTarget) {
+        const runners = await listGithubRunners(target);
+        listings.set(key, new Map(runners.map((runner) => [runner.name, runner])));
+    }
+    return listings;
 }
 
 /**
@@ -110,13 +228,24 @@ async function reconcilePool(pool: PoolRow): Promise<void> {
 async function settleJob(
     machine: RunnerMachine,
     target: RunnerTarget,
-    job: PoolRow["jobs"][number],
+    job: JobRow,
     registration: GithubRunner | undefined
 ): Promise<boolean> {
     const handle = job.handle ? { isolation: job.isolation as RunnerIsolation, handle: job.handle } : null;
     if (handle && (await machine.isAlive(handle))) {
         const state: RunnerJobState = registration ? (registration.busy ? "busy" : "idle") : "starting";
-        if (state !== job.state) await prisma.runnerJob.update({ where: { id: job.id }, data: { state } });
+        if (state !== job.state) {
+            await prisma.runnerJob.update({
+                where: { id: job.id },
+                data: {
+                    state,
+                    // The moment it was first seen working is where its consumption
+                    // starts being counted, and it is only ever set once.
+                    ...(state === "busy" && job.busyAt === null ? { busyAt: new Date() } : {})
+                }
+            });
+            job.state = state;
+        }
         return true;
     }
 
@@ -139,16 +268,97 @@ async function settleJob(
     return false;
 }
 
-/** Start runners until the pool is back at its concurrency. */
-async function fillSlots(
-    machine: RunnerMachine,
-    pool: PoolRow,
-    target: RunnerTarget,
-    missing: number,
-    alive: string[]
-): Promise<void> {
-    if (missing <= 0) return;
+/**
+ * Stop one runner and give its slot back: off the machine, out of GitHub, closed
+ * in the record. Used both for a repository that has left the pool's scope and for
+ * an idle runner being moved to one that has work.
+ *
+ * A busy runner is never passed here. Interrupting somebody's build to rebalance a
+ * pool would be a worse failure than the imbalance.
+ */
+async function standDown(machine: RunnerMachine, job: JobRow, reason: string | null): Promise<void> {
+    if (job.handle) {
+        await machine.reap(job.name, { isolation: job.isolation as RunnerIsolation, handle: job.handle }).catch(() => "");
+    }
+    if (job.githubRunnerId !== null) {
+        await deleteGithubRunner(jobTarget(job), job.githubRunnerId).catch(() => undefined);
+    }
+    await prisma.runnerJob.update({
+        where: { id: job.id },
+        data: { state: "finished", error: reason, finishedAt: new Date() }
+    });
+}
 
+/**
+ * Work out what each repository has spent and record why it is not being served.
+ *
+ * The reason is stored on the target rather than only used here, because "why is
+ * nothing running for this repository" is a question asked on the pool card long
+ * after the pass that answered it.
+ */
+async function applyBudgets(pool: PoolRow, targets: readonly StoredTarget[]): Promise<Map<string, string | null>> {
+    const limits = {
+        perTargetConcurrent: pool.perTargetConcurrent,
+        minutesBudget: pool.minutesBudget,
+        minutesWindow: pool.minutesWindow as RunnerWindow,
+        jobsPerDay: pool.jobsPerDay,
+        onExhausted: pool.onExhausted === "warn" ? ("warn" as const) : ("pause" as const)
+    };
+    const usage = await poolUsage(pool.id, limits.minutesWindow);
+    const verdicts = new Map<string, string | null>();
+
+    for (const target of targets) {
+        const verdict = budgetVerdict(usageFor(usage, target.key), limits);
+        // `warn` reports the overage without withholding the runner, so what is
+        // stored is the sentence and what gates placement is `allowed`.
+        const blocked = verdict.allowed ? null : verdict.exceeded;
+        verdicts.set(target.key, verdict.exceeded);
+        if (target.blocked !== blocked) {
+            await prisma.runnerPoolTarget.update({ where: { id: target.id }, data: { blocked } });
+            target.blocked = blocked;
+        }
+    }
+    return verdicts;
+}
+
+/** What each target looks like to the placement rules. */
+function buildStates(
+    targets: readonly StoredTarget[],
+    alive: readonly JobRow[],
+    queued: Map<string, number>
+): TargetState[] {
+    return targets.map((target) => {
+        const mine = alive.filter((job) => targetKey(job.targetOwner, job.targetRepo) === target.key);
+        return {
+            key: target.key,
+            queued: queued.get(target.key) ?? 0,
+            live: mine.length,
+            idle: mine.filter((job) => job.state === "idle").length,
+            blocked: target.blocked,
+            lastServedAt: target.lastServedAt?.getTime() ?? 0
+        };
+    });
+}
+
+/** One line for the pool card when repositories are over budget, or null. */
+function overBudgetNote(blocked: Map<string, string | null>): string | null {
+    const over = [...blocked.entries()].filter(([, reason]) => reason !== null);
+    if (over.length === 0) return null;
+    const [first] = over;
+    if (over.length === 1 && first) return `${first[0]}: ${first[1]}`;
+    return `${over.length} repositories are over their budget this window.`;
+}
+
+/**
+ * Check the machine can still do what the pool asks and get the runner onto it.
+ *
+ * Done before any registration is minted: a machine that cannot fetch the runner
+ * would otherwise leave a registration on GitHub that nothing will ever come for.
+ */
+async function prepareMachine(
+    machine: RunnerMachine,
+    pool: PoolRow
+): Promise<{ release: Awaited<ReturnType<typeof resolveRunnerRelease>>; isolation: RunnerIsolation }> {
     const probed = await machine.probe();
     const platform = runnerPlatform(probed.platform, probed.arch);
     if (!platform) throw new Error(`GitHub publishes no runner for ${probed.platform} on ${probed.arch}`);
@@ -163,41 +373,54 @@ async function fillSlots(
     }
 
     const release = await resolveRunnerRelease(platform);
-    // Before any registration is minted: a machine that cannot get the runner
-    // would otherwise leave a registered runner nothing will ever come for.
     await machine.prepare(release, isolation);
+    return { release, isolation };
+}
 
-    const labels = parseLabels(pool.labels);
-    for (let slot = 0; slot < missing; slot += 1) {
-        // The name is settled before the row exists, so a crash between the two can
-        // never leave a nameless runner holding a slot nothing can reconcile.
-        const name = runnerName(pool.name, randomUUID());
-        const job = await prisma.runnerJob.create({
-            data: { poolId: pool.id, name, isolation, state: "starting" },
-            select: { id: true }
+/** Start one runner for one target, on a machine already prepared for it. */
+async function startRunner(
+    machine: RunnerMachine,
+    pool: PoolRow,
+    target: StoredTarget,
+    ready: { release: Awaited<ReturnType<typeof resolveRunnerRelease>>; isolation: RunnerIsolation }
+): Promise<void> {
+    const { release, isolation } = ready;
+
+    // The name is settled before the row exists, so a crash between the two can
+    // never leave a nameless runner holding a slot nothing can reconcile.
+    const name = runnerName(pool.name, randomUUID());
+    const job = await prisma.runnerJob.create({
+        data: {
+            poolId: pool.id,
+            name,
+            isolation,
+            state: "starting",
+            targetOwner: target.owner,
+            targetRepo: target.repo
+        },
+        select: { id: true }
+    });
+
+    const jit = await createRunnerJitConfig(storedTarget(target), { name, labels: parseLabels(pool.labels) });
+    await prisma.runnerJob.update({ where: { id: job.id }, data: { githubRunnerId: jit.runnerId } });
+
+    try {
+        const handle = await machine.start({ name, isolation, release, jitConfig: jit.encodedConfig });
+        await prisma.runnerJob.update({ where: { id: job.id }, data: { handle: handle.handle } });
+        await markServed(target.id);
+    } catch (caught) {
+        // The registration exists and nothing will ever use it, so it goes before
+        // the error is reported.
+        await deleteGithubRunner(storedTarget(target), jit.runnerId).catch(() => undefined);
+        await prisma.runnerJob.update({
+            where: { id: job.id },
+            data: {
+                state: "failed",
+                finishedAt: new Date(),
+                error: caught instanceof Error ? caught.message : "The machine did not start the runner"
+            }
         });
-
-        const jit = await createRunnerJitConfig(target, { name, labels });
-        await prisma.runnerJob.update({ where: { id: job.id }, data: { githubRunnerId: jit.runnerId } });
-
-        try {
-            const handle = await machine.start({ name, isolation, release, jitConfig: jit.encodedConfig });
-            await prisma.runnerJob.update({ where: { id: job.id }, data: { handle: handle.handle } });
-            alive.push(name);
-        } catch (caught) {
-            // The registration exists and nothing will ever use it, so it goes
-            // before the error is reported.
-            await deleteGithubRunner(target, jit.runnerId).catch(() => undefined);
-            await prisma.runnerJob.update({
-                where: { id: job.id },
-                data: {
-                    state: "failed",
-                    finishedAt: new Date(),
-                    error: caught instanceof Error ? caught.message : "The machine did not start the runner"
-                }
-            });
-            throw caught;
-        }
+        throw caught;
     }
 }
 
@@ -207,29 +430,41 @@ async function fillSlots(
  * enough to hand them a workflow that will then wait forever.
  */
 async function dropOrphans(
-    target: RunnerTarget,
+    targets: readonly StoredTarget[],
     poolName: string,
-    registered: readonly GithubRunner[],
-    alive: readonly string[]
+    registered: Map<string, Map<string, GithubRunner>>,
+    alive: readonly JobRow[]
 ): Promise<void> {
     const prefix = runnerNamePrefix(poolName);
-    const candidates = registered.filter((runner) => runner.name.startsWith(prefix) && !alive.includes(runner.name));
-    if (candidates.length === 0) return;
+    const living = new Set(alive.map((job) => job.name));
+    const byKey = new Map(targets.map((target) => [target.key, target]));
 
-    // Two pools can be named the same and share a prefix, so a name any pool still
-    // has a live runner for is left alone.
-    const claimed = new Set(
-        (
-            await prisma.runnerJob.findMany({
-                where: { name: { in: candidates.map((runner) => runner.name) }, state: { in: [...RUNNER_JOB_LIVE_STATES] } },
-                select: { name: true }
-            })
-        ).map((job) => job.name)
-    );
+    for (const [key, runners] of registered) {
+        const target = byKey.get(key);
+        if (!target) continue;
+        const candidates = [...runners.values()].filter(
+            (runner) => runner.name.startsWith(prefix) && !living.has(runner.name)
+        );
+        if (candidates.length === 0) continue;
 
-    for (const runner of candidates) {
-        if (claimed.has(runner.name)) continue;
-        await deleteGithubRunner(target, runner.id).catch(() => undefined);
+        // Two pools can be named the same and share a prefix, so a name any pool
+        // still has a live runner for is left alone.
+        const claimed = new Set(
+            (
+                await prisma.runnerJob.findMany({
+                    where: {
+                        name: { in: candidates.map((runner) => runner.name) },
+                        state: { in: [...RUNNER_JOB_LIVE_STATES] }
+                    },
+                    select: { name: true }
+                })
+            ).map((job) => job.name)
+        );
+
+        for (const runner of candidates) {
+            if (claimed.has(runner.name)) continue;
+            await deleteGithubRunner(storedTarget(target), runner.id).catch(() => undefined);
+        }
     }
 }
 

@@ -7,8 +7,15 @@
  * stored; password and security settings live under ./security.
  */
 
-import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { auth } from "@/lib/auth";
+import { emailField } from "@polaris/core";
+import { revalidatePath } from "next/cache";
+import { requireUser } from "@/lib/session";
+import { recordAudit } from "@/lib/audit-service";
+import { rateLimit } from "@/lib/rate-limit-service";
+import { unlinkGithubIdentity } from "@/lib/github-identity";
+import { requestEmailVerification } from "@/lib/email-verification-service";
 import {
     addUserEmail,
     promoteUserEmail,
@@ -16,12 +23,6 @@ import {
     setUserEmailRecovery,
     updateUserProfile
 } from "@polaris/auth";
-import { emailField } from "@polaris/core";
-import { recordAudit } from "@/lib/audit-service";
-import { rateLimit } from "@/lib/rate-limit-service";
-import { requireUser } from "@/lib/session";
-import { auth } from "@/lib/auth";
-import { requestEmailVerification } from "@/lib/email-verification-service";
 
 const emailIdSchema = z.string().uuid();
 
@@ -113,4 +114,17 @@ export async function promoteEmailAction(emailId: unknown, currentPassword: stri
         revalidatePath("/account");
     }
     return result;
+}
+
+/** Forget the GitHub account this profile is linked to. Self-service only: the
+ *  session is re-resolved here, so this can never unlink somebody else. */
+export async function unlinkGithubAction(): Promise<{ error?: string }> {
+    const user = await requireUser();
+    try {
+        await unlinkGithubIdentity(user.id);
+    } catch {
+        return { error: "Could not unlink the GitHub account." };
+    }
+    revalidatePath("/account");
+    return {};
 }

@@ -9,11 +9,20 @@
 
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/session";
-import { DYMO_IP_RULES, findIntegration, type ScanAction } from "@/lib/integrations/registry";
+import { recordAudit } from "@/lib/audit-service";
+import { verifyIp } from "@/lib/integrations/dymo";
+import { applyTunnel } from "@/lib/tunnel-service";
+import { verifyKey } from "@/lib/integrations/virustotal";
+import type { CfAccount } from "@/lib/integrations/cloudflare-api";
+import { setDomainConfig, syncDuckDns } from "@/lib/domain-service";
 import { isTunnelToken, tunnelTokenHint } from "@/lib/integrations/tunnel-token";
 import { getIntegrationState, upsertIntegration } from "@/lib/integration-service";
-import { verifyKey } from "@/lib/integrations/virustotal";
-import { verifyIp } from "@/lib/integrations/dymo";
+import type { CloudflareTokenScope } from "@/lib/integrations/cloudflare-token-link";
+import { DYMO_IP_RULES, findIntegration, type ScanAction } from "@/lib/integrations/registry";
+import {
+    connectCloudflareToken,
+    disconnectCloudflareToken
+} from "@/lib/integrations/cloudflare-account-service";
 import {
     connectGithubApp,
     connectGithubPat,
@@ -21,15 +30,6 @@ import {
     refreshInstallations,
     verifyGithubToken
 } from "@/lib/github-service";
-import { applyTunnel } from "@/lib/tunnel-service";
-import { setDomainConfig, syncDuckDns } from "@/lib/domain-service";
-import {
-    connectCloudflareToken,
-    disconnectCloudflareToken
-} from "@/lib/integrations/cloudflare-account-service";
-import type { CloudflareTokenScope } from "@/lib/integrations/cloudflare-token-link";
-import type { CfAccount } from "@/lib/integrations/cloudflare-api";
-import { recordAudit } from "@/lib/audit-service";
 
 const SCAN_ACTIONS = new Set<ScanAction>(["block", "quarantine", "notify"]);
 
@@ -335,6 +335,10 @@ export async function connectGithubAppAction(input: {
     appId: string;
     pem: string;
     appName?: string;
+    /** Optional, and only used so people can link their own GitHub account: the
+     *  app can act on repositories without them. */
+    clientId?: string;
+    clientSecret?: string;
 }): Promise<{ error?: string; installations?: number }> {
     const user = await requireAdmin();
     try {

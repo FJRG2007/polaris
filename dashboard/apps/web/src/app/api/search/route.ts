@@ -95,7 +95,7 @@ export async function GET(): Promise<Response> {
                 id: pool.id,
                 kind: "runner",
                 label: pool.name,
-                context: pool.targetRepo ? `${pool.targetOwner}/${pool.targetRepo}` : pool.targetOwner,
+                context: pool.scopeSummary,
                 href: "/apps/runners"
             });
         }

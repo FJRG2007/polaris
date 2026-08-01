@@ -18,8 +18,8 @@
  * its tokens expire on their own, and it is not tied to one person's account.
  */
 
-import { evaluateRunnerAccess, normalizeRunnerLabels, type RunnerScope } from "@polaris/core";
 import { getGithubStatus, githubApiToken, listGithubInstallations } from "@/lib/github-service";
+import { evaluateRunnerAccess, normalizeRunnerLabels, type RunnerTargetKind } from "@polaris/core";
 
 const API = "https://api.github.com";
 
@@ -38,7 +38,7 @@ function apiHeaders(token: string): HeadersInit {
 
 /** Where a runner is being registered. A repo scope needs both parts. */
 export interface RunnerTarget {
-    scope: RunnerScope;
+    scope: RunnerTargetKind;
     owner: string;
     /** Required for `repo`, ignored for `org`. */
     repo?: string;
@@ -158,6 +158,34 @@ export async function listGithubRunners(target: RunnerTarget): Promise<GithubRun
         busy: runner.busy,
         labels: (runner.labels ?? []).map((label) => label.name)
     }));
+}
+
+/**
+ * How many workflow runs are waiting on this repository right now.
+ *
+ * This is the fallback for instances GitHub cannot reach with a webhook, which is
+ * most of them - a Polaris on a home network has no public address. It counts runs
+ * rather than jobs: a run holds one or more jobs and listing each run's jobs would
+ * triple the calls to sharpen a number that is only used to decide who gets the
+ * next runner. Being one job out never changes that answer.
+ *
+ * Never throws. A repository that cannot be read this pass reads as no demand,
+ * which costs it a turn rather than taking the whole pass down.
+ */
+export async function countQueuedRuns(target: RunnerTarget): Promise<number> {
+    if (target.scope !== "repo" || !target.repo) return 0;
+    try {
+        const token = await tokenFor(target);
+        const res = await fetch(
+            `${API}/repos/${encodeURIComponent(target.owner)}/${encodeURIComponent(target.repo)}/actions/runs?status=queued&per_page=50`,
+            { headers: apiHeaders(token), cache: "no-store" }
+        );
+        if (!res.ok) return 0;
+        const body = (await res.json()) as { total_count?: number };
+        return typeof body.total_count === "number" ? body.total_count : 0;
+    } catch {
+        return 0;
+    }
 }
 
 /**

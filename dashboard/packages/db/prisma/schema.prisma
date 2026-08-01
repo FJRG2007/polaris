@@ -94,6 +94,7 @@ model User {
     notifyDeliveries    NotificationDelivery[]
     enrollments         Enrollment[]
     runnerPools         RunnerPool[]
+    githubIdentity      GithubIdentity?
 }
 
 // Addresses a user owns besides the one they sign in with. The primary stays on
@@ -835,18 +836,36 @@ model RunnerPool {
     // runs on, which has no Host row and is reached through polaris-hostd.
     hostId        String?  @db.Uuid
     name          String
-    // repo | org - org-level covers every repository in the organization at once
-    // and needs a far narrower App permission, so it is the one to prefer.
+    // repo | repos | account | org | users | group - what the pool was asked to
+    // serve. Only `repo` and `org` are single registrations; the rest resolve to a
+    // set of them (see RunnerPoolTarget).
     scope         String
-    // The GitHub account the runners are registered against, and the repository
-    // when the scope is `repo`. Stored as typed, since GitHub is case-preserving.
-    targetOwner   String
-    targetRepo    String?
+    // The rest of the scope, as stringified JSON whose shape depends on `scope`:
+    // the repositories picked, the account named, the Polaris people or group
+    // chosen. Validated by runnerScopeSchema in @polaris/core on the way in and
+    // again on the way out, since a column is not a type.
+    scopeConfig   String   @default("{}")
     // Labels a workflow selects with `runs-on`, as a stringified JSON array.
     labels        String
     // How many runners are kept waiting at once. Each is a real process on the
     // machine, so it is bounded (see MAX_RUNNER_CONCURRENCY in @polaris/core).
     maxConcurrent Int      @default(1)
+    // What one repository may spend inside this pool. Null is no limit of that
+    // kind; the pool's own ceiling is maxConcurrent above. These exist so one busy
+    // repository cannot be the only one a shared machine ever serves.
+    perTargetConcurrent Int?
+    minutesBudget       Int?
+    // day | month - the calendar window minutesBudget is measured over.
+    minutesWindow       String @default("month")
+    jobsPerDay          Int?
+    // pause | warn - whether a repository that has spent its budget stops being
+    // served, or keeps being served with the overage reported on the pool.
+    onExhausted         String @default("pause")
+    // When the scope was last turned into targets. A scope that names an account
+    // or a group is a question for GitHub and the user directory, and asking it on
+    // every pass would spend the connection's rate limit on an answer that changes
+    // about as often as somebody creates a repository.
+    targetsResolvedAt   DateTime?
     // container | workspace - whether a job is thrown away with a container, or
     // only given an empty directory on the machine itself.
     isolation     String
@@ -857,12 +876,70 @@ model RunnerPool {
     createdAt     DateTime @default(now())
     updatedAt     DateTime @updatedAt
 
-    owner User        @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-    host  Host?       @relation(fields: [hostId], references: [id], onDelete: Cascade)
-    jobs  RunnerJob[]
+    owner   User               @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+    host    Host?              @relation(fields: [hostId], references: [id], onDelete: Cascade)
+    jobs    RunnerJob[]
+    targets RunnerPoolTarget[]
 
     @@index([ownerId])
     @@index([hostId])
+}
+
+// One place a pool registers runners: a repository, or an organization as a whole.
+//
+// This is derived state, not configuration - it is what the pool's scope resolved
+// to the last time it was read, and an account that gains a repository gains a row
+// here without anybody editing the pool. It is stored rather than recomputed
+// because the columns below are per target and have to survive a pass: what GitHub
+// has queued for it, when it last got a runner, and why it is not being served.
+model RunnerPoolTarget {
+    id           String   @id @default(uuid(7)) @db.Uuid
+    poolId       String   @db.Uuid
+    // "owner/repo", or "owner" for an organization registration. The identity of
+    // the target, and what the placement logic in @polaris/core keys on.
+    key          String
+    // repo | org, as GitHub's runner endpoints divide them.
+    kind         String
+    owner        String
+    // Null for an organization registration.
+    repo         String?
+    // Jobs GitHub has waiting that this target could take, as last observed - from
+    // a workflow_job webhook where one arrives, and from a poll where none does.
+    queued       Int      @default(0)
+    // When that count was last refreshed, so a stale one can be told from a zero.
+    queuedAt     DateTime?
+    // When this pool last started a runner here. Oldest first is what stops one
+    // repository from holding every slot on a shared machine.
+    lastServedAt DateTime?
+    // Why this target is not being served right now (a spent budget), or null.
+    blocked      String?
+    createdAt    DateTime @default(now())
+    updatedAt    DateTime @updatedAt
+
+    pool RunnerPool @relation(fields: [poolId], references: [id], onDelete: Cascade)
+
+    @@unique([poolId, key])
+    @@index([poolId])
+}
+
+// A Polaris account's GitHub identity, established by the person themselves
+// through GitHub's own authorization screen - never typed in on their behalf.
+//
+// It exists so a pool can serve "these people's repositories" without an
+// administrator being able to point somebody else's machine at a stranger's code
+// by guessing a login. The numeric id is the identity that matters: GitHub logins
+// can be renamed and re-registered by somebody else, so the login here is a label.
+model GithubIdentity {
+    id        String   @id @default(uuid(7)) @db.Uuid
+    userId    String   @unique @db.Uuid
+    // GitHub's own id for the account. Unique, so one GitHub account cannot be
+    // claimed by two Polaris users.
+    githubId  Int      @unique
+    login     String
+    avatarUrl String?
+    linkedAt  DateTime @default(now())
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 // One ephemeral runner: registered, started, given a single job, gone.
@@ -878,8 +955,18 @@ model RunnerJob {
     // GitHub's id for the runner row, so one that never started can still be
     // removed. Null between creating the row and minting the registration.
     githubRunnerId Int?
+    // Where it was registered. Denormalized rather than a link to the target row,
+    // so a finished job still says what it ran for after the pool stopped serving
+    // it - and so usage can be counted per repository over a window without
+    // depending on a row that resolution may have removed since.
+    targetOwner    String    @default("")
+    targetRepo     String?
     // starting | idle | busy | finished | failed
     state          String    @default("starting")
+    // When it was first seen taking a job, which is where its consumption starts
+    // being counted. A runner that waited an hour and worked for two minutes spent
+    // two minutes, and billing it for the hour it sat idle would be a lie.
+    busyAt         DateTime?
     // What this one actually got, which can differ from the pool's setting if the
     // machine changed under it.
     isolation      String
@@ -894,6 +981,10 @@ model RunnerJob {
 
     @@index([poolId, state])
     @@index([startedAt])
+    // What a repository has spent in the current window is read on every pass, per
+    // pool and per target, so the window is part of the index rather than a scan
+    // over everything the pool has ever run.
+    @@index([poolId, targetOwner, startedAt])
 }
 
 model StorageMount {
