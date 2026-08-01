@@ -148,6 +148,40 @@ export const recoverPasswordSchema = z
     });
 
 // ---------------------------------------------------------------------------
+// Recovering an account from outside it
+// ---------------------------------------------------------------------------
+
+/** How a request to get back into an account stands. */
+export const ACCOUNT_RECOVERY_STATUSES = ["pending", "approved", "denied", "expired", "used"] as const;
+
+export type AccountRecoveryStatus = (typeof ACCOUNT_RECOVERY_STATUSES)[number];
+
+const recoveryIdentifierField = z
+    .string()
+    .trim()
+    .min(1, "Enter your email or username")
+    .max(200);
+
+export const recoveryLookupSchema = z.object({ identifier: recoveryIdentifierField });
+
+/**
+ * Raising the request. Answers are optional because the route exists precisely
+ * for accounts that have nothing left to prove with: one that never set the
+ * questions still gets to ask, and the administrator deciding it is told that
+ * nothing was verified.
+ */
+export const recoveryRequestSchema = z.object({
+    identifier: recoveryIdentifierField,
+    answers: z.array(securityAnswerField).max(SECURITY_QUESTION_COUNT).default([])
+});
+
+/** Spending an approved request on a new password. */
+export const recoveryResetSchema = z.object({
+    ticket: z.string().trim().min(1).max(512),
+    newPassword: z.string().min(10, "Use at least 10 characters").max(256)
+});
+
+// ---------------------------------------------------------------------------
 // API keys
 // ---------------------------------------------------------------------------
 

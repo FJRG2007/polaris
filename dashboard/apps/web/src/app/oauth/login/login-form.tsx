@@ -1,0 +1,249 @@
+"use client";
+
+import Link from "next/link";
+import { KeyRound } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { loginSchema } from "@polaris/core";
+import { useZodForm } from "@/lib/use-zod-form";
+import { authClient, signIn } from "@/lib/auth-client";
+import { useEffect, useState, type FormEvent } from "react";
+import { accountHasPasskey, magicLinkAvailable, resolveIdentifier } from "./actions";
+import { Button, Card, CardBody, CardHeader, CardTitle, Input, PolarisMark } from "@polaris/ui";
+
+/** Where the last-used identifier is remembered so the field is prefilled. */
+const LAST_IDENTIFIER_KEY = "polaris:last-identifier";
+const GENERIC_ERROR = "Invalid email/username or password";
+
+/** Post-login destination: a same-origin `redirect` param (used by the edge login
+ *  handoff at /edge/authorize) if it is a safe relative path, else the drive. Read
+ *  from window.location to avoid a Suspense boundary for useSearchParams. */
+function postLoginTarget(): string {
+    const redirect = new URLSearchParams(window.location.search).get("redirect");
+    return redirect && redirect.startsWith("/") && !redirect.startsWith("//") ? redirect : "/drive";
+}
+
+/** Why the previous session ended, when it ended for a reason worth explaining.
+ *  Deliberately vague about network rules: the page is public, so it says the
+ *  access was refused without describing the rule that refused it. */
+const SESSION_NOTICES: Readonly<Record<string, string>> = {
+    banned: "That account has been suspended.",
+    expired: "Your session reached its time limit. Sign in again.",
+    blocked: "Sign-in is not allowed from this location.",
+    denied: "That sign-in was denied from another device."
+};
+
+function sessionNotice(): string | null {
+    const params = new URLSearchParams(window.location.search);
+    for (const [key, message] of Object.entries(SESSION_NOTICES)) {
+        if (params.get(key) === "1") return message;
+    }
+    return null;
+}
+
+export function LoginForm({ awaitingSetup }: { awaitingSetup: boolean }) {
+    const router = useRouter();
+    const form = useZodForm(loginSchema);
+    const [values, setValues] = useState({ identifier: "", password: "" });
+    const [error, setError] = useState<string | null>(null);
+    const [notice, setNotice] = useState<string | null>(null);
+    const [pending, setPending] = useState(false);
+    const [canEmailLink, setCanEmailLink] = useState(false);
+    const [linkSent, setLinkSent] = useState(false);
+    const [hasPasskey, setHasPasskey] = useState(false);
+
+    // Prefill the identifier with the one used last on this device, and explain
+    // why the last session ended if it ended for a reason.
+    useEffect(() => {
+        const remembered = window.localStorage.getItem(LAST_IDENTIFIER_KEY);
+        if (remembered) setValues((prev) => ({ ...prev, identifier: remembered }));
+        setNotice(sessionNotice());
+        // Whether the instance can send at all. Nothing account-specific, so it
+        // is safe to ask for before anyone has identified themselves.
+        void magicLinkAvailable().then(setCanEmailLink);
+    }, []);
+
+    // Look up whether the typed account has a passkey, so it is offered without
+    // the user having to remember they set one up. Debounced because it runs as
+    // they type, and re-checked from scratch whenever the identifier changes.
+    useEffect(() => {
+        const identifier = values.identifier.trim();
+        if (!identifier) {
+            setHasPasskey(false);
+            return;
+        }
+        let current = true;
+        const timer = setTimeout(() => {
+            void accountHasPasskey(identifier).then((found) => {
+                if (current) setHasPasskey(found);
+            });
+        }, 400);
+        return () => {
+            current = false;
+            clearTimeout(timer);
+        };
+    }, [values.identifier]);
+
+    /** Sign in with the device's passkey. The ceremony is the browser's; a
+     *  cancelled prompt just leaves the form as it was. */
+    async function signInWithPasskey() {
+        setPending(true);
+        setError(null);
+        const result = await authClient.signIn.passkey();
+        setPending(false);
+        if (result?.error) {
+            setError("That passkey did not work. Use your password instead.");
+            return;
+        }
+        window.localStorage.setItem(LAST_IDENTIFIER_KEY, values.identifier.trim());
+        router.push(postLoginTarget());
+        router.refresh();
+    }
+
+    /**
+     * Email a one-time sign-in link. The answer is the same whether or not the
+     * address has an account: the page must not become a way to find out which
+     * addresses are registered here.
+     */
+    async function sendLink() {
+        const identifier = values.identifier.trim();
+        if (!identifier) {
+            form.markTouched("identifier");
+            return;
+        }
+        setPending(true);
+        setError(null);
+        const email = await resolveIdentifier(identifier);
+        if (email) {
+            await authClient.signIn.magicLink({ email, callbackURL: postLoginTarget() });
+        }
+        setPending(false);
+        setLinkSent(true);
+    }
+
+    function update(field: "identifier" | "password", value: string) {
+        const next = { ...values, [field]: value };
+        setValues(next);
+        form.revalidate(next);
+    }
+
+    async function onSubmit(event: FormEvent) {
+        event.preventDefault();
+        const parsed = form.submit(values);
+        if (!parsed) return;
+        setPending(true);
+        setError(null);
+        // An identifier may be an email or a username; resolve it to the email.
+        const email = await resolveIdentifier(parsed.identifier);
+        if (!email) {
+            setPending(false);
+            setError(GENERIC_ERROR);
+            return;
+        }
+        const { data, error: signInError } = await signIn.email({ email, password: parsed.password });
+        setPending(false);
+        if (signInError) {
+            setError(GENERIC_ERROR);
+            return;
+        }
+        window.localStorage.setItem(LAST_IDENTIFIER_KEY, parsed.identifier);
+        // With a second factor armed, the password alone issues no session: the
+        // challenge page completes the sign-in. Carry the destination across.
+        if ((data as { twoFactorRedirect?: boolean } | null)?.twoFactorRedirect) {
+            router.push(`/oauth/2fa?redirect=${encodeURIComponent(postLoginTarget())}`);
+            return;
+        }
+        router.push(postLoginTarget());
+        router.refresh();
+    }
+
+    return (
+        <main className="grid min-h-screen place-items-center p-4">
+            <Card className="w-full max-w-sm">
+                <CardHeader className="items-center">
+                    <PolarisMark className="mb-1" />
+                    <CardTitle>Sign in to Polaris</CardTitle>
+                </CardHeader>
+                <CardBody>
+                    {notice ? (
+                        <p className="mb-3 rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+                            {notice}
+                        </p>
+                    ) : null}
+                    <form onSubmit={onSubmit} noValidate className="flex flex-col gap-3">
+                        <div className="flex flex-col gap-1">
+                            <Input
+                                placeholder="Email or username"
+                                autoComplete="username"
+                                value={values.identifier}
+                                onChange={(event) => update("identifier", event.target.value)}
+                                onBlur={() => form.markTouched("identifier")}
+                                aria-invalid={Boolean(form.error("identifier"))}
+                            />
+                            {form.error("identifier") ? (
+                                <p className="text-xs text-danger">{form.error("identifier")}</p>
+                            ) : null}
+                        </div>
+                        <div className="flex flex-col gap-1">
+                            <Input
+                                type="password"
+                                placeholder="Password"
+                                autoComplete="current-password"
+                                value={values.password}
+                                onChange={(event) => update("password", event.target.value)}
+                                onBlur={() => form.markTouched("password")}
+                                aria-invalid={Boolean(form.error("password"))}
+                            />
+                            {form.error("password") ? (
+                                <p className="text-xs text-danger">{form.error("password")}</p>
+                            ) : null}
+                        </div>
+                        {error ? <p className="text-sm text-danger">{error}</p> : null}
+                        <Button type="submit" disabled={pending}>
+                            {pending ? "Signing in..." : "Sign in"}
+                        </Button>
+                        {hasPasskey ? (
+                            <Button
+                                type="button"
+                                variant="secondary"
+                                disabled={pending}
+                                onClick={() => void signInWithPasskey()}
+                            >
+                                <KeyRound className="size-4" />
+                                Use your passkey
+                            </Button>
+                        ) : null}
+                        {canEmailLink ? (
+                            linkSent ? (
+                                <p className="text-center text-xs text-muted-foreground">
+                                    If that account exists, a sign-in link is on its way. It works
+                                    once and expires in 10 minutes.
+                                </p>
+                            ) : (
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    disabled={pending}
+                                    onClick={() => void sendLink()}
+                                >
+                                    Email me a sign-in link
+                                </Button>
+                            )
+                        ) : null}
+                    </form>
+                    <p className="mt-4 text-center text-xs text-muted-foreground">
+                        <Link href="/oauth/recover" className="underline underline-offset-2 hover:text-foreground">
+                            Forgot your password?
+                        </Link>
+                    </p>
+                    {awaitingSetup ? (
+                        <p className="mt-2 text-center text-xs text-muted-foreground">
+                            New accounts are by invitation. Setting up a new instance? Run{" "}
+                            <code className="rounded bg-muted px-1">polaris setup</code> on the server for a
+                            setup link.
+                        </p>
+                    ) : null}
+                </CardBody>
+            </Card>
+        </main>
+    );
+}

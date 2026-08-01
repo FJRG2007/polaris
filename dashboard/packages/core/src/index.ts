@@ -13,6 +13,7 @@ export * from "./geo.js";
 export * from "./hostnames.js";
 export * from "./names.js";
 export * from "./passkeys.js";
+export * from "./password-safety.js";
 export * from "./paths.js";
 export * from "./format.js";
 export * from "./permissions.js";

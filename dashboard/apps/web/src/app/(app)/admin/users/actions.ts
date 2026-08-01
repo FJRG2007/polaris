@@ -11,10 +11,11 @@
  */
 
 import { revalidatePath } from "next/cache";
-import { accessRulesSchema, createInviteSchema, INVITE_ROLES } from "@polaris/core";
 import { requireAdmin } from "@/lib/session";
-import { createInvite, revokeInvite, type CreatedInvite } from "@/lib/invite-service";
 import { recordAudit } from "@/lib/audit-service";
+import { decideRecoveryRequest } from "@/lib/account-recovery-service";
+import { accessRulesSchema, createInviteSchema, INVITE_ROLES } from "@polaris/core";
+import { createInvite, revokeInvite, type CreatedInvite } from "@/lib/invite-service";
 import {
     banUser,
     deleteUser,
@@ -49,6 +50,18 @@ export async function createInviteAction(input: unknown): Promise<CreatedInvite 
     });
     revalidatePath("/admin/users");
     return created;
+}
+
+/**
+ * Let somebody back into their account, or refuse to. Approving grants nothing on
+ * its own - it lets the person holding the ticket choose their own password, so
+ * an administrator never learns what they picked.
+ */
+export async function decideRecoveryRequestAction(id: string, approve: boolean): Promise<{ error?: string }> {
+    const admin = await requireAdmin();
+    const result = await decideRecoveryRequest(admin.id, String(id), approve === true);
+    revalidatePath("/admin/users");
+    return result;
 }
 
 export async function revokeInviteAction(id: string): Promise<void> {

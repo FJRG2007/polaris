@@ -12,15 +12,17 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Ban, Mail, MapPin, Search, Shield, Trash2, UserPlus } from "lucide-react";
-import { Badge, Button, Card, CardBody, Input, Select, cn } from "@polaris/ui";
-import type { AccessGroupOption } from "@/components/access-rules-editor";
-import { useDisplayFormat } from "@/components/display-format";
-import type { DirectoryUser } from "@/lib/user-admin-service";
-import type { InviteListItem } from "@/lib/invite-service";
 import { InviteDialog } from "./invite-dialog";
-import { UserDetailDialog } from "./user-detail-dialog";
 import { revokeInviteAction } from "./actions";
+import { RecoveryRequests } from "./recovery-requests";
+import { UserDetailDialog } from "./user-detail-dialog";
+import type { InviteListItem } from "@/lib/invite-service";
+import type { DirectoryUser } from "@/lib/user-admin-service";
+import { useDisplayFormat } from "@/components/display-format";
+import type { AccessGroupOption } from "@/components/access-rules-editor";
+import type { RecoveryRequestView } from "@/lib/account-recovery-service";
+import { Badge, Button, Card, CardBody, Input, Select, cn } from "@polaris/ui";
+import { Ban, Mail, MapPin, Search, Shield, Trash2, UserPlus } from "lucide-react";
 
 /** The cuts an operator reaches for; anything finer is what search is for. */
 const FILTERS = [
@@ -66,12 +68,14 @@ function Avatar({ name }: { name: string }) {
 export function UsersAdmin({
     users,
     invites,
+    recoveries,
     groups,
     canSendMail,
     viewerId
 }: {
     users: DirectoryUser[];
     invites: InviteListItem[];
+    recoveries: RecoveryRequestView[];
     groups: AccessGroupOption[];
     canSendMail: boolean;
     viewerId: string;
@@ -102,6 +106,7 @@ export function UsersAdmin({
 
     return (
         <div className="flex flex-col gap-4">
+            <RecoveryRequests requests={recoveries} />
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                 <div className="relative flex-1">
                     <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />

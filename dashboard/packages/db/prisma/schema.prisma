@@ -81,6 +81,7 @@ model User {
     deployTickets     DeployTicket[]
     security            UserSecurity?
     securityQuestions   SecurityQuestion[]
+    accountRecoveries   AccountRecovery[]
     accessGroups        AccessGroup[]
     accessGroupBindings UserAccessGroup[]
     apiKeys             ApiKey[]
@@ -381,6 +382,39 @@ model SecurityQuestion {
     user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
     @@index([userId])
+}
+
+// A request to get back into an account from outside it: the last way in, for
+// someone who has lost the password and every second factor with it. An
+// administrator decides it, because nothing an unauthenticated caller can present
+// is proof enough on its own - the recovery questions raise the request, they do
+// not grant it.
+//
+// The ticket is a 256-bit token held only by the requester's browser; the row
+// keeps its SHA-256, so a database dump yields nothing that can be redeemed. It
+// is spent the moment a password is set through it.
+model AccountRecovery {
+    id        String @id @default(uuid(7)) @db.Uuid
+    userId    String @db.Uuid
+    tokenHash String @unique
+    // Whether the recovery questions were answered before the request was raised.
+    // An unverified request is not refused - an account may have no questions set,
+    // which is exactly when this route matters - but the decider is told, because
+    // it changes what they should check before approving.
+    verified  Boolean @default(false)
+    // "pending", "approved", "denied", or "used" once a password has been set.
+    status    String  @default("pending")
+    // Where the request came from, for the administrator judging it.
+    requestIp String?
+    decidedById String?   @db.Uuid
+    decidedAt   DateTime?
+    expiresAt   DateTime
+    createdAt   DateTime  @default(now())
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@index([userId])
+    @@index([status, createdAt])
 }
 
 // A named, reusable set of network rules ("Home", "Office") a user attaches to
