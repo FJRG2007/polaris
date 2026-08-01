@@ -218,6 +218,23 @@ export async function markAllNotificationsRead(userId: string): Promise<void> {
     await prisma.notification.updateMany({ where: { userId, readAt: null }, data: { readAt: new Date() } });
 }
 
+/**
+ * Mark every unread notification of these types read, for everyone.
+ *
+ * The one exception to the per-user scoping above, and deliberately so: some
+ * alerts describe a state of the deployment rather than of an account, and when
+ * that state resolves the alert is answered rather than ignored. An update that
+ * has been installed cannot be installed again, so leaving its announcement
+ * unread would hand every operator a bell to empty by hand after each release.
+ * The condition being cleared belongs to the instance, so the clearing does too.
+ */
+export async function markNotificationsReadByType(types: readonly string[]): Promise<void> {
+    await prisma.notification.updateMany({
+        where: { type: { in: [...types] }, readAt: null },
+        data: { readAt: new Date() }
+    });
+}
+
 /** Delete one notification (scoped to the owner). */
 export async function deleteNotification(userId: string, id: string): Promise<void> {
     await prisma.notification.deleteMany({ where: { id, userId } });

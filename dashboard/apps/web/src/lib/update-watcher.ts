@@ -25,6 +25,7 @@ import { getUpdateSource } from "@/lib/update-source";
 import { getUpdateStatus } from "@/lib/update-service";
 import { getSetting, setSetting } from "@/lib/setting-store";
 import { notifyOperators } from "@/lib/notifications/operators";
+import { markNotificationsReadByType } from "@/lib/notification-service";
 import { lastUpdateOutcome, publishUpdateSource, startHostUpdate, updateTriggerReason, type UpdateTrigger } from "@/lib/update-runner";
 import {
     autoUpdateRunsAt,
@@ -37,6 +38,10 @@ import {
 
 /** Who is told about an update - the same people allowed to install one. */
 const UPDATE_PERMISSION: Permission = "system.manage";
+
+/** The alerts this file raises, and therefore the ones it retires once the build
+ *  they are about is the one being served. */
+const UPDATE_EVENTS = ["system.update", "system.updated"] as const;
 
 const POLICY_KEY = "updates.auto";
 const ANNOUNCED_KEY = "updates.announced";
@@ -188,9 +193,38 @@ async function reportFailedInstall(sha: string): Promise<void> {
     });
 }
 
+/**
+ * Put down the alerts about a build that has now landed.
+ *
+ * Everything raised here - the announcement, the install, a failure along the
+ * way - is about a version that was not being served yet. Once it is, none of it
+ * describes anything left to do, and an operator should not have to empty their
+ * bell by hand after every release. The container that notices is the new build's
+ * own: it is the one whose stamp matches what was announced.
+ *
+ * Both rows are dropped rather than marked, which is what makes this happen once
+ * across the containers serving at the same time - the delete is a conditional
+ * write exactly one of them can win. A later build re-announces itself normally,
+ * since the claims are keyed by version and this one's are gone with it.
+ */
+async function retireLandedNotices(current: string | null): Promise<void> {
+    if (!current) return;
+    const announced = (await getSetting(ANNOUNCED_KEY))?.split(" ")[0];
+    if (announced !== current) return;
+    const claimed = await prisma.setting.deleteMany({
+        where: { key: ANNOUNCED_KEY, value: { startsWith: `${current} ` } }
+    });
+    if (claimed.count !== 1) return;
+    await prisma.setting.deleteMany({ where: { key: INSTALLED_KEY, value: { startsWith: `${current} ` } } });
+    await markNotificationsReadByType(UPDATE_EVENTS);
+}
+
 /** One pass: notice, then install if it is time to. */
 export async function checkForUpdate(): Promise<void> {
     const status = await getUpdateStatus();
+    // Before anything else: the build this deployment was told about may be the
+    // one it is now serving, in which case what it was told is answered.
+    await retireLandedNotices(status.current);
     // Only a published image that this deployment can actually move to. Anything
     // else - up to date, still building, a commit that failed its checks - is
     // nothing to announce and nothing to install.

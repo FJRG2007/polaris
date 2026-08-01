@@ -109,6 +109,15 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         defaults: { inapp: true, email: true }
     },
     {
+        id: "account.recovery",
+        group: "security",
+        label: "Someone locked out of their account",
+        description: "A request to reset a password is waiting for a decision.",
+        level: "warning",
+        critical: true,
+        defaults: { inapp: true, email: true }
+    },
+    {
         id: "scan.detection",
         group: "drive",
         label: "Malware in an upload",

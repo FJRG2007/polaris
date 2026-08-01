@@ -50,11 +50,17 @@ const setting = {
         rows.set(where.key, create.value);
         return create;
     }),
-    deleteMany: vi.fn(async ({ where }: { where: { key: string; }; }) => {
+    deleteMany: vi.fn(async ({ where }: { where: { key: string; value?: { startsWith: string; }; }; }) => {
+        const current = rows.get(where.key);
+        if (current === undefined) return { count: 0 };
+        if (where.value && !current.startsWith(where.value.startsWith)) return { count: 0 };
         rows.delete(where.key);
         return { count: 1 };
     })
 };
+
+/** Marking a whole event read, which is how the watcher puts its own alerts down. */
+const notificationUpdateMany = vi.fn(async () => ({ count: 0 }));
 
 const notify = vi.fn(async () => {});
 const startHostUpdate = vi.fn(async () => "started" as const);
@@ -63,7 +69,7 @@ const publishUpdateSource = vi.fn(async (_source: string) => {});
 const lastUpdateOutcome = vi.fn(async () => null as { exitCode: number | null; endedAt: number; } | null);
 let status: UpdateStatus;
 
-vi.mock("@polaris/db", () => ({ prisma: { setting } }));
+vi.mock("@polaris/db", () => ({ prisma: { setting, notification: { updateMany: notificationUpdateMany } } }));
 vi.mock("@polaris/auth", () => ({ usersWithPermission: async () => ["user-1", "user-2"] }));
 vi.mock("@/lib/notifications/dispatch", () => ({ notify: (input: unknown) => notify(input as never) }));
 vi.mock("@/lib/update-service", () => ({ getUpdateStatus: async () => status }));
@@ -106,6 +112,7 @@ beforeEach(() => {
     publishUpdateSource.mockClear();
     startHostUpdate.mockResolvedValue("started");
     lastUpdateOutcome.mockResolvedValue(null);
+    notificationUpdateMany.mockClear();
     status = available();
 });
 
@@ -139,6 +146,53 @@ describe("announcing a build", () => {
         await checkForUpdate();
         expect(notify).not.toHaveBeenCalled();
         expect(startHostUpdate).not.toHaveBeenCalled();
+    });
+});
+
+describe("putting the alerts down once the build lands", () => {
+    /** The status the new build's own container sees on its first pass. */
+    function landed(sha: string): UpdateStatus {
+        return { ...available(null), phase: "up-to-date", current: sha, upToDate: true };
+    }
+
+    it("marks the update alerts read once the announced build is the one serving", async () => {
+        await saveAutoUpdatePolicy({ mode: "off", at: "05:00" });
+        await checkForUpdate();
+        expect(raised("system.update")).toHaveLength(2);
+
+        status = landed(SHA);
+        await checkForUpdate();
+
+        expect(notificationUpdateMany).toHaveBeenCalledTimes(1);
+        expect(notificationUpdateMany.mock.calls[0]?.[0]).toMatchObject({
+            where: { type: { in: ["system.update", "system.updated"] }, readAt: null }
+        });
+        // The claims went with them, so nothing is left to retire twice.
+        expect(rows.has("updates.announced")).toBe(false);
+        await checkForUpdate();
+        expect(notificationUpdateMany).toHaveBeenCalledTimes(1);
+    });
+
+    it("leaves the alerts alone while the announced build is still not the one serving", async () => {
+        await saveAutoUpdatePolicy({ mode: "off", at: "05:00" });
+        await checkForUpdate();
+        status = { ...available(), current: "0000000" };
+        await checkForUpdate();
+        expect(notificationUpdateMany).not.toHaveBeenCalled();
+    });
+
+    it("clears an install that failed and was later installed another way", async () => {
+        await saveAutoUpdatePolicy({ mode: "immediate", at: "05:00" });
+        lastUpdateOutcome.mockResolvedValue({ exitCode: 1, endedAt: Date.now() + 60_000 });
+        await checkForUpdate();
+        await checkForUpdate();
+        expect(raised("system.updated").at(-1)?.title).toContain("failed to install");
+
+        // The host was updated by hand, so the build that failed here is serving.
+        status = landed(SHA);
+        await checkForUpdate();
+        expect(notificationUpdateMany).toHaveBeenCalledTimes(1);
+        expect(rows.has("updates.installed")).toBe(false);
     });
 });
 
