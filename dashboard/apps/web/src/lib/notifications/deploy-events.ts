@@ -14,11 +14,14 @@
 
 import { notify } from "./dispatch";
 import { prisma } from "@polaris/db";
+import { dispatchProjectWebhooks } from "../deploy-project-service";
 
 /** What was being deployed, in words, plus where to look at it. */
 interface Deployable {
     label: string;
     href: string;
+    /** The project it belongs to, so its own webhooks hear about it too. */
+    projectId: string;
 }
 
 async function describeDeployable(type: string, id: string): Promise<Deployable | null> {
@@ -31,7 +34,11 @@ async function describeDeployable(type: string, id: string): Promise<Deployable 
         const project = app.environment.project;
         // The service, not just the project it lives in: an alert about one deploy
         // that lands on a project of a dozen services leaves the reader to find it.
-        return { label: `${project.name} / ${app.name}`, href: `/apps/deploy/${project.id}?service=${id}` };
+        return {
+            label: `${project.name} / ${app.name}`,
+            href: `/apps/deploy/${project.id}?service=${id}`,
+            projectId: project.id
+        };
     }
     if (type === "database") {
         const database = await prisma.managedDatabase.findUnique({
@@ -44,7 +51,8 @@ async function describeDeployable(type: string, id: string): Promise<Deployable 
         // close as a link gets - still better than defaulting to production.
         return {
             label: `${project.name} / ${database.name}`,
-            href: `/apps/deploy/${project.id}?env=${database.environment.id}`
+            href: `/apps/deploy/${project.id}?env=${database.environment.id}`,
+            projectId: project.id
         };
     }
     return null;
@@ -112,6 +120,18 @@ export async function notifyDeployFinished(input: {
                 }
             });
         }
+
+        // The project's own endpoints, alongside the people. These belong to the
+        // project rather than to anyone's account, so they keep reporting when
+        // whoever added them is gone - which is the point of having them.
+        await dispatchProjectWebhooks({
+            projectId: deployable.projectId,
+            event,
+            title,
+            body,
+            url: deployable.href,
+            level: input.ok ? "success" : "danger"
+        });
     } catch (error) {
         console.error("polaris: could not raise the deploy notification:", error);
     }

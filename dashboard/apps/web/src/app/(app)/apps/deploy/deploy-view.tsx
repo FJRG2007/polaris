@@ -15,6 +15,7 @@ import { TerminalPanel } from "./terminal-panel";
 import { LogViewer } from "@/components/log-viewer";
 import { externalGitUrl } from "@/lib/repo-reference";
 import { isLocalDomain, primaryDomain } from "./domain-rank";
+import { stageDatabaseDeleteAction } from "./project-actions";
 import { DockerMark, GitHubMark } from "@/components/brand-icons";
 import {
     useCallback,
@@ -25,20 +26,6 @@ import {
     useTransition,
     type ReactNode
 } from "react";
-import {
-    Badge,
-    Button,
-    Card,
-    CardBody,
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
-    Input,
-    Select,
-    Switch,
-    type SelectOption
-} from "@polaris/ui";
 import {
     ArrowLeft,
     ChevronRight,
@@ -52,8 +39,24 @@ import {
     RefreshCw,
     Rocket,
     Search,
-    TerminalSquare
+    TerminalSquare,
+    Trash2
 } from "lucide-react";
+import {
+    Badge,
+    Button,
+    Card,
+    CardBody,
+    ConfirmDeleteDialog,
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    Input,
+    Select,
+    Switch,
+    type SelectOption
+} from "@polaris/ui";
 
 const DB_ENGINES = ["postgres", "mysql", "mariadb", "mongo", "redis"] as const;
 
@@ -143,11 +146,15 @@ export function ServiceIcon({ kind, className = "size-4" }: { kind: ServiceKind;
 export function EnvironmentServices({
     environment,
     canManage,
+    stagedIds,
     onChanged,
     onOpenService
 }: {
     environment: ProjectSummary["environments"][number];
     canManage: boolean;
+    /** Services queued for removal in the changeset, marked rather than hidden -
+     *  they are still running until the changeset is deployed. */
+    stagedIds?: ReadonlySet<string>;
     onChanged: () => void;
     onOpenService?: (app: ProjectApp) => void;
 }) {
@@ -183,12 +190,19 @@ export function EnvironmentServices({
                             key={app.id}
                             app={app}
                             canManage={canManage}
+                            staged={stagedIds?.has(app.id) ?? false}
                             onChanged={onChanged}
                             onOpen={onOpenService ? () => onOpenService(app) : undefined}
                         />
                     ))}
                     {environment.databases.map((database) => (
-                        <DatabaseCard key={database.id} database={database} canManage={canManage} onChanged={onChanged} />
+                        <DatabaseCard
+                            key={database.id}
+                            database={database}
+                            canManage={canManage}
+                            staged={stagedIds?.has(database.id) ?? false}
+                            onChanged={onChanged}
+                        />
                     ))}
                 </div>
             )}
@@ -199,11 +213,13 @@ export function EnvironmentServices({
 function AppCard({
     app,
     canManage,
+    staged,
     onChanged,
     onOpen
 }: {
     app: ProjectApp;
     canManage: boolean;
+    staged: boolean;
     onChanged: () => void;
     onOpen?: () => void;
 }) {
@@ -228,7 +244,11 @@ function AppCard({
     }
 
     return (
-        <div className="flex flex-col gap-3 rounded-xl border border-border/60 bg-surface/60 p-4 transition-[border-color,box-shadow] hover:border-border hover:shadow-md hover:shadow-black/15">
+        <div
+            className={`flex flex-col gap-3 rounded-xl border bg-surface/60 p-4 transition-[border-color,box-shadow] hover:shadow-md hover:shadow-black/15 ${
+                staged ? "border-primary/50 ring-1 ring-primary/20" : "border-border/60 hover:border-border"
+            }`}
+        >
             <div className="flex items-start justify-between gap-2">
                 <button
                     type="button"
@@ -248,6 +268,11 @@ function AppCard({
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
+                {staged && (
+                    <span className="rounded-full border border-primary/40 bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
+                        Removal pending
+                    </span>
+                )}
                 <Badge>{app.sourceType === "dockerfile" ? "git" : app.sourceType}</Badge>
                 {app.autoDeploy && <Badge>auto-deploy</Badge>}
                 <MetricsBadge applicationId={app.id} />
@@ -347,16 +372,37 @@ function AppCard({
 function DatabaseCard({
     database,
     canManage,
+    staged,
     onChanged
 }: {
     database: ProjectDatabase;
     canManage: boolean;
+    staged: boolean;
     onChanged: () => void;
 }) {
     const [pending, startTransition] = useTransition();
+    const [confirming, setConfirming] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    function remove() {
+        setError(null);
+        startTransition(async () => {
+            const result = await stageDatabaseDeleteAction({ databaseId: database.id });
+            if (result.error) {
+                setError(result.error);
+                return;
+            }
+            setConfirming(false);
+            onChanged();
+        });
+    }
 
     return (
-        <div className="flex flex-col gap-3 rounded-xl border border-border/60 bg-surface/60 p-4 transition-[border-color,box-shadow] hover:border-border hover:shadow-md hover:shadow-black/15">
+        <div
+            className={`flex flex-col gap-3 rounded-xl border bg-surface/60 p-4 transition-[border-color,box-shadow] hover:shadow-md hover:shadow-black/15 ${
+                staged ? "border-primary/50 ring-1 ring-primary/20" : "border-border/60 hover:border-border"
+            }`}
+        >
             <div className="flex items-start justify-between gap-2">
                 <div className="flex min-w-0 items-center gap-2.5">
                     <span className="grid size-7 shrink-0 place-items-center rounded-md border border-border bg-surface text-accent">
@@ -368,15 +414,23 @@ function DatabaseCard({
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
+                {staged && (
+                    <span className="rounded-full border border-primary/40 bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
+                        Removal pending
+                    </span>
+                )}
                 <Badge>{database.engine}</Badge>
             </div>
 
+            {error && <p className="text-xs text-danger">{error}</p>}
+
             {canManage && (
-                <div className="mt-auto flex border-t border-border/60 pt-3">
+                <div className="mt-auto flex items-center gap-1 border-t border-border/60 pt-3">
                     <Button
                         size="sm"
                         variant="secondary"
                         disabled={pending}
+                        className="mr-auto"
                         onClick={() =>
                             startTransition(async () => {
                                 await deployActions.deployDatabaseAction(database.id);
@@ -386,8 +440,30 @@ function DatabaseCard({
                     >
                         {pending ? <Loader2 className="size-4 animate-spin" /> : <Rocket className="size-4" />} Provision
                     </Button>
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        title={staged ? "Removal pending" : "Delete database"}
+                        aria-label="Delete database"
+                        disabled={staged}
+                        onClick={() => setConfirming(true)}
+                    >
+                        <Trash2 className="size-4" />
+                    </Button>
                 </div>
             )}
+
+            <ConfirmDeleteDialog
+                open={confirming}
+                onOpenChange={setConfirming}
+                name={database.name}
+                kind="database"
+                confirmLabel="Stage removal"
+                description="The container goes; the named volume holding its data is left on the server so it can still be recovered by hand."
+                error={error}
+                pending={pending}
+                onConfirm={remove}
+            />
         </div>
     );
 }

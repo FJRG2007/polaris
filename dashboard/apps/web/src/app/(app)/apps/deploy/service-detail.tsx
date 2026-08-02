@@ -15,6 +15,7 @@ import { TerminalPanel } from "./terminal-panel";
 import { LogViewer } from "@/components/log-viewer";
 import type { HttpLogEntry } from "@polaris/deploy";
 import { isLocalDomain, primaryDomain } from "./domain-rank";
+import { stageServiceDeleteAction } from "./project-actions";
 import { useDisplayFormat } from "@/components/display-format";
 import { isTunnelHostname, type DisplayFormat } from "@polaris/core";
 import { CloudflareMark, NgrokMark } from "@/components/brand-icons";
@@ -24,6 +25,7 @@ import { MetricsHistory, percent, ratioPercent, type MetricSpec } from "@/compon
 import {
     Button,
     Checkbox,
+    ConfirmDeleteDialog,
     Dialog,
     DialogContent,
     DialogTitle,
@@ -64,7 +66,19 @@ import {
 const TABS = ["Deployments", "Variables", "Metrics", "Console", "Files", "Volumes", "Security", "Settings"] as const;
 type Tab = (typeof TABS)[number];
 
-export function ServiceDetail({ app, onChanged, onClose }: { app: ProjectApp; onChanged: () => void; onClose: () => void }) {
+export function ServiceDetail({
+    app,
+    staged,
+    onChanged,
+    onClose
+}: {
+    app: ProjectApp;
+    /** Queued for removal in the changeset. The panel keeps working - the service
+     *  is still up - but says so, and stops offering a second delete. */
+    staged?: boolean;
+    onChanged: () => void;
+    onClose: () => void;
+}) {
     const [tab, setTab] = useState<Tab>("Deployments");
     const [full, setFull] = useState(false);
     const isGit = app.sourceType === "dockerfile" || app.sourceType === "nixpacks";
@@ -82,6 +96,11 @@ export function ServiceDetail({ app, onChanged, onClose }: { app: ProjectApp; on
                     <DialogTitle className="truncate text-base font-semibold">{app.name}</DialogTitle>
                     {app.currentDeploymentId && (
                         <StatusPill tone={dbTone(app.deployStatus ?? "")} label={app.deployStatus ?? "deployed"} />
+                    )}
+                    {staged && (
+                        <span className="shrink-0 rounded-full border border-primary/40 bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                            Removal pending
+                        </span>
                     )}
                     <button
                         type="button"
@@ -129,7 +148,9 @@ export function ServiceDetail({ app, onChanged, onClose }: { app: ProjectApp; on
                             description="Restrict who can reach this service. Rules are enforced at the server's own edge, so they keep working even if the Polaris control plane goes down."
                         />
                     )}
-                    {tab === "Settings" && <SettingsTab app={app} isGit={isGit} onChanged={onChanged} />}
+                    {tab === "Settings" && (
+                        <SettingsTab app={app} isGit={isGit} staged={staged ?? false} onChanged={onChanged} />
+                    )}
                 </div>
             </DialogContent>
         </Dialog>
@@ -1599,7 +1620,17 @@ function dnsAdvice(dns: AddDomainDns, hostname: string): string | null {
     return `Point ${hostname}${target} in your DNS provider${dns.detail ? ` - ${dns.detail}` : "."}`;
 }
 
-function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolean; onChanged: () => void }) {
+function SettingsTab({
+    app,
+    isGit,
+    staged,
+    onChanged
+}: {
+    app: ProjectApp;
+    isGit: boolean;
+    staged: boolean;
+    onChanged: () => void;
+}) {
     const [autoDeploy, setAutoDeploy] = useState(app.autoDeploy);
     const [branch, setBranch] = useState(app.deployBranch ?? "");
     const [filter, setFilter] = useState(app.commitFilter ?? "");
@@ -2143,7 +2174,65 @@ function SettingsTab({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
                     {pending && <Loader2 className="size-4 animate-spin" />} Save settings
                 </Button>
             </div>
+
+            <DangerSection app={app} staged={staged} onChanged={onChanged} />
         </div>
+    );
+}
+
+/**
+ * Removing the service. It is queued rather than done: the changeset banner at
+ * the top of the project is what actually carries it out, so there is a step
+ * between the click and the container being gone.
+ */
+function DangerSection({ app, staged, onChanged }: { app: ProjectApp; staged: boolean; onChanged: () => void }) {
+    const [confirming, setConfirming] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [pending, startTransition] = useTransition();
+
+    function remove() {
+        setError(null);
+        startTransition(async () => {
+            const result = await stageServiceDeleteAction({ applicationId: app.id });
+            if (result.error) {
+                setError(result.error);
+                return;
+            }
+            setConfirming(false);
+            onChanged();
+        });
+    }
+
+    return (
+        <section className="flex flex-col gap-2">
+            <h3 className="text-sm font-medium text-danger">Danger</h3>
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-danger/30 bg-danger/5 p-3">
+                <span className="min-w-0">
+                    <span className="text-sm font-medium">Delete service</span>
+                    <span className="block text-xs text-muted-foreground">
+                        {staged
+                            ? "Already queued. Deploy the pending changes to carry it out, or discard it from the banner."
+                            : "Removes the container, its domains, variables and deploy history."}
+                    </span>
+                </span>
+                <Button variant="danger" size="sm" disabled={staged} onClick={() => setConfirming(true)}>
+                    <Trash2 className="size-4" /> {staged ? "Removal pending" : "Delete"}
+                </Button>
+            </div>
+            {error && <p className="text-sm text-danger">{error}</p>}
+
+            <ConfirmDeleteDialog
+                open={confirming}
+                onOpenChange={setConfirming}
+                name={app.name}
+                kind="service"
+                confirmLabel="Stage removal"
+                description="The container, its domains, variables and deploy history go. Nothing happens until you deploy the pending changes."
+                error={error}
+                pending={pending}
+                onConfirm={remove}
+            />
+        </section>
     );
 }
 

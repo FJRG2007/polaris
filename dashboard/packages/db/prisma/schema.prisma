@@ -78,6 +78,7 @@ model User {
     notifications     Notification[]
     deployTargets     DeployTarget[]
     projects          Project[]
+    projectMemberships ProjectMember[]
     deployTickets     DeployTicket[]
     security            UserSecurity?
     securityQuestions   SecurityQuestion[]
@@ -488,12 +489,18 @@ model ApiKey {
     lastUsedAt        DateTime?
     lastUsedIp        String?
     revokedAt         DateTime?
+    // Set on a token minted from a project's settings: the key still carries its
+    // owner's permissions, but may only act on this project. Null is an ordinary
+    // account key, which reaches everything its scopes allow.
+    projectId         String?   @db.Uuid
     createdAt         DateTime  @default(now())
 
-    user   User                @relation(fields: [userId], references: [id], onDelete: Cascade)
-    groups ApiKeyAccessGroup[]
+    user    User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+    project Project?            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+    groups  ApiKeyAccessGroup[]
 
     @@index([userId])
+    @@index([projectId])
 }
 
 // Polaris-owned state for one better-auth session: whether the sign-in has been
@@ -1682,14 +1689,104 @@ model Project {
     name        String
     slug        String
     description String?
+    // private | internal. A private project is the owner's and whoever was added
+    // to it; an internal one is readable by anyone on the instance holding
+    // deploy.read, which is what a home lab with one household usually wants.
+    visibility  String   @default("private")
+    // Project-level behaviour toggles as a JSON object (see ProjectFlags in
+    // @polaris/core). One column rather than a table: they are read together on
+    // every project load and never addressed one at a time.
+    flags       String   @default("{}")
     createdAt   DateTime @default(now())
     updatedAt   DateTime @updatedAt
 
-    owner        User          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+    owner        User             @relation(fields: [ownerId], references: [id], onDelete: Cascade)
     environments Environment[]
+    members      ProjectMember[]
+    webhooks     ProjectWebhook[]
+    tokens       ApiKey[]
 
     @@unique([ownerId, slug])
     @@index([ownerId])
+}
+
+// Somebody other than the owner who may reach a project. The owner is never a
+// row here - ownership is on Project - so removing every member can never lock
+// the project away from the person who made it.
+model ProjectMember {
+    id        String   @id @default(uuid(7)) @db.Uuid
+    projectId String   @db.Uuid
+    userId    String   @db.Uuid
+    // viewer (read) | developer (deploy and configure services) | admin (also
+    // project settings and destructive changes).
+    role      String   @default("viewer")
+    invitedBy String?  @db.Uuid
+    createdAt DateTime @default(now())
+
+    project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+    user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@unique([projectId, userId])
+    @@index([userId])
+}
+
+// Where a project reports its deploys, besides the bell. Project-scoped rather
+// than user-scoped (unlike NotificationDestination) because it describes the
+// project's own integrations, and survives whoever added it leaving. The URL is
+// the credential, so it is envelope-encrypted like every other secret here and
+// only the mask is ever read back.
+model ProjectWebhook {
+    id           String    @id @default(uuid(7)) @db.Uuid
+    projectId    String    @db.Uuid
+    name         String
+    // discord | slack | generic - the body shape posted.
+    format       String    @default("generic")
+    // Masked URL for display, e.g. "discord.com/api/webhooks/...".
+    targetHint   String
+    encryptedUrl Bytes
+    urlNonce     Bytes
+    urlKeyId     String?
+    // JSON string array of event ids this endpoint wants, e.g.
+    // ["deploy.succeeded","deploy.failed"]. Empty = every deploy event.
+    events       String    @default("[]")
+    enabled      Boolean   @default(true)
+    // ok | error | untested - the result of the last send or test.
+    status       String    @default("untested")
+    lastError    String?
+    lastUsedAt   DateTime?
+    createdAt    DateTime  @default(now())
+    updatedAt    DateTime  @updatedAt
+
+    project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+    @@index([projectId])
+}
+
+// A structural change parked for review instead of applied, Railway-style: it is
+// recorded here, drawn on the canvas as pending, and only takes effect when the
+// environment's changeset is deployed. Only the destructive changes stage -
+// removing a service or a volume - because those are the ones a misclick cannot
+// take back; everything else still applies as it always did.
+model StagedChange {
+    id            String   @id @default(uuid(7)) @db.Uuid
+    environmentId String   @db.Uuid
+    // service.delete | database.delete | volume.delete
+    kind          String
+    // application | database | volume
+    targetType    String
+    targetId      String   @db.Uuid
+    // The name as it read when the change was staged, so the changeset still
+    // describes itself once the target is gone.
+    targetName    String
+    // Change-specific detail as JSON (e.g. { "wipe": true } on a volume).
+    payload       String   @default("{}")
+    createdById   String?  @db.Uuid
+    createdAt     DateTime @default(now())
+
+    environment Environment @relation(fields: [environmentId], references: [id], onDelete: Cascade)
+
+    @@unique([targetType, targetId, kind])
+    @@index([environmentId])
 }
 
 // A private container-registry login, owner-scoped, one per registry host. The
@@ -1721,9 +1818,10 @@ model Environment {
     layout    String   @default("{}")
     createdAt DateTime @default(now())
 
-    project      Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
-    applications Application[]
-    databases    ManagedDatabase[]
+    project       Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+    applications  Application[]
+    databases     ManagedDatabase[]
+    stagedChanges StagedChange[]
 
     @@unique([projectId, slug])
     @@index([projectId])

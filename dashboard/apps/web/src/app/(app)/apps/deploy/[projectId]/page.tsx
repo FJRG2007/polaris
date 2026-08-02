@@ -8,7 +8,7 @@ import { refreshCapabilities } from "@polaris/hostd-client";
 import type { TunnelDomain } from "@/lib/deploy/tunnel-domains";
 import { requirePermission, userHasManage } from "@/lib/session";
 import { listActiveTunnelDomains } from "@/lib/deploy/tunnel-domains";
-import { getDeploymentStatuses, getProjectFull, hostPortForApp, listProjects } from "@/lib/deploy-service";
+import { getDeploymentStatuses, getProjectFull, hostPortForApp } from "@/lib/deploy-service";
 
 export const dynamic = "force-dynamic";
 
@@ -55,7 +55,6 @@ export default async function DeployProjectPage({
         environment.applications.map((app) => app.currentDeploymentId).filter((id): id is string => Boolean(id))
     );
     const statuses = await getDeploymentStatuses(deploymentIds);
-    const allProjects = (await listProjects(user.id)).map((item) => ({ id: item.id, name: item.name }));
     const serverIp = await getPublicIp();
     const appIds = project.environments.flatMap((environment) => environment.applications.map((app) => app.id));
     const tunnelDomains = await listActiveTunnelDomains(appIds);
@@ -136,11 +135,10 @@ export default async function DeployProjectPage({
     return (
         <ProjectDetail
             project={summary}
-            projects={allProjects}
             canManage={canManage}
             localReady={localReady}
+            activeEnvironmentId={pick(query.env)}
             openService={pick(query.service)}
-            openEnvironment={pick(query.env)}
         />
     );
 }

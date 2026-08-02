@@ -6,11 +6,12 @@
  * reuse the exact same runner and per-target queue as applications.
  */
 
+import { prisma } from "@polaris/db";
 import { randomBytes } from "node:crypto";
 import { loadEnv } from "@polaris/config";
-import { prisma } from "@polaris/db";
-import { serviceName, shortHash, slugify, type DbDeployPlan } from "@polaris/deploy";
+import { getPorts, type TargetRow } from "./deploy/runtime";
 import { decryptCredentials, encryptCredentials } from "@polaris/storage";
+import { serviceName, shortHash, slugify, type DbDeployPlan } from "@polaris/deploy";
 import { deployLogPath, enqueueOnTarget, executeDeployment } from "./deploy-service";
 
 export type DbEngine = "postgres" | "mysql" | "mariadb" | "mongo" | "redis";
@@ -206,4 +207,38 @@ export async function deployDatabase(databaseId: string, ownerId: string, userId
     // Reference kept for symmetry with app deploys (log path is by deployment id).
     void deployLogPath(deployment.id);
     return deployment.id;
+}
+
+/**
+ * Delete a managed database: bring its compose project down, then remove the row
+ * and the deploy history pointing at it.
+ *
+ * The named volume is deliberately left on the host. A database is the one
+ * service whose data is the whole point of it, and an operator who removes the
+ * container by mistake can still get it back - `docker volume rm` is one command
+ * away when they mean it, and unrecoverable when Polaris runs it for them.
+ */
+export async function deleteDatabase(databaseId: string, ownerId: string): Promise<void> {
+    const db = await prisma.managedDatabase.findFirst({
+        where: { id: databaseId, environment: { project: { ownerId } } },
+        include: { environment: { include: { project: true } }, target: true }
+    });
+    if (!db) throw new Error("Database not found");
+
+    // A database that never deployed has no compose project to tear down, and
+    // `containerName` is only written once one has - so derive the project the
+    // same way the deploy did rather than trusting an empty column.
+    const project = `polaris-db-${shortHash(db.id, 8)}`;
+    const ports = await getPorts(db.target as TargetRow, ownerId);
+    try {
+        await ports.composeDown(project);
+    } catch {
+        // Already gone, or the host is unreachable. The record still goes: leaving
+        // a row behind for a container nobody can reach helps no one.
+    } finally {
+        await ports.dispose();
+    }
+
+    await prisma.deployment.deleteMany({ where: { deployableType: "database", deployableId: databaseId } });
+    await prisma.managedDatabase.delete({ where: { id: databaseId } });
 }

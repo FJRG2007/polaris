@@ -16,10 +16,12 @@ import { isTunnelHostname } from "@polaris/core";
 import { decryptSecret } from "@polaris/storage";
 import { mkdir, readFile } from "node:fs/promises";
 import { ensureLocalCa } from "./local-ca-service";
+import { wipeVolume } from "./deploy-volume-service";
 import { resolveAutoDomain } from "./network-service";
 import { resolveMountTarget } from "./storage-service";
 import { resolveWaf, resolveWafBatch } from "./waf-service";
 import { LocalRouter, type AppRoute } from "./deploy/router";
+import { getFlagsForEnvironment } from "./deploy-project-service";
 import { resolveRegistryLogin } from "./registry-credential-service";
 import { notifyDeployFinished } from "./notifications/deploy-events";
 import { deployHostname, type ZoneMintFailure } from "./domain-zones";
@@ -67,9 +69,19 @@ export async function readDeployment(
 
 // --- projects / environments / applications --------------------------------
 
+/**
+ * Every project a user may at least read: their own, the ones they were added
+ * to, and the ones the instance shares internally. Read paths take this so a
+ * member sees the project at all; write paths still resolve a role first (see
+ * deploy-project-access) and then act as the owner.
+ */
+function visibleProjectWhere(userId: string) {
+    return { OR: [{ ownerId: userId }, { members: { some: { userId } } }, { visibility: "internal" }] };
+}
+
 export async function listProjects(ownerId: string) {
     return prisma.project.findMany({
-        where: { ownerId },
+        where: visibleProjectWhere(ownerId),
         orderBy: { createdAt: "asc" },
         include: {
             environments: {
@@ -82,7 +94,7 @@ export async function listProjects(ownerId: string) {
 
 export async function getProject(projectId: string, ownerId: string) {
     return prisma.project.findFirst({
-        where: { id: projectId, ownerId },
+        where: { id: projectId, ...visibleProjectWhere(ownerId) },
         include: {
             environments: {
                 include: { applications: true, databases: true },
@@ -95,7 +107,7 @@ export async function getProject(projectId: string, ownerId: string) {
 /** One project with the full environment/service tree the detail view renders. */
 export async function getProjectFull(projectId: string, ownerId: string) {
     return prisma.project.findFirst({
-        where: { id: projectId, ownerId },
+        where: { id: projectId, ...visibleProjectWhere(ownerId) },
         include: {
             environments: {
                 include: {
@@ -132,6 +144,80 @@ export async function saveEnvironmentLayout(environmentId: string, ownerId: stri
     await prisma.environment.update({ where: { id: environmentId }, data: { layout } });
 }
 
+/** Rename an environment, keeping its slug in step with the new name. A slug
+ *  already taken in this project is left alone rather than blocking the rename;
+ *  the name is what the operator asked to change. */
+export async function renameEnvironment(environmentId: string, ownerId: string, name: string): Promise<void> {
+    const environment = await prisma.environment.findFirst({
+        where: { id: environmentId, project: { ownerId } },
+        select: { id: true, projectId: true }
+    });
+    if (!environment) throw new Error("Environment not found");
+    const slug = slugify(name);
+    if (!slug) throw new Error("Environment name must contain letters or digits");
+    const taken = await prisma.environment.findFirst({
+        where: { projectId: environment.projectId, slug, id: { not: environmentId } },
+        select: { id: true }
+    });
+    await prisma.environment.update({
+        where: { id: environmentId },
+        data: { name, slug: taken ? undefined : slug }
+    });
+}
+
+/** Make one environment the project's default - the one a link with no
+ *  environment lands on. Exactly one is default at a time. */
+export async function setDefaultEnvironment(environmentId: string, ownerId: string): Promise<void> {
+    const environment = await prisma.environment.findFirst({
+        where: { id: environmentId, project: { ownerId } },
+        select: { id: true, projectId: true }
+    });
+    if (!environment) throw new Error("Environment not found");
+    await prisma.environment.updateMany({
+        where: { projectId: environment.projectId },
+        data: { isDefault: false }
+    });
+    await prisma.environment.update({ where: { id: environmentId }, data: { isDefault: true } });
+}
+
+/** Just enough of a service to name it in a confirmation or a changeset. */
+export async function getApplicationSummary(
+    applicationId: string,
+    ownerId: string
+): Promise<{ id: string; name: string; environmentId: string } | null> {
+    return prisma.application.findFirst({
+        where: { id: applicationId, environment: { project: { ownerId } } },
+        select: { id: true, name: true, environmentId: true }
+    });
+}
+
+/** The same for a managed database, plus the project it sits in - resolved
+ *  without an owner filter because the caller authorizes on the project id it
+ *  gets back, rather than assuming who owns it. */
+export async function getDatabaseSummary(
+    databaseId: string
+): Promise<{ id: string; name: string; environmentId: string; projectId: string } | null> {
+    const row = await prisma.managedDatabase.findUnique({
+        where: { id: databaseId },
+        select: { id: true, name: true, environmentId: true, environment: { select: { projectId: true } } }
+    });
+    return row
+        ? { id: row.id, name: row.name, environmentId: row.environmentId, projectId: row.environment.projectId }
+        : null;
+}
+
+/** Who a volume's resources belong to, and the service it hangs off. The caller
+ *  authorizes against that service and then acts as the owner. */
+export async function getVolumeOwner(
+    volumeId: string
+): Promise<{ ownerId: string; applicationId: string | null } | null> {
+    const row = await prisma.volume.findUnique({
+        where: { id: volumeId },
+        select: { applicationId: true, target: { select: { ownerId: true } } }
+    });
+    return row ? { ownerId: row.target.ownerId, applicationId: row.applicationId } : null;
+}
+
 /** Delete a non-default environment (and everything in it) the owner owns. */
 export async function deleteEnvironment(environmentId: string, ownerId: string) {
     const environment = await prisma.environment.findFirst({
@@ -157,8 +243,12 @@ export async function createProject(ownerId: string, name: string) {
     });
 }
 
+/** Delete a project the caller owns. Being an admin on somebody else's project is
+ *  enough to change everything in it and deliberately not enough to remove it, so
+ *  a non-owner is told plainly rather than getting a silent no-op. */
 export async function deleteProject(projectId: string, ownerId: string) {
-    await prisma.project.deleteMany({ where: { id: projectId, ownerId } });
+    const removed = await prisma.project.deleteMany({ where: { id: projectId, ownerId } });
+    if (removed.count === 0) throw new Error("Only the project's owner can delete it");
 }
 
 export interface CreateApplicationInput {
@@ -170,6 +260,9 @@ export interface CreateApplicationInput {
     /** Track the branch and redeploy on new commits (default for git sources). */
     autoDeploy?: boolean;
     deployBranch?: string | null;
+    /** Keep earlier builds running beside the current one, Railway-style. Comes
+     *  from the project's flags, so a project can set the house style once. */
+    keepReleases?: boolean;
 }
 
 export async function createApplication(ownerId: string, input: CreateApplicationInput) {
@@ -191,7 +284,8 @@ export async function createApplication(ownerId: string, input: CreateApplicatio
             sourceType: input.sourceType,
             sourceConfig: JSON.stringify(input.sourceConfig),
             autoDeploy: input.autoDeploy ?? false,
-            deployBranch: input.deployBranch ?? null
+            deployBranch: input.deployBranch ?? null,
+            keepReleases: input.keepReleases ?? false
         }
     });
 }
@@ -923,9 +1017,20 @@ export async function removeApplicationDeployment(applicationId: string, ownerId
 export async function deleteApplication(applicationId: string, ownerId: string): Promise<void> {
     const app = await prisma.application.findFirst({
         where: { id: applicationId, environment: { project: { ownerId } } },
-        select: { id: true }
+        select: { id: true, environmentId: true, volumes: { select: { id: true } } }
     });
     if (!app) throw new Error("Application not found");
+
+    // Destroying the data is opt-in per project. It has to happen while the
+    // container is still up - that is the only way in to the volume - so it runs
+    // before the deployment comes down, not after.
+    const flags = await getFlagsForEnvironment(app.environmentId);
+    if (flags.wipeVolumesOnDelete) {
+        for (const volume of app.volumes) {
+            await wipeVolume(volume.id, ownerId).catch(() => undefined);
+        }
+    }
+
     await removeApplicationDeployment(applicationId, ownerId).catch(() => undefined);
     await prisma.deployment.deleteMany({ where: { deployableType: "application", deployableId: applicationId } });
     await prisma.envVar.deleteMany({ where: { scopeType: "application", scopeId: applicationId } });

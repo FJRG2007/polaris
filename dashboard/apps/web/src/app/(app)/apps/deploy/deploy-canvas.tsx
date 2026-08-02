@@ -8,24 +8,15 @@
  * private networking. Full service controls live in the List view.
  */
 
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Copy, HardDrive, Loader2, Plus, ScrollText, Trash2 } from "lucide-react";
-import {
-    Button,
-    ContextMenu,
-    ContextMenuContent,
-    ContextMenuItem,
-    ContextMenuSeparator,
-    ContextMenuSub,
-    ContextMenuSubContent,
-    ContextMenuSubTrigger,
-    ContextMenuTrigger,
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle
-} from "@polaris/ui";
+import { primaryDomain } from "./domain-rank";
+import { VolumeDetailDialog } from "./volume-detail";
+import { useStagedChanges } from "./staged-changes";
+import { duplicateApplicationAction, saveLayoutAction } from "./actions";
+import { NewVolumeDialog, EditVolumeDialog, type EditVolume } from "./volume-form";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { stageDatabaseDeleteAction, stageServiceDeleteAction } from "./project-actions";
+import { Copy, HardDrive, Loader2, Plus, ScrollText, Settings2, Trash2 } from "lucide-react";
 import {
     NewServiceDialog,
     SERVICE_TYPES,
@@ -37,9 +28,17 @@ import {
     type ServiceKind,
     type ServiceView
 } from "./deploy-view";
-import { primaryDomain } from "./domain-rank";
-import { deleteApplicationAction, duplicateApplicationAction, saveLayoutAction } from "./actions";
-import { NewVolumeDialog, EditVolumeDialog, type EditVolume } from "./volume-form";
+import {
+    ConfirmDeleteDialog,
+    ContextMenu,
+    ContextMenuContent,
+    ContextMenuItem,
+    ContextMenuSeparator,
+    ContextMenuSub,
+    ContextMenuSubContent,
+    ContextMenuSubTrigger,
+    ContextMenuTrigger
+} from "@polaris/ui";
 
 const NODE_W = 280;
 const NODE_H = 116;
@@ -210,10 +209,15 @@ const VIGNETTE: React.CSSProperties = {
 export function DeployCanvas({
     environment,
     canManage,
+    stagedIds,
     onOpenService
 }: {
     environment: ProjectSummary["environments"][number];
     canManage: boolean;
+    /** Services and databases queued for removal in the changeset. They stay on
+     *  the board - they are still running - but read as pending, so nobody
+     *  believes a delete already happened or that one still needs doing. */
+    stagedIds?: ReadonlySet<string>;
     onOpenService?: (app: ProjectApp) => void;
 }) {
     const nodes = useMemo(() => nodesFromEnvironment(environment), [environment]);
@@ -233,11 +237,17 @@ export function DeployCanvas({
     const [saving, setSaving] = useState(false);
 
     const router = useRouter();
-    const [deleteTarget, setDeleteTarget] = useState<ProjectApp | null>(null);
+    const { refresh: refreshStaged } = useStagedChanges();
+    const staged = stagedIds ?? new Set<string>();
+    const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string; kind: "service" | "database" } | null>(
+        null
+    );
+    const [deleteError, setDeleteError] = useState<string | null>(null);
     const [acting, setActing] = useState(false);
     const [newService, setNewService] = useState<{ open: boolean; view: ServiceView }>({ open: false, view: "list" });
     const [newVolumeOpen, setNewVolumeOpen] = useState(false);
     const [editVolume, setEditVolume] = useState<{ appId: string; volume: EditVolume } | null>(null);
+    const [detailVolumeId, setDetailVolumeId] = useState<string | null>(null);
     const volumeServices = environment.applications.map((app) => ({ id: app.id, name: app.name }));
 
     function duplicate(app: ProjectApp) {
@@ -248,14 +258,27 @@ export function DeployCanvas({
         });
     }
 
+    /** Queue the removal (or carry it out, when the project has staging off). The
+     *  banner is what completes it, so the dialog closes either way. */
     function confirmDelete() {
         if (!deleteTarget) return;
+        const target = deleteTarget;
         setActing(true);
-        void deleteApplicationAction(deleteTarget.id).finally(() => {
+        setDeleteError(null);
+        void (async () => {
+            const result =
+                target.kind === "database"
+                    ? await stageDatabaseDeleteAction({ databaseId: target.id })
+                    : await stageServiceDeleteAction({ applicationId: target.id });
             setActing(false);
+            if (result.error) {
+                setDeleteError(result.error);
+                return;
+            }
             setDeleteTarget(null);
+            refreshStaged();
             router.refresh();
-        });
+        })();
     }
 
     const containerRef = useRef<HTMLDivElement>(null);
@@ -575,18 +598,23 @@ export function DeployCanvas({
                         const label = node.tone === "success" ? "Online" : node.statusLabel;
                         const pulsing = node.tone === "warning";
                         const app = environment.applications.find((item) => item.id === node.id);
+                        const removing = staged.has(node.id);
                         const card = (
                             <div
                                 className={`group absolute flex select-none flex-col border bg-card shadow-sm transition-[border-color,box-shadow] hover:shadow-lg hover:shadow-black/25 ${
                                     node.volume || node.volumes?.length ? "rounded-t-2xl" : "rounded-2xl"
-                                } ${dragId === node.id ? "border-primary ring-1 ring-primary/40" : TONE_BORDER[node.tone]} ${
-                                    canManage ? "cursor-grab active:cursor-grabbing" : ""
-                                }`}
+                                } ${
+                                    removing
+                                        ? "border-primary/60 ring-1 ring-primary/30"
+                                        : dragId === node.id
+                                          ? "border-primary ring-1 ring-primary/40"
+                                          : TONE_BORDER[node.tone]
+                                } ${canManage ? "cursor-grab active:cursor-grabbing" : ""}`}
                                 style={{ left: p.x, top: p.y, width: NODE_W, height: NODE_H }}
                                 onPointerDown={(event) => onNodePointerDown(event, node.id)}
                                 onContextMenu={(event) => event.stopPropagation()}
                             >
-                                <div className="flex flex-1 flex-col p-4">
+                                <div className={`flex flex-1 flex-col p-4 ${removing ? "opacity-60" : ""}`}>
                                     <div className="flex items-center gap-3">
                                         <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-muted text-foreground">
                                             <ServiceIcon kind={node.kind} className="size-5" />
@@ -595,8 +623,19 @@ export function DeployCanvas({
                                     </div>
                                     <p className="mt-1 truncate text-sm text-muted-foreground">{node.subtitle}</p>
                                     <div className="mt-auto flex items-center gap-2 text-sm">
-                                        <span className={`size-2 rounded-full ${TONE_DOT[node.tone]} ${pulsing ? "animate-pulse" : ""}`} />
-                                        <span className={TONE_TEXT[node.tone]}>{label}</span>
+                                        {removing ? (
+                                            <>
+                                                <span className="size-2 rounded-full bg-primary" />
+                                                <span className="text-primary">Removal pending</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <span
+                                                    className={`size-2 rounded-full ${TONE_DOT[node.tone]} ${pulsing ? "animate-pulse" : ""}`}
+                                                />
+                                                <span className={TONE_TEXT[node.tone]}>{label}</span>
+                                            </>
+                                        )}
                                     </div>
                                 </div>
                                 {canManage && (
@@ -611,19 +650,34 @@ export function DeployCanvas({
                         );
                         return (
                             <Fragment key={node.id}>
-                                {app && canManage ? (
+                                {canManage ? (
                                     <ContextMenu>
                                         <ContextMenuTrigger asChild>{card}</ContextMenuTrigger>
                                         <ContextMenuContent>
-                                            <ContextMenuItem onSelect={() => onOpenService?.(app)}>
-                                                <ScrollText className="size-4" /> View latest deploy
-                                            </ContextMenuItem>
-                                            <ContextMenuItem onSelect={() => duplicate(app)}>
-                                                <Copy className="size-4" /> Duplicate
-                                            </ContextMenuItem>
+                                            {app && (
+                                                <>
+                                                    <ContextMenuItem onSelect={() => onOpenService?.(app)}>
+                                                        <ScrollText className="size-4" /> Open service
+                                                    </ContextMenuItem>
+                                                    <ContextMenuItem onSelect={() => duplicate(app)}>
+                                                        <Copy className="size-4" /> Duplicate
+                                                    </ContextMenuItem>
+                                                </>
+                                            )}
                                             <ContextMenuSeparator />
-                                            <ContextMenuItem variant="danger" onSelect={() => setDeleteTarget(app)}>
-                                                <Trash2 className="size-4" /> Delete
+                                            <ContextMenuItem
+                                                variant="danger"
+                                                disabled={removing}
+                                                onSelect={() =>
+                                                    setDeleteTarget({
+                                                        id: node.id,
+                                                        name: node.name,
+                                                        kind: app ? "service" : "database"
+                                                    })
+                                                }
+                                            >
+                                                <Trash2 className="size-4" />
+                                                {removing ? "Removal pending" : "Delete"}
                                             </ContextMenuItem>
                                         </ContextMenuContent>
                                     </ContextMenu>
@@ -643,7 +697,7 @@ export function DeployCanvas({
                                         <ContextMenuTrigger asChild>
                                             <button
                                                 type="button"
-                                                onClick={() => setEditVolume({ appId: node.id, volume: chipToEditVolume(vol) })}
+                                                onClick={() => setDetailVolumeId(vol.id)}
                                                 onContextMenu={(event) => event.stopPropagation()}
                                                 className={`absolute flex items-center gap-2 border border-t-0 border-border bg-card/60 px-4 py-2.5 text-left text-xs text-muted-foreground transition-colors hover:bg-card ${
                                                     vi === (node.volumes?.length ?? 0) - 1 ? "rounded-b-2xl" : ""
@@ -658,12 +712,19 @@ export function DeployCanvas({
                                             </button>
                                         </ContextMenuTrigger>
                                         <ContextMenuContent>
+                                            <ContextMenuItem onSelect={() => setDetailVolumeId(vol.id)}>
+                                                <Settings2 className="size-4" /> Volume settings
+                                            </ContextMenuItem>
                                             <ContextMenuItem onSelect={() => router.push(volumeDriveHref(node.id, vol))}>
                                                 <HardDrive className="size-4" /> View in Drive
                                             </ContextMenuItem>
-                                            {app && (
-                                                <ContextMenuItem onSelect={() => onOpenService?.(app)}>
-                                                    <ScrollText className="size-4" /> Manage volumes
+                                            {canManage && (
+                                                <ContextMenuItem
+                                                    onSelect={() =>
+                                                        setEditVolume({ appId: node.id, volume: chipToEditVolume(vol) })
+                                                    }
+                                                >
+                                                    <ScrollText className="size-4" /> Edit mount
                                                 </ContextMenuItem>
                                             )}
                                         </ContextMenuContent>
@@ -684,24 +745,32 @@ export function DeployCanvas({
                 </p>
             )}
 
-            <Dialog open={deleteTarget !== null} onOpenChange={(open) => !open && setDeleteTarget(null)}>
-                <DialogContent className="max-w-sm">
-                    <DialogHeader>
-                        <DialogTitle>Delete {deleteTarget?.name}?</DialogTitle>
-                    </DialogHeader>
-                    <p className="text-sm text-muted-foreground">
-                        This removes the service, its container, domains, and variables. This cannot be undone.
-                    </p>
-                    <div className="mt-2 flex justify-end gap-2">
-                        <Button variant="ghost" onClick={() => setDeleteTarget(null)}>
-                            Cancel
-                        </Button>
-                        <Button variant="danger" disabled={acting} onClick={confirmDelete}>
-                            {acting && <Loader2 className="size-4 animate-spin" />} Delete
-                        </Button>
-                    </div>
-                </DialogContent>
-            </Dialog>
+            <ConfirmDeleteDialog
+                open={deleteTarget !== null}
+                onOpenChange={(open) => {
+                    if (!open) {
+                        setDeleteTarget(null);
+                        setDeleteError(null);
+                    }
+                }}
+                name={deleteTarget?.name ?? ""}
+                kind={deleteTarget?.kind ?? "service"}
+                description={
+                    deleteTarget?.kind === "database"
+                        ? "The container goes; the named volume holding its data is left on the server so it can still be recovered by hand."
+                        : "This removes the service, its container, domains, and variables."
+                }
+                confirmLabel="Stage removal"
+                error={deleteError}
+                pending={acting}
+                onConfirm={confirmDelete}
+            />
+
+            <VolumeDetailDialog
+                volumeId={detailVolumeId}
+                onOpenChange={(open) => !open && setDetailVolumeId(null)}
+                onChanged={() => router.refresh()}
+            />
             {dialog}
         </div>
     );

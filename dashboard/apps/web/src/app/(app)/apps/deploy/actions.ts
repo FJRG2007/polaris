@@ -19,6 +19,7 @@ import { getNetworkStatus } from "@/lib/network-service";
 import type { WafCustomRule, WafScopeType } from "@polaris/core";
 import { listConnections, getDriver } from "@/lib/storage-service";
 import { getDomainZones, listDeployZones } from "@/lib/domain-zones";
+import { getFlagsForEnvironment } from "@/lib/deploy-project-service";
 import { ensurePublicIp, getDomainConfig } from "@/lib/domain-service";
 import { getWafRule, setWafRule, type WafRuleView } from "@/lib/waf-service";
 import { provisionHostnameDns, type HostnameDnsResult } from "@/lib/domain-dns";
@@ -100,11 +101,19 @@ export async function createProjectAction(input: { name: string }): Promise<{ er
     }
 }
 
-export async function deleteProjectAction(projectId: string): Promise<void> {
+export async function deleteProjectAction(projectId: string): Promise<{ error?: string }> {
     const user = await requirePermission("deploy.manage");
-    await deployService.deleteProject(projectId, user.id);
-    await recordAudit({ actorId: user.id, action: "deploy.project.delete", targetType: "project", targetId: projectId });
-    revalidatePath(DEPLOY_PATH);
+    try {
+        // Only the owner may delete a project. Being an admin *on* one is enough to
+        // change everything inside it, and deliberately not enough to remove the
+        // thing itself.
+        await deployService.deleteProject(projectId, user.id);
+        await recordAudit({ actorId: user.id, action: "deploy.project.delete", targetType: "project", targetId: projectId });
+        revalidatePath(DEPLOY_PATH);
+        return {};
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not delete the project" };
+    }
 }
 
 export async function createEnvironmentAction(input: { projectId: string; name: string }): Promise<{ error?: string; id?: string }> {
@@ -211,7 +220,9 @@ export async function createApplicationAction(input: {
             target = await getOrCreateLocalTarget(user.id);
         }
         // Git sources track their branch and auto-deploy on new commits by default,
-        // Vercel-style (a poller picks them up even without a public webhook).
+        // Vercel-style (a poller picks them up even without a public webhook) -
+        // unless the project has turned that default off in its flags.
+        const flags = await getFlagsForEnvironment(input.environmentId);
         const branch = input.branch?.trim() || undefined;
         const app = await deployService.createApplication(user.id, {
             environmentId: input.environmentId,
@@ -219,8 +230,9 @@ export async function createApplicationAction(input: {
             name,
             sourceType,
             sourceConfig,
-            autoDeploy: isGit && Boolean(branch),
-            deployBranch: isGit ? (branch ?? null) : null
+            autoDeploy: flags.autoDeployNewServices && isGit && Boolean(branch),
+            deployBranch: isGit ? (branch ?? null) : null,
+            keepReleases: flags.keepReleasesByDefault
         });
         await recordAudit({ actorId: user.id, action: "deploy.app.create", targetType: "application", targetId: app.id });
         // Give it a free testing subdomain and kick off the first deploy right away,
@@ -229,10 +241,12 @@ export async function createApplicationAction(input: {
         const requestHeaders = await headers();
         await ensurePublicIp(requestHeaders.get("x-server-ip") ?? requestHeaders.get("host"));
         const targetPort = Number.isInteger(input.port) ? Number(input.port) : isGit ? 3000 : 80;
-        try {
-            await deployService.addApplicationDomain(app.id, user.id, { targetPort });
-        } catch {
-            // No public IP / free-subdomain base configured; the user can add a domain.
+        if (flags.autoSubdomain) {
+            try {
+                await deployService.addApplicationDomain(app.id, user.id, { targetPort });
+            } catch {
+                // No public IP / free-subdomain base configured; the user can add a domain.
+            }
         }
         let deploymentId: string | undefined;
         try {
