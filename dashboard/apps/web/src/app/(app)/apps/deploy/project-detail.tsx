@@ -26,36 +26,67 @@ export function ProjectDetail({
     project,
     projects,
     canManage,
-    localReady
+    localReady,
+    openService,
+    openEnvironment
 }: {
     project: ProjectSummary;
     projects: { id: string; name: string }[];
     canManage: boolean;
     localReady: boolean;
+    /** Service to open on arrival, from the URL - a deploy alert or a shared link. */
+    openService?: string | null;
+    /** Environment to select on arrival, for a link that names no service. */
+    openEnvironment?: string | null;
 }) {
     const router = useRouter();
     const refresh = () => router.refresh();
 
     const environments = project.environments;
     const defaultEnv = environments.find((env) => env.isDefault) ?? environments[0];
-    const [activeId, setActiveId] = useState(defaultEnv?.id ?? "");
+    // A link that names a service lands on the environment holding it, not on
+    // whichever one the project happens to open with.
+    const linked = openService
+        ? environments.find((env) => env.applications.some((app) => app.id === openService))
+        : environments.find((env) => env.id === openEnvironment);
+    const [activeId, setActiveId] = useState(linked?.id ?? defaultEnv?.id ?? "");
     const active = environments.find((env) => env.id === activeId) ?? defaultEnv;
 
     const [confirmDeleteProject, setConfirmDeleteProject] = useState(false);
     const [view, setView] = useState<"canvas" | "list">("canvas");
-    const [detailApp, setDetailApp] = useState<ProjectApp | null>(null);
+    const [detailAppId, setDetailAppId] = useState<string | null>(openService ?? null);
     const [showNewProject, setShowNewProject] = useState(false);
     const [showNewEnv, setShowNewEnv] = useState(false);
     const [pending, startTransition] = useTransition();
 
-    // Keep the open service panel in sync with refreshed data: after a change
-    // (e.g. removing a domain) the panel must reflect the new state, and it must
-    // close if the service was deleted, rather than showing a stale snapshot.
-    useEffect(() => {
-        if (!detailApp) return;
-        const fresh = environments.flatMap((env) => env.applications).find((app) => app.id === detailApp.id);
-        if (fresh !== detailApp) setDetailApp(fresh ?? null);
-    }, [environments, detailApp]);
+    // Derived rather than stored, so refreshed data reaches the open panel (e.g.
+    // after removing a domain) and a deleted service closes it instead of leaving
+    // a stale snapshot on screen.
+    const detailApp = environments.flatMap((env) => env.applications).find((app) => app.id === detailAppId) ?? null;
+
+    /** Open or close the service panel, keeping the URL on the service so the page
+     *  can be linked to, reloaded and shared where it was left. Written straight to
+     *  history rather than navigated, since the panel is already rendered. */
+    function showService(app: ProjectApp | null) {
+        setDetailAppId(app?.id ?? null);
+        const url = new URL(window.location.href);
+        if (app) url.searchParams.set("service", app.id);
+        else url.searchParams.delete("service");
+        url.searchParams.delete("env");
+        window.history.replaceState(null, "", url);
+    }
+
+    /** Switching environment by hand leaves the link that opened this page behind:
+     *  the panel belonged to the environment being left, and a reload must not
+     *  drag the page back to it. */
+    function selectEnvironment(id: string) {
+        setActiveId(id);
+        setDetailAppId(null);
+        const url = new URL(window.location.href);
+        url.searchParams.delete("service");
+        url.searchParams.delete("env");
+        window.history.replaceState(null, "", url);
+    }
 
     const newProjectOption = canManage
         ? [{ value: NEW_PROJECT, label: "New project", icon: <Plus className="size-3.5 text-muted-foreground" /> }]
@@ -76,7 +107,7 @@ export function ProjectDetail({
     const environmentSelect = (
         <Select
             value={active?.id ?? ""}
-            onValueChange={(id) => (id === NEW_ENV ? setShowNewEnv(true) : setActiveId(id))}
+            onValueChange={(id) => (id === NEW_ENV ? setShowNewEnv(true) : selectEnvironment(id))}
             options={[...environments.map((env) => ({ value: env.id, label: env.name })), ...newEnvOption]}
             className="h-8 min-w-0 flex-1 md:w-52 md:min-w-[13rem] md:flex-none"
             aria-label="Environment"
@@ -184,13 +215,13 @@ export function ProjectDetail({
 
             {active ? (
                 view === "canvas" ? (
-                    <DeployCanvas environment={active} canManage={canManage} onOpenService={setDetailApp} />
+                    <DeployCanvas environment={active} canManage={canManage} onOpenService={showService} />
                 ) : (
                     <EnvironmentServices
                         environment={active}
                         canManage={canManage}
                         onChanged={refresh}
-                        onOpenService={setDetailApp}
+                        onOpenService={showService}
                     />
                 )
             ) : (
@@ -198,11 +229,7 @@ export function ProjectDetail({
             )}
 
             {detailApp && (
-                <ServiceDetail
-                    app={detailApp}
-                    onChanged={refresh}
-                    onClose={() => setDetailApp(null)}
-                />
+                <ServiceDetail app={detailApp} onChanged={refresh} onClose={() => showService(null)} />
             )}
 
             <NewProjectDialog open={showNewProject} onOpenChange={setShowNewProject} />

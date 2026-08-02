@@ -1,14 +1,14 @@
 import { notFound } from "next/navigation";
-import { refreshCapabilities } from "@polaris/hostd-client";
-import { requirePermission, userHasManage } from "@/lib/session";
-import { getDeploymentStatuses, getProjectFull, hostPortForApp, listProjects } from "@/lib/deploy-service";
-import { currentReleaseRef } from "@/lib/deploy/releases";
-import { listActiveTunnelDomains } from "@/lib/deploy/tunnel-domains";
-import { getPublicIp } from "@/lib/domain-service";
-import type { TunnelDomain } from "@/lib/deploy/tunnel-domains";
-import { ProjectDetail } from "../project-detail";
-import type { ProjectSummary } from "../deploy-view";
 import type { AppDomain } from "../domain-rank";
+import { ProjectDetail } from "../project-detail";
+import { getPublicIp } from "@/lib/domain-service";
+import type { ProjectSummary } from "../deploy-view";
+import { currentReleaseRef } from "@/lib/deploy/releases";
+import { refreshCapabilities } from "@polaris/hostd-client";
+import type { TunnelDomain } from "@/lib/deploy/tunnel-domains";
+import { requirePermission, userHasManage } from "@/lib/session";
+import { listActiveTunnelDomains } from "@/lib/deploy/tunnel-domains";
+import { getDeploymentStatuses, getProjectFull, hostPortForApp, listProjects } from "@/lib/deploy-service";
 
 export const dynamic = "force-dynamic";
 
@@ -29,8 +29,19 @@ function portOf(sourceConfig: string): number | null {
     }
 }
 
-export default async function DeployProjectPage({ params }: { params: Promise<{ projectId: string }> }) {
+function pick(value: string | string[] | undefined): string | null {
+    return (Array.isArray(value) ? value[0] : value) ?? null;
+}
+
+export default async function DeployProjectPage({
+    params,
+    searchParams
+}: {
+    params: Promise<{ projectId: string }>;
+    searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
     const { projectId } = await params;
+    const query = await searchParams;
     const user = await requirePermission("deploy.read");
     const canManage = await userHasManage(user, "deploy.manage");
 
@@ -120,5 +131,16 @@ export default async function DeployProjectPage({ params }: { params: Promise<{ 
         }))
     };
 
-    return <ProjectDetail project={summary} projects={allProjects} canManage={canManage} localReady={localReady} />;
+    // Both are only ever matched against this project's own ids, so an id that
+    // belongs to nobody (or to another project) simply opens the default view.
+    return (
+        <ProjectDetail
+            project={summary}
+            projects={allProjects}
+            canManage={canManage}
+            localReady={localReady}
+            openService={pick(query.service)}
+            openEnvironment={pick(query.env)}
+        />
+    );
 }

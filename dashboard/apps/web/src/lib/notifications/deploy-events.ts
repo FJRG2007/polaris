@@ -12,8 +12,8 @@
  * of them gets it routed by their own rules.
  */
 
-import { prisma } from "@polaris/db";
 import { notify } from "./dispatch";
+import { prisma } from "@polaris/db";
 
 /** What was being deployed, in words, plus where to look at it. */
 interface Deployable {
@@ -29,16 +29,23 @@ async function describeDeployable(type: string, id: string): Promise<Deployable 
         });
         if (!app) return null;
         const project = app.environment.project;
-        return { label: `${project.name} / ${app.name}`, href: `/apps/deploy/${project.id}` };
+        // The service, not just the project it lives in: an alert about one deploy
+        // that lands on a project of a dozen services leaves the reader to find it.
+        return { label: `${project.name} / ${app.name}`, href: `/apps/deploy/${project.id}?service=${id}` };
     }
     if (type === "database") {
         const database = await prisma.managedDatabase.findUnique({
             where: { id },
-            select: { name: true, environment: { select: { project: { select: { id: true, name: true } } } } }
+            select: { name: true, environment: { select: { id: true, project: { select: { id: true, name: true } } } } }
         });
         if (!database) return null;
         const project = database.environment.project;
-        return { label: `${project.name} / ${database.name}`, href: `/apps/deploy/${project.id}` };
+        // A database has no panel of its own, so the environment holding it is as
+        // close as a link gets - still better than defaulting to production.
+        return {
+            label: `${project.name} / ${database.name}`,
+            href: `/apps/deploy/${project.id}?env=${database.environment.id}`
+        };
     }
     return null;
 }
