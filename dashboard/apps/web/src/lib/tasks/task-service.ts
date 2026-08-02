@@ -44,6 +44,10 @@ export interface TaskScope {
 
 export interface TaskQueryOptions {
     readonly includeArchived?: boolean;
+    /** Leaves out work whose status counts as finished. For a screen that answers
+     *  "what do I still have to do", where something ticked off has stopped being
+     *  an answer. A task with no status at all is not finished. */
+    readonly openOnly?: boolean;
     readonly limit?: number;
 }
 
@@ -176,7 +180,21 @@ export async function listTasks(scope: TaskScope, options: TaskQueryOptions = {}
             ...(scope.sprintId ? { sprintId: scope.sprintId } : {}),
             ...(scope.assigneeId ? { assignees: { some: { userId: scope.assigneeId } } } : {}),
             ...(scope.parentId !== undefined ? { parentId: scope.parentId } : {}),
-            ...(options.includeArchived ? {} : { archived: false })
+            ...(options.includeArchived ? {} : { archived: false }),
+            // Under AND rather than beside the scope's own OR, which this would
+            // otherwise replace and quietly widen the query to every space.
+            ...(options.openOnly
+                ? {
+                      AND: [
+                          {
+                              OR: [
+                                  { status: null },
+                                  { status: { type: { in: [...core.UNFINISHED_STATUS_TYPES] } } }
+                              ]
+                          }
+                      ]
+                  }
+                : {})
         },
         orderBy: [{ order: "asc" }, { createdAt: "asc" }],
         take: options.limit ?? 2000,

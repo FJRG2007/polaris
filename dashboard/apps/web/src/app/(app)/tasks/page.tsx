@@ -26,7 +26,13 @@ export default async function TasksHomePage() {
 
     const [tree, tasks, counts, timer] = await Promise.all([
         listSpaceTree(user.id, scope, user.isAdmin),
-        listTasks({ spaceIds: scope.spaceIds, listIds: scope.listIds, assigneeId: user.id }, { limit: 500 }),
+        // Only what is still to do. Ticking a task off is how somebody clears
+        // this screen, so leaving it on the list makes the gesture do nothing -
+        // and the counts above already left it out, so the two disagreed.
+        listTasks(
+            { spaceIds: scope.spaceIds, listIds: scope.listIds, assigneeId: user.id },
+            { limit: 500, openOnly: true }
+        ),
         myWorkCounts(user.id, scope),
         runningTimer(user.id)
     ]);

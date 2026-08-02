@@ -125,6 +125,12 @@ export function isFinishedStatus(type: TaskStatusType): boolean {
     return type === "done" || type === "closed";
 }
 
+/** The two halves of that answer, named once. A query asking the database for
+ *  unfinished work and a screen asking the same question of a row cannot then
+ *  disagree about what finished means. */
+export const FINISHED_STATUS_TYPES = TASK_STATUS_TYPES.filter(isFinishedStatus);
+export const UNFINISHED_STATUS_TYPES = TASK_STATUS_TYPES.filter((type) => !isFinishedStatus(type));
+
 /**
  * The statuses a brand-new space starts with, and the colours people already
  * read them by: grey is untouched, blue is being worked, yellow is waiting on

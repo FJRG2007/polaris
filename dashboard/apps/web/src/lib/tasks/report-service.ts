@@ -77,11 +77,11 @@ export async function buildReport(scope: TaskScope, now = new Date()): Promise<T
     // and quietly widen every count on the page.
     const reach = scopeTaskWhere(scope);
     const base: Prisma.TaskWhereInput = { ...reach, archived: false };
-    const finishedTypes: Prisma.TaskWhereInput = { status: { type: { in: ["done", "closed"] } } };
+    const finishedTypes: Prisma.TaskWhereInput = { status: { type: { in: [...core.FINISHED_STATUS_TYPES] } } };
     // A task with no status at all is still outstanding, so the "not finished"
     // filter has to say so explicitly rather than relying on the join.
     const unfinished: Prisma.TaskWhereInput = {
-        OR: [{ status: null }, { status: { type: { in: ["open", "active"] } } }]
+        OR: [{ status: null }, { status: { type: { in: [...core.UNFINISHED_STATUS_TYPES] } } }]
     };
 
     const [total, done, overdue, dueThisWeek, completedThisWeek, tracked, statuses, priorities, completion] =
@@ -162,7 +162,7 @@ async function workload(scope: TaskScope, now: Date): Promise<PersonLoad[]> {
             task: {
                 ...scopeTaskWhere(scope),
                 archived: false,
-                AND: [{ OR: [{ status: null }, { status: { type: { in: ["open", "active"] } } }] }]
+                AND: [{ OR: [{ status: null }, { status: { type: { in: [...core.UNFINISHED_STATUS_TYPES] } } }] }]
             }
         },
         select: {
@@ -203,7 +203,7 @@ export async function myWorkCounts(userId: string, scope: TaskScope, now = new D
         ...scopeTaskWhere(scope),
         archived: false,
         assignees: { some: { userId } },
-        AND: [{ OR: [{ status: null }, { status: { type: { in: ["open", "active"] } } }] }]
+        AND: [{ OR: [{ status: null }, { status: { type: { in: [...core.UNFINISHED_STATUS_TYPES] } } }] }]
     };
 
     const [assigned, overdue, dueToday] = await Promise.all([
