@@ -11,11 +11,17 @@
  * from it before deciding whether to sign it out.
  */
 
-import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { Check, History, LogOut, MonitorSmartphone, X } from "lucide-react";
+import { signOut } from "@/lib/auth-client";
+import { Check, LogOut, X } from "lucide-react";
+import { useState, type FormEvent } from "react";
+import { useConfirm } from "@/components/confirm-dialog";
+import { RelativeTime } from "@/components/relative-time";
+import type { SessionView } from "@/lib/session-directory";
+import { SessionActivityDialog } from "./session-activity-dialog";
+import { SessionsTable, sessionOrigin } from "@/components/sessions-table";
+import { decideLoginApprovalAction, revokeOtherSessionsAction, revokeSessionAction } from "./actions";
 import {
-    Badge,
     Button,
     Card,
     CardBody,
@@ -26,18 +32,11 @@ import {
     DialogTitle,
     Input
 } from "@polaris/ui";
-import { useConfirm } from "@/components/confirm-dialog";
-import { RelativeTime } from "@/components/relative-time";
-import { signOut } from "@/lib/auth-client";
-import type { SessionView } from "@/lib/session-directory";
-import { decideLoginApprovalAction, revokeOtherSessionsAction, revokeSessionAction } from "./actions";
-import { SessionActivityDialog } from "./session-activity-dialog";
 
 function Origin({ session }: { session: SessionView }) {
-    const where = [session.ip, session.country].filter(Boolean).join(" - ");
     return (
         <p className="text-xs text-muted-foreground">
-            {where || "Unknown location"} - last active <RelativeTime iso={session.lastSeenAt} />
+            {sessionOrigin(session)} - last active <RelativeTime iso={session.lastSeenAt} />
         </p>
     );
 }
@@ -166,43 +165,13 @@ export function SessionsView({ sessions }: { sessions: SessionView[] }) {
                         ) : null}
                     </div>
 
-                    {active.map((session) => (
-                        <div
-                            key={session.id}
-                            className="flex items-center justify-between gap-3 border-t border-border pt-3 first:border-t-0 first:pt-0"
-                        >
-                            <div className="flex min-w-0 items-center gap-3">
-                                <MonitorSmartphone className="size-4 shrink-0 text-muted-foreground" />
-                                <div className="min-w-0">
-                                    <p className="flex items-center gap-2 text-sm">
-                                        <span className="truncate">{session.device}</span>
-                                        {session.current ? <Badge variant="primary">This device</Badge> : null}
-                                        {session.locked ? <Badge>Locked</Badge> : null}
-                                    </p>
-                                    <Origin session={session} />
-                                </div>
-                            </div>
-                            <div className="flex shrink-0 items-center gap-1">
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    title="Activity from this session"
-                                    onClick={() => setActivityFor(session)}
-                                >
-                                    <History className="size-4" />
-                                    <span className="sr-only sm:not-sr-only">Activity</span>
-                                </Button>
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    disabled={busyId === session.id}
-                                    onClick={() => void (session.current ? signOutHere() : revoke(session))}
-                                >
-                                    Sign out
-                                </Button>
-                            </div>
-                        </div>
-                    ))}
+                    <SessionsTable
+                        sessions={active}
+                        busyId={busyId}
+                        emptyLabel="Nothing is signed in."
+                        onActivity={setActivityFor}
+                        onRevoke={(session) => void (session.current ? signOutHere() : revoke(session))}
+                    />
                 </CardBody>
             </Card>
 

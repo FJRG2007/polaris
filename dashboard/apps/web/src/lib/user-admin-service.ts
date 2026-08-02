@@ -13,10 +13,10 @@
  * no reachable administrator is only recoverable from the database.
  */
 
-import { updateEnforcedRules, type AccessGroupView } from "@polaris/auth";
-import { parseStringList, type AccessRulesInput } from "@polaris/core";
 import { prisma } from "@polaris/db";
 import { recordAudit } from "@/lib/audit-service";
+import { parseStringList, type AccessRulesInput } from "@polaris/core";
+import { updateEnforcedRules, type AccessGroupView } from "@polaris/auth";
 
 /** One person, as the directory lists them. */
 export interface DirectoryUser {
@@ -34,8 +34,8 @@ export interface DirectoryUser {
     /** Roles held directly, and the groups they belong to. */
     roles: string[];
     groups: string[];
-    /** Live sessions right now, and where the most recent one was last seen. */
-    sessions: number;
+    /** Where the most recent session was last seen. The sessions themselves are
+     *  read when a record is opened, not with the directory. */
     lastSeenAt: string | null;
     lastIp: string | null;
     lastCountry: string | null;
@@ -64,7 +64,6 @@ export async function listUserDirectory(): Promise<DirectoryUser[]> {
             groups: { select: { group: { select: { name: true } } } },
             accessGroupBindings: { where: { enforced: true }, select: { groupId: true } },
             security: { select: { adminCidrs: true, adminCountries: true, adminContinents: true } },
-            _count: { select: { sessions: true } },
             // The freshest session tells the directory when this account was last
             // actually used, and from where.
             sessionStates: {
@@ -91,7 +90,6 @@ export async function listUserDirectory(): Promise<DirectoryUser[]> {
             twoFactorEnabled: row.twoFactorEnabled,
             roles: row.roles.map((entry) => entry.role.name),
             groups: row.groups.map((entry) => entry.group.name),
-            sessions: row._count.sessions,
             lastSeenAt: latest?.lastSeenAt.toISOString() ?? null,
             lastIp: latest?.ip ?? null,
             lastCountry: latest?.country ?? null,
@@ -227,6 +225,31 @@ export async function setUserLimits(
 export async function revokeUserSessions(actorId: string, userId: string): Promise<{ error?: string }> {
     await dropSessions(userId);
     await recordAudit({ actorId, action: "user.sessions.revoke", targetType: "user", targetId: userId });
+    return {};
+}
+
+/**
+ * End one of somebody else's sessions and leave the rest alone. An operator who
+ * can only sign an account out everywhere has to lock its owner out of the
+ * machine they are working on in order to close the one they do not recognize.
+ *
+ * Scoped by account as well as by session, so a mismatched pair ends nothing
+ * rather than ending a stranger's session.
+ */
+export async function revokeSessionForUser(
+    actorId: string,
+    userId: string,
+    sessionId: string
+): Promise<{ error?: string }> {
+    const result = await prisma.session.deleteMany({ where: { id: sessionId, userId } });
+    if (result.count === 0) return { error: "That session has already ended." };
+    await recordAudit({
+        actorId,
+        action: "user.session.revoke",
+        targetType: "session",
+        targetId: sessionId,
+        metadata: { userId }
+    });
     return {};
 }
 

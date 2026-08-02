@@ -8,9 +8,9 @@
  * a decision - and is rendered as a short summary rather than echoed raw.
  */
 
-import { verifyQuickPin } from "@polaris/auth";
-import { prisma } from "@polaris/db";
 import { auth } from "@/lib/auth";
+import { prisma } from "@polaris/db";
+import { verifyQuickPin } from "@polaris/auth";
 import { recordAudit } from "@/lib/audit-service";
 
 export interface SessionView {
@@ -22,6 +22,9 @@ export interface SessionView {
     device: string;
     ip: string | null;
     country: string | null;
+    /** Which of this deployment's names the session was opened on, when it was
+     *  recorded. Null for sessions older than the column. */
+    host: string | null;
     lastSeenAt: string;
     createdAt: string;
     expiresAt: string;
@@ -59,7 +62,17 @@ export function describeOrigin(
 
 const APPROVALS: ReadonlySet<string> = new Set(["approved", "pending", "denied"]);
 
-/** Every live session for a user, newest first, with the current one flagged. */
+/**
+ * Every live session for a user, newest first, with the current one flagged.
+ *
+ * Everything the account holds, not everything on one address: a deployment
+ * answers on several names and the cookie is host-only, so the same person is
+ * usually signed in more than once and every one of those is theirs to see.
+ *
+ * `currentSessionId` only decides which row is labelled, so an administrator
+ * reading somebody else's list passes their own and gets no match, which is
+ * exactly right - none of those sessions is the one they are reading from.
+ */
 export async function listUserSessions(userId: string, currentSessionId: string): Promise<SessionView[]> {
     const rows = await prisma.session.findMany({
         where: { userId, expiresAt: { gt: new Date() } },
@@ -83,6 +96,7 @@ export async function listUserSessions(userId: string, currentSessionId: string)
             device: describeDevice(row.state?.userAgent ?? row.userAgent),
             ip: row.state?.ip ?? row.ipAddress,
             country: row.state?.country ?? null,
+            host: row.state?.host ?? null,
             lastSeenAt: (row.state?.lastSeenAt ?? row.createdAt).toISOString(),
             createdAt: row.createdAt.toISOString(),
             expiresAt: row.expiresAt.toISOString()

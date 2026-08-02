@@ -10,10 +10,22 @@
  * "sign them out" and "ban them" wait on a role change nobody asked to make.
  */
 
-import { useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { Ban, LogOut, Shield, Trash2, Undo2 } from "lucide-react";
 import { INVITE_ROLES } from "@polaris/core";
+import { useConfirm } from "@/components/confirm-dialog";
+import type { SessionView } from "@/lib/session-directory";
+import { SessionsTable } from "@/components/sessions-table";
+import type { DirectoryUser } from "@/lib/user-admin-service";
+import { useDisplayFormat } from "@/components/display-format";
+import { Ban, LogOut, Shield, Trash2, Undo2 } from "lucide-react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
+import {
+    AccessRulesEditor,
+    accessRulesAreEmpty,
+    accessRulesEqual,
+    type AccessGroupOption,
+    type AccessRulesValue
+} from "@/components/access-rules-editor";
 import {
     Badge,
     Button,
@@ -24,26 +36,19 @@ import {
     DialogTitle,
     Input,
     Select,
+    Skeleton,
     Switch
 } from "@polaris/ui";
 import {
-    AccessRulesEditor,
-    accessRulesAreEmpty,
-    accessRulesEqual,
-    type AccessGroupOption,
-    type AccessRulesValue
-} from "@/components/access-rules-editor";
-import { useConfirm } from "@/components/confirm-dialog";
-import { useDisplayFormat } from "@/components/display-format";
-import type { DirectoryUser } from "@/lib/user-admin-service";
-import {
     banUserAction,
     deleteUserAction,
+    revokeUserSessionAction,
     revokeUserSessionsAction,
     setAdminAccessAction,
     setUserLimitsAction,
     setUserRoleAction,
-    unbanUserAction
+    unbanUserAction,
+    userSessionsAction
 } from "./actions";
 
 /** A labelled fact in the identity grid. */
@@ -74,6 +79,20 @@ export function UserDetailDialog({
     const [banReason, setBanReason] = useState("");
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    // Null until the list arrives, so the section can hold its shape rather than
+    // the dialog waiting on a query nobody opened it for.
+    const [sessions, setSessions] = useState<SessionView[] | null>(null);
+
+    /** The open sessions, re-read whenever an action may have ended one. The
+     *  directory's own refresh only carries the count. */
+    const loadSessions = useCallback(async () => {
+        const result = await userSessionsAction(user.id);
+        setSessions(result.sessions ?? []);
+    }, [user.id]);
+
+    useEffect(() => {
+        void loadSessions();
+    }, [loadSessions]);
 
     /** Run one action, keep its refusal on screen, and re-read the directory. */
     async function run(action: () => Promise<{ error?: string }>) {
@@ -85,6 +104,7 @@ export function UserDetailDialog({
             setError(result.error);
             return false;
         }
+        await loadSessions();
         router.refresh();
         return true;
     }
@@ -189,26 +209,41 @@ export function UserDetailDialog({
                     </section>
 
                     <section className="flex flex-col gap-3 border-t border-border pt-4">
-                        <h3 className="text-sm font-medium">Sessions</h3>
                         <div className="flex items-center justify-between gap-3">
-                            <p className="text-xs text-muted-foreground">
-                                {user.sessions === 0
-                                    ? "No open sessions."
-                                    : `${user.sessions} open session${user.sessions === 1 ? "" : "s"}.`}
-                                {user.lastSeenAt ? ` Last seen ${format.dateTime(user.lastSeenAt)}` : ""}
-                                {user.lastIp ? ` from ${user.lastIp}` : ""}
-                                {user.lastCountry ? ` (${user.lastCountry})` : ""}
-                            </p>
+                            <div className="min-w-0">
+                                <h3 className="text-sm font-medium">Sessions</h3>
+                                <p className="text-xs text-muted-foreground">
+                                    Every device signed in as {user.name}, and which of this instance&apos;s
+                                    addresses each one came in on.
+                                </p>
+                            </div>
                             <Button
                                 size="sm"
                                 variant="ghost"
-                                disabled={busy || user.sessions === 0}
+                                disabled={busy || sessions?.length === 0}
                                 onClick={() => void run(() => revokeUserSessionsAction(user.id))}
                             >
                                 <LogOut className="size-4" />
                                 Sign out everywhere
                             </Button>
                         </div>
+                        {sessions ? (
+                            <SessionsTable
+                                sessions={sessions}
+                                busyId={busy ? "all" : null}
+                                emptyLabel="Nothing is signed in."
+                                onRevoke={(session) =>
+                                    void run(() => revokeUserSessionAction(user.id, session.id))
+                                }
+                            />
+                        ) : (
+                            <Skeleton className="h-24 w-full rounded-lg" />
+                        )}
+                        <p className="text-xs text-muted-foreground">
+                            {user.lastSeenAt ? `Last seen ${format.dateTime(user.lastSeenAt)}` : "Never seen."}
+                            {user.lastIp ? ` from ${user.lastIp}` : ""}
+                            {user.lastCountry ? ` (${user.lastCountry})` : ""}
+                        </p>
                     </section>
 
                     <section className="flex flex-col gap-3 border-t border-border pt-4">

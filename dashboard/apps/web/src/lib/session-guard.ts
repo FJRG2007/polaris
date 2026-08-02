@@ -14,13 +14,13 @@
  * only when the activity stamp has gone stale.
  */
 
-import { consumeSessionRotation, resolveSignInRules } from "@polaris/auth";
 import { prisma } from "@polaris/db";
 import { recordAudit } from "@/lib/audit-service";
-import { clientIp, clientUserAgent } from "@/lib/request-context";
 import { notify } from "@/lib/notifications/dispatch";
 import { describeOrigin } from "@/lib/session-directory";
 import { evaluateAccountAccess } from "@/lib/network-rules";
+import { consumeSessionRotation, resolveSignInRules } from "@polaris/auth";
+import { clientHost, clientIp, clientUserAgent } from "@/lib/request-context";
 
 /** Where a refused session is sent, or null when the session may proceed. */
 export type SessionVerdict = { ok: true } | { ok: false; redirect: string };
@@ -142,10 +142,13 @@ export async function guardSession({
         return { ok: false, redirect: "/oauth/lock" };
     }
 
-    // 5. Keep the activity stamp fresh, but not on every single request.
-    if (now - state.lastSeenAt.getTime() >= ACTIVITY_WRITE_INTERVAL_MS) {
+    // 5. Keep the activity stamp fresh, but not on every single request. A
+    //    session opened before the host was recorded adopts it here, which is the
+    //    only way an already-open one ever gets a name against it.
+    const host = state.host ?? (await clientHost()) ?? null;
+    if (host !== state.host || now - state.lastSeenAt.getTime() >= ACTIVITY_WRITE_INTERVAL_MS) {
         await prisma.sessionState
-            .update({ where: { sessionId }, data: { lastSeenAt: new Date() } })
+            .update({ where: { sessionId }, data: { lastSeenAt: new Date(), host } })
             .catch(() => undefined);
     }
 
@@ -193,7 +196,7 @@ async function createSessionState(input: {
         if (approver) approval = "pending";
     }
 
-    const userAgent = await clientUserAgent();
+    const [userAgent, host] = await Promise.all([clientUserAgent(), clientHost()]);
     try {
         await prisma.sessionState.create({
             data: {
@@ -202,7 +205,8 @@ async function createSessionState(input: {
                 approval,
                 ip: input.ip ?? null,
                 country: input.country,
-                userAgent: userAgent ?? null
+                userAgent: userAgent ?? null,
+                host: host ?? null
             }
         });
     } catch {

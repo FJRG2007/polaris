@@ -530,6 +530,12 @@ model SessionState {
     ip         String?
     country    String?
     userAgent  String?
+    // The hostname the session was opened on. A deployment answers on several
+    // names - polaris.local on the LAN, its domain from outside - and the cookie
+    // is host-only, so the same person signed in twice holds two sessions that
+    // are otherwise indistinguishable. Client-supplied, like the user-agent: a
+    // label to tell them apart, never an input to a decision.
+    host       String?
     createdAt  DateTime  @default(now())
 
     session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)

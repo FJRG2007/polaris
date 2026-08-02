@@ -10,21 +10,28 @@
  * this file only validates input and refreshes the page.
  */
 
+import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/session";
 import { recordAudit } from "@/lib/audit-service";
 import { decideRecoveryRequest } from "@/lib/account-recovery-service";
+import { listUserSessions, type SessionView } from "@/lib/session-directory";
 import { accessRulesSchema, createInviteSchema, INVITE_ROLES } from "@polaris/core";
 import { createInvite, revokeInvite, type CreatedInvite } from "@/lib/invite-service";
 import {
     banUser,
     deleteUser,
+    revokeSessionForUser,
     revokeUserSessions,
     setAdminAccess,
     setUserLimits,
     setUserRole,
     unbanUser
 } from "@/lib/user-admin-service";
+
+/** Account and session ids are uuids; anything else matches nothing anyway, and
+ *  is refused here rather than sent to the database. */
+const idSchema = z.string().uuid();
 
 export async function createInviteAction(input: unknown): Promise<CreatedInvite & { error?: string }> {
     const admin = await requireAdmin();
@@ -112,6 +119,31 @@ export async function setUserLimitsAction(userId: string, input: unknown): Promi
 export async function revokeUserSessionsAction(userId: string): Promise<{ error?: string }> {
     const admin = await requireAdmin();
     const result = await revokeUserSessions(admin.id, userId);
+    revalidatePath("/admin/users");
+    return result;
+}
+
+/**
+ * Every session an account holds. Read when the dialog opens rather than with
+ * the directory: most rows are never expanded, and the list is the one part of a
+ * person's record that changes while you are looking at it.
+ *
+ * Nothing here is the caller's own session, so none is flagged as current.
+ */
+export async function userSessionsAction(userId: unknown): Promise<{ sessions?: SessionView[]; error?: string }> {
+    await requireAdmin();
+    const parsed = idSchema.safeParse(userId);
+    if (!parsed.success) return { error: "Unknown account." };
+    return { sessions: await listUserSessions(parsed.data, "") };
+}
+
+/** End one session of somebody else's without ending the rest. */
+export async function revokeUserSessionAction(userId: unknown, sessionId: unknown): Promise<{ error?: string }> {
+    const admin = await requireAdmin();
+    const target = idSchema.safeParse(userId);
+    const session = idSchema.safeParse(sessionId);
+    if (!target.success || !session.success) return { error: "Unknown session." };
+    const result = await revokeSessionForUser(admin.id, target.data, session.data);
     revalidatePath("/admin/users");
     return result;
 }
