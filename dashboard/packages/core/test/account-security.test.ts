@@ -12,6 +12,7 @@ import {
     stringifyList,
     unionRules
 } from "../src/schemas/account-security.js";
+import { namePlaces } from "../src/geo.js";
 
 describe("access rules", () => {
     it("accepts addresses and CIDR ranges, rejects anything else", () => {
@@ -200,5 +201,23 @@ describe("rule union", () => {
             allowedContinents: []
         });
         expect(unionRules([])).toEqual({ allowedCidrs: [], allowedCountries: [], allowedContinents: [] });
+    });
+});
+
+describe("naming the places a rule admits", () => {
+    it("names them, because a count is unreadable where there is no dialog to open", () => {
+        expect(namePlaces(["ES", "PT"], ["EU"])).toEqual(["Europe", "Spain", "Portugal"]);
+    });
+
+    it("puts continents first: the broader rule is the one that explains the narrower", () => {
+        expect(namePlaces(["ES"], ["EU"])[0]).toBe("Europe");
+    });
+
+    it("leaves an unrestricted rule set with nothing to say", () => {
+        expect(namePlaces([], [])).toEqual([]);
+    });
+
+    it("falls back to the code rather than dropping a place it cannot name", () => {
+        expect(namePlaces([], ["ZZ"])).toEqual(["ZZ"]);
     });
 });

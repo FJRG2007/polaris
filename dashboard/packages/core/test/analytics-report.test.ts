@@ -1,5 +1,6 @@
+import { countryName } from "../src/geo.js";
 import { describe, expect, it } from "vitest";
-import { countryFlag, countryForTimeZone, countryName, parseLanguage, resolveCountry } from "../src/analytics-geo.js";
+import { countryFlag, countryForTimeZone, parseLanguage, resolveCountry } from "../src/analytics-geo.js";
 import {
     reportVisits,
     visitDay,

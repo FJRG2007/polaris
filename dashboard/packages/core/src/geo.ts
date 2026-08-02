@@ -53,6 +53,47 @@ export function continentOf(countryCode: string | null | undefined): string | nu
     return COUNTRY_TO_CONTINENT[countryCode.toUpperCase()] ?? null;
 }
 
+/** Country names come from the platform's own table rather than a shipped one.
+ *  Built once; a runtime without the data leaves every code as itself. */
+const REGION_NAMES: Intl.DisplayNames | null = (() => {
+    try {
+        return new Intl.DisplayNames(["en"], { type: "region" });
+    } catch {
+        return null;
+    }
+})();
+
+/**
+ * The country's name in English.
+ *
+ * Deliberately not localised to the reader: the rest of the dashboard is in
+ * English, and a breakdown whose row labels change language halfway down -
+ * because some are translated and the codes underneath are not - reads as a bug.
+ * Anything that is not a country code reads as "Unknown", which is what a row in
+ * a table of visitors has to say.
+ */
+export function countryName(code: string | null | undefined): string {
+    if (!code || !/^[A-Za-z]{2}$/.test(code)) return "Unknown";
+    const upper = code.toUpperCase();
+    try {
+        return REGION_NAMES?.of(upper) ?? upper;
+    } catch {
+        return upper;
+    }
+}
+
+/** The name for a continent code, falling back to the code itself. */
+export function continentName(code: string): string {
+    const upper = code.toUpperCase();
+    return CONTINENTS.find((entry) => entry.code === upper)?.name ?? code;
+}
+
+/** Every place a rule set admits, named rather than counted: countries and
+ *  continents in one list, for a summary a reader has to act on. */
+export function namePlaces(countries: readonly string[], continents: readonly string[]): string[] {
+    return [...continents.map(continentName), ...countries.map(countryName)];
+}
+
 /**
  * Whether a resolved location passes an allowlist. Empty lists mean no geo
  * restriction (admit everything). A non-empty list admits a location that

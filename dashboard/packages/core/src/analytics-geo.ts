@@ -239,28 +239,6 @@ export function resolveCountry(header: string | null | undefined, zone: string |
     return countryForTimeZone(zone);
 }
 
-let names: Intl.DisplayNames | null | undefined;
-
-/**
- * The country's name in English.
- *
- * Deliberately not localised to the reader: the rest of the dashboard is in English,
- * and a breakdown whose row labels change language halfway down - because some are
- * translated and the codes underneath are not - reads as a bug.
- */
-export function countryName(code: string | null | undefined): string {
-    if (!code || !/^[A-Za-z]{2}$/.test(code)) return "Unknown";
-    const upper = code.toUpperCase();
-    if (names === undefined) {
-        try {
-            names = new Intl.DisplayNames(["en"], { type: "region" });
-        } catch {
-            names = null;
-        }
-    }
-    return names?.of(upper) ?? upper;
-}
-
 /**
  * The flag, as the two regional-indicator code points the letters map to. Computed
  * rather than stored - there is no table of flags to keep, and a code Intl has never

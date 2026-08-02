@@ -11,9 +11,24 @@
  */
 
 import { useState } from "react";
+import { namePlaces } from "@polaris/core";
 import { useRouter } from "next/navigation";
-import { Globe, Pencil, Plus, Trash2 } from "lucide-react";
 import type { AccessGroupView } from "@polaris/auth";
+import { useConfirm } from "@/components/confirm-dialog";
+import { Globe, Pencil, Plus, Trash2 } from "lucide-react";
+import {
+    createAccessGroupAction,
+    deleteAccessGroupAction,
+    saveSignInRulesAction,
+    updateAccessGroupAction
+} from "./actions";
+import {
+    AccessRulesEditor,
+    accessRulesAreEmpty,
+    accessRulesEqual,
+    EMPTY_ACCESS_RULES,
+    type AccessRulesValue
+} from "@/components/access-rules-editor";
 import {
     Badge,
     Button,
@@ -26,20 +41,6 @@ import {
     DialogTitle,
     Input
 } from "@polaris/ui";
-import {
-    AccessRulesEditor,
-    accessRulesAreEmpty,
-    accessRulesEqual,
-    EMPTY_ACCESS_RULES,
-    type AccessRulesValue
-} from "@/components/access-rules-editor";
-import { useConfirm } from "@/components/confirm-dialog";
-import {
-    createAccessGroupAction,
-    deleteAccessGroupAction,
-    saveSignInRulesAction,
-    updateAccessGroupAction
-} from "./actions";
 
 /** One-line summary of what a rule set restricts. */
 function summarize(value: {
@@ -56,6 +57,20 @@ function summarize(value: {
     const places = value.allowedCountries.length + value.allowedContinents.length;
     if (places) parts.push(`${places} location${places === 1 ? "" : "s"}`);
     return parts.length > 0 ? parts.join(", ") : "No restriction - reachable from anywhere";
+}
+
+/**
+ * The same rule set spelled out. A count is enough where a dialog can be opened
+ * to see the entries; where there is none - the limits an administrator imposed -
+ * "1 location" tells a user they are restricted without telling them to what,
+ * which is the one thing they need in order to understand a refused sign-in.
+ */
+function spellOut(value: {
+    allowedCidrs: string[];
+    allowedCountries: string[];
+    allowedContinents: string[];
+}): string {
+    return [...value.allowedCidrs, ...namePlaces(value.allowedCountries, value.allowedContinents)].join(", ");
 }
 
 export function AccessView({
@@ -77,7 +92,7 @@ export function AccessView({
         null
     );
     const [error, setError] = useState<string | null>(null);
-    const enforcedSummary = accessRulesAreEmpty({ ...enforced, groupIds: [] }) ? null : summarize(enforced);
+    const enforcedSummary = accessRulesAreEmpty({ ...enforced, groupIds: [] }) ? null : spellOut(enforced);
 
     async function removeGroup(group: AccessGroupView) {
         const ok = await confirm({
@@ -113,7 +128,7 @@ export function AccessView({
                             unexplainable from this page. */}
                         {enforcedSummary ? (
                             <p className="pt-1 text-xs text-warning">
-                                An administrator also limits this account: {enforcedSummary}.
+                                An administrator also limits this account to {enforcedSummary}.
                             </p>
                         ) : null}
                     </div>

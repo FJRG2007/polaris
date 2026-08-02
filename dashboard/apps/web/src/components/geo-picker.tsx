@@ -3,33 +3,14 @@
 /**
  * Country/continent allowlist picker for shares and drop points. Continents are a
  * short chip row; countries are added from a searchable datalist and shown as
- * removable chips. Country names come from the browser's Intl.DisplayNames, so no
+ * removable chips. Country names come from the platform's own region table, so no
  * name table ships. Controlled: the parent owns the selected code arrays.
  */
 
-import { useMemo, useState } from "react";
 import { X } from "lucide-react";
-import { CONTINENTS, COUNTRY_CODES } from "@polaris/core";
 import { cn } from "@polaris/ui";
-
-/** Map ISO country codes to display names once, falling back to the code. */
-function useCountryNames(): (code: string) => string {
-    return useMemo(() => {
-        let display: Intl.DisplayNames | null = null;
-        try {
-            display = new Intl.DisplayNames(["en"], { type: "region" });
-        } catch {
-            display = null;
-        }
-        return (code: string) => {
-            try {
-                return display?.of(code) ?? code;
-            } catch {
-                return code;
-            }
-        };
-    }, []);
-}
+import { useMemo, useState } from "react";
+import { CONTINENTS, COUNTRY_CODES, countryName } from "@polaris/core";
 
 export function GeoPicker({
     countries,
@@ -42,11 +23,12 @@ export function GeoPicker({
     onCountries: (next: string[]) => void;
     onContinents: (next: string[]) => void;
 }) {
-    const nameOf = useCountryNames();
     const options = useMemo(
         () =>
-            COUNTRY_CODES.map((code) => ({ code, name: nameOf(code) })).sort((a, b) => a.name.localeCompare(b.name)),
-        [nameOf]
+            COUNTRY_CODES.map((code) => ({ code, name: countryName(code) })).sort((a, b) =>
+                a.name.localeCompare(b.name)
+            ),
+        []
     );
 
     const [query, setQuery] = useState("");
@@ -148,7 +130,7 @@ export function GeoPicker({
                                 key={code}
                                 className="flex items-center gap-1 rounded-full border border-primary/40 bg-primary/5 px-2 py-0.5 text-xs text-primary"
                             >
-                                {nameOf(code)}
+                                {countryName(code)}
                                 <button
                                     type="button"
                                     onClick={() => onCountries(countries.filter((c) => c !== code))}
