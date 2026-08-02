@@ -45,7 +45,10 @@ interface RawResponse {
  * A daemon rejection, phrased for whoever reads the deploy log. The daemon
  * already answers with the reason the kernel or the mount helper gave, so that
  * text is the message; the status code only appears when there is no body to
- * show, which would otherwise leave nothing to act on.
+ * show, which would otherwise leave nothing to act on. A failure on the host
+ * side of the daemon (an io error, a path it could not create) reads as a
+ * generic line instead - the detail stays in the daemon's own log, so that is
+ * where to look when the message alone does not explain it.
  */
 function daemonMessage(operation: string, response: RawResponse): string {
     const reason = response.body.trim();

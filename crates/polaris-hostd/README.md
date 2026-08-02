@@ -88,6 +88,13 @@ safe, generic message (internal error detail is never leaked).
   No request body is ever relayed.
 - **Bounded input** - control (JSON) bodies are capped at 16 MiB; the request
   head is capped at 64 KiB; body reads are bounded to `Content-Length`.
+- **No internal detail in responses** - a host-side failure (compose up, exec,
+  mount, umount) answers with a fixed generic message; the `io::Error` and the
+  host path behind it go to the daemon's stderr instead
+  (`docker compose logs hostd`, or `journalctl -u polaris-hostd` under the
+  systemd unit). The exception is a mount helper's own diagnostic - "Host is
+  down", "Permission denied" - which is passed through because it names what an
+  operator has to go and fix.
 - **No secret logging** - the token is never logged.
 
 ## Build and run

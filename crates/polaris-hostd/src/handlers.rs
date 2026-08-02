@@ -2,7 +2,8 @@
 //!
 //! Every handler returns an [`http::Response`]; none may panic on bad input.
 //! Client-facing error text is deliberately generic so internal detail (paths,
-//! errno strings) never leaks to the caller.
+//! errno strings) never leaks to the caller; that detail goes to the daemon's
+//! stderr instead, where an operator reading its log can still see it.
 
 use std::collections::HashMap;
 use std::io::Read;
@@ -331,11 +332,10 @@ fn deploy_up<R: Read>(state: &AppState, req: &Request, body: &mut R) -> Response
     let yaml = deploy::render_compose(&spec, &state.config);
     match deploy::compose_up(&state.config, &spec.project, &yaml) {
         Ok(reader) => stream_response(reader),
-        Err(e) => Response::text(
-            502,
-            "Bad Gateway",
-            &format!("could not start docker compose: {e}"),
-        ),
+        Err(e) => {
+            eprintln!("compose up for {} failed: {e}", spec.project);
+            Response::text(502, "Bad Gateway", "could not start docker compose")
+        }
     }
 }
 
@@ -696,11 +696,10 @@ fn deploy_exec_run<R: Read>(req: &Request, body: &mut R) -> Response {
             let body = serde_json::json!({ "code": code, "output": output });
             Response::json(200, "OK", &body)
         }
-        Err(error) => Response::text(
-            502,
-            "Bad Gateway",
-            &format!("could not run the command: {error}"),
-        ),
+        Err(error) => {
+            eprintln!("exec run in {} failed: {error}", request.container);
+            Response::text(502, "Bad Gateway", "could not run the command")
+        }
     }
 }
 
@@ -1025,7 +1024,8 @@ enum MountError {
     /// The operation failed, carrying what the kernel or the mount helper said.
     /// The reason reaches the caller verbatim: "mount command failed" tells an
     /// operator nothing, while "Host is down" or "Permission denied" names the
-    /// thing they have to go and fix.
+    /// thing they have to go and fix. Only the helper's own diagnostic goes in
+    /// here - a host-side io::Error or path stays on the daemon's stderr.
     Failed(String),
 }
 
@@ -1055,10 +1055,13 @@ fn run_mount(request: &MountRequest, target: &std::path::Path) -> Result<bool, M
         force_unmount(target)?;
     }
     if let Err(error) = std::fs::create_dir_all(target) {
-        return Err(MountError::Failed(format!(
+        eprintln!(
             "could not create the mount point {}: {error}",
             target.to_string_lossy()
-        )));
+        );
+        return Err(MountError::Failed(
+            "could not create the mount point".to_string(),
+        ));
     }
     let fstype = match request.kind {
         MountKind::Smb => "cifs",
@@ -1074,9 +1077,13 @@ fn run_mount(request: &MountRequest, target: &std::path::Path) -> Result<bool, M
     {
         let path = std::path::Path::new("/run/polaris").join(format!("mount-creds-{}", request.id));
         if let Err(error) = write_creds_file(&path, user, pass) {
-            return Err(MountError::Failed(format!(
-                "could not write the credentials file: {error}"
-            )));
+            eprintln!(
+                "could not write the credentials file for mount {}: {error}",
+                request.id
+            );
+            return Err(MountError::Failed(
+                "could not write the credentials file".to_string(),
+            ));
         }
         opts.push(format!("credentials={}", path.to_string_lossy()));
         creds_file = Some(path);
@@ -1102,7 +1109,10 @@ fn run_mount(request: &MountRequest, target: &std::path::Path) -> Result<bool, M
             request.source,
             command_message(&output)
         ))),
-        Err(error) => Err(MountError::Failed(format!("could not run mount: {error}"))),
+        Err(error) => {
+            eprintln!("could not run mount for {}: {error}", request.source);
+            Err(MountError::Failed("could not run mount".to_string()))
+        }
     }
 }
 
@@ -1181,14 +1191,27 @@ fn force_unmount(target: &std::path::Path) -> Result<(), MountError> {
                 args.join(" "),
                 command_message(&output)
             )),
-            Err(error) => return Err(MountError::Failed(format!("could not run umount: {error}"))),
+            Err(error) => {
+                eprintln!(
+                    "could not run umount on {}: {error}",
+                    target.to_string_lossy()
+                );
+                return Err(MountError::Failed("could not run umount".to_string()));
+            }
         }
     }
-    Err(MountError::Failed(format!(
-        "{} holds a dead mount that could not be detached ({}); unmount it on the host and retry",
+    // Both attempts and what they said go to the daemon's log, where the path is
+    // useful; the caller gets the one line it can act on without being told where
+    // on the host the mount sits.
+    eprintln!(
+        "{} holds a dead mount that could not be detached ({})",
         target.to_string_lossy(),
         reasons.join("; ")
-    )))
+    );
+    Err(MountError::Failed(
+        "the mount point holds a dead mount that could not be detached; unmount it on the host and retry"
+            .to_string(),
+    ))
 }
 
 /// True when `path` is a mount point.
@@ -1250,7 +1273,13 @@ fn run_umount(target: &std::path::Path) -> Result<(), MountError> {
         // A mount the caller wants gone but whose server has died refuses a plain
         // umount, so fall through to the same detach the mount path uses.
         Ok(_) => force_unmount(target),
-        Err(error) => Err(MountError::Failed(format!("could not run umount: {error}"))),
+        Err(error) => {
+            eprintln!(
+                "could not run umount on {}: {error}",
+                target.to_string_lossy()
+            );
+            Err(MountError::Failed("could not run umount".to_string()))
+        }
     }
 }
 
@@ -1331,6 +1360,26 @@ mod tests {
             stderr: Vec::new(),
         };
         assert_eq!(command_message(&silent), "exit status 1");
+    }
+
+    /// The reason a mount failure carries reaches the caller verbatim, so it may
+    /// only ever hold the helper's own diagnostic - never a host-side path.
+    #[cfg(unix)]
+    #[test]
+    fn a_failed_detach_does_not_name_the_host_path() {
+        let target =
+            std::env::temp_dir().join(format!("polaris-hostd-test-detach-{}", std::process::id()));
+        std::fs::create_dir_all(&target).unwrap();
+        let reason = match force_unmount(&target) {
+            Err(MountError::Failed(reason)) => reason,
+            other => panic!(
+                "detaching a path that is not mounted must fail: {}",
+                other.is_ok()
+            ),
+        };
+        let _ = std::fs::remove_dir(&target);
+        assert!(!reason.contains(&*target.to_string_lossy()));
+        assert!(!reason.contains(&*std::env::temp_dir().to_string_lossy()));
     }
 
     /// Output past the cap used to abort the whole daemon whenever it held a
