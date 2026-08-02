@@ -696,7 +696,11 @@ fn deploy_exec_run<R: Read>(req: &Request, body: &mut R) -> Response {
             let body = serde_json::json!({ "code": code, "output": output });
             Response::json(200, "OK", &body)
         }
-        Err(error) => Response::text(502, "Bad Gateway", &format!("could not run the command: {error}"))
+        Err(error) => Response::text(
+            502,
+            "Bad Gateway",
+            &format!("could not run the command: {error}"),
+        ),
     }
 }
 
@@ -722,7 +726,7 @@ fn run_in_container(container: &str, argv: &[String]) -> std::io::Result<(i32, S
 fn run_in_container(_container: &str, _argv: &[String]) -> std::io::Result<(i32, String)> {
     Err(std::io::Error::new(
         std::io::ErrorKind::Unsupported,
-        "exec is only supported on unix hosts"
+        "exec is only supported on unix hosts",
     ))
 }
 
@@ -1099,7 +1103,7 @@ fn command_message(output: &std::process::Output) -> String {
     }
     match output.status.code() {
         Some(code) => format!("exit status {code}"),
-        None => "killed by a signal".to_string()
+        None => "killed by a signal".to_string(),
     }
 }
 
@@ -1116,9 +1120,7 @@ fn force_unmount(target: &std::path::Path) -> Result<(), MountError> {
         match output {
             Ok(output) if output.status.success() => return Ok(()),
             Ok(_) => continue,
-            Err(error) => {
-                return Err(MountError::Failed(format!("could not run umount: {error}")))
-            }
+            Err(error) => return Err(MountError::Failed(format!("could not run umount: {error}"))),
         }
     }
     Err(MountError::Failed(format!(
@@ -1186,7 +1188,7 @@ fn run_umount(target: &std::path::Path) -> Result<(), MountError> {
         // A mount the caller wants gone but whose server has died refuses a plain
         // umount, so fall through to the same detach the mount path uses.
         Ok(_) => force_unmount(target),
-        Err(error) => Err(MountError::Failed(format!("could not run umount: {error}")))
+        Err(error) => Err(MountError::Failed(format!("could not run umount: {error}"))),
     }
 }
 
@@ -1253,12 +1255,19 @@ mod tests {
             status: failed,
             stdout: b"ignored".to_vec(),
             stderr: b"\nmount error(112): Host is down\nRefer to the mount.cifs(8) manual page\n"
-                .to_vec()
+                .to_vec(),
         };
-        assert_eq!(command_message(&with_stderr), "mount error(112): Host is down");
+        assert_eq!(
+            command_message(&with_stderr),
+            "mount error(112): Host is down"
+        );
 
         // Nothing printed at all still names something actionable.
-        let silent = std::process::Output { status: failed, stdout: Vec::new(), stderr: Vec::new() };
+        let silent = std::process::Output {
+            status: failed,
+            stdout: Vec::new(),
+            stderr: Vec::new(),
+        };
         assert_eq!(command_message(&silent), "exit status 1");
     }
 
