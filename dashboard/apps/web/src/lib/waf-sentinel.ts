@@ -13,6 +13,8 @@
 
 import { runWafJails } from "@/lib/waf-ban-service";
 import { runSshJails } from "@/lib/waf-ssh-service";
+import { armPolarisPresets } from "@/lib/waf-service";
+import { syncDashboardRoute } from "@/lib/domain-edge";
 import { runWafAnomalies } from "@/lib/waf-anomaly-service";
 import { publishWafIntel, pruneWafBans, refreshWafFeeds } from "@/lib/waf-intel-service";
 
@@ -40,6 +42,13 @@ export function startWafSentinel(): void {
     // fresh install, a recreated container - is enforcing the current bans without
     // waiting out the first tick.
     void publishWafIntel();
+
+    // An instance older than the current pack defaults has the dashboard's own scope
+    // brought up to them here, once. The route is only rewritten if that changed
+    // something, so an already-armed instance pays nothing for this.
+    void armPolarisPresets()
+        .then((changed) => (changed ? syncDashboardRoute() : undefined))
+        .catch((error: unknown) => console.error("polaris: arming the dashboard's firewall scope failed:", error));
 
     const tick = async () => {
         try {

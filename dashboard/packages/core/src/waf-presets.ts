@@ -22,8 +22,8 @@ export const WAF_PRESET_IDS = [
     "scanners",
     "dotfiles",
     "directory-listing",
-    "cms-probes",
     "admin-panels",
+    "cms-probes",
     "ai-crawlers",
     "search-crawlers"
 ] as const;
@@ -32,6 +32,13 @@ export type WafPresetId = (typeof WAF_PRESET_IDS)[number];
 
 export interface WafPreset {
     readonly id: WafPresetId;
+    /**
+     * What the pack does, phrased as the action rather than the subject.
+     *
+     * "AI crawlers" next to a switch does not say which way the switch goes - it reads
+     * as plausibly as a setting that welcomes them. "Block AI crawlers" cannot be read
+     * two ways, and every pack here blocks something, so they all say so.
+     */
     readonly label: string;
     readonly description: string;
     /**
@@ -221,7 +228,7 @@ const SEARCH_AGENTS = [
 export const WAF_PRESETS: readonly WafPreset[] = [
     {
         id: "scanners",
-        label: "Vulnerability scanners",
+        label: "Block vulnerability scanners",
         description: "Blocks agents that exist to probe for holes - sqlmap, nikto, nmap, wpscan and the like.",
         defaultAt: "instance",
         rules: [
@@ -241,7 +248,7 @@ export const WAF_PRESETS: readonly WafPreset[] = [
     },
     {
         id: "dotfiles",
-        label: "Exposed secrets and dotfiles",
+        label: "Block exposed secrets and dotfiles",
         description:
             "Blocks requests for .env, .git, SSH keys, database dumps and editor folders. Certificate validation under /.well-known/ still gets through.",
         defaultAt: "instance",
@@ -265,7 +272,7 @@ export const WAF_PRESETS: readonly WafPreset[] = [
     },
     {
         id: "directory-listing",
-        label: "Directory listing",
+        label: "Block directory listing",
         description:
             "Refuses the two ways a served directory listing gets used: the sort links a listing page generates, and reads of directories that should never be browsable at all.",
         defaultAt: "instance",
@@ -289,7 +296,7 @@ export const WAF_PRESETS: readonly WafPreset[] = [
     },
     {
         id: "admin-panels",
-        label: "Exposed admin panels",
+        label: "Block exposed admin panels",
         description:
             "Blocks probes for Adminer, pgAdmin, Portainer, Jenkins, Grafana, Spring Actuator and the Kubernetes API - the front-ends an attacker checks for before anything else.",
         defaultAt: "instance",
@@ -305,7 +312,7 @@ export const WAF_PRESETS: readonly WafPreset[] = [
     },
     {
         id: "cms-probes",
-        label: "WordPress and PHP probing",
+        label: "Block WordPress and PHP probing",
         description:
             "Blocks /wp-admin, /phpmyadmin, .php and the rest of the standard exploit sweep. On a service that does not run PHP, a request for any of them is never a visitor.",
         defaultAt: "application",
@@ -327,7 +334,7 @@ export const WAF_PRESETS: readonly WafPreset[] = [
     },
     {
         id: "ai-crawlers",
-        label: "AI crawlers",
+        label: "Block AI crawlers",
         description: "Blocks GPTBot, ClaudeBot, PerplexityBot, Bytespider and other model and answer-engine agents.",
         defaultAt: null,
         caution: "Well-behaved agents identify themselves honestly; one that lies about its user agent is not stopped by this.",
@@ -342,7 +349,7 @@ export const WAF_PRESETS: readonly WafPreset[] = [
     },
     {
         id: "search-crawlers",
-        label: "Search engine crawlers",
+        label: "Block search engine crawlers",
         description: "Blocks Googlebot, bingbot, Slurp, LinkedInBot and other indexers.",
         defaultAt: null,
         caution: "This removes the service from search results. Turn it on for something private, not for a public site.",
@@ -389,6 +396,20 @@ export function expandWafPresets(ids: readonly string[]): WafCustomRule[] {
  *  construction: nothing here can be wrong for a service Polaris has not seen yet. */
 export function instanceDefaultWafPresets(): WafPresetId[] {
     return WAF_PRESETS.filter((preset) => preset.defaultAt === "instance").map((preset) => preset.id);
+}
+
+/**
+ * The packs Polaris's own ingress starts with: every one of them.
+ *
+ * The dashboard is not a website. It serves no PHP, has no directories to browse, and
+ * wants nothing to do with a search index or a model crawler - so the two packs that
+ * are a publishing decision everywhere else are simply correct here, and none of the
+ * rest can be wrong for it. Every path they refuse is a path Polaris does not answer
+ * on, which is why this is the one scope that can be fully armed without knowing
+ * anything about what is deployed.
+ */
+export function polarisDefaultWafPresets(): WafPresetId[] {
+    return WAF_PRESETS.map((preset) => preset.id);
 }
 
 /**

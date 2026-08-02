@@ -82,8 +82,13 @@ export default async function FirewallPage({
 
     // An unknown scope in the URL is a typo or a stale link, not a 404: fall back to
     // the widest thing this caller is allowed to see.
+    //
+    // "All services" rather than "Polaris itself", even though the dashboard's own
+    // scope is the broader-sounding of the two. Someone opening the firewall came to
+    // protect what they deployed; the dashboard is one application among those, and its
+    // own scope is a special case they can pick when they want it.
     const requested = WAF_SCOPE_TYPES.includes(scope as WafScopeType) ? (scope as WafScopeType) : null;
-    const fallback: WafScopeType = canOperate ? "polaris" : "project";
+    const fallback: WafScopeType = canOperate ? "global" : "project";
     let kind = requested ?? fallback;
     if (!canOperate && (kind === "polaris" || kind === "global")) kind = "project";
 

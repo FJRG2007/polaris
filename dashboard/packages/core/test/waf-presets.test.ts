@@ -6,6 +6,7 @@ import {
     expandWafPresets,
     instanceDefaultWafPresets,
     isWafPresetId,
+    polarisDefaultWafPresets,
     wafPreset,
     WAF_PRESETS
 } from "../src/waf-presets.js";
@@ -29,10 +30,14 @@ describe("rule packs", () => {
     });
 
     it("resolves an id and rejects one it does not ship", () => {
-        expect(wafPreset("scanners")?.label).toBe("Vulnerability scanners");
+        expect(wafPreset("scanners")?.label).toBe("Block vulnerability scanners");
         expect(wafPreset("nope")).toBeUndefined();
         expect(isWafPresetId("dotfiles")).toBe(true);
         expect(isWafPresetId("nope")).toBe(false);
+    });
+
+    it("names every pack as the action, so a switch cannot be read backwards", () => {
+        for (const preset of WAF_PRESETS) expect(preset.label.startsWith("Block ")).toBe(true);
     });
 
     it("expands in pack order regardless of how the ids were stored", () => {
@@ -156,10 +161,19 @@ describe("defaults", () => {
         expect(applicationDefaultWafPresets("wordpress:latest")).toEqual([]);
     });
 
-    it("never enables a crawler pack on its own", () => {
+    it("never enables a crawler pack on a scope that serves the public", () => {
         const defaults = [...instanceDefaultWafPresets(), ...applicationDefaultWafPresets("node")];
         expect(defaults).not.toContain("ai-crawlers");
         expect(defaults).not.toContain("search-crawlers");
+    });
+
+    it("arms every pack on the dashboard's own scope, crawlers included", () => {
+        // The one scope where the application is known, and it is this one: nothing
+        // here can be wrong for it, so nothing is held back.
+        expect(polarisDefaultWafPresets()).toEqual(WAF_PRESETS.map((preset) => preset.id));
+        expect(polarisDefaultWafPresets()).toContain("ai-crawlers");
+        expect(polarisDefaultWafPresets()).toContain("search-crawlers");
+        expect(polarisDefaultWafPresets()).toContain("directory-listing");
     });
 });
 
