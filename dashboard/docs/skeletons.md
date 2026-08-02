@@ -53,7 +53,14 @@ download and no session to fake.
    It walks the routes under `src/app`, skipping dynamic segments, and writes one
    `<name>.bones.json` per screen at each width in `boneyard.config.json`. Its own
    `registry.ts` output is not used - `src/bones/index.ts` is the list Polaris
-   reads, so add a line there for any new screen.
+   reads, so add a line there for any new screen, and delete the `registry.ts` it
+   leaves behind.
+
+   A screen is recorded in the state the signed-in account finds it in, so what
+   the database holds during the run is what the skeleton will sketch: a table
+   captured against an empty log records its empty state. Give the long ones a
+   screenful or two of rows first - and no more than that, since anything past
+   `max-h-[150vh]` is never drawn and only makes the file bigger.
 
 ## Widths
 
@@ -62,6 +69,16 @@ widths, and `BoneSkeleton` picks between them with the matching Tailwind media
 queries (`md` and `xl`) rather than by measuring, so the first painted frame is
 already the right one. Changing the list means changing the `VISIBILITY` map in
 `bone-skeleton.tsx` with it.
+
+A capture stores x and width as **percentages of the width it was taken at**,
+which only reproduces the screen at that width. Above 1280 that stretched every
+screen whose content is a column of a fixed width: `max-w-2xl` drawn as "68% of
+the content area" is 1117px on a 1920 viewport, over a column that is still
+672px. `BoneSkeleton` recovers the column instead - a recording whose blocks are
+centred within it is a column that `mx-auto` put there, so the extent they span
+is taken in pixels and the sketch is drawn at that width. A screen that is narrow
+because of what is in it sits against its left edge rather than centred, and
+keeps following the width it is given, which is what its content does too.
 
 ## In-view skeletons
 

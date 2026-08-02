@@ -9,6 +9,7 @@
 import routeAdmin from "./route-admin.bones.json";
 import routeDrive from "./route-drive.bones.json";
 import routeInbox from "./route-inbox.bones.json";
+import routeTasks from "./route-tasks.bones.json";
 import routeTrash from "./route-trash.bones.json";
 import routeWatch from "./route-watch.bones.json";
 import type { ResponsiveLayout } from "@polaris/ui";
@@ -16,9 +17,12 @@ import routeAccount from "./route-account.bones.json";
 import routeSettings from "./route-settings.bones.json";
 import routeFavorites from "./route-favorites.bones.json";
 import routeInboxLogs from "./route-inbox-logs.bones.json";
+import routeTasksDocs from "./route-tasks-docs.bones.json";
+import routeTasksTime from "./route-tasks-time.bones.json";
 import routeAdminEmail from "./route-admin-email.bones.json";
 import routeAdminUsers from "./route-admin-users.bones.json";
 import routeAppsDeploy from "./route-apps-deploy.bones.json";
+import routeTasksGoals from "./route-tasks-goals.bones.json";
 import routeAdminGroups from "./route-admin-groups.bones.json";
 import routeAppsBackups from "./route-apps-backups.bones.json";
 import routeAppsRunners from "./route-apps-runners.bones.json";
@@ -28,11 +32,14 @@ import routeWatchAlarms from "./route-watch-alarms.bones.json";
 import routeIntegrations from "./route-integrations.bones.json";
 import routeAdminDisplay from "./route-admin-display.bones.json";
 import routeAdminDomains from "./route-admin-domains.bones.json";
-import routeWatchServers from "./route-watch-servers.bones.json";
 import routeAppsFirewall from "./route-apps-firewall.bones.json";
+import routeTasksReports from "./route-tasks-reports.bones.json";
+import routeTasksSprints from "./route-tasks-sprints.bones.json";
+import routeWatchServers from "./route-watch-servers.bones.json";
 import routeAccountAccess from "./route-account-access.bones.json";
 import routeAdminActivity from "./route-admin-activity.bones.json";
 import routeAdminPolicies from "./route-admin-policies.bones.json";
+import routeAppsAnalytics from "./route-apps-analytics.bones.json";
 import routeDriveOverview from "./route-drive-overview.bones.json";
 import routeInboxChannels from "./route-inbox-channels.bones.json";
 import routeInboxContacts from "./route-inbox-contacts.bones.json";
@@ -43,6 +50,7 @@ import routeAccountApiKeys from "./route-account-api-keys.bones.json";
 import routeAccountSecurity from "./route-account-security.bones.json";
 import routeAccountSessions from "./route-account-sessions.bones.json";
 import routeAppsMarketplace from "./route-apps-marketplace.bones.json";
+import routeTasksEverything from "./route-tasks-everything.bones.json";
 import routeWatchContainers from "./route-watch-containers.bones.json";
 import routeDriveDropPoints from "./route-drive-drop-points.bones.json";
 import routeDriveSharedLinks from "./route-drive-shared-links.bones.json";
@@ -66,6 +74,7 @@ export const ROUTE_BONES: Record<string, ResponsiveLayout | undefined> = {
     "route-admin-groups": routeAdminGroups,
     "route-admin-policies": routeAdminPolicies,
     "route-admin-users": routeAdminUsers,
+    "route-apps-analytics": routeAppsAnalytics,
     "route-apps-backups": routeAppsBackups,
     "route-apps-containers": routeAppsContainers,
     "route-apps-deploy": routeAppsDeploy,
@@ -86,6 +95,13 @@ export const ROUTE_BONES: Record<string, ResponsiveLayout | undefined> = {
     "route-inbox-logs": routeInboxLogs,
     "route-integrations": routeIntegrations,
     "route-settings": routeSettings,
+    "route-tasks": routeTasks,
+    "route-tasks-docs": routeTasksDocs,
+    "route-tasks-everything": routeTasksEverything,
+    "route-tasks-goals": routeTasksGoals,
+    "route-tasks-reports": routeTasksReports,
+    "route-tasks-sprints": routeTasksSprints,
+    "route-tasks-time": routeTasksTime,
     "route-trash": routeTrash,
     "route-watch": routeWatch,
     "route-watch-alarms": routeWatchAlarms,
