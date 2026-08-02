@@ -100,6 +100,13 @@ export async function register(): Promise<void> {
     const { startWafSentinel } = await import("./lib/waf-sentinel");
     startWafSentinel();
 
+    // Fold the same access log into visits, so every deployed service has analytics
+    // the moment it has a domain - no script tag, no redeploy, nothing for the app to
+    // cooperate with. Also rolls each finished day into totals and drops the raw rows
+    // past the retention window.
+    const { startAnalyticsCollector } = await import("./lib/analytics-collector");
+    startAnalyticsCollector();
+
     // Re-establish messaging channels in the bridge after a bridge or web restart:
     // the bridge holds adapters in memory, so without this a channel stays
     // "connected" in the DB but dead at the bridge until manually reconnected.

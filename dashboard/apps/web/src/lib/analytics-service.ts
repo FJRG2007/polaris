@@ -26,9 +26,11 @@ import {
     visitDay,
     visitSessionId,
     type AnalyticsSettings,
+    type VisitDimension,
     type VisitEventRow,
     type VisitRange,
     type VisitReport,
+    type VisitRow,
     type VisitSessionRow,
     VISIT_RANGE_SPEC
 } from "@polaris/core";
@@ -286,11 +288,29 @@ export interface AnalyticsView extends VisitReport {
     readonly to: number;
     /** Visitors active in the last five minutes. */
     readonly online: number;
-    /** True when the window reaches past the raw retention window, so the screen can
-     *  say the detail behind these totals no longer exists rather than implying the
-     *  breakdowns are complete. */
-    readonly beyondRetention: boolean;
+    /** Whether these numbers came from the per-visit rows or from the daily totals.
+     *  The screen says which, because the two do not answer the same questions. */
+    readonly source: "raw" | "daily";
+    /** The dimensions this source cannot answer, so the screen can say why a panel is
+     *  empty instead of implying nobody used a screen size all quarter. */
+    readonly unavailable: readonly VisitDimension[];
 }
+
+/**
+ * Longest window still answered from the per-visit rows.
+ *
+ * Past this the daily totals are read instead. Not an optimisation - a year of raw
+ * requests on a busy service is millions of rows, and loading them to draw twelve
+ * bars would take the process down. It is also why the rollup exists.
+ */
+const RAW_MAX_MS = 31 * 86_400_000;
+
+/** A backstop for a service that gets a month of traffic in a day. Reaching it means
+ *  the window is reported as truncated rather than silently wrong. */
+const RAW_EVENT_CAP = 200_000;
+
+/** What only the per-visit rows can answer. */
+const RAW_ONLY: readonly VisitDimension[] = ["entry", "exit", "campaign", "language", "screen", "ip"];
 
 export async function readAnalytics(
     site: AnalyticsSiteView,
@@ -299,9 +319,16 @@ export async function readAnalytics(
 ): Promise<AnalyticsView> {
     const spec = VISIT_RANGE_SPEC[range];
     const from = now - spec.ms;
-    const settings = await getAnalyticsSettings();
+    const online = await prisma.analyticsSession.count({
+        where: { siteId: site.id, lastSeenAt: { gte: new Date(now - 5 * 60 * 1000) } }
+    });
 
-    const [sessions, events, online] = await Promise.all([
+    if (spec.ms > RAW_MAX_MS) {
+        const report = await reportFromDays(site.id, from, now, spec.buckets);
+        return { ...report, site, from, to: now, online, source: "daily", unavailable: RAW_ONLY };
+    }
+
+    const [sessions, events] = await Promise.all([
         prisma.analyticsSession.findMany({
             where: { siteId: site.id, lastSeenAt: { gte: new Date(from) } },
             orderBy: { startedAt: "asc" }
@@ -309,10 +336,8 @@ export async function readAnalytics(
         prisma.analyticsEvent.findMany({
             where: { siteId: site.id, at: { gte: new Date(from), lt: new Date(now) } },
             orderBy: { at: "asc" },
+            take: RAW_EVENT_CAP,
             select: { sessionId: true, at: true, kind: true, name: true, path: true }
-        }),
-        prisma.analyticsSession.count({
-            where: { siteId: site.id, lastSeenAt: { gte: new Date(now - 5 * 60 * 1000) } }
         })
     ]);
 
@@ -323,14 +348,87 @@ export async function readAnalytics(
         to: now,
         buckets: spec.buckets
     });
+    return { ...report, site, from, to: now, online, source: "raw", unavailable: [] };
+}
 
+/**
+ * The same report, rebuilt from the daily totals.
+ *
+ * Coarser by construction: a day is the smallest bucket, and the dimensions the
+ * rollup does not carry come back empty rather than approximated. Visitors are
+ * summed across days, which counts a person who came back on two days twice - the
+ * only thing it can mean when sessions are cookieless and rotate daily, and what the
+ * screen labels it as.
+ */
+async function reportFromDays(siteId: string, from: number, to: number, buckets: number): Promise<VisitReport> {
+    const rows = await prisma.analyticsDay.findMany({
+        where: { siteId, day: { gte: new Date(visitDay(from)), lt: new Date(to) } },
+        orderBy: { day: "asc" }
+    });
+
+    const totals = rows.filter((row) => row.dimension === "total");
+    const views = totals.reduce((sum, row) => sum + row.views, 0);
+    const visitors = totals.reduce((sum, row) => sum + row.visitors, 0);
+    const bounces = totals.reduce((sum, row) => sum + row.bounces, 0);
+    const durationSec = totals.reduce((sum, row) => sum + row.durationSec, 0);
+    const measured = totals.reduce((sum, row) => sum + row.measured, 0);
+
+    const width = Math.max(1, (to - from) / Math.max(1, buckets));
+    const slots = Array.from({ length: Math.max(1, buckets) }, (_, index) => ({
+        t: Math.round(from + index * width),
+        views: 0,
+        visitors: 0
+    }));
+    for (const row of totals) {
+        const slot = slots[Math.min(slots.length - 1, Math.max(0, Math.floor((row.day.getTime() - from) / width)))];
+        if (!slot) continue;
+        slot.views += row.views;
+        slot.visitors += row.visitors;
+    }
+
+    const rank = (dimension: VisitDimension) => {
+        const tally = new Map<string, { visitors: number; views: number }>();
+        for (const row of rows) {
+            if (row.dimension !== dimension) continue;
+            const cell = tally.get(row.value) ?? { visitors: 0, views: 0 };
+            cell.visitors += row.visitors;
+            cell.views += row.views;
+            tally.set(row.value, cell);
+        }
+        return [...tally]
+            .map(([key, cell]) => ({ key, ...cell }))
+            .sort((a, b) => b.visitors - a.visitors || b.views - a.views || (a.key < b.key ? -1 : 1))
+            .slice(0, 10);
+    };
+
+    const empty: VisitRow[] = [];
     return {
-        ...report,
-        site,
-        from,
-        to: now,
-        online,
-        beyondRetention: spec.ms > settings.retentionDays * 86_400_000
+        overview: {
+            visitors,
+            sessions: visitors,
+            views,
+            events: rows.filter((row) => row.dimension === "event").reduce((sum, row) => sum + row.views, 0),
+            bounceRate: visitors > 0 ? bounces / visitors : null,
+            avgVisitSec: measured > 0 ? Math.round(durationSec / measured) : null,
+            viewsPerSession: visitors > 0 ? views / visitors : null
+        },
+        series: slots,
+        breakdowns: {
+            path: rank("path"),
+            entry: empty,
+            exit: empty,
+            referrer: rank("referrer"),
+            channel: rank("channel"),
+            campaign: empty,
+            browser: rank("browser"),
+            os: rank("os"),
+            device: rank("device"),
+            country: rank("country"),
+            language: empty,
+            screen: empty,
+            event: rank("event"),
+            ip: empty
+        }
     };
 }
 

@@ -169,6 +169,12 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             icon: ShieldCheck,
             keywords: ["waf", "ip", "allowlist", "denylist", "block", "access"]
         },
+        {
+            label: "Analytics",
+            href: "/apps/analytics",
+            icon: ChartColumn,
+            keywords: ["visitors", "traffic", "pageviews", "referrers", "metrics", "umami"]
+        },
         { label: "Containers", href: "/apps/containers", icon: Container, keywords: ["docker"] },
         { label: "Backups", href: "/apps/backups", icon: Database, keywords: ["restore", "snapshots"] }
     ],

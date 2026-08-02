@@ -79,6 +79,22 @@ function visibleProjectWhere(userId: string) {
     return { OR: [{ ownerId: userId }, { members: { some: { userId } } }, { visibility: "internal" }] };
 }
 
+/**
+ * One service, if this user may read it at all. Same rule as the lists above, so a
+ * screen never offers a service in its picker and then refuses to show it - which is
+ * what happens whenever a read path authorizes more narrowly than the list that fed
+ * it.
+ */
+export async function visibleApplication(
+    applicationId: string,
+    userId: string
+): Promise<{ id: string; name: string; environmentId: string } | null> {
+    return prisma.application.findFirst({
+        where: { id: applicationId, environment: { project: visibleProjectWhere(userId) } },
+        select: { id: true, name: true, environmentId: true }
+    });
+}
+
 export async function listProjects(ownerId: string) {
     return prisma.project.findMany({
         where: visibleProjectWhere(ownerId),
