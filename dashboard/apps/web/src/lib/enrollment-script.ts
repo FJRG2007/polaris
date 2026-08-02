@@ -27,6 +27,12 @@ const DARWIN_UID_FLOOR = 300;
  * and neither is a thing to grant because a socket happened to be present or
  * because it would be convenient - they stay in the command where whoever runs it
  * can read what they are agreeing to.
+ *
+ * No `-f`. A refusal from this endpoint is a shell script that explains itself and
+ * exits non-zero, and `-f` throws that body away: the operator gets `curl: (22)
+ * ... 404` and a pipeline that still exits 0, so a spent command looks like a
+ * successful run and the dialog waits forever. Errors curl raises itself are still
+ * printed - that is what `-S` is for.
  */
 export function enrollmentCommand(
     baseUrl: string,
@@ -36,7 +42,7 @@ export function enrollmentCommand(
 ): string {
     const url = `${baseUrl}/api/servers/enroll/${token}`;
     const flags = [grantDocker ? "--docker" : null, grantRoot ? "--root" : null].filter(Boolean);
-    return flags.length > 0 ? `curl -fsSL ${url} | sudo sh -s -- ${flags.join(" ")}` : `curl -fsSL ${url} | sudo sh`;
+    return flags.length > 0 ? `curl -sSL ${url} | sudo sh -s -- ${flags.join(" ")}` : `curl -sSL ${url} | sudo sh`;
 }
 
 export interface EnrollmentScriptInput {

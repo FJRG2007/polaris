@@ -94,19 +94,39 @@ export type ClaimEnrollmentInput = z.infer<typeof claimEnrollmentSchema>;
 export const ENROLLMENT_STATES = ["pending", "claimed", "failed", "expired"] as const;
 export type EnrollmentState = (typeof ENROLLMENT_STATES)[number];
 
+/** How many addresses a claim is allowed to send Polaris knocking on. Each one
+ *  costs an outbound SSH handshake, and a machine with more than a handful of
+ *  usable addresses is not the case worth paying for. */
+const MAX_ADDRESS_CANDIDATES = 6;
+
 /**
- * Where to reach a machine that just claimed an enrollment.
+ * Where to try reaching a machine that just claimed an enrollment, best first.
  *
- * The address the claim was observed arriving from wins over every address the
- * payload offers, because that one Polaris saw for itself and the rest are the
- * machine's own account of its network. Loopback is never it: a claim arriving
- * from 127.0.0.1 came through Polaris's own proxy, so believing it would point
- * the new server at Polaris.
+ * The address the claim was observed arriving from leads, because that one
+ * Polaris saw for itself and the rest are the machine's own account of its
+ * network. It is a candidate rather than the answer, though: a claim that took
+ * any NAT on the way - a machine reaching Polaris through its own public
+ * hostname, so the router hairpins it and rewrites the source - is observed
+ * arriving from the router, and the router is not the machine. When that address
+ * does not answer as this machine, the ones it reported are tried in turn.
+ *
+ * Trusting a reported address costs nothing extra: the caller only accepts an
+ * address that answers with one of the host keys the machine committed to while
+ * the script still had root on it, so an address pointing somewhere else fails
+ * that check exactly as it would have before.
+ *
+ * Loopback is never a candidate: a claim arriving from 127.0.0.1 came through
+ * Polaris's own proxy, so believing it would point the new server at Polaris.
  */
-export function pickEnrollmentAddress(observed: string | undefined, reported: string[]): string | null {
-    const source = (observed ?? "").trim();
-    if (source && !isLoopback(source)) return source;
-    return reported.map((value) => value.trim()).find((value) => value && !isLoopback(value)) ?? null;
+export function enrollmentAddressCandidates(observed: string | undefined, reported: string[]): string[] {
+    const ordered = [observed ?? "", ...reported].map((value) => value.trim());
+    const candidates: string[] = [];
+    for (const value of ordered) {
+        if (!value || isLoopback(value) || candidates.includes(value)) continue;
+        candidates.push(value);
+        if (candidates.length === MAX_ADDRESS_CANDIDATES) break;
+    }
+    return candidates;
 }
 
 function isLoopback(value: string): boolean {

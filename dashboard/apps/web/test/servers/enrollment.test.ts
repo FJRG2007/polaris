@@ -5,35 +5,72 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { pickEnrollmentAddress } from "@polaris/core";
+import { enrollmentAddressCandidates } from "@polaris/core";
 import { enrollmentCommand, enrollmentScript } from "../../src/lib/enrollment-script";
 
-describe("pickEnrollmentAddress", () => {
-    it("believes the address it observed over the one it was told", () => {
-        expect(pickEnrollmentAddress("203.0.113.8", ["10.0.0.5", "192.168.1.7"])).toBe("203.0.113.8");
+describe("enrollmentAddressCandidates", () => {
+    it("leads with the address it observed over the ones it was told", () => {
+        expect(enrollmentAddressCandidates("203.0.113.8", ["10.0.0.5", "192.168.1.7"])).toEqual([
+            "203.0.113.8",
+            "10.0.0.5",
+            "192.168.1.7"
+        ]);
+    });
+
+    // A machine reaching Polaris through its own public hostname is hairpinned by
+    // the router, so the claim is observed arriving from the router. Keeping the
+    // reported addresses is the only thing between that and an enrollment that
+    // fails on a machine which was reachable all along.
+    it("keeps the reported addresses behind an observed one that is not the machine", () => {
+        expect(enrollmentAddressCandidates("192.168.1.1", ["192.168.1.142"])).toEqual([
+            "192.168.1.1",
+            "192.168.1.142"
+        ]);
     });
 
     it("falls back to a reported address when nothing was observed", () => {
-        expect(pickEnrollmentAddress(undefined, ["192.168.1.7"])).toBe("192.168.1.7");
+        expect(enrollmentAddressCandidates(undefined, ["192.168.1.7"])).toEqual(["192.168.1.7"]);
     });
 
-    it("never accepts loopback, which is Polaris's own proxy and not the machine", () => {
-        expect(pickEnrollmentAddress("127.0.0.1", ["192.168.1.7"])).toBe("192.168.1.7");
-        expect(pickEnrollmentAddress("::1", ["192.168.1.7"])).toBe("192.168.1.7");
-        expect(pickEnrollmentAddress("127.0.0.1", ["127.0.0.1", "localhost"])).toBeNull();
+    it("never offers loopback, which is Polaris's own proxy and not the machine", () => {
+        expect(enrollmentAddressCandidates("127.0.0.1", ["192.168.1.7"])).toEqual(["192.168.1.7"]);
+        expect(enrollmentAddressCandidates("::1", ["192.168.1.7"])).toEqual(["192.168.1.7"]);
+        expect(enrollmentAddressCandidates("127.0.0.1", ["127.0.0.1", "localhost"])).toEqual([]);
     });
 
     it("has nothing to offer when the machine reported nothing usable", () => {
-        expect(pickEnrollmentAddress(undefined, [])).toBeNull();
-        expect(pickEnrollmentAddress("", ["  "])).toBeNull();
+        expect(enrollmentAddressCandidates(undefined, [])).toEqual([]);
+        expect(enrollmentAddressCandidates("", ["  "])).toEqual([]);
+    });
+
+    it("does not knock twice on the same address", () => {
+        expect(enrollmentAddressCandidates("192.168.1.7", ["192.168.1.7", "10.0.0.5"])).toEqual([
+            "192.168.1.7",
+            "10.0.0.5"
+        ]);
+    });
+
+    // Each candidate is an outbound SSH handshake, and a claim is unauthenticated
+    // beyond its token, so the list it can send Polaris knocking on is bounded.
+    it("bounds how many addresses one claim can send Polaris knocking on", () => {
+        const reported = Array.from({ length: 16 }, (_, index) => `10.0.0.${index + 1}`);
+        expect(enrollmentAddressCandidates("203.0.113.8", reported)).toHaveLength(6);
     });
 });
 
 describe("enrollmentCommand", () => {
     it("stays a plain pipe into sh so it runs on a minimal box", () => {
         expect(enrollmentCommand("https://polaris.example.com", "tok")).toBe(
-            "curl -fsSL https://polaris.example.com/api/servers/enroll/tok | sudo sh"
+            "curl -sSL https://polaris.example.com/api/servers/enroll/tok | sudo sh"
         );
+    });
+
+    // A spent or unknown token is answered with a script that says so and exits 1.
+    // `-f` discards that body, leaving the operator with `curl: (22) ... 404` and a
+    // pipeline that exits 0 - the command looks like it worked and nothing arrives.
+    it("does not throw away the body a refusal explains itself in", () => {
+        expect(enrollmentCommand("https://polaris.example.com", "tok")).not.toContain("-f");
+        expect(enrollmentCommand("https://polaris.example.com", "tok", true, true)).not.toContain("-f");
     });
 
     it("keeps container access visible as an argument rather than hiding it", () => {

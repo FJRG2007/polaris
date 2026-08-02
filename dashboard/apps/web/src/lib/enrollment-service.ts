@@ -20,6 +20,12 @@
  * address becomes the server. Here the machine committed to its keys while the
  * script still had root on it, so a different key answering later is caught.
  *
+ * That check is also what lets step 4 try more than one address. The address the
+ * claim arrived from is the router rather than the machine whenever the claim was
+ * hairpinned through it - which is what happens whenever a machine reaches Polaris
+ * through its public hostname - so the addresses the machine reported are tried
+ * after it, and whichever one answers with a committed key is the machine.
+ *
  * What an attacker gets from intercepting the command is a token that expires in
  * minutes, works once, and only ever causes Polaris to dial OUT to whoever
  * claimed it - a connection that then fails host-key verification unless they
@@ -40,8 +46,8 @@ import { generateSshKeyPair, publicKeyBlob, testAndCaptureHostKey } from "@polar
 import {
     ENROLLMENT_TTL_MS,
     ENROLLMENT_USERNAME,
+    enrollmentAddressCandidates,
     environmentFromAddress,
-    pickEnrollmentAddress,
     type ClaimEnrollmentInput,
     type CreateEnrollmentInput,
     type EnrollmentKind,
@@ -218,8 +224,8 @@ export async function claimEnrollment(
         }
     });
 
-    const address = pickEnrollmentAddress(sourceIp, payload.addresses);
-    if (!address) return await failClaim(row.id, "Could not work out an address to reach this machine at");
+    const candidates = enrollmentAddressCandidates(sourceIp, payload.addresses);
+    if (candidates.length === 0) return await failClaim(row.id, "Could not work out an address to reach this machine at");
 
     const pins = payload.hostKeys.map(publicKeyBlob).filter((blob): blob is string => blob !== null);
     if (pins.length === 0) return await failClaim(row.id, "The machine reported no usable SSH host key");
@@ -233,23 +239,9 @@ export async function claimEnrollment(
         loadEnv().POLARIS_MASTER_KEY
     );
 
-    let hostKey: string;
-    try {
-        hostKey = await testAndCaptureHostKey({
-            host: address,
-            port: payload.port,
-            username: payload.username,
-            auth: { method: "key", privateKey }
-        });
-    } catch (caught) {
-        return await failClaim(row.id, connectError(caught));
-    }
-
-    // The machine named its keys while the script still had root on it. A key it
-    // did not name means something other than that machine answered.
-    if (!pins.includes(hostKey)) {
-        return await failClaim(row.id, "The machine that answered presented an unexpected host key");
-    }
+    const reached = await reachMachine(candidates, payload, privateKey, pins);
+    if ("error" in reached) return await failClaim(row.id, reached.error);
+    const { address, hostKey } = reached;
 
     const credentials = encryptSecret(privateKey, loadEnv().POLARIS_MASTER_KEY);
     const host = await prisma.host.create({
@@ -298,6 +290,60 @@ export async function claimEnrollment(
 
     return { ok: true };
 }
+
+/**
+ * Dial the machine, trying each candidate address until one answers as the
+ * machine that claimed the enrollment.
+ *
+ * An address that answers with a key the claim did not name is not this machine,
+ * so it is passed over rather than refused outright: the observed address is the
+ * router itself whenever the claim was hairpinned through it, and the router
+ * answering on 22 must not cost the enrollment the addresses that would have
+ * worked. The pin check is what makes trying them safe - it is applied to every
+ * candidate, so the only thing that can be registered is a machine holding a key
+ * the script committed to while it still had root.
+ *
+ * The last failure is what gets reported, since the candidates are ordered
+ * best-first and the tail of the list is the closest thing to an answer.
+ */
+async function reachMachine(
+    candidates: string[],
+    payload: ClaimEnrollmentInput,
+    privateKey: string,
+    pins: string[]
+): Promise<{ address: string; hostKey: string } | { error: string }> {
+    let failure = "Polaris could not reach this machine at any address it offered";
+
+    for (const address of candidates) {
+        let hostKey: string;
+        try {
+            hostKey = await testAndCaptureHostKey({
+                host: address,
+                port: payload.port,
+                username: payload.username,
+                auth: { method: "key", privateKey },
+                readyTimeoutMs: PROBE_TIMEOUT_MS
+            });
+        } catch (caught) {
+            failure = connectError(caught);
+            continue;
+        }
+        // The machine named its keys while the script still had root on it. A key
+        // it did not name means something other than that machine answered here.
+        if (!pins.includes(hostKey)) {
+            failure = "The machine that answered presented an unexpected host key";
+            continue;
+        }
+        return { address, hostKey };
+    }
+
+    return { error: failure };
+}
+
+/** Per-address budget. Shorter than a normal connect because several of these can
+ *  run back to back and the operator is watching a dialog wait on all of them; an
+ *  SSH handshake that has not started in this long is not going to. */
+const PROBE_TIMEOUT_MS = 6_000;
 
 /** Record why a claim did not finish and report it back. The message is written
  *  for the operator watching the dialog, so it says what to go and look at. */
