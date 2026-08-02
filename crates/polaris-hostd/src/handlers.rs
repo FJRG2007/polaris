@@ -718,8 +718,27 @@ fn run_in_container(container: &str, argv: &[String]) -> std::io::Result<(i32, S
     let output = cmd.output()?;
     let mut text = String::from_utf8_lossy(&output.stdout).into_owned();
     text.push_str(&String::from_utf8_lossy(&output.stderr));
-    text.truncate(EXEC_RUN_MAX_OUTPUT);
+    truncate_on_char_boundary(&mut text, EXEC_RUN_MAX_OUTPUT);
     Ok((output.status.code().unwrap_or(-1), text))
+}
+
+/// Cut `text` down to `max` bytes at worst, stepping back to the nearest
+/// character boundary.
+///
+/// `String::truncate` panics unless the byte index it is given starts a
+/// character, and the cap almost never does: a container writes whatever it
+/// likes, and decoding that leniently leaves a three-byte replacement wherever
+/// the stream was not valid UTF-8. Cutting blind aborts the daemon.
+fn truncate_on_char_boundary(text: &mut String, max: usize) {
+    if text.len() <= max {
+        return;
+    }
+    let mut end = max;
+    // Index 0 always starts a character, so this stops within three steps.
+    while !text.is_char_boundary(end) {
+        end -= 1;
+    }
+    text.truncate(end);
 }
 
 #[cfg(not(unix))]
@@ -1269,6 +1288,28 @@ mod tests {
             stderr: Vec::new(),
         };
         assert_eq!(command_message(&silent), "exit status 1");
+    }
+
+    /// Output past the cap used to abort the whole daemon whenever it held a
+    /// character wider than a byte, which binary output guarantees.
+    #[test]
+    fn exec_output_is_cut_on_a_character_boundary() {
+        let mut wide = "€".repeat(EXEC_RUN_MAX_OUTPUT);
+        truncate_on_char_boundary(&mut wide, EXEC_RUN_MAX_OUTPUT);
+        assert!(wide.len() <= EXEC_RUN_MAX_OUTPUT);
+        // Every character survived whole; none was cut in half.
+        assert!(wide.chars().all(|c| c == '€'));
+
+        // Binary output decodes to replacement characters, also three bytes.
+        let mut lossy = String::from_utf8_lossy(&vec![0xff; EXEC_RUN_MAX_OUTPUT]).into_owned();
+        truncate_on_char_boundary(&mut lossy, EXEC_RUN_MAX_OUTPUT);
+        assert!(lossy.len() <= EXEC_RUN_MAX_OUTPUT);
+        assert!(lossy.chars().all(|c| c == char::REPLACEMENT_CHARACTER));
+
+        // Anything under the cap is left alone.
+        let mut short = "created".to_string();
+        truncate_on_char_boundary(&mut short, EXEC_RUN_MAX_OUTPUT);
+        assert_eq!(short, "created");
     }
 
     #[test]
