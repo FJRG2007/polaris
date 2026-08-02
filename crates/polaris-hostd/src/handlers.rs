@@ -1176,7 +1176,11 @@ fn force_unmount(target: &std::path::Path) -> Result<(), MountError> {
         let output = Command::new("umount").args(&args).arg(target).output();
         match output {
             Ok(output) if output.status.success() => return Ok(()),
-            Ok(output) => reasons.push(format!("umount {}: {}", args.join(" "), command_message(&output))),
+            Ok(output) => reasons.push(format!(
+                "umount {}: {}",
+                args.join(" "),
+                command_message(&output)
+            )),
             Err(error) => return Err(MountError::Failed(format!("could not run umount: {error}"))),
         }
     }
