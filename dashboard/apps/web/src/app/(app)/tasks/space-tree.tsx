@@ -58,7 +58,9 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
     Input,
-    cn
+    cn,
+    keepFocusOnClose,
+    useDeferredFocus
 } from "@polaris/ui";
 
 const COLLAPSED_KEY = "polaris.tasks.tree.collapsed";
@@ -103,6 +105,9 @@ interface RowAction {
  * and delete, so the same kinds sit under one entry there. Both come from
  * `createOptionsFor`, which is what keeps a container from offering something it
  * cannot hold.
+ *
+ * A list and a folder are named in a row that appears the moment the menu closes,
+ * so the menu has to leave focus in that row rather than take it back.
  */
 function CreateButton({ at, onPick }: { at: CreateAt; onPick: (kind: CreateKind) => void }) {
     const options = createOptionsFor(at);
@@ -119,7 +124,7 @@ function CreateButton({ at, onPick }: { at: CreateAt; onPick: (kind: CreateKind)
                     <Plus className="size-3.5" />
                 </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-44">
+            <DropdownMenuContent align="start" className="w-44" onCloseAutoFocus={keepFocusOnClose}>
                 {options.map((option) => (
                     <DropdownMenuItem key={option.kind} onSelect={() => onPick(option.kind)} className="gap-2">
                         <option.Icon className="size-3.5" />
@@ -216,12 +221,15 @@ function TreeRow({
     createMenu
 }: RowProps) {
     const [over, setOver] = useState<"into" | "before" | null>(null);
+    // Renaming is reached from the right-click menu, which is still trapping
+    // focus when the field appears; it claims focus once the menu has gone.
+    const field = useDeferredFocus<HTMLInputElement>(renaming);
 
     if (renaming) {
         return (
             <div className="flex items-center gap-1 py-0.5" style={{ paddingLeft: depth * 12 }}>
                 <Input
-                    autoFocus
+                    ref={field}
                     defaultValue={label}
                     aria-label={`Rename ${label}`}
                     onFocus={(event) => event.target.select()}
@@ -361,7 +369,7 @@ function TreeRow({
                     </div>
                 </ContextMenuTrigger>
                 {(rowActions.length > 0 || createMenu) && (
-                    <ContextMenuContent>
+                    <ContextMenuContent onCloseAutoFocus={keepFocusOnClose}>
                         {createMenu}
                         {createMenu && rowActions.length > 0 && <ContextMenuSeparator />}
                         {rowActions.map((action, index) => (
@@ -410,16 +418,30 @@ export function SpaceTree({ spaces, canCreate }: { spaces: readonly SpaceTreeVie
         }
     }, []);
 
-    const toggle = (key: string) => {
-        const next = new Set(collapsed);
-        if (next.has(key)) next.delete(key);
-        else next.add(key);
+    const remember = (next: ReadonlySet<string>) => {
         setCollapsed(next);
         try {
             window.localStorage.setItem(COLLAPSED_KEY, JSON.stringify([...next]));
         } catch {
             // Private browsing refuses the write; the tree still works this visit.
         }
+    };
+
+    const toggle = (key: string) => {
+        const next = new Set(collapsed);
+        if (next.has(key)) next.delete(key);
+        else next.add(key);
+        remember(next);
+    };
+
+    /** Open everything on the way to a row, in one write. Two toggles in a row
+     *  both read the same state, so the second undoes the first and whatever was
+     *  about to appear stays hidden inside a folder nobody opened. */
+    const reveal = (...keys: readonly (string | null)[]) => {
+        if (!keys.some((key) => key !== null && collapsed.has(key))) return;
+        const next = new Set(collapsed);
+        for (const key of keys) if (key) next.delete(key);
+        remember(next);
     };
 
     const run = async (call: () => Promise<{ error?: string }>) => {
@@ -441,8 +463,7 @@ export function SpaceTree({ spaces, canCreate }: { spaces: readonly SpaceTreeVie
             setDraft({ kind, spaceId: at.spaceId, parentId: at.folderId });
             // A container is opened when something is being put into it, or the
             // new row appears somewhere nobody is looking.
-            if (at.folderId && collapsed.has(at.folderId)) toggle(at.folderId);
-            if (collapsed.has(at.spaceId)) toggle(at.spaceId);
+            reveal(at.spaceId, at.folderId);
             return;
         }
         setCreate({ kind, at });
@@ -621,6 +642,9 @@ function SpaceSection({
     const open = !collapsed.has(space.id);
     const editable = canWrite(space.role);
     const tree = useMemo(() => core.buildFolderTree(space.folders), [space.folders]);
+    // Renaming a space is reached from its right-click menu; the field waits for
+    // the menu to let go of focus before taking it.
+    const nameField = useDeferredFocus<HTMLInputElement>(renaming === `space:${space.id}`);
 
     /** The row a drop above `id` should land before, among a given set. */
     const neighbours = (siblings: readonly { id: string }[], targetId: string) => {
@@ -852,7 +876,7 @@ function SpaceSection({
                         />
                         {renaming === `space:${space.id}` ? (
                             <Input
-                                autoFocus
+                                ref={nameField}
                                 defaultValue={space.name}
                                 aria-label={`Rename ${space.name}`}
                                 onFocus={(event) => event.target.select()}
@@ -894,7 +918,7 @@ function SpaceSection({
                     </div>
                 </ContextMenuTrigger>
                 {editable && !space.partial && (
-                    <ContextMenuContent>
+                    <ContextMenuContent onCloseAutoFocus={keepFocusOnClose}>
                         <CreateSubmenu at={spaceAt} onPick={(kind) => onCreate(kind, spaceAt)} />
                         {spaceManageable && (
                             <>
@@ -983,6 +1007,9 @@ function DraftRow({
     run: (call: () => Promise<{ error?: string }>) => Promise<void>;
 }) {
     const [value, setValue] = useState("");
+    // The create menu is still trapping focus when this row appears, so the
+    // field takes focus a tick after it, once the menu is gone.
+    const field = useDeferredFocus<HTMLInputElement>();
 
     const commit = async () => {
         const name = value.trim();
@@ -998,7 +1025,7 @@ function DraftRow({
     return (
         <div className="py-0.5" style={{ paddingLeft: depth * 12 }}>
             <Input
-                autoFocus
+                ref={field}
                 value={value}
                 aria-label={draft.kind === "folder" ? "Folder name" : "List name"}
                 placeholder={draft.kind === "folder" ? "Folder name, then enter" : "List name, then enter"}

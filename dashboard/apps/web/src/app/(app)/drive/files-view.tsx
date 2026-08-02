@@ -64,6 +64,8 @@ import {
     ContextMenuLabel,
     DropdownMenuItem,
     DialogDescription,
+    keepFocusOnClose,
+    useDeferredFocus,
     ContextMenuContent,
     ContextMenuTrigger,
     DropdownMenuContent,
@@ -292,6 +294,9 @@ export function FilesView({
     const gridRef = useRef<HTMLDivElement>(null);
     const [renaming, setRenaming] = useState<string | null>(null);
     const [renameValue, setRenameValue] = useState("");
+    // Renaming is reached from the right-click menu, which is still trapping
+    // focus when the field appears; it claims focus once the menu has gone.
+    const renameField = useDeferredFocus<HTMLInputElement>(renaming !== null);
     const [viewerTarget, setViewerTarget] = useState<ViewerTarget | null>(null);
     const [showHidden, setShowHidden] = useState(false);
     const [viewMode, setViewMode] = useState<"list" | "grid">("list");
@@ -873,10 +878,12 @@ export function FilesView({
         };
     }
 
-    /** The right-click menu for a single entry, shared by the list and grid views. */
+    /** The right-click menu for a single entry, shared by the list and grid views.
+     *  Rename puts an input where the name was, so the menu leaves focus there
+     *  instead of taking it back and blurring the field away. */
     function entryMenu(entry: DriveEntry) {
         return (
-            <ContextMenuContent>
+            <ContextMenuContent onCloseAutoFocus={keepFocusOnClose}>
                 <ContextMenuLabel>{entry.name}</ContextMenuLabel>
                 {entry.kind === "dir" ? (
                     <>
@@ -1868,7 +1875,7 @@ export function FilesView({
                                                                     />
                                                                     {isRenaming ? (
                                                                         <Input
-                                                                            autoFocus
+                                                                            ref={renameField}
                                                                             value={renameValue}
                                                                             onChange={(e) =>
                                                                                 setRenameValue(
@@ -2044,7 +2051,7 @@ export function FilesView({
                                                                         <div className="min-w-0 flex-1 truncate px-1">
                                                                             {isRenaming ? (
                                                                                 <Input
-                                                                                    autoFocus
+                                                                                    ref={renameField}
                                                                                     value={
                                                                                         renameValue
                                                                                     }

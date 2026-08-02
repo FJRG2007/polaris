@@ -6,6 +6,8 @@
  */
 
 export { cn } from "./lib/cn";
+export { keepFocusOnClose } from "./lib/menu-focus";
+export { useDeferredFocus } from "./lib/use-deferred-focus";
 export { Button, buttonVariants, type ButtonProps } from "./components/button";
 export { Input, type InputProps } from "./components/input";
 export { Textarea, type TextareaProps } from "./components/textarea";
