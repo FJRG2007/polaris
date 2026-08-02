@@ -11,9 +11,21 @@
  * failed to send.
  */
 
-import { useState, useTransition } from "react";
-import { AlertTriangle, Bell, Mail, Smartphone, Webhook } from "lucide-react";
-import { Badge, Card, CardBody, CardHeader, CardTitle, cn } from "@polaris/ui";
+import { DeliveryLog } from "./delivery-log";
+import { SmsSenderCard } from "./sms-sender-card";
+import { DestinationsCard } from "./destinations-card";
+import { saveNotificationRuleAction } from "./actions";
+import { useEffect, useState, useTransition } from "react";
+import type { DeliveryView } from "@/lib/notification-service";
+import type { SmsSenderView } from "@/lib/notifications/sms-service";
+import type { DestinationView } from "@/lib/notifications/destinations";
+import { AlertTriangle, Bell, Mail, Smartphone, Volume2, Webhook } from "lucide-react";
+import { Badge, Card, CardBody, CardHeader, CardTitle, Switch, cn } from "@polaris/ui";
+import {
+    notificationSoundEnabled,
+    playNotificationSound,
+    setNotificationSoundEnabled
+} from "@/lib/notification-sound";
 import {
     isMuted,
     NOTIFICATION_EVENTS,
@@ -22,13 +34,6 @@ import {
     type NotificationGroup,
     type NotificationRule
 } from "@polaris/core";
-import type { DeliveryView } from "@/lib/notification-service";
-import type { DestinationView } from "@/lib/notifications/destinations";
-import type { SmsSenderView } from "@/lib/notifications/sms-service";
-import { DestinationsCard } from "./destinations-card";
-import { SmsSenderCard } from "./sms-sender-card";
-import { DeliveryLog } from "./delivery-log";
-import { saveNotificationRuleAction } from "./actions";
 
 export function NotificationSettingsView({
     rules,
@@ -72,6 +77,8 @@ export function NotificationSettingsView({
                 </p>
             ) : null}
 
+            <SoundCard />
+
             {groups.map((group) => (
                 <EventGroup
                     key={group}
@@ -86,6 +93,55 @@ export function NotificationSettingsView({
             <SmsSenderCard senders={senders} />
             <DeliveryLog deliveries={deliveries} />
         </div>
+    );
+}
+
+/**
+ * Whether an arriving alert makes a sound. This one is not part of the rules
+ * saved on the account: it belongs to the machine you are at, not to you, and a
+ * chime that follows you onto a shared desk is the wrong default.
+ */
+function SoundCard() {
+    // Storage is not readable while the page is rendered on the server, so the
+    // switch takes its real position on mount.
+    const [enabled, setEnabled] = useState(true);
+    useEffect(() => setEnabled(notificationSoundEnabled()), []);
+
+    function toggle(next: boolean) {
+        setEnabled(next);
+        setNotificationSoundEnabled(next);
+        // Turning it on answers "what will that sound like" without a second click.
+        if (next) playNotificationSound();
+    }
+
+    return (
+        <Card>
+            <CardBody className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                    <p className="text-sm font-medium">Sound</p>
+                    <p className="text-xs text-muted-foreground">
+                        Play a chime when a notification arrives. Kept on this device.
+                    </p>
+                </div>
+                <div className="flex shrink-0 items-center gap-1.5">
+                    <button
+                        type="button"
+                        aria-label="Hear it"
+                        title="Hear it"
+                        disabled={!enabled}
+                        onClick={playNotificationSound}
+                        className="rounded p-1 text-muted-foreground transition-colors hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+                    >
+                        <Volume2 className="size-4" />
+                    </button>
+                    <Switch
+                        checked={enabled}
+                        onChange={toggle}
+                        aria-label="Play a sound when a notification arrives"
+                    />
+                </div>
+            </CardBody>
+        </Card>
     );
 }
 

@@ -9,8 +9,9 @@
  * the server refuses them.
  */
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { NotificationView } from "@/lib/notification-service";
+import { hasNewArrival, notificationSoundEnabled, playNotificationSound } from "@/lib/notification-sound";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
     clearNotificationsAction,
     deleteNotificationAction,
@@ -41,6 +42,9 @@ export function NotificationsProvider({ initial, children }: { initial: Notifica
     // A snapshot the server took before an in-flight mutation landed would undo
     // the optimistic update, so stream frames are ignored while one is running.
     const inFlight = useRef(0);
+    // What this tab has already shown. Seeded from the first paint so the alerts
+    // that were waiting when the page opened do not all chime at once.
+    const seen = useRef(new Set(initial.map((row) => row.id)));
 
     useEffect(() => {
         const source = new EventSource("/api/notifications/stream");
@@ -48,7 +52,12 @@ export function NotificationsProvider({ initial, children }: { initial: Notifica
             if (inFlight.current > 0) return;
             try {
                 const payload = JSON.parse(event.data) as { items?: NotificationView[] };
-                if (Array.isArray(payload.items)) setItems(payload.items);
+                if (Array.isArray(payload.items)) {
+                    if (hasNewArrival(seen.current, payload.items) && notificationSoundEnabled()) {
+                        playNotificationSound();
+                    }
+                    setItems(payload.items);
+                }
             } catch {
                 // A malformed frame is not worth recovering from; the next tick resends the state.
             }
