@@ -14,6 +14,7 @@
  */
 
 import { notFound } from "next/navigation";
+import { ScopePicker } from "./scope-picker";
 import { listHosts } from "@/lib/host-service";
 import { clientIp } from "@/lib/request-context";
 import { FirewallScopeEditor } from "./scope-editor";
@@ -22,7 +23,6 @@ import { listHostGroups } from "@/lib/host-group-service";
 import { FirewallInstancePanels } from "./instance-panels";
 import { requirePermission, userHasManage } from "@/lib/session";
 import { WAF_SCOPE_TYPES, type WafScopeType } from "@polaris/core";
-import { ScopePicker } from "./scope-picker";
 import { scopeNeedsTarget, scopeOptions, type ScopeCatalog, type ScopeOption } from "./scope-kinds";
 
 export const dynamic = "force-dynamic";
@@ -100,7 +100,17 @@ export default async function FirewallPage({
     return (
         <div className="mx-auto flex w-full max-w-5xl flex-col gap-5">
             <div className="flex flex-col gap-3">
-                <h1 className="text-2xl font-semibold">Firewall</h1>
+                <div className="flex min-w-0 items-baseline gap-2">
+                    <h1 className="text-2xl font-semibold">Firewall</h1>
+                    {/* The selects live in the app bar on a wide screen, where the
+                        chosen scope is no longer next to the title - so the title
+                        carries it. */}
+                    {label ? (
+                        <span className="hidden min-w-0 truncate text-sm text-muted-foreground md:inline" title={label}>
+                            {label}
+                        </span>
+                    ) : null}
+                </div>
                 <ScopePicker kind={kind} id={scopeId} catalog={catalog} canOperate={canOperate} />
             </div>
 
@@ -129,4 +139,3 @@ export default async function FirewallPage({
         </div>
     );
 }
-

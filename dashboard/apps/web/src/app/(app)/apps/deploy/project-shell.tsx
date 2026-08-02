@@ -14,13 +14,13 @@
  */
 
 import Link from "next/link";
-import { createPortal } from "react-dom";
 import { createProjectAction } from "./actions";
 import { Plus, type LucideIcon } from "lucide-react";
+import { HeaderPortal } from "@/components/header-portal";
+import { useState, useTransition, type ReactNode } from "react";
 import type { StagedChangeView } from "@/lib/deploy-staged-changes";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Activity, LayoutGrid, ScrollText, Settings } from "lucide-react";
-import { useEffect, useState, useTransition, type ReactNode } from "react";
 import { StagedChangesBanner, StagedChangesProvider } from "./staged-changes";
 import { NEW_ENVIRONMENT, NewEnvironmentDialog, newEnvironmentOption } from "./new-environment-dialog";
 import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, Input, Select, cn } from "@polaris/ui";
@@ -222,15 +222,6 @@ function ProjectNav({
             </ul>
         </nav>
     );
-}
-
-/** Render children into the app-shell header slot (right of the app switcher). */
-function HeaderPortal({ children }: { children: ReactNode }) {
-    const [target, setTarget] = useState<HTMLElement | null>(null);
-    useEffect(() => {
-        setTarget(document.getElementById("polaris-header-slot"));
-    }, []);
-    return target ? createPortal(children, target) : null;
 }
 
 function NewProjectDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {

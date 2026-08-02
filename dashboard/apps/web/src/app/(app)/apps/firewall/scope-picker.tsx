@@ -8,13 +8,16 @@
  * each is already nine entries before a single server or service appears, and the
  * list is the same length whether you came here for Polaris or for one container.
  *
- * So it works the way Deploy's header does instead - pick the kind of thing, then
- * pick which one - and the choice lives in the URL, so a scope can be linked to,
- * reloaded, and reached from a service's own page.
+ * So it works the way Deploy's header does instead, in the same place: the two
+ * selects are portalled into the app bar beside the app switcher, because the scope
+ * is what the whole screen is about rather than one control on it. The choice lives
+ * in the URL, so a scope can be linked to, reloaded, and reached from a service's
+ * own page.
  */
 
 import { Select } from "@polaris/ui";
 import type { WafScopeType } from "@polaris/core";
+import { HeaderPortal } from "@/components/header-portal";
 import { useRouter, useSearchParams } from "next/navigation";
 import { SCOPE_KINDS, scopeNeedsTarget, scopeOptions, type ScopeCatalog } from "./scope-kinds";
 
@@ -46,34 +49,51 @@ export function ScopePicker({
         router.push(`/apps/firewall?${next.toString()}`);
     }
 
+    const kindSelect = (
+        <Select
+            value={kind}
+            aria-label="Scope"
+            className="h-8 min-w-0 flex-1 font-medium md:w-40 md:min-w-[10rem] md:flex-none"
+            options={kinds.map((entry) => ({ value: entry.value, label: entry.label }))}
+            onValueChange={(value) => {
+                const nextKind = value as WafScopeType;
+                // Moving to a kind that names something lands on its first entry, so the
+                // page is never showing a chooser with nothing chosen.
+                const first = scopeNeedsTarget(nextKind) ? (scopeOptions(nextKind, catalog)[0]?.id ?? "") : "";
+                go(nextKind, first);
+            }}
+        />
+    );
+
+    const targetSelect = !scopeNeedsTarget(kind) ? null : targets.length > 0 ? (
+        <Select
+            value={id || (targets[0]?.id ?? "")}
+            aria-label="Scope target"
+            className="h-8 min-w-0 flex-1 md:w-60 md:min-w-[15rem] md:flex-none"
+            options={targets.map((target) => ({ value: target.id, label: target.label }))}
+            onValueChange={(value) => go(kind, value)}
+        />
+    ) : (
+        <span className="whitespace-nowrap text-sm text-muted-foreground">Nothing of that kind yet.</span>
+    );
+
     return (
-        <div className="flex flex-wrap items-center gap-2">
-            <Select
-                value={kind}
-                aria-label="Scope"
-                className="h-8 w-full font-medium sm:w-48"
-                options={kinds.map((entry) => ({ value: entry.value, label: entry.label }))}
-                onValueChange={(value) => {
-                    const nextKind = value as WafScopeType;
-                    // Moving to a kind that names something lands on its first entry,
-                    // so the page is never showing a chooser with nothing chosen.
-                    const first = scopeNeedsTarget(nextKind) ? (scopeOptions(nextKind, catalog)[0]?.id ?? "") : "";
-                    go(nextKind, first);
-                }}
-            />
-            {scopeNeedsTarget(kind) ? (
-                targets.length > 0 ? (
-                    <Select
-                        value={id || (targets[0]?.id ?? "")}
-                        aria-label="Scope target"
-                        className="h-8 w-full sm:w-64"
-                        options={targets.map((target) => ({ value: target.id, label: target.label }))}
-                        onValueChange={(value) => go(kind, value)}
-                    />
-                ) : (
-                    <p className="text-sm text-muted-foreground">Nothing of that kind yet.</p>
-                )
-            ) : null}
-        </div>
+        <>
+            {/* In the top bar where there is room beside the app switcher, and at the
+                top of the page where there is not - the same controls, never both. */}
+            <HeaderPortal>
+                <span className="hidden text-muted-foreground/40 md:inline">/</span>
+                <span className="hidden items-center gap-2 md:flex">
+                    {kindSelect}
+                    {targetSelect ? <span className="text-muted-foreground/40">/</span> : null}
+                    {targetSelect}
+                </span>
+            </HeaderPortal>
+
+            <div className="flex items-center gap-2 md:hidden">
+                {kindSelect}
+                {targetSelect}
+            </div>
+        </>
     );
 }
