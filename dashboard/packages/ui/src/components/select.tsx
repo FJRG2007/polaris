@@ -17,7 +17,7 @@
  * expressed with `value=""` plus a `placeholder` rather than a blank option.
  */
 
-import { cn } from "../lib/cn.js";
+import { cn } from "../lib/cn";
 import { Check, ChevronDown } from "lucide-react";
 import * as RadixSelect from "@radix-ui/react-select";
 import { forwardRef, type ComponentPropsWithoutRef, type ElementRef, type ReactNode } from "react";

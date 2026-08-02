@@ -8,7 +8,7 @@
  * the limited edition; clicking one routes to its unlock explainer.
  */
 
-import { cn } from "../lib/cn.js";
+import { cn } from "../lib/cn";
 import { Check, ChevronDown, Lock, type LucideIcon } from "lucide-react";
 import {
     DropdownMenu,
@@ -17,7 +17,7 @@ import {
     DropdownMenuLabel,
     DropdownMenuSeparator,
     DropdownMenuTrigger
-} from "../components/dropdown-menu.js";
+} from "../components/dropdown-menu";
 
 export interface PolarisApp {
     readonly id: string;

@@ -21,7 +21,7 @@ import type { RunningTimer } from "@/lib/tasks/time-service";
 import { useDisplayFormat } from "@/components/display-format";
 import { CircleAlert, Clock, ListChecks, Play, Square } from "lucide-react";
 import { toFacts, type SpaceContext, type TaskRow } from "@/lib/tasks/facts";
-import { AvatarStack, CompleteToggle, DueBadge, PriorityFlag, StatusDot } from "./pickers";
+import { AvatarStack, DueBadge, PriorityFlag, StatusDot, StatusMarker } from "./pickers";
 
 export interface HomeCounts {
     readonly assigned: number;
@@ -79,13 +79,8 @@ export function HomeView({
     const openSpaceId = tasks.find((task) => task.id === openTaskId)?.spaceId;
     const openContext = openSpaceId ? contexts[openSpaceId] : undefined;
 
-    const complete = async (task: TaskRow) => {
-        const done = contexts[task.spaceId]?.statuses.find((status) => status.type === "done");
-        if (!done) {
-            setError("That space has no done status yet.");
-            return;
-        }
-        await runAction(() => actions.updateTaskAction({ taskId: task.id, statusId: done.id }), setError);
+    const setStatus = async (task: TaskRow, statusId: string) => {
+        await runAction(() => actions.updateTaskAction({ taskId: task.id, statusId }), setError);
         router.refresh();
     };
 
@@ -153,7 +148,15 @@ export function HomeView({
                     <ul className="divide-y divide-border rounded-lg border border-border">
                         {group.tasks.map((task) => (
                             <li key={task.id} className="flex items-center gap-2 px-3 py-2">
-                                <CompleteToggle statusType={task.statusType} onToggle={() => void complete(task)} />
+                                <StatusMarker
+                                    statuses={contexts[task.spaceId]?.statuses ?? []}
+                                    statusId={task.statusId}
+                                    statusColor={task.statusColor}
+                                    statusType={task.statusType}
+                                    statusName={task.statusName}
+                                    spaceId={task.spaceId}
+                                    onChange={(statusId) => void setStatus(task, statusId)}
+                                />
                                 <button
                                     type="button"
                                     onClick={() => setOpenTaskId(task.id)}

@@ -2358,6 +2358,8 @@ model TaskFolder {
     parent   TaskFolder?        @relation("TaskFolderNesting", fields: [parentId], references: [id], onDelete: Cascade)
     children TaskFolder[]       @relation("TaskFolderNesting")
     lists    TaskList[]
+    docs     TaskDoc[]
+    sprints  TaskSprint[]
     members  TaskFolderMember[]
 
     @@index([spaceId])
@@ -2530,6 +2532,8 @@ model Task {
     activity    TaskActivity[]
     reminders   TaskReminder[]
     submissions TaskFormSubmission[]
+    attachments TaskAttachment[]
+    commits     TaskCommit[]
 
     @@unique([spaceId, number])
     @@index([listId])
@@ -2745,6 +2749,9 @@ model TaskView {
 model TaskSprint {
     id        String   @id @default(uuid(7)) @db.Uuid
     spaceId   String   @db.Uuid
+    // The folder whose work this sprint plans. Null is a sprint the whole space
+    // runs, which is what every sprint was before folders could nest.
+    folderId  String?  @db.Uuid
     name      String
     goal      String   @default("")
     startDate DateTime
@@ -2754,10 +2761,12 @@ model TaskSprint {
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
 
-    space TaskSpace @relation(fields: [spaceId], references: [id], onDelete: Cascade)
-    tasks Task[]
+    space  TaskSpace   @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+    folder TaskFolder? @relation(fields: [folderId], references: [id], onDelete: SetNull)
+    tasks  Task[]
 
     @@index([spaceId])
+    @@index([folderId])
 }
 
 // An objective measured by one or more targets. A `tasks` target counts finished
@@ -2915,11 +2924,62 @@ model TaskReminder {
     @@index([taskId])
 }
 
+// A file hanging off a task. Polaris stores the bytes wherever the instance was
+// told to put them - a NAS it already has a connection to, or its own disk - and
+// keeps only the pointer here, so moving where uploads live never means moving
+// rows. `connectionId` is null for the server's own disk; it is not a foreign key
+// because a connection can be removed while the file it holds is still described
+// here, and a broken pointer says more than a silently deleted attachment.
+model TaskAttachment {
+    id           String   @id @default(uuid(7)) @db.Uuid
+    taskId       String   @db.Uuid
+    name         String
+    mime         String   @default("application/octet-stream")
+    // Bytes. Capped at upload, so an Int is enough and stays JSON-safe.
+    size         Int      @default(0)
+    connectionId String?
+    // Where the bytes are under the chosen storage, relative to its root.
+    path         String
+    // No FK: the file outlives the account that uploaded it.
+    uploadedById String?  @db.Uuid
+    createdAt    DateTime @default(now())
+
+    task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+    @@index([taskId])
+}
+
+// A commit somebody attached to a task. Stored rather than fetched on read: the
+// point of linking one is that the task still says what shipped it long after
+// the branch is gone, and a repository that goes private must not blank the
+// history of what was done.
+model TaskCommit {
+    id          String    @id @default(uuid(7)) @db.Uuid
+    taskId      String    @db.Uuid
+    // "owner/name", as GitHub spells it.
+    repository  String
+    sha         String
+    message     String    @default("")
+    url         String
+    authorName  String    @default("")
+    committedAt DateTime?
+    // No FK: the link outlives the account that made it.
+    linkedById  String?   @db.Uuid
+    createdAt   DateTime  @default(now())
+
+    task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+    @@unique([taskId, repository, sha])
+    @@index([taskId])
+}
+
 // A document or wiki page. Nests through `parentId`, so a space's knowledge base
 // is a tree rather than a flat pile.
 model TaskDoc {
     id          String   @id @default(uuid(7)) @db.Uuid
     spaceId     String?  @db.Uuid
+    // The folder this page belongs to. Null is a page the whole space shares.
+    folderId    String?  @db.Uuid
     parentId    String?  @db.Uuid
     title       String
     // Markdown. Stored as written so it stays portable out of Polaris.
@@ -2933,11 +2993,13 @@ model TaskDoc {
     createdAt   DateTime @default(now())
     updatedAt   DateTime @updatedAt
 
-    space    TaskSpace? @relation(fields: [spaceId], references: [id], onDelete: Cascade)
-    parent   TaskDoc?   @relation("DocTree", fields: [parentId], references: [id], onDelete: Cascade)
-    children TaskDoc[]  @relation("DocTree")
+    space    TaskSpace?  @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+    folder   TaskFolder? @relation(fields: [folderId], references: [id], onDelete: SetNull)
+    parent   TaskDoc?    @relation("DocTree", fields: [parentId], references: [id], onDelete: Cascade)
+    children TaskDoc[]   @relation("DocTree")
 
     @@index([spaceId])
+    @@index([folderId])
     @@index([parentId])
 }
 

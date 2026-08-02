@@ -5,16 +5,17 @@
  * them into their own Tailwind and global CSS.
  */
 
-export { cn } from "./lib/cn.js";
-export { Button, buttonVariants, type ButtonProps } from "./components/button.js";
-export { Input, type InputProps } from "./components/input.js";
-export { Badge, type BadgeProps } from "./components/badge.js";
-export { Card, CardHeader, CardTitle, CardBody } from "./components/card.js";
-export { Skeleton } from "./components/skeleton.js";
-export { BoneSkeleton, type CapturedLayout, type ResponsiveLayout } from "./components/bone-skeleton.js";
-export { Checkbox, type CheckboxProps } from "./components/checkbox.js";
-export { ConfirmDeleteDialog, type ConfirmDeleteDialogProps } from "./components/confirm-delete-dialog.js";
-export { Switch } from "./components/switch.js";
+export { cn } from "./lib/cn";
+export { Button, buttonVariants, type ButtonProps } from "./components/button";
+export { Input, type InputProps } from "./components/input";
+export { Textarea, type TextareaProps } from "./components/textarea";
+export { Badge, type BadgeProps } from "./components/badge";
+export { Card, CardHeader, CardTitle, CardBody } from "./components/card";
+export { Skeleton } from "./components/skeleton";
+export { BoneSkeleton, type CapturedLayout, type ResponsiveLayout } from "./components/bone-skeleton";
+export { Checkbox, type CheckboxProps } from "./components/checkbox";
+export { ConfirmDeleteDialog, type ConfirmDeleteDialogProps } from "./components/confirm-delete-dialog";
+export { Switch } from "./components/switch";
 export {
     Select,
     SelectRoot,
@@ -27,13 +28,13 @@ export {
     SelectSeparator,
     type SelectOption,
     type SelectProps
-} from "./components/select.js";
-export { RadialGauge, TimeSeriesChart, type GaugeTone, type TimePoint } from "./components/charts.js";
-export { summarizeSeries, type SeriesStats, type SeriesSummary } from "./lib/series-summary.js";
-export * from "./components/dropdown-menu.js";
-export * from "./components/context-menu.js";
-export * from "./components/dialog.js";
-export * from "./shell/capabilities.js";
-export { AppSwitcher, type PolarisApp } from "./shell/app-switcher.js";
-export { MobileNav } from "./shell/mobile-nav.js";
-export { AppShell, PolarisMark, PageHeader } from "./shell/app-shell.js";
+} from "./components/select";
+export { RadialGauge, TimeSeriesChart, type GaugeTone, type TimePoint } from "./components/charts";
+export { summarizeSeries, type SeriesStats, type SeriesSummary } from "./lib/series-summary";
+export * from "./components/dropdown-menu";
+export * from "./components/context-menu";
+export * from "./components/dialog";
+export * from "./shell/capabilities";
+export { AppSwitcher, type PolarisApp } from "./shell/app-switcher";
+export { MobileNav } from "./shell/mobile-nav";
+export { AppShell, PolarisMark, PageHeader } from "./shell/app-shell";

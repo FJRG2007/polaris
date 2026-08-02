@@ -630,8 +630,44 @@ export async function deleteFolder(folderId: string): Promise<void> {
     await prisma.$transaction([
         prisma.taskFolder.updateMany({ where: { parentId: folderId }, data: { parentId: folder.parentId } }),
         prisma.taskList.updateMany({ where: { folderId }, data: { folderId: folder.parentId } }),
+        // Pages and sprints move up with everything else. The database clears
+        // the link on its own, which would quietly promote a client's page to
+        // the whole space; lifting it explicitly keeps it where it belongs.
+        prisma.taskDoc.updateMany({ where: { folderId }, data: { folderId: folder.parentId } }),
+        prisma.taskSprint.updateMany({ where: { folderId }, data: { folderId: folder.parentId } }),
         prisma.taskFolder.delete({ where: { id: folderId } })
     ]);
+}
+
+/** Everything a create dialog opened from the sidebar needs: the vocabulary of
+ *  one space, and the lists a new task could go into. */
+export interface CreateContext {
+    readonly spaceId: string;
+    readonly statuses: StatusView[];
+    readonly tags: TagView[];
+    readonly people: { id: string; name: string; image: string | null }[];
+    readonly lists: { id: string; name: string }[];
+}
+
+/**
+ * The lists inside a folder, including the ones in the folders under it, so a
+ * task created from a project folder can be dropped into any list that project
+ * holds. A null folder means the whole space.
+ */
+export async function branchLists(spaceId: string, folderId: string | null): Promise<{ id: string; name: string }[]> {
+    if (!folderId) {
+        return prisma.taskList.findMany({
+            where: { spaceId, archived: false },
+            orderBy: [{ order: "asc" }, { createdAt: "asc" }],
+            select: { id: true, name: true }
+        });
+    }
+    const branch = core.folderBranch(await spaceFolders(spaceId), folderId);
+    return prisma.taskList.findMany({
+        where: { spaceId, archived: false, folderId: { in: [...branch] } },
+        orderBy: [{ order: "asc" }, { createdAt: "asc" }],
+        select: { id: true, name: true }
+    });
 }
 
 export async function createList(input: core.ListInput): Promise<string> {

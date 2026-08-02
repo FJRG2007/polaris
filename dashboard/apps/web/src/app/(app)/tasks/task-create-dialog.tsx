@@ -18,9 +18,30 @@ import * as actions from "./actions";
 import * as core from "@polaris/core";
 import { useEffect, useState } from "react";
 import { runAction } from "@/lib/run-action";
-import type { SpaceContext } from "@/lib/tasks/facts";
-import { Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Input, Select } from "@polaris/ui";
-import { AssigneePicker, AvatarStack, DateField, DurationField, PriorityPicker, StatusPicker, TagChip, TagPicker } from "./pickers";
+import type { PersonRef } from "@/lib/tasks/facts";
+import type { StatusView, TagView } from "@/lib/tasks/space-service";
+import {
+    Button,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    Input,
+    Select,
+    Textarea
+} from "@polaris/ui";
+import {
+    AssigneePicker,
+    AvatarStack,
+    DateField,
+    DurationField,
+    PriorityPicker,
+    StatusPicker,
+    TagChip,
+    TagPicker,
+    tagColorFor
+} from "./pickers";
 
 interface Fields {
     name: string;
@@ -67,7 +88,10 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 export function TaskCreateDialog({
     open,
-    context,
+    spaceId,
+    statuses,
+    tags,
+    people,
     lists,
     defaultListId,
     defaultStatusId,
@@ -75,7 +99,11 @@ export function TaskCreateDialog({
     onCreated
 }: {
     open: boolean;
-    context: SpaceContext;
+    /** The space the vocabulary belongs to, so a tag can be created here. */
+    readonly spaceId: string;
+    statuses: readonly StatusView[];
+    tags: readonly TagView[];
+    people: readonly PersonRef[];
     lists: readonly { id: string; name: string }[];
     defaultListId: string;
     /** Pre-selected when the dialog was opened from a particular board column. */
@@ -83,7 +111,7 @@ export function TaskCreateDialog({
     onClose: () => void;
     onCreated: (taskId: string) => void;
 }) {
-    const firstStatus = defaultStatusId ?? context.statuses[0]?.id ?? null;
+    const firstStatus = defaultStatusId ?? statuses[0]?.id ?? null;
     const [fields, setFields] = useState<Fields>(() => blank(defaultListId, firstStatus));
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState("");
@@ -156,13 +184,12 @@ export function TaskCreateDialog({
                         {nameIssue && <p className="text-xs text-danger">{nameIssue}</p>}
                     </div>
 
-                    <textarea
+                    <Textarea
                         rows={3}
                         value={fields.description}
                         aria-label="Description"
                         placeholder="What does done look like?"
                         onChange={(event) => set("description", event.target.value)}
-                        className="w-full resize-y rounded-md border border-border bg-background px-3 py-2 text-sm outline-none placeholder:text-muted-foreground focus:border-primary"
                     />
 
                     <div className="grid gap-3 sm:grid-cols-2">
@@ -177,7 +204,7 @@ export function TaskCreateDialog({
                         </Field>
                         <Field label="Status">
                             <StatusPicker
-                                statuses={context.statuses}
+                                statuses={statuses}
                                 value={fields.statusId}
                                 onChange={(statusId) => set("statusId", statusId)}
                             />
@@ -185,10 +212,10 @@ export function TaskCreateDialog({
                         <Field label="Assignees">
                             <div className="flex items-center gap-2">
                                 <AvatarStack
-                                    people={context.people.filter((person) => fields.assigneeIds.includes(person.id))}
+                                    people={people.filter((person) => fields.assigneeIds.includes(person.id))}
                                 />
                                 <AssigneePicker
-                                    people={context.people}
+                                    people={people}
                                     selected={fields.assigneeIds}
                                     onChange={(ids) => set("assigneeIds", ids)}
                                 />
@@ -249,7 +276,7 @@ export function TaskCreateDialog({
 
                     <Field label="Tags">
                         <div className="flex flex-wrap items-center gap-1">
-                            {context.tags
+                            {tags
                                 .filter((tag) => fields.tagIds.includes(tag.id))
                                 .map((tag) => (
                                     <TagChip
@@ -264,9 +291,19 @@ export function TaskCreateDialog({
                                     />
                                 ))}
                             <TagPicker
-                                tags={context.tags}
+                                tags={tags}
                                 selected={fields.tagIds}
                                 onChange={(tagIds) => set("tagIds", tagIds)}
+                                // A tag that does not exist yet is created here
+                                // rather than sending somebody to the settings
+                                // and back with the form half filled in.
+                                onCreate={async (name) => {
+                                    const created = await runAction(
+                                        () => actions.createTagAction(spaceId, name, tagColorFor(name)),
+                                        setError
+                                    );
+                                    return created?.id ?? null;
+                                }}
                             />
                         </div>
                     </Field>

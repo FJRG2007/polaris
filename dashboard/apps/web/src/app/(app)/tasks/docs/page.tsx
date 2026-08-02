@@ -15,11 +15,14 @@ export default async function DocsPage({ searchParams }: { searchParams: Promise
     const { doc: docId } = await searchParams;
     const user = await requirePermission("tasks.read");
     const actor: TaskActor = { id: user.id, isAdmin: user.isAdmin };
-    // A wiki belongs to the whole space, so a folder grant does not open it.
-    const { spaceIds } = await visibleScope(actor);
+    // A page the space shares needs the space. A page written inside a folder
+    // belongs to that branch, so a folder grant reaches it and nothing beside it.
+    const scope = await visibleScope(actor);
+    const { spaceIds } = scope;
+    const grantedFolderIds = Object.keys(scope.folderRoles);
 
     const [tree, spaces] = await Promise.all([
-        docTree(spaceIds),
+        docTree(spaceIds, grantedFolderIds),
         prisma.taskSpace.findMany({
             where: { id: { in: spaceIds } },
             orderBy: { order: "asc" },
@@ -30,7 +33,12 @@ export default async function DocsPage({ searchParams }: { searchParams: Promise
     // A page in a space the reader cannot see is simply not opened, rather than
     // refused loudly - the id in the URL is not a secret worth confirming.
     const doc = docId ? await getDoc(docId) : null;
-    const readable = doc && (doc.spaceId === null || spaceIds.includes(doc.spaceId)) ? doc : null;
+    const reachable =
+        doc !== null &&
+        (doc.spaceId === null ||
+            spaceIds.includes(doc.spaceId) ||
+            (doc.folderId !== null && grantedFolderIds.includes(doc.folderId)));
+    const readable = reachable ? doc : null;
 
     return <DocsView tree={tree} doc={readable} spaces={spaces} canEdit />;
 }

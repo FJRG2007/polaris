@@ -17,6 +17,10 @@ import * as core from "@polaris/core";
 
 export interface SprintView {
     readonly id: string;
+    readonly spaceId: string;
+    /** The folder whose work this sprint plans, or null for a space-wide one. */
+    readonly folderId: string | null;
+    readonly folderName: string | null;
     readonly name: string;
     readonly goal: string;
     readonly startDate: string;
@@ -28,17 +32,30 @@ export interface SprintView {
     readonly donePoints: number;
 }
 
-export async function listSprints(spaceId: string): Promise<SprintView[]> {
+/**
+ * Every sprint the reader can see, in one query rather than one per space.
+ *
+ * `folderIds` are the folders reached through a grant in a space the reader does
+ * not hold outright, so a contractor invited to one project sees that project's
+ * sprints and none of the ones beside it.
+ */
+export async function listSprints(reach: { spaceIds: string[]; folderIds?: string[] }): Promise<SprintView[]> {
+    const folderIds = reach.folderIds ?? [];
+    if (reach.spaceIds.length === 0 && folderIds.length === 0) return [];
+
     const sprints = await prisma.taskSprint.findMany({
-        where: { spaceId },
+        where: { OR: [{ spaceId: { in: reach.spaceIds } }, { folderId: { in: folderIds } }] },
         orderBy: { startDate: "desc" },
         select: {
             id: true,
+            spaceId: true,
+            folderId: true,
             name: true,
             goal: true,
             startDate: true,
             endDate: true,
             status: true,
+            folder: { select: { name: true } },
             tasks: { select: { points: true, status: { select: { type: true } } } }
         }
     });
@@ -49,6 +66,9 @@ export async function listSprints(spaceId: string): Promise<SprintView[]> {
         );
         return {
             id: sprint.id,
+            spaceId: sprint.spaceId,
+            folderId: sprint.folderId,
+            folderName: sprint.folder?.name ?? null,
             name: sprint.name,
             goal: sprint.goal,
             startDate: sprint.startDate.toISOString(),
@@ -69,6 +89,7 @@ export async function createSprint(input: core.SprintInput): Promise<string> {
     const sprint = await prisma.taskSprint.create({
         data: {
             spaceId: input.spaceId,
+            folderId: input.folderId,
             name: input.name,
             goal: input.goal,
             startDate: new Date(input.startDate),
@@ -79,7 +100,10 @@ export async function createSprint(input: core.SprintInput): Promise<string> {
     return sprint.id;
 }
 
-export async function updateSprint(sprintId: string, input: Omit<core.SprintInput, "spaceId">): Promise<void> {
+/** Edits a sprint's own details. It deliberately cannot change which folder the
+ *  sprint plans: that is a different sprint, and moving one would silently take
+ *  its burndown out from under whoever was reading it. */
+export async function updateSprint(sprintId: string, input: Omit<core.SprintInput, "spaceId" | "folderId">): Promise<void> {
     if (new Date(input.endDate) <= new Date(input.startDate)) {
         throw new Error("A sprint has to end after it starts");
     }
@@ -95,9 +119,10 @@ export async function updateSprint(sprintId: string, input: Omit<core.SprintInpu
 }
 
 /**
- * Move a sprint's state on. Starting one ends whichever sprint was active in the
- * space, because two sprints running at once is a scheduling accident rather
- * than a plan.
+ * Move a sprint's state on. Starting one ends whichever sprint was already
+ * running beside it, because two sprints at once is a scheduling accident rather
+ * than a plan - but only within the same container. A project running its own
+ * sprints must not end the sprint of the project in the folder next door.
  */
 export async function setSprintStatus(
     spaceId: string,
@@ -105,8 +130,12 @@ export async function setSprintStatus(
     status: SprintView["status"]
 ): Promise<void> {
     if (status === "active") {
+        const starting = await prisma.taskSprint.findUnique({
+            where: { id: sprintId },
+            select: { folderId: true }
+        });
         await prisma.taskSprint.updateMany({
-            where: { spaceId, status: "active", id: { not: sprintId } },
+            where: { spaceId, folderId: starting?.folderId ?? null, status: "active", id: { not: sprintId } },
             data: { status: "completed" }
         });
     }

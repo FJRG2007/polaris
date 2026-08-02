@@ -13,38 +13,35 @@ import { useState } from "react";
 import { cn } from "@polaris/ui";
 import * as core from "@polaris/core";
 import type { ViewProps } from "./shared";
+import { toFacts } from "@/lib/tasks/facts";
 import { CustomFieldValue } from "../custom-fields";
-import { toFacts, type TaskRow } from "@/lib/tasks/facts";
 import { useDisplayFormat } from "@/components/display-format";
 import { Ban, ChevronDown, ChevronRight, Plus } from "lucide-react";
-import { AvatarStack, CompleteToggle, DueBadge, PriorityFlag, StatusDot, TagChip } from "../pickers";
+import { commandsFor, TaskControls, TaskMenu, TaskStatusMarker, type TaskCommands } from "./task-actions";
+import { AssigneePicker, AvatarStack, DueBadge, DuePicker, PriorityPicker, StatusDot, TagChip } from "../pickers";
 
 /** One task as a row. Shared by both views so a task reads the same in either. */
 function TaskLine({
-    task,
+    commands,
     depth,
-    canEdit,
     selected,
-    onOpen,
     onSelect,
-    onToggleComplete,
     onDragStart,
     onDropBefore
 }: {
-    task: TaskRow;
+    commands: TaskCommands;
     depth: number;
-    canEdit: boolean;
     selected: boolean;
-    onOpen: () => void;
     onSelect: () => void;
-    onToggleComplete: (complete: boolean) => void;
     onDragStart?: () => void;
     onDropBefore?: () => void;
 }) {
     const format = useDisplayFormat();
     const [over, setOver] = useState(false);
+    const { task, canEdit, onOpen } = commands;
 
     return (
+        <TaskMenu commands={commands}>
         <li
             draggable={canEdit && onDragStart !== undefined}
             onDragStart={(event) => {
@@ -71,7 +68,7 @@ function TaskLine({
             )}
             style={{ paddingLeft: `${0.5 + depth * 1.25}rem` }}
         >
-            <CompleteToggle statusType={task.statusType} disabled={!canEdit} onToggle={onToggleComplete} />
+            <TaskStatusMarker commands={commands} />
             <button
                 type="button"
                 onClick={(event) => (event.metaKey || event.ctrlKey ? onSelect() : onOpen())}
@@ -91,25 +88,28 @@ function TaskLine({
                 <StatusDot color={task.statusColor} />
                 {task.statusName}
             </span>
-            <PriorityFlag priority={task.priority} />
             <span className="hidden w-24 justify-end md:flex">
                 <DueBadge dueDate={task.dueDate} statusType={task.statusType} timed={task.timed} format={format.date} />
             </span>
             <AvatarStack people={task.assignees} size={20} />
+            {/* The editable versions of what the row just showed. They sit at the
+                end so the row still reads left to right, and stay out of the way
+                until somebody is actually pointing at this task. */}
+            <span
+                className={cn(
+                    "flex shrink-0 items-center transition-opacity focus-within:opacity-100 group-hover:opacity-100",
+                    canEdit ? "opacity-0" : "hidden"
+                )}
+            >
+                <TaskControls commands={commands} />
+            </span>
         </li>
+        </TaskMenu>
     );
 }
 
-export function ListView({
-    groups,
-    canEdit,
-    selection,
-    onOpen,
-    onSelect,
-    onMove,
-    onQuickCreate,
-    onToggleComplete
-}: ViewProps) {
+export function ListView(props: ViewProps) {
+    const { groups, canEdit, selection, onSelect, onMove, onQuickCreate } = props;
     const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set());
     const [dragging, setDragging] = useState<string | null>(null);
     const [addingTo, setAddingTo] = useState<string | null>(null);
@@ -185,13 +185,10 @@ export function ListView({
                                     return (
                                         <TaskLine
                                             key={task.id}
-                                            task={task}
+                                            commands={commandsFor(props, task)}
                                             depth={node.depth}
-                                            canEdit={canEdit}
                                             selected={selection.has(task.id)}
-                                            onOpen={() => onOpen(task.id)}
                                             onSelect={() => onSelect(task.id)}
-                                            onToggleComplete={(complete) => onToggleComplete(task, complete)}
                                             onDragStart={() => setDragging(task.id)}
                                             onDropBefore={() => {
                                                 if (!dragging) return;
@@ -249,7 +246,8 @@ export function ListView({
     );
 }
 
-export function TableView({ rows, context, canEdit, selection, onOpen, onSelect, onToggleComplete }: ViewProps) {
+export function TableView(props: ViewProps) {
+    const { rows, context, selection, onOpen, onSelect } = props;
     const format = useDisplayFormat();
     // Every custom field gets a column here: being able to compare them side by
     // side is the whole reason to look at a table rather than a list.
@@ -276,20 +274,18 @@ export function TableView({ rows, context, canEdit, selection, onOpen, onSelect,
                     </tr>
                 </thead>
                 <tbody>
-                    {rows.map((task) => (
+                    {rows.map((task) => {
+                        const commands = commandsFor(props, task);
+                        return (
+                        <TaskMenu key={task.id} commands={commands}>
                         <tr
-                            key={task.id}
                             className={cn(
-                                "border-b border-border transition-colors hover:bg-muted/40",
+                                "group border-b border-border transition-colors hover:bg-muted/40",
                                 selection.has(task.id) && "bg-primary/5"
                             )}
                         >
                             <td className="px-2 py-1.5">
-                                <CompleteToggle
-                                    statusType={task.statusType}
-                                    disabled={!canEdit}
-                                    onToggle={(complete) => onToggleComplete(task, complete)}
-                                />
+                                <TaskStatusMarker commands={commands} />
                             </td>
                             <td className="max-w-xs px-2 py-1.5">
                                 <button
@@ -308,18 +304,45 @@ export function TableView({ rows, context, canEdit, selection, onOpen, onSelect,
                                 </span>
                             </td>
                             <td className="px-2 py-1.5">
-                                <AvatarStack people={task.assignees} size={20} />
+                                <span className="flex items-center gap-1">
+                                    <AvatarStack people={task.assignees} size={20} />
+                                    <span className="opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
+                                        <AssigneePicker
+                                            people={context.people}
+                                            selected={task.assignees.map((person) => person.id)}
+                                            disabled={!props.canEdit}
+                                            onChange={(assigneeIds) => props.onEdit(task, { assigneeIds })}
+                                        />
+                                    </span>
+                                </span>
                             </td>
                             <td className="whitespace-nowrap px-2 py-1.5 text-xs">
-                                {core.TASK_PRIORITY_LABELS[task.priority]}
+                                <span className="inline-flex items-center gap-1.5">
+                                    <PriorityPicker
+                                        value={task.priority}
+                                        disabled={!props.canEdit}
+                                        onChange={(priority) => props.onEdit(task, { priority })}
+                                    />
+                                    {core.TASK_PRIORITY_LABELS[task.priority]}
+                                </span>
                             </td>
                             <td className="whitespace-nowrap px-2 py-1.5">
-                                <DueBadge
-                                    dueDate={task.dueDate}
-                                    statusType={task.statusType}
-                                    timed={task.timed}
-                                    format={format.date}
-                                />
+                                <span className="inline-flex items-center gap-1">
+                                    <DueBadge
+                                        dueDate={task.dueDate}
+                                        statusType={task.statusType}
+                                        timed={task.timed}
+                                        format={format.date}
+                                    />
+                                    <span className="opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
+                                        <DuePicker
+                                            dueDate={task.dueDate}
+                                            timed={task.timed}
+                                            disabled={!props.canEdit}
+                                            onChange={(dueDate) => props.onEdit(task, { dueDate })}
+                                        />
+                                    </span>
+                                </span>
                             </td>
                             <td className="whitespace-nowrap px-2 py-1.5 text-xs text-muted-foreground">
                                 {core.formatDurationMinutes(task.timeEstimate) || "-"}
@@ -337,7 +360,9 @@ export function TableView({ rows, context, canEdit, selection, onOpen, onSelect,
                                 </td>
                             ))}
                         </tr>
-                    ))}
+                        </TaskMenu>
+                        );
+                    })}
                     {rows.length === 0 && (
                         <tr>
                             <td colSpan={8 + columns.length} className="px-4 py-10 text-center text-sm text-muted-foreground">

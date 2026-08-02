@@ -9,8 +9,8 @@
  */
 
 import { useId, useMemo, useRef, useState, type PointerEvent } from "react";
-import { cn } from "../lib/cn.js";
-import { summarizeSeries, type SeriesSummary } from "../lib/series-summary.js";
+import { cn } from "../lib/cn";
+import { summarizeSeries, type SeriesSummary } from "../lib/series-summary";
 
 export type GaugeTone = "primary" | "success" | "warning" | "danger";
 

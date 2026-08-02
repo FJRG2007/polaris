@@ -22,6 +22,7 @@ import type { BoardMove, ViewProps } from "./shared";
 import { useDisplayFormat } from "@/components/display-format";
 import { Ban, MessageSquare, Paperclip, Plus, Repeat } from "lucide-react";
 import { AvatarStack, DueBadge, PriorityFlag, StatusDot, TagChip } from "../pickers";
+import { commandsFor, TaskControls, TaskMenu, TaskStatusMarker, type TaskCommands } from "./task-actions";
 
 /** Where a card was dropped, as neighbours rather than an index. */
 function neighbours(tasks: readonly TaskRow[], targetId: string | null, dragged: string): BoardMove["position"] {
@@ -36,15 +37,13 @@ function neighbours(tasks: readonly TaskRow[], targetId: string | null, dragged:
 }
 
 export function TaskCard({
-    task,
-    onOpen,
+    commands,
     onDragStart,
     onDropBefore,
     selected,
     onSelect
 }: {
-    task: TaskRow;
-    onOpen: () => void;
+    commands: TaskCommands;
     onDragStart: () => void;
     onDropBefore: () => void;
     selected: boolean;
@@ -52,8 +51,10 @@ export function TaskCard({
 }) {
     const format = useDisplayFormat();
     const [over, setOver] = useState(false);
+    const { task, onOpen } = commands;
 
     return (
+        <TaskMenu commands={commands}>
         <li
             draggable
             onDragStart={(event) => {
@@ -85,11 +86,20 @@ export function TaskCard({
                     }
                 }}
                 className={cn(
-                    "flex cursor-pointer flex-col gap-2 rounded-lg border border-border bg-card p-3 text-left transition-colors hover:border-primary/50",
+                    "group flex cursor-pointer flex-col gap-2 rounded-lg border border-border bg-card p-3 text-left transition-colors hover:border-primary/50",
                     selected && "border-primary ring-1 ring-primary"
                 )}
             >
                 <div className="flex items-start gap-2">
+                    <span
+                        // The card opens on click, so the controls on it have to
+                        // stop the click from reaching the card underneath.
+                        onClick={(event) => event.stopPropagation()}
+                        onKeyDown={(event) => event.stopPropagation()}
+                        role="presentation"
+                    >
+                        <TaskStatusMarker commands={commands} />
+                    </span>
                     <span className="mt-0.5 font-mono text-[10px] text-muted-foreground">{task.reference}</span>
                     <span className="flex-1" />
                     <PriorityFlag priority={task.priority} />
@@ -126,16 +136,33 @@ export function TaskCard({
                     {task.points !== null && <span title="Points">{task.points} pts</span>}
                     <span className="flex-1" />
                     <AvatarStack people={task.assignees} size={20} />
+                    <span
+                        onClick={(event) => event.stopPropagation()}
+                        onKeyDown={(event) => event.stopPropagation()}
+                        role="presentation"
+                        className="flex items-center opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100"
+                    >
+                        <TaskControls commands={commands} compact />
+                    </span>
                 </div>
             </div>
         </li>
+        </TaskMenu>
     );
 }
 
-export function BoardView({ groups, selection, onOpen, onSelect, onMove, onQuickCreate, canEdit }: ViewProps) {
+export function BoardView(props: ViewProps) {
+    const { groups, selection, onSelect, onMove, onQuickCreate, canEdit } = props;
     const [dragging, setDragging] = useState<string | null>(null);
     const [addingTo, setAddingTo] = useState<string | null>(null);
     const [draft, setDraft] = useState("");
+    const [newColumn, setNewColumn] = useState<{ name: string; type: core.TaskStatusType; color: string } | null>(null);
+    const [savingColumn, setSavingColumn] = useState(false);
+
+    // A column can only be added when the board's columns ARE the space's
+    // statuses. Grouped by assignee or by tag, "add a column" would mean
+    // inventing a person or a label, which is not what the button says.
+    const canAddColumn = props.onCreateGroup !== undefined && (props.groupBy ?? "status") === "status";
 
     const drop = (groupKey: string, tasks: readonly TaskRow[], targetId: string | null) => {
         if (!dragging) return;
@@ -201,9 +228,8 @@ export function BoardView({ groups, selection, onOpen, onSelect, onMove, onQuick
                         {group.tasks.map((task) => (
                             <TaskCard
                                 key={task.id}
-                                task={task}
+                                commands={commandsFor(props, task)}
                                 selected={selection.has(task.id)}
-                                onOpen={() => onOpen(task.id)}
                                 onSelect={() => onSelect(task.id)}
                                 onDragStart={() => setDragging(task.id)}
                                 onDropBefore={() => drop(group.key, group.tasks, task.id)}
@@ -217,6 +243,80 @@ export function BoardView({ groups, selection, onOpen, onSelect, onMove, onQuick
                     </ul>
                 </section>
             ))}
+
+            {canAddColumn &&
+                (newColumn ? (
+                    <section className="flex w-72 shrink-0 flex-col gap-2 rounded-lg border border-dashed border-primary/50 bg-muted/20 p-3">
+                        <input
+                            autoFocus
+                            value={newColumn.name}
+                            placeholder="Column name"
+                            aria-label="Status name"
+                            onChange={(event) => setNewColumn({ ...newColumn, name: event.target.value })}
+                            className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm outline-none focus:border-primary"
+                        />
+                        {/* The kind is not decoration: it is what decides whether
+                            work in this column counts as finished, so it is asked
+                            for rather than guessed from the name. */}
+                        <div className="flex flex-wrap gap-1">
+                            {core.TASK_STATUS_TYPES.map((type) => (
+                                <button
+                                    key={type}
+                                    type="button"
+                                    onClick={() => setNewColumn({ ...newColumn, type })}
+                                    aria-pressed={newColumn.type === type}
+                                    title={core.TASK_STATUS_TYPE_HINTS[type]}
+                                    className={cn(
+                                        "rounded-md border px-2 py-1 text-[11px] transition-colors",
+                                        newColumn.type === type
+                                            ? "border-primary bg-primary/10 text-foreground"
+                                            : "border-border text-muted-foreground hover:text-foreground"
+                                    )}
+                                >
+                                    {core.TASK_STATUS_TYPE_LABELS[type]}
+                                </button>
+                            ))}
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <input
+                                type="color"
+                                value={newColumn.color}
+                                aria-label="Column colour"
+                                onChange={(event) => setNewColumn({ ...newColumn, color: event.target.value })}
+                                className="size-8 cursor-pointer rounded border border-border bg-transparent"
+                            />
+                            <button
+                                type="button"
+                                disabled={!newColumn.name.trim() || savingColumn}
+                                onClick={async () => {
+                                    if (!props.onCreateGroup) return;
+                                    setSavingColumn(true);
+                                    await props.onCreateGroup(newColumn.name.trim(), newColumn.type, newColumn.color);
+                                    setSavingColumn(false);
+                                    setNewColumn(null);
+                                }}
+                                className="rounded-md bg-primary px-2 py-1 text-xs text-primary-foreground disabled:opacity-50"
+                            >
+                                Add
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setNewColumn(null)}
+                                className="rounded-md px-2 py-1 text-xs text-muted-foreground hover:text-foreground"
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    </section>
+                ) : (
+                    <button
+                        type="button"
+                        onClick={() => setNewColumn({ name: "", type: "open", color: "#64748b" })}
+                        className="flex h-10 w-56 shrink-0 items-center justify-center gap-1.5 rounded-lg border border-dashed border-border text-xs text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground"
+                    >
+                        <Plus className="size-3.5" /> New column
+                    </button>
+                ))}
         </div>
     );
 }

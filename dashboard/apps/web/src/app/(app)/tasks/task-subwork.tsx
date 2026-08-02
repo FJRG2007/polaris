@@ -15,10 +15,79 @@ import * as actions from "./actions";
 import * as core from "@polaris/core";
 import { runAction } from "@/lib/run-action";
 import type { TaskRow } from "@/lib/tasks/facts";
-import { AvatarStack, ProgressBar, StatusDot } from "./pickers";
+import type { StatusView } from "@/lib/tasks/space-service";
 import { Button, Card, CardBody, Checkbox, cn, Input } from "@polaris/ui";
+import { AvatarStack, ProgressBar, StatusDot, StatusMarker } from "./pickers";
 import type { ChecklistView, DependencyView } from "@/lib/tasks/task-service";
 import { ArrowUpRight, Ban, Check, Link2, Plus, Trash2, X } from "lucide-react";
+
+/**
+ * A row that can be picked up and put down somewhere else in its own list.
+ *
+ * The three lists inside a task - subtasks, checklists, the steps in one - are
+ * all things people write down in the order they thought of them and then want
+ * in the order they will do them. The drop is reported as the two rows it landed
+ * between rather than as an index, the same way every other drag in Polaris is,
+ * so two people tidying the same task cannot renumber each other.
+ */
+function Sortable({
+    id,
+    dragging,
+    onDragStart,
+    onDragEnd,
+    onDropBefore,
+    disabled,
+    className,
+    children
+}: {
+    id: string;
+    dragging: string | null;
+    onDragStart: () => void;
+    onDragEnd: () => void;
+    onDropBefore: () => void;
+    disabled?: boolean;
+    className?: string;
+    children: React.ReactNode;
+}) {
+    const [over, setOver] = useState(false);
+
+    return (
+        <li
+            draggable={!disabled}
+            onDragStart={(event) => {
+                event.stopPropagation();
+                event.dataTransfer.effectAllowed = "move";
+                event.dataTransfer.setData("text/plain", id);
+                onDragStart();
+            }}
+            onDragEnd={onDragEnd}
+            onDragOver={(event) => {
+                if (disabled || !dragging || dragging === id) return;
+                event.preventDefault();
+                event.stopPropagation();
+                setOver(true);
+            }}
+            onDragLeave={() => setOver(false)}
+            onDrop={(event) => {
+                if (!over) return;
+                event.preventDefault();
+                event.stopPropagation();
+                setOver(false);
+                onDropBefore();
+            }}
+            className={cn("relative", over && "before:absolute before:-top-px before:h-0.5 before:w-full before:rounded before:bg-primary", className)}
+        >
+            {children}
+        </li>
+    );
+}
+
+/** The row a drop above `id` should land between, among a set of siblings. */
+function neighbours(siblings: readonly { id: string }[], targetId: string, dragged: string) {
+    const without = siblings.filter((entry) => entry.id !== dragged);
+    const index = without.findIndex((entry) => entry.id === targetId);
+    return { beforeId: index > 0 ? (without[index - 1]?.id ?? null) : null, afterId: targetId };
+}
 
 /** A short line of text somebody types and presses enter on. Used for every
  *  "add one more" affordance so they all behave identically. */
@@ -70,6 +139,7 @@ export function SubtaskSection({
     taskId,
     listId,
     subtasks,
+    statuses,
     canEdit,
     onOpen,
     onChanged,
@@ -78,12 +148,24 @@ export function SubtaskSection({
     taskId: string;
     listId: string;
     subtasks: readonly TaskRow[];
+    statuses: readonly StatusView[];
     canEdit: boolean;
     onOpen: (taskId: string) => void;
     onChanged: () => void;
     onError: (message: string) => void;
 }) {
     const progress = core.rollupProgress(subtasks.map((task) => ({ statusType: task.statusType })));
+    const [dragging, setDragging] = useState<string | null>(null);
+
+    const move = async (targetId: string) => {
+        if (!dragging || dragging === targetId) return;
+        const position = neighbours(subtasks, targetId, dragging);
+        const moved = dragging;
+        setDragging(null);
+        onError("");
+        await runAction(() => actions.moveTaskAction({ taskId: moved, ...position }), onError);
+        onChanged();
+    };
 
     return (
         <section className="flex flex-col gap-2">
@@ -104,15 +186,30 @@ export function SubtaskSection({
                     </li>
                 )}
                 {subtasks.map((subtask) => (
-                    <li key={subtask.id} className="flex items-center gap-2 px-3 py-2">
-                        <Checkbox
-                            checked={core.isFinishedStatus(subtask.statusType)}
+                    <Sortable
+                        key={subtask.id}
+                        id={subtask.id}
+                        dragging={dragging}
+                        disabled={!canEdit}
+                        onDragStart={() => setDragging(subtask.id)}
+                        onDragEnd={() => setDragging(null)}
+                        onDropBefore={() => void move(subtask.id)}
+                        className="flex items-center gap-2 px-3 py-2"
+                    >
+                        {/* The marker sets the state, rather than a checkbox that
+                            only ever meant done or not. It also used to write
+                            `archived: false`, which changed nothing at all. */}
+                        <StatusMarker
+                            statuses={statuses}
+                            statusId={subtask.statusId}
+                            statusColor={subtask.statusColor}
+                            statusType={subtask.statusType}
+                            statusName={subtask.statusName}
                             disabled={!canEdit}
-                            aria-label={`Complete ${subtask.name}`}
-                            onChange={async () => {
+                            onChange={async (statusId) => {
                                 onError("");
                                 await runAction(
-                                    () => actions.updateTaskAction({ taskId: subtask.id, archived: false }),
+                                    () => actions.updateTaskAction({ taskId: subtask.id, statusId }),
                                     onError
                                 );
                                 onChanged();
@@ -128,9 +225,8 @@ export function SubtaskSection({
                                 {subtask.name}
                             </span>
                         </button>
-                        <StatusDot color={subtask.statusColor} />
                         <AvatarStack people={subtask.assignees} size={20} />
-                    </li>
+                    </Sortable>
                 ))}
             </ul>
 
@@ -175,6 +271,34 @@ export function ChecklistSection({
     onError: (message: string) => void;
 }) {
     const [adding, setAdding] = useState(false);
+    // One at a time: a checklist and a step are never dragged together, and
+    // keeping them apart is what stops a step being dropped onto a checklist
+    // header and landing nowhere.
+    const [draggingList, setDraggingList] = useState<string | null>(null);
+    const [draggingStep, setDraggingStep] = useState<{ id: string; checklistId: string } | null>(null);
+
+    const moveChecklist = async (targetId: string) => {
+        if (!draggingList || draggingList === targetId) return;
+        const position = neighbours(checklists, targetId, draggingList);
+        const moved = draggingList;
+        setDraggingList(null);
+        onError("");
+        await runAction(() => actions.moveChecklistAction(taskId, moved, position), onError);
+        onChanged();
+    };
+
+    const moveStep = async (checklistId: string, items: readonly { id: string }[], targetId: string | null) => {
+        if (!draggingStep) return;
+        const moved = draggingStep.id;
+        // Dropped on the list itself rather than on a step: the end of it.
+        const position = targetId
+            ? neighbours(items, targetId, moved)
+            : { beforeId: items.filter((item) => item.id !== moved).at(-1)?.id ?? null, afterId: null };
+        setDraggingStep(null);
+        onError("");
+        await runAction(() => actions.moveChecklistItemAction(taskId, moved, { checklistId, ...position }), onError);
+        onChanged();
+    };
 
     return (
         <section className="flex flex-col gap-3">
@@ -206,10 +330,20 @@ export function ChecklistSection({
                 </p>
             )}
 
+            <ul className="flex flex-col gap-3">
             {checklists.map((checklist) => {
                 const done = checklist.items.filter((item) => item.done).length;
                 return (
-                    <Card key={checklist.id}>
+                    <Sortable
+                        key={checklist.id}
+                        id={checklist.id}
+                        dragging={draggingList}
+                        disabled={!canEdit}
+                        onDragStart={() => setDraggingList(checklist.id)}
+                        onDragEnd={() => setDraggingList(null)}
+                        onDropBefore={() => void moveChecklist(checklist.id)}
+                    >
+                    <Card>
                         <CardBody className="flex flex-col gap-2 p-3">
                             <div className="flex items-center justify-between gap-2">
                                 <h4 className="text-sm font-medium">{checklist.name}</h4>
@@ -240,9 +374,28 @@ export function ChecklistSection({
                                 <ProgressBar percent={Math.round((done / checklist.items.length) * 100)} />
                             )}
 
-                            <ul className="flex flex-col gap-1">
+                            <ul
+                                className="flex flex-col gap-1"
+                                onDragOver={(event) => {
+                                    if (draggingStep) event.preventDefault();
+                                }}
+                                onDrop={(event) => {
+                                    if (!draggingStep) return;
+                                    event.preventDefault();
+                                    void moveStep(checklist.id, checklist.items, null);
+                                }}
+                            >
                                 {checklist.items.map((item) => (
-                                    <li key={item.id} className="group flex items-center gap-2">
+                                    <Sortable
+                                        key={item.id}
+                                        id={item.id}
+                                        dragging={draggingStep?.id ?? null}
+                                        disabled={!canEdit}
+                                        onDragStart={() => setDraggingStep({ id: item.id, checklistId: checklist.id })}
+                                        onDragEnd={() => setDraggingStep(null)}
+                                        onDropBefore={() => void moveStep(checklist.id, checklist.items, item.id)}
+                                        className="group flex items-center gap-2"
+                                    >
                                         <Checkbox
                                             checked={item.done}
                                             aria-label={item.name}
@@ -296,7 +449,7 @@ export function ChecklistSection({
                                                 </button>
                                             </span>
                                         )}
-                                    </li>
+                                    </Sortable>
                                 ))}
                             </ul>
 
@@ -315,8 +468,10 @@ export function ChecklistSection({
                             )}
                         </CardBody>
                     </Card>
+                    </Sortable>
                 );
             })}
+            </ul>
         </section>
     );
 }

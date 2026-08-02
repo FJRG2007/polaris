@@ -24,6 +24,8 @@ import * as tasks from "@/lib/tasks/task-service";
 import * as views from "@/lib/tasks/view-service";
 import * as forms from "@/lib/tasks/form-service";
 import * as spaces from "@/lib/tasks/space-service";
+import * as commits from "@/lib/tasks/commit-service";
+import * as files from "@/lib/tasks/attachment-service";
 import * as planning from "@/lib/tasks/planning-service";
 import * as details from "@/lib/tasks/task-detail-service";
 import * as automations from "@/lib/tasks/automation-service";
@@ -294,12 +296,40 @@ export async function removeFolderMemberAction(folderId: string, userId: string)
     }
 }
 
+/** What the sidebar needs to open a create dialog for a space or one folder in
+ *  it: the vocabulary of that space and the lists a task could go into. Fetched
+ *  when the dialog opens rather than sent with every page, because most visits
+ *  never create anything. */
+export async function createContextAction(
+    spaceId: string,
+    folderId: string | null
+): Promise<{ context?: spaces.CreateContext; error?: string }> {
+    const caller = await actor();
+    try {
+        if (folderId) await access.requireFolder(caller, folderId, "member");
+        else await access.requireSpace(caller, spaceId, "member");
+        const [statuses, tags, people, lists] = await Promise.all([
+            spaces.listStatuses(spaceId),
+            spaces.listTags(spaceId),
+            spaces.spacePeople(spaceId),
+            spaces.branchLists(spaceId, folderId)
+        ]);
+        return { context: { spaceId, statuses, tags, people, lists } };
+    } catch (caught) {
+        return failure(caught, "Could not open that");
+    }
+}
+
 export async function createListAction(input: unknown): Promise<{ id?: string; error?: string }> {
     const caller = await actor();
     const parsed = core.listSchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
     try {
-        await access.requireSpace(caller, parsed.data.spaceId, "member");
+        // Authorized against the folder it goes into when there is one, so
+        // somebody invited to a single project can add a list inside it without
+        // being handed the space around it.
+        if (parsed.data.folderId) await access.requireFolder(caller, parsed.data.folderId, "member");
+        else await access.requireSpace(caller, parsed.data.spaceId, "member");
         const id = await spaces.createList(parsed.data);
         refresh();
         return { id };
@@ -704,6 +734,44 @@ export async function createChecklistAction(taskId: string, name: string): Promi
     }
 }
 
+/** Reorder the checklists on a task after a drag. */
+export async function moveChecklistAction(
+    taskId: string,
+    checklistId: string,
+    move: unknown
+): Promise<{ error?: string }> {
+    const caller = await actor();
+    const parsed = core.checklistMoveSchema.safeParse(move);
+    if (!parsed.success) return { error: "Could not work out where that was dropped" };
+    try {
+        await access.requireTask(caller, taskId, "member");
+        await details.moveChecklist(taskId, checklistId, parsed.data);
+        refresh();
+        return {};
+    } catch (caught) {
+        return failure(caught, "Could not move the checklist");
+    }
+}
+
+/** Reorder a step, or move it into another checklist on the same task. */
+export async function moveChecklistItemAction(
+    taskId: string,
+    itemId: string,
+    move: unknown
+): Promise<{ error?: string }> {
+    const caller = await actor();
+    const parsed = core.checklistItemMoveSchema.safeParse(move);
+    if (!parsed.success) return { error: "Could not work out where that was dropped" };
+    try {
+        await access.requireTask(caller, taskId, "member");
+        await details.moveChecklistItem(taskId, itemId, parsed.data);
+        refresh();
+        return {};
+    } catch (caught) {
+        return failure(caught, "Could not move the step");
+    }
+}
+
 export async function deleteChecklistAction(taskId: string, checklistId: string): Promise<{ error?: string }> {
     const caller = await actor();
     try {
@@ -852,6 +920,53 @@ export async function addReminderAction(taskId: string, remindAt: string, note: 
 }
 
 // ---------------------------------------------------------------------------
+// Attachments and commits
+// ---------------------------------------------------------------------------
+
+/** Uploading goes through /api/tasks/attachments, which streams the body; this
+ *  is only the other half - taking one off again. */
+export async function deleteAttachmentAction(taskId: string, attachmentId: string): Promise<{ error?: string }> {
+    const caller = await actor();
+    try {
+        await access.requireTask(caller, taskId, "member");
+        const owner = await files.attachmentTaskId(attachmentId);
+        // The id came from the client, so it is checked against the task the
+        // caller was actually cleared for.
+        if (owner !== taskId) return { error: "That file is not on this task" };
+        await files.deleteAttachment(attachmentId);
+        refresh();
+        return {};
+    } catch (caught) {
+        return failure(caught, "Could not remove that file");
+    }
+}
+
+export async function linkCommitAction(taskId: string, reference: string): Promise<{ error?: string }> {
+    const caller = await actor();
+    try {
+        await access.requireTask(caller, taskId, "member");
+        await commits.linkCommit(taskId, caller.id, reference.slice(0, 500));
+        refresh();
+        return {};
+    } catch (caught) {
+        if (caught instanceof commits.CommitLinkError) return { error: caught.message };
+        return failure(caught, "Could not link that commit");
+    }
+}
+
+export async function unlinkCommitAction(taskId: string, commitId: string): Promise<{ error?: string }> {
+    const caller = await actor();
+    try {
+        await access.requireTask(caller, taskId, "member");
+        await commits.unlinkCommit(taskId, commitId);
+        refresh();
+        return {};
+    } catch (caught) {
+        return failure(caught, "Could not unlink that commit");
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Time tracking
 // ---------------------------------------------------------------------------
 
@@ -969,7 +1084,10 @@ export async function createSprintAction(input: unknown): Promise<{ error?: stri
     const parsed = core.sprintSchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the dates and try again" };
     try {
-        await access.requireSpace(caller, parsed.data.spaceId, "member");
+        // A sprint planning one folder is authorized against that folder, which
+        // is what lets a project run its own sprints inside a shared space.
+        if (parsed.data.folderId) await access.requireFolder(caller, parsed.data.folderId, "member");
+        else await access.requireSpace(caller, parsed.data.spaceId, "member");
         await planning.createSprint(parsed.data);
         refresh();
         return {};
@@ -1192,7 +1310,10 @@ export async function createDocAction(input: unknown): Promise<{ id?: string; er
     const parsed = core.docSchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the page and try again" };
     try {
-        if (parsed.data.spaceId) await access.requireSpace(caller, parsed.data.spaceId, "member");
+        // A page written inside a folder is authorized against that folder; one
+        // the space shares needs the space itself.
+        if (parsed.data.folderId) await access.requireFolder(caller, parsed.data.folderId, "member");
+        else if (parsed.data.spaceId) await access.requireSpace(caller, parsed.data.spaceId, "member");
         const id = await docs.createDoc(caller.id, parsed.data);
         refresh();
         return { id };
@@ -1206,7 +1327,8 @@ export async function updateDocAction(docId: string, input: unknown): Promise<{ 
     const parsed = core.docSchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the page and try again" };
     try {
-        if (parsed.data.spaceId) await access.requireSpace(caller, parsed.data.spaceId, "member");
+        if (parsed.data.folderId) await access.requireFolder(caller, parsed.data.folderId, "member");
+        else if (parsed.data.spaceId) await access.requireSpace(caller, parsed.data.spaceId, "member");
         await docs.updateDoc(caller.id, docId, parsed.data);
         refresh();
         return {};

@@ -11,12 +11,22 @@
  * reports a value and the caller decides what to write.
  */
 
+import Link from "next/link";
 import * as core from "@polaris/core";
 import type { PersonRef, TagRef } from "@/lib/tasks/facts";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { StatusView, TagView } from "@/lib/tasks/space-service";
-import { Check, ChevronDown, Flag, Plus, Search, X } from "lucide-react";
-import { Badge, Checkbox, cn, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, Input } from "@polaris/ui";
+import { Ban, CalendarPlus, Check, ChevronDown, Flag, Plus, Search, Settings2, UserPlus, X } from "lucide-react";
+import {
+    Badge,
+    cn,
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+    Input
+} from "@polaris/ui";
 
 // ---------------------------------------------------------------------------
 // People
@@ -112,13 +122,13 @@ export function AssigneePicker({
                     <button
                         type="button"
                         aria-label="Assignees"
+                        title="Assign somebody"
+                        // Always the plus, never the faces. Every caller already
+                        // draws the people it has; a trigger that drew them too
+                        // showed everybody assigned to the task twice.
                         className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                     >
-                        {selected.length === 0 ? (
-                            <Plus className="size-3.5" />
-                        ) : (
-                            <AvatarStack people={people.filter((person) => selected.includes(person.id))} size={20} />
-                        )}
+                        <UserPlus className="size-3.5" />
                     </button>
                 )}
             </DropdownMenuTrigger>
@@ -167,43 +177,118 @@ export function StatusPicker({
     value,
     onChange,
     disabled,
-    compact
+    compact,
+    trigger,
+    spaceId
 }: {
     statuses: readonly StatusView[];
     value: string | null;
     onChange: (statusId: string) => void;
     disabled?: boolean;
     compact?: boolean;
+    /** Replaces the default pill - a row uses the state marker as its trigger. */
+    trigger?: React.ReactNode;
+    /** Offers the way to a space's own statuses. A workspace outgrows the ones
+     *  it started with, and the moment to add "On hold" is the moment somebody
+     *  went looking for it. */
+    spaceId?: string;
 }) {
     const current = statuses.find((status) => status.id === value);
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild disabled={disabled}>
-                <button
-                    type="button"
-                    className={cn(
-                        "inline-flex items-center gap-1.5 rounded-md border border-border px-2 py-1 text-xs font-medium transition-colors hover:bg-muted",
-                        compact && "border-transparent px-1.5"
-                    )}
-                    style={current ? { color: current.color } : undefined}
-                >
-                    <StatusDot color={current?.color ?? "#64748b"} />
-                    <span className="truncate">{current?.name ?? "No status"}</span>
-                    {!compact && <ChevronDown className="size-3 opacity-60" />}
-                </button>
+                {trigger ?? (
+                    <button
+                        type="button"
+                        aria-label="Status"
+                        className={cn(
+                            "inline-flex items-center gap-1.5 rounded-md border border-border px-2 py-1 text-xs font-medium transition-colors hover:bg-muted",
+                            compact && "border-transparent px-1.5"
+                        )}
+                        style={current ? { color: current.color } : undefined}
+                    >
+                        <StatusDot color={current?.color ?? "#64748b"} />
+                        <span className="truncate">{current?.name ?? "No status"}</span>
+                        {!compact && <ChevronDown className="size-3 opacity-60" />}
+                    </button>
+                )}
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-52">
+            <DropdownMenuContent align="start" className="w-56">
                 {statuses.map((status) => (
                     <DropdownMenuItem key={status.id} onSelect={() => onChange(status.id)} className="gap-2">
                         <StatusDot color={status.color} />
                         <span className="flex-1 truncate">{status.name}</span>
-                        <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                            {core.TASK_STATUS_TYPE_LABELS[status.type]}
-                        </span>
+                        {status.id === value ? (
+                            <Check className="size-3.5 text-primary" />
+                        ) : (
+                            <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                                {core.TASK_STATUS_TYPE_LABELS[status.type]}
+                            </span>
+                        )}
                     </DropdownMenuItem>
                 ))}
+                {spaceId && (
+                    <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem asChild className="gap-2 text-muted-foreground">
+                            <Link href={`/tasks/s/${spaceId}?tab=Statuses`}>
+                                <Settings2 className="size-3.5" />
+                                Edit statuses
+                            </Link>
+                        </DropdownMenuItem>
+                    </>
+                )}
             </DropdownMenuContent>
         </DropdownMenu>
+    );
+}
+
+/**
+ * The marker a row carries and the way its state is changed: one click, and the
+ * states this space actually uses. A plain checkbox only ever says finished or
+ * not, so moving something to "In review" meant opening the task to do it - and
+ * a board with five columns is a workspace that already decided a task has more
+ * than two states.
+ */
+export function StatusMarker({
+    statuses,
+    statusId,
+    statusColor,
+    statusType,
+    statusName,
+    onChange,
+    disabled,
+    spaceId
+}: {
+    statuses: readonly StatusView[];
+    statusId: string | null;
+    statusColor: string;
+    statusType: core.TaskStatusType;
+    statusName: string;
+    onChange: (statusId: string) => void;
+    disabled?: boolean;
+    spaceId?: string;
+}) {
+    const done = core.isFinishedStatus(statusType);
+    return (
+        <StatusPicker
+            statuses={statuses}
+            value={statusId}
+            onChange={onChange}
+            disabled={disabled}
+            spaceId={spaceId}
+            trigger={
+                <button
+                    type="button"
+                    title={statusName}
+                    aria-label={`Status: ${statusName}`}
+                    className="inline-flex size-5 shrink-0 items-center justify-center rounded-full border-2 transition-transform hover:scale-110 disabled:cursor-not-allowed disabled:opacity-50"
+                    style={{ borderColor: statusColor, backgroundColor: done ? statusColor : "transparent" }}
+                >
+                    {done && <Check className="size-3 text-white" strokeWidth={3} />}
+                </button>
+            }
+        />
     );
 }
 
@@ -216,6 +301,9 @@ export function PriorityFlag({ priority, className }: { priority: core.TaskPrior
     return (
         <Flag
             className={cn("size-3.5 shrink-0", className)}
+            // Filled, so urgency reads at a glance down a column of rows rather
+            // than only when somebody stops to look at the outline.
+            fill={core.TASK_PRIORITY_COLORS[priority]}
             style={{ color: core.TASK_PRIORITY_COLORS[priority] }}
             aria-label={core.TASK_PRIORITY_LABELS[priority]}
         />
@@ -225,31 +313,48 @@ export function PriorityFlag({ priority, className }: { priority: core.TaskPrior
 export function PriorityPicker({
     value,
     onChange,
-    disabled
+    disabled,
+    trigger
 }: {
     value: core.TaskPriority;
     onChange: (priority: core.TaskPriority) => void;
     disabled?: boolean;
+    trigger?: React.ReactNode;
 }) {
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild disabled={disabled}>
-                <button
-                    type="button"
-                    aria-label="Priority"
-                    className="inline-flex items-center gap-1.5 rounded-md px-1.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                >
-                    {value === "none" ? <Flag className="size-3.5 opacity-50" /> : <PriorityFlag priority={value} />}
-                </button>
+                {trigger ?? (
+                    <button
+                        type="button"
+                        aria-label="Priority"
+                        title={core.TASK_PRIORITY_LABELS[value]}
+                        className="inline-flex items-center gap-1.5 rounded-md px-1.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    >
+                        {value === "none" ? <Flag className="size-3.5 opacity-50" /> : <PriorityFlag priority={value} />}
+                    </button>
+                )}
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-44">
-                {core.TASK_PRIORITIES.map((priority) => (
+                <p className="px-2 pb-1 text-[10px] uppercase tracking-wide text-muted-foreground">Priority</p>
+                {core.TASK_PRIORITIES.filter((priority) => priority !== "none").map((priority) => (
                     <DropdownMenuItem key={priority} onSelect={() => onChange(priority)} className="gap-2">
-                        <Flag className="size-3.5" style={{ color: core.TASK_PRIORITY_COLORS[priority] }} />
+                        <Flag
+                            className="size-3.5"
+                            fill={core.TASK_PRIORITY_COLORS[priority]}
+                            style={{ color: core.TASK_PRIORITY_COLORS[priority] }}
+                        />
                         <span className="flex-1">{core.TASK_PRIORITY_LABELS[priority]}</span>
                         {value === priority && <Check className="size-3.5 text-primary" />}
                     </DropdownMenuItem>
                 ))}
+                {/* "No priority" is the absence of the others, so it reads as the
+                    way out of the menu rather than a fifth thing to pick. */}
+                <DropdownMenuItem onSelect={() => onChange("none")} className="gap-2 text-muted-foreground">
+                    <Ban className="size-3.5" />
+                    <span className="flex-1">Clear</span>
+                    {value === "none" && <Check className="size-3.5 text-primary" />}
+                </DropdownMenuItem>
             </DropdownMenuContent>
         </DropdownMenu>
     );
@@ -258,6 +363,21 @@ export function PriorityPicker({
 // ---------------------------------------------------------------------------
 // Tags
 // ---------------------------------------------------------------------------
+
+/**
+ * The colour a tag gets when it is born in a picker rather than in the settings.
+ *
+ * Derived from the name, so the same tag typed in two places comes out the same
+ * colour, and a workspace does not end up with six tags in the same blue because
+ * they were all created first. Any of them can be recoloured afterwards.
+ */
+const TAG_PALETTE = ["#3b82f6", "#8b5cf6", "#ec4899", "#f97316", "#eab308", "#22c55e", "#14b8a6", "#64748b"] as const;
+
+export function tagColorFor(name: string): string {
+    let hash = 0;
+    for (let index = 0; index < name.length; index += 1) hash = (hash * 31 + name.charCodeAt(index)) % 997;
+    return TAG_PALETTE[hash % TAG_PALETTE.length] as string;
+}
 
 export function TagChip({ tag, onRemove }: { tag: TagRef | TagView; onRemove?: () => void }) {
     return (
@@ -523,24 +643,61 @@ export function ProgressBar({ percent, className }: { percent: number; className
     );
 }
 
-/** A checkbox that completes a task, which is the single most-used control in
- *  the whole app and therefore gets to be one click everywhere. */
-export function CompleteToggle({
-    statusType,
-    onToggle,
-    disabled
+/**
+ * Setting a due date without leaving the row. The date input lives in a menu
+ * rather than in the row itself, because a row full of empty date boxes is a row
+ * nobody can read - the affordance appears where the date would be.
+ */
+export function DuePicker({
+    dueDate,
+    timed,
+    onChange,
+    disabled,
+    trigger
 }: {
-    statusType: core.TaskStatusType;
-    onToggle: (complete: boolean) => void;
+    dueDate: string | null;
+    timed: boolean;
+    onChange: (iso: string | null) => void;
     disabled?: boolean;
+    trigger?: React.ReactNode;
 }) {
-    const done = core.isFinishedStatus(statusType);
     return (
-        <Checkbox
-            checked={done}
-            disabled={disabled}
-            aria-label={done ? "Reopen task" : "Complete task"}
-            onChange={(event) => onToggle(event.target.checked)}
-        />
+        <DropdownMenu>
+            <DropdownMenuTrigger asChild disabled={disabled}>
+                {trigger ?? (
+                    <button
+                        type="button"
+                        aria-label="Due date"
+                        title="Set a due date"
+                        className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    >
+                        <CalendarPlus className="size-3.5" />
+                    </button>
+                )}
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-auto p-2">
+                <div className="flex items-center gap-2">
+                    <input
+                        autoFocus
+                        type={timed ? "datetime-local" : "date"}
+                        aria-label="Due date"
+                        value={toDateInput(dueDate, timed)}
+                        onChange={(event) => onChange(fromDateInput(event.target.value))}
+                        className="rounded-md border border-border bg-background px-2 py-1 text-xs text-foreground outline-none focus:border-primary"
+                    />
+                    {dueDate && (
+                        <button
+                            type="button"
+                            onClick={() => onChange(null)}
+                            aria-label="Clear the due date"
+                            title="Clear the due date"
+                            className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                        >
+                            <X className="size-3.5" />
+                        </button>
+                    )}
+                </div>
+            </DropdownMenuContent>
+        </DropdownMenu>
     );
 }

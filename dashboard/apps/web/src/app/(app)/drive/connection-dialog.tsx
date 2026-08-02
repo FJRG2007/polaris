@@ -15,15 +15,16 @@ import { useRouter } from "next/navigation";
 import { AlertTriangle, ArrowLeft, CheckCircle2, ChevronRight, Plus, Radar, XCircle } from "lucide-react";
 import { type StorageProviderKind } from "@polaris/core";
 import {
+    Input,
     Button,
     Dialog,
+    Textarea,
     DialogClose,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
     DialogTitle,
+    DialogHeader,
+    DialogContent,
     DialogTrigger,
-    Input
+    DialogDescription
 } from "@polaris/ui";
 import { useFormChanged } from "@/lib/use-form-changed";
 import {
@@ -104,7 +105,7 @@ function KeyFileField({ name, label }: { name: string; label: string }) {
                     <input type="file" hidden onChange={onFile} />
                 </label>
             </span>
-            <textarea
+            <Textarea
                 ref={ref}
                 name={name}
                 rows={3}

@@ -14,7 +14,7 @@ import { CircleCheck } from "lucide-react";
 import { runAction } from "@/lib/run-action";
 import { submitFormAction } from "./actions";
 import type { FormField } from "@polaris/core";
-import { Button, Card, CardBody, Input, Select } from "@polaris/ui";
+import { Card, Input, Button, Select, CardBody, Textarea } from "@polaris/ui";
 
 export function PublicForm({
     token,
@@ -100,7 +100,7 @@ export function PublicForm({
                             {field.help && <span className="text-xs text-muted-foreground">{field.help}</span>}
 
                             {field.type === "longText" ? (
-                                <textarea
+                                <Textarea
                                     value={value}
                                     rows={4}
                                     aria-invalid={invalid}

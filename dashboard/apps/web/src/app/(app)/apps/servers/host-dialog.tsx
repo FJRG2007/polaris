@@ -23,16 +23,17 @@ import {
     type SshAuthMethod
 } from "@polaris/core";
 import {
+    Input,
     Button,
     Dialog,
+    Select,
+    Textarea,
     DialogClose,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
     DialogTitle,
+    DialogHeader,
+    DialogContent,
     DialogTrigger,
-    Input,
-    Select
+    DialogDescription
 } from "@polaris/ui";
 
 const AUTH_LABELS: Record<SshAuthMethod, string> = {
@@ -194,7 +195,7 @@ export function HostDialog() {
                         <>
                             <label className="flex flex-col gap-1 text-sm">
                                 Private key (PEM)
-                                <textarea
+                                <Textarea
                                     name="privateKey"
                                     required
                                     rows={4}

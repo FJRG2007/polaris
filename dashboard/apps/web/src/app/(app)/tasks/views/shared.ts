@@ -7,9 +7,8 @@
  * a new view type is a rendering problem rather than a data one.
  */
 
-import type { TaskGroup } from "@polaris/core";
 import type { SpaceContext, TaskRow } from "@/lib/tasks/facts";
-
+import type { TaskGroup, TaskGroupField, TaskPriority, TaskStatusType } from "@polaris/core";
 
 /** A drag result, described by the neighbours it landed between. */
 export interface BoardMove {
@@ -18,6 +17,19 @@ export interface BoardMove {
      *  group key otherwise. */
     readonly groupKey: string;
     readonly position: { beforeId: string | null; afterId: string | null };
+}
+
+/**
+ * A change made from a row without opening the task. Every field here is one a
+ * person changes far more often than they change a description, which is why
+ * they are reachable from the row at all.
+ */
+export interface TaskEdit {
+    readonly statusId?: string;
+    readonly priority?: TaskPriority;
+    readonly assigneeIds?: string[];
+    readonly tagIds?: string[];
+    readonly dueDate?: string | null;
 }
 
 export interface ViewProps {
@@ -30,6 +42,18 @@ export interface ViewProps {
     readonly onSelect: (taskId: string) => void;
     readonly onMove: (move: BoardMove) => void;
     readonly onQuickCreate: (groupKey: string, name: string) => void;
-    /** Complete or reopen from a row, the most-used control in the app. */
-    readonly onToggleComplete: (task: TaskRow, complete: boolean) => void;
+    /** Apply a change from the row itself, optimistically. */
+    readonly onEdit: (task: TaskRow, change: TaskEdit) => void;
+    readonly onDuplicate: (task: TaskRow) => void;
+    /** Asks for the task to be deleted; the screen owns the confirmation. */
+    readonly onDelete: (task: TaskRow) => void;
+    /** Born where it is needed: a tag typed into a picker that matches nothing. */
+    readonly onCreateTag?: (name: string, color: string) => Promise<string | null>;
+    /** What the board is grouped by, so it knows whether a new column is a
+     *  status somebody can add or a slice of data it cannot invent. */
+    readonly groupBy?: TaskGroupField;
+    /** Add a status to the space from the end of the board. Only supplied when
+     *  the reader may change the space's statuses, which is what decides whether
+     *  the affordance exists at all. */
+    readonly onCreateGroup?: (name: string, type: TaskStatusType, color: string) => Promise<void>;
 }

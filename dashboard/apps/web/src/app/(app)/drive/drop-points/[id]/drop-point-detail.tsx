@@ -27,17 +27,18 @@ import {
 } from "lucide-react";
 import { formatBytes } from "@polaris/core";
 import {
-    Badge,
-    Button,
+    cn,
     Card,
-    CardBody,
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle,
+    Badge,
     Input,
-    cn
+    Button,
+    Dialog,
+    CardBody,
+    Textarea,
+    DialogTitle,
+    DialogHeader,
+    DialogContent,
+    DialogDescription
 } from "@polaris/ui";
 import { GeoPicker } from "@/components/geo-picker";
 import { useConfirm } from "@/components/confirm-dialog";
@@ -761,7 +762,7 @@ function EditDropPointDialog({
                     </label>
                     <label className="flex flex-col gap-1 text-sm">
                         Instructions (optional)
-                        <textarea
+                        <Textarea
                             name="instructions"
                             rows={2}
                             defaultValue={config.instructions ?? ""}

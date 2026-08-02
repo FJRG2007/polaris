@@ -1,7 +1,18 @@
 import Link from "next/link";
-import { Activity, Blocks, ChevronRight, Globe, Mail, Settings, ShieldCheck, Users, UsersRound } from "lucide-react";
 import { PageHeader } from "@polaris/ui";
 import { requireAdmin } from "@/lib/session";
+import {
+    Activity,
+    Blocks,
+    ChevronRight,
+    Globe,
+    HardDrive,
+    Mail,
+    Settings,
+    ShieldCheck,
+    Users,
+    UsersRound
+} from "lucide-react";
 
 /**
  * The Management app's home: one card per administration area. The areas
@@ -24,6 +35,12 @@ const SECTIONS = [
         icon: Mail,
         title: "Account mail",
         description: "The email channel that carries verification and sign-in messages."
+    },
+    {
+        href: "/admin/uploads",
+        icon: HardDrive,
+        title: "Uploads",
+        description: "Where files attached to work are kept, and how big one may be."
     },
     {
         href: "/integrations",

@@ -6,7 +6,7 @@
  * value from onChange.
  */
 
-import { cn } from "../lib/cn.js";
+import { cn } from "../lib/cn";
 
 export function Switch({
     checked,

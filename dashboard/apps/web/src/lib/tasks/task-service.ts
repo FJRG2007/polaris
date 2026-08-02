@@ -20,6 +20,8 @@ import { prisma, type Prisma } from "@polaris/db";
 import { notify } from "@/lib/notifications/dispatch";
 import { runAutomations } from "./automation-service";
 import type { PersonRef, TagRef, TaskRow } from "./facts";
+import { listCommits, type CommitLink } from "./commit-service";
+import { listAttachments, type AttachmentView } from "./attachment-service";
 
 // ---------------------------------------------------------------------------
 // Reading
@@ -246,6 +248,8 @@ export interface TaskDetail {
     readonly dependencies: DependencyView[];
     readonly activity: ActivityView[];
     readonly timeEntries: TimeEntryView[];
+    readonly attachments: AttachmentView[];
+    readonly commits: CommitLink[];
     readonly recurrence: core.Recurrence | null;
     readonly parent: { id: string; reference: string; name: string } | null;
 }
@@ -254,8 +258,20 @@ export async function getTaskDetail(taskId: string): Promise<TaskDetail | null> 
     const record = await prisma.task.findUnique({ where: { id: taskId }, select: ROW_SELECT });
     if (!record) return null;
 
-    const [decorated, subtasks, watchers, checklists, comments, blocking, blockedBy, activity, entries, parent] =
-        await Promise.all([
+    const [
+        decorated,
+        subtasks,
+        watchers,
+        checklists,
+        comments,
+        blocking,
+        blockedBy,
+        activity,
+        entries,
+        parent,
+        attachments,
+        commits
+    ] = await Promise.all([
             decorate([taskId]),
             listTasks({ parentId: taskId }, { includeArchived: true }),
             prisma.taskWatcher.findMany({
@@ -320,7 +336,9 @@ export async function getTaskDetail(taskId: string): Promise<TaskDetail | null> 
                       where: { id: record.parentId },
                       select: { id: true, name: true, number: true, space: { select: { prefix: true } } }
                   })
-                : Promise.resolve(null)
+                : Promise.resolve(null),
+            listAttachments(taskId),
+            listCommits(taskId)
         ]);
 
     const authorIds = [...new Set(activity.map((line) => line.userId).filter((id): id is string => id !== null))];
@@ -365,6 +383,8 @@ export async function getTaskDetail(taskId: string): Promise<TaskDetail | null> 
             startedAt: entry.startedAt.toISOString(),
             running: entry.endedAt === null
         })),
+        attachments,
+        commits,
         recurrence: core.parseRecurrence(record.recurrence),
         parent: parent
             ? { id: parent.id, reference: core.taskReference(parent.space.prefix, parent.number), name: parent.name }

@@ -43,10 +43,15 @@ export interface SpaceScreenProps {
     readonly people: readonly PersonRef[];
     readonly canManage: boolean;
     readonly origin: string;
+    /** Which tab to open on, from the URL. Anything unrecognised opens the
+     *  overview rather than a blank screen. */
+    readonly initialTab?: string;
 }
 
 export function SpaceScreen(props: SpaceScreenProps) {
-    const [tab, setTab] = useState<Tab>("Overview");
+    const [tab, setTab] = useState<Tab>(
+        TABS.includes(props.initialTab as Tab) ? (props.initialTab as Tab) : "Overview"
+    );
     const [error, setError] = useState("");
 
     const listRefs = props.lists.map((list) => ({ id: list.id, name: list.name }));

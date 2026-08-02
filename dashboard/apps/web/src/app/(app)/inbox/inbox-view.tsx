@@ -29,18 +29,19 @@ import type {
     MessageView
 } from "@/lib/messaging-service";
 import {
-    Badge,
-    Button,
+    cn,
     Card,
-    CardBody,
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle,
+    Badge,
     Input,
+    Button,
+    Dialog,
     Select,
-    cn
+    CardBody,
+    Textarea,
+    DialogTitle,
+    DialogHeader,
+    DialogContent,
+    DialogDescription
 } from "@polaris/ui";
 import {
     assignConversationAction,
@@ -430,7 +431,7 @@ function Thread({
             <div className="flex flex-col gap-2 border-t border-border p-3">
                 {error && <p className="text-sm text-danger">{error}</p>}
                 {optionsMode && (
-                    <textarea
+                    <Textarea
                         value={optionsText}
                         onChange={(event) => setOptionsText(event.target.value)}
                         placeholder={"One option per line"}

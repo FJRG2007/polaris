@@ -13,12 +13,16 @@ export interface DocNode {
     readonly id: string;
     readonly title: string;
     readonly icon: string;
+    /** The folder this page belongs to, so the sidebar can say which project a
+     *  page is about without opening it. Null for a page the space shares. */
+    readonly folderName: string | null;
     readonly children: DocNode[];
 }
 
 export interface DocView {
     readonly id: string;
     readonly spaceId: string | null;
+    readonly folderId: string | null;
     readonly parentId: string | null;
     readonly title: string;
     readonly icon: string;
@@ -28,17 +32,31 @@ export interface DocView {
     readonly breadcrumb: { id: string; title: string }[];
 }
 
-/** The whole tree for a set of spaces, nested for the sidebar. */
-export async function docTree(spaceIds: string[]): Promise<DocNode[]> {
+/**
+ * The whole tree for a set of spaces, nested for the sidebar.
+ *
+ * `folderIds` names the folders reached through a grant rather than through the
+ * space above them, so somebody invited to one client's folder reads that
+ * client's pages and no others.
+ */
+export async function docTree(spaceIds: string[], folderIds: string[] = []): Promise<DocNode[]> {
     const docs = await prisma.taskDoc.findMany({
-        where: { archived: false, OR: [{ spaceId: { in: spaceIds } }, { spaceId: null }] },
+        where: {
+            archived: false,
+            OR: [{ spaceId: { in: spaceIds } }, { spaceId: null }, { folderId: { in: folderIds } }]
+        },
         orderBy: [{ order: "asc" }, { createdAt: "asc" }],
-        select: { id: true, title: true, icon: true, parentId: true }
+        select: { id: true, title: true, icon: true, parentId: true, folder: { select: { name: true } } }
     });
 
     const children = new Map<string, DocNode[]>();
     const roots: DocNode[] = [];
-    const nodes = new Map(docs.map((doc) => [doc.id, { id: doc.id, title: doc.title, icon: doc.icon, children: [] as DocNode[] }]));
+    const nodes = new Map(
+        docs.map((doc) => [
+            doc.id,
+            { id: doc.id, title: doc.title, icon: doc.icon, folderName: doc.folder?.name ?? null, children: [] as DocNode[] }
+        ])
+    );
 
     for (const doc of docs) {
         const node = nodes.get(doc.id) as DocNode;
@@ -63,6 +81,7 @@ export async function getDoc(docId: string): Promise<DocView | null> {
         select: {
             id: true,
             spaceId: true,
+            folderId: true,
             parentId: true,
             title: true,
             icon: true,
@@ -94,6 +113,7 @@ export async function getDoc(docId: string): Promise<DocView | null> {
     return {
         id: doc.id,
         spaceId: doc.spaceId,
+        folderId: doc.folderId,
         parentId: doc.parentId,
         title: doc.title,
         icon: doc.icon,
@@ -106,13 +126,14 @@ export async function getDoc(docId: string): Promise<DocView | null> {
 
 export async function createDoc(actorId: string, input: core.DocInput): Promise<string> {
     const last = await prisma.taskDoc.findFirst({
-        where: { spaceId: input.spaceId, parentId: input.parentId },
+        where: { spaceId: input.spaceId, folderId: input.folderId, parentId: input.parentId },
         orderBy: { order: "desc" },
         select: { order: true }
     });
     const doc = await prisma.taskDoc.create({
         data: {
             spaceId: input.spaceId,
+            folderId: input.folderId,
             parentId: input.parentId,
             title: input.title,
             body: input.body,
@@ -133,6 +154,7 @@ export async function updateDoc(actorId: string, docId: string, input: core.DocI
             title: input.title,
             body: input.body,
             icon: input.icon,
+            folderId: input.folderId,
             parentId: input.parentId,
             updatedById: actorId
         }

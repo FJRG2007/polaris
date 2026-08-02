@@ -23,21 +23,22 @@ import { useEffect, useRef, useState, useTransition, type ReactNode } from "reac
 import { ServiceIcon, StatusPill, dbTone, serviceKindOf, type ProjectApp } from "./deploy-view";
 import { MetricsHistory, percent, ratioPercent, type MetricSpec } from "@/components/metrics-history";
 import {
-    Button,
-    Checkbox,
-    ConfirmDeleteDialog,
-    Dialog,
-    DialogContent,
-    DialogTitle,
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
+    cn,
     Input,
+    Button,
+    Dialog,
     Select,
     Switch,
-    cn
+    Checkbox,
+    Textarea,
+    DialogTitle,
+    DropdownMenu,
+    DialogContent,
+    DropdownMenuItem,
+    ConfirmDeleteDialog,
+    DropdownMenuContent,
+    DropdownMenuTrigger,
+    DropdownMenuSeparator
 } from "@polaris/ui";
 import {
     ArrowUpRight,
@@ -1221,7 +1222,7 @@ function VariablesTab({ app }: { app: ProjectApp }) {
                     <span className="text-xs font-medium text-muted-foreground">
                         Paste a .env - KEY=value per line. Quotes, spaces, `export` and # comments are handled.
                     </span>
-                    <textarea
+                    <Textarea
                         value={raw}
                         onChange={(event) => setRaw(event.target.value)}
                         rows={6}

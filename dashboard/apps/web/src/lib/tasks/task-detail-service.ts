@@ -112,6 +112,107 @@ export async function renameChecklist(checklistId: string, name: string): Promis
     await prisma.taskChecklist.update({ where: { id: checklistId }, data: { name } });
 }
 
+/**
+ * The order key for a row dropped between two others.
+ *
+ * The drop is reported as the two neighbours rather than an index, the same way
+ * a task drag is, so two people rearranging the same checklist at once cannot
+ * renumber each other. When the gap between the neighbours has run out of room
+ * the whole container is re-spaced first and the neighbours are read again.
+ */
+async function orderForDrop(
+    read: (id: string) => Promise<number | null>,
+    rebalance: () => Promise<void>,
+    move: { beforeId: string | null; afterId: string | null }
+): Promise<number | null> {
+    const before = move.beforeId ? await read(move.beforeId) : null;
+    const after = move.afterId ? await read(move.afterId) : null;
+    // A neighbour that has since been deleted means the drop was aimed at a row
+    // that is no longer there; refusing beats guessing a position.
+    if ((move.beforeId && before === null) || (move.afterId && after === null)) return null;
+
+    if (!core.needsRebalance(before, after)) return core.orderBetween(before, after);
+
+    await rebalance();
+    const spacedBefore = move.beforeId ? await read(move.beforeId) : null;
+    const spacedAfter = move.afterId ? await read(move.afterId) : null;
+    return core.orderBetween(spacedBefore, spacedAfter);
+}
+
+/** Reorder the checklists on one task after a drag. */
+export async function moveChecklist(
+    taskId: string,
+    checklistId: string,
+    move: { beforeId: string | null; afterId: string | null }
+): Promise<void> {
+    const order = await orderForDrop(
+        async (id) => (await prisma.taskChecklist.findUnique({ where: { id }, select: { order: true } }))?.order ?? null,
+        async () => {
+            const siblings = await prisma.taskChecklist.findMany({
+                where: { taskId },
+                orderBy: [{ order: "asc" }, { createdAt: "asc" }],
+                select: { id: true }
+            });
+            const orders = core.rebalanceOrders(siblings.length);
+            await prisma.$transaction(
+                siblings.map((row, index) =>
+                    prisma.taskChecklist.update({ where: { id: row.id }, data: { order: orders[index] } })
+                )
+            );
+        },
+        move
+    );
+    if (order === null) throw new Error("That spot has moved. Try again");
+    await prisma.taskChecklist.update({ where: { id: checklistId }, data: { order } });
+}
+
+/**
+ * Reorder a step, or move it to another checklist on the same task. Dragging a
+ * step from "Design" to "Build" is the same gesture as moving it up two rows, so
+ * it is the same call rather than a cut and a paste.
+ */
+export async function moveChecklistItem(
+    taskId: string,
+    itemId: string,
+    move: { checklistId: string; beforeId: string | null; afterId: string | null }
+): Promise<void> {
+    const [item, destination] = await Promise.all([
+        prisma.taskChecklistItem.findUnique({
+            where: { id: itemId },
+            select: { checklist: { select: { taskId: true } } }
+        }),
+        prisma.taskChecklist.findUnique({ where: { id: move.checklistId }, select: { taskId: true } })
+    ]);
+    // Both ends have to be on the task the caller was authorized for, or a drag
+    // would be a way to write into a checklist on somebody else's task.
+    if (!item || item.checklist.taskId !== taskId) throw new Error("That step no longer exists");
+    if (!destination || destination.taskId !== taskId) throw new Error("That checklist no longer exists");
+
+    const order = await orderForDrop(
+        async (id) =>
+            (await prisma.taskChecklistItem.findUnique({ where: { id }, select: { order: true } }))?.order ?? null,
+        async () => {
+            const siblings = await prisma.taskChecklistItem.findMany({
+                where: { checklistId: move.checklistId },
+                orderBy: [{ order: "asc" }, { createdAt: "asc" }],
+                select: { id: true }
+            });
+            const orders = core.rebalanceOrders(siblings.length);
+            await prisma.$transaction(
+                siblings.map((row, index) =>
+                    prisma.taskChecklistItem.update({ where: { id: row.id }, data: { order: orders[index] } })
+                )
+            );
+        },
+        move
+    );
+    if (order === null) throw new Error("That spot has moved. Try again");
+    await prisma.taskChecklistItem.update({
+        where: { id: itemId },
+        data: { checklistId: move.checklistId, order }
+    });
+}
+
 export async function deleteChecklist(checklistId: string): Promise<void> {
     await prisma.taskChecklist.delete({ where: { id: checklistId } });
 }

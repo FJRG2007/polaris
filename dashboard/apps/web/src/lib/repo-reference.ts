@@ -54,6 +54,39 @@ export function parseGithubRepo(input: string): RepoReference | null {
     return null;
 }
 
+/** A commit, as GitHub identifies one. */
+export interface CommitReference extends RepoReference {
+    /** Lowercased; GitHub renders seven characters and stores forty. */
+    sha: string;
+}
+
+/**
+ * The commit the input names, or null.
+ *
+ * Accepts the URL from the browser bar, the plural `/commits/` path the API
+ * hands back, and the `owner/repo@sha` shorthand people write in chat. The
+ * repository half goes through `parseGithubRepo`, so everything that is not a
+ * repository there - a settings page, a reserved owner - is not a commit here
+ * either.
+ */
+export function parseGithubCommit(input: string): CommitReference | null {
+    const value = input.trim();
+    if (!value) return null;
+
+    const url = /^(.*github\.com\/[^/?#]+\/[^/?#]+)\/commits?\/([0-9a-f]{7,40})\b/i.exec(value);
+    if (url) {
+        const repo = parseGithubRepo(url[1] as string);
+        return repo ? { ...repo, sha: (url[2] as string).toLowerCase() } : null;
+    }
+
+    const shorthand = /^([^\s@]+)@([0-9a-f]{7,40})$/i.exec(value);
+    if (shorthand) {
+        const repo = parseGithubRepo(shorthand[1] as string);
+        return repo ? { ...repo, sha: (shorthand[2] as string).toLowerCase() } : null;
+    }
+    return null;
+}
+
 /**
  * A clonable git URL that is not on GitHub (GitLab, Bitbucket, a self-hosted
  * remote), normalized, or null. This is the escape hatch behind the picker: the

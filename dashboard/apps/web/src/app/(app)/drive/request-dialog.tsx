@@ -14,15 +14,16 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { Check, Copy, Inbox } from "lucide-react";
 import {
+    cn,
+    Input,
     Button,
     Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle,
-    Input,
     Select,
-    cn
+    Textarea,
+    DialogTitle,
+    DialogHeader,
+    DialogContent,
+    DialogDescription
 } from "@polaris/ui";
 import { GeoPicker } from "@/components/geo-picker";
 import { ExpirySelect } from "@/components/expiry-select";
@@ -328,7 +329,7 @@ export function RequestDialog({
                         </label>
                         <label className="flex flex-col gap-1 text-sm">
                             Instructions (optional)
-                            <textarea
+                            <Textarea
                                 name="instructions"
                                 rows={2}
                                 defaultValue={initial?.instructions}

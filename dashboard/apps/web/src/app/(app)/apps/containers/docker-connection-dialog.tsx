@@ -12,16 +12,17 @@ import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
 import { DOCKER_TRANSPORTS, type DockerTransport } from "@polaris/docker/schema";
 import {
+    Input,
     Button,
     Dialog,
+    Select,
+    Textarea,
     DialogClose,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
     DialogTitle,
+    DialogHeader,
+    DialogContent,
     DialogTrigger,
-    Input,
-    Select
+    DialogDescription
 } from "@polaris/ui";
 import { createDockerConnectionAction } from "./actions";
 
@@ -165,7 +166,7 @@ export function DockerConnectionDialog({ sshEnabled }: { sshEnabled: boolean }) 
                                 <>
                                     <label className="flex flex-col gap-1 text-sm">
                                         Private key (PEM)
-                                        <textarea
+                                        <Textarea
                                             name="privateKey"
                                             rows={4}
                                             className="rounded-md border border-input bg-surface px-3 py-1 text-sm"
@@ -205,7 +206,7 @@ export function DockerConnectionDialog({ sshEnabled }: { sshEnabled: boolean }) 
                                 <>
                                     <label className="flex flex-col gap-1 text-sm">
                                         CA certificate
-                                        <textarea
+                                        <Textarea
                                             name="ca"
                                             rows={3}
                                             className="rounded-md border border-input bg-surface px-3 py-1 text-sm"
@@ -213,7 +214,7 @@ export function DockerConnectionDialog({ sshEnabled }: { sshEnabled: boolean }) 
                                     </label>
                                     <label className="flex flex-col gap-1 text-sm">
                                         Client certificate
-                                        <textarea
+                                        <Textarea
                                             name="cert"
                                             rows={3}
                                             className="rounded-md border border-input bg-surface px-3 py-1 text-sm"
@@ -221,7 +222,7 @@ export function DockerConnectionDialog({ sshEnabled }: { sshEnabled: boolean }) 
                                     </label>
                                     <label className="flex flex-col gap-1 text-sm">
                                         Client key
-                                        <textarea
+                                        <Textarea
                                             name="key"
                                             rows={3}
                                             className="rounded-md border border-input bg-surface px-3 py-1 text-sm"

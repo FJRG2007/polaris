@@ -13,7 +13,7 @@ import { Avatar } from "./pickers";
 import * as actions from "./actions";
 import * as core from "@polaris/core";
 import { runAction } from "@/lib/run-action";
-import { Button, cn, Input } from "@polaris/ui";
+import { cn, Input, Button, Textarea } from "@polaris/ui";
 import { RelativeTime } from "@/components/relative-time";
 import { CheckCircle2, CornerDownRight, Play, Square, Trash2 } from "lucide-react";
 import type { ActivityView, CommentView, TimeEntryView } from "@/lib/tasks/task-service";
@@ -37,7 +37,7 @@ function CommentComposer({
 
     return (
         <div className="flex flex-col gap-2">
-            <textarea
+            <Textarea
                 value={body}
                 rows={3}
                 placeholder={placeholder}

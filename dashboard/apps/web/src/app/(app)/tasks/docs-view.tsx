@@ -13,7 +13,7 @@ import { useState } from "react";
 import * as actions from "./actions";
 import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
-import { Button, cn } from "@polaris/ui";
+import { cn, Button, Textarea } from "@polaris/ui";
 import { RelativeTime } from "@/components/relative-time";
 import type { DocNode, DocView } from "@/lib/tasks/doc-service";
 import { ChevronRight, FileText, Plus, Search, Trash2 } from "lucide-react";
@@ -93,6 +93,10 @@ export function DocsView({
                     title: title.trim() || "Untitled",
                     body,
                     spaceId: doc.spaceId,
+                    // Sent back as it was: a save is an edit to the text, and
+                    // leaving this out would quietly lift the page out of the
+                    // folder it belongs to on every keystroke saved.
+                    folderId: doc.folderId,
                     parentId: doc.parentId,
                     icon: doc.icon
                 }),
@@ -217,14 +221,17 @@ export function DocsView({
                             </p>
                         )}
 
-                        <textarea
+                        <Textarea
                             value={body}
                             rows={24}
                             disabled={!canEdit}
                             aria-label="Page content"
                             placeholder="Write in Markdown. Headings with #, lists with -, links with [text](url)."
                             onChange={(event) => setBody(event.target.value)}
-                            className="w-full flex-1 resize-y rounded-md border border-border bg-background px-3 py-2 font-mono text-sm leading-relaxed outline-none focus:border-primary"
+                            // A page editor earns a taller ceiling than a form
+                            // field, but still a ceiling: an editor that grows
+                            // past the viewport takes its own save button with it.
+                            className="min-h-[24rem] w-full max-h-[70vh] flex-1 resize-y rounded-md border border-border bg-background px-3 py-2 font-mono text-sm leading-relaxed outline-none focus:border-primary"
                         />
                     </>
                 )}

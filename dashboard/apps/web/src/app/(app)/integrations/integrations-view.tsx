@@ -20,19 +20,20 @@ import {
     type CloudflareTokenScope
 } from "@/lib/integrations/cloudflare-token-link";
 import {
-    Badge,
-    Button,
+    cn,
     Card,
-    CardBody,
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle,
+    Badge,
     Input,
+    Button,
+    Dialog,
     Select,
     Switch,
-    cn
+    CardBody,
+    Textarea,
+    DialogTitle,
+    DialogHeader,
+    DialogContent,
+    DialogDescription
 } from "@polaris/ui";
 
 export interface IntegrationCard {
@@ -912,7 +913,7 @@ function GitHubConnect({ card, onClose }: { card: IntegrationCard; onClose: () =
                             </label>
                             <label className="flex flex-col gap-1">
                                 <span className="font-medium">Private key (PEM)</span>
-                                <textarea
+                                <Textarea
                                     value={pem}
                                     onChange={(event) => setPem(event.target.value)}
                                     placeholder="Paste the contents of the app's .pem file"

@@ -10,7 +10,7 @@
 
 import { Check, Minus } from "lucide-react";
 import { forwardRef, type InputHTMLAttributes } from "react";
-import { cn } from "../lib/cn.js";
+import { cn } from "../lib/cn";
 
 export interface CheckboxProps extends Omit<InputHTMLAttributes<HTMLInputElement>, "type"> {
     /** Render a dash instead of a tick, for a partial (some-selected) state. */

@@ -125,12 +125,21 @@ export function isFinishedStatus(type: TaskStatusType): boolean {
     return type === "done" || type === "closed";
 }
 
-/** The statuses a brand-new space starts with. Deliberately short: four columns
- *  is a board a person can read, and a space can add its own at any time. */
+/**
+ * The statuses a brand-new space starts with, and the colours people already
+ * read them by: grey is untouched, blue is being worked, yellow is waiting on
+ * somebody, brown is parked, green is finished. A space adds, renames and
+ * recolours its own at any time - this is a starting point, not the set.
+ *
+ * "On hold" is `open` rather than `active`: a parked task is not in progress,
+ * and every burndown, report and "what is being worked on" count reads the kind
+ * rather than the name.
+ */
 export const DEFAULT_TASK_STATUSES: readonly { name: string; type: TaskStatusType; color: string }[] = [
     { name: "To do", type: "open", color: "#64748b" },
     { name: "In progress", type: "active", color: "#3b82f6" },
-    { name: "In review", type: "active", color: "#a855f7" },
+    { name: "On hold", type: "open", color: "#92400e" },
+    { name: "In review", type: "active", color: "#eab308" },
     { name: "Done", type: "done", color: "#22c55e" },
     { name: "Cancelled", type: "closed", color: "#71717a" }
 ];
@@ -820,6 +829,10 @@ export const tagSchema = z.object({
 
 export const sprintSchema = z.object({
     spaceId: uuid,
+    /** The folder whose work this sprint plans, or null for a sprint the whole
+     *  space runs. A project kept as a folder gets its own sprints without a
+     *  space per project. */
+    folderId: uuid.nullable().default(null),
     name: containerName,
     goal: z.string().trim().max(500).default(""),
     startDate: z.string().datetime({ offset: true }),
@@ -933,6 +946,21 @@ export const checklistSchema = z.object({
     name: containerName
 });
 
+/** Where a checklist was dropped among the others on its task. */
+export const checklistMoveSchema = z.object({
+    beforeId: uuid.nullable().default(null),
+    afterId: uuid.nullable().default(null)
+});
+
+/** Where a step was dropped: which checklist it landed in - dragging one from
+ *  "Design" to "Build" is the same gesture as moving it up two rows - and the
+ *  two steps it landed between. */
+export const checklistItemMoveSchema = z.object({
+    checklistId: uuid,
+    beforeId: uuid.nullable().default(null),
+    afterId: uuid.nullable().default(null)
+});
+
 export const checklistItemSchema = z.object({
     checklistId: uuid,
     name: taskName,
@@ -960,6 +988,10 @@ export const reminderSchema = z.object({
 
 export const docSchema = z.object({
     spaceId: uuid.nullable().default(null),
+    /** The folder this page belongs to, or null for a page the space shares.
+     *  A page written inside a client's folder is reachable by that client and
+     *  by nobody standing outside it. */
+    folderId: uuid.nullable().default(null),
     parentId: uuid.nullable().default(null),
     title: containerName,
     body: z.string().max(200000).default(""),

@@ -9,7 +9,7 @@
 import * as RadixMenu from "@radix-ui/react-context-menu";
 import { ChevronRight } from "lucide-react";
 import { forwardRef, type ComponentPropsWithoutRef, type ElementRef } from "react";
-import { cn } from "../lib/cn.js";
+import { cn } from "../lib/cn";
 
 export const ContextMenu = RadixMenu.Root;
 export const ContextMenuTrigger = RadixMenu.Trigger;

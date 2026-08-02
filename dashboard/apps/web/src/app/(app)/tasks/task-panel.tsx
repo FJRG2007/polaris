@@ -18,13 +18,15 @@ import * as core from "@polaris/core";
 import { runAction } from "@/lib/run-action";
 import { CustomFieldEditor } from "./custom-fields";
 import type { SpaceContext } from "@/lib/tasks/facts";
+import { CopyButton } from "@/components/copy-button";
 import type { TaskDetail } from "@/lib/tasks/task-service";
 import { useDisplayFormat } from "@/components/display-format";
+import { AttachmentSection, CommitSection } from "./task-files";
 import { useCallback, useEffect, useState, useTransition } from "react";
 import { Bell, BellOff, Copy, Loader2, Repeat, Trash2 } from "lucide-react";
 import { ActivitySection, CommentSection, TimeSection } from "./task-conversation";
 import { ChecklistSection, DependencySection, SubtaskSection } from "./task-subwork";
-import { ConfirmDeleteDialog, Dialog, DialogContent, DialogTitle, Button, cn } from "@polaris/ui";
+import { ConfirmDeleteDialog, Dialog, DialogContent, DialogTitle, Button, Textarea, cn } from "@polaris/ui";
 import {
     AssigneePicker,
     AvatarStack,
@@ -33,7 +35,8 @@ import {
     PriorityPicker,
     StatusPicker,
     TagChip,
-    TagPicker
+    TagPicker,
+    tagColorFor
 } from "./pickers";
 
 /** A labelled row in the properties block. */
@@ -118,6 +121,10 @@ export function TaskPanel({
                     <>
                         <header className="flex flex-wrap items-center gap-2 border-b border-border py-3 pl-5 pr-14">
                             <span className="font-mono text-xs text-muted-foreground">{task.reference}</span>
+                            {/* The same copy control the rest of Polaris uses,
+                                acknowledgement included - a reference people
+                                quote in chat is a reference they copy. */}
+                            <CopyButton value={task.reference} label="the task reference" />
                             {detail?.parent && (
                                 <button
                                     type="button"
@@ -203,7 +210,7 @@ export function TaskPanel({
 
                                 <section className="flex flex-col gap-1">
                                     <h3 className="text-sm font-medium">Description</h3>
-                                    <textarea
+                                    <Textarea
                                         key={task.id}
                                         defaultValue={task.description}
                                         rows={4}
@@ -214,14 +221,30 @@ export function TaskPanel({
                                                 void patch({ description: event.target.value });
                                             }
                                         }}
-                                        className="w-full resize-y rounded-md border border-border bg-background px-3 py-2 text-sm outline-none placeholder:text-muted-foreground focus:border-primary"
                                     />
                                 </section>
+
+                                <AttachmentSection
+                                    taskId={task.id}
+                                    attachments={detail?.attachments ?? []}
+                                    canEdit={context.canEdit}
+                                    onChanged={() => load(task.id)}
+                                    onError={setError}
+                                />
+
+                                <CommitSection
+                                    taskId={task.id}
+                                    links={detail?.commits ?? []}
+                                    canEdit={context.canEdit}
+                                    onChanged={() => load(task.id)}
+                                    onError={setError}
+                                />
 
                                 <SubtaskSection
                                     taskId={task.id}
                                     listId={task.listId}
                                     subtasks={detail?.subtasks ?? []}
+                                    statuses={context.statuses}
                                     canEdit={context.canEdit}
                                     onOpen={setOpenId}
                                     onChanged={() => {
@@ -281,6 +304,7 @@ export function TaskPanel({
                                         statuses={context.statuses}
                                         value={task.statusId}
                                         disabled={!context.canEdit}
+                                        spaceId={context.spaceId}
                                         onChange={(statusId) => void patch({ statusId })}
                                     />
                                 </Field>
@@ -378,6 +402,19 @@ export function TaskPanel({
                                             selected={task.tags.map((tag) => tag.id)}
                                             disabled={!context.canEdit}
                                             onChange={(tagIds) => void patch({ tagIds })}
+                                            onCreate={async (name) => {
+                                                const created = await runAction(
+                                                    () =>
+                                                        actions.createTagAction(
+                                                            context.spaceId,
+                                                            name,
+                                                            tagColorFor(name)
+                                                        ),
+                                                    setError
+                                                );
+                                                if (created?.id) onChanged();
+                                                return created?.id ?? null;
+                                            }}
                                         />
                                     </div>
                                 </Field>
@@ -436,6 +473,11 @@ export function TaskPanel({
                             onOpenChange={setConfirmDelete}
                             name={task.name}
                             kind="task"
+                            // One row of many, deleted several times a day. Making
+                            // somebody retype its name is a toll on the common
+                            // case, not a safeguard; that belongs on the things
+                            // that hold other people's work.
+                            requireTyping={false}
                             description="Comments, checklists and tracked time go with it. Archiving keeps all of that and takes it off the board."
                             confirmLabel="Delete task"
                             onConfirm={async () => {

@@ -16,7 +16,7 @@
 import { SettingsCard } from "../project-settings";
 import type { EnvVarView } from "@/lib/env-var-service";
 import { useEffect, useState, useTransition } from "react";
-import { Button, Checkbox, Input, Select } from "@polaris/ui";
+import { Input, Button, Select, Checkbox, Textarea } from "@polaris/ui";
 import type { ProjectSettingsView } from "@/lib/deploy-project-service";
 import { Eye, EyeOff, Loader2, Plus, Trash2, Upload } from "lucide-react";
 import { NEW_ENVIRONMENT, NewEnvironmentDialog, newEnvironmentOption } from "../new-environment-dialog";
@@ -232,7 +232,7 @@ export function SharedVariablesSection({
                 >
                     {importing ? (
                         <div className="flex flex-col gap-3">
-                            <textarea
+                            <Textarea
                                 value={bulk}
                                 onChange={(event) => setBulk(event.target.value)}
                                 rows={6}

@@ -46,30 +46,31 @@ import {
     type ReactNode
 } from "react";
 import {
+    cn,
     Badge,
+    Input,
     Button,
+    Dialog,
     Checkbox,
+    Skeleton,
+    Textarea,
     ContextMenu,
-    ContextMenuContent,
+    DialogTitle,
+    DialogHeader,
+    DropdownMenu,
+    DialogContent,
+    ContextMenuSub,
     ContextMenuItem,
     ContextMenuLabel,
-    ContextMenuSeparator,
-    ContextMenuSub,
-    ContextMenuSubContent,
-    ContextMenuSubTrigger,
-    ContextMenuTrigger,
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle,
-    DropdownMenu,
-    DropdownMenuContent,
     DropdownMenuItem,
+    DialogDescription,
+    ContextMenuContent,
+    ContextMenuTrigger,
+    DropdownMenuContent,
     DropdownMenuTrigger,
-    Input,
-    Skeleton,
-    cn
+    ContextMenuSeparator,
+    ContextMenuSubContent,
+    ContextMenuSubTrigger
 } from "@polaris/ui";
 import {
     ArrowDownAZ,
@@ -2682,7 +2683,7 @@ export function FilesView({
                         }}
                         className="flex flex-col gap-3"
                     >
-                        <textarea
+                        <Textarea
                             autoFocus
                             value={noteValue}
                             onChange={(event) => setNoteValue(event.target.value)}

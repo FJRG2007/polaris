@@ -28,6 +28,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { FolderAccessDialog } from "./folder-access-dialog";
 import type { FolderSummary, ListSummary, SpaceTreeView } from "@/lib/tasks/space-service";
+import { createOptionsFor, TreeCreate, type CreateAt, type CreateKind } from "./tree-create";
 import {
     ChevronDown,
     ChevronRight,
@@ -35,7 +36,6 @@ import {
     FolderOpen,
     FolderPlus,
     Hash,
-    ListPlus,
     Pencil,
     Plus,
     Settings2,
@@ -49,7 +49,14 @@ import {
     ContextMenuContent,
     ContextMenuItem,
     ContextMenuSeparator,
+    ContextMenuSub,
+    ContextMenuSubContent,
+    ContextMenuSubTrigger,
     ContextMenuTrigger,
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
     Input,
     cn
 } from "@polaris/ui";
@@ -88,6 +95,61 @@ interface RowAction {
     readonly danger?: boolean;
 }
 
+/**
+ * The plus on a row, and the "Create new" branch of its right-click menu.
+ *
+ * One list of options rendered two ways. The plus is already the create button,
+ * so its menu goes straight to the kinds; the right-click menu also holds rename
+ * and delete, so the same kinds sit under one entry there. Both come from
+ * `createOptionsFor`, which is what keeps a container from offering something it
+ * cannot hold.
+ */
+function CreateButton({ at, onPick }: { at: CreateAt; onPick: (kind: CreateKind) => void }) {
+    const options = createOptionsFor(at);
+    return (
+        <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+                <button
+                    type="button"
+                    aria-label={`Create in ${at.name}`}
+                    title="Create"
+                    onClick={(event) => event.preventDefault()}
+                    className="rounded p-1 text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
+                >
+                    <Plus className="size-3.5" />
+                </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-44">
+                {options.map((option) => (
+                    <DropdownMenuItem key={option.kind} onSelect={() => onPick(option.kind)} className="gap-2">
+                        <option.Icon className="size-3.5" />
+                        {option.label}
+                    </DropdownMenuItem>
+                ))}
+            </DropdownMenuContent>
+        </DropdownMenu>
+    );
+}
+
+function CreateSubmenu({ at, onPick }: { at: CreateAt; onPick: (kind: CreateKind) => void }) {
+    return (
+        <ContextMenuSub>
+            <ContextMenuSubTrigger>
+                <Plus className="size-3.5" />
+                Create new
+            </ContextMenuSubTrigger>
+            <ContextMenuSubContent className="w-44">
+                {createOptionsFor(at).map((option) => (
+                    <ContextMenuItem key={option.kind} onSelect={() => onPick(option.kind)} className="gap-2">
+                        <option.Icon className="size-3.5" />
+                        {option.label}
+                    </ContextMenuItem>
+                ))}
+            </ContextMenuSubContent>
+        </ContextMenuSub>
+    );
+}
+
 function canWrite(role: string): boolean {
     return role === "owner" || role === "admin" || role === "member";
 }
@@ -124,6 +186,10 @@ interface RowProps {
     readonly acceptsBefore: boolean;
     readonly acceptsInto: boolean;
     readonly expander?: React.ReactNode;
+    /** The plus, shown next to the row's own quick actions. */
+    readonly create?: React.ReactNode;
+    /** The "Create new" branch, shown at the top of the right-click menu. */
+    readonly createMenu?: React.ReactNode;
 }
 
 function TreeRow({
@@ -145,7 +211,9 @@ function TreeRow({
     onDropBefore,
     acceptsBefore,
     acceptsInto,
-    expander
+    expander,
+    create,
+    createMenu
 }: RowProps) {
     const [over, setOver] = useState<"into" | "before" | null>(null);
 
@@ -268,8 +336,9 @@ function TreeRow({
                                 {body}
                             </div>
                         )}
-                        {rowActions.length > 0 && (
+                        {(rowActions.length > 0 || create) && (
                             <span className="flex shrink-0 items-center opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
+                                {create}
                                 {rowActions
                                     .filter((action) => action.quick)
                                     .map((action) => (
@@ -291,8 +360,10 @@ function TreeRow({
                         )}
                     </div>
                 </ContextMenuTrigger>
-                {rowActions.length > 0 && (
+                {(rowActions.length > 0 || createMenu) && (
                     <ContextMenuContent>
+                        {createMenu}
+                        {createMenu && rowActions.length > 0 && <ContextMenuSeparator />}
                         {rowActions.map((action, index) => (
                             <span key={action.label}>
                                 {action.danger && index > 0 && <ContextMenuSeparator />}
@@ -324,6 +395,7 @@ export function SpaceTree({ spaces, canCreate }: { spaces: readonly SpaceTreeVie
     const [dragging, setDragging] = useState<Dragged | null>(null);
     const [confirm, setConfirm] = useState<Pending>(null);
     const [accessFolderId, setAccessFolderId] = useState<string | null>(null);
+    const [create, setCreate] = useState<{ kind: CreateKind; at: CreateAt } | null>(null);
     const [newSpace, setNewSpace] = useState(false);
     const [spaceName, setSpaceName] = useState("");
     const [error, setError] = useState("");
@@ -354,6 +426,26 @@ export function SpaceTree({ spaces, canCreate }: { spaces: readonly SpaceTreeVie
         setError("");
         const result = await runAction(call, setError);
         if (result?.error) setError(result.error);
+    };
+
+    /**
+     * What "create a <kind> here" means.
+     *
+     * A list and a folder are only a name, so they are typed into the tree where
+     * they will appear - naming a thing in the place it is going is faster and
+     * says more than a dialog does. Everything else needs more than a name and
+     * goes to TreeCreate.
+     */
+    const pickCreate = (kind: CreateKind, at: CreateAt) => {
+        if (kind === "list" || kind === "folder") {
+            setDraft({ kind, spaceId: at.spaceId, parentId: at.folderId });
+            // A container is opened when something is being put into it, or the
+            // new row appears somewhere nobody is looking.
+            if (at.folderId && collapsed.has(at.folderId)) toggle(at.folderId);
+            if (collapsed.has(at.spaceId)) toggle(at.spaceId);
+            return;
+        }
+        setCreate({ kind, at });
     };
 
     const dropFolder = (spaceId: string, parentId: string | null, position: { beforeId: string | null; afterId: string | null }) => {
@@ -437,9 +529,17 @@ export function SpaceTree({ spaces, canCreate }: { spaces: readonly SpaceTreeVie
                     onDrop={dropFolder}
                     onConfirm={setConfirm}
                     onAccess={setAccessFolderId}
+                    onCreate={pickCreate}
                     run={run}
                 />
             ))}
+
+            <TreeCreate
+                request={create}
+                onClose={() => setCreate(null)}
+                onDone={() => setCreate(null)}
+                onError={setError}
+            />
 
             <FolderAccessDialog
                 folderId={accessFolderId}
@@ -497,6 +597,7 @@ interface SectionProps {
     ) => void;
     readonly onConfirm: (pending: Pending) => void;
     readonly onAccess: (folderId: string) => void;
+    readonly onCreate: (kind: CreateKind, at: CreateAt) => void;
     readonly run: (call: () => Promise<{ error?: string }>) => Promise<void>;
 }
 
@@ -514,6 +615,7 @@ function SpaceSection({
     onDrop,
     onConfirm,
     onAccess,
+    onCreate,
     run
 }: SectionProps) {
     const open = !collapsed.has(space.id);
@@ -537,11 +639,23 @@ function SpaceSection({
             parentId === null ||
             core.folderMoveRefusal(space.folders, dragging.id, parentId) === null);
 
+    /** Where a create menu opened on this list points. */
+    const listAt = (list: ListSummary): CreateAt => ({
+        kind: "list",
+        spaceId: space.id,
+        folderId: list.folderId,
+        listId: list.id,
+        depth: 0,
+        name: list.name
+    });
+
     const renderList = (list: ListSummary, depth: number, siblings: readonly { id: string }[]) => (
         <TreeRow
             key={list.id}
             label={list.name}
             depth={depth}
+            create={editable ? <CreateButton at={listAt(list)} onPick={(kind) => onCreate(kind, listAt(list))} /> : undefined}
+            createMenu={editable ? <CreateSubmenu at={listAt(list)} onPick={(kind) => onCreate(kind, listAt(list))} /> : undefined}
             href={`/tasks/l/${list.id}`}
             active={pathname === `/tasks/l/${list.id}`}
             badge={list.openCount > 0 ? String(list.openCount) : undefined}
@@ -584,27 +698,21 @@ function SpaceSection({
         />
     );
 
+    /** Where a create menu opened on this folder points. */
+    const folderAt = (node: core.FolderNode<FolderSummary>): CreateAt => ({
+        kind: "folder",
+        spaceId: space.id,
+        folderId: node.folder.id,
+        listId: null,
+        depth: node.depth,
+        name: node.folder.name
+    });
+
+    /** What a folder offers beyond creating things: the plus holds those now, so
+     *  the row keeps two icons instead of five. */
     const folderActions = (node: core.FolderNode<FolderSummary>): RowAction[] => {
         const folder = node.folder;
         return [
-            {
-                label: "Add a list here",
-                Icon: ListPlus,
-                quick: true,
-                onSelect: () => onDraft({ kind: "list", spaceId: space.id, parentId: folder.id })
-            },
-            // A subfolder is only offered while there is room left to nest one,
-            // rather than offered and then refused after the name is typed.
-            ...(node.depth + 1 < core.FOLDER_DEPTH_LIMIT
-                ? [
-                      {
-                          label: "Add a subfolder",
-                          Icon: FolderPlus,
-                          quick: true,
-                          onSelect: () => onDraft({ kind: "folder", spaceId: space.id, parentId: folder.id })
-                      }
-                  ]
-                : []),
             ...(canAdmin(folder.role)
                 ? [{ label: "Who can reach this", Icon: Users, quick: true, onSelect: () => onAccess(folder.id) }]
                 : []),
@@ -636,6 +744,16 @@ function SpaceSection({
                 <TreeRow
                     label={folder.name}
                     depth={depth}
+                    create={
+                        canEditHere ? (
+                            <CreateButton at={folderAt(node)} onPick={(kind) => onCreate(kind, folderAt(node))} />
+                        ) : undefined
+                    }
+                    createMenu={
+                        canEditHere ? (
+                            <CreateSubmenu at={folderAt(node)} onPick={(kind) => onCreate(kind, folderAt(node))} />
+                        ) : undefined
+                    }
                     icon={
                         folderOpen ? (
                             <FolderOpen className="size-3.5 shrink-0 opacity-60" />
@@ -696,6 +814,16 @@ function SpaceSection({
 
     const spaceManageable = canAdmin(space.role) && !space.partial;
 
+    /** Where a create menu opened on the space itself points. */
+    const spaceAt: CreateAt = {
+        kind: "space",
+        spaceId: space.id,
+        folderId: null,
+        listId: null,
+        depth: 0,
+        name: space.name
+    };
+
     return (
         <section className="flex flex-col gap-0.5">
             <ContextMenu>
@@ -750,6 +878,9 @@ function SpaceSection({
                             </Link>
                         )}
                         <span className="font-mono text-[10px] text-muted-foreground">{space.prefix}</span>
+                        {editable && !space.partial && (
+                            <CreateButton at={spaceAt} onPick={(kind) => onCreate(kind, spaceAt)} />
+                        )}
                         {spaceManageable && (
                             <Link
                                 href={`/tasks/s/${space.id}`}
@@ -764,23 +895,21 @@ function SpaceSection({
                 </ContextMenuTrigger>
                 {editable && !space.partial && (
                     <ContextMenuContent>
-                        <ContextMenuItem
-                            onSelect={() => onDraft({ kind: "list", spaceId: space.id, parentId: null })}
-                        >
-                            <ListPlus className="size-3.5" />
-                            Add a list
-                        </ContextMenuItem>
-                        <ContextMenuItem
-                            onSelect={() => onDraft({ kind: "folder", spaceId: space.id, parentId: null })}
-                        >
-                            <FolderPlus className="size-3.5" />
-                            Add a folder
-                        </ContextMenuItem>
+                        <CreateSubmenu at={spaceAt} onPick={(kind) => onCreate(kind, spaceAt)} />
                         {spaceManageable && (
-                            <ContextMenuItem onSelect={() => onRenaming(`space:${space.id}`)}>
-                                <Pencil className="size-3.5" />
-                                Rename (F2)
-                            </ContextMenuItem>
+                            <>
+                                <ContextMenuSeparator />
+                                <ContextMenuItem onSelect={() => onRenaming(`space:${space.id}`)}>
+                                    <Pencil className="size-3.5" />
+                                    Rename (F2)
+                                </ContextMenuItem>
+                                <ContextMenuItem asChild>
+                                    <Link href={`/tasks/s/${space.id}`}>
+                                        <Settings2 className="size-3.5" />
+                                        Space settings
+                                    </Link>
+                                </ContextMenuItem>
+                            </>
                         )}
                     </ContextMenuContent>
                 )}
@@ -809,7 +938,7 @@ function SpaceSection({
                         <div className="flex items-center gap-1 pt-0.5">
                             <button
                                 type="button"
-                                onClick={() => onDraft({ kind: "list", spaceId: space.id, parentId: null })}
+                                onClick={() => onCreate("list", spaceAt)}
                                 className="flex flex-1 items-center gap-1.5 rounded-md px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                             >
                                 <Plus className="size-3.5" /> List
@@ -818,7 +947,7 @@ function SpaceSection({
                                 type="button"
                                 aria-label={`Add a folder to ${space.name}`}
                                 title="Add a folder"
-                                onClick={() => onDraft({ kind: "folder", spaceId: space.id, parentId: null })}
+                                onClick={() => onCreate("folder", spaceAt)}
                                 className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                             >
                                 <FolderPlus className="size-3.5" />

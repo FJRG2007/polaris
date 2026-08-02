@@ -25,8 +25,17 @@ async function currentOrigin(): Promise<string> {
     return host ? `${protocol}://${host}` : "";
 }
 
-export default async function SpacePage({ params }: { params: Promise<{ spaceId: string }> }) {
+export default async function SpacePage({
+    params,
+    searchParams
+}: {
+    params: Promise<{ spaceId: string }>;
+    searchParams: Promise<{ tab?: string }>;
+}) {
     const { spaceId } = await params;
+    // The tab is in the URL so the rest of the app can send somebody straight to
+    // it - "edit statuses" from a status menu has to land on the statuses.
+    const { tab } = await searchParams;
     const user = await requirePermission("tasks.read");
     const actor: TaskActor = { id: user.id, isAdmin: user.isAdmin };
 
@@ -77,6 +86,7 @@ export default async function SpacePage({ params }: { params: Promise<{ spaceId:
                 people={members.map((member) => ({ id: member.userId, name: member.name, image: member.image }))}
                 canManage={canManage}
                 origin={origin}
+                initialTab={tab}
             />
         </div>
     );

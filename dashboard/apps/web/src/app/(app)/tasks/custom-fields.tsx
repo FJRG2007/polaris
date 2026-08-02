@@ -11,7 +11,7 @@
 
 import { useState } from "react";
 import * as core from "@polaris/core";
-import { Input, Select } from "@polaris/ui";
+import { Input, Select, Textarea } from "@polaris/ui";
 import { Avatar, StatusDot } from "./pickers";
 import type { PersonRef } from "@/lib/tasks/facts";
 import { useDisplayFormat } from "@/components/display-format";
@@ -128,7 +128,7 @@ export function CustomFieldEditor({
             );
         case "longText":
             return (
-                <textarea
+                <Textarea
                     defaultValue={value}
                     rows={3}
                     disabled={disabled}

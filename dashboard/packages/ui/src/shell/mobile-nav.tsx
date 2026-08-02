@@ -11,7 +11,7 @@
 import { useState } from "react";
 import { Menu } from "lucide-react";
 import type { MouseEvent, ReactNode } from "react";
-import { Dialog, DialogContent, DialogTitle } from "../components/dialog.js";
+import { Dialog, DialogContent, DialogTitle } from "../components/dialog";
 
 export function MobileNav({ children }: { children: ReactNode }) {
     const [open, setOpen] = useState(false);

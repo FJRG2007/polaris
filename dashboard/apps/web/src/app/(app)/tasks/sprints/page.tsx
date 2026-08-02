@@ -16,29 +16,26 @@ export const dynamic = "force-dynamic";
 export default async function SprintsPage() {
     const user = await requirePermission("tasks.read");
     const actor: TaskActor = { id: user.id, isAdmin: user.isAdmin };
-    // Sprints belong to a space, not to a branch of one, so they are listed
-    // only for the spaces the reader holds outright.
     const scope = await visibleScope(actor);
+    // A space-wide sprint needs the space. A sprint planning one folder is
+    // reached by whoever was granted that folder, and by nobody beside them.
+    const grantedFolderIds = Object.keys(scope.folderRoles);
 
-    const [tree, spaces] = await Promise.all([
+    const [tree, spaces, sprints] = await Promise.all([
         listSpaceTree(user.id, scope, user.isAdmin),
         prisma.taskSpace.findMany({
-            where: { id: { in: scope.spaceIds } },
+            where: { id: { in: [...scope.spaceIds, ...scope.partialSpaceIds] } },
             orderBy: { order: "asc" },
             select: { id: true, name: true }
-        })
+        }),
+        listSprints({ spaceIds: scope.spaceIds, folderIds: grantedFolderIds })
     ]);
 
-    const perSpace = await Promise.all(
-        spaces.map(async (space) => {
-            const sprints = await listSprints(space.id);
-            return sprints.map((sprint) => ({ ...sprint, spaceId: space.id, spaceName: space.name }));
-        })
-    );
-    const sprints = perSpace.flat();
+    const spaceNames = new Map(spaces.map((space) => [space.id, space.name]));
+    const named = sprints.map((sprint) => ({ ...sprint, spaceName: spaceNames.get(sprint.spaceId) ?? "" }));
 
     const burndowns: Record<string, BurndownPoint[]> = {};
-    for (const sprint of sprints) {
+    for (const sprint of named) {
         // Only sprints that are running or finished have a line worth drawing; a
         // planned one is a straight edge nobody learns anything from.
         if (sprint.status !== "planned") burndowns[sprint.id] = await sprintBurndown(sprint.id);
@@ -47,7 +44,11 @@ export default async function SprintsPage() {
     return (
         <div className="flex w-full flex-col gap-6 md:flex-row">
             <SpaceTree spaces={tree} canCreate={false} />
-            <SprintsView sprints={sprints} spaces={spaces} burndowns={burndowns} />
+            <SprintsView
+                sprints={named}
+                spaces={spaces.filter((space) => scope.spaceIds.includes(space.id))}
+                burndowns={burndowns}
+            />
         </div>
     );
 }

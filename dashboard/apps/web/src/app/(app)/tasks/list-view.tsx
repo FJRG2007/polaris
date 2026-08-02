@@ -14,6 +14,7 @@
  * screen showing something that did not happen.
  */
 
+import Fuse from "fuse.js";
 import * as actions from "./actions";
 import * as core from "@polaris/core";
 import { FilterBar } from "./filter-bar";
@@ -21,14 +22,14 @@ import { TaskPanel } from "./task-panel";
 import { BoardView } from "./views/board";
 import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
-import type { ViewProps } from "./views/shared";
-import { Button, Select, cn } from "@polaris/ui";
 import { ListView, TableView } from "./views/rows";
 import { TaskCreateDialog } from "./task-create-dialog";
 import { useMemo, useState, useTransition } from "react";
 import { AssigneePicker, StatusPicker } from "./pickers";
+import type { TaskEdit, ViewProps } from "./views/shared";
 import type { SavedView } from "@/lib/tasks/view-service";
 import { CalendarView, GanttView } from "./views/schedule";
+import { Button, ConfirmDeleteDialog, Select, cn } from "@polaris/ui";
 import { toFacts, type SpaceContext, type TaskRow } from "@/lib/tasks/facts";
 import { CalendarDays, GanttChart, LayoutList, Plus, Rows3, Search, Table2, X } from "lucide-react";
 
@@ -78,6 +79,7 @@ export function ListScreen({
     const [search, setSearch] = useState("");
     const [openTaskId, setOpenTaskId] = useState<string | null>(initialTaskId);
     const [creating, setCreating] = useState(false);
+    const [deleting, setDeleting] = useState<TaskRow | null>(null);
     const [selection, setSelection] = useState<ReadonlySet<string>>(new Set());
     const [error, setError] = useState("");
 
@@ -102,21 +104,42 @@ export function ListScreen({
     // and the row is looked back up by id wherever one is drawn.
     const rowById = useMemo(() => new Map(rows.map((task) => [task.id, task])), [rows]);
 
+    /**
+     * Search is fuzzy, because the way people look for a task is by half
+     * remembering it. A substring match only finds "user agent" if that is what
+     * somebody typed, and misses it for "useragent", "UA blocked" or a
+     * transposed letter - which is exactly when they are searching in the first
+     * place. Reference and tags are searchable too, at lower weight, so quoting
+     * "ENG-42" still lands on it.
+     */
+    const index = useMemo(
+        () =>
+            new Fuse(rows, {
+                keys: [
+                    { name: "name", weight: 3 },
+                    { name: "reference", weight: 2 },
+                    { name: "description", weight: 1 },
+                    { name: "tags.name", weight: 1 }
+                ],
+                threshold: 0.4,
+                ignoreLocation: true,
+                minMatchCharLength: 2
+            }),
+        [rows]
+    );
+
     const visibleFacts = useMemo(() => {
         const now = new Date();
-        const needle = search.trim().toLowerCase();
-        const working = rows
+        const needle = search.trim();
+        const matched = needle ? index.search(needle).map((hit) => hit.item) : rows;
+        const working = matched
             .filter((task) => showClosed || task.statusType !== "closed")
-            .filter(
-                (task) =>
-                    !needle ||
-                    task.name.toLowerCase().includes(needle) ||
-                    task.reference.toLowerCase().includes(needle)
-            )
             .map(toFacts)
             .filter((facts) => core.matchesFilter(facts, filter, now));
-        return core.sortTasks(working, sort, statusOrder);
-    }, [rows, filter, showClosed, search, sort, statusOrder]);
+        // A search is already ranked by how well each row matched; re-sorting it
+        // by due date would throw that away.
+        return needle ? working : core.sortTasks(working, sort, statusOrder);
+    }, [rows, index, filter, showClosed, search, sort, statusOrder]);
 
     const visible = useMemo(
         () => visibleFacts.map((facts) => rowById.get(facts.id)).filter((task): task is TaskRow => task !== undefined),
@@ -141,24 +164,43 @@ export function ListScreen({
         [visibleFacts, rowById, groupBy, context.statuses, context.people, context.tags, lists]
     );
 
-    /** Complete or reopen from a row: find the space's first done status (or its
-     *  first open one) so one click means the obvious thing. */
-    const toggleComplete = async (task: TaskRow, complete: boolean) => {
-        const target = complete
-            ? context.statuses.find((status) => status.type === "done")
-            : context.statuses.find((status) => status.type === "open");
-        if (!target) {
-            setError("This space has no status to move it to. Add one in the space settings.");
-            return;
+    /**
+     * A change made from a row, applied here before it is sent.
+     *
+     * The overlay carries the resolved shape a row renders - a status id is no
+     * use to a cell that draws a colour - so the screen repaints on the click
+     * rather than on the round trip. A refused write reloads and the overlay
+     * goes with it.
+     */
+    const editTask = async (task: TaskRow, change: TaskEdit) => {
+        // The overlay is written into, so it is the mutable shape of a row.
+        const optimistic: { -readonly [Key in keyof TaskRow]?: TaskRow[Key] } = {};
+        if (change.statusId !== undefined) {
+            const status = context.statuses.find((entry) => entry.id === change.statusId);
+            if (status) {
+                optimistic.statusId = status.id;
+                optimistic.statusName = status.name;
+                optimistic.statusColor = status.color;
+                optimistic.statusType = status.type;
+            }
         }
-        setPending((current) => ({
-            ...current,
-            [task.id]: { statusId: target.id, statusName: target.name, statusColor: target.color, statusType: target.type }
-        }));
-        const result = await runAction(
-            () => actions.updateTaskAction({ taskId: task.id, statusId: target.id }),
-            setError
-        );
+        if (change.priority !== undefined) optimistic.priority = change.priority;
+        if (change.dueDate !== undefined) optimistic.dueDate = change.dueDate;
+        if (change.assigneeIds !== undefined) {
+            optimistic.assignees = context.people.filter((person) => change.assigneeIds?.includes(person.id));
+        }
+        if (change.tagIds !== undefined) {
+            optimistic.tags = context.tags.filter((tag) => change.tagIds?.includes(tag.id));
+        }
+        setPending((current) => ({ ...current, [task.id]: { ...current[task.id], ...optimistic } }));
+
+        const result = await runAction(() => actions.updateTaskAction({ taskId: task.id, ...change }), setError);
+        if (result?.error) setError(result.error);
+        refresh();
+    };
+
+    const duplicateTask = async (task: TaskRow) => {
+        const result = await runAction(() => actions.duplicateTaskAction(task.id), setError);
         if (result?.error) setError(result.error);
         refresh();
     };
@@ -229,7 +271,29 @@ export function ListScreen({
         onSelect: toggleSelect,
         onMove: move,
         onQuickCreate: quickCreate,
-        onToggleComplete: toggleComplete
+        onEdit: editTask,
+        onDuplicate: duplicateTask,
+        onDelete: setDeleting,
+        onCreateTag: async (name, color) => {
+            const created = await runAction(() => actions.createTagAction(context.spaceId, name, color), setError);
+            if (created?.id) refresh();
+            return created?.id ?? null;
+        },
+        groupBy,
+        // A new board column is a new status for the whole space, so it is
+        // offered only to whoever may change the space's statuses. The action
+        // enforces the same thing; this is what keeps the button from appearing
+        // for somebody who would only be refused.
+        onCreateGroup: context.canModerate
+            ? async (name, type, color) => {
+                  const result = await runAction(
+                      () => actions.createStatusAction(context.spaceId, { name, type, color }),
+                      setError
+                  );
+                  if (result?.error) setError(result.error);
+                  refresh();
+              }
+            : undefined
     };
 
     return (
@@ -415,7 +479,10 @@ export function ListScreen({
             {(listId ?? defaultListId) && (
                 <TaskCreateDialog
                     open={creating}
-                    context={context}
+                    spaceId={context.spaceId}
+                    statuses={context.statuses}
+                    tags={context.tags}
+                    people={context.people}
                     lists={lists.length > 0 ? lists : [{ id: (listId ?? defaultListId) as string, name: title }]}
                     defaultListId={(listId ?? defaultListId) as string}
                     onClose={() => setCreating(false)}
@@ -433,6 +500,23 @@ export function ListScreen({
                 context={context}
                 onClose={() => setOpenTaskId(null)}
                 onChanged={refresh}
+            />
+
+            <ConfirmDeleteDialog
+                open={deleting !== null}
+                onOpenChange={(open) => (open ? undefined : setDeleting(null))}
+                name={deleting?.name ?? ""}
+                kind="task"
+                requireTyping={false}
+                description="Comments, checklists and tracked time go with it. Archiving keeps all of that and takes it off the board."
+                confirmLabel="Delete task"
+                onConfirm={async () => {
+                    if (!deleting) return;
+                    const result = await runAction(() => actions.deleteTaskAction(deleting.id), setError);
+                    if (result?.error) setError(result.error);
+                    setDeleting(null);
+                    refresh();
+                }}
             />
         </div>
     );

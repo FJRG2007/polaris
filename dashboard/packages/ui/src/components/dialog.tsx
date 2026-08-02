@@ -3,7 +3,7 @@
 /** Modal dialog built on Radix, used for connection/share/request forms. */
 
 import { X } from "lucide-react";
-import { cn } from "../lib/cn.js";
+import { cn } from "../lib/cn";
 import * as RadixDialog from "@radix-ui/react-dialog";
 import { forwardRef, type ComponentPropsWithoutRef, type ElementRef } from "react";
 

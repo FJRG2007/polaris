@@ -11,7 +11,7 @@
 import { createContext, useContext, type ReactNode } from "react";
 import { Lock } from "lucide-react";
 import type { Capabilities } from "@polaris/config";
-import { Badge } from "../components/badge.js";
+import { Badge } from "../components/badge";
 
 const CapabilityContext = createContext<Capabilities | null>(null);
 
