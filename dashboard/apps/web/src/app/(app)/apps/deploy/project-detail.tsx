@@ -46,10 +46,12 @@ export function ProjectDetail({
     const defaultEnv = environments.find((env) => env.isDefault) ?? environments[0];
     // A link that names a service lands on the environment holding it, not on
     // whichever one the project happens to open with.
-    const linked = openService
-        ? environments.find((env) => env.applications.some((app) => app.id === openService))
-        : environments.find((env) => env.id === openEnvironment);
-    const [activeId, setActiveId] = useState(linked?.id ?? defaultEnv?.id ?? "");
+    const linkedId =
+        (openService
+            ? environments.find((env) => env.applications.some((app) => app.id === openService))
+            : environments.find((env) => env.id === openEnvironment)
+        )?.id ?? null;
+    const [activeId, setActiveId] = useState(linkedId ?? defaultEnv?.id ?? "");
     const active = environments.find((env) => env.id === activeId) ?? defaultEnv;
 
     const [confirmDeleteProject, setConfirmDeleteProject] = useState(false);
@@ -63,6 +65,17 @@ export function ProjectDetail({
     // after removing a domain) and a deleted service closes it instead of leaving
     // a stale snapshot on screen.
     const detailApp = environments.flatMap((env) => env.applications).find((app) => app.id === detailAppId) ?? null;
+
+    // The initializers above only run on mount, and the common case never
+    // remounts: the notification bell lives in the app shell, so clicking a deploy
+    // alert while already on that project is a search-params-only navigation -
+    // React re-renders with the new props and the link would otherwise do nothing.
+    // Opening a panel by hand rewrites history without touching these props, so
+    // this cannot fight what the reader did themselves.
+    useEffect(() => {
+        if (openService) setDetailAppId(openService);
+        if (linkedId) setActiveId(linkedId);
+    }, [openService, linkedId]);
 
     /** Open or close the service panel, keeping the URL on the service so the page
      *  can be linked to, reloaded and shared where it was left. Written straight to
