@@ -277,11 +277,19 @@ export function ListScreen({
         // A screen with no list of its own is showing work from several, so each
         // row has to name the one it came from.
         showLocation: listId === null,
-        onCreateTag: async (name, color) => {
-            const created = await runAction(() => actions.createTagAction(context.spaceId, name, color), setError);
-            if (created?.id) refresh();
-            return created?.id ?? null;
-        },
+        // A tag belongs to a space. A screen that spans them all has none of its
+        // own, so there is nowhere to put a new one; the picker then offers
+        // finding rather than creating, instead of refusing a typed name.
+        onCreateTag: context.spaceId
+            ? async (name, color) => {
+                  const created = await runAction(
+                      () => actions.createTagAction(context.spaceId, name, color),
+                      setError
+                  );
+                  if (created?.id) refresh();
+                  return created?.id ?? null;
+              }
+            : undefined,
         groupBy,
         // A new board column is a new status for the whole space, so it is
         // offered only to whoever may change the space's statuses. The action

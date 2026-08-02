@@ -78,7 +78,18 @@ export function AvatarStack({ people, size = 24 }: { people: readonly PersonRef[
 }
 
 /** A menu that filters as you type once the list stops being scannable. */
-function MenuSearch({ value, onChange, placeholder }: { value: string; onChange: (value: string) => void; placeholder: string }) {
+function MenuSearch({
+    value,
+    onChange,
+    placeholder,
+    onSubmit
+}: {
+    value: string;
+    onChange: (value: string) => void;
+    placeholder: string;
+    /** What enter does, where typing a name is a way of picking one. */
+    onSubmit?: () => void;
+}) {
     return (
         <div className="flex items-center gap-2 border-b border-border px-2 pb-2">
             <Search className="size-3.5 shrink-0 text-muted-foreground" />
@@ -86,6 +97,11 @@ function MenuSearch({ value, onChange, placeholder }: { value: string; onChange:
                 autoFocus
                 value={value}
                 onChange={(event) => onChange(event.target.value)}
+                onKeyDown={(event) => {
+                    if (event.key !== "Enter" || !onSubmit) return;
+                    event.preventDefault();
+                    onSubmit();
+                }}
                 placeholder={placeholder}
                 className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
             />
@@ -530,10 +546,37 @@ export function TagPicker({
     const [creating, setCreating] = useState(false);
     const needle = query.trim().toLowerCase();
     const matches = tags.filter((tag) => tag.name.toLowerCase().includes(needle));
-    const exact = tags.some((tag) => tag.name.toLowerCase() === needle);
+    const existing = tags.find((tag) => tag.name.toLowerCase() === needle);
 
     const toggle = (id: string) =>
         onChange(selected.includes(id) ? selected.filter((entry) => entry !== id) : [...selected, id]);
+
+    /**
+     * Type a name, press enter, get that tag: it is put on the task if it
+     * already exists and made first if it does not. Reaching for the mouse to
+     * confirm a name you have just finished typing is the kind of step that
+     * stops people tagging anything at all.
+     *
+     * Only an exact name counts as "it exists". Typing "back" while a "backend"
+     * exists means "back", and picking the near miss is what leaves work filed
+     * under a tag nobody meant.
+     */
+    const submit = async () => {
+        const name = query.trim();
+        if (!name || creating) return;
+        if (existing) {
+            if (!selected.includes(existing.id)) onChange([...selected, existing.id]);
+            setQuery("");
+            return;
+        }
+        if (!onCreate) return;
+        setCreating(true);
+        const id = await onCreate(name);
+        setCreating(false);
+        if (!id) return;
+        onChange([...selected, id]);
+        setQuery("");
+    };
 
     return (
         <DropdownMenu>
@@ -547,7 +590,12 @@ export function TagPicker({
                 </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-56 pt-2">
-                <MenuSearch value={query} onChange={setQuery} placeholder="Find or create a tag" />
+                <MenuSearch
+                    value={query}
+                    onChange={setQuery}
+                    onSubmit={() => void submit()}
+                    placeholder={onCreate ? "Find or create a tag" : "Find a tag"}
+                />
                 <div className="max-h-56 overflow-y-auto">
                     {matches.map((tag) => (
                         <DropdownMenuItem
@@ -563,23 +611,18 @@ export function TagPicker({
                             {selected.includes(tag.id) && <Check className="size-3.5 text-primary" />}
                         </DropdownMenuItem>
                     ))}
-                    {onCreate && needle.length > 0 && !exact && (
+                    {onCreate && needle.length > 0 && !existing && (
                         <DropdownMenuItem
                             disabled={creating}
-                            onSelect={async (event) => {
+                            onSelect={(event) => {
                                 event.preventDefault();
-                                setCreating(true);
-                                const id = await onCreate(query.trim());
-                                setCreating(false);
-                                if (id) {
-                                    onChange([...selected, id]);
-                                    setQuery("");
-                                }
+                                void submit();
                             }}
                             className="gap-2"
                         >
                             <Plus className="size-3.5" />
-                            <span className="truncate">Create &ldquo;{query.trim()}&rdquo;</span>
+                            <span className="flex-1 truncate">Create &ldquo;{query.trim()}&rdquo;</span>
+                            <span className="text-[10px] text-muted-foreground">Enter</span>
                         </DropdownMenuItem>
                     )}
                 </div>
