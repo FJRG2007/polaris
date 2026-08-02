@@ -121,8 +121,37 @@ export function normalizeVolumeSource(kind: DeployVolumeKind, source: string): s
  * part of any project and never takes part in a service's merge, so blocking the
  * public internet there cannot reach an app, and blocking an app cannot reach it.
  */
-export const WAF_SCOPE_TYPES = ["polaris", "global", "project", "environment", "application"] as const;
+export const WAF_SCOPE_TYPES = [
+    "polaris",
+    "global",
+    "server-group",
+    "server",
+    "project",
+    "environment",
+    "application"
+] as const;
 export type WafScopeType = (typeof WAF_SCOPE_TYPES)[number];
+
+/**
+ * Scopes ranked broadest first, which is the order their rules are offered a request.
+ * A rule set is first-match-wins, so this ranking is what stops a project writing an
+ * `allow` that overrides an instance-wide block.
+ *
+ * Where a server sits relative to a project is a genuine choice rather than a fact:
+ * the two are orthogonal (a project's services can be spread across servers, and a
+ * server hosts services from several projects). Server comes first because it is a
+ * statement about the machine - "nothing reaches this box except from the office" is
+ * meant to hold whatever happens to be deployed on it.
+ */
+export const WAF_SCOPE_ORDER: Readonly<Record<WafScopeType, number>> = {
+    polaris: 0,
+    global: 0,
+    "server-group": 1,
+    server: 2,
+    project: 3,
+    environment: 4,
+    application: 5
+};
 
 /** Max entries per list, so one rule can never bloat the generated edge config. */
 export const WAF_LIST_MAX = 256;

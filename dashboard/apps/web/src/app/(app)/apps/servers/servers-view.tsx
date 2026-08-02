@@ -19,6 +19,7 @@ import { HostDialog } from "./host-dialog";
 import { useRouter } from "next/navigation";
 import { QuickEnroll } from "./quick-enroll";
 import { deleteHostAction } from "./actions";
+import { ServerGroups } from "./server-groups";
 import { ServerDialog } from "./server-dialog";
 import { ENVIRONMENT_META } from "./environment-meta";
 import { TerminalPanel } from "../deploy/terminal-panel";
@@ -287,6 +288,11 @@ export function ServersView({ servers }: { servers: ServerRow[] }) {
                 }}
                 onClose={() => setDetails(null)}
             />
+
+            {/* Below the table, because a group is something you reach for once the
+                machines exist - and it is the firewall that consumes it, not this
+                screen. */}
+            <ServerGroups servers={servers} />
         </div>
     );
 }

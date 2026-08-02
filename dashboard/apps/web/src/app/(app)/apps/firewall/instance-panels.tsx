@@ -44,21 +44,53 @@ const WINDOWS = [
     { hours: 168, label: "7d" }
 ];
 
+/**
+ * Applies a change to what is on screen, then confirms it with the server. Handed
+ * down so every control here behaves the same way: the switch moves under the
+ * finger, and only a real failure moves it back.
+ */
+export type Mutate = (
+    patch: (current: Overview) => Overview,
+    run: () => Promise<{ error?: string }>
+) => void;
+
 export function FirewallInstancePanels() {
     const [hours, setHours] = useState(24);
     const [data, setData] = useState<Overview | null>(null);
+    const [failure, setFailure] = useState<string | null>(null);
     const [refreshing, startRefresh] = useTransition();
 
-    const load = useCallback(
-        (window: number) => {
-            startRefresh(async () => {
-                setData(await getWafOverviewAction(window));
-            });
-        },
-        [startRefresh]
-    );
+    const load = useCallback((window: number) => {
+        startRefresh(async () => {
+            setData(await getWafOverviewAction(window));
+        });
+    }, []);
 
     useEffect(() => load(hours), [hours, load]);
+
+    const mutate = useCallback<Mutate>(
+        (patch, run) => {
+            setData((current) => {
+                if (!current) return current;
+                const previous = current;
+                setFailure(null);
+                void run().then((result) => {
+                    if (result.error) {
+                        // Put back exactly what was there. Rolling back to a refetch
+                        // instead would also undo anything else changed meanwhile.
+                        setData(previous);
+                        setFailure(result.error);
+                        return;
+                    }
+                    // Re-read so the figures the server derives - ban counts, the size
+                    // of a feed - catch up with the change that was just made.
+                    load(hours);
+                });
+                return patch(current);
+            });
+        },
+        [hours, load]
+    );
 
     return (
         <div className="flex flex-col gap-4">
@@ -70,9 +102,10 @@ export function FirewallInstancePanels() {
                 refreshing={refreshing}
                 onRefresh={() => load(hours)}
             />
-            <BansPanel bans={data?.bans} loading={!data} onChanged={() => load(hours)} />
-            <JailsPanel jails={data?.jails} loading={!data} onChanged={() => load(hours)} />
-            <IntelPanel tor={data?.tor} loading={!data} onChanged={() => load(hours)} />
+            <BansPanel bans={data?.bans} loading={!data} mutate={mutate} />
+            <JailsPanel jails={data?.jails} loading={!data} onSaved={() => load(hours)} />
+            <IntelPanel tor={data?.tor} loading={!data} mutate={mutate} />
+            {failure ? <p className="text-sm text-danger">{failure}</p> : null}
             {data?.error ? <p className="text-sm text-danger">{data.error}</p> : null}
         </div>
     );
@@ -197,17 +230,8 @@ function TopList({ title, entries }: { title: string; entries: readonly { value:
     );
 }
 
-function BansPanel({
-    bans,
-    loading,
-    onChanged
-}: {
-    bans: WafBanView[] | undefined;
-    loading: boolean;
-    onChanged: () => void;
-}) {
+function BansPanel({ bans, loading, mutate }: { bans: WafBanView[] | undefined; loading: boolean; mutate: Mutate }) {
     const format = useDisplayFormat();
-    const [pending, start] = useTransition();
 
     return (
         <Card>
@@ -257,16 +281,18 @@ function BansPanel({
                                         <td className="px-2 py-2 text-right">
                                             <button
                                                 type="button"
-                                                disabled={pending}
                                                 aria-label={`Lift the ban on ${ban.ip}`}
                                                 title="Lift this ban"
                                                 onClick={() =>
-                                                    start(async () => {
-                                                        await liftWafBanAction(ban.ip);
-                                                        onChanged();
-                                                    })
+                                                    mutate(
+                                                        (current) => ({
+                                                            ...current,
+                                                            bans: current.bans?.filter((row) => row.ip !== ban.ip)
+                                                        }),
+                                                        () => liftWafBanAction(ban.ip)
+                                                    )
                                                 }
-                                                className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
+                                                className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                                             >
                                                 <ShieldOff className="size-3.5" />
                                             </button>
@@ -285,11 +311,11 @@ function BansPanel({
 function JailsPanel({
     jails,
     loading,
-    onChanged
+    onSaved
 }: {
     jails: WafJail[] | undefined;
     loading: boolean;
-    onChanged: () => void;
+    onSaved: () => void;
 }) {
     const [draft, setDraft] = useState<WafJail[] | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -318,7 +344,7 @@ function JailsPanel({
                 return;
             }
             setDraft(null);
-            onChanged();
+            onSaved();
         });
     }
 
@@ -424,14 +450,13 @@ function NumberField({
 function IntelPanel({
     tor,
     loading,
-    onChanged
+    mutate
 }: {
     tor: { enabled: boolean; count: number; fetchedAt: string | null; error: string | null } | undefined;
     loading: boolean;
-    onChanged: () => void;
+    mutate: Mutate;
 }) {
     const format = useDisplayFormat();
-    const [pending, start] = useTransition();
 
     return (
         <Card>
@@ -452,7 +477,10 @@ function IntelPanel({
                                 Refuses every Tor exit node. The list is fetched hourly and held at the edge, so a
                                 request is never delayed by looking one up.
                             </p>
-                            {tor?.enabled ? (
+                            {/* Only once there is a list. Between switching it on and
+                                the first fetch landing there is no count to show, and
+                                "0 exit nodes" would read as a broken feed. */}
+                            {tor?.enabled && tor.count > 0 ? (
                                 <p className="mt-1 text-xs text-muted-foreground">
                                     {grouped(tor.count)} exit nodes
                                     {tor.fetchedAt ? `, updated ${format.dateTime(tor.fetchedAt)}` : ""}
@@ -467,13 +495,15 @@ function IntelPanel({
                         </div>
                         <Switch
                             checked={tor?.enabled ?? false}
-                            disabled={pending}
                             aria-label="Block the Tor network"
                             onChange={(on) =>
-                                start(async () => {
-                                    await setTorBlockedAction(on);
-                                    onChanged();
-                                })
+                                mutate(
+                                    (current) => ({
+                                        ...current,
+                                        tor: { count: 0, fetchedAt: null, error: null, ...current.tor, enabled: on }
+                                    }),
+                                    () => setTorBlockedAction(on)
+                                )
                             }
                         />
                     </div>

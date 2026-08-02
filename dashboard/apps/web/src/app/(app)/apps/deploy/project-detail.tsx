@@ -84,7 +84,7 @@ export function ProjectDetail({
                     {canManage && active && <NewServiceButton environmentId={active.id} onChanged={refresh} />}
                     {canManage && (
                         <Link
-                            href={`/apps/deploy/${project.id}/firewall`}
+                            href={`/apps/firewall?scope=project&id=${project.id}`}
                             aria-label="Firewall"
                             title="Firewall"
                             className="inline-flex size-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"

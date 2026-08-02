@@ -10,6 +10,14 @@
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/session";
+import {
+    createHostGroup,
+    deleteHostGroup,
+    listHostGroups,
+    renameHostGroup,
+    setHostGroupMembers,
+    type HostGroupView
+} from "@/lib/host-group-service";
 import { recordAudit } from "@/lib/audit-service";
 import { setLocalEnvironment } from "@/lib/network-service";
 import { getLocalHostId, setLocalHostId, setLocalServerName } from "@/lib/local-server";
@@ -172,4 +180,57 @@ export async function deleteHostAction(hostId: string): Promise<void> {
     if ((await getLocalHostId()) === hostId) await setLocalHostId(null);
     await recordAudit({ actorId: user.id, action: "host.delete", targetType: "host", targetId: hostId });
     revalidatePath(SERVERS_PATH);
+}
+
+/** The owner's server groups, with membership, for the groups panel. */
+export async function listHostGroupsAction(): Promise<HostGroupView[]> {
+    const user = await requirePermission("system.manage");
+    return listHostGroups(user.id);
+}
+
+export async function createHostGroupAction(name: string): Promise<{ id?: string; error?: string }> {
+    const user = await requirePermission("system.manage");
+    try {
+        const group = await createHostGroup(user.id, name);
+        await recordAudit({ actorId: user.id, action: "host.group.create", targetType: "hostGroup", targetId: group.id });
+        revalidatePath(SERVERS_PATH);
+        return { id: group.id };
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not create the group" };
+    }
+}
+
+export async function renameHostGroupAction(groupId: string, name: string): Promise<{ error?: string }> {
+    const user = await requirePermission("system.manage");
+    try {
+        await renameHostGroup(user.id, groupId, name);
+        revalidatePath(SERVERS_PATH);
+        return {};
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not rename the group" };
+    }
+}
+
+/** Delete a group. Its firewall rules go with it - see deleteHostGroup. */
+export async function deleteHostGroupAction(groupId: string): Promise<{ error?: string }> {
+    const user = await requirePermission("system.manage");
+    try {
+        await deleteHostGroup(user.id, groupId);
+        await recordAudit({ actorId: user.id, action: "host.group.delete", targetType: "hostGroup", targetId: groupId });
+        revalidatePath(SERVERS_PATH);
+        return {};
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not delete the group" };
+    }
+}
+
+export async function setHostGroupMembersAction(groupId: string, hostIds: string[]): Promise<{ error?: string }> {
+    const user = await requirePermission("system.manage");
+    try {
+        await setHostGroupMembers(user.id, groupId, hostIds);
+        revalidatePath(SERVERS_PATH);
+        return {};
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not save the group" };
+    }
 }

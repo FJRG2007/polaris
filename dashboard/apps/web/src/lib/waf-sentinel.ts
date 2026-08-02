@@ -12,6 +12,7 @@
  */
 
 import { runWafJails } from "@/lib/waf-ban-service";
+import { runSshJails } from "@/lib/waf-ssh-service";
 import { publishWafIntel, pruneWafBans, refreshWafFeeds } from "@/lib/waf-intel-service";
 
 /** How often the log is scanned. Fast enough that a scanner is stopped mid-sweep,
@@ -21,6 +22,11 @@ const TICK_MS = 30_000;
 /** Ticks between the housekeeping pass (feed refresh, history pruning), which is
  *  hourly work and does not belong on every scan. */
 const MAINTENANCE_EVERY_TICKS = 60;
+
+/** Ticks between SSH auth sweeps. Rarer than the HTTP scan because each one opens a
+ *  session to every enrolled server: the edge log is already local, a server is not.
+ *  Two minutes still stops a credential sweep long before it works through a list. */
+const SSH_EVERY_TICKS = 4;
 
 let started = false;
 
@@ -37,6 +43,7 @@ export function startWafSentinel(): void {
     const tick = async () => {
         try {
             await runWafJails();
+            if (ticks % SSH_EVERY_TICKS === 0) await runSshJails();
             if (ticks % MAINTENANCE_EVERY_TICKS === 0) {
                 await refreshWafFeeds();
                 await pruneWafBans();

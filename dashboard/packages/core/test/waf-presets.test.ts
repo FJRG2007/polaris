@@ -138,7 +138,12 @@ describe("crawler packs", () => {
 
 describe("defaults", () => {
     it("starts an instance on the stack-agnostic packs only", () => {
-        expect(instanceDefaultWafPresets()).toEqual(["scanners", "dotfiles"]);
+        expect(instanceDefaultWafPresets()).toEqual([
+            "scanners",
+            "dotfiles",
+            "directory-listing",
+            "admin-panels"
+        ]);
     });
 
     it("turns CMS probing on for a service that does not run PHP", () => {
@@ -191,5 +196,43 @@ describe("the wire format", () => {
     it("returns the same decoded object for a repeated header", () => {
         const header = encodeGuardRule({ deny: [], requireLogin: false, presets: ["dotfiles"], rules: [] });
         expect(decodeGuardRule(header)).toBe(decodeGuardRule(header));
+    });
+});
+
+describe("directory-listing", () => {
+    it("blocks the sort links a served listing generates", () => {
+        for (const query of ["C=N;O=D", "C=M;O=A", "C=S;O=A", "C=D;O=A"]) {
+            expect(verdict(["directory-listing"], { path: "/files/", query, userAgent: BROWSER })?.action).toBe(
+                "block"
+            );
+        }
+    });
+
+    it("blocks browsing a directory that should never be listed", () => {
+        for (const path of ["/backup/", "/logs/", "/private/", "/sql/"]) {
+            expect(verdict(["directory-listing"], { path, userAgent: BROWSER })?.action).toBe("block");
+        }
+    });
+
+    it("still serves a file someone was legitimately linked to inside one", () => {
+        expect(verdict(["directory-listing"], { path: "/backup/restore-guide.pdf", userAgent: BROWSER })).toBeNull();
+    });
+
+    it("leaves ordinary directories and queries alone", () => {
+        expect(verdict(["directory-listing"], { path: "/docs/", userAgent: BROWSER })).toBeNull();
+        expect(verdict(["directory-listing"], { path: "/search", query: "q=backup", userAgent: BROWSER })).toBeNull();
+    });
+});
+
+describe("admin-panels", () => {
+    it.each(["/adminer.php", "/pgadmin/login", "/actuator/heapdump", "/manager/html", "/portainer/api/status"])(
+        "blocks %s",
+        (path) => {
+            expect(verdict(["admin-panels"], { path, userAgent: BROWSER })?.action).toBe("block");
+        }
+    );
+
+    it("leaves an application's own admin route alone", () => {
+        expect(verdict(["admin-panels"], { path: "/admin/orders", userAgent: BROWSER })).toBeNull();
     });
 });

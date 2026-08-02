@@ -25,7 +25,7 @@ export interface HttpLogLike {
     readonly status: number;
 }
 
-export const WAF_JAIL_IDS = ["not-found", "rate-limited", "auth-failed", "probes"] as const;
+export const WAF_JAIL_IDS = ["not-found", "rate-limited", "auth-failed", "probes", "ssh-auth"] as const;
 export type WafJailId = (typeof WAF_JAIL_IDS)[number];
 
 export interface WafJail {
@@ -72,6 +72,11 @@ function counts(jail: WafJailId, entry: HttpLogLike): boolean {
             const path = entry.path?.toLowerCase() ?? "";
             return path !== "" && PROBE_MARKERS.some((marker) => path.includes(marker));
         }
+        case "ssh-auth":
+            // Fed only by the auth-log reader, which presents a refused SSH or SFTP
+            // login in this shape (see authAttemptsAsEntries). Matched on the path so
+            // it can never be tripped by a web request that happened to return 401.
+            return entry.status === 401 && (entry.path === "/ssh" || entry.path === "/sftp");
     }
 }
 
@@ -118,6 +123,19 @@ export const DEFAULT_WAF_JAILS: readonly WafJail[] = [
         enabled: true,
         maxRetry: 3,
         findTimeSec: 60,
+        banTimeSec: 86400
+    },
+    {
+        id: "ssh-auth",
+        label: "Failed SSH and SFTP logins",
+        description:
+            "Bans an address that keeps failing to log in over SSH or SFTP on your servers. Read from each server's own auth log, so it catches the traffic that never reaches the web edge.",
+        enabled: true,
+        // A person mistyping a passphrase gets several goes; a credential sweep hits
+        // this inside a second. The long ban is the point - these do not stop on
+        // their own, and there is no legitimate client on the other end to inconvenience.
+        maxRetry: 5,
+        findTimeSec: 600,
         banTimeSec: 86400
     }
 ];

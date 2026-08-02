@@ -92,8 +92,9 @@ export async function listProjects(ownerId: string) {
     });
 }
 
-/** Project and environment names only - what the firewall's scope list needs, without
- *  dragging every service and domain along for a nav of labels. */
+/** Project, environment and service names only - what the firewall's scope selector
+ *  needs, without dragging every domain, volume and deployment along for a list of
+ *  labels. */
 export async function listProjectScopes(ownerId: string) {
     return prisma.project.findMany({
         where: visibleProjectWhere(ownerId),
@@ -101,7 +102,14 @@ export async function listProjectScopes(ownerId: string) {
         select: {
             id: true,
             name: true,
-            environments: { select: { id: true, name: true }, orderBy: { createdAt: "asc" } }
+            environments: {
+                select: {
+                    id: true,
+                    name: true,
+                    applications: { select: { id: true, name: true }, orderBy: { createdAt: "asc" } }
+                },
+                orderBy: { createdAt: "asc" }
+            }
         }
     });
 }

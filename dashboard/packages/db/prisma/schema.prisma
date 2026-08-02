@@ -68,6 +68,7 @@ model User {
     connections       StorageConnection[]
     dockerConnections DockerConnection[]
     hosts             Host[]
+    hostGroups        HostGroup[]
     shares            Share[]
     shareInvites      ShareInvite[]
     fileRequests      FileRequest[]
@@ -805,12 +806,45 @@ model Host {
     createdAt           DateTime @default(now())
     updatedAt           DateTime @updatedAt
 
-    owner         User           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+    owner         User              @relation(fields: [ownerId], references: [id], onDelete: Cascade)
     deployTargets DeployTarget[]
     enrollments   Enrollment[]
     runnerPools   RunnerPool[]
+    groups        HostGroupMember[]
 
     @@index([ownerId])
+}
+
+/// A named set of servers, so a rule can be written once for "the VPS boxes" or
+/// "everything at home" instead of once per machine.
+///
+/// Membership only - a group carries no settings of its own. What makes it useful is
+/// that it is a firewall scope like any other, so the rules attached to it merge into
+/// every service running on any of its members.
+model HostGroup {
+    id      String @id @default(uuid(7)) @db.Uuid
+    ownerId String @db.Uuid
+    name    String
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    owner   User              @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+    members HostGroupMember[]
+
+    @@unique([ownerId, name])
+    @@index([ownerId])
+}
+
+model HostGroupMember {
+    groupId String @db.Uuid
+    hostId  String @db.Uuid
+
+    group HostGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+    host  Host      @relation(fields: [hostId], references: [id], onDelete: Cascade)
+
+    @@id([groupId, hostId])
+    @@index([hostId])
 }
 
 // An offer to let one machine join Polaris, redeemed by a script run on it.
