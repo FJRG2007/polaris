@@ -9,10 +9,13 @@ import {
     Activity,
     Bell,
     Blocks,
+    CalendarRange,
+    ChartColumn,
     Clock,
     Contact,
     Container,
     Database,
+    FileText,
     FolderOpen,
     Globe,
     HardDrive,
@@ -21,6 +24,7 @@ import {
     LayoutDashboard,
     LayoutGrid,
     Link2,
+    ListTodo,
     Mail,
     MessagesSquare,
     MonitorSmartphone,
@@ -32,8 +36,11 @@ import {
     Settings,
     ShieldCheck,
     SlidersHorizontal,
+    SquareCheckBig,
     Star,
     Store,
+    Target,
+    Timer,
     Trash2,
     UserCog,
     Users,
@@ -80,6 +87,13 @@ export const POLARIS_APPS: AppEntry[] = [
         // Owns the whole /apps subtree: the marketplace, installed-app dashboards,
         // and the built-in Deploy / Servers / Containers / Backups rails.
         match: ["/apps"]
+    },
+    {
+        id: "tasks",
+        label: "Tasks",
+        description: "Plan and track work: spaces, lists, boards & goals",
+        icon: SquareCheckBig,
+        href: "/tasks"
     },
     {
         id: "inbox",
@@ -165,6 +179,15 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
         { label: "Containers", href: "/watch/containers", icon: Container, keywords: ["docker"] },
         { label: "Alarms", href: "/watch/alarms", icon: Bell, keywords: ["thresholds", "alerts", "events"] },
         { label: "Webhooks", href: "/watch/webhooks", icon: Webhook, keywords: ["discord", "slack", "endpoints"] }
+    ],
+    tasks: [
+        { label: "My work", href: "/tasks", icon: ListTodo, keywords: ["home", "assigned", "todo", "my tasks"] },
+        { label: "Everything", href: "/tasks/everything", icon: LayoutGrid, keywords: ["all tasks", "across spaces"] },
+        { label: "Sprints", href: "/tasks/sprints", icon: CalendarRange, keywords: ["agile", "burndown", "iteration"] },
+        { label: "Goals", href: "/tasks/goals", icon: Target, keywords: ["okr", "objectives", "targets"] },
+        { label: "Docs", href: "/tasks/docs", icon: FileText, keywords: ["wiki", "notes", "knowledge"] },
+        { label: "Timesheet", href: "/tasks/time", icon: Timer, keywords: ["time tracking", "hours", "billable"] },
+        { label: "Reporting", href: "/tasks/reports", icon: ChartColumn, keywords: ["dashboard", "workload", "metrics"] }
     ],
     inbox: [
         { label: "Conversations", href: "/inbox", icon: MessagesSquare, keywords: ["chats", "messages"] },

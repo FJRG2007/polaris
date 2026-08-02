@@ -98,6 +98,15 @@ model User {
     enrollments         Enrollment[]
     runnerPools         RunnerPool[]
     githubIdentity      GithubIdentity?
+    taskSpaces          TaskSpace[]
+    taskSpaceMemberships TaskSpaceMember[]
+    taskAssignments     TaskAssignee[]
+    taskWatching        TaskWatcher[]
+    taskComments        TaskComment[]
+    taskTimeEntries     TaskTimeEntry[]
+    taskReminders       TaskReminder[]
+    taskViews           TaskView[]
+    taskGoals           TaskGoal[]
 }
 
 // Addresses a user owns besides the one they sign in with. The primary stays on
@@ -2262,4 +2271,780 @@ model AlarmEvent {
     alarm Alarm @relation(fields: [alarmId], references: [id], onDelete: Cascade)
 
     @@index([alarmId, createdAt])
+}
+// ---------------------------------------------------------------------------
+// Tasks (work management)
+// ---------------------------------------------------------------------------
+
+// The top of the work hierarchy: Space > Folder > List > Task > Subtask. A space
+// owns the vocabulary its lists share - statuses, tags, custom fields, sprints -
+// so two teams on one instance can run different processes without negotiating a
+// single global set of columns.
+//
+// `prefix` and `taskCounter` produce the reference people quote ("ENG-42"). The
+// prefix is fixed when the space is created and unique across the instance, so a
+// reference written in a commit message still resolves after a rename.
+model TaskSpace {
+    id          String   @id @default(uuid(7)) @db.Uuid
+    ownerId     String   @db.Uuid
+    name        String
+    prefix      String   @unique
+    description String   @default("")
+    color       String   @default("#7c5cff")
+    // private | internal - see SPACE_VISIBILITIES in @polaris/core.
+    visibility  String   @default("private")
+    archived    Boolean  @default(false)
+    order       Float    @default(1024)
+    // Highest number handed out so far. Never decremented, so a deleted task
+    // does not hand its reference to the next one.
+    taskCounter Int      @default(0)
+    createdAt   DateTime @default(now())
+    updatedAt   DateTime @updatedAt
+
+    owner       User              @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+    members     TaskSpaceMember[]
+    folders     TaskFolder[]
+    lists       TaskList[]
+    statuses    TaskStatus[]
+    tags        TaskTag[]
+    fields      TaskCustomField[]
+    tasks       Task[]
+    sprints     TaskSprint[]
+    goals       TaskGoal[]
+    docs        TaskDoc[]
+    views       TaskView[]
+    automations TaskAutomation[]
+    templates   TaskTemplate[]
+    forms       TaskForm[]
+
+    @@index([ownerId])
+}
+
+// Somebody other than the owner who may reach a space. The owner is never a row
+// here, so removing every member cannot lock the space away from its creator.
+model TaskSpaceMember {
+    id        String   @id @default(uuid(7)) @db.Uuid
+    spaceId   String   @db.Uuid
+    userId    String   @db.Uuid
+    // guest | member | admin - see SPACE_ROLES in @polaris/core.
+    role      String   @default("member")
+    createdAt DateTime @default(now())
+
+    space TaskSpace @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+    user  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@unique([spaceId, userId])
+    @@index([userId])
+}
+
+// An optional middle layer that groups lists. Deleting one keeps its lists and
+// moves them to the space root, because a folder is an arrangement rather than
+// an owner of the work inside it.
+model TaskFolder {
+    id        String   @id @default(uuid(7)) @db.Uuid
+    spaceId   String   @db.Uuid
+    name      String
+    order     Float    @default(1024)
+    archived  Boolean  @default(false)
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    space TaskSpace  @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+    lists TaskList[]
+
+    @@index([spaceId])
+}
+
+// Where tasks live. A task cannot exist outside a list, which is what makes the
+// list the unit that owns views, automations and intake forms.
+model TaskList {
+    id          String    @id @default(uuid(7)) @db.Uuid
+    spaceId     String    @db.Uuid
+    folderId    String?   @db.Uuid
+    name        String
+    description String    @default("")
+    color       String?
+    startDate   DateTime?
+    dueDate     DateTime?
+    order       Float     @default(1024)
+    archived    Boolean   @default(false)
+    createdAt   DateTime  @default(now())
+    updatedAt   DateTime  @updatedAt
+
+    space       TaskSpace        @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+    folder      TaskFolder?      @relation(fields: [folderId], references: [id], onDelete: SetNull)
+    tasks       Task[]
+    views       TaskView[]
+    automations TaskAutomation[]
+    forms       TaskForm[]
+    goalTargets TaskGoalTarget[]
+
+    @@index([spaceId])
+    @@index([folderId])
+}
+
+// A named workflow stage. Statuses belong to the space rather than to each list:
+// a board people move work across has to mean the same thing in every list, and
+// per-list overrides are how a workspace ends up with nine spellings of "Done".
+model TaskStatus {
+    id        String   @id @default(uuid(7)) @db.Uuid
+    spaceId   String   @db.Uuid
+    name      String
+    // open | active | done | closed - the kind the product reasons about, so
+    // "is this finished" never depends on the name somebody typed.
+    type      String   @default("open")
+    color     String   @default("#64748b")
+    order     Float    @default(1024)
+    createdAt DateTime @default(now())
+
+    space TaskSpace @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+    tasks Task[]
+
+    @@index([spaceId])
+}
+
+// A cross-cutting label. Space-scoped so one team's labels do not leak into
+// another team's tag picker.
+model TaskTag {
+    id        String   @id @default(uuid(7)) @db.Uuid
+    spaceId   String   @db.Uuid
+    name      String
+    color     String   @default("#7c5cff")
+    createdAt DateTime @default(now())
+
+    space TaskSpace     @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+    tasks TaskTagLink[]
+
+    @@unique([spaceId, name])
+}
+
+// A column a space adds to its tasks. `config` is the per-type settings as
+// stringified JSON (options, bounds, currency); see customFieldConfigSchema.
+model TaskCustomField {
+    id         String   @id @default(uuid(7)) @db.Uuid
+    spaceId    String   @db.Uuid
+    name       String
+    // See CUSTOM_FIELD_TYPES in @polaris/core.
+    type       String
+    config     String   @default("{}")
+    required   Boolean  @default(false)
+    // Shown on the card and in the table without opening the task.
+    showOnCard Boolean  @default(false)
+    order      Float    @default(1024)
+    createdAt  DateTime @default(now())
+
+    space  TaskSpace              @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+    values TaskCustomFieldValue[]
+
+    @@index([spaceId])
+}
+
+// One work item.
+//
+// `spaceId` is carried alongside `listId` rather than being reached through it:
+// the reference counter, the tag and custom-field vocabulary, and every
+// cross-list view are all space-scoped, and joining through the list on each of
+// those reads costs more than one column. A task therefore moves freely between
+// lists in its space and never between spaces, which is also what keeps its
+// reference stable.
+model Task {
+    id           String    @id @default(uuid(7)) @db.Uuid
+    spaceId      String    @db.Uuid
+    listId       String    @db.Uuid
+    parentId     String?   @db.Uuid
+    // Per-space sequential, rendered with the space prefix as "ENG-42".
+    number       Int
+    name         String
+    description  String    @default("")
+    statusId     String?   @db.Uuid
+    // urgent | high | normal | low | none.
+    priority     String    @default("none")
+    startDate    DateTime?
+    dueDate      DateTime?
+    // Whether the dates carry a time of day. An all-day task is due at the end
+    // of its day, which is what decides when it turns overdue.
+    timed        Boolean   @default(false)
+    // Minutes.
+    timeEstimate Int?
+    points       Int?
+    milestone    Boolean   @default(false)
+    order        Float     @default(1024)
+    archived     Boolean   @default(false)
+    // Stamped when the task first reaches a done/closed status, and cleared if
+    // it is reopened, so a burndown has a real date to count against.
+    completedAt  DateTime?
+    sprintId     String?   @db.Uuid
+    // Recurrence rule as stringified JSON; see recurrenceSchema in @polaris/core.
+    recurrence   String?
+    // No FK: the trail outlives the account that created the task.
+    createdById  String?   @db.Uuid
+    createdAt    DateTime  @default(now())
+    updatedAt    DateTime  @updatedAt
+
+    space       TaskSpace              @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+    list        TaskList               @relation(fields: [listId], references: [id], onDelete: Cascade)
+    parent      Task?                  @relation("TaskSubtasks", fields: [parentId], references: [id], onDelete: Cascade)
+    subtasks    Task[]                 @relation("TaskSubtasks")
+    status      TaskStatus?            @relation(fields: [statusId], references: [id], onDelete: SetNull)
+    sprint      TaskSprint?            @relation(fields: [sprintId], references: [id], onDelete: SetNull)
+    assignees   TaskAssignee[]
+    watchers    TaskWatcher[]
+    tags        TaskTagLink[]
+    fieldValues TaskCustomFieldValue[]
+    comments    TaskComment[]
+    checklists  TaskChecklist[]
+    blocking    TaskDependency[]       @relation("TaskBlocker")
+    blockedBy   TaskDependency[]       @relation("TaskBlocked")
+    timeEntries TaskTimeEntry[]
+    activity    TaskActivity[]
+    reminders   TaskReminder[]
+    submissions TaskFormSubmission[]
+
+    @@unique([spaceId, number])
+    @@index([listId])
+    @@index([spaceId, archived])
+    @@index([statusId])
+    @@index([parentId])
+    @@index([sprintId])
+    @@index([dueDate])
+}
+
+// Who is doing the work. More than one person can be, which is why this is a
+// table and not a column.
+model TaskAssignee {
+    taskId String @db.Uuid
+    userId String @db.Uuid
+
+    task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@id([taskId, userId])
+    @@index([userId])
+}
+
+// Who is told when it changes, without being asked to do it.
+model TaskWatcher {
+    taskId String @db.Uuid
+    userId String @db.Uuid
+
+    task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@id([taskId, userId])
+    @@index([userId])
+}
+
+model TaskTagLink {
+    taskId String @db.Uuid
+    tagId  String @db.Uuid
+
+    task Task    @relation(fields: [taskId], references: [id], onDelete: Cascade)
+    tag  TaskTag @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+    @@id([taskId, tagId])
+    @@index([tagId])
+}
+
+// One custom-field answer. Always a string: the field's type decides how it is
+// read, which keeps this table one shape however many types exist.
+model TaskCustomFieldValue {
+    taskId  String @db.Uuid
+    fieldId String @db.Uuid
+    value   String
+
+    task  Task            @relation(fields: [taskId], references: [id], onDelete: Cascade)
+    field TaskCustomField @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+
+    @@id([taskId, fieldId])
+    @@index([fieldId])
+}
+
+// A comment, or a reply to one. A comment can be handed to somebody as an action
+// item and resolved when it is dealt with, so feedback does not need a task of
+// its own to be tracked.
+model TaskComment {
+    id           String    @id @default(uuid(7)) @db.Uuid
+    taskId       String    @db.Uuid
+    parentId     String?   @db.Uuid
+    userId       String?   @db.Uuid
+    body         String
+    // No FKs: both are display references that must survive the account leaving.
+    assignedToId String?   @db.Uuid
+    resolvedById String?   @db.Uuid
+    resolvedAt   DateTime?
+    createdAt    DateTime  @default(now())
+    updatedAt    DateTime  @updatedAt
+
+    task    Task          @relation(fields: [taskId], references: [id], onDelete: Cascade)
+    user    User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+    parent  TaskComment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+    replies TaskComment[] @relation("CommentReplies")
+
+    @@index([taskId, createdAt])
+    @@index([parentId])
+}
+
+// A named group of steps inside one task. Steps are not tasks: they have no
+// status, no dates and no reference, which is the whole point of having both.
+model TaskChecklist {
+    id        String   @id @default(uuid(7)) @db.Uuid
+    taskId    String   @db.Uuid
+    name      String
+    order     Float    @default(1024)
+    createdAt DateTime @default(now())
+
+    task  Task                @relation(fields: [taskId], references: [id], onDelete: Cascade)
+    items TaskChecklistItem[]
+
+    @@index([taskId])
+}
+
+model TaskChecklistItem {
+    id          String    @id @default(uuid(7)) @db.Uuid
+    checklistId String    @db.Uuid
+    name        String
+    done        Boolean   @default(false)
+    doneAt      DateTime?
+    // No FK: a display reference that survives the account leaving.
+    assigneeId  String?   @db.Uuid
+    order       Float     @default(1024)
+    createdAt   DateTime  @default(now())
+
+    checklist TaskChecklist @relation(fields: [checklistId], references: [id], onDelete: Cascade)
+
+    @@index([checklistId])
+}
+
+// A directed edge. Only one direction is ever stored, so a dependency cannot
+// disagree with itself; "waiting on" is the same row read from the other end.
+model TaskDependency {
+    id        String   @id @default(uuid(7)) @db.Uuid
+    // The task that has to finish first.
+    blockerId String   @db.Uuid
+    // The task held up by it.
+    blockedId String   @db.Uuid
+    // blocks | relates - `relates` carries no scheduling meaning.
+    type      String   @default("blocks")
+    createdAt DateTime @default(now())
+
+    blocker Task @relation("TaskBlocker", fields: [blockerId], references: [id], onDelete: Cascade)
+    blocked Task @relation("TaskBlocked", fields: [blockedId], references: [id], onDelete: Cascade)
+
+    @@unique([blockerId, blockedId, type])
+    @@index([blockedId])
+}
+
+// A stretch of tracked time. A running timer is a row with no `endedAt`; there
+// can be at most one of those per person, which the service enforces so a second
+// start stops the first rather than double-counting the hour.
+model TaskTimeEntry {
+    id        String    @id @default(uuid(7)) @db.Uuid
+    taskId    String    @db.Uuid
+    userId    String    @db.Uuid
+    startedAt DateTime  @default(now())
+    endedAt   DateTime?
+    // Seconds. Written when the timer stops, or straight away for a manual entry.
+    seconds   Int       @default(0)
+    note      String    @default("")
+    billable  Boolean   @default(false)
+    createdAt DateTime  @default(now())
+
+    task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@index([taskId])
+    @@index([userId, startedAt])
+}
+
+// What changed on a task, for the history panel. `userId` carries no FK so the
+// trail survives an account being deleted.
+model TaskActivity {
+    id        String   @id @default(uuid(7)) @db.Uuid
+    taskId    String   @db.Uuid
+    userId    String?  @db.Uuid
+    // created | status | priority | assignee | due | moved | archived | ...
+    action    String
+    // Human-readable endpoints of the change, already resolved to names so the
+    // history does not have to look up a deleted status to render a line.
+    fromValue String?
+    toValue   String?
+    createdAt DateTime @default(now())
+
+    task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+    @@index([taskId, createdAt])
+}
+
+// A saved way of looking at work: which tasks, grouped how, sorted how. Bound to
+// a list or to a space (a space view spans every list in it). A private view
+// belongs to its author; a shared one belongs to the list.
+model TaskView {
+    id            String   @id @default(uuid(7)) @db.Uuid
+    ownerId       String   @db.Uuid
+    listId        String?  @db.Uuid
+    spaceId       String?  @db.Uuid
+    name          String
+    // list | board | table | calendar | gantt.
+    type          String   @default("list")
+    groupBy       String   @default("status")
+    sortField     String   @default("manual")
+    sortDirection String   @default("asc")
+    // Stringified JSON; see taskFilterSchema in @polaris/core.
+    filter        String   @default("{}")
+    // Stringified JSON array of column ids for the table view.
+    columns       String   @default("[]")
+    showSubtasks  Boolean  @default(true)
+    showClosed    Boolean  @default(false)
+    shared        Boolean  @default(true)
+    order         Float    @default(1024)
+    createdAt     DateTime @default(now())
+    updatedAt     DateTime @updatedAt
+
+    owner User       @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+    list  TaskList?  @relation(fields: [listId], references: [id], onDelete: Cascade)
+    space TaskSpace? @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+
+    @@index([listId])
+    @@index([spaceId])
+    @@index([ownerId])
+}
+
+// A time-boxed run of work. Tasks point at a sprint rather than living in one,
+// so moving work in and out never changes which list it belongs to.
+model TaskSprint {
+    id        String   @id @default(uuid(7)) @db.Uuid
+    spaceId   String   @db.Uuid
+    name      String
+    goal      String   @default("")
+    startDate DateTime
+    endDate   DateTime
+    // planned | active | completed.
+    status    String   @default("planned")
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    space TaskSpace @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+    tasks Task[]
+
+    @@index([spaceId])
+}
+
+// An objective measured by one or more targets. A `tasks` target counts finished
+// work in the list it watches and needs no manual update; every other type is a
+// number somebody keeps current.
+model TaskGoal {
+    id          String    @id @default(uuid(7)) @db.Uuid
+    ownerId     String    @db.Uuid
+    spaceId     String?   @db.Uuid
+    name        String
+    description String    @default("")
+    dueDate     DateTime?
+    color       String    @default("#7c5cff")
+    archived    Boolean   @default(false)
+    completedAt DateTime?
+    createdAt   DateTime  @default(now())
+    updatedAt   DateTime  @updatedAt
+
+    owner   User             @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+    space   TaskSpace?       @relation(fields: [spaceId], references: [id], onDelete: SetNull)
+    targets TaskGoalTarget[]
+
+    @@index([ownerId])
+    @@index([spaceId])
+}
+
+model TaskGoalTarget {
+    id           String   @id @default(uuid(7)) @db.Uuid
+    goalId       String   @db.Uuid
+    name         String
+    // number | currency | percent | boolean | tasks.
+    type         String   @default("number")
+    startValue   Float    @default(0)
+    targetValue  Float    @default(100)
+    currentValue Float    @default(0)
+    unit         String   @default("")
+    // Only for `tasks` targets: the list whose finished work is counted.
+    listId       String?  @db.Uuid
+    order        Float    @default(1024)
+    createdAt    DateTime @default(now())
+
+    goal TaskGoal  @relation(fields: [goalId], references: [id], onDelete: Cascade)
+    list TaskList? @relation(fields: [listId], references: [id], onDelete: SetNull)
+
+    @@index([goalId])
+    @@index([listId])
+}
+
+// A rule: when this happens to a task that looks like this, do these things.
+// Conditions reuse the saved-view filter, so "only urgent bugs" means the same
+// to a rule as it does to a view the reader already understands.
+model TaskAutomation {
+    id          String    @id @default(uuid(7)) @db.Uuid
+    spaceId     String    @db.Uuid
+    // Null means the rule covers every list in the space.
+    listId      String?   @db.Uuid
+    name        String
+    // See AUTOMATION_TRIGGERS in @polaris/core.
+    trigger     String
+    // Stringified JSON: taskFilterSchema and an array of automationActionSchema.
+    conditions  String    @default("{}")
+    actions     String    @default("[]")
+    enabled     Boolean   @default(true)
+    runCount    Int       @default(0)
+    lastRunAt   DateTime?
+    // No FK: the rule outlives whoever wrote it.
+    createdById String?   @db.Uuid
+    createdAt   DateTime  @default(now())
+    updatedAt   DateTime  @updatedAt
+
+    space TaskSpace @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+    list  TaskList? @relation(fields: [listId], references: [id], onDelete: Cascade)
+
+    @@index([spaceId])
+    @@index([listId])
+}
+
+// A task shape worth repeating, stored as the payload a new task is built from
+// (subtasks and checklists included).
+model TaskTemplate {
+    id          String   @id @default(uuid(7)) @db.Uuid
+    spaceId     String   @db.Uuid
+    name        String
+    // Stringified JSON; see taskTemplateSchema in @polaris/core.
+    payload     String   @default("{}")
+    createdById String?  @db.Uuid
+    createdAt   DateTime @default(now())
+    updatedAt   DateTime @updatedAt
+
+    space TaskSpace @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+
+    @@index([spaceId])
+}
+
+// A public intake form that files what it collects as a task in one list. The
+// token is the URL, so it is random and revoked by deleting the form.
+model TaskForm {
+    id              String   @id @default(uuid(7)) @db.Uuid
+    spaceId         String   @db.Uuid
+    listId          String   @db.Uuid
+    token           String   @unique
+    name            String
+    intro           String   @default("")
+    // Stringified JSON array; see formFieldSchema in @polaris/core.
+    fields          String   @default("[]")
+    defaultStatusId String?  @db.Uuid
+    confirmation    String   @default("")
+    requireLogin    Boolean  @default(false)
+    enabled         Boolean  @default(true)
+    createdById     String?  @db.Uuid
+    createdAt       DateTime @default(now())
+    updatedAt       DateTime @updatedAt
+
+    space       TaskSpace            @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+    list        TaskList             @relation(fields: [listId], references: [id], onDelete: Cascade)
+    submissions TaskFormSubmission[]
+
+    @@index([listId])
+    @@index([spaceId])
+}
+
+// What one person sent through a form, kept alongside the task it opened so an
+// answer that was not mapped to a field is never lost.
+model TaskFormSubmission {
+    id            String   @id @default(uuid(7)) @db.Uuid
+    formId        String   @db.Uuid
+    taskId        String?  @db.Uuid
+    // Stringified JSON object keyed by field id.
+    answers       String   @default("{}")
+    // No FK: an anonymous submission has no account behind it at all.
+    submittedById String?  @db.Uuid
+    createdAt     DateTime @default(now())
+
+    form TaskForm @relation(fields: [formId], references: [id], onDelete: Cascade)
+    task Task?    @relation(fields: [taskId], references: [id], onDelete: SetNull)
+
+    @@index([formId, createdAt])
+}
+
+// A personal nudge about one task. Per-user rather than per-task: two people can
+// want reminding about the same work at different times.
+model TaskReminder {
+    id        String    @id @default(uuid(7)) @db.Uuid
+    taskId    String    @db.Uuid
+    userId    String    @db.Uuid
+    remindAt  DateTime
+    note      String    @default("")
+    sentAt    DateTime?
+    createdAt DateTime  @default(now())
+
+    task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@index([userId, remindAt])
+    @@index([taskId])
+}
+
+// A document or wiki page. Nests through `parentId`, so a space's knowledge base
+// is a tree rather than a flat pile.
+model TaskDoc {
+    id          String   @id @default(uuid(7)) @db.Uuid
+    spaceId     String?  @db.Uuid
+    parentId    String?  @db.Uuid
+    title       String
+    // Markdown. Stored as written so it stays portable out of Polaris.
+    body        String   @default("")
+    icon        String   @default("")
+    order       Float    @default(1024)
+    archived    Boolean  @default(false)
+    // No FKs: a page outlives the account that wrote it.
+    createdById String?  @db.Uuid
+    updatedById String?  @db.Uuid
+    createdAt   DateTime @default(now())
+    updatedAt   DateTime @updatedAt
+
+    space    TaskSpace? @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+    parent   TaskDoc?   @relation("DocTree", fields: [parentId], references: [id], onDelete: Cascade)
+    children TaskDoc[]  @relation("DocTree")
+
+    @@index([spaceId])
+    @@index([parentId])
+}
+
+// ---------------------------------------------------------------------------
+// Analytics
+// ---------------------------------------------------------------------------
+
+/// What is being measured: one deployed service, or Polaris itself.
+///
+/// A row exists so a site can have a tracker key and a name of its own. Everything
+/// else about it - which project it belongs to, which domains answer for it - is
+/// already recorded elsewhere and is read from there rather than copied, with the
+/// one exception of `hostnames`: the edge log names a host, not an application, and
+/// resolving that per line against the domain table would be a query per request.
+model AnalyticsSite {
+    id        String @id @default(uuid(7)) @db.Uuid
+    /// polaris | application
+    scopeType String
+    /// The application id, or "" for Polaris itself.
+    scopeId   String @default("")
+    name      String
+    /// Hostnames whose edge-log requests belong here, as a JSON string array.
+    hostnames String @default("[]")
+    /// The key the tracker script carries. Public by nature - it names the site in a
+    /// script tag on a page anyone can read - so it grants writing visits and
+    /// nothing else, and can be rotated without touching the recorded history.
+    publicKey String @unique
+    /// Whether the tracker endpoint accepts beats for this site.
+    trackerEnabled Boolean @default(false)
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    sessions AnalyticsSession[]
+    events   AnalyticsEvent[]
+    days     AnalyticsDay[]
+
+    @@unique([scopeType, scopeId])
+}
+
+/// One visit - one person, one sitting.
+///
+/// The id is the cookieless session hash, not a surrogate key: salt, site, address
+/// and user agent, with the salt rotating daily. That is what makes the id both the
+/// natural primary key and unreversible once the day turns over.
+///
+/// Everything that does not change mid-visit lives here rather than on every event,
+/// which is most of the interesting dimensions and the reason the event rows stay
+/// narrow.
+model AnalyticsSession {
+    id         String   @id
+    siteId     String   @db.Uuid
+    startedAt  DateTime
+    lastSeenAt DateTime
+    /// Pageviews in this session, for a bounce test that does not need the events.
+    views      Int      @default(0)
+
+    /// Kept, where Umami deliberately does not. Polaris already shows addresses in
+    /// the firewall, and "who is this and block them" is the reason an operator
+    /// opens analytics after seeing a spike. It goes with the rest of the raw row at
+    /// the retention window; the daily totals that outlive it hold no address.
+    ip             String?
+    browser        String
+    os             String
+    device         String
+    country        String?
+    language       String?
+    screen         String?
+    referrerKind   String
+    referrerSource String?
+    campaign       String?
+    medium         String?
+
+    site   AnalyticsSite    @relation(fields: [siteId], references: [id], onDelete: Cascade)
+    events AnalyticsEvent[]
+
+    @@index([siteId, startedAt])
+    @@index([lastSeenAt])
+}
+
+/// A pageview or a custom event.
+model AnalyticsEvent {
+    id        String   @id @default(uuid(7)) @db.Uuid
+    siteId    String   @db.Uuid
+    sessionId String
+    at        DateTime
+    /// pageview | event
+    kind      String
+    /// The custom event's name. Null for a pageview.
+    name      String?
+    /// The route, with identifiers grouped, so /post/1 and /post/2 are one row.
+    path      String
+    /// As requested, when it differs from the grouped route - so a single visit can
+    /// still be traced to the exact URL.
+    rawPath   String?
+    /// Custom event properties, as a JSON string object.
+    props     String?
+
+    site    AnalyticsSite    @relation(fields: [siteId], references: [id], onDelete: Cascade)
+    session AnalyticsSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+    @@index([siteId, at])
+    @@index([sessionId])
+    @@index([siteId, kind, at])
+}
+
+/// A day of traffic, folded down.
+///
+/// Raw visits are pruned at the retention window; these are not, so a year-old month
+/// is still comparable without keeping a year of rows. One row per dimension value
+/// per day, with the total carried as the dimension "total" and an empty value.
+///
+/// `visitors` is the distinct sessions of that day and does not sum across days -
+/// sessions rotate daily, so there is no identity to deduplicate by and pretending
+/// otherwise would quietly inflate every multi-day figure. The screen says which it
+/// is showing.
+model AnalyticsDay {
+    id        String   @id @default(uuid(7)) @db.Uuid
+    siteId    String   @db.Uuid
+    /// UTC midnight.
+    day       DateTime
+    /// total | path | referrer | channel | browser | os | device | country | event
+    dimension String
+    /// Empty for the total row.
+    value     String   @default("")
+
+    visitors Int @default(0)
+    views    Int @default(0)
+    /// Sessions that saw exactly one page.
+    bounces  Int @default(0)
+    /// Summed session length in seconds, over the sessions that had a measurable
+    /// one, and how many those were - so the average can be recovered without
+    /// storing an average that cannot be re-averaged.
+    durationSec Int @default(0)
+    measured    Int @default(0)
+
+    site AnalyticsSite @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+    @@unique([siteId, day, dimension, value])
+    @@index([siteId, day])
 }

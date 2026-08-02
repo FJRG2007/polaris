@@ -36,13 +36,14 @@ export const WEBHOOK_FORMATS = ["discord", "slack", "generic"] as const;
 export type WebhookFormat = (typeof WEBHOOK_FORMATS)[number];
 
 /** The groups the settings page renders events under. */
-export const NOTIFICATION_GROUPS = ["deploy", "watch", "security", "drive", "network", "system"] as const;
+export const NOTIFICATION_GROUPS = ["deploy", "watch", "tasks", "security", "drive", "network", "system"] as const;
 
 export type NotificationGroup = (typeof NOTIFICATION_GROUPS)[number];
 
 export const NOTIFICATION_GROUP_LABEL: Record<NotificationGroup, string> = {
     deploy: "Deploy",
     watch: "Watch",
+    tasks: "Tasks",
     security: "Security",
     drive: "Drive",
     network: "Network",
@@ -82,6 +83,30 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         description: "A service or database finished deploying and is serving.",
         level: "success",
         defaults: { inapp: false, email: false }
+    },
+    {
+        id: "tasks.assigned",
+        group: "tasks",
+        label: "Assigned a task",
+        description: "Somebody put a task in your name, or a rule did.",
+        level: "info",
+        defaults: { inapp: true, email: false }
+    },
+    {
+        id: "tasks.comment",
+        group: "tasks",
+        label: "Comment on your work",
+        description: "A comment on a task you are assigned to or watching.",
+        level: "info",
+        defaults: { inapp: true, email: false }
+    },
+    {
+        id: "tasks.due",
+        group: "tasks",
+        label: "Task reminder",
+        description: "A reminder you set on a task, and work falling due today.",
+        level: "warning",
+        defaults: { inapp: true, email: false }
     },
     {
         id: "watch.alarm",

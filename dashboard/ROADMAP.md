@@ -103,6 +103,31 @@ Platform:
 - [ ] CI / release / deploy / agent-maintenance workflows
 - [ ] Marketing landing + demo
 
+Tasks (work management):
+- [x] Hierarchy: Space > Folder > List > Task > nested subtasks, with a stable
+      per-space reference ("ENG-42") allocated inside the insert transaction
+- [x] Space-level vocabulary: custom statuses (four kinds), tags, custom fields
+      (15 types), members with guest/member/admin roles
+- [x] Tasks: multiple assignees, priorities, start/due dates (all-day or timed),
+      time estimates, points, milestones, watchers, archive, duplicate
+- [x] Five views over one load: List (grouped, nested), Board (drag and drop),
+      Table (custom-field columns), Calendar, Gantt
+- [x] Saved views: filters, grouping, sorting, shared or private
+- [x] Filter engine shared by views and automations (relative dates, custom
+      fields, any/all matching), pure and unit-tested in `@polaris/core`
+- [x] Comments (one level of replies, resolve, assign), checklists (promote a
+      step to a task), dependencies with cycle refusal
+- [x] Time tracking: one running timer per person, manual entries, billable
+      flag, weekly timesheet, time by person
+- [x] Recurring tasks (schedule- or completion-based), reminders via cron
+- [x] Automations: 10 triggers, 12 actions, view-shaped conditions, one hop
+- [x] Sprints with burndown, goals with targets (a `tasks` target counts itself)
+- [x] Docs/wiki as a Markdown tree; public intake forms that file tasks
+- [x] Reporting: status/priority mix, 30-day completion, workload, tracked time
+- [ ] Attachments on a task (Drive file picker)
+- [ ] Whiteboards, mind maps, clips, AI, email-in, proofing, map and workload
+      views, portfolios - out of scope for this pillar
+
 ## Notes / deliberate decisions
 
 - Polaris is a control plane, not a file mirror: the browser lists remote trees
@@ -110,6 +135,16 @@ Platform:
   (shared or requested items), avoiding an unwinnable sync problem.
 - Prisma schema stays SQLite-portable (no Postgres-only types/enums/arrays; JSON
   stored as stringified `String`; byte sizes as `BigInt`).
+- Tasks statuses are space-level, not per-list: a board people drag work across
+  has to mean the same thing in every list, and per-list overrides are how a
+  workspace ends up with nine spellings of "Done". A task therefore moves
+  between lists in its space and never between spaces, which is also what keeps
+  its reference stable.
+- The Tasks filter/group/sort engine is pure and lives in `@polaris/core`, so a
+  saved view, an optimistic re-render after a drag, and an automation's
+  conditions all evaluate through the same code rather than three that drift.
+- An automation's own writes never raise another event. One hop, always: two
+  rules pointing at each other would otherwise run until the request timed out.
 - Accepted dependency risk: two moderate advisories remain against `postcss@8.4.31`
   bundled inside Next.js's private build toolchain (an XSS-in-CSS-stringify path
   that our app never exercises - build-time only, no untrusted CSS). The direct

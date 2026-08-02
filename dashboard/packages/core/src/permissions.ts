@@ -18,6 +18,8 @@ export const PERMISSIONS = [
     "requests.manage",
     "deploy.read",
     "deploy.manage",
+    "tasks.read",
+    "tasks.manage",
     "users.manage",
     "settings.manage",
     "system.manage"
@@ -41,9 +43,11 @@ export const DEFAULT_ROLES: Record<string, readonly GrantedPermission[]> = {
         "shares.create",
         "requests.create",
         "deploy.read",
-        "deploy.manage"
+        "deploy.manage",
+        "tasks.read",
+        "tasks.manage"
     ],
-    viewer: ["drive.read", "deploy.read"]
+    viewer: ["drive.read", "deploy.read", "tasks.read"]
 };
 
 /**
@@ -61,7 +65,8 @@ export const IMPLIED_PERMISSIONS: Readonly<Partial<Record<Permission, readonly P
     "drive.delete": ["drive.read"],
     "shares.manage": ["shares.create"],
     "requests.manage": ["requests.create"],
-    "deploy.manage": ["deploy.read"]
+    "deploy.manage": ["deploy.read"],
+    "tasks.manage": ["tasks.read"]
 };
 
 /** The permissions one grant carries with it, itself excluded. */
