@@ -7,7 +7,36 @@
  * Reuses the existing terminal/files/logs building blocks.
  */
 
+import { WafEditor } from "./waf-editor";
+import { FilesPanel } from "./files-panel";
+import * as deployActions from "./actions";
+import { VolumesTab } from "./volumes-panel";
+import { TerminalPanel } from "./terminal-panel";
+import { LogViewer } from "@/components/log-viewer";
+import type { HttpLogEntry } from "@polaris/deploy";
+import { isLocalDomain, primaryDomain } from "./domain-rank";
+import { useDisplayFormat } from "@/components/display-format";
+import { isTunnelHostname, type DisplayFormat } from "@polaris/core";
+import { CloudflareMark, NgrokMark } from "@/components/brand-icons";
 import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
+import { ServiceIcon, StatusPill, dbTone, serviceKindOf, type ProjectApp } from "./deploy-view";
+import { MetricsHistory, percent, ratioPercent, type MetricSpec } from "@/components/metrics-history";
+import {
+    Button,
+    Checkbox,
+    Dialog,
+    DialogContent,
+    DialogTitle,
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+    Input,
+    Select,
+    Switch,
+    cn
+} from "@polaris/ui";
 import {
     CheckCircle2,
     ChevronDown,
@@ -31,35 +60,6 @@ import {
     Trash2,
     X
 } from "lucide-react";
-import {
-    Button,
-    Checkbox,
-    Dialog,
-    DialogContent,
-    DialogTitle,
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
-    Input,
-    Select,
-    Switch,
-    cn
-} from "@polaris/ui";
-import { isTunnelHostname, type DisplayFormat } from "@polaris/core";
-import { CloudflareMark, NgrokMark } from "@/components/brand-icons";
-import { useDisplayFormat } from "@/components/display-format";
-import { ServiceIcon, StatusPill, dbTone, serviceKindOf, type ProjectApp } from "./deploy-view";
-import { isLocalDomain, primaryDomain } from "./domain-rank";
-import { MetricsHistory, percent, ratioPercent, type MetricSpec } from "@/components/metrics-history";
-import { LogViewer } from "@/components/log-viewer";
-import type { HttpLogEntry } from "@polaris/deploy";
-import { TerminalPanel } from "./terminal-panel";
-import { FilesPanel } from "./files-panel";
-import { VolumesTab } from "./volumes-panel";
-import { WafEditor } from "./waf-editor";
-import * as deployActions from "./actions";
 
 const TABS = ["Deployments", "Variables", "Metrics", "Console", "Files", "Volumes", "Security", "Settings"] as const;
 type Tab = (typeof TABS)[number];
@@ -208,6 +208,30 @@ function ReleaseLink({ deployment }: { deployment: DepSummary }) {
             className="shrink-0 rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
         >
             <ExternalLink className="size-4" />
+        </a>
+    );
+}
+
+/**
+ * The commit a deployment was built from, linking to it on the forge when the
+ * repository is one whose URL shape we know. Without a link it is still shown -
+ * the short SHA is what identifies the build in the logs either way.
+ */
+function CommitRef({ deployment, chars = 7 }: { deployment: DepSummary | null; chars?: number }) {
+    if (!deployment?.commitSha) return null;
+    const short = deployment.commitSha.slice(0, chars);
+    if (!deployment.commitUrl) return <span className="font-mono">{short}</span>;
+    return (
+        <a
+            href={deployment.commitUrl}
+            target="_blank"
+            rel="noreferrer"
+            onClick={(event) => event.stopPropagation()}
+            title={`View ${short} on the repository`}
+            className="inline-flex items-center gap-1 font-mono underline-offset-2 transition-colors hover:text-foreground hover:underline"
+        >
+            {short}
+            <ExternalLink className="size-3" />
         </a>
     );
 }
@@ -422,11 +446,7 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
                             </button>
                             {successOpen && (
                                 <div className="border-t border-success/20 px-3 py-2 text-xs text-muted-foreground">
-                                    {active.commitSha ? (
-                                        <span className="font-mono">{active.commitSha.slice(0, 7)}</span>
-                                    ) : (
-                                        "Manual deploy"
-                                    )}
+                                    {active.commitSha ? <CommitRef deployment={active} /> : "Manual deploy"}
                                     {" - "}
                                     {format.dateTime(active.createdAt)}
                                 </div>
@@ -517,7 +537,9 @@ function DeploymentLogsView({
                 {deployment?.commitSha && (
                     <>
                         <span className="text-muted-foreground/40">/</span>
-                        <span className="font-mono text-xs text-muted-foreground">{deployment.commitSha.slice(0, 7)}</span>
+                        <span className="text-xs text-muted-foreground">
+                            <CommitRef deployment={deployment} />
+                        </span>
                     </>
                 )}
                 {badge && <span className={`shrink-0 rounded px-2 py-0.5 text-xs font-medium ${badge.cls}`}>{badge.label}</span>}
@@ -562,7 +584,7 @@ function DetailsPanel({ app, deployment }: { app: ProjectApp; deployment: DepSum
     const format = useDisplayFormat();
     const rows: Array<[string, ReactNode]> = [
         ["Status", deployment?.status ?? "-"],
-        ["Commit", deployment?.commitSha ? deployment.commitSha.slice(0, 12) : "-"],
+        ["Commit", deployment?.commitSha ? <CommitRef deployment={deployment} chars={12} /> : "-"],
         ["Message", deployment?.commitMessage ?? "-"],
         ["Started", deployment ? format.dateTime(deployment.createdAt) : "-"],
         ["Domain", (primaryDomain(app.domains) ?? app.domains[0])?.hostname ?? "-"]
@@ -1490,7 +1512,6 @@ function NgrokTunnelRow({ appId, nonce, onChanged }: { appId: string; nonce: num
         />
     );
 }
-
 
 /** The app's Cloudflare named tunnel (stable hostname), shown when configured. */
 function NamedTunnelRow({ appId, nonce, onChanged }: { appId: string; nonce: number; onChanged: () => void }) {

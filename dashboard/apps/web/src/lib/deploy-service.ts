@@ -11,6 +11,7 @@ import { prisma } from "@polaris/db";
 import { loadEnv } from "@polaris/config";
 import { createWriteStream } from "node:fs";
 import { getPublicIp } from "./domain-service";
+import { commitUrl } from "./deploy/commit-url";
 import { isTunnelHostname } from "@polaris/core";
 import { decryptSecret } from "@polaris/storage";
 import { mkdir, readFile } from "node:fs/promises";
@@ -1255,6 +1256,8 @@ export interface DeploymentSummary {
     commitSha: string | null;
     authorName: string | null;
     authorAvatarUrl: string | null;
+    /** Where to read this commit on the forge, when the source is one we can place. */
+    commitUrl: string | null;
     /** The hostname this release answers on while it is kept, if it has one. */
     hostname: string | null;
 }
@@ -1263,9 +1266,17 @@ export interface DeploymentSummary {
 export async function listDeployments(applicationId: string, ownerId: string): Promise<DeploymentSummary[]> {
     const app = await prisma.application.findFirst({
         where: { id: applicationId, environment: { project: { ownerId } } },
-        select: { id: true, currentDeploymentId: true }
+        select: { id: true, currentDeploymentId: true, sourceConfig: true }
     });
     if (!app) throw new Error("Application not found");
+    const repoUrl = (() => {
+        try {
+            const source = JSON.parse(app.sourceConfig) as Record<string, unknown>;
+            return typeof source.repoUrl === "string" ? source.repoUrl : "";
+        } catch {
+            return "";
+        }
+    })();
     const rows = await prisma.deployment.findMany({
         where: { deployableType: "application", deployableId: applicationId },
         orderBy: { createdAt: "desc" },
@@ -1301,6 +1312,7 @@ export async function listDeployments(applicationId: string, ownerId: string): P
         commitSha: row.commitSha,
         authorName: row.authorName,
         authorAvatarUrl: row.authorAvatarUrl,
+        commitUrl: repoUrl && row.commitSha ? commitUrl(repoUrl, row.commitSha) : null,
         hostname: hostnames.get(row.id) ?? null
     }));
 }
