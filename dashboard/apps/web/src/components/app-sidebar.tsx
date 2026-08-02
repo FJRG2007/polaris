@@ -15,7 +15,7 @@ import { APP_SECTIONS, resolveActiveApp } from "@/lib/apps";
 
 /** Section roots that must match their own path exactly, so they do not stay
  *  highlighted while a sibling sub-route is open. */
-const EXACT_MATCH = new Set(["/drive", "/admin", "/inbox", "/account"]);
+const EXACT_MATCH = new Set(["/drive", "/admin", "/inbox", "/account", "/watch"]);
 
 export function AppSidebar() {
     const pathname = usePathname();

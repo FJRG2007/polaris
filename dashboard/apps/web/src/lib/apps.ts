@@ -38,6 +38,7 @@ import {
     UserCog,
     Users,
     UsersRound,
+    Webhook,
     Workflow,
     type LucideIcon
 } from "lucide-react";
@@ -150,6 +151,14 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
         { label: "Runners", href: "/apps/runners", icon: Workflow, keywords: ["github actions", "ci"] },
         { label: "Containers", href: "/apps/containers", icon: Container, keywords: ["docker"] },
         { label: "Backups", href: "/apps/backups", icon: Database, keywords: ["restore", "snapshots"] }
+    ],
+    watch: [
+        { label: "Overview", href: "/watch", icon: LayoutDashboard, keywords: ["monitoring", "health"] },
+        { label: "Servers", href: "/watch/servers", icon: Server, keywords: ["hosts", "machines", "load"] },
+        { label: "Services", href: "/watch/services", icon: Rocket, keywords: ["apps", "deploys", "cpu", "memory"] },
+        { label: "Containers", href: "/watch/containers", icon: Container, keywords: ["docker"] },
+        { label: "Alarms", href: "/watch/alarms", icon: Bell, keywords: ["thresholds", "alerts", "events"] },
+        { label: "Webhooks", href: "/watch/webhooks", icon: Webhook, keywords: ["discord", "slack", "endpoints"] }
     ],
     inbox: [
         { label: "Conversations", href: "/inbox", icon: MessagesSquare, keywords: ["chats", "messages"] },
