@@ -12,7 +12,7 @@
  * A screen with no capture renders whatever `fallback` the caller passes.
  */
 
-import { cn } from "../lib/cn.js";
+import { cn } from "../lib/cn";
 import type { ReactNode } from "react";
 
 /**
@@ -60,36 +60,74 @@ export function BoneSkeleton({
 
     return (
         <div className={cn("animate-pulse", className)} aria-busy="true" aria-live="polite">
-            {captures.map(([width, capture]) => (
-                <div
-                    key={width}
-                    // A long screen is sketched down to about a screen and a half
-                    // and no further: a placeholder several viewports tall is a
-                    // scrollbar the content is about to take back.
-                    className={cn("relative w-full max-h-[150vh] overflow-hidden", VISIBILITY[width])}
-                    style={{ height: capture.height }}
-                >
-                    {capture.bones.map(toBone).map((bone, index) =>
-                        bone.container ? null : (
-                            <div
-                                key={index}
-                                className="absolute bg-muted"
-                                style={{
-                                    left: `${bone.x}%`,
-                                    top: bone.y,
-                                    // A round bone is round in pixels: a 50% radius on a
-                                    // percentage width would draw an ellipse instead.
-                                    width: bone.radius === "50%" ? bone.height : `${bone.w}%`,
-                                    height: bone.height,
-                                    borderRadius: typeof bone.radius === "number" ? `${bone.radius}px` : bone.radius
-                                }}
-                            />
-                        )
-                    )}
-                </div>
-            ))}
+            {captures.map(([width, capture]) => {
+                const column = columnOf(capture);
+                return (
+                    <div
+                        key={width}
+                        // A long screen is sketched down to about a screen and a half
+                        // and no further: a placeholder several viewports tall is a
+                        // scrollbar the content is about to take back.
+                        className={cn(
+                            "relative max-h-[150vh] overflow-hidden",
+                            column ? "mx-auto w-full" : "w-full",
+                            VISIBILITY[width]
+                        )}
+                        style={{ height: capture.height, maxWidth: column?.width }}
+                    >
+                        {capture.bones.map(toBone).map((bone, index) =>
+                            bone.container ? null : (
+                                <div
+                                    key={index}
+                                    className="absolute bg-muted"
+                                    style={{
+                                        left: `${column ? ((bone.x - column.left) / column.span) * 100 : bone.x}%`,
+                                        top: bone.y,
+                                        // A round bone is round in pixels: a 50% radius on a
+                                        // percentage width would draw an ellipse instead.
+                                        width:
+                                            bone.radius === "50%"
+                                                ? bone.height
+                                                : `${column ? (bone.w / column.span) * 100 : bone.w}%`,
+                                        height: bone.height,
+                                        borderRadius:
+                                            typeof bone.radius === "number" ? `${bone.radius}px` : bone.radius
+                                    }}
+                                />
+                            )
+                        )}
+                    </div>
+                );
+            })}
         </div>
     );
+}
+
+/** A recorded column counts as centred when its two margins match this closely. */
+const CENTRED_TOLERANCE = 0.5;
+
+/**
+ * The fixed-width column a screen was recorded in, in pixels, or null when the
+ * screen fills whatever it is given.
+ *
+ * A capture stores x and width as percentages of the width it was taken at,
+ * which only reproduces the page at that exact width: on a wider viewport a
+ * `max-w-2xl` column drawn as "68% of the content area" is half as wide again as
+ * the column it stands in for. A centred column is the tell - `mx-auto` is what
+ * puts it there, and it keeps its pixel width at any viewport - so the extent
+ * the bones span is recovered in pixels and the sketch is drawn at that width
+ * instead of stretched. A screen that is narrow because of what is in it (a grid
+ * with one card in it) sits against its left edge rather than centred, and keeps
+ * the percentages, which is what actually follows the content there.
+ */
+function columnOf(capture: CapturedLayout): { width: number; left: number; span: number } | null {
+    if (capture.bones.length === 0) return null;
+    const left = Math.min(...capture.bones.map((bone) => Number(bone[0]) || 0));
+    const right = Math.max(...capture.bones.map((bone) => (Number(bone[0]) || 0) + (Number(bone[2]) || 0)));
+    const span = right - left;
+    if (span >= 98 || left <= CENTRED_TOLERANCE) return null;
+    if (Math.abs(left - (100 - right)) > CENTRED_TOLERANCE) return null;
+    return { width: Math.round((span / 100) * capture.width), left, span };
 }
 
 /** Read one bone out of the tuple the capture file stores it as. */
