@@ -11,14 +11,14 @@
 import { useRouter } from "next/navigation";
 import { primaryDomain } from "./domain-rank";
 import { dbEngineLabel } from "@polaris/core";
+import { NewVolumeDialog } from "./volume-form";
 import { useStagedChanges } from "./staged-changes";
-import { VolumeDetailDialog } from "./volume-detail";
 import { DbEngineIcon } from "@/components/db-engine-icon";
+import { VolumeDetailDialog, type VolumeTab } from "./volume-detail";
 import { duplicateApplicationAction, saveLayoutAction } from "./actions";
-import { NewVolumeDialog, EditVolumeDialog, type EditVolume } from "./volume-form";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { stageDatabaseDeleteAction, stageServiceDeleteAction } from "./project-actions";
-import { Copy, HardDrive, Loader2, Plus, ScrollText, Settings2, Trash2 } from "lucide-react";
+import { Copy, Files, HardDrive, Loader2, Plus, ScrollText, Settings2, Trash2 } from "lucide-react";
 import {
     NewServiceDialog,
     SERVICE_TYPES,
@@ -68,19 +68,6 @@ interface CanvasNode {
     volume?: string;
     /** Real attached volumes (applications), each an interactive strip below the card. */
     volumes?: VolumeChip[];
-}
-
-/** Narrow a canvas volume chip (kind is a plain string) into the edit form's shape. */
-function chipToEditVolume(vol: VolumeChip): EditVolume {
-    return {
-        id: vol.id,
-        name: vol.name,
-        mountPath: vol.mountPath,
-        kind: vol.kind === "bind" ? "bind" : vol.kind === "nas" ? "nas" : "volume",
-        source: vol.source,
-        connectionId: vol.connectionId,
-        sizeLimit: vol.sizeLimit
-    };
 }
 
 /** Where a volume opens in Drive: a nas volume points at its NAS connection + folder;
@@ -264,8 +251,9 @@ export function DeployCanvas({
     const [acting, setActing] = useState(false);
     const [newService, setNewService] = useState<{ open: boolean; view: ServiceView }>({ open: false, view: "list" });
     const [newVolumeOpen, setNewVolumeOpen] = useState(false);
-    const [editVolume, setEditVolume] = useState<{ appId: string; volume: EditVolume } | null>(null);
-    const [detailVolumeId, setDetailVolumeId] = useState<string | null>(null);
+    // The volume panel and the tab it opens on: "Volume settings" lands on its
+    // figures, "Edit mount" on the fields that change it.
+    const [openVolume, setOpenVolume] = useState<{ id: string; tab: VolumeTab } | null>(null);
     const volumeServices = environment.applications.map((app) => ({ id: app.id, name: app.name }));
 
     function duplicate(app: ProjectApp) {
@@ -523,13 +511,6 @@ export function DeployCanvas({
                 onOpenChange={setNewVolumeOpen}
                 onCreated={() => router.refresh()}
             />
-            <EditVolumeDialog
-                open={editVolume !== null}
-                applicationId={editVolume?.appId ?? ""}
-                volume={editVolume?.volume ?? null}
-                onOpenChange={(open) => !open && setEditVolume(null)}
-                onSaved={() => router.refresh()}
-            />
         </>
     );
 
@@ -720,7 +701,7 @@ export function DeployCanvas({
                                         <ContextMenuTrigger asChild>
                                             <button
                                                 type="button"
-                                                onClick={() => setDetailVolumeId(vol.id)}
+                                                onClick={() => setOpenVolume({ id: vol.id, tab: "Metrics" })}
                                                 onContextMenu={(event) => event.stopPropagation()}
                                                 className={`absolute flex items-center gap-2 border border-t-0 border-border bg-card/60 px-4 py-2.5 text-left text-xs text-muted-foreground transition-colors hover:bg-card ${
                                                     vi === (node.volumes?.length ?? 0) - 1 ? "rounded-b-2xl" : ""
@@ -735,18 +716,17 @@ export function DeployCanvas({
                                             </button>
                                         </ContextMenuTrigger>
                                         <ContextMenuContent>
-                                            <ContextMenuItem onSelect={() => setDetailVolumeId(vol.id)}>
+                                            <ContextMenuItem onSelect={() => setOpenVolume({ id: vol.id, tab: "Metrics" })}>
                                                 <Settings2 className="size-4" /> Volume settings
+                                            </ContextMenuItem>
+                                            <ContextMenuItem onSelect={() => setOpenVolume({ id: vol.id, tab: "Files" })}>
+                                                <Files className="size-4" /> Browse files
                                             </ContextMenuItem>
                                             <ContextMenuItem onSelect={() => router.push(volumeDriveHref(node.id, vol))}>
                                                 <HardDrive className="size-4" /> View in Drive
                                             </ContextMenuItem>
                                             {canManage && (
-                                                <ContextMenuItem
-                                                    onSelect={() =>
-                                                        setEditVolume({ appId: node.id, volume: chipToEditVolume(vol) })
-                                                    }
-                                                >
+                                                <ContextMenuItem onSelect={() => setOpenVolume({ id: vol.id, tab: "Settings" })}>
                                                     <ScrollText className="size-4" /> Edit mount
                                                 </ContextMenuItem>
                                             )}
@@ -792,8 +772,9 @@ export function DeployCanvas({
             />
 
             <VolumeDetailDialog
-                volumeId={detailVolumeId}
-                onOpenChange={(open) => !open && setDetailVolumeId(null)}
+                volumeId={openVolume?.id ?? null}
+                tab={openVolume?.tab}
+                onOpenChange={(open) => !open && setOpenVolume(null)}
                 onChanged={() => router.refresh()}
             />
             {dialog}

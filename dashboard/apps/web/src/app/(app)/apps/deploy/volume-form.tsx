@@ -2,17 +2,17 @@
 
 /**
  * Volume form, shared by the per-service Volumes tab, the canvas "New volume"
- * dialog (service picker), and the "Volume options" edit dialog. Three confined
+ * dialog (service picker), and the volume panel's Settings tab. Three confined
  * kinds - Docker volume, a folder on the service's server, or a folder on a
  * host-mounted NAS connection. The daemon re-confines every source. In edit mode
  * the kind and service are fixed; only paths, size cap, and the connection change.
  */
 
-import { useEffect, useState, useTransition } from "react";
 import { FolderSearch } from "lucide-react";
-import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, Input } from "@polaris/ui";
-import { createVolumeAction, updateVolumeAction, listNasConnectionsAction } from "./actions";
 import { FolderPicker } from "./folder-picker";
+import { useEffect, useState, useTransition } from "react";
+import { createVolumeAction, updateVolumeAction, listNasConnectionsAction } from "./actions";
+import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, Input, Select } from "@polaris/ui";
 
 type Kind = "volume" | "bind" | "nas";
 type NasConnection = Awaited<ReturnType<typeof listNasConnectionsAction>>[number];
@@ -38,9 +38,6 @@ const KIND_HELP: Record<Kind, string> = {
     bind: "A folder on this service's server. Persists across redeploys and is browsable in the Files tab.",
     nas: "A folder on a host-mounted storage connection - it lives on the NAS and can be managed as a Drive folder."
 };
-
-const SELECT_CLASS =
-    "rounded-md border border-input bg-surface px-3 py-2 text-sm text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
 export function VolumeForm({
     applicationId,
@@ -74,18 +71,20 @@ export function VolumeForm({
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
 
+    // Keyed on whether this form creates or edits, not on the volume itself: an
+    // inline form is handed a fresh object on every render of its panel, and
+    // depending on that identity would re-fetch the connections forever.
     useEffect(() => {
         void listNasConnectionsAction().then((rows) => {
             setConnections(rows);
             // Pre-select when there's a single usable connection (create only - edit
             // keeps the volume's own connection).
-            if (!volume) {
-                const usable = rows.filter((row) => row.active);
-                const only = usable[0];
-                if (only && usable.length === 1) setConnectionId(only.id);
-            }
+            if (editing) return;
+            const usable = rows.filter((row) => row.active);
+            const only = usable[0];
+            if (only && usable.length === 1) setConnectionId(only.id);
         });
-    }, [volume]);
+    }, [editing]);
 
     function save() {
         setError(null);
@@ -153,13 +152,12 @@ export function VolumeForm({
             {needsService && (
                 <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
                     Service
-                    <select value={serviceId} onChange={(event) => setServiceId(event.target.value)} className={SELECT_CLASS}>
-                        {services?.map((service) => (
-                            <option key={service.id} value={service.id}>
-                                {service.name}
-                            </option>
-                        ))}
-                    </select>
+                    <Select
+                        value={serviceId}
+                        onValueChange={setServiceId}
+                        aria-label="Service"
+                        options={(services ?? []).map((service) => ({ value: service.id, label: service.name }))}
+                    />
                 </label>
             )}
 
@@ -203,15 +201,17 @@ export function VolumeForm({
             {kind === "nas" && (
                 <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
                     Storage connection
-                    <select value={connectionId} onChange={(event) => setConnectionId(event.target.value)} className={SELECT_CLASS}>
-                        <option value="">Select a NAS connection...</option>
-                        {connections.map((connection) => (
-                            <option key={connection.id} value={connection.id} disabled={!connection.active}>
-                                {connection.name}
-                                {connection.active ? "" : " (not connected)"}
-                            </option>
-                        ))}
-                    </select>
+                    <Select
+                        value={connectionId}
+                        onValueChange={setConnectionId}
+                        placeholder="Select a NAS connection"
+                        aria-label="Storage connection"
+                        options={connections.map((connection) => ({
+                            value: connection.id,
+                            label: connection.active ? connection.name : `${connection.name} (not connected)`,
+                            disabled: !connection.active
+                        }))}
+                    />
                     {connections.length === 0 && (
                         <span className="text-[11px] text-muted-foreground">
                             No NAS connections found. Add an NFS, SMB, or UniFi UNAS connection in Drive first.
@@ -318,42 +318,6 @@ export function NewVolumeDialog({
                         onSaved={() => {
                             onOpenChange(false);
                             onCreated();
-                        }}
-                        onCancel={() => onOpenChange(false)}
-                    />
-                )}
-            </DialogContent>
-        </Dialog>
-    );
-}
-
-/** "Volume options": edit an existing volume's paths, size cap, and connection. */
-export function EditVolumeDialog({
-    open,
-    applicationId,
-    volume,
-    onOpenChange,
-    onSaved
-}: {
-    open: boolean;
-    applicationId: string;
-    volume: EditVolume | null;
-    onOpenChange: (open: boolean) => void;
-    onSaved: () => void;
-}) {
-    return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-md">
-                <DialogHeader>
-                    <DialogTitle>Volume options</DialogTitle>
-                </DialogHeader>
-                {volume && (
-                    <VolumeForm
-                        applicationId={applicationId}
-                        volume={volume}
-                        onSaved={() => {
-                            onOpenChange(false);
-                            onSaved();
                         }}
                         onCancel={() => onOpenChange(false)}
                     />

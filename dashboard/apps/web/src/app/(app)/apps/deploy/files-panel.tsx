@@ -5,20 +5,27 @@
  * download a file, and upload one (host -> container). Reads/writes go through the
  * deploy fs endpoints, which the host daemon serves from a small command
  * allowlist. In-app only; no native dialogs.
+ *
+ * It can be rooted below "/" so a volume opens on its own contents rather than on
+ * the container's filesystem. The root is a floor, not a filter: navigation never
+ * climbs above it, because a panel opened on a volume that wanders into /etc is
+ * showing something the operator did not ask for.
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowUp, Download, File as FileIcon, Folder, HardDrive, Upload } from "lucide-react";
 import { Button } from "@polaris/ui";
+import { asDirectory, parentDirectory } from "./files-path";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { ArrowUp, Download, File as FileIcon, Folder, HardDrive, Upload } from "lucide-react";
 
 interface Entry {
     name: string;
     isDir: boolean;
 }
 
-export function FilesPanel({ applicationId }: { applicationId: string }) {
-    const [path, setPath] = useState("/");
+export function FilesPanel({ applicationId, root = "/" }: { applicationId: string; root?: string }) {
+    const base = asDirectory(root);
+    const [path, setPath] = useState(base);
     const [entries, setEntries] = useState<Entry[]>([]);
     const [error, setError] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
@@ -43,13 +50,11 @@ export function FilesPanel({ applicationId }: { applicationId: string }) {
     );
 
     useEffect(() => {
-        void load("/");
-    }, [load]);
+        void load(base);
+    }, [base, load]);
 
     function goUp() {
-        const parts = path.split("/").filter(Boolean);
-        parts.pop();
-        void load(parts.length ? `/${parts.join("/")}/` : "/");
+        void load(parentDirectory(path, base));
     }
 
     function enter(entry: Entry) {
@@ -75,7 +80,7 @@ export function FilesPanel({ applicationId }: { applicationId: string }) {
     return (
         <div className="flex flex-col gap-2">
             <div className="flex items-center gap-2">
-                <Button variant="ghost" onClick={goUp} disabled={busy || path === "/"} title="Up">
+                <Button variant="ghost" onClick={goUp} disabled={busy || path === base} title="Up" aria-label="Up">
                     <ArrowUp className="size-4" />
                 </Button>
                 <span className="truncate text-xs text-muted-foreground">{path}</span>

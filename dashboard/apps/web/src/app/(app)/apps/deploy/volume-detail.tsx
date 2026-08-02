@@ -3,10 +3,11 @@
 /**
  * A volume, opened.
  *
- * It is a service in its own right - it has usage, a size, a place it lives, and
- * two ways to destroy it - so it opens the way every other service here does: the
- * same right-hand panel, the same header and tab strip, over what you were
- * looking at rather than pushing it around.
+ * It is a service in its own right - it has usage, a size, files, a place it
+ * lives, and two ways to destroy it - so it opens the way every other service here
+ * does: the same right-hand panel, the same header and tab strip, over what you
+ * were looking at rather than pushing it around. Its settings are edited in that
+ * panel too, in place, rather than in a dialog stacked on top of it.
  *
  * The panel paints as soon as the row is read. How full the volume is arrives
  * separately, because measuring it means reaching into a container on the server
@@ -20,10 +21,11 @@
  * standing between a service and a missing mount.
  */
 
+import { FilesPanel } from "./files-panel";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
+import { VolumeForm, type EditVolume } from "./volume-form";
 import type { VolumeDetail } from "@/lib/deploy-volume-service";
-import { EditVolumeDialog, type EditVolume } from "./volume-form";
 import { MetricsHistory, type MetricSpec } from "@/components/metrics-history";
 import { stageVolumeDeleteAction, volumeDetailAction, volumeUsageAction, wipeVolumeAction } from "./project-actions";
 import {
@@ -42,14 +44,14 @@ import {
     Loader2,
     Maximize2,
     Minimize2,
-    Pencil,
     Server,
     Trash2,
     TriangleAlert
 } from "lucide-react";
 
-const TABS = ["Metrics", "Settings"] as const;
-type Tab = (typeof TABS)[number];
+const TABS = ["Metrics", "Files", "Settings"] as const;
+export type VolumeTab = (typeof TABS)[number];
+type Tab = VolumeTab;
 
 function formatBytes(bytes: number): string {
     const units = ["B", "KB", "MB", "GB", "TB"];
@@ -91,21 +93,23 @@ const usageCache = new Map<string, { bytes: number | null; at: number }>();
 
 export function VolumeDetailDialog({
     volumeId,
+    tab: openOn = "Metrics",
     onOpenChange,
     onChanged
 }: {
     /** Null closes the panel. Passing an id opens it and loads that volume. */
     volumeId: string | null;
+    /** The tab this open lands on, so "Edit mount" arrives at the mount itself. */
+    tab?: VolumeTab;
     onOpenChange: (open: boolean) => void;
     onChanged: () => void;
 }) {
     const router = useRouter();
-    const [tab, setTab] = useState<Tab>("Metrics");
+    const [tab, setTab] = useState<Tab>(openOn);
     const [full, setFull] = useState(false);
     const [data, setData] = useState<{ volume: VolumeDetail; canManage: boolean } | null>(null);
     const [usage, setUsage] = useState<Usage>({ state: "measuring" });
     const [error, setError] = useState<string | null>(null);
-    const [editing, setEditing] = useState(false);
 
     useEffect(() => {
         if (!volumeId) return;
@@ -113,7 +117,7 @@ export function VolumeDetailDialog({
         // figures under this volume's name is worse than one that shows nothing.
         setData(null);
         setError(null);
-        setTab("Metrics");
+        setTab(openOn);
         let active = true;
 
         void volumeDetailAction(volumeId).then((result) => {
@@ -142,7 +146,7 @@ export function VolumeDetailDialog({
         return () => {
             active = false;
         };
-    }, [volumeId]);
+    }, [openOn, volumeId]);
 
     const volume = data?.volume ?? null;
 
@@ -165,96 +169,79 @@ export function VolumeDetailDialog({
     }
 
     return (
-        <>
-            <Dialog open={volumeId !== null} onOpenChange={onOpenChange}>
-                <DialogContent
-                    className={cn(
-                        "left-auto right-0 top-0 flex h-full max-h-none translate-x-0 translate-y-0 flex-col gap-0 rounded-none rounded-l-xl border-y-0 border-r-0 p-0 data-[state=open]:slide-in-from-right-4",
-                        full ? "w-full max-w-none" : "w-full max-w-none sm:w-[820px] sm:max-w-[calc(100vw-2rem)]"
-                    )}
-                >
-                    <div className="flex items-center gap-3 border-b border-border/60 px-5 py-4">
-                        <HardDrive className={cn("size-5 shrink-0", volume?.kind === "nas" && "text-sky-400")} />
-                        <div className="min-w-0 flex-1">
-                            <DialogTitle className="truncate text-base font-semibold">
-                                {volume?.name ?? "Volume"}
-                            </DialogTitle>
-                            {volume && (
-                                <p className="truncate text-xs text-muted-foreground">
-                                    {volume.applicationName
-                                        ? `Mounted in ${volume.applicationName} at ${volume.mountPath}`
-                                        : `Mounted at ${volume.mountPath}`}
-                                </p>
-                            )}
-                        </div>
-                        <button
-                            type="button"
-                            onClick={() => setFull((value) => !value)}
-                            title={full ? "Exit full screen" : "Full screen"}
-                            aria-label={full ? "Exit full screen" : "Full screen"}
-                            className="mr-8 shrink-0 rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                        >
-                            {full ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
-                        </button>
-                    </div>
-
-                    <div className="flex items-center gap-1 border-b border-border/60 px-5 text-sm">
-                        {TABS.map((entry) => (
-                            <button
-                                key={entry}
-                                type="button"
-                                onClick={() => setTab(entry)}
-                                aria-current={tab === entry ? "page" : undefined}
-                                className={cn(
-                                    "-mb-px whitespace-nowrap border-b-2 px-3 py-2 transition-colors",
-                                    tab === entry
-                                        ? "border-primary text-foreground"
-                                        : "border-transparent text-muted-foreground hover:text-foreground"
-                                )}
-                            >
-                                {entry}
-                            </button>
-                        ))}
-                    </div>
-
-                    <div className="flex-1 overflow-y-auto px-5 py-4">
-                        {error && <p className="text-sm text-danger">{error}</p>}
-
-                        {!volume && !error && (
-                            <div className="flex items-center justify-center py-12 text-muted-foreground">
-                                <Loader2 className="size-5 animate-spin" />
-                            </div>
+        <Dialog open={volumeId !== null} onOpenChange={onOpenChange}>
+            <DialogContent
+                className={cn(
+                    "left-auto right-0 top-0 flex h-full max-h-none translate-x-0 translate-y-0 flex-col gap-0 rounded-none rounded-l-xl border-y-0 border-r-0 p-0 data-[state=open]:slide-in-from-right-4",
+                    full ? "w-full max-w-none" : "w-full max-w-none sm:w-[820px] sm:max-w-[calc(100vw-2rem)]"
+                )}
+            >
+                <div className="flex items-center gap-3 border-b border-border/60 px-5 py-4">
+                    <HardDrive className={cn("size-5 shrink-0", volume?.kind === "nas" && "text-sky-400")} />
+                    <div className="min-w-0 flex-1">
+                        <DialogTitle className="truncate text-base font-semibold">
+                            {volume?.name ?? "Volume"}
+                        </DialogTitle>
+                        {volume && (
+                            <p className="truncate text-xs text-muted-foreground">
+                                {volume.applicationName
+                                    ? `Mounted in ${volume.applicationName} at ${volume.mountPath}`
+                                    : `Mounted at ${volume.mountPath}`}
+                            </p>
                         )}
-
-                        {volume &&
-                            (tab === "Metrics" ? (
-                                <MetricsTab volume={volume} usage={usage} />
-                            ) : (
-                                <SettingsTab
-                                    volume={volume}
-                                    canManage={data?.canManage ?? false}
-                                    onEdit={() => setEditing(true)}
-                                    onChanged={reload}
-                                    onClosed={() => onOpenChange(false)}
-                                />
-                            ))}
                     </div>
-                </DialogContent>
-            </Dialog>
+                    <button
+                        type="button"
+                        onClick={() => setFull((value) => !value)}
+                        title={full ? "Exit full screen" : "Full screen"}
+                        aria-label={full ? "Exit full screen" : "Full screen"}
+                        className="mr-8 shrink-0 rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    >
+                        {full ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
+                    </button>
+                </div>
 
-            {volume?.applicationId && (
-                <EditVolumeDialog
-                    open={editing}
-                    onOpenChange={setEditing}
-                    applicationId={volume.applicationId}
-                    volume={toEditVolume(volume)}
-                    onSaved={() => {
-                        setEditing(false);
-                        reload();
-                    }}
-                />
-            )}
-        </>
+                <div className="flex items-center gap-1 border-b border-border/60 px-5 text-sm">
+                    {TABS.map((entry) => (
+                        <button
+                            key={entry}
+                            type="button"
+                            onClick={() => setTab(entry)}
+                            aria-current={tab === entry ? "page" : undefined}
+                            className={cn(
+                                "-mb-px whitespace-nowrap border-b-2 px-3 py-2 transition-colors",
+                                tab === entry
+                                    ? "border-primary text-foreground"
+                                    : "border-transparent text-muted-foreground hover:text-foreground"
+                            )}
+                        >
+                            {entry}
+                        </button>
+                    ))}
+                </div>
+
+                <div className="flex-1 overflow-y-auto px-5 py-4">
+                    {error && <p className="text-sm text-danger">{error}</p>}
+
+                    {!volume && !error && (
+                        <div className="flex items-center justify-center py-12 text-muted-foreground">
+                            <Loader2 className="size-5 animate-spin" />
+                        </div>
+                    )}
+
+                    {volume && tab === "Metrics" && <MetricsTab volume={volume} usage={usage} />}
+                    {volume && tab === "Files" && <FilesTab volume={volume} />}
+                    {volume && tab === "Settings" && (
+                        <SettingsTab
+                            volume={volume}
+                            canManage={data?.canManage ?? false}
+                            onChanged={reload}
+                            onClosed={() => onOpenChange(false)}
+                        />
+                    )}
+                </div>
+            </DialogContent>
+        </Dialog>
     );
 }
 
@@ -268,6 +255,51 @@ function toEditVolume(volume: VolumeDetail): EditVolume {
         connectionId: volume.connectionId,
         sizeLimit: volume.sizeLimit
     };
+}
+
+/**
+ * What is actually in the volume. All three kinds - a named volume, a server
+ * folder and a NAS folder - appear at the mount path inside the service that
+ * mounts it, which is the one place the same browser can reach any of them. The
+ * browser is rooted there, so it opens on the volume's own contents and cannot
+ * wander out into the rest of the container.
+ */
+function FilesTab({ volume }: { volume: VolumeDetail }) {
+    if (!volume.applicationId) {
+        return (
+            <Notice
+                title="Nothing to browse through"
+                body="This volume is not attached to a service, and its data is only reachable from inside the container that mounts it."
+            />
+        );
+    }
+    if (!volume.serviceRunning) {
+        return (
+            <Notice
+                title="The service is not running"
+                body={`Files are read from inside ${volume.applicationName ?? "the service"}. Deploy it to browse ${volume.mountPath}.`}
+            />
+        );
+    }
+    return (
+        <div className="flex flex-col gap-2">
+            <FilesPanel applicationId={volume.applicationId} root={volume.mountPath} />
+            <p className="text-xs text-muted-foreground">
+                {volume.applicationName
+                    ? `Read from inside ${volume.applicationName} at ${volume.mountPath}.`
+                    : `Read from inside the service at ${volume.mountPath}.`}
+            </p>
+        </div>
+    );
+}
+
+function Notice({ title, body }: { title: string; body: string }) {
+    return (
+        <div className="rounded-lg border border-border/60 px-4 py-6 text-center">
+            <p className="text-sm font-medium">{title}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{body}</p>
+        </div>
+    );
 }
 
 function MetricsTab({ volume, usage }: { volume: VolumeDetail; usage: Usage }) {
@@ -343,13 +375,11 @@ function Stat({
 function SettingsTab({
     volume,
     canManage,
-    onEdit,
     onChanged,
     onClosed
 }: {
     volume: VolumeDetail;
     canManage: boolean;
-    onEdit: () => void;
     onChanged: () => void;
     onClosed: () => void;
 }) {
@@ -365,6 +395,11 @@ function SettingsTab({
     const blockedReason = !volume.applicationId
         ? "This volume is not attached to a service."
         : null;
+
+    // The mount is editable in place, not through a dialog on top of the panel -
+    // but only when it has a service to be mounted in, since that is what the
+    // change is applied to.
+    const editable = canManage && volume.applicationId !== null;
 
     function wipe() {
         setError(null);
@@ -394,32 +429,34 @@ function SettingsTab({
     }
 
     return (
-        <div className="flex flex-col gap-4">
-            <Section title="Connection" hint="Where this volume appears inside the container.">
-                <Row label="Mount path" value={volume.mountPath} icon={<HardDrive className="size-4" />} />
-                <Row
-                    label="Source"
-                    value={volume.source}
-                    icon={volume.kind === "nas" ? <Database className="size-4" /> : <Server className="size-4" />}
-                />
-            </Section>
-
-            <Section title="Size" hint="The cap this volume is allowed to reach. You are only charged disk for what is actually stored.">
-                <Row label="Size limit" value={volume.sizeLimit ?? "No limit"} icon={<HardDrive className="size-4" />} />
+        <div className="flex flex-col gap-5">
+            <Section
+                title="Mount"
+                hint="Where this volume comes from and where the service sees it. Changes apply the next time the service is recreated."
+            >
+                {editable ? (
+                    <VolumeForm applicationId={volume.applicationId ?? ""} volume={toEditVolume(volume)} onSaved={onChanged} />
+                ) : (
+                    <Rows>
+                        <Row label="Mount path" value={volume.mountPath} icon={<HardDrive className="size-4" />} />
+                        <Row
+                            label="Source"
+                            value={volume.source}
+                            icon={volume.kind === "nas" ? <Database className="size-4" /> : <Server className="size-4" />}
+                        />
+                        <Row label="Size limit" value={volume.sizeLimit ?? "No limit"} icon={<HardDrive className="size-4" />} />
+                    </Rows>
+                )}
             </Section>
 
             <Section title="Region" hint="Volumes live on the same server as the service that mounts them.">
-                <Row label="Server" value={volume.serverName} icon={<Server className="size-4" />} />
+                <Rows>
+                    <Row label="Server" value={volume.serverName} icon={<Server className="size-4" />} />
+                </Rows>
             </Section>
 
             {canManage && (
                 <>
-                    <div className="flex justify-end">
-                        <Button variant="ghost" size="sm" onClick={onEdit}>
-                            <Pencil className="size-4" /> Edit mount
-                        </Button>
-                    </div>
-
                     <div className="flex flex-col gap-3 rounded-lg border border-danger/30 bg-danger/5 p-3">
                         <p className="flex items-center gap-1.5 text-sm font-medium text-danger">
                             <TriangleAlert className="size-4" /> Danger
@@ -501,14 +538,19 @@ function SettingsTab({
 
 function Section({ title, hint, children }: { title: string; hint: string; children: React.ReactNode }) {
     return (
-        <div className="flex flex-col gap-2">
+        <section className="flex flex-col gap-2">
             <div>
                 <h3 className="text-sm font-medium">{title}</h3>
                 <p className="text-xs text-muted-foreground">{hint}</p>
             </div>
-            <div className="overflow-hidden rounded-md border border-border/60">{children}</div>
-        </div>
+            {children}
+        </section>
     );
+}
+
+/** The framed list a section falls back to when its values are read-only. */
+function Rows({ children }: { children: React.ReactNode }) {
+    return <div className="overflow-hidden rounded-md border border-border/60">{children}</div>;
 }
 
 function Row({ label, value, icon }: { label: string; value: string; icon: React.ReactNode }) {
