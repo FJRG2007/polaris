@@ -12,22 +12,22 @@ import { SpaceTree } from "@/app/(app)/tasks/space-tree";
 import { buildReport } from "@/lib/tasks/report-service";
 import { listSpaceTree } from "@/lib/tasks/space-service";
 import { ReportsView } from "@/app/(app)/tasks/reports-view";
-import { visibleSpaceIds, type TaskActor } from "@/lib/tasks/access";
+import { visibleScope, type TaskActor } from "@/lib/tasks/access";
 
 export const dynamic = "force-dynamic";
 
 export default async function ReportsPage() {
     const user = await requirePermission("tasks.read");
     const actor: TaskActor = { id: user.id, isAdmin: user.isAdmin };
-    const spaceIds = await visibleSpaceIds(actor);
+    const scope = await visibleScope(actor);
 
     const now = new Date();
     const weekStart = startOfWeek(now);
 
     const [tree, report, byPerson] = await Promise.all([
-        listSpaceTree(user.id, spaceIds, user.isAdmin),
-        buildReport(spaceIds, now),
-        timeByPerson(spaceIds, weekStart, addDays(weekStart, 7))
+        listSpaceTree(user.id, scope, user.isAdmin),
+        buildReport(scope, now),
+        timeByPerson(scope, weekStart, addDays(weekStart, 7))
     ]);
 
     return (

@@ -15,18 +15,23 @@ import { listTasks } from "@/lib/tasks/task-service";
 import type { SpaceContext } from "@/lib/tasks/facts";
 import { ListScreen } from "@/app/(app)/tasks/list-view";
 import { SpaceTree } from "@/app/(app)/tasks/space-tree";
-import { visibleSpaceIds, type TaskActor } from "@/lib/tasks/access";
+import { scopeSpaceIds, visibleScope, type TaskActor } from "@/lib/tasks/access";
 
 export const dynamic = "force-dynamic";
 
 export default async function EverythingPage() {
     const user = await requirePermission("tasks.read");
     const actor: TaskActor = { id: user.id, isAdmin: user.isAdmin };
-    const spaceIds = await visibleSpaceIds(actor);
+    const scope = await visibleScope(actor);
+    // The vocabulary (statuses, tags, fields) is drawn from every space the
+    // reader touches, including one they only reach through a folder - without
+    // its statuses the tasks from that branch would have no column to sit in.
+    // The work itself stays narrowed to the branch.
+    const spaceIds = scopeSpaceIds(scope);
 
     const [tree, tasks, statuses, tags, fields, lists, people] = await Promise.all([
-        spaces.listSpaceTree(user.id, spaceIds, user.isAdmin),
-        listTasks({ spaceIds }, { limit: 2000 }),
+        spaces.listSpaceTree(user.id, scope, user.isAdmin),
+        listTasks({ spaceIds: scope.spaceIds, listIds: scope.listIds }, { limit: 2000 }),
         prisma.taskStatus.findMany({
             where: { spaceId: { in: spaceIds } },
             orderBy: { order: "asc" },
@@ -43,11 +48,25 @@ export default async function EverythingPage() {
             select: { id: true, name: true, type: true, config: true, required: true, showOnCard: true }
         }),
         prisma.taskList.findMany({
-            where: { spaceId: { in: spaceIds }, archived: false },
+            where: {
+                archived: false,
+                OR: [{ spaceId: { in: scope.spaceIds } }, { id: { in: scope.listIds } }]
+            },
             orderBy: { name: "asc" },
             select: { id: true, name: true }
         }),
-        prisma.user.findMany({ select: { id: true, name: true, image: true } })
+        // The people on the spaces in reach, not the instance's whole directory:
+        // a picker here should offer who can actually be given this work.
+        prisma.user.findMany({
+            where: {
+                OR: [
+                    { taskSpaces: { some: { id: { in: spaceIds } } } },
+                    { taskSpaceMemberships: { some: { spaceId: { in: spaceIds } } } },
+                    { taskFolderMemberships: { some: { folder: { spaceId: { in: spaceIds } } } } }
+                ]
+            },
+            select: { id: true, name: true, image: true }
+        })
     ]);
 
     const context: SpaceContext = {

@@ -15,7 +15,7 @@ import { listTasks } from "@/lib/tasks/task-service";
 import { listViews } from "@/lib/tasks/view-service";
 import { buildSpaceContext } from "@/lib/tasks/screen-context";
 import { getList, listSpaceTree } from "@/lib/tasks/space-service";
-import { requireList, visibleSpaceIds, type TaskActor } from "@/lib/tasks/access";
+import { requireList, visibleScope, type TaskActor } from "@/lib/tasks/access";
 
 export const dynamic = "force-dynamic";
 
@@ -34,13 +34,20 @@ export default async function TaskListPage({ params }: { params: Promise<{ listI
     const list = await getList(listId);
     if (!list) notFound();
 
+    const scope = await visibleScope(actor);
     const [tree, tasks, views, context, siblingLists] = await Promise.all([
-        listSpaceTree(user.id, await visibleSpaceIds(actor), user.isAdmin),
+        listSpaceTree(user.id, scope, user.isAdmin),
         listTasks({ listId }, { limit: 2000 }),
         listViews(user.id, { listId }),
-        buildSpaceContext(list.spaceId, role, user.id),
+        buildSpaceContext(list.spaceId, role, user.id, scope),
+        // The lists work can be moved to: those in the space, narrowed to the
+        // granted branch when that is all the reader reaches.
         prisma.taskList.findMany({
-            where: { spaceId: list.spaceId, archived: false },
+            where: {
+                spaceId: list.spaceId,
+                archived: false,
+                ...(scope.partialSpaceIds.includes(list.spaceId) ? { id: { in: scope.listIds } } : {})
+            },
             orderBy: { order: "asc" },
             select: { id: true, name: true }
         })

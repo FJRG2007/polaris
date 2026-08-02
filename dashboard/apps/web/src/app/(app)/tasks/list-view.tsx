@@ -24,6 +24,7 @@ import { runAction } from "@/lib/run-action";
 import type { ViewProps } from "./views/shared";
 import { Button, Select, cn } from "@polaris/ui";
 import { ListView, TableView } from "./views/rows";
+import { TaskCreateDialog } from "./task-create-dialog";
 import { useMemo, useState, useTransition } from "react";
 import { AssigneePicker, StatusPicker } from "./pickers";
 import type { SavedView } from "@/lib/tasks/view-service";
@@ -76,6 +77,7 @@ export function ListScreen({
     const [showClosed, setShowClosed] = useState(initial?.showClosed ?? false);
     const [search, setSearch] = useState("");
     const [openTaskId, setOpenTaskId] = useState<string | null>(initialTaskId);
+    const [creating, setCreating] = useState(false);
     const [selection, setSelection] = useState<ReadonlySet<string>>(new Set());
     const [error, setError] = useState("");
 
@@ -162,13 +164,18 @@ export function ListScreen({
     };
 
     const move: ViewProps["onMove"] = async ({ taskId, groupKey, position }) => {
-        const statusId = groupBy === "status" ? groupKey : undefined;
+        // The column of tasks with no status is keyed by an empty string. Sent
+        // as-is it fails validation and the drop silently does nothing, so it
+        // becomes an explicit null: "put this back to having no status".
+        const statusId = groupBy === "status" ? (groupKey || null) : undefined;
         const target = context.statuses.find((status) => status.id === statusId);
         setPending((current) => ({
             ...current,
             [taskId]: target
                 ? { statusId: target.id, statusName: target.name, statusColor: target.color, statusType: target.type }
-                : {}
+                : statusId === null
+                  ? { statusId: null, statusName: "No status", statusColor: "#64748b", statusType: "open" }
+                  : {}
         }));
         const result = await runAction(
             () =>
@@ -234,7 +241,7 @@ export function ListScreen({
                 </div>
                 <span className="flex-1" />
                 {context.canEdit && (listId ?? defaultListId) && (
-                    <Button size="sm" onClick={() => void quickCreate(context.statuses[0]?.id ?? "", "New task")}>
+                    <Button size="sm" onClick={() => setCreating(true)}>
                         <Plus className="size-4" /> New task
                     </Button>
                 )}
@@ -404,6 +411,22 @@ export function ListScreen({
             <p className="text-[11px] text-muted-foreground">
                 Ctrl-click (or Cmd-click) a task to select it without opening it.
             </p>
+
+            {(listId ?? defaultListId) && (
+                <TaskCreateDialog
+                    open={creating}
+                    context={context}
+                    lists={lists.length > 0 ? lists : [{ id: (listId ?? defaultListId) as string, name: title }]}
+                    defaultListId={(listId ?? defaultListId) as string}
+                    onClose={() => setCreating(false)}
+                    onCreated={(id) => {
+                        refresh();
+                        // Straight into the new task: whoever just described it
+                        // is the person most likely to keep working on it.
+                        setOpenTaskId(id);
+                    }}
+                />
+            )}
 
             <TaskPanel
                 taskId={openTaskId}

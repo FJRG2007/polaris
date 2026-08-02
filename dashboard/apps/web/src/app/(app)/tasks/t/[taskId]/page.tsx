@@ -16,7 +16,7 @@ import { ListScreen } from "@/app/(app)/tasks/list-view";
 import { SpaceTree } from "@/app/(app)/tasks/space-tree";
 import { buildSpaceContext } from "@/lib/tasks/screen-context";
 import { getList, listSpaceTree } from "@/lib/tasks/space-service";
-import { requireTask, visibleSpaceIds, type TaskActor } from "@/lib/tasks/access";
+import { requireTask, visibleScope, type TaskActor } from "@/lib/tasks/access";
 
 export const dynamic = "force-dynamic";
 
@@ -35,13 +35,18 @@ export default async function TaskPermalinkPage({ params }: { params: Promise<{ 
     const list = await getList(resolved.listId);
     if (!list) redirect("/tasks");
 
+    const scope = await visibleScope(actor);
     const [tree, tasks, views, context, siblingLists] = await Promise.all([
-        listSpaceTree(user.id, await visibleSpaceIds(actor), user.isAdmin),
+        listSpaceTree(user.id, scope, user.isAdmin),
         listTasks({ listId: resolved.listId }, { limit: 2000 }),
         listViews(user.id, { listId: resolved.listId }),
-        buildSpaceContext(resolved.spaceId, resolved.role, user.id),
+        buildSpaceContext(resolved.spaceId, resolved.role, user.id, scope),
         prisma.taskList.findMany({
-            where: { spaceId: resolved.spaceId, archived: false },
+            where: {
+                spaceId: resolved.spaceId,
+                archived: false,
+                ...(scope.partialSpaceIds.includes(resolved.spaceId) ? { id: { in: scope.listIds } } : {})
+            },
             orderBy: { order: "asc" },
             select: { id: true, name: true }
         })

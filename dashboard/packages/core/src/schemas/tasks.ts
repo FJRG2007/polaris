@@ -748,6 +748,12 @@ export function spaceRoleAtLeast(role: SpaceRole, minimum: SpaceRole): boolean {
     return SPACE_ROLES.indexOf(role) >= SPACE_ROLES.indexOf(minimum);
 }
 
+/** The stronger of two roles, so a grant on a folder can only ever add to what
+ *  the space already gave somebody and never quietly take it away. */
+export function strongerRole(left: SpaceRole, right: SpaceRole): SpaceRole {
+    return SPACE_ROLES.indexOf(left) >= SPACE_ROLES.indexOf(right) ? left : right;
+}
+
 export const spaceSchema = z.object({
     name: containerName,
     description: z.string().trim().max(500).default(""),
@@ -757,10 +763,35 @@ export const spaceSchema = z.object({
 
 export type SpaceInput = z.infer<typeof spaceSchema>;
 
+/**
+ * How deep folders may nest. Deep enough for the arrangement people actually
+ * keep - agency > client > project > phase - and shallow enough that the
+ * sidebar's indentation and a breadcrumb still fit on one line.
+ */
+export const FOLDER_DEPTH_LIMIT = 8;
+
 export const folderSchema = z.object({
     spaceId: uuid,
+    /** The folder this one sits inside, or null for a folder at the space root. */
+    parentId: uuid.nullable().default(null),
     name: containerName
 });
+
+export type FolderInput = z.infer<typeof folderSchema>;
+
+/**
+ * Where a folder or a list was dropped in the sidebar: the container it landed
+ * in, plus the two rows it landed between. Neighbours rather than an index, for
+ * the same reason a task drag reports them - two people rearranging at once
+ * cannot renumber each other.
+ */
+export const containerMoveSchema = z.object({
+    parentId: uuid.nullable().default(null),
+    beforeId: uuid.nullable().default(null),
+    afterId: uuid.nullable().default(null)
+});
+
+export type ContainerMove = z.infer<typeof containerMoveSchema>;
 
 export const listSchema = z.object({
     spaceId: uuid,
@@ -859,7 +890,10 @@ export type TaskUpdateInput = z.infer<typeof taskUpdateSchema>;
 export const taskMoveSchema = z.object({
     taskId: uuid,
     listId: uuid.optional(),
-    statusId: uuid.optional(),
+    /** Explicit null clears the status, which is what dropping a card into the
+     *  "No status" column means. Omitted leaves it alone, which is what a drag
+     *  inside one column means. */
+    statusId: uuid.nullable().optional(),
     beforeId: uuid.nullable().default(null),
     afterId: uuid.nullable().default(null)
 });

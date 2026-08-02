@@ -16,8 +16,8 @@
 import * as actions from "./actions";
 import * as core from "@polaris/core";
 import { runAction } from "@/lib/run-action";
-import type { SpaceContext } from "@/lib/tasks/facts";
 import { CustomFieldEditor } from "./custom-fields";
+import type { SpaceContext } from "@/lib/tasks/facts";
 import type { TaskDetail } from "@/lib/tasks/task-service";
 import { useDisplayFormat } from "@/components/display-format";
 import { useCallback, useEffect, useState, useTransition } from "react";
@@ -103,7 +103,11 @@ export function TaskPanel({
 
     return (
         <Dialog open={openId !== null} onOpenChange={(open) => (open ? undefined : onClose())}>
-            <DialogContent className="flex max-h-[92vh] w-[min(56rem,95vw)] flex-col gap-0 overflow-hidden p-0">
+            {/* max-w has to be set as well as w: DialogContent's own max-w-lg
+                caps the width otherwise, and the panel renders at half the size
+                its two columns were laid out for. The header keeps clear of the
+                dialog's close button rather than sliding under it. */}
+            <DialogContent className="flex max-h-[92vh] w-[min(64rem,96vw)] max-w-[min(64rem,96vw)] flex-col gap-0 overflow-hidden p-0">
                 {!task && (
                     <div className="flex h-64 items-center justify-center text-sm text-muted-foreground">
                         {loading ? <Loader2 className="size-5 animate-spin" /> : (error || "Loading the task")}
@@ -112,7 +116,7 @@ export function TaskPanel({
 
                 {task && (
                     <>
-                        <header className="flex flex-wrap items-center gap-2 border-b border-border px-5 py-3">
+                        <header className="flex flex-wrap items-center gap-2 border-b border-border py-3 pl-5 pr-14">
                             <span className="font-mono text-xs text-muted-foreground">{task.reference}</span>
                             {detail?.parent && (
                                 <button
@@ -172,8 +176,10 @@ export function TaskPanel({
                             )}
                         </header>
 
-                        <div className="grid min-h-0 flex-1 grid-cols-1 overflow-y-auto md:grid-cols-[1fr_20rem]">
-                            <div className="flex flex-col gap-6 p-5">
+                        {/* Each column scrolls on its own so a long comment
+                            thread cannot carry the properties off the screen. */}
+                        <div className="grid min-h-0 flex-1 grid-cols-1 overflow-y-auto md:grid-cols-[minmax(0,1fr)_21rem] md:overflow-hidden">
+                            <div className="flex flex-col gap-6 p-5 md:overflow-y-auto">
                                 <div>
                                     <DialogTitle asChild>
                                         <input
@@ -269,7 +275,7 @@ export function TaskPanel({
                                 <ActivitySection activity={detail?.activity ?? []} />
                             </div>
 
-                            <aside className="flex flex-col gap-1 border-t border-border p-5 md:border-l md:border-t-0">
+                            <aside className="flex flex-col gap-1 border-t border-border p-5 md:overflow-y-auto md:border-l md:border-t-0">
                                 <Field label="Status">
                                     <StatusPicker
                                         statuses={context.statuses}

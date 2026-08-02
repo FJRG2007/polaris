@@ -12,7 +12,7 @@ import type { SpaceVisibility } from "@polaris/core";
 import { SpaceTree } from "@/app/(app)/tasks/space-tree";
 import { SpaceScreen } from "@/app/(app)/tasks/space-view";
 import { listAutomations } from "@/lib/tasks/automation-service";
-import { requireSpace, visibleSpaceIds, type TaskActor } from "@/lib/tasks/access";
+import { requireSpace, visibleScope, type TaskActor } from "@/lib/tasks/access";
 
 export const dynamic = "force-dynamic";
 
@@ -45,7 +45,7 @@ export default async function SpacePage({ params }: { params: Promise<{ spaceId:
 
     const canManage = role === "owner" || role === "admin";
     const [tree, statuses, fields, tags, members, automations, forms, origin] = await Promise.all([
-        spaces.listSpaceTree(user.id, await visibleSpaceIds(actor), user.isAdmin),
+        spaces.listSpaceTree(user.id, await visibleScope(actor), user.isAdmin),
         spaces.listStatuses(spaceId),
         spaces.listCustomFields(spaceId),
         spaces.listTags(spaceId),

@@ -7,7 +7,7 @@ import { prisma } from "@polaris/db";
 import { requirePermission } from "@/lib/session";
 import { DocsView } from "@/app/(app)/tasks/docs-view";
 import { docTree, getDoc } from "@/lib/tasks/doc-service";
-import { visibleSpaceIds, type TaskActor } from "@/lib/tasks/access";
+import { visibleScope, type TaskActor } from "@/lib/tasks/access";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +15,8 @@ export default async function DocsPage({ searchParams }: { searchParams: Promise
     const { doc: docId } = await searchParams;
     const user = await requirePermission("tasks.read");
     const actor: TaskActor = { id: user.id, isAdmin: user.isAdmin };
-    const spaceIds = await visibleSpaceIds(actor);
+    // A wiki belongs to the whole space, so a folder grant does not open it.
+    const { spaceIds } = await visibleScope(actor);
 
     const [tree, spaces] = await Promise.all([
         docTree(spaceIds),

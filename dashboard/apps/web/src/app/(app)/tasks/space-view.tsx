@@ -484,6 +484,10 @@ function PeopleTab({
 
     return (
         <section className="flex flex-col gap-3">
+            <p className="text-xs text-muted-foreground">
+                Everyone here reaches the whole space. To give somebody one client or one project instead, right-click
+                that folder in the sidebar and choose who can reach it.
+            </p>
             <ul className="divide-y divide-border rounded-lg border border-border">
                 {members.map((member) => (
                     <li key={member.userId} className="flex flex-wrap items-center gap-3 px-3 py-2">

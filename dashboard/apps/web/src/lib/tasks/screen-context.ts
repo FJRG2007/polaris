@@ -9,8 +9,8 @@
 
 import * as spaces from "./space-service";
 import { listTasks } from "./task-service";
-import type { SpaceAccess } from "./access";
 import type { SpaceContext } from "./facts";
+import type { SpaceAccess, TaskScope } from "./access";
 
 /** How many sibling tasks the dependency picker is given. Beyond this a person
  *  is searching, not scanning, and the picker filters what it was handed. */
@@ -19,14 +19,21 @@ const SIBLING_LIMIT = 500;
 export async function buildSpaceContext(
     spaceId: string,
     role: SpaceAccess,
-    currentUserId: string
+    currentUserId: string,
+    /** Passed when the reader only reaches part of this space, so the sibling
+     *  list a dependency picker offers cannot name another client's work. */
+    scope?: TaskScope
 ): Promise<SpaceContext> {
+    const partial = scope?.partialSpaceIds.includes(spaceId) ?? false;
     const [statuses, tags, fields, people, siblings] = await Promise.all([
         spaces.listStatuses(spaceId),
         spaces.listTags(spaceId),
         spaces.listCustomFields(spaceId),
         spaces.spacePeople(spaceId),
-        listTasks({ spaceIds: [spaceId] }, { limit: SIBLING_LIMIT })
+        listTasks(
+            partial ? { listIds: scope?.listIds ?? [] } : { spaceIds: [spaceId] },
+            { limit: SIBLING_LIMIT }
+        )
     ]);
 
     return {

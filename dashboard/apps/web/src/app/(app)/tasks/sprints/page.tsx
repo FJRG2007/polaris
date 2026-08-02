@@ -8,7 +8,7 @@ import type { BurndownPoint } from "@polaris/core";
 import { SpaceTree } from "@/app/(app)/tasks/space-tree";
 import { listSpaceTree } from "@/lib/tasks/space-service";
 import { SprintsView } from "@/app/(app)/tasks/planning-view";
-import { visibleSpaceIds, type TaskActor } from "@/lib/tasks/access";
+import { visibleScope, type TaskActor } from "@/lib/tasks/access";
 import { listSprints, sprintBurndown } from "@/lib/tasks/planning-service";
 
 export const dynamic = "force-dynamic";
@@ -16,12 +16,14 @@ export const dynamic = "force-dynamic";
 export default async function SprintsPage() {
     const user = await requirePermission("tasks.read");
     const actor: TaskActor = { id: user.id, isAdmin: user.isAdmin };
-    const spaceIds = await visibleSpaceIds(actor);
+    // Sprints belong to a space, not to a branch of one, so they are listed
+    // only for the spaces the reader holds outright.
+    const scope = await visibleScope(actor);
 
     const [tree, spaces] = await Promise.all([
-        listSpaceTree(user.id, spaceIds, user.isAdmin),
+        listSpaceTree(user.id, scope, user.isAdmin),
         prisma.taskSpace.findMany({
-            where: { id: { in: spaceIds } },
+            where: { id: { in: scope.spaceIds } },
             orderBy: { order: "asc" },
             select: { id: true, name: true }
         })

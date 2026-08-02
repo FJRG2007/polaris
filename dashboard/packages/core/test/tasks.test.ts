@@ -1,6 +1,7 @@
 import * as engine from "../src/tasks.js";
 import { describe, expect, it } from "vitest";
 import type { Recurrence, TaskFilter } from "../src/schemas/tasks.js";
+import { FOLDER_DEPTH_LIMIT, strongerRole } from "../src/schemas/tasks.js";
 
 /** Wednesday, so "this week" has days on both sides of it. */
 const NOW = new Date("2026-08-05T12:00:00.000Z");
@@ -316,6 +317,86 @@ describe("subtask trees", () => {
         const tree = engine.buildTaskTree([parent, child]);
         expect(engine.flattenTree(tree)).toHaveLength(2);
         expect(engine.flattenTree(tree, new Set(["parent"]))).toHaveLength(1);
+    });
+});
+
+describe("folder trees", () => {
+    /** agency > client > project, plus a second client beside the first. */
+    const folders = [
+        { id: "agency", parentId: null },
+        { id: "client-a", parentId: "agency" },
+        { id: "project-1", parentId: "client-a" },
+        { id: "client-b", parentId: "agency" }
+    ];
+
+    it("nests each folder under its parent", () => {
+        const tree = engine.buildFolderTree(folders);
+        expect(tree).toHaveLength(1);
+        expect(tree[0]?.children).toHaveLength(2);
+        expect(tree[0]?.children[0]?.children[0]?.folder.id).toBe("project-1");
+        expect(tree[0]?.children[0]?.children[0]?.depth).toBe(2);
+    });
+
+    it("treats a folder whose parent is out of reach as a root", () => {
+        // What a pruned tree looks like: somebody invited to one client sees
+        // that client, and the agency above it is not theirs to see.
+        const tree = engine.buildFolderTree(folders.filter((folder) => folder.id !== "agency"));
+        expect(tree.map((node) => node.folder.id).sort()).toEqual(["client-a", "client-b"]);
+    });
+
+    it("reads the chain from the root down", () => {
+        expect(engine.folderAncestors(folders, "project-1").map((folder) => folder.id)).toEqual([
+            "agency",
+            "client-a",
+            "project-1"
+        ]);
+        expect(engine.folderDepth(folders, "project-1")).toBe(2);
+    });
+
+    it("collects a folder and everything under it", () => {
+        expect([...engine.folderBranch(folders, "client-a")].sort()).toEqual(["client-a", "project-1"]);
+        expect(engine.folderBranch(folders, "project-1").size).toBe(1);
+    });
+
+    it("refuses a move into itself or its own branch", () => {
+        expect(engine.folderMoveRefusal(folders, "client-a", "client-a")).toMatch(/into itself/);
+        expect(engine.folderMoveRefusal(folders, "client-a", "project-1")).toMatch(/own subfolders/);
+        expect(engine.folderMoveRefusal(folders, "client-a", "client-b")).toBeNull();
+        expect(engine.folderMoveRefusal(folders, "client-a", null)).toBeNull();
+    });
+
+    it("refuses a move that would push a branch past the depth limit", () => {
+        // A chain exactly as deep as the limit allows, plus a two-level branch
+        // beside it: dropping the branch on the deepest link overflows.
+        const deep = Array.from({ length: FOLDER_DEPTH_LIMIT }, (_, index) => ({
+            id: `deep-${index}`,
+            parentId: index === 0 ? null : `deep-${index - 1}`
+        }));
+        const withBranch = [...deep, { id: "top", parentId: null }, { id: "under-top", parentId: "top" }];
+        expect(engine.folderMoveRefusal(withBranch, "top", "deep-0")).toBeNull();
+        expect(engine.folderMoveRefusal(withBranch, "top", `deep-${FOLDER_DEPTH_LIMIT - 2}`)).toMatch(/deep/);
+    });
+
+    it("stops building past the depth limit rather than recursing forever", () => {
+        const chain = Array.from({ length: FOLDER_DEPTH_LIMIT + 4 }, (_, index) => ({
+            id: `f-${index}`,
+            parentId: index === 0 ? null : `f-${index - 1}`
+        }));
+        let depth = 0;
+        let node = engine.buildFolderTree(chain)[0];
+        while (node?.children[0]) {
+            depth += 1;
+            node = node.children[0];
+        }
+        expect(depth).toBe(FOLDER_DEPTH_LIMIT - 1);
+    });
+});
+
+describe("space roles", () => {
+    it("takes the stronger of two grants", () => {
+        expect(strongerRole("guest", "member")).toBe("member");
+        expect(strongerRole("admin", "member")).toBe("admin");
+        expect(strongerRole("guest", "guest")).toBe("guest");
     });
 });
 

@@ -142,26 +142,29 @@ export async function removeSpaceMemberAction(spaceId: string, userId: string): 
     }
 }
 
-export async function createFolderAction(spaceId: string, name: string): Promise<{ error?: string }> {
+export async function createFolderAction(input: unknown): Promise<{ id?: string; error?: string }> {
     const caller = await actor();
-    const parsed = core.folderSchema.safeParse({ spaceId, name });
+    const parsed = core.folderSchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Enter a name" };
     try {
-        await access.requireSpace(caller, spaceId, "member");
-        await spaces.createFolder(spaceId, parsed.data.name);
+        // A subfolder is authorized against the folder it goes into, so somebody
+        // invited to one client can organise inside it without holding the space.
+        if (parsed.data.parentId) await access.requireFolder(caller, parsed.data.parentId, "member");
+        else await access.requireSpace(caller, parsed.data.spaceId, "member");
+        const id = await spaces.createFolder(parsed.data);
         refresh();
-        return {};
+        return { id };
     } catch (caught) {
         return failure(caught, "Could not create the folder");
     }
 }
 
-export async function renameFolderAction(spaceId: string, folderId: string, name: string): Promise<{ error?: string }> {
+export async function renameFolderAction(folderId: string, name: string): Promise<{ error?: string }> {
     const caller = await actor();
     const parsed = core.containerName.safeParse(name);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Enter a name" };
     try {
-        await access.requireSpace(caller, spaceId, "member");
+        await access.requireFolder(caller, folderId, "member");
         await spaces.renameFolder(folderId, parsed.data);
         refresh();
         return {};
@@ -170,15 +173,124 @@ export async function renameFolderAction(spaceId: string, folderId: string, name
     }
 }
 
-export async function deleteFolderAction(spaceId: string, folderId: string): Promise<{ error?: string }> {
+export async function deleteFolderAction(folderId: string): Promise<{ error?: string }> {
     const caller = await actor();
     try {
-        await access.requireSpace(caller, spaceId, "admin");
+        await access.requireFolder(caller, folderId, "admin");
         await spaces.deleteFolder(folderId);
         refresh();
         return {};
     } catch (caught) {
         return failure(caught, "Could not delete the folder");
+    }
+}
+
+/** Reparent or reposition a folder after a drag in the sidebar. */
+export async function moveFolderAction(folderId: string, move: unknown): Promise<{ error?: string }> {
+    const caller = await actor();
+    const parsed = core.containerMoveSchema.safeParse(move);
+    if (!parsed.success) return { error: "Could not work out where that was dropped" };
+    try {
+        const { spaceId } = await access.requireFolder(caller, folderId, "member");
+        // Both ends are checked: dragging out of a branch you may edit into one
+        // you may not is still a write to the destination.
+        if (parsed.data.parentId) await access.requireFolder(caller, parsed.data.parentId, "member");
+        else await access.requireSpace(caller, spaceId, "member");
+        await spaces.moveFolder(spaceId, folderId, parsed.data);
+        refresh();
+        return {};
+    } catch (caught) {
+        return failure(caught, "Could not move the folder");
+    }
+}
+
+/** Move a list into a folder, out to the space root, or up and down its
+ *  siblings, after a drag in the sidebar. */
+export async function moveListAction(listId: string, move: unknown): Promise<{ error?: string }> {
+    const caller = await actor();
+    const parsed = core.containerMoveSchema.safeParse(move);
+    if (!parsed.success) return { error: "Could not work out where that was dropped" };
+    try {
+        const { spaceId } = await access.requireList(caller, listId, "member");
+        if (parsed.data.parentId) await access.requireFolder(caller, parsed.data.parentId, "member");
+        else await access.requireSpace(caller, spaceId, "member");
+        await spaces.moveList(spaceId, listId, parsed.data);
+        refresh();
+        return {};
+    } catch (caught) {
+        return failure(caught, "Could not move the list");
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Folder members
+// ---------------------------------------------------------------------------
+
+export async function listFolderMembersAction(folderId: string): Promise<{
+    folder?: spaces.FolderDetail;
+    members?: spaces.FolderMemberView[];
+    error?: string;
+}> {
+    const caller = await actor("tasks.read");
+    try {
+        await access.requireFolder(caller, folderId, "guest");
+        const [folder, members] = await Promise.all([
+            spaces.getFolder(folderId),
+            spaces.listFolderMembers(folderId)
+        ]);
+        return folder ? { folder, members } : { error: "That folder no longer exists" };
+    } catch (caught) {
+        return failure(caught, "Could not read who has access");
+    }
+}
+
+export async function addFolderMemberAction(
+    folderId: string,
+    identifier: string,
+    role: core.SpaceRole
+): Promise<{ error?: string }> {
+    const caller = await actor();
+    try {
+        await access.requireFolder(caller, folderId, "admin");
+        await spaces.addFolderMember(folderId, identifier, role);
+        await recordAudit({
+            actorId: caller.id,
+            action: "tasks.folder.invite",
+            targetType: "folder",
+            targetId: folderId
+        });
+        refresh();
+        return {};
+    } catch (caught) {
+        return failure(caught, "Could not add that person");
+    }
+}
+
+export async function setFolderMemberRoleAction(
+    folderId: string,
+    userId: string,
+    role: core.SpaceRole
+): Promise<{ error?: string }> {
+    const caller = await actor();
+    try {
+        await access.requireFolder(caller, folderId, "admin");
+        await spaces.setFolderMemberRole(folderId, userId, role);
+        refresh();
+        return {};
+    } catch (caught) {
+        return failure(caught, "Could not change that role");
+    }
+}
+
+export async function removeFolderMemberAction(folderId: string, userId: string): Promise<{ error?: string }> {
+    const caller = await actor();
+    try {
+        await access.requireFolder(caller, folderId, "admin");
+        await spaces.removeFolderMember(folderId, userId);
+        refresh();
+        return {};
+    } catch (caught) {
+        return failure(caught, "Could not remove that person");
     }
 }
 
@@ -207,6 +319,36 @@ export async function updateListAction(listId: string, input: unknown): Promise<
         return {};
     } catch (caught) {
         return failure(caught, "Could not save the list");
+    }
+}
+
+/** Rename in place from the sidebar. Separate from updateListAction because that
+ *  one takes the whole list and would blank the fields a rename never sees. */
+export async function renameListAction(listId: string, name: string): Promise<{ error?: string }> {
+    const caller = await actor();
+    const parsed = core.containerName.safeParse(name);
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Enter a name" };
+    try {
+        await access.requireList(caller, listId, "member");
+        await spaces.renameList(listId, parsed.data);
+        refresh();
+        return {};
+    } catch (caught) {
+        return failure(caught, "Could not rename the list");
+    }
+}
+
+export async function renameSpaceAction(spaceId: string, name: string): Promise<{ error?: string }> {
+    const caller = await actor();
+    const parsed = core.containerName.safeParse(name);
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Enter a name" };
+    try {
+        await access.requireSpace(caller, spaceId, "admin");
+        await spaces.renameSpace(spaceId, parsed.data);
+        refresh();
+        return {};
+    } catch (caught) {
+        return failure(caught, "Could not rename the space");
     }
 }
 
@@ -429,8 +571,8 @@ export async function bulkUpdateAction(input: unknown): Promise<{ count?: number
     const parsed = core.taskBulkSchema.safeParse(input);
     if (!parsed.success) return { error: "Check the selection and try again" };
     try {
-        const spaceIds = await access.visibleSpaceIds(caller);
-        const count = await tasks.bulkUpdate(caller.id, spaceIds, parsed.data);
+        const scope = await access.visibleScope(caller);
+        const count = await tasks.bulkUpdate(caller.id, { spaceIds: scope.spaceIds, listIds: scope.listIds }, parsed.data);
         refresh();
         return { count };
     } catch (caught) {

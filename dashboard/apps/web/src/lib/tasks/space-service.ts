@@ -10,7 +10,7 @@
 
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
-import type { SpaceAccess } from "./access";
+import type { SpaceAccess, TaskScope } from "./access";
 
 // ---------------------------------------------------------------------------
 // The sidebar tree
@@ -25,10 +25,17 @@ export interface ListSummary {
     readonly totalCount: number;
 }
 
+/** Folders come back flat with their parent, and the sidebar nests them through
+ *  the same `buildFolderTree` the server would use. Sending the nesting already
+ *  built would mean two shapes of the same tree to keep in step. */
 export interface FolderSummary {
     readonly id: string;
     readonly name: string;
+    readonly parentId: string | null;
     readonly lists: ListSummary[];
+    /** What the reader may do in this branch. Equal to the space role except in
+     *  a space they only reach through a grant, where each branch can differ. */
+    readonly role: SpaceAccess;
 }
 
 export interface SpaceTreeView {
@@ -41,19 +48,26 @@ export interface SpaceTreeView {
     readonly folders: FolderSummary[];
     /** Lists that sit at the space root rather than in a folder. */
     readonly lists: ListSummary[];
+    /** True when the actor only reaches part of this space through a folder
+     *  grant, so the sidebar can hide the space-wide controls. */
+    readonly partial: boolean;
 }
 
 /**
  * Everything the left rail draws, for every space the actor can see, in one
  * round trip. Counts come from a single grouped query rather than a count per
  * list, so a workspace with forty lists still costs three statements.
+ *
+ * A space the actor only reaches through a folder grant is pruned to that
+ * branch: the folders outside it and the lists at the space root never leave the
+ * server, so the sidebar cannot show a client the client beside them.
  */
-export async function listSpaceTree(
-    userId: string,
-    spaceIds: string[],
-    isAdmin: boolean
-): Promise<SpaceTreeView[]> {
+export async function listSpaceTree(userId: string, scope: TaskScope, isAdmin: boolean): Promise<SpaceTreeView[]> {
+    const spaceIds = [...scope.spaceIds, ...scope.partialSpaceIds];
     if (spaceIds.length === 0) return [];
+
+    const partialSpaces = new Set(scope.partialSpaceIds);
+    const grantedListIds = new Set(scope.listIds);
 
     const [spaces, lists, counts] = await Promise.all([
         prisma.taskSpace.findMany({
@@ -70,7 +84,7 @@ export async function listSpaceTree(
                 folders: {
                     where: { archived: false },
                     orderBy: [{ order: "asc" }, { createdAt: "asc" }],
-                    select: { id: true, name: true }
+                    select: { id: true, name: true, parentId: true }
                 }
             }
         }),
@@ -108,9 +122,23 @@ export async function listSpaceTree(
     };
 
     return spaces.map((space) => {
-        const own = lists.filter((list) => list.spaceId === space.id);
-        const role: SpaceAccess =
+        const partial = partialSpaces.has(space.id);
+        const folders = partial
+            ? space.folders.filter((folder) => scope.folderRoles[folder.id] !== undefined)
+            : space.folders;
+        const own = lists
+            .filter((list) => list.spaceId === space.id)
+            .filter((list) => !partial || grantedListIds.has(list.id));
+        const spaceRole: SpaceAccess =
             space.ownerId === userId || isAdmin ? "owner" : ((space.members[0]?.role as core.SpaceRole) ?? "guest");
+        // In a partial space the space role means nothing - what the reader may
+        // do is whatever their strongest grant gives them.
+        const role: SpaceAccess = partial
+            ? folders.reduce<core.SpaceRole>(
+                  (best, folder) => core.strongerRole(best, scope.folderRoles[folder.id] as core.SpaceRole),
+                  "guest"
+              )
+            : spaceRole;
         return {
             id: space.id,
             name: space.name,
@@ -118,12 +146,18 @@ export async function listSpaceTree(
             color: space.color,
             visibility: space.visibility as core.SpaceVisibility,
             role,
-            folders: space.folders.map((folder) => ({
+            folders: folders.map((folder) => ({
                 id: folder.id,
                 name: folder.name,
-                lists: own.filter((list) => list.folderId === folder.id).map(summarize)
+                // A granted branch's top folder keeps its real parent id, which
+                // no longer resolves in the pruned set. buildFolderTree treats a
+                // missing parent as a root, so the branch draws from its top.
+                parentId: folder.parentId,
+                lists: own.filter((list) => list.folderId === folder.id).map(summarize),
+                role: partial ? (scope.folderRoles[folder.id] as core.SpaceRole) : spaceRole
             })),
-            lists: own.filter((list) => list.folderId === null).map(summarize)
+            lists: partial ? [] : own.filter((list) => list.folderId === null).map(summarize),
+            partial
         };
     });
 }
@@ -212,6 +246,10 @@ export async function createSpace(
 
         return { id: space.id, listId: list.id };
     });
+}
+
+export async function renameSpace(spaceId: string, name: string): Promise<void> {
+    await prisma.taskSpace.update({ where: { id: spaceId }, data: { name } });
 }
 
 export async function updateSpace(spaceId: string, input: core.SpaceInput): Promise<void> {
@@ -304,36 +342,239 @@ export async function removeSpaceMember(spaceId: string, userId: string): Promis
     await prisma.taskSpaceMember.deleteMany({ where: { spaceId, userId } });
 }
 
-/** The people a picker can offer for a space: its owner and its members. */
+/** The people a picker can offer for a space: its owner, its members, and anyone
+ *  invited to a folder inside it - a task in a client's folder has to be
+ *  assignable to that client. */
 export async function spacePeople(spaceId: string): Promise<{ id: string; name: string; image: string | null }[]> {
-    const members = await listSpaceMembers(spaceId);
-    return members.map((member) => ({ id: member.userId, name: member.name, image: member.image }));
+    const [members, grantees] = await Promise.all([
+        listSpaceMembers(spaceId),
+        prisma.taskFolderMember.findMany({
+            where: { folder: { spaceId } },
+            select: { user: { select: { id: true, name: true, image: true } } }
+        })
+    ]);
+    const people = new Map(members.map((member) => [member.userId, { id: member.userId, name: member.name, image: member.image }]));
+    for (const grant of grantees) {
+        if (!people.has(grant.user.id)) people.set(grant.user.id, grant.user);
+    }
+    return [...people.values()];
+}
+
+// ---------------------------------------------------------------------------
+// Folder members
+// ---------------------------------------------------------------------------
+
+export interface FolderMemberView {
+    readonly userId: string;
+    readonly name: string;
+    readonly email: string;
+    readonly image: string | null;
+    readonly role: core.SpaceRole;
+    /** The folder the grant was actually made on. Equal to the folder being
+     *  looked at, or an ancestor when the access is inherited. */
+    readonly folderId: string;
+    readonly folderName: string;
+    readonly inherited: boolean;
+}
+
+export interface FolderDetail {
+    readonly id: string;
+    readonly spaceId: string;
+    readonly parentId: string | null;
+    readonly name: string;
+    /** Root first, this folder last, for a breadcrumb. */
+    readonly path: { id: string; name: string }[];
+}
+
+export async function getFolder(folderId: string): Promise<FolderDetail | null> {
+    const folder = await prisma.taskFolder.findUnique({
+        where: { id: folderId },
+        select: { id: true, spaceId: true, parentId: true, name: true }
+    });
+    if (!folder) return null;
+    const folders = await prisma.taskFolder.findMany({
+        where: { spaceId: folder.spaceId },
+        select: { id: true, parentId: true, name: true }
+    });
+    return {
+        id: folder.id,
+        spaceId: folder.spaceId,
+        parentId: folder.parentId,
+        name: folder.name,
+        path: core.folderAncestors(folders, folderId).map((entry) => ({ id: entry.id, name: entry.name }))
+    };
+}
+
+/**
+ * Who reaches this folder through a grant - the ones made on it, and the ones
+ * made further up that it inherits. Showing the inherited rows is the point:
+ * without them somebody reads an empty list and re-invites a person who is
+ * already there through the client above.
+ */
+export async function listFolderMembers(folderId: string): Promise<FolderMemberView[]> {
+    const folder = await prisma.taskFolder.findUnique({ where: { id: folderId }, select: { spaceId: true } });
+    if (!folder) return [];
+    const folders = await prisma.taskFolder.findMany({
+        where: { spaceId: folder.spaceId },
+        select: { id: true, parentId: true, name: true }
+    });
+    const chain = core.folderAncestors(folders, folderId);
+    const grants = await prisma.taskFolderMember.findMany({
+        where: { folderId: { in: chain.map((entry) => entry.id) } },
+        orderBy: { createdAt: "asc" },
+        select: {
+            folderId: true,
+            role: true,
+            user: { select: { id: true, name: true, email: true, image: true } }
+        }
+    });
+    const names = new Map(chain.map((entry) => [entry.id, entry.name]));
+    return grants.map((grant) => ({
+        userId: grant.user.id,
+        name: grant.user.name,
+        email: grant.user.email,
+        image: grant.user.image,
+        role: grant.role as core.SpaceRole,
+        folderId: grant.folderId,
+        folderName: names.get(grant.folderId) ?? "",
+        inherited: grant.folderId !== folderId
+    }));
+}
+
+/** Invite somebody to one branch by email or username, which is what the person
+ *  doing the inviting has in front of them rather than an id. */
+export async function addFolderMember(folderId: string, identifier: string, role: core.SpaceRole): Promise<void> {
+    const needle = identifier.trim().toLowerCase();
+    const user = await prisma.user.findFirst({
+        where: { OR: [{ email: needle }, { username: needle }] },
+        select: { id: true }
+    });
+    if (!user) throw new Error("No account matches that email or username");
+
+    const folder = await prisma.taskFolder.findUnique({
+        where: { id: folderId },
+        select: { space: { select: { ownerId: true } } }
+    });
+    if (folder?.space.ownerId === user.id) throw new Error("That person already owns this space");
+
+    await prisma.taskFolderMember.upsert({
+        where: { folderId_userId: { folderId, userId: user.id } },
+        update: { role },
+        create: { folderId, userId: user.id, role }
+    });
+}
+
+export async function setFolderMemberRole(folderId: string, userId: string, role: core.SpaceRole): Promise<void> {
+    await prisma.taskFolderMember.update({ where: { folderId_userId: { folderId, userId } }, data: { role } });
+}
+
+export async function removeFolderMember(folderId: string, userId: string): Promise<void> {
+    await prisma.taskFolderMember.deleteMany({ where: { folderId, userId } });
 }
 
 // ---------------------------------------------------------------------------
 // Folders and lists
 // ---------------------------------------------------------------------------
 
-/** The next order key at the end of a set, so a new container lands last. */
-async function nextOrder(model: "folder" | "list", spaceId: string): Promise<number> {
+/** The next order key at the end of a container, so a new folder or list lands
+ *  last among its own siblings rather than last in the whole space. */
+async function nextOrder(model: "folder" | "list", spaceId: string, parentId: string | null): Promise<number> {
     const last =
         model === "folder"
             ? await prisma.taskFolder.findFirst({
-                  where: { spaceId },
+                  where: { spaceId, parentId },
                   orderBy: { order: "desc" },
                   select: { order: true }
               })
             : await prisma.taskList.findFirst({
-                  where: { spaceId },
+                  where: { spaceId, folderId: parentId },
                   orderBy: { order: "desc" },
                   select: { order: true }
               });
     return (last?.order ?? 0) + core.ORDER_STEP;
 }
 
-export async function createFolder(spaceId: string, name: string): Promise<string> {
+/**
+ * The order key for a container dropped between two neighbours, re-spacing the
+ * siblings first when the gap has become too thin to split honestly. Returns
+ * null when a neighbour named by the client has since disappeared, so the caller
+ * refuses the drop rather than writing an order derived from nothing.
+ */
+async function orderForDrop(
+    model: "folder" | "list",
+    spaceId: string,
+    parentId: string | null,
+    move: core.ContainerMove
+): Promise<number | null> {
+    const read = async (id: string): Promise<number | null> => {
+        const row =
+            model === "folder"
+                ? await prisma.taskFolder.findUnique({ where: { id }, select: { order: true } })
+                : await prisma.taskList.findUnique({ where: { id }, select: { order: true } });
+        return row?.order ?? null;
+    };
+
+    const before = move.beforeId ? await read(move.beforeId) : null;
+    const after = move.afterId ? await read(move.afterId) : null;
+    if ((move.beforeId && before === null) || (move.afterId && after === null)) return null;
+
+    if (!core.needsRebalance(before, after)) {
+        return before === null && after === null
+            ? await nextOrder(model, spaceId, parentId)
+            : core.orderBetween(before, after);
+    }
+
+    // Too tight to split: re-space the whole container, then read the two
+    // neighbours again so the drop lands in the gap that now exists.
+    await rebalanceContainer(model, spaceId, parentId);
+    const spacedBefore = move.beforeId ? await read(move.beforeId) : null;
+    const spacedAfter = move.afterId ? await read(move.afterId) : null;
+    return core.orderBetween(spacedBefore, spacedAfter);
+}
+
+/** Evenly re-space one container's children after their gaps have collapsed. */
+async function rebalanceContainer(model: "folder" | "list", spaceId: string, parentId: string | null): Promise<void> {
+    const siblings =
+        model === "folder"
+            ? await prisma.taskFolder.findMany({
+                  where: { spaceId, parentId },
+                  orderBy: [{ order: "asc" }, { createdAt: "asc" }],
+                  select: { id: true }
+              })
+            : await prisma.taskList.findMany({
+                  where: { spaceId, folderId: parentId },
+                  orderBy: [{ order: "asc" }, { createdAt: "asc" }],
+                  select: { id: true }
+              });
+    const orders = core.rebalanceOrders(siblings.length);
+    await prisma.$transaction(
+        siblings.map((row, index) =>
+            model === "folder"
+                ? prisma.taskFolder.update({ where: { id: row.id }, data: { order: orders[index] } })
+                : prisma.taskList.update({ where: { id: row.id }, data: { order: orders[index] } })
+        )
+    );
+}
+
+export async function createFolder(input: core.FolderInput): Promise<string> {
+    if (input.parentId) {
+        const parent = await prisma.taskFolder.findUnique({
+            where: { id: input.parentId },
+            select: { spaceId: true }
+        });
+        if (!parent || parent.spaceId !== input.spaceId) throw new Error("That folder is not in this space");
+        const folders = await spaceFolders(input.spaceId);
+        if (core.folderDepth(folders, input.parentId) + 1 >= core.FOLDER_DEPTH_LIMIT) {
+            throw new Error(`Folders can nest ${core.FOLDER_DEPTH_LIMIT} deep`);
+        }
+    }
     const folder = await prisma.taskFolder.create({
-        data: { spaceId, name, order: await nextOrder("folder", spaceId) },
+        data: {
+            spaceId: input.spaceId,
+            parentId: input.parentId,
+            name: input.name,
+            order: await nextOrder("folder", input.spaceId, input.parentId)
+        },
         select: { id: true }
     });
     return folder.id;
@@ -343,16 +584,61 @@ export async function renameFolder(folderId: string, name: string): Promise<void
     await prisma.taskFolder.update({ where: { id: folderId }, data: { name } });
 }
 
-/** Deleting a folder keeps its lists and returns them to the space root: a
- *  folder is an arrangement, not the owner of the work inside it. */
+/** Every folder in a space, as the tree maths wants them. */
+async function spaceFolders(spaceId: string): Promise<{ id: string; parentId: string | null }[]> {
+    return prisma.taskFolder.findMany({ where: { spaceId }, select: { id: true, parentId: true } });
+}
+
+/**
+ * Move a folder to a new parent, a new position among its siblings, or both.
+ * The refusals live in the engine so a drag can grey out an illegal drop with
+ * the same rule that rejects it here.
+ */
+export async function moveFolder(spaceId: string, folderId: string, move: core.ContainerMove): Promise<void> {
+    const folders = await spaceFolders(spaceId);
+    if (move.parentId && !folders.some((folder) => folder.id === move.parentId)) {
+        throw new Error("That folder is not in this space");
+    }
+    const refusal = core.folderMoveRefusal(folders, folderId, move.parentId);
+    if (refusal) throw new Error(refusal);
+
+    const order = await orderForDrop("folder", spaceId, move.parentId, move);
+    if (order === null) throw new Error("That spot has moved. Try again.");
+    await prisma.taskFolder.update({ where: { id: folderId }, data: { parentId: move.parentId, order } });
+}
+
+/** Move a list into a folder (or back to the space root) and position it. */
+export async function moveList(spaceId: string, listId: string, move: core.ContainerMove): Promise<void> {
+    if (move.parentId) {
+        const parent = await prisma.taskFolder.findUnique({ where: { id: move.parentId }, select: { spaceId: true } });
+        if (!parent || parent.spaceId !== spaceId) throw new Error("That folder is not in this space");
+    }
+    const order = await orderForDrop("list", spaceId, move.parentId, move);
+    if (order === null) throw new Error("That spot has moved. Try again.");
+    await prisma.taskList.update({ where: { id: listId }, data: { folderId: move.parentId, order } });
+}
+
+/**
+ * Deleting a folder keeps everything that was inside it and lifts it one level,
+ * to the deleted folder's own parent. A folder is an arrangement, not the owner
+ * of the work inside it, and the alternative - the database cascade - would take
+ * a client's whole project tree down with a mis-click on the client.
+ */
 export async function deleteFolder(folderId: string): Promise<void> {
+    const folder = await prisma.taskFolder.findUnique({ where: { id: folderId }, select: { parentId: true } });
+    if (!folder) return;
     await prisma.$transaction([
-        prisma.taskList.updateMany({ where: { folderId }, data: { folderId: null } }),
+        prisma.taskFolder.updateMany({ where: { parentId: folderId }, data: { parentId: folder.parentId } }),
+        prisma.taskList.updateMany({ where: { folderId }, data: { folderId: folder.parentId } }),
         prisma.taskFolder.delete({ where: { id: folderId } })
     ]);
 }
 
 export async function createList(input: core.ListInput): Promise<string> {
+    if (input.folderId) {
+        const parent = await prisma.taskFolder.findUnique({ where: { id: input.folderId }, select: { spaceId: true } });
+        if (!parent || parent.spaceId !== input.spaceId) throw new Error("That folder is not in this space");
+    }
     const list = await prisma.taskList.create({
         data: {
             spaceId: input.spaceId,
@@ -362,11 +648,15 @@ export async function createList(input: core.ListInput): Promise<string> {
             color: input.color ?? null,
             startDate: input.startDate ? new Date(input.startDate) : null,
             dueDate: input.dueDate ? new Date(input.dueDate) : null,
-            order: await nextOrder("list", input.spaceId)
+            order: await nextOrder("list", input.spaceId, input.folderId)
         },
         select: { id: true }
     });
     return list.id;
+}
+
+export async function renameList(listId: string, name: string): Promise<void> {
+    await prisma.taskList.update({ where: { id: listId }, data: { name } });
 }
 
 export async function updateList(listId: string, input: Omit<core.ListInput, "spaceId">): Promise<void> {

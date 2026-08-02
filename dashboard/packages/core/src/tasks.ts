@@ -800,6 +800,123 @@ export function flattenTree<T extends TaskFacts>(
 }
 
 // ---------------------------------------------------------------------------
+// Folder trees
+// ---------------------------------------------------------------------------
+
+/** The little a folder has to expose for the tree maths to work on it. */
+export interface FolderRow {
+    readonly id: string;
+    readonly parentId: string | null;
+}
+
+export interface FolderNode<T extends FolderRow> {
+    readonly folder: T;
+    readonly depth: number;
+    readonly children: FolderNode<T>[];
+}
+
+/**
+ * Nest folders by parent. A folder whose parent is missing from the set becomes
+ * a root, which is what keeps a pruned tree (somebody invited to one client, not
+ * the whole space) drawable without inventing the ancestors they cannot see.
+ */
+export function buildFolderTree<T extends FolderRow>(
+    folders: readonly T[],
+    maxDepth = work.FOLDER_DEPTH_LIMIT
+): FolderNode<T>[] {
+    const byId = new Map(folders.map((folder) => [folder.id, folder]));
+    const children = new Map<string, T[]>();
+    const roots: T[] = [];
+    for (const folder of folders) {
+        if (folder.parentId && byId.has(folder.parentId)) {
+            const siblings = children.get(folder.parentId);
+            if (siblings) siblings.push(folder);
+            else children.set(folder.parentId, [folder]);
+        } else {
+            roots.push(folder);
+        }
+    }
+    const build = (folder: T, depth: number): FolderNode<T> => ({
+        folder,
+        depth,
+        children:
+            depth + 1 >= maxDepth
+                ? []
+                : (children.get(folder.id) ?? []).map((child) => build(child, depth + 1))
+    });
+    return roots.map((folder) => build(folder, 0));
+}
+
+/** The chain from the root down to this folder, itself last. Bounded by the
+ *  depth limit so a row that somehow points at its own ancestor cannot spin. */
+export function folderAncestors<T extends FolderRow>(folders: readonly T[], folderId: string): T[] {
+    const byId = new Map(folders.map((folder) => [folder.id, folder]));
+    const chain: T[] = [];
+    let current = byId.get(folderId);
+    for (let depth = 0; depth < work.FOLDER_DEPTH_LIMIT && current; depth += 1) {
+        chain.unshift(current);
+        current = current.parentId ? byId.get(current.parentId) : undefined;
+    }
+    return chain;
+}
+
+/** A folder and everything under it. The folder itself is included, because
+ *  every caller either moves it or checks access to the whole branch. */
+export function folderBranch<T extends FolderRow>(folders: readonly T[], folderId: string): Set<string> {
+    const children = new Map<string, string[]>();
+    for (const folder of folders) {
+        if (!folder.parentId) continue;
+        const siblings = children.get(folder.parentId);
+        if (siblings) siblings.push(folder.id);
+        else children.set(folder.parentId, [folder.id]);
+    }
+    const branch = new Set<string>();
+    const stack = [folderId];
+    while (stack.length > 0) {
+        const current = stack.pop() as string;
+        if (branch.has(current)) continue;
+        branch.add(current);
+        for (const child of children.get(current) ?? []) stack.push(child);
+    }
+    return branch;
+}
+
+/** How deep this folder sits, counting the root as zero. */
+export function folderDepth<T extends FolderRow>(folders: readonly T[], folderId: string): number {
+    return Math.max(0, folderAncestors(folders, folderId).length - 1);
+}
+
+/**
+ * Why a folder cannot be dropped where it was dropped, or null when it can.
+ *
+ * Two things go wrong on a drag: dropping a folder inside its own branch, which
+ * detaches the whole subtree from the tree and loses it; and dropping a deep
+ * branch under an already-deep parent, which pushes descendants past the depth
+ * the sidebar and the breadcrumb can render. Both are refused with a sentence a
+ * person can act on rather than a silent no-op.
+ */
+export function folderMoveRefusal<T extends FolderRow>(
+    folders: readonly T[],
+    folderId: string,
+    parentId: string | null
+): string | null {
+    if (parentId === null) return null;
+    if (parentId === folderId) return "A folder cannot be moved into itself";
+    const branch = folderBranch(folders, folderId);
+    if (branch.has(parentId)) return "A folder cannot be moved into one of its own subfolders";
+
+    // The deepest descendant decides: moving a two-level branch under a parent
+    // at depth 6 would put its leaves at 8.
+    const own = folderDepth(folders, folderId);
+    const deepest = [...branch].reduce((max, id) => Math.max(max, folderDepth(folders, id)), own);
+    const height = deepest - own;
+    if (folderDepth(folders, parentId) + 1 + height >= work.FOLDER_DEPTH_LIMIT) {
+        return `Folders can nest ${work.FOLDER_DEPTH_LIMIT} deep, and that would go further`;
+    }
+    return null;
+}
+
+// ---------------------------------------------------------------------------
 // Dependencies
 // ---------------------------------------------------------------------------
 

@@ -100,6 +100,7 @@ model User {
     githubIdentity      GithubIdentity?
     taskSpaces          TaskSpace[]
     taskSpaceMemberships TaskSpaceMember[]
+    taskFolderMemberships TaskFolderMember[]
     taskAssignments     TaskAssignee[]
     taskWatching        TaskWatcher[]
     taskComments        TaskComment[]
@@ -2337,22 +2338,52 @@ model TaskSpaceMember {
     @@index([userId])
 }
 
-// An optional middle layer that groups lists. Deleting one keeps its lists and
-// moves them to the space root, because a folder is an arrangement rather than
-// an owner of the work inside it.
+// An optional middle layer that groups lists, and other folders. The nesting is
+// what lets one space hold the arrangement people already think in - a client,
+// then a project inside that client, then that project's lists - without paying
+// a whole space per client. Deleting a folder keeps what was inside it and
+// lifts it to the folder's own parent, because a folder is an arrangement
+// rather than an owner of the work inside it.
 model TaskFolder {
     id        String   @id @default(uuid(7)) @db.Uuid
     spaceId   String   @db.Uuid
+    parentId  String?  @db.Uuid
     name      String
     order     Float    @default(1024)
     archived  Boolean  @default(false)
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
 
-    space TaskSpace  @relation(fields: [spaceId], references: [id], onDelete: Cascade)
-    lists TaskList[]
+    space    TaskSpace          @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+    parent   TaskFolder?        @relation("TaskFolderNesting", fields: [parentId], references: [id], onDelete: Cascade)
+    children TaskFolder[]       @relation("TaskFolderNesting")
+    lists    TaskList[]
+    members  TaskFolderMember[]
 
     @@index([spaceId])
+    @@index([parentId])
+}
+
+// Somebody granted access to one branch of a space rather than to all of it.
+// This is how a client is given their own folder, or a contractor a single
+// project, without being shown every other client sitting in the same space. A
+// grant reaches everything under the folder it names and nothing beside it, the
+// strongest grant on the chain wins, and a space-level role is never reduced by
+// one.
+model TaskFolderMember {
+    id        String   @id @default(uuid(7)) @db.Uuid
+    folderId  String   @db.Uuid
+    userId    String   @db.Uuid
+    // guest | member | admin - the same vocabulary a space membership uses, so
+    // one role means one thing wherever it was granted.
+    role      String   @default("member")
+    createdAt DateTime @default(now())
+
+    folder TaskFolder @relation(fields: [folderId], references: [id], onDelete: Cascade)
+    user   User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@unique([folderId, userId])
+    @@index([userId])
 }
 
 // Where tasks live. A task cannot exist outside a list, which is what makes the

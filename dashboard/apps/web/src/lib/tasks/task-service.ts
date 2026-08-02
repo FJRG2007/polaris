@@ -29,7 +29,11 @@ import type { PersonRef, TagRef, TaskRow } from "./facts";
  *  refused by the caller rather than quietly returning the whole instance. */
 export interface TaskScope {
     readonly listId?: string;
+    /** Spaces the reader reaches in full. */
     readonly spaceIds?: string[];
+    /** Lists the reader reaches through a folder grant, in spaces they do not
+     *  hold in full. Read together with `spaceIds` as an either-or. */
+    readonly listIds?: string[];
     readonly sprintId?: string;
     readonly assigneeId?: string;
     /** null asks for top-level tasks only, undefined for every level. */
@@ -152,7 +156,17 @@ export async function listTasks(scope: TaskScope, options: TaskQueryOptions = {}
     const records = await prisma.task.findMany({
         where: {
             ...(scope.listId ? { listId: scope.listId } : {}),
-            ...(scope.spaceIds ? { spaceId: { in: scope.spaceIds } } : {}),
+            // Either-or rather than two narrowing clauses: a reader can hold one
+            // space outright and a single folder in another, and both sets of
+            // work belong on a cross-space screen.
+            ...(scope.spaceIds || scope.listIds
+                ? {
+                      OR: [
+                          ...(scope.spaceIds ? [{ spaceId: { in: scope.spaceIds } }] : []),
+                          ...(scope.listIds ? [{ listId: { in: scope.listIds } }] : [])
+                      ]
+                  }
+                : {}),
             ...(scope.sprintId ? { sprintId: scope.sprintId } : {}),
             ...(scope.assigneeId ? { assignees: { some: { userId: scope.assigneeId } } } : {}),
             ...(scope.parentId !== undefined ? { parentId: scope.parentId } : {}),
@@ -389,22 +403,6 @@ function toDependency(
         statusColor: other.status?.color ?? "#64748b",
         finished: other.status ? core.isFinishedStatus(other.status.type as core.TaskStatusType) : false
     };
-}
-
-/** One task by its reference ("ENG-42"), for the command palette and for links
- *  people paste into a comment. */
-export async function findByReference(reference: string, spaceIds: string[]): Promise<string | null> {
-    const match = /^([A-Za-z0-9]+)-(\d+)$/.exec(reference.trim());
-    if (!match) return null;
-    const task = await prisma.task.findFirst({
-        where: {
-            spaceId: { in: spaceIds },
-            number: Number(match[2]),
-            space: { prefix: match[1]!.toUpperCase() }
-        },
-        select: { id: true }
-    });
-    return task?.id ?? null;
 }
 
 // ---------------------------------------------------------------------------
@@ -734,14 +732,20 @@ export async function moveTask(actorId: string, input: core.TaskMoveInput): Prom
         }
         data.listId = input.listId;
     }
-    if (input.statusId && input.statusId !== current.statusId) {
-        const status = await prisma.taskStatus.findUnique({
-            where: { id: input.statusId },
-            select: { type: true, spaceId: true }
-        });
-        if (!status || status.spaceId !== current.spaceId) throw new Error("That status is not in this space");
-        data.statusId = input.statusId;
-        data.completedAt = core.isFinishedStatus(status.type as core.TaskStatusType) ? new Date() : null;
+    if (input.statusId !== undefined && input.statusId !== current.statusId) {
+        if (input.statusId === null) {
+            // Dropped into the column of tasks that have no status yet.
+            data.statusId = null;
+            data.completedAt = null;
+        } else {
+            const status = await prisma.taskStatus.findUnique({
+                where: { id: input.statusId },
+                select: { type: true, spaceId: true }
+            });
+            if (!status || status.spaceId !== current.spaceId) throw new Error("That status is not in this space");
+            data.statusId = input.statusId;
+            data.completedAt = core.isFinishedStatus(status.type as core.TaskStatusType) ? new Date() : null;
+        }
     }
 
     await prisma.task.update({ where: { id: input.taskId }, data });
@@ -780,19 +784,45 @@ async function rebalanceList(listId: string): Promise<void> {
 
 /** Apply one change to a selection. Kept separate from updateTask so the fields
  *  a bulk edit may touch stay an explicit, reviewable list. */
-export async function bulkUpdate(actorId: string, spaceIds: string[], input: core.TaskBulkInput): Promise<number> {
-    // Never let a selection reach outside the spaces the caller was cleared for.
+export async function bulkUpdate(
+    actorId: string,
+    reach: { spaceIds: string[]; listIds: string[] },
+    input: core.TaskBulkInput
+): Promise<number> {
+    // Never let a selection reach outside what the caller was cleared for - the
+    // ids arrive from the browser and a selection is easy to forge.
     const allowed = await prisma.task.findMany({
-        where: { id: { in: input.taskIds }, spaceId: { in: spaceIds } },
-        select: { id: true }
+        where: {
+            id: { in: input.taskIds },
+            OR: [{ spaceId: { in: reach.spaceIds } }, { listId: { in: reach.listIds } }]
+        },
+        select: { id: true, spaceId: true }
     });
     const ids = allowed.map((task) => task.id);
     if (ids.length === 0) return 0;
+    const spacesTouched = new Set(allowed.map((task) => task.spaceId));
 
     const data: Record<string, unknown> = {};
     if (input.priority !== undefined) data.priority = input.priority;
     if (input.dueDate !== undefined) data.dueDate = input.dueDate ? new Date(input.dueDate) : null;
-    if (input.listId !== undefined) data.listId = input.listId;
+    if (input.listId !== undefined) {
+        // The destination is as forgeable as the selection. It also has to sit in
+        // the same space as everything being moved: Task.spaceId is not being
+        // rewritten here, and a task whose list and space disagree drops out of
+        // every space-scoped view at once.
+        const target = await prisma.taskList.findFirst({
+            where: {
+                id: input.listId,
+                OR: [{ spaceId: { in: reach.spaceIds } }, { id: { in: reach.listIds } }]
+            },
+            select: { spaceId: true }
+        });
+        if (!target) throw new Error("You do not have access to that list");
+        if (spacesTouched.size > 1 || !spacesTouched.has(target.spaceId)) {
+            throw new Error("Tasks can only be moved between lists in their own space");
+        }
+        data.listId = input.listId;
+    }
     if (input.sprintId !== undefined) data.sprintId = input.sprintId;
     if (input.archived !== undefined) data.archived = input.archived;
     if (input.statusId !== undefined) {

@@ -106,6 +106,12 @@ Platform:
 Tasks (work management):
 - [x] Hierarchy: Space > Folder > List > Task > nested subtasks, with a stable
       per-space reference ("ENG-42") allocated inside the insert transaction
+- [x] Folders nest as deep as the work does (a client, its projects, their
+      lists), rearranged by dragging in the sidebar and renamed in place (F2,
+      double click, or the right-click menu)
+- [x] Access granted on one folder: a client or a contractor is invited to a
+      branch and sees that branch only, with the space beside it pruned out of
+      the sidebar and every cross-space screen
 - [x] Space-level vocabulary: custom statuses (four kinds), tags, custom fields
       (15 types), members with guest/member/admin roles
 - [x] Tasks: multiple assignees, priorities, start/due dates (all-day or timed),
@@ -145,6 +151,17 @@ Tasks (work management):
   conditions all evaluate through the same code rather than three that drift.
 - An automation's own writes never raise another event. One hop, always: two
   rules pointing at each other would otherwise run until the request timed out.
+- A Tasks folder is an arrangement, not an owner. Deleting one lifts its
+  subfolders and lists to its own parent rather than taking them with it; the
+  database cascade behind it is the backstop for a row deleted out from under
+  the application, not the path a person takes.
+- Tasks access is granted at two levels and they only ever add up. A space role
+  covers everything in the space; a folder grant covers one branch and inherits
+  downwards, with the strongest grant on the chain winning. A grant never
+  reduces a space role, and never reaches the space's own settings, sprints,
+  goals or wiki - those belong to the whole space. Cross-space screens read a
+  resolved scope (spaces held outright, plus the exact lists granted elsewhere)
+  rather than asking per row, so an aggregate cannot leak the client next door.
 - Accepted dependency risk: two moderate advisories remain against `postcss@8.4.31`
   bundled inside Next.js's private build toolchain (an XSS-in-CSS-stringify path
   that our app never exercises - build-time only, no untrusted CSS). The direct

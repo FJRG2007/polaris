@@ -8,6 +8,7 @@
 
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
+import { scopeTaskWhere, type TaskScope } from "./access";
 
 export interface RunningTimer {
     readonly entryId: string;
@@ -119,7 +120,7 @@ export interface Timesheet {
  * task with both billable and unbillable time shows the split instead of hiding
  * it in a single number an invoice cannot use.
  */
-export async function weeklyTimesheet(userId: string, anchor: Date, spaceIds: string[]): Promise<Timesheet> {
+export async function weeklyTimesheet(userId: string, anchor: Date, scope: TaskScope): Promise<Timesheet> {
     const from = core.startOfWeek(anchor);
     const to = core.endOfDay(core.addDays(from, 6));
 
@@ -127,7 +128,7 @@ export async function weeklyTimesheet(userId: string, anchor: Date, spaceIds: st
         where: {
             userId,
             startedAt: { gte: from, lte: to },
-            task: { spaceId: { in: spaceIds } }
+            task: scopeTaskWhere(scope)
         },
         select: {
             seconds: true,
@@ -185,13 +186,13 @@ export async function weeklyTimesheet(userId: string, anchor: Date, spaceIds: st
 /** Time logged across a set of spaces in a window, by person. Feeds the report
  *  screen without pulling every entry into the page. */
 export async function timeByPerson(
-    spaceIds: string[],
+    scope: TaskScope,
     from: Date,
     to: Date
 ): Promise<{ userId: string; name: string; seconds: number }[]> {
     const grouped = await prisma.taskTimeEntry.groupBy({
         by: ["userId"],
-        where: { startedAt: { gte: from, lte: to }, task: { spaceId: { in: spaceIds } } },
+        where: { startedAt: { gte: from, lte: to }, task: scopeTaskWhere(scope) },
         _sum: { seconds: true }
     });
     if (grouped.length === 0) return [];

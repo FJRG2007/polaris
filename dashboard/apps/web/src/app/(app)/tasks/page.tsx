@@ -10,25 +10,24 @@ import { HomeView } from "./home-view";
 import { SpaceTree } from "./space-tree";
 import { requirePermission } from "@/lib/session";
 import { listTasks } from "@/lib/tasks/task-service";
-import { resolveSpaceRole } from "@/lib/tasks/access";
 import type { SpaceContext } from "@/lib/tasks/facts";
 import { runningTimer } from "@/lib/tasks/time-service";
 import { listSpaceTree } from "@/lib/tasks/space-service";
 import { myWorkCounts } from "@/lib/tasks/report-service";
 import { buildSpaceContext } from "@/lib/tasks/screen-context";
-import { visibleSpaceIds, type TaskActor } from "@/lib/tasks/access";
+import { scopedSpaceRole, visibleScope, type TaskActor } from "@/lib/tasks/access";
 
 export const dynamic = "force-dynamic";
 
 export default async function TasksHomePage() {
     const user = await requirePermission("tasks.read");
     const actor: TaskActor = { id: user.id, isAdmin: user.isAdmin };
-    const spaceIds = await visibleSpaceIds(actor);
+    const scope = await visibleScope(actor);
 
     const [tree, tasks, counts, timer] = await Promise.all([
-        listSpaceTree(user.id, spaceIds, user.isAdmin),
-        listTasks({ spaceIds, assigneeId: user.id }, { limit: 500 }),
-        myWorkCounts(user.id, spaceIds),
+        listSpaceTree(user.id, scope, user.isAdmin),
+        listTasks({ spaceIds: scope.spaceIds, listIds: scope.listIds, assigneeId: user.id }, { limit: 500 }),
+        myWorkCounts(user.id, scope),
         runningTimer(user.id)
     ]);
 
@@ -37,8 +36,8 @@ export default async function TasksHomePage() {
     const involved = [...new Set(tasks.map((task) => task.spaceId))];
     const contexts: Record<string, SpaceContext> = {};
     for (const spaceId of involved) {
-        const role = await resolveSpaceRole(actor, spaceId);
-        if (role) contexts[spaceId] = await buildSpaceContext(spaceId, role, user.id);
+        const role = await scopedSpaceRole(actor, scope, spaceId);
+        if (role) contexts[spaceId] = await buildSpaceContext(spaceId, role, user.id, scope);
     }
 
     return (

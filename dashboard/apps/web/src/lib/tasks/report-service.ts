@@ -9,6 +9,7 @@
 
 import * as core from "@polaris/core";
 import { prisma, type Prisma } from "@polaris/db";
+import { scopeSpaceIds, scopeTaskWhere, type TaskScope } from "./access";
 
 export interface ReportSummary {
     readonly total: number;
@@ -48,8 +49,9 @@ export interface TaskReport {
     readonly completion: CompletionPoint[];
 }
 
-/** The whole reporting page for a set of spaces, in one pass. */
-export async function buildReport(spaceIds: string[], now = new Date()): Promise<TaskReport> {
+/** The whole reporting page for everything the reader can reach, in one pass. */
+export async function buildReport(scope: TaskScope, now = new Date()): Promise<TaskReport> {
+    const spaceIds = scopeSpaceIds(scope);
     if (spaceIds.length === 0) {
         return {
             summary: {
@@ -70,7 +72,11 @@ export async function buildReport(spaceIds: string[], now = new Date()): Promise
 
     const weekStart = core.startOfWeek(now);
     const weekEnd = core.endOfDay(core.addDays(weekStart, 6));
-    const scope: Prisma.TaskWhereInput = { spaceId: { in: spaceIds }, archived: false };
+    // The reach clause is itself an OR, so anything else that needs one is
+    // nested under AND rather than spread beside it, where it would overwrite it
+    // and quietly widen every count on the page.
+    const reach = scopeTaskWhere(scope);
+    const base: Prisma.TaskWhereInput = { ...reach, archived: false };
     const finishedTypes: Prisma.TaskWhereInput = { status: { type: { in: ["done", "closed"] } } };
     // A task with no status at all is still outstanding, so the "not finished"
     // filter has to say so explicitly rather than relying on the join.
@@ -80,19 +86,19 @@ export async function buildReport(spaceIds: string[], now = new Date()): Promise
 
     const [total, done, overdue, dueThisWeek, completedThisWeek, tracked, statuses, priorities, completion] =
         await Promise.all([
-            prisma.task.count({ where: scope }),
-            prisma.task.count({ where: { ...scope, ...finishedTypes } }),
-            prisma.task.count({ where: { ...scope, ...unfinished, dueDate: { lt: core.startOfDay(now) } } }),
-            prisma.task.count({ where: { ...scope, dueDate: { gte: weekStart, lte: weekEnd } } }),
-            prisma.task.count({ where: { ...scope, completedAt: { gte: weekStart, lte: weekEnd } } }),
+            prisma.task.count({ where: base }),
+            prisma.task.count({ where: { ...base, ...finishedTypes } }),
+            prisma.task.count({ where: { ...base, AND: [unfinished], dueDate: { lt: core.startOfDay(now) } } }),
+            prisma.task.count({ where: { ...base, dueDate: { gte: weekStart, lte: weekEnd } } }),
+            prisma.task.count({ where: { ...base, completedAt: { gte: weekStart, lte: weekEnd } } }),
             prisma.taskTimeEntry.aggregate({
-                where: { startedAt: { gte: weekStart, lte: weekEnd }, task: { spaceId: { in: spaceIds } } },
+                where: { startedAt: { gte: weekStart, lte: weekEnd }, task: reach },
                 _sum: { seconds: true }
             }),
-            prisma.task.groupBy({ by: ["statusId"], where: scope, _count: { _all: true } }),
-            prisma.task.groupBy({ by: ["priority"], where: { ...scope, ...unfinished }, _count: { _all: true } }),
+            prisma.task.groupBy({ by: ["statusId"], where: base, _count: { _all: true } }),
+            prisma.task.groupBy({ by: ["priority"], where: { ...base, AND: [unfinished] }, _count: { _all: true } }),
             prisma.task.findMany({
-                where: { ...scope, completedAt: { gte: core.addDays(core.startOfDay(now), -29) } },
+                where: { ...base, completedAt: { gte: core.addDays(core.startOfDay(now), -29) } },
                 select: { completedAt: true }
             })
         ]);
@@ -143,20 +149,20 @@ export async function buildReport(spaceIds: string[], now = new Date()): Promise
         byPriority: priorities
             .map((row) => ({ priority: row.priority as core.TaskPriority, count: row._count._all }))
             .sort((left, right) => core.priorityRank(left.priority) - core.priorityRank(right.priority)),
-        load: await workload(spaceIds, now),
+        load: await workload(scope, now),
         completion: [...days.entries()].map(([date, completed]) => ({ date, completed }))
     };
 }
 
 /** Who is carrying what, counted from the assignee table so a task with two
  *  owners appears on both of their rows. */
-async function workload(spaceIds: string[], now: Date): Promise<PersonLoad[]> {
+async function workload(scope: TaskScope, now: Date): Promise<PersonLoad[]> {
     const assignments = await prisma.taskAssignee.findMany({
         where: {
             task: {
-                spaceId: { in: spaceIds },
+                ...scopeTaskWhere(scope),
                 archived: false,
-                OR: [{ status: null }, { status: { type: { in: ["open", "active"] } } }]
+                AND: [{ OR: [{ status: null }, { status: { type: { in: ["open", "active"] } } }] }]
             }
         },
         select: {
@@ -187,17 +193,17 @@ async function workload(spaceIds: string[], now: Date): Promise<PersonLoad[]> {
 }
 
 /** What one person has on right now, for the home screen headline. */
-export async function myWorkCounts(userId: string, spaceIds: string[], now = new Date()): Promise<{
+export async function myWorkCounts(userId: string, scope: TaskScope, now = new Date()): Promise<{
     assigned: number;
     overdue: number;
     dueToday: number;
 }> {
-    if (spaceIds.length === 0) return { assigned: 0, overdue: 0, dueToday: 0 };
+    if (scopeSpaceIds(scope).length === 0) return { assigned: 0, overdue: 0, dueToday: 0 };
     const mine: Prisma.TaskWhereInput = {
-        spaceId: { in: spaceIds },
+        ...scopeTaskWhere(scope),
         archived: false,
         assignees: { some: { userId } },
-        OR: [{ status: null }, { status: { type: { in: ["open", "active"] } } }]
+        AND: [{ OR: [{ status: null }, { status: { type: { in: ["open", "active"] } } }] }]
     };
 
     const [assigned, overdue, dueToday] = await Promise.all([
