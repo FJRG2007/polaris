@@ -15,18 +15,18 @@
 
 import Link from "next/link";
 import { createPortal } from "react-dom";
+import { createProjectAction } from "./actions";
 import { Plus, type LucideIcon } from "lucide-react";
 import type { StagedChangeView } from "@/lib/deploy-staged-changes";
-import { createEnvironmentAction, createProjectAction } from "./actions";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Activity, LayoutGrid, ScrollText, Settings } from "lucide-react";
 import { useEffect, useState, useTransition, type ReactNode } from "react";
 import { StagedChangesBanner, StagedChangesProvider } from "./staged-changes";
+import { NEW_ENVIRONMENT, NewEnvironmentDialog, newEnvironmentOption } from "./new-environment-dialog";
 import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, Input, Select, cn } from "@polaris/ui";
 
-/** Picking one of these opens a create dialog instead of switching to it. */
+/** Picking this opens the create dialog instead of switching to it. */
 const NEW_PROJECT = "__new_project__";
-const NEW_ENV = "__new_environment__";
 
 export interface ShellEnvironment {
     id: string;
@@ -91,7 +91,7 @@ export function ProjectShell({
     }
 
     function selectEnvironment(id: string): void {
-        if (id === NEW_ENV) {
+        if (id === NEW_ENVIRONMENT) {
             setShowNewEnv(true);
             return;
         }
@@ -106,9 +106,7 @@ export function ProjectShell({
     const newProjectOption = canManage
         ? [{ value: NEW_PROJECT, label: "New project", icon: <Plus className="size-3.5 text-muted-foreground" /> }]
         : [];
-    const newEnvOption = canManage
-        ? [{ value: NEW_ENV, label: "New environment", icon: <Plus className="size-3.5 text-muted-foreground" /> }]
-        : [];
+    const newEnvOption = newEnvironmentOption(canManage);
 
     const projectSelect = (
         <Select
@@ -271,72 +269,6 @@ function NewProjectDialog({ open, onOpenChange }: { open: boolean; onOpenChange:
                             value={name}
                             onChange={(event) => setName(event.target.value)}
                             placeholder="my-project"
-                            onKeyDown={(event) => event.key === "Enter" && submit()}
-                        />
-                    </label>
-                    {error && <p className="text-sm text-danger">{error}</p>}
-                    <div className="flex justify-end gap-2">
-                        <Button variant="ghost" onClick={() => onOpenChange(false)}>
-                            Cancel
-                        </Button>
-                        <Button onClick={submit} disabled={pending || !name.trim()}>
-                            Create
-                        </Button>
-                    </div>
-                </div>
-            </DialogContent>
-        </Dialog>
-    );
-}
-
-function NewEnvironmentDialog({
-    projectId,
-    open,
-    onOpenChange,
-    onCreated
-}: {
-    projectId: string;
-    open: boolean;
-    onOpenChange: (open: boolean) => void;
-    onCreated: (id: string) => void;
-}) {
-    const router = useRouter();
-    const [name, setName] = useState("");
-    const [error, setError] = useState<string | null>(null);
-    const [pending, startTransition] = useTransition();
-
-    function submit() {
-        if (!name.trim()) return;
-        setError(null);
-        startTransition(async () => {
-            const result = await createEnvironmentAction({ projectId, name });
-            if (result.error) {
-                setError(result.error);
-                return;
-            }
-            setName("");
-            onOpenChange(false);
-            // Land on what was just created: an environment made and then not
-            // switched to reads as if nothing happened.
-            if (result.id) onCreated(result.id);
-            else router.refresh();
-        });
-    }
-
-    return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-md">
-                <DialogHeader>
-                    <DialogTitle>New environment</DialogTitle>
-                </DialogHeader>
-                <div className="flex flex-col gap-3">
-                    <label className="flex flex-col gap-1.5">
-                        <span className="text-xs font-medium text-muted-foreground">Name</span>
-                        <Input
-                            autoFocus
-                            value={name}
-                            onChange={(event) => setName(event.target.value)}
-                            placeholder="development"
                             onKeyDown={(event) => event.key === "Enter" && submit()}
                         />
                     </label>

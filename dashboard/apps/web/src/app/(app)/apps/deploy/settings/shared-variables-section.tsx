@@ -19,6 +19,7 @@ import { useEffect, useState, useTransition } from "react";
 import { Button, Checkbox, Input, Select } from "@polaris/ui";
 import type { ProjectSettingsView } from "@/lib/deploy-project-service";
 import { Eye, EyeOff, Loader2, Plus, Trash2, Upload } from "lucide-react";
+import { NEW_ENVIRONMENT, NewEnvironmentDialog, newEnvironmentOption } from "../new-environment-dialog";
 import {
     deleteEnvVarAction,
     importEnvVarsAction,
@@ -42,6 +43,7 @@ export function SharedVariablesSection({
     const [value, setValue] = useState("");
     const [secret, setSecret] = useState(false);
     const [importing, setImporting] = useState(false);
+    const [creating, setCreating] = useState(false);
     const [bulk, setBulk] = useState("");
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
@@ -118,11 +120,32 @@ export function SharedVariablesSection({
         });
     }
 
+    /** Picking the create option opens the dialog instead of switching to it. */
+    function selectEnvironment(id: string) {
+        if (id === NEW_ENVIRONMENT) setCreating(true);
+        else setEnvironmentId(id);
+    }
+
     if (!first) {
         return (
-            <SettingsCard title="Shared variables" description="Values every service in an environment receives.">
-                <p className="text-sm text-muted-foreground">This project has no environments yet.</p>
-            </SettingsCard>
+            <>
+                <SettingsCard title="Shared variables" description="Values every service in an environment receives.">
+                    <p className="text-sm text-muted-foreground">This project has no environments yet.</p>
+                    {canManage && (
+                        <div>
+                            <Button variant="ghost" onClick={() => setCreating(true)}>
+                                <Plus className="size-4" /> New environment
+                            </Button>
+                        </div>
+                    )}
+                </SettingsCard>
+                <NewEnvironmentDialog
+                    projectId={settings.id}
+                    open={creating}
+                    onOpenChange={setCreating}
+                    onCreated={setEnvironmentId}
+                />
+            </>
         );
     }
 
@@ -134,11 +157,14 @@ export function SharedVariablesSection({
             >
                 <Select
                     value={environmentId}
-                    onValueChange={setEnvironmentId}
-                    options={settings.environments.map((environment) => ({
-                        value: environment.id,
-                        label: environment.name
-                    }))}
+                    onValueChange={selectEnvironment}
+                    options={[
+                        ...settings.environments.map((environment) => ({
+                            value: environment.id,
+                            label: environment.name
+                        })),
+                        ...newEnvironmentOption(canManage)
+                    ]}
                     className="max-w-xs"
                     aria-label="Environment"
                 />
@@ -264,6 +290,13 @@ export function SharedVariablesSection({
                     )}
                 </SettingsCard>
             )}
+
+            <NewEnvironmentDialog
+                projectId={settings.id}
+                open={creating}
+                onOpenChange={setCreating}
+                onCreated={setEnvironmentId}
+            />
         </div>
     );
 }

@@ -16,7 +16,8 @@ import { SettingsCard } from "../project-settings";
 import { deleteEnvironmentAction } from "../actions";
 import { useDisplayFormat } from "@/components/display-format";
 import { Button, ConfirmDeleteDialog, Input } from "@polaris/ui";
-import { Check, Pencil, Star, Trash2, X } from "lucide-react";
+import { NewEnvironmentDialog } from "../new-environment-dialog";
+import { Check, Pencil, Plus, Star, Trash2, X } from "lucide-react";
 import { renameEnvironmentAction, setDefaultEnvironmentAction } from "../project-actions";
 import type { ProjectEnvironmentView, ProjectSettingsView } from "@/lib/deploy-project-service";
 
@@ -31,6 +32,7 @@ export function EnvironmentsSection({
     const [renaming, setRenaming] = useState<string | null>(null);
     const [draft, setDraft] = useState("");
     const [deleting, setDeleting] = useState<ProjectEnvironmentView | null>(null);
+    const [creating, setCreating] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
     const display = useDisplayFormat();
@@ -189,7 +191,17 @@ export function EnvironmentsSection({
                         </div>
                     ))}
                 </div>
+
+                {canManage && (
+                    <div className="flex justify-end">
+                        <Button variant="ghost" onClick={() => setCreating(true)}>
+                            <Plus className="size-4" /> New environment
+                        </Button>
+                    </div>
+                )}
             </SettingsCard>
+
+            <NewEnvironmentDialog projectId={settings.id} open={creating} onOpenChange={setCreating} />
 
             <ConfirmDeleteDialog
                 open={deleting !== null}
