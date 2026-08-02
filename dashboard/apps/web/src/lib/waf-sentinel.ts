@@ -13,6 +13,7 @@
 
 import { runWafJails } from "@/lib/waf-ban-service";
 import { runSshJails } from "@/lib/waf-ssh-service";
+import { runWafAnomalies } from "@/lib/waf-anomaly-service";
 import { publishWafIntel, pruneWafBans, refreshWafFeeds } from "@/lib/waf-intel-service";
 
 /** How often the log is scanned. Fast enough that a scanner is stopped mid-sweep,
@@ -43,6 +44,9 @@ export function startWafSentinel(): void {
     const tick = async () => {
         try {
             await runWafJails();
+            // Same log, a different question: not who was refused, but who is using a
+            // route in a way the rest of its traffic does not.
+            await runWafAnomalies();
             if (ticks % SSH_EVERY_TICKS === 0) await runSshJails();
             if (ticks % MAINTENANCE_EVERY_TICKS === 0) {
                 await refreshWafFeeds();

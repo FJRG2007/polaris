@@ -24,6 +24,8 @@ export * from "./runner-placement.js";
 export * from "./waf-rules.js";
 export * from "./waf-jails.js";
 export * from "./waf-auth-log.js";
+export * from "./waf-anomalies.js";
+export * from "./analytics-visit.js";
 export * from "./waf-intel.js";
 export * from "./waf-presets.js";
 export * from "./waf-analytics.js";

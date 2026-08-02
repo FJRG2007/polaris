@@ -15,14 +15,17 @@
 
 import Link from "next/link";
 import { useDisplayFormat } from "@/components/display-format";
-import type { WafJail, WafTrafficSummary } from "@polaris/core";
+import type { WafAnomalySettings } from "@/lib/waf-anomaly-service";
 import { useCallback, useEffect, useState, useTransition } from "react";
-import { Activity, Ban, Globe, RefreshCw, ShieldOff, Timer, TriangleAlert } from "lucide-react";
+import type { WafAnomaly, WafJail, WafTrafficSummary } from "@polaris/core";
+import { Activity, Ban, Globe, RadarIcon, RefreshCw, ShieldOff, Timer, TriangleAlert } from "lucide-react";
 import { Badge, Button, Card, CardBody, CardHeader, CardTitle, Skeleton, Switch, TimeSeriesChart } from "@polaris/ui";
 import {
+    blockAnomalyAction,
     getWafOverviewAction,
     liftWafBanAction,
     setTorBlockedAction,
+    setWafAnomalySettingsAction,
     setWafJailsAction,
     type WafBanView
 } from "./actions";
@@ -33,7 +36,7 @@ type Overview = Awaited<ReturnType<typeof getWafOverviewAction>>;
  *  would pick a separator from the browser, which disagrees with the server on the
  *  first render and is not the operator's chosen format either. */
 function grouped(value: number): string {
-    return String(Math.round(value)).replace(/B(?=(d{3})+(?!d))/g, ",");
+    return String(Math.round(value)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 }
 
 /** How far back the traffic panel looks. The edge log is the source, so a longer
@@ -101,6 +104,12 @@ export function FirewallInstancePanels() {
                 loading={!data}
                 refreshing={refreshing}
                 onRefresh={() => load(hours)}
+            />
+            <AnomaliesPanel
+                anomalies={data?.anomalies}
+                settings={data?.anomalySettings}
+                loading={!data}
+                mutate={mutate}
             />
             <BansPanel bans={data?.bans} loading={!data} mutate={mutate} />
             <JailsPanel jails={data?.jails} loading={!data} onSaved={() => load(hours)} />
@@ -230,6 +239,160 @@ function TopList({ title, entries }: { title: string; entries: readonly { value:
     );
 }
 
+/**
+ * What the detector currently sees in the traffic: addresses using a route in a way
+ * the rest of its traffic does not.
+ *
+ * The evidence is shown, not just the verdict. "198.51.100.9 made 200 requests where
+ * everyone else made about 5" is something an operator can agree or disagree with;
+ * "suspicious activity detected" is not, and it is why nobody trusts that kind of
+ * panel. Automatic blocking is off until they have seen it be right a few times.
+ */
+function AnomaliesPanel({
+    anomalies,
+    settings,
+    loading,
+    mutate
+}: {
+    anomalies: WafAnomaly[] | undefined;
+    settings: WafAnomalySettings | undefined;
+    loading: boolean;
+    mutate: Mutate;
+}) {
+    const high = (anomalies ?? []).filter((anomaly) => anomaly.severity === "high").length;
+
+    function patchSettings(next: WafAnomalySettings) {
+        mutate(
+            (current) => ({ ...current, anomalySettings: next }),
+            () => setWafAnomalySettingsAction(next)
+        );
+    }
+
+    return (
+        <Card>
+            <CardHeader className="flex flex-wrap items-center justify-between gap-2">
+                <CardTitle className="flex items-center gap-2">
+                    <RadarIcon className="size-4 text-muted-foreground" />
+                    Anomalies
+                    {high > 0 ? <Badge variant="danger">{String(high)}</Badge> : null}
+                </CardTitle>
+                {settings ? (
+                    <Switch
+                        checked={settings.enabled}
+                        aria-label="Detect route abuse"
+                        onChange={(on) => patchSettings({ ...settings, enabled: on })}
+                    />
+                ) : null}
+            </CardHeader>
+            <CardBody className="flex flex-col gap-3">
+                <p className="text-xs text-muted-foreground">
+                    Traffic that is fine one request at a time and wrong in aggregate: a file pulled hundreds of times,
+                    a route walked rather than used, a payload in a query string. Each address is judged against what
+                    the rest of that route&apos;s visitors do, so a busy endpoint is not an anomaly just for being busy.
+                </p>
+
+                {loading ? (
+                    <Skeleton className="h-20 w-full" />
+                ) : !settings?.enabled ? (
+                    <p className="py-4 text-center text-sm text-muted-foreground">Detection is off.</p>
+                ) : !anomalies || anomalies.length === 0 ? (
+                    <p className="py-4 text-center text-sm text-muted-foreground">
+                        Nothing unusual in the last ten minutes.
+                    </p>
+                ) : (
+                    <ul className="flex flex-col gap-2">
+                        {anomalies.slice(0, 12).map((anomaly) => (
+                            <li
+                                key={`${anomaly.kind}:${anomaly.ip}:${anomaly.route}`}
+                                className="flex items-start justify-between gap-3 rounded-md border border-border px-3 py-2"
+                            >
+                                <div className="min-w-0">
+                                    <div className="flex flex-wrap items-center gap-2 text-sm">
+                                        <span className="font-mono text-xs">{anomaly.ip}</span>
+                                        <Badge variant={anomaly.severity === "high" ? "danger" : "neutral"}>
+                                            {anomaly.kind.replace(/-/g, " ")}
+                                        </Badge>
+                                        <span className="truncate font-mono text-xs text-muted-foreground">
+                                            {anomaly.route}
+                                        </span>
+                                    </div>
+                                    <p className="mt-0.5 text-xs text-muted-foreground">{anomaly.detail}</p>
+                                </div>
+                                <button
+                                    type="button"
+                                    aria-label={`Block ${anomaly.ip}`}
+                                    title="Block this address"
+                                    onClick={() =>
+                                        mutate(
+                                            (current) => ({
+                                                ...current,
+                                                anomalies: current.anomalies?.filter((entry) => entry.ip !== anomaly.ip)
+                                            }),
+                                            () => blockAnomalyAction(anomaly.ip, `${anomaly.route}: ${anomaly.detail}`)
+                                        )
+                                    }
+                                    className="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-danger/10 hover:text-danger"
+                                >
+                                    <Ban className="size-3.5" />
+                                </button>
+                            </li>
+                        ))}
+                    </ul>
+                )}
+
+                {settings?.enabled ? (
+                    <div className="flex flex-col gap-2 rounded-md border border-border px-3 py-2.5">
+                        <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                                <div className="text-sm">Block automatically</div>
+                                <p className="mt-0.5 text-xs text-muted-foreground">
+                                    Bans the address behind anything scored high, without waiting for you. Leave it off
+                                    until the findings above have been right a few times.
+                                </p>
+                            </div>
+                            <Switch
+                                checked={settings.autoBlock}
+                                aria-label="Block anomalies automatically"
+                                onChange={(on) => patchSettings({ ...settings, autoBlock: on })}
+                            />
+                        </div>
+                        <div className="flex flex-wrap gap-3">
+                            <NumberField
+                                label="Times the norm"
+                                value={settings.overBaseline}
+                                min={2}
+                                max={1000}
+                                onChange={(value) => patchSettings({ ...settings, overBaseline: value })}
+                            />
+                            <NumberField
+                                label="Asset fetches"
+                                value={settings.assetMax}
+                                min={5}
+                                max={100000}
+                                onChange={(value) => patchSettings({ ...settings, assetMax: value })}
+                            />
+                            <NumberField
+                                label="Query variants"
+                                value={settings.variantMax}
+                                min={5}
+                                max={100000}
+                                onChange={(value) => patchSettings({ ...settings, variantMax: value })}
+                            />
+                            <NumberField
+                                label="Ban for (min)"
+                                value={Math.round(settings.banTimeSec / 60)}
+                                min={1}
+                                max={43200}
+                                onChange={(value) => patchSettings({ ...settings, banTimeSec: value * 60 })}
+                            />
+                        </div>
+                    </div>
+                ) : null}
+            </CardBody>
+        </Card>
+    );
+}
+
 function BansPanel({ bans, loading, mutate }: { bans: WafBanView[] | undefined; loading: boolean; mutate: Mutate }) {
     const format = useDisplayFormat();
 
@@ -239,7 +402,7 @@ function BansPanel({ bans, loading, mutate }: { bans: WafBanView[] | undefined; 
                 <CardTitle className="flex items-center gap-2">
                     <Ban className="size-4 text-muted-foreground" />
                     Blocked right now
-                    {bans && bans.length > 0 ? <Badge>{bans.length}</Badge> : null}
+                    {bans && bans.length > 0 ? <Badge>{String(bans.length)}</Badge> : null}
                 </CardTitle>
             </CardHeader>
             <CardBody>

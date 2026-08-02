@@ -13,8 +13,21 @@ import { recordAudit } from "@/lib/audit-service";
 import { syncAppRoutes } from "@/lib/deploy-service";
 import { syncDashboardRoute } from "@/lib/domain-edge";
 import { wafTraffic } from "@/lib/waf-analytics-service";
+import {
+    currentWafAnomalies,
+    getWafAnomalySettings,
+    setWafAnomalySettings,
+    type WafAnomalySettings
+} from "@/lib/waf-anomaly-service";
 import { getWafRule, setWafRule, type WafRuleView } from "@/lib/waf-service";
-import { getWafFeed, listWafBans, removeWafBan, setWafFeedEnabled } from "@/lib/waf-intel-service";
+import {
+    getWafFeed,
+    listWafBans,
+    publishWafIntel,
+    recordWafBan,
+    removeWafBan,
+    setWafFeedEnabled
+} from "@/lib/waf-intel-service";
 import {
     getWafIgnoreList,
     getWafJails,
@@ -28,6 +41,7 @@ import {
     WAF_LIST_MAX,
     type WafCustomRule,
     type WafJail,
+    type WafAnomaly,
     type WafScopeType,
     type WafTrafficSummary
 } from "@polaris/core";
@@ -106,16 +120,20 @@ export async function getWafOverviewAction(hours = 24): Promise<{
     jails?: WafJail[];
     ignore?: string[];
     tor?: { enabled: boolean; count: number; fetchedAt: string | null; error: string | null };
+    anomalies?: WafAnomaly[];
+    anomalySettings?: WafAnomalySettings;
     error?: string;
 }> {
     await requirePermission("system.manage");
     try {
-        const [traffic, bans, jails, ignore, feed] = await Promise.all([
+        const [traffic, bans, jails, ignore, feed, anomalies, anomalySettings] = await Promise.all([
             wafTraffic(hours),
             listWafBans(),
             getWafJails(),
             getWafIgnoreList(),
-            getWafFeed("tor")
+            getWafFeed("tor"),
+            currentWafAnomalies(),
+            getWafAnomalySettings()
         ]);
         return {
             traffic,
@@ -129,6 +147,8 @@ export async function getWafOverviewAction(hours = 24): Promise<{
             })),
             jails,
             ignore,
+            anomalies,
+            anomalySettings,
             tor: {
                 enabled: feed?.enabled ?? false,
                 count: countEntries(feed?.entries),
@@ -216,5 +236,53 @@ export async function setTorBlockedAction(enabled: boolean): Promise<{ error?: s
         return {};
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Could not change the Tor setting" };
+    }
+}
+
+const anomalySettingsSchema = z.object({
+    enabled: z.boolean(),
+    autoBlock: z.boolean(),
+    banTimeSec: z.number().int().min(60).max(30 * 24 * 3600),
+    minHits: z.number().int().min(5).max(100000),
+    overBaseline: z.number().int().min(2).max(1000),
+    assetMax: z.number().int().min(5).max(100000),
+    variantMax: z.number().int().min(5).max(100000)
+});
+
+export async function setWafAnomalySettingsAction(settings: WafAnomalySettings): Promise<{ error?: string }> {
+    const user = await requirePermission("system.manage");
+    const parsed = anomalySettingsSchema.safeParse(settings);
+    if (!parsed.success) return { error: "Those anomaly settings are not valid" };
+    try {
+        await setWafAnomalySettings(parsed.data);
+        await recordAudit({ actorId: user.id, action: "waf.anomalies.set", targetType: "global", targetId: "anomalies" });
+        revalidatePath(FIREWALL_PATH);
+        return {};
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not save the settings" };
+    }
+}
+
+/** Block the address behind a finding by hand, for an operator who has looked at the
+ *  evidence and does not want to wait for automatic blocking to be trusted. */
+export async function blockAnomalyAction(ip: string, note: string): Promise<{ error?: string }> {
+    const user = await requirePermission("system.manage");
+    const parsed = cidrOrIp.safeParse(ip);
+    if (!parsed.success) return { error: "That is not a valid address" };
+    try {
+        const settings = await getWafAnomalySettings();
+        await recordWafBan({
+            ip: parsed.data,
+            reason: "manual",
+            source: "anomaly",
+            note: note.slice(0, 200),
+            until: new Date(Date.now() + settings.banTimeSec * 1000)
+        });
+        await publishWafIntel();
+        await recordAudit({ actorId: user.id, action: "waf.anomaly.block", targetType: "ip", targetId: parsed.data });
+        revalidatePath(FIREWALL_PATH);
+        return {};
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not block that address" };
     }
 }
