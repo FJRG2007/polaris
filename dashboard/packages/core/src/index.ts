@@ -8,6 +8,7 @@
 // Note: token hashing (./tokens.js) uses node:crypto and is intentionally NOT
 // re-exported here so this barrel stays client-safe. Import it from
 // "@polaris/core/tokens" in server-only code.
+export * from "./async.js";
 export * from "./cidr.js";
 export * from "./geo.js";
 export * from "./hostnames.js";

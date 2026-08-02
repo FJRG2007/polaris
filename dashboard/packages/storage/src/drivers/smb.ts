@@ -9,10 +9,10 @@
  * faster - but this keeps SMB usable everywhere.
  */
 
+import SMB2 from "v9u-smb2";
 import { Readable } from "node:stream";
 import type { Writable } from "node:stream";
-import SMB2 from "v9u-smb2";
-import { baseName, normalizeRelPath } from "@polaris/core";
+import { baseName, normalizeRelPath, withTimeout } from "@polaris/core";
 import {
     StorageError,
     type ListOptions,
@@ -277,22 +277,4 @@ function parentOf(rel: string): string {
 
 function message(error: unknown): string {
     return error instanceof Error ? error.message : String(error);
-}
-
-/** Reject with a clear message if a promise does not settle within `ms`. */
-function withTimeout<T>(promise: Promise<T>, ms: number, reason: string): Promise<T> {
-    return new Promise<T>((resolve, reject) => {
-        const timer = setTimeout(() => reject(new Error(reason)), ms);
-        if (typeof timer.unref === "function") timer.unref();
-        promise.then(
-            (value) => {
-                clearTimeout(timer);
-                resolve(value);
-            },
-            (error) => {
-                clearTimeout(timer);
-                reject(error);
-            }
-        );
-    });
 }

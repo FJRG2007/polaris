@@ -580,21 +580,34 @@ async function volumeFor(volumeId: string, userId: string): Promise<VolumeDetail
     return getVolume(volumeId, summary.ownerId);
 }
 
+/**
+ * Everything about a volume that is already known, which is everything except
+ * how full it is. Kept apart from the measurement below deliberately: reading
+ * the row is instant, while measuring means reaching a container on another
+ * host, and bundling them made the panel show nothing until the slow half
+ * finished.
+ */
 export async function volumeDetailAction(
     volumeId: string
-): Promise<Result<{ volume: VolumeDetail; usedBytes: number | null; canManage: boolean }>> {
+): Promise<Result<{ volume: VolumeDetail; canManage: boolean }>> {
     return attempt("Could not load the volume", async () => {
         const user = await requirePermission("deploy.read");
         const volume = await volumeFor(volumeId, user.id);
-        const owner = await deployService.getVolumeOwner(volumeId);
         const access = volume.applicationId
             ? await requireApplicationAccess(volume.applicationId, user.id, "viewer")
             : null;
-        return {
-            volume,
-            usedBytes: await measureVolumeUsage(volumeId, owner?.ownerId ?? user.id),
-            canManage: access ? accessAtLeast(access, "developer") : true
-        };
+        return { volume, canManage: access ? accessAtLeast(access, "developer") : true };
+    });
+}
+
+/** How full a volume is, measured from inside the service that mounts it. Null
+ *  when it cannot be measured now (nothing running, no `du`, or too slow). */
+export async function volumeUsageAction(volumeId: string): Promise<Result<{ usedBytes: number | null }>> {
+    return attempt("Could not measure the volume", async () => {
+        const user = await requirePermission("deploy.read");
+        await volumeFor(volumeId, user.id);
+        const owner = await deployService.getVolumeOwner(volumeId);
+        return { usedBytes: await measureVolumeUsage(volumeId, owner?.ownerId ?? user.id) };
     });
 }
 

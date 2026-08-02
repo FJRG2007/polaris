@@ -17,6 +17,7 @@ import { currentReleaseRef } from "./deploy/releases";
 import { getPorts, type TargetRow } from "./deploy/runtime";
 import {
     canHostMount,
+    withTimeout,
     deployVolumeInputSchema,
     deployVolumeUpdateSchema,
     normalizeVolumeSource,
@@ -324,9 +325,18 @@ async function volumeRuntime(id: string, ownerId: string) {
 }
 
 /**
+ * How long a single measurement may take before it is reported as unmeasurable.
+ * `du` walks the whole tree, and on a NAS share that has stopped answering it
+ * never comes back at all - so a caller a person is waiting on gets an answer
+ * either way rather than a panel that loads forever.
+ */
+const USAGE_TIMEOUT_MS = 15_000;
+
+/**
  * Bytes currently used by a volume, or null when it cannot be measured right now
- * (the service is not up, or the image has no `du`). Never throws for the
- * ordinary "nothing running" case - a chart with no data is the honest answer.
+ * (the service is not up, the image has no `du`, or the walk ran past its
+ * budget). Never throws for the ordinary "nothing running" case - a chart with
+ * no data is the honest answer.
  */
 export async function measureVolumeUsage(id: string, ownerId: string): Promise<number | null> {
     let runtime;
@@ -337,7 +347,11 @@ export async function measureVolumeUsage(id: string, ownerId: string): Promise<n
     }
     const ports = await getPorts(runtime.target, ownerId);
     try {
-        return await ports.diskUsage(runtime.container, runtime.volume.mountPath);
+        return await withTimeout(
+            ports.diskUsage(runtime.container, runtime.volume.mountPath),
+            USAGE_TIMEOUT_MS,
+            "measuring the volume took too long"
+        );
     } catch {
         return null;
     } finally {

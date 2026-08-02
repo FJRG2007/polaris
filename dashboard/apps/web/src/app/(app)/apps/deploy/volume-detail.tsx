@@ -3,10 +3,16 @@
 /**
  * A volume, opened.
  *
- * Clicking a volume used to drop an edit form into the page. It is a service in
- * its own right - it has usage, a size, a place it lives, and two ways to destroy
- * it - so it gets what every other service here gets: a panel with Metrics and
- * Settings, opened over what you were looking at rather than pushing it around.
+ * It is a service in its own right - it has usage, a size, a place it lives, and
+ * two ways to destroy it - so it opens the way every other service here does: the
+ * same right-hand panel, the same header and tab strip, over what you were
+ * looking at rather than pushing it around.
+ *
+ * The panel paints as soon as the row is read. How full the volume is arrives
+ * separately, because measuring it means reaching into a container on the server
+ * that holds it and walking the tree - seconds on a NAS, and sometimes never.
+ * Waiting for that before drawing anything left the panel blank for the whole
+ * measurement.
  *
  * The two destructive actions are deliberately different. Wiping keeps the volume
  * and destroys what is in it; deleting keeps nothing. Both are typed-confirmation
@@ -19,19 +25,28 @@ import { useEffect, useState, useTransition } from "react";
 import type { VolumeDetail } from "@/lib/deploy-volume-service";
 import { EditVolumeDialog, type EditVolume } from "./volume-form";
 import { MetricsHistory, type MetricSpec } from "@/components/metrics-history";
-import { stageVolumeDeleteAction, volumeDetailAction, wipeVolumeAction } from "./project-actions";
-import { Database, Eraser, HardDrive, Loader2, Pencil, Server, Trash2, TriangleAlert } from "lucide-react";
+import { stageVolumeDeleteAction, volumeDetailAction, volumeUsageAction, wipeVolumeAction } from "./project-actions";
 import {
     Button,
     ConfirmDeleteDialog,
     Dialog,
     DialogContent,
-    DialogDescription,
-    DialogHeader,
     DialogTitle,
     Switch,
     cn
 } from "@polaris/ui";
+import {
+    Database,
+    Eraser,
+    HardDrive,
+    Loader2,
+    Maximize2,
+    Minimize2,
+    Pencil,
+    Server,
+    Trash2,
+    TriangleAlert
+} from "lucide-react";
 
 const TABS = ["Metrics", "Settings"] as const;
 type Tab = (typeof TABS)[number];
@@ -64,6 +79,16 @@ const VOLUME_METRICS: MetricSpec[] = [
     }
 ];
 
+/** A measurement in flight, done, or not started. `bytes` is only meaningful
+ *  once it is "done", where null means "could not be measured". */
+type Usage = { state: "measuring" } | { state: "done"; bytes: number | null };
+
+/** Measurements already taken this session, so reopening a volume shows its size
+ *  at once instead of walking the tree again. Short-lived on purpose: a figure
+ *  from a minute ago is worth showing, one from an hour ago is not. */
+const USAGE_TTL_MS = 60_000;
+const usageCache = new Map<string, { bytes: number | null; at: number }>();
+
 export function VolumeDetailDialog({
     volumeId,
     onOpenChange,
@@ -76,9 +101,9 @@ export function VolumeDetailDialog({
 }) {
     const router = useRouter();
     const [tab, setTab] = useState<Tab>("Metrics");
-    const [data, setData] = useState<{ volume: VolumeDetail; usedBytes: number | null; canManage: boolean } | null>(
-        null
-    );
+    const [full, setFull] = useState(false);
+    const [data, setData] = useState<{ volume: VolumeDetail; canManage: boolean } | null>(null);
+    const [usage, setUsage] = useState<Usage>({ state: "measuring" });
     const [error, setError] = useState<string | null>(null);
     const [editing, setEditing] = useState(false);
 
@@ -90,18 +115,30 @@ export function VolumeDetailDialog({
         setError(null);
         setTab("Metrics");
         let active = true;
+
         void volumeDetailAction(volumeId).then((result) => {
             if (!active) return;
             if (result.error || !result.volume) {
                 setError(result.error ?? "Could not load the volume");
                 return;
             }
-            setData({
-                volume: result.volume,
-                usedBytes: result.usedBytes ?? null,
-                canManage: result.canManage ?? false
-            });
+            setData({ volume: result.volume, canManage: result.canManage ?? false });
         });
+
+        // Measured alongside, not after: the panel is already on screen and
+        // usable while this is still walking the volume.
+        const cached = usageCache.get(volumeId);
+        if (cached && Date.now() - cached.at < USAGE_TTL_MS) {
+            setUsage({ state: "done", bytes: cached.bytes });
+        } else {
+            setUsage({ state: "measuring" });
+            void volumeUsageAction(volumeId).then((result) => {
+                const bytes = result.usedBytes ?? null;
+                usageCache.set(volumeId, { bytes, at: Date.now() });
+                if (active) setUsage({ state: "done", bytes });
+            });
+        }
+
         return () => {
             active = false;
         };
@@ -112,68 +149,86 @@ export function VolumeDetailDialog({
     function reload() {
         onChanged();
         router.refresh();
-        if (volumeId) {
-            void volumeDetailAction(volumeId).then((result) => {
-                if (result.volume) {
-                    setData({
-                        volume: result.volume,
-                        usedBytes: result.usedBytes ?? null,
-                        canManage: result.canManage ?? false
-                    });
-                }
-            });
-        }
+        if (!volumeId) return;
+        // What the volume holds has changed under it, so the cached figure is the
+        // one thing that must not be reused.
+        usageCache.delete(volumeId);
+        setUsage({ state: "measuring" });
+        void volumeDetailAction(volumeId).then((result) => {
+            if (result.volume) setData({ volume: result.volume, canManage: result.canManage ?? false });
+        });
+        void volumeUsageAction(volumeId).then((result) => {
+            const bytes = result.usedBytes ?? null;
+            usageCache.set(volumeId, { bytes, at: Date.now() });
+            setUsage({ state: "done", bytes });
+        });
     }
 
     return (
         <>
             <Dialog open={volumeId !== null} onOpenChange={onOpenChange}>
-                <DialogContent className="max-w-2xl">
-                    <DialogHeader>
-                        <DialogTitle className="flex items-center gap-2">
-                            <HardDrive className={cn("size-4", volume?.kind === "nas" && "text-sky-400")} />
-                            {volume?.name ?? "Volume"}
-                        </DialogTitle>
-                        {volume && (
-                            <DialogDescription>
-                                {volume.applicationName
-                                    ? `Mounted in ${volume.applicationName} at ${volume.mountPath}`
-                                    : `Mounted at ${volume.mountPath}`}
-                            </DialogDescription>
-                        )}
-                    </DialogHeader>
-
-                    {error && <p className="text-sm text-danger">{error}</p>}
-
-                    {!volume && !error && (
-                        <div className="flex items-center justify-center py-12 text-muted-foreground">
-                            <Loader2 className="size-5 animate-spin" />
-                        </div>
+                <DialogContent
+                    className={cn(
+                        "left-auto right-0 top-0 flex h-full max-h-none translate-x-0 translate-y-0 flex-col gap-0 rounded-none rounded-l-xl border-y-0 border-r-0 p-0 data-[state=open]:slide-in-from-right-4",
+                        full ? "w-full max-w-none" : "w-full max-w-none sm:w-[820px] sm:max-w-[calc(100vw-2rem)]"
                     )}
+                >
+                    <div className="flex items-center gap-3 border-b border-border/60 px-5 py-4">
+                        <HardDrive className={cn("size-5 shrink-0", volume?.kind === "nas" && "text-sky-400")} />
+                        <div className="min-w-0 flex-1">
+                            <DialogTitle className="truncate text-base font-semibold">
+                                {volume?.name ?? "Volume"}
+                            </DialogTitle>
+                            {volume && (
+                                <p className="truncate text-xs text-muted-foreground">
+                                    {volume.applicationName
+                                        ? `Mounted in ${volume.applicationName} at ${volume.mountPath}`
+                                        : `Mounted at ${volume.mountPath}`}
+                                </p>
+                            )}
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => setFull((value) => !value)}
+                            title={full ? "Exit full screen" : "Full screen"}
+                            aria-label={full ? "Exit full screen" : "Full screen"}
+                            className="mr-8 shrink-0 rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                        >
+                            {full ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
+                        </button>
+                    </div>
 
-                    {volume && (
-                        <div className="flex flex-col gap-4">
-                            <div className="flex gap-1 border-b border-border/60">
-                                {TABS.map((entry) => (
-                                    <button
-                                        key={entry}
-                                        type="button"
-                                        onClick={() => setTab(entry)}
-                                        aria-current={tab === entry ? "page" : undefined}
-                                        className={cn(
-                                            "-mb-px border-b-2 px-3 py-1.5 text-sm transition-colors",
-                                            tab === entry
-                                                ? "border-primary font-medium text-foreground"
-                                                : "border-transparent text-muted-foreground hover:text-foreground"
-                                        )}
-                                    >
-                                        {entry}
-                                    </button>
-                                ))}
+                    <div className="flex items-center gap-1 border-b border-border/60 px-5 text-sm">
+                        {TABS.map((entry) => (
+                            <button
+                                key={entry}
+                                type="button"
+                                onClick={() => setTab(entry)}
+                                aria-current={tab === entry ? "page" : undefined}
+                                className={cn(
+                                    "-mb-px whitespace-nowrap border-b-2 px-3 py-2 transition-colors",
+                                    tab === entry
+                                        ? "border-primary text-foreground"
+                                        : "border-transparent text-muted-foreground hover:text-foreground"
+                                )}
+                            >
+                                {entry}
+                            </button>
+                        ))}
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto px-5 py-4">
+                        {error && <p className="text-sm text-danger">{error}</p>}
+
+                        {!volume && !error && (
+                            <div className="flex items-center justify-center py-12 text-muted-foreground">
+                                <Loader2 className="size-5 animate-spin" />
                             </div>
+                        )}
 
-                            {tab === "Metrics" ? (
-                                <MetricsTab volume={volume} usedBytes={data?.usedBytes ?? null} />
+                        {volume &&
+                            (tab === "Metrics" ? (
+                                <MetricsTab volume={volume} usage={usage} />
                             ) : (
                                 <SettingsTab
                                     volume={volume}
@@ -182,9 +237,8 @@ export function VolumeDetailDialog({
                                     onChanged={reload}
                                     onClosed={() => onOpenChange(false)}
                                 />
-                            )}
-                        </div>
-                    )}
+                            ))}
+                    </div>
                 </DialogContent>
             </Dialog>
 
@@ -216,21 +270,26 @@ function toEditVolume(volume: VolumeDetail): EditVolume {
     };
 }
 
-function MetricsTab({ volume, usedBytes }: { volume: VolumeDetail; usedBytes: number | null }) {
+function MetricsTab({ volume, usage }: { volume: VolumeDetail; usage: Usage }) {
+    const measuring = usage.state === "measuring";
+    const usedBytes = usage.state === "done" ? usage.bytes : null;
     return (
         <div className="flex flex-col gap-4">
             <div className="grid gap-3 sm:grid-cols-3">
                 <Stat
                     label="In use"
-                    value={usedBytes == null ? "Not measurable" : formatBytes(usedBytes)}
+                    value={measuring ? "Measuring" : usedBytes == null ? "Not measurable" : formatBytes(usedBytes)}
+                    pending={measuring}
                     hint={
-                        usedBytes == null
-                            ? volume.serviceRunning
-                                ? "The image has no du, so its size cannot be read."
-                                : "The service is not running."
-                            : volume.sizeLimit
-                              ? `of ${volume.sizeLimit}`
-                              : "No size cap set"
+                        measuring
+                            ? "Reading the volume from inside the service"
+                            : usedBytes == null
+                              ? volume.serviceRunning
+                                  ? "The image has no du, so its size cannot be read."
+                                  : "The service is not running."
+                              : volume.sizeLimit
+                                ? `of ${volume.sizeLimit}`
+                                : "No size cap set"
                     }
                 />
                 <Stat label="Kind" value={kindLabel(volume)} hint={volume.source} />
@@ -253,11 +312,23 @@ function kindLabel(volume: VolumeDetail): string {
     return volume.kind === "bind" ? "Server folder" : "Named volume";
 }
 
-function Stat({ label, value, hint }: { label: string; value: string; hint?: string | null }) {
+function Stat({
+    label,
+    value,
+    hint,
+    pending
+}: {
+    label: string;
+    value: string;
+    hint?: string | null;
+    /** Marks a figure that is still being worked out, rather than one that is late. */
+    pending?: boolean;
+}) {
     return (
         <div className="rounded-lg border border-border/60 p-3">
             <p className="text-xs text-muted-foreground">{label}</p>
-            <p className="mt-0.5 truncate text-sm font-medium" title={value}>
+            <p className="mt-0.5 flex items-center gap-1.5 truncate text-sm font-medium" title={value}>
+                {pending && <Loader2 className="size-3.5 shrink-0 animate-spin text-muted-foreground" />}
                 {value}
             </p>
             {hint && (
