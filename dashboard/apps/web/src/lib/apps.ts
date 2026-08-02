@@ -219,6 +219,12 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
         { label: "Domains", href: "/admin/domains", icon: Globe, keywords: ["dns", "tunnels", "certificates"] },
         { label: "Email delivery", href: "/admin/email", icon: Mail, keywords: ["smtp", "sender"], hidden: true },
         { label: "Display defaults", href: "/admin/display", icon: SlidersHorizontal, keywords: ["units", "formats"] },
+        {
+            label: "Uploads",
+            href: "/admin/uploads",
+            icon: HardDrive,
+            keywords: ["attachments", "files", "storage", "nas", "size limit"]
+        },
         { label: "Integrations", href: "/integrations", icon: Blocks, keywords: ["github", "cloudflare", "connect"] },
         { label: "Updates & settings", href: "/settings", icon: Settings, keywords: ["version", "upgrade"] }
     ]
