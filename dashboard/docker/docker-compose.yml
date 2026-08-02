@@ -120,6 +120,17 @@ services:
       # self-update container (POLARIS_HOST_REPO is the true host repo root); the
       # `../..` default resolves to the repo root for a direct host run.
       - ${POLARIS_HOST_REPO:-../..}/dashboard/docker/secrets/ssh:/run/polaris-ssh:ro
+      # NAS mount root. The daemon mounts SMB/NFS shares here in the host
+      # namespace; `rslave` is what makes those mounts appear inside this
+      # container, so Drive and the volume browser read a share through the
+      # kernel mount instead of opening a userspace SMB session per call.
+      # Without it the path exists but is empty, or missing entirely.
+      - type: bind
+        source: /mnt/polaris
+        target: /mnt/polaris
+        bind:
+          propagation: rslave
+          create_host_path: true
     # Not published to the host: Caddy is the only public entry point.
     expose:
       - "3000"

@@ -158,8 +158,21 @@ async function hostMountedDriver(row: ConnectionRow): Promise<StorageDriver | nu
         console.error(`storage: could not host-mount ${row.id}, falling back to userspace:`, error);
         return null;
     }
+    // The daemon mounts into the HOST's namespace; this process only sees that
+    // mount when `<mount_root>` is bound into its own container with slave
+    // propagation. Where it is not - an older compose file, a deployment that
+    // predates the bind, or a mount whose session has died and answers EHOSTDOWN -
+    // the path is unreadable here even though the daemon reported success. Falling
+    // back keeps Drive working instead of failing the whole connection, which is
+    // the difference between "a bit slower" and "Could not connect to this
+    // location".
     const driver = new LocalDriver({ id: row.id, root: `${HOSTD_MOUNT_ROOT}/${row.id}` });
-    await driver.connect();
+    try {
+        await driver.connect();
+    } catch (error) {
+        console.error(`storage: host mount for ${row.id} is not readable here, falling back to userspace:`, error);
+        return null;
+    }
     return driver;
 }
 
