@@ -7,10 +7,18 @@
  * activation step (see enigma marker).
  */
 
-import { getCapabilities, loadEnv } from "@polaris/config";
-import type { StorageConfig, StorageCredentials, StorageProviderKind } from "@polaris/core";
-import { requiresHostd } from "@polaris/core";
 import { prisma } from "@polaris/db";
+import { listSmbShares } from "@/lib/smb-shares";
+import { HostdClient } from "@polaris/hostd-client";
+import { getCapabilities, loadEnv } from "@polaris/config";
+import { canHostMount, requiresHostd } from "@polaris/core";
+import { grantedConnectionIds } from "@/lib/drive-acl-service";
+import { ContainerDriver } from "@/lib/deploy/container-driver";
+import { getHostConnection, listHosts } from "@/lib/host-service";
+import { fetchUnasMetrics, type UnasMetrics } from "@/lib/unifi-unas";
+import { deleteMetricsForSubject } from "@/lib/metrics-history-service";
+import type { StorageConfig, StorageCredentials, StorageProviderKind } from "@polaris/core";
+import { resolveContainerName, resolveLocalContainer } from "@/lib/container-files-service";
 import {
     createDriver,
     decryptCredentials,
@@ -22,13 +30,6 @@ import {
     type ConnectionRecord,
     type StorageDriver
 } from "@polaris/storage";
-import { fetchUnasMetrics, type UnasMetrics } from "@/lib/unifi-unas";
-import { deleteMetricsForSubject } from "@/lib/metrics-history-service";
-import { listSmbShares } from "@/lib/smb-shares";
-import { grantedConnectionIds } from "@/lib/drive-acl-service";
-import { getHostConnection, listHosts } from "@/lib/host-service";
-import { resolveContainerName, resolveLocalContainer } from "@/lib/container-files-service";
-import { ContainerDriver } from "@/lib/deploy/container-driver";
 
 /** Connection-id prefix for a global Host browsed over SFTP in Drive. The Host is
  *  managed in the Servers app; Drive consumes it read/write over SFTP. */
@@ -105,21 +106,67 @@ type ConnectionRow = {
     credentialKeyId: string | null;
 };
 
+/** Decrypt a row's credentials, whatever kind it is. */
+function credentialsOf(row: ConnectionRow): StorageCredentials {
+    if (!row.encryptedCredential || !row.credentialNonce) return { kind: row.kind } as StorageCredentials;
+    return decryptCredentials(
+        {
+            ciphertext: Buffer.from(row.encryptedCredential),
+            nonce: Buffer.from(row.credentialNonce),
+            keyId: row.credentialKeyId ?? ""
+        },
+        loadEnv().POLARIS_MASTER_KEY
+    );
+}
+
+/**
+ * Put the kernel mount for a host-mountable connection in place and hand back a
+ * local driver onto it, or null when that is not available here.
+ *
+ * Reading a share through the kernel mount instead of a userspace SMB session is
+ * the difference between a local `stat` and a fresh TCP connect, SMB negotiate,
+ * NTLM session setup and tree connect for every single call - and the userspace
+ * client checks a connection by listing the whole share root, so the cost lands
+ * on operations that never asked for a listing (creating one volume folder used
+ * to pay for all of it, twice).
+ *
+ * The mount is established here rather than assumed, because assuming it is how
+ * a share silently reads as an empty folder: the deploy pipeline and the boot
+ * reconcile both mount it, but neither has necessarily run when Drive or the
+ * volume form asks. `ensureMount` is idempotent and costs a mount-table read
+ * when the mount is already live, so paying it per driver is free in the case
+ * that matters.
+ */
+async function hostMountedDriver(row: ConnectionRow): Promise<StorageDriver | null> {
+    if (!getCapabilities().nativeMounts) return null;
+    const spec = mountSpecFor(row);
+    if (!spec) return null;
+    try {
+        await new HostdClient().createMount({
+            id: spec.id,
+            kind: spec.kind,
+            source: spec.source,
+            target: spec.id,
+            options: spec.options,
+            username: spec.username,
+            password: spec.password
+        });
+    } catch (error) {
+        // The daemon is the fast path, not the only one. A share it cannot mount
+        // (no daemon, an NFS export that moved, a NAS that is briefly away) falls
+        // back to whatever userspace path the kind has, so browsing keeps working.
+        console.error(`storage: could not host-mount ${row.id}, falling back to userspace:`, error);
+        return null;
+    }
+    const driver = new LocalDriver({ id: row.id, root: `${HOSTD_MOUNT_ROOT}/${row.id}` });
+    await driver.connect();
+    return driver;
+}
+
 /** Decrypt a row's credentials and build a connected driver for it. */
 async function buildDriver(row: ConnectionRow): Promise<StorageDriver> {
-    const env = loadEnv();
     const config = JSON.parse(row.config) as StorageConfig;
-    const credentials: StorageCredentials =
-        row.encryptedCredential && row.credentialNonce
-            ? decryptCredentials(
-                  {
-                      ciphertext: Buffer.from(row.encryptedCredential),
-                      nonce: Buffer.from(row.credentialNonce),
-                      keyId: row.credentialKeyId ?? ""
-                  },
-                  env.POLARIS_MASTER_KEY
-              )
-            : ({ kind: row.kind } as StorageCredentials);
+    const credentials = credentialsOf(row);
 
     // A UniFi UNAS is a metrics connection, but its files are reachable over the
     // SMB share on the same device - and the UNAS accepts the same UniFi account,
@@ -128,6 +175,8 @@ async function buildDriver(row: ConnectionRow): Promise<StorageDriver> {
     if (row.kind === "unifi-unas") {
         const cfg = config as Extract<StorageConfig, { kind: "unifi-unas" }>;
         if (!cfg.smbShare) throw new SmbShareRequiredError();
+        const mounted = await hostMountedDriver(row);
+        if (mounted) return mounted;
         const creds = credentials as Extract<StorageCredentials, { kind: "unifi-unas" }>;
         const driver = new SmbDriver({
             id: row.id,
@@ -148,42 +197,45 @@ async function buildDriver(row: ConnectionRow): Promise<StorageDriver> {
         credentials
     };
 
+    // A share Polaris can kernel-mount is read through that mount when the daemon
+    // is here, and over its own protocol when it is not.
+    if (canHostMount(record.kind)) {
+        const mounted = await hostMountedDriver(row);
+        if (mounted) return mounted;
+    }
+
+    // Without the mount, `nativeMounts` would still route a preferring kind at the
+    // daemon and land on an empty directory, so the registry is asked for the
+    // userspace driver explicitly. A kind that REQUIRES the daemon has none, and
+    // is left to fail with the registry's own reason.
+    const capabilities = getCapabilities();
     const driver = createDriver(record, {
-        capabilities: getCapabilities(),
-        // The kernel mount at HOSTD_MOUNT_ROOT/<id> is established by the deploy
-        // pipeline (ensureMount before composeUp) and re-established on boot by
-        // reconcileNasMounts; here we just point a local driver at that path.
+        capabilities: requiresHostd(record.kind) ? capabilities : { ...capabilities, nativeMounts: false },
         hostdFactory: (rec) => new LocalDriver({ id: rec.id, root: `${HOSTD_MOUNT_ROOT}/${rec.id}` })
     });
     await driver.connect();
     return driver;
 }
 
-/** Build the NAS mount spec for a host-mountable connection (smb/unifi-unas/nfs),
- *  so the deploy pipeline can kernel-mount it at `<mount_root>/<id>` and a bind
- *  volume under it resolves onto the NAS. Returns null for kinds Polaris does not
- *  kernel-mount. Owner-scoped via loadConnection; decrypts SMB credentials. */
-export async function resolveMountTarget(
-    connectionId: string,
-    ownerId: string
-): Promise<{ id: string; kind: "smb" | "nfs"; source: string; options?: string; username?: string; password?: string } | null> {
-    const row = await loadConnection(connectionId, ownerId);
-    const config = JSON.parse(row.config) as StorageConfig;
-    const credentials: StorageCredentials =
-        row.encryptedCredential && row.credentialNonce
-            ? decryptCredentials(
-                  {
-                      ciphertext: Buffer.from(row.encryptedCredential),
-                      nonce: Buffer.from(row.credentialNonce),
-                      keyId: row.credentialKeyId ?? ""
-                  },
-                  loadEnv().POLARIS_MASTER_KEY
-              )
-            : ({ kind: row.kind } as StorageCredentials);
+/** What a kernel mount of a connection needs, or null for a kind Polaris does not
+ *  mount. Callers that already hold the row use this; `resolveMountTarget` is the
+ *  owner-scoped entry point for callers that only have an id. */
+export interface MountSpec {
+    id: string;
+    kind: "smb" | "nfs";
+    source: string;
+    options?: string;
+    username?: string;
+    password?: string;
+}
 
-    // Permissive modes so a container (root or not) reads/writes the share like a
-    // normal docker volume; nobrl avoids byte-range-lock errors some apps trigger.
-    const SMB_OPTS = "vers=3.0,uid=0,gid=0,file_mode=0666,dir_mode=0777,nobrl";
+/** Permissive modes so a container (root or not) reads/writes the share like a
+ *  normal docker volume; nobrl avoids byte-range-lock errors some apps trigger. */
+const SMB_OPTS = "vers=3.0,uid=0,gid=0,file_mode=0666,dir_mode=0777,nobrl";
+
+function mountSpecFor(row: ConnectionRow): MountSpec | null {
+    const config = JSON.parse(row.config) as StorageConfig;
+    const credentials = credentialsOf(row);
     if (row.kind === "unifi-unas") {
         const cfg = config as Extract<StorageConfig, { kind: "unifi-unas" }>;
         if (!cfg.smbShare) return null;
@@ -200,6 +252,14 @@ export async function resolveMountTarget(
         return { id: row.id, kind: "nfs", source: `${cfg.host}:${cfg.exportPath}`, options: "nfsvers=4" };
     }
     return null;
+}
+
+/** Build the NAS mount spec for a host-mountable connection (smb/unifi-unas/nfs),
+ *  so the deploy pipeline can kernel-mount it at `<mount_root>/<id>` and a bind
+ *  volume under it resolves onto the NAS. Returns null for kinds Polaris does not
+ *  kernel-mount. Owner-scoped via loadConnection; decrypts SMB credentials. */
+export async function resolveMountTarget(connectionId: string, ownerId: string): Promise<MountSpec | null> {
+    return mountSpecFor(await loadConnection(connectionId, ownerId));
 }
 
 /** Build a connected driver for a connection owned by the given user. A `host:`

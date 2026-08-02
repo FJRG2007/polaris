@@ -1049,7 +1049,7 @@ fn run_mount(request: &MountRequest, target: &std::path::Path) -> Result<bool, M
     // EHOSTDOWN - so leaving it in place fails every later mount, and the failure
     // lands on `create_dir_all` below, far from the cause.
     if is_mountpoint(target) {
-        if std::fs::metadata(target).is_ok() {
+        if mount_answers(target) {
             return Ok(false);
         }
         force_unmount(target)?;
@@ -1126,25 +1126,64 @@ fn command_message(output: &std::process::Output) -> String {
     }
 }
 
-/// Detach a mount whose session is dead. A plain `umount` is enough once the
-/// filesystem has given up; a lazy detach is the fallback for the case where the
-/// kernel still holds references to it, and is safe here precisely because
-/// nothing can read through a dead mount anyway.
+/// Whether a mount still answers, within a deadline.
+///
+/// The question is "is this session dead", and the only way to ask a mounted
+/// filesystem that is to touch it - but a network mount whose server stopped
+/// answering does not fail the stat, it BLOCKS in it, for as long as the
+/// protocol's own timeouts take. That is a stat inside a deploy, so it is given
+/// a deadline: a mount that has not answered by then is treated as dead and
+/// re-established, which is the same conclusion the stat would eventually reach
+/// without holding the deploy open to reach it.
+///
+/// The probe thread is left to finish on its own. It is parked in the kernel and
+/// cannot be cancelled; it costs one thread until the filesystem gives up, which
+/// is the price of not waiting for it.
+#[cfg(unix)]
+fn mount_answers(target: &std::path::Path) -> bool {
+    use std::sync::mpsc;
+
+    let (tx, rx) = mpsc::channel();
+    let path = target.to_path_buf();
+    std::thread::spawn(move || {
+        let _ = tx.send(std::fs::metadata(&path).is_ok());
+    });
+    rx.recv_timeout(MOUNT_PROBE_TIMEOUT).unwrap_or(false)
+}
+
+/// How long a mount gets to prove it is alive before it is treated as dead.
+#[cfg(unix)]
+const MOUNT_PROBE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
+
+/// Detach a mount whose session is dead.
+///
+/// Lazy first, deliberately. `umount -f` is the intuitive order and the wrong
+/// one: MNT_FORCE asks the filesystem to give up, which for a server that is
+/// gone means waiting out its timeouts - the deploy sits there for a minute and
+/// then usually fails anyway. MNT_DETACH takes the mount out of the tree
+/// immediately and lets the kernel clean it up in the background, which is safe
+/// precisely because nothing can read through a dead mount. `-f` stays as the
+/// fallback for the case lazy refuses.
+///
+/// A failure carries what umount said. Without it the operator gets "could not
+/// be detached" and no way to tell a busy mount from a missing helper.
 #[cfg(unix)]
 fn force_unmount(target: &std::path::Path) -> Result<(), MountError> {
     use std::process::Command;
 
-    for args in [vec!["-f"], vec!["-l"]] {
+    let mut reasons: Vec<String> = Vec::new();
+    for args in [vec!["-l"], vec!["-f"]] {
         let output = Command::new("umount").args(&args).arg(target).output();
         match output {
             Ok(output) if output.status.success() => return Ok(()),
-            Ok(_) => continue,
+            Ok(output) => reasons.push(format!("umount {}: {}", args.join(" "), command_message(&output))),
             Err(error) => return Err(MountError::Failed(format!("could not run umount: {error}"))),
         }
     }
     Err(MountError::Failed(format!(
-        "{} holds a dead mount that could not be detached; unmount it on the host and retry",
-        target.to_string_lossy()
+        "{} holds a dead mount that could not be detached ({}); unmount it on the host and retry",
+        target.to_string_lossy(),
+        reasons.join("; ")
     )))
 }
 

@@ -906,13 +906,18 @@ export async function listNasFoldersAction(
     path: string
 ): Promise<{ folders: string[]; error?: string }> {
     const user = await requirePermission("deploy.manage");
+    let driver;
     try {
-        const driver = await getDriver(connectionId, user.id);
+        driver = await getDriver(connectionId, user.id);
         const result = await driver.list(normalizeRelPath(path));
         const folders = result.entries.filter((entry) => entry.kind === "dir").map((entry) => entry.name).sort();
         return { folders };
     } catch (caught) {
         return { folders: [], error: caught instanceof Error ? caught.message : "Could not list folders" };
+    } finally {
+        // A driver is a live session to the storage; the picker opens one per
+        // keystroke-driven browse, so leaving them open exhausts the NAS.
+        await driver?.dispose().catch(() => undefined);
     }
 }
 

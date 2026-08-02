@@ -27,6 +27,60 @@ export interface PublishedImage {
 /** Registry calls sit in a page render, so none of them may hang. */
 const TIMEOUT_MS = 6000;
 
+/**
+ * Anonymous pull tokens, keyed by the repository they are good for.
+ *
+ * Every request to a registry that has not been given one is answered with a 401
+ * carrying the challenge, so a client with no token pays two round trips for the
+ * first call and one for the rest. Holding the token turns that into one round
+ * trip for all of them. They are short-lived by design (the registry states the
+ * lifetime; five minutes is the usual default), and they carry no privilege
+ * beyond pulling a public image, which is what an anonymous client already has.
+ *
+ * Keyed by `host/repository` - the thing a pull token is scoped to - so a token
+ * minted for one image is never offered for another.
+ */
+const tokens = new Map<string, { value: string; expiresAt: number }>();
+
+function cachedToken(scope: string): string | null {
+    const entry = tokens.get(scope);
+    if (!entry) return null;
+    if (entry.expiresAt <= Date.now()) {
+        tokens.delete(scope);
+        return null;
+    }
+    return entry.value;
+}
+
+/** Immutable-by-identity registry reads, keyed by content digest.
+ *
+ *  An image config is addressed BY the hash of its own bytes, so a digest that
+ *  has been read once can never mean anything else and re-fetching it is pure
+ *  latency. The whole update check is "did this tag move", and on the common
+ *  answer - no - this turns the two calls behind the tag into zero. */
+const configs = new Map<string, PublishedImage>();
+
+/** A digest cache with no eviction grows with every release; a deployment sees
+ *  few, and this keeps the map from being unbounded on a long-lived process. */
+const MAX_CACHED_CONFIGS = 32;
+
+/** Forget every cached token and config. Nothing in the product needs this - a
+ *  token expires and a digest cannot go stale - but a test that asserts on the
+ *  calls a check makes has to start from a client that has never talked to a
+ *  registry, which is the state a fresh process is in. */
+export function resetRegistryCache(): void {
+    tokens.clear();
+    configs.clear();
+}
+
+function rememberConfig(digest: string, image: PublishedImage): void {
+    if (configs.size >= MAX_CACHED_CONFIGS) {
+        const oldest = configs.keys().next().value;
+        if (oldest) configs.delete(oldest);
+    }
+    configs.set(digest, image);
+}
+
 /** Manifest media types we can read, most preferred first. */
 const ACCEPT = [
     "application/vnd.oci.image.index.v1+json",
@@ -81,9 +135,16 @@ function parseChallenge(header: string): { realm: string; params: URLSearchParam
     return realm ? { realm, params } : null;
 }
 
-const tokenSchema = z.object({ token: z.string().optional(), access_token: z.string().optional() });
+const tokenSchema = z.object({
+    token: z.string().optional(),
+    access_token: z.string().optional(),
+    expires_in: z.number().optional()
+});
 
-async function anonymousToken(challenge: { realm: string; params: URLSearchParams }): Promise<string | null> {
+async function anonymousToken(
+    challenge: { realm: string; params: URLSearchParams },
+    scope: string
+): Promise<string | null> {
     const response = await fetch(`${challenge.realm}?${challenge.params.toString()}`, {
         headers: { accept: "application/json" },
         signal: AbortSignal.timeout(TIMEOUT_MS)
@@ -91,15 +152,31 @@ async function anonymousToken(challenge: { realm: string; params: URLSearchParam
     if (!response.ok) return null;
     const parsed = tokenSchema.safeParse(await response.json());
     if (!parsed.success) return null;
-    return parsed.data.token ?? parsed.data.access_token ?? null;
+    const value = parsed.data.token ?? parsed.data.access_token ?? null;
+    if (!value) return null;
+    // Retire it early: a token that expires mid-check costs a retry, and the
+    // registry's stated lifetime is a ceiling, not a promise about clock skew.
+    const lifetime = Math.max(0, (parsed.data.expires_in ?? 300) - 30) * 1000;
+    tokens.set(scope, { value, expiresAt: Date.now() + lifetime });
+    return value;
 }
 
 /**
- * GET a registry path, acquiring an anonymous pull token when challenged. The
- * token is minted per client (they are short-lived and free), so nothing here
- * holds registry state.
+ * GET a registry path, acquiring an anonymous pull token when challenged.
+ *
+ * The token is offered up front when one has already been minted for this
+ * repository, because the alternative is a guaranteed 401 on the first call of
+ * every check. A challenge that arrives anyway is still honoured, and a token
+ * the registry rejects is dropped so the retry mints a fresh one - an expired
+ * token costs a round trip, never the check.
  */
-async function registryGet(host: string, path: string, accept: string, token: { value: string | null }): Promise<Response> {
+async function registryGet(
+    host: string,
+    path: string,
+    accept: string,
+    token: { value: string | null },
+    scope: string
+): Promise<Response> {
     const url = `https://${host}${path}`;
     const send = (): Promise<Response> =>
         fetch(url, {
@@ -115,7 +192,10 @@ async function registryGet(host: string, path: string, accept: string, token: { 
     if (response.status !== 401) return response;
     const challenge = parseChallenge(response.headers.get("www-authenticate") ?? "");
     if (!challenge) return response;
-    token.value = await anonymousToken(challenge);
+    // A token that was sent and refused is stale; one that was never sent leaves
+    // whatever is cached alone, since this 401 says nothing about it.
+    if (token.value) tokens.delete(scope);
+    token.value = await anonymousToken(challenge, scope);
     if (!token.value) return response;
     response = await send();
     return response;
@@ -128,11 +208,22 @@ async function registryGet(host: string, path: string, accept: string, token: { 
  */
 export async function readPublishedImage(image: string, tag: string): Promise<PublishedImage> {
     const { host, repository } = splitImage(image);
-    const token = { value: null as string | null };
+    const scope = `${host}/${repository}`;
+    const token = { value: cachedToken(scope) };
 
-    const head = await registryGet(host, `/v2/${repository}/manifests/${encodeURIComponent(tag)}`, ACCEPT, token);
+    const head = await registryGet(host, `/v2/${repository}/manifests/${encodeURIComponent(tag)}`, ACCEPT, token, scope);
     if (!head.ok) throw new Error(`the registry answered ${head.status} for ${image}:${tag}`);
     const digest = head.headers.get("docker-content-digest");
+
+    // The tag's digest IS the answer to "has this moved". A digest already read
+    // describes bytes that cannot have changed, so the platform manifest and the
+    // config blob behind it are not fetched again - which is every call but the
+    // one after a release.
+    if (digest) {
+        const seen = configs.get(digest);
+        if (seen) return seen;
+    }
+
     const index = manifestSchema.parse(await head.json());
 
     // A multi-platform tag points at one manifest per architecture; the dashboard
@@ -143,21 +234,23 @@ export async function readPublishedImage(image: string, tag: string): Promise<Pu
             index.manifests.find((item) => item.platform?.architecture === "amd64" && item.platform?.os === "linux") ??
             index.manifests[0];
         if (!entry) throw new Error("the registry returned an empty manifest list");
-        const platform = await registryGet(host, `/v2/${repository}/manifests/${entry.digest}`, ACCEPT, token);
+        const platform = await registryGet(host, `/v2/${repository}/manifests/${entry.digest}`, ACCEPT, token, scope);
         if (!platform.ok) throw new Error(`the registry answered ${platform.status} for a platform manifest`);
         config = manifestSchema.parse(await platform.json()).config?.digest ?? null;
     }
     if (!config) throw new Error("the published image carries no config to read");
 
     // Blob reads redirect to the registry's storage backend; fetch follows that.
-    const blob = await registryGet(host, `/v2/${repository}/blobs/${config}`, "application/json", token);
+    const blob = await registryGet(host, `/v2/${repository}/blobs/${config}`, "application/json", token, scope);
     if (!blob.ok) throw new Error(`the registry answered ${blob.status} for the image config`);
     const parsed = configSchema.parse(await blob.json());
     const stamped = (parsed.config?.Env ?? []).find((entry) => entry.startsWith("POLARIS_BUILD_SHA="));
 
-    return {
+    const published: PublishedImage = {
         digest,
         buildSha: stamped ? stamped.slice("POLARIS_BUILD_SHA=".length).trim() || null : null,
         createdAt: parsed.created ?? null
     };
+    if (digest) rememberConfig(digest, published);
+    return published;
 }

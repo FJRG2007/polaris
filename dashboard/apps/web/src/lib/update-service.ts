@@ -279,6 +279,15 @@ async function query(): Promise<UpdateStatus> {
 
     // What a pull would fetch right now. This is the only call that may fail the
     // check: without it there is no honest answer, only a guess.
+    //
+    // The branch comparison is started alongside it rather than after it. Both
+    // inputs it needs are already known, and on the answer this deployment gets
+    // almost every time - running exactly what is published - it is the very next
+    // thing asked for, so waiting for the registry first only adds its latency to
+    // the check. When the tag has moved, the comparison it wants is a different
+    // one and this one is discarded; that costs an API call on the rare pass and
+    // saves a round trip on all the others.
+    const pendingFromRunning = running ? compare(repo, running, branch) : Promise.resolve(null);
     const published = await readPublishedImage(env.POLARIS_WEB_IMAGE, env.POLARIS_IMAGE_TAG);
     const target = published.buildSha;
 
@@ -301,7 +310,8 @@ async function query(): Promise<UpdateStatus> {
     // Already running the published image: the only thing left to report is whether
     // the branch has moved past it, i.e. a build is on its way.
     if (running === target) {
-        const pending = await compare(repo, target, branch);
+        // Already in flight: `running` and `target` are the same commit here.
+        const pending = await pendingFromRunning;
         const rebuilds = pending?.files.some((file) => WEB_IMAGE_PATHS.test(file)) ?? false;
         const building = (pending?.aheadBy ?? 0) > 0 && rebuilds;
         // A commit that failed its suites is not a build on its way: publishing

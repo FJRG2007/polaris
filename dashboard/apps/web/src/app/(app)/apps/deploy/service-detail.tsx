@@ -262,22 +262,46 @@ function DeploymentMenu({
     app,
     deployment,
     onAct,
-    onChanged
+    onChanged,
+    onDeployStarted
 }: {
     app: ProjectApp;
     deployment: DepSummary;
     onAct: () => void;
     onChanged: () => void;
+    /** A redeploy from here starts a NEW deployment; the caller follows it. */
+    onDeployStarted: (deploymentId: string) => void;
 }) {
     const [pending, startTransition] = useTransition();
+    const [error, setError] = useState<string | null>(null);
     const isActive = deployment.isCurrent;
     const stopped = deployment.status === "stopped";
 
     function run(action: () => Promise<{ error?: string }>) {
         startTransition(async () => {
-            await action().catch(() => undefined);
+            const result = await action().catch(() => ({ error: "That did not go through." }));
+            setError(result?.error ?? null);
             onAct();
             onChanged();
+        });
+    }
+
+    /**
+     * Redeploy starts a new build; the row it was clicked from describes an old
+     * one. Following the new deployment is the point - without it the row sits
+     * there looking untouched while a build runs, and clicking it again opens the
+     * log of the deployment that was replaced, which reads as the UI being stuck.
+     */
+    function redeploy() {
+        startTransition(async () => {
+            const result = await deployActions.deployApplicationAction(app.id).catch(() => ({
+                error: "Could not start the deployment",
+                deploymentId: undefined
+            }));
+            setError(result.error ?? null);
+            onAct();
+            onChanged();
+            if (result.deploymentId) onDeployStarted(result.deploymentId);
         });
     }
 
@@ -288,14 +312,18 @@ function DeploymentMenu({
                     type="button"
                     onClick={(event) => event.stopPropagation()}
                     disabled={pending}
-                    className="shrink-0 rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                    aria-label="Deployment actions"
+                    title={error ?? undefined}
+                    className={cn(
+                        "shrink-0 rounded p-1 transition-colors hover:bg-muted hover:text-foreground",
+                        error ? "text-danger" : "text-muted-foreground"
+                    )}
+                    aria-label={error ? `Deployment actions - ${error}` : "Deployment actions"}
                 >
                     {pending ? <Loader2 className="size-4 animate-spin" /> : <MoreVertical className="size-4" />}
                 </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" onClick={(event) => event.stopPropagation()}>
-                <DropdownMenuItem onSelect={() => run(() => deployActions.deployApplicationAction(app.id))}>
+                <DropdownMenuItem onSelect={redeploy}>
                     <RotateCw className="size-4" /> Redeploy
                 </DropdownMenuItem>
                 {isActive && (
@@ -450,7 +478,13 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
                                     View logs
                                 </Button>
                                 <ReleaseLink deployment={active} />
-                                <DeploymentMenu app={app} deployment={active} onAct={reload} onChanged={onChanged} />
+                                <DeploymentMenu
+                                    app={app}
+                                    deployment={active}
+                                    onAct={reload}
+                                    onChanged={onChanged}
+                                    onDeployStarted={setLogsFor}
+                                />
                             </div>
                             <button
                                 type="button"
@@ -510,7 +544,13 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
                                                     <p className="truncate text-xs text-muted-foreground">{deploySubtitle(deployment, app, format)}</p>
                                                 </div>
                                                 <ReleaseLink deployment={deployment} />
-                                                <DeploymentMenu app={app} deployment={deployment} onAct={reload} onChanged={onChanged} />
+                                                <DeploymentMenu
+                                                    app={app}
+                                                    deployment={deployment}
+                                                    onAct={reload}
+                                                    onChanged={onChanged}
+                                                    onDeployStarted={setLogsFor}
+                                                />
                                             </li>
                                         );
                                     })}

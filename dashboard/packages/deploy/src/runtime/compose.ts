@@ -6,9 +6,9 @@
  * refinement tracked on top of this straight up/down flow.
  */
 
-import { appComposeSpec, dbComposeSpec } from "../compose-spec.js";
-import { imageTag as toImageTag } from "../naming.js";
 import { parseContainerState } from "./status.js";
+import { imageTag as toImageTag } from "../naming.js";
+import { appComposeSpec, dbComposeSpec } from "../compose-spec.js";
 import type {
     AppDeployPlan,
     DbDeployPlan,
@@ -18,6 +18,22 @@ import type {
     RuntimeStatus,
     ServiceRef
 } from "./driver.js";
+
+/**
+ * Announce a step and time it. `step("Doing the thing")` writes the line, and
+ * the returned function closes it with how long it took (plus an optional word
+ * on what happened), so every phase of a deploy accounts for its own seconds.
+ */
+function timer(ctx: RuntimeContext): (label: string) => (note?: string) => void {
+    return (label) => {
+        const startedAt = Date.now();
+        ctx.log(Buffer.from(`==> ${label}...\n`));
+        return (note) => {
+            const seconds = ((Date.now() - startedAt) / 1000).toFixed(1);
+            ctx.log(Buffer.from(`==> ${label}: ${note ? `${note}, ` : ""}${seconds}s\n`));
+        };
+    };
+}
 
 export class ComposeRuntime implements RuntimeDriver {
     public readonly engine = "compose" as const;
@@ -31,16 +47,26 @@ export class ComposeRuntime implements RuntimeDriver {
 
     public async deployApplication(plan: AppDeployPlan, ctx: RuntimeContext): Promise<DeployResult> {
         const sink = (chunk: Buffer): void => ctx.log(chunk);
+        // The pipeline's own steps are timed and announced. Without this the log is
+        // whatever docker happened to print, so a deploy that spends a minute
+        // fetching the source and a second building it reads as a slow build - and
+        // a step with no output of its own (mounting a share) looks like a hang.
+        const step = timer(ctx);
         let imageTag: string;
         if (plan.build.method === "image") {
             if (!plan.build.imageRef) return { ok: false, error: "an image source needs an image reference" };
             imageTag = plan.build.imageRef;
+            const done = step(`Pulling ${plan.build.imageRef}`);
             await ctx.ports.pull(imageTag, sink);
+            done();
         } else if ((plan.build.method === "dockerfile" || plan.build.method === "nixpacks") && ctx.buildContext) {
             // Build from the cloned repo: a Dockerfile, or Nixpacks auto-detecting the
             // framework (no Dockerfile needed). Then run the built image.
             imageTag = toImageTag(plan.build.name, plan.build.commitSha);
+            const fetched = step("Fetching the source");
             const contextTar = await ctx.buildContext();
+            fetched();
+            const built = step("Building the image");
             await ctx.ports.build(
                 {
                     tag: imageTag,
@@ -50,6 +76,7 @@ export class ComposeRuntime implements RuntimeDriver {
                 },
                 sink
             );
+            built();
         } else {
             // buildpacks/static need a builder toolchain on the target; not yet wired.
             return { ok: false, error: `build method "${plan.build.method}" is not yet supported on the compose runtime` };
@@ -61,17 +88,20 @@ export class ComposeRuntime implements RuntimeDriver {
         // up - so `<mount_root>/<id>/...` resolves onto the NAS, not an empty dir.
         try {
             for (const mount of plan.mounts ?? []) {
-                ctx.log(Buffer.from(`Mounting ${mount.kind.toUpperCase()} ${mount.source}...\n`));
-                await ctx.ports.ensureMount(mount);
+                const done = step(`Mounting ${mount.kind.toUpperCase()} ${mount.source}`);
+                const created = await ctx.ports.ensureMount(mount);
+                done(created ? "mounted" : "already mounted");
             }
         } catch (error) {
             return { ok: false, error: `could not mount a NAS volume: ${error instanceof Error ? error.message : "mount failed"}` };
         }
+        const started = step("Starting the containers");
         try {
             await ctx.ports.composeUp(spec, sink);
         } catch (error) {
             return { ok: false, error: error instanceof Error ? error.message : "compose up failed" };
         }
+        started();
         return { ok: true, imageTag };
     }
 

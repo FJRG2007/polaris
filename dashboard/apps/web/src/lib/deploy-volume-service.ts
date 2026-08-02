@@ -38,16 +38,50 @@ export interface VolumeView {
     sizeLimit: string | null;
 }
 
-/** Create a nas volume's folder tree on its connection, so it exists and is
- *  browsable in Drive. mkdir builds parents and is idempotent; a failure (NAS
- *  unreachable) is swallowed - the caller must never depend on this succeeding. */
-async function ensureNasFolder(connectionId: string, source: string, ownerId: string): Promise<void> {
+/**
+ * Create nas volume folder trees on one connection, so they exist and are
+ * browsable in Drive. mkdir builds parents and is idempotent; a failure (NAS
+ * unreachable) is swallowed - the caller must never depend on this succeeding.
+ *
+ * One driver serves every folder on the connection, and it is always disposed.
+ * Both matter: a driver is a live session to the NAS, so opening one per folder
+ * and dropping it on the floor left a socket per volume per page view, and a NAS
+ * that runs out of sessions gets slower until it stops answering at all.
+ *
+ * Bounded, because this is a self-heal on a path the user is waiting on: a NAS
+ * that has gone quiet must cost the folder check, not the screen.
+ */
+async function ensureNasFolders(connectionId: string, sources: readonly string[], ownerId: string): Promise<void> {
+    // Held separately from the timeout: giving up on waiting does not cancel the
+    // connect, so the session it opens still has to be closed when it lands - or
+    // the timeout leaks the very socket this function exists to not leak. Closed
+    // without waiting, for the same reason: the deadline is the point.
+    const opening = getDriver(connectionId, ownerId);
     try {
-        const driver = await getDriver(connectionId, ownerId);
-        await driver.mkdir(source);
+        const driver = await withTimeout(opening, NAS_FOLDER_TIMEOUT_MS, "the storage connection did not answer");
+        for (const source of sources) {
+            await withTimeout(driver.mkdir(source), NAS_FOLDER_TIMEOUT_MS, "the storage connection did not answer");
+        }
     } catch (error) {
-        console.error(`volume: could not ensure NAS folder ${source} on ${connectionId}:`, error);
+        console.error(`volume: could not ensure NAS folders on ${connectionId}:`, error);
+    } finally {
+        void opening.then((opened) => opened.dispose()).catch(() => undefined);
     }
+}
+
+/** How long the folder self-heal may hold up whatever asked for it. */
+const NAS_FOLDER_TIMEOUT_MS = 10_000;
+
+/** Group nas volumes by connection, so one session covers all of their folders. */
+function nasFoldersByConnection(rows: readonly { kind: string; connectionId: string | null; source: string | null }[]): Map<string, string[]> {
+    const byConnection = new Map<string, string[]>();
+    for (const row of rows) {
+        if (row.kind !== "nas" || !row.connectionId || !row.source) continue;
+        const sources = byConnection.get(row.connectionId);
+        if (sources) sources.push(row.source);
+        else byConnection.set(row.connectionId, [row.source]);
+    }
+    return byConnection;
 }
 
 /** List an application's volumes, ownership-checked. Also self-heals: makes sure
@@ -65,9 +99,7 @@ export async function listVolumes(applicationId: string, ownerId: string): Promi
         include: { connection: { select: { name: true } } }
     });
     await Promise.all(
-        rows
-            .filter((row) => row.kind === "nas" && row.connectionId && row.source)
-            .map((row) => ensureNasFolder(row.connectionId as string, row.source as string, ownerId))
+        [...nasFoldersByConnection(rows)].map(([connectionId, sources]) => ensureNasFolders(connectionId, sources, ownerId))
     );
     return rows.map((row) => ({
         id: row.id,
@@ -143,11 +175,10 @@ export async function createVolume(ownerId: string, input: DeployVolumeInput): P
         include: { connection: { select: { name: true } } }
     });
 
-    // Create the folder on the NAS now (via the userspace driver, which works even
-    // before the kernel mount is wired), so it exists and is browsable in Drive
+    // Create the folder on the NAS now, so it exists and is browsable in Drive
     // right away - the same folder the container binds to at deploy.
     if (parsed.kind === "nas" && parsed.connectionId) {
-        await ensureNasFolder(parsed.connectionId, source, ownerId);
+        await ensureNasFolders(parsed.connectionId, [source], ownerId);
     }
 
     return {
@@ -225,7 +256,7 @@ export async function updateVolume(ownerId: string, input: DeployVolumeUpdateInp
         include: { connection: { select: { name: true } } }
     });
 
-    if (kind === "nas" && connectionId) await ensureNasFolder(connectionId, source, ownerId);
+    if (kind === "nas" && connectionId) await ensureNasFolders(connectionId, [source], ownerId);
 
     return {
         id: updated.id,
