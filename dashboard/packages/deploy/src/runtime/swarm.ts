@@ -7,9 +7,9 @@
  * remote identically.
  */
 
-import { appComposeSpec, dbComposeSpec } from "../compose-spec.js";
-import { imageTag as toImageTag } from "../naming.js";
 import { parseContainerState } from "./status.js";
+import { imageTag as toImageTag } from "../naming.js";
+import { appComposeSpec, dbComposeSpec, forSwarm } from "../compose-spec.js";
 import type {
     AppDeployPlan,
     DbDeployPlan,
@@ -49,7 +49,7 @@ export class SwarmRuntime implements RuntimeDriver {
         } else {
             return { ok: false, error: `build method "${plan.build.method}" is not yet supported on the swarm runtime` };
         }
-        const spec = appComposeSpec(plan, imageTag, ctx.target.proxyNetwork);
+        const spec = forSwarm(appComposeSpec(plan, imageTag, ctx.target.proxyNetwork));
         try {
             await ctx.ports.stackUp(spec, sink);
         } catch (error) {
@@ -61,7 +61,7 @@ export class SwarmRuntime implements RuntimeDriver {
     public async deployDatabase(plan: DbDeployPlan, ctx: RuntimeContext): Promise<DeployResult> {
         const sink = (chunk: Buffer): void => ctx.log(chunk);
         await ctx.ports.pull(plan.image, sink);
-        const spec = dbComposeSpec(plan, ctx.target.proxyNetwork);
+        const spec = forSwarm(dbComposeSpec(plan, ctx.target.proxyNetwork));
         try {
             await ctx.ports.stackUp(spec, sink);
         } catch (error) {

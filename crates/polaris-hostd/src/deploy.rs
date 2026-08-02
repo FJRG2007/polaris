@@ -40,10 +40,15 @@ pub struct DeploySpec {
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct ServiceSpec {
     pub name: String,
     pub image: String,
+    /// What compose may do about the image: "always" for anything that comes from
+    /// a registry (a mutable tag that moved is otherwise never noticed), "never"
+    /// for an image built on this host (no registry has it to fetch). Absent
+    /// leaves compose on its own default.
+    pub pull_policy: Option<String>,
     #[serde(default)]
     pub env: BTreeMap<String, String>,
     #[serde(default)]
@@ -86,7 +91,7 @@ pub struct VolumeSpec {
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct HealthSpec {
     pub test: Vec<String>,
     pub interval: Option<u32>,
@@ -95,6 +100,7 @@ pub struct HealthSpec {
 }
 
 const ALLOWED_RESTART: &[&str] = &["no", "always", "unless-stopped", "on-failure"];
+const ALLOWED_PULL_POLICY: &[&str] = &["always", "never", "missing", "build"];
 
 /// Validate a deploy spec against the host's roots. Returns a client-safe error
 /// message describing the first offending field, or `Ok`.
@@ -142,6 +148,11 @@ pub fn validate_spec(spec: &DeploySpec, config: &Config) -> Result<(), String> {
         if let Some(restart) = &service.restart {
             if !ALLOWED_RESTART.contains(&restart.as_str()) {
                 return Err(format!("invalid restart policy: {restart}"));
+            }
+        }
+        if let Some(policy) = &service.pull_policy {
+            if !ALLOWED_PULL_POLICY.contains(&policy.as_str()) {
+                return Err(format!("invalid pull policy: {policy}"));
             }
         }
         for net in &service.networks {
@@ -228,6 +239,9 @@ pub fn render_compose(spec: &DeploySpec, config: &Config) -> String {
             "    container_name: {}\n",
             yaml_quote(&service.name)
         ));
+        if let Some(policy) = &service.pull_policy {
+            out.push_str(&format!("    pull_policy: {}\n", yaml_quote(policy)));
+        }
         if let Some(restart) = &service.restart {
             out.push_str(&format!("    restart: {}\n", yaml_quote(restart)));
         }
@@ -903,6 +917,35 @@ mod tests {
         let bad2 =
             r#"{"project":"p","services":[{"name":"a","image":"nginx","network_mode":"host"}]}"#;
         assert!(serde_json::from_str::<DeploySpec>(bad2).is_err());
+    }
+
+    #[test]
+    fn renders_the_pull_policy_and_refuses_an_invented_one() {
+        // Without it compose reuses the copy of a moved tag the host already has,
+        // so a registry-sourced deploy silently reruns the previous build.
+        let config = test_config();
+        let good = spec(
+            r#"{"project":"p","services":[{"name":"web","image":"nginx:latest","pullPolicy":"always"}]}"#,
+        );
+        assert!(validate_spec(&good, &config).is_ok());
+        assert!(render_compose(&good, &config).contains("pull_policy: \"always\""));
+
+        let bad = spec(
+            r#"{"project":"p","services":[{"name":"web","image":"nginx","pullPolicy":"whenever"}]}"#,
+        );
+        assert!(validate_spec(&bad, &config).is_err());
+    }
+
+    #[test]
+    fn accepts_the_camel_case_the_dashboard_sends() {
+        // The dashboard renders one spec for both paths, in camelCase; a snake_case
+        // struct silently refused every service that carried one of these.
+        let s = spec(
+            r#"{"project":"p","services":[{"name":"web","image":"nginx","dependsOn":["db"],"healthcheck":{"test":["CMD","true"],"startPeriod":10}}]}"#,
+        );
+        let service = &s.services[0];
+        assert_eq!(service.depends_on, vec!["db".to_string()]);
+        assert_eq!(service.healthcheck.as_ref().unwrap().start_period, Some(10));
     }
 
     #[test]

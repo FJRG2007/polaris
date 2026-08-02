@@ -30,9 +30,24 @@ export interface ComposeSpecHealth {
     readonly startPeriod?: number;
 }
 
+/**
+ * What compose is allowed to do about the image at `up` time.
+ *
+ * Compose's own default is "missing": a tag already on the host is reused, so a
+ * mutable tag (`:latest`, `:stable`, a branch tag) that moved in the registry is
+ * never noticed and the deploy silently reruns the old build. Every image that
+ * comes from a registry is therefore pinned to "always".
+ *
+ * "never" is the other half of that: an image built on this host exists nowhere
+ * else, so compose must not try to fetch it - with "always" the deploy would fail
+ * on a tag no registry has.
+ */
+export type ComposePullPolicy = "always" | "never";
+
 export interface ComposeSpecService {
     readonly name: string;
     readonly image: string;
+    readonly pullPolicy?: ComposePullPolicy;
     readonly env: Record<string, string>;
     readonly ports: ComposeSpecPort[];
     readonly volumes: ComposeSpecVolume[];
@@ -68,6 +83,7 @@ export function appComposeSpec(plan: AppDeployPlan, imageTag: string, network: s
             {
                 name: plan.ref.name,
                 image: imageTag,
+                pullPolicy: plan.build.method === "image" ? "always" : "never",
                 env: { ...plan.env },
                 // Publish a host port so the app is reachable over the host's IP
                 // (LAN/intranet) with no reverse proxy - bound on all interfaces,
@@ -97,6 +113,21 @@ export function appComposeSpec(plan: AppDeployPlan, imageTag: string, network: s
     };
 }
 
+/**
+ * The same spec with the pull policy dropped, for a swarm stack.
+ *
+ * `docker stack deploy` has no use for it - it resolves every tag to a digest on
+ * the manager at deploy time, so a moved tag is picked up regardless - and warns
+ * ("Ignoring unsupported options: pull_policy") on every deploy, which reads like
+ * something went wrong in a log an operator is watching for exactly that.
+ */
+export function forSwarm(spec: ComposeSpec): ComposeSpec {
+    return {
+        ...spec,
+        services: spec.services.map(({ pullPolicy: _dropped, ...service }) => service)
+    };
+}
+
 /** Build the structured spec for a managed-database deployment. */
 export function dbComposeSpec(plan: DbDeployPlan, network: string): ComposeSpec {
     const ports: ComposeSpecPort[] =
@@ -107,6 +138,7 @@ export function dbComposeSpec(plan: DbDeployPlan, network: string): ComposeSpec 
             {
                 name: plan.ref.name,
                 image: plan.image,
+                pullPolicy: "always",
                 env: { ...plan.env },
                 ports,
                 volumes: [{ source: plan.volumeName, target: plan.dataPath, kind: "volume" }],
@@ -142,6 +174,7 @@ export function renderComposeYaml(spec: ComposeSpec, volumeRoot: string, mountRo
         lines.push(`  ${service.name}:`);
         lines.push(`    image: ${yamlQuote(service.image)}`);
         lines.push(`    container_name: ${yamlQuote(service.name)}`);
+        if (service.pullPolicy) lines.push(`    pull_policy: ${yamlQuote(service.pullPolicy)}`);
         if (service.restart) lines.push(`    restart: ${yamlQuote(service.restart)}`);
         if (Object.keys(service.env).length > 0) {
             lines.push("    environment:");
