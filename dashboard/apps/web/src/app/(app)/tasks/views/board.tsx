@@ -21,8 +21,8 @@ import type { TaskRow } from "@/lib/tasks/facts";
 import type { BoardMove, ViewProps } from "./shared";
 import { useDisplayFormat } from "@/components/display-format";
 import { Ban, MessageSquare, Paperclip, Plus, Repeat } from "lucide-react";
-import { AvatarStack, DueBadge, PriorityFlag, StatusDot, TagChip, TaskLocation } from "../pickers";
-import { commandsFor, TaskControls, TaskMenu, TaskStatusMarker, type TaskCommands } from "./task-actions";
+import { commandsFor, TaskMenu, TaskStatusMarker, type TaskCommands } from "./task-actions";
+import { AssigneePicker, AvatarStack, DueBadge, PriorityPicker, StatusDot, TagChip, TaskLocation } from "../pickers";
 
 /** Where a card was dropped, as neighbours rather than an index. */
 function neighbours(tasks: readonly TaskRow[], targetId: string | null, dragged: string): BoardMove["position"] {
@@ -34,6 +34,20 @@ function neighbours(tasks: readonly TaskRow[], targetId: string | null, dragged:
     const index = without.findIndex((task) => task.id === targetId);
     if (index === -1) return { beforeId: null, afterId: null };
     return { beforeId: without[index - 1]?.id ?? null, afterId: targetId };
+}
+
+/**
+ * A control in the card's corner. What is set reads as information and stays
+ * visible; what is empty would only be a pair of grey placeholders on every
+ * card, so it waits for the pointer, and never appears at all to somebody who
+ * cannot edit the task.
+ */
+function CornerControl({ set, canEdit, children }: { set: boolean; canEdit: boolean; children: React.ReactNode }) {
+    if (set) return <>{children}</>;
+    if (!canEdit) return null;
+    return (
+        <span className="opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">{children}</span>
+    );
 }
 
 export function TaskCard({
@@ -53,7 +67,9 @@ export function TaskCard({
 }) {
     const format = useDisplayFormat();
     const [over, setOver] = useState(false);
-    const { task, onOpen } = commands;
+    const { task, context, canEdit, onOpen } = commands;
+    // The bottom line only earns its space when there is something on it.
+    const hasMeta = task.dueDate !== null || task.subtaskCount > 0 || task.commentCount > 0 || task.points !== null;
 
     return (
         <TaskMenu commands={commands}>
@@ -92,7 +108,7 @@ export function TaskCard({
                     selected && "border-primary ring-1 ring-primary"
                 )}
             >
-                <div className="flex items-start gap-2">
+                <div className="flex items-center gap-2">
                     <span
                         // The card opens on click, so the controls on it have to
                         // stop the click from reaching the card underneath.
@@ -102,11 +118,47 @@ export function TaskCard({
                     >
                         <TaskStatusMarker commands={commands} />
                     </span>
-                    <span className="mt-0.5 font-mono text-[10px] text-muted-foreground">{task.reference}</span>
+                    <span className="font-mono text-[10px] text-muted-foreground">{task.reference}</span>
                     <span className="flex-1" />
-                    <PriorityFlag priority={task.priority} />
-                    {task.blocked && <Ban className="size-3.5 text-amber-500" aria-label="Blocked" />}
-                    {task.recurring && <Repeat className="size-3.5 text-muted-foreground" aria-label="Repeats" />}
+                    {task.blocked && <Ban className="size-3.5 shrink-0 text-amber-500" aria-label="Blocked" />}
+                    {task.recurring && <Repeat className="size-3.5 shrink-0 text-muted-foreground" aria-label="Repeats" />}
+                    {/* Who it is on and how urgent it is, in the corner rather
+                        than adrift under the name - and each one is the control
+                        that changes it, so there is no second flag on hover
+                        doing what the flag already shown could do. */}
+                    <span
+                        onClick={(event) => event.stopPropagation()}
+                        onKeyDown={(event) => event.stopPropagation()}
+                        role="presentation"
+                        className="flex items-center gap-1"
+                    >
+                        <CornerControl set={task.assignees.length > 0} canEdit={canEdit}>
+                            <AssigneePicker
+                                people={context.people}
+                                selected={task.assignees.map((person) => person.id)}
+                                disabled={!canEdit}
+                                onChange={(assigneeIds) => commands.onEdit({ assigneeIds })}
+                                trigger={
+                                    task.assignees.length > 0 ? (
+                                        <button
+                                            type="button"
+                                            aria-label="Assignees"
+                                            className="flex items-center rounded-full transition-opacity hover:opacity-75"
+                                        >
+                                            <AvatarStack people={task.assignees} size={18} />
+                                        </button>
+                                    ) : undefined
+                                }
+                            />
+                        </CornerControl>
+                        <CornerControl set={task.priority !== "none"} canEdit={canEdit}>
+                            <PriorityPicker
+                                value={task.priority}
+                                disabled={!canEdit}
+                                onChange={(priority) => commands.onEdit({ priority })}
+                            />
+                        </CornerControl>
+                    </span>
                 </div>
 
                 <p className={cn("text-sm leading-snug", core.isFinishedStatus(task.statusType) && "text-muted-foreground line-through")}>
@@ -127,32 +179,24 @@ export function TaskCard({
                     </div>
                 )}
 
-                <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
-                    <DueBadge dueDate={task.dueDate} statusType={task.statusType} timed={task.timed} format={format.date} />
-                    {task.subtaskCount > 0 && (
-                        <span className="inline-flex items-center gap-0.5" title={`${task.subtaskCount} subtasks`}>
-                            <Paperclip className="size-3" />
-                            {task.subtaskCount}
-                        </span>
-                    )}
-                    {task.commentCount > 0 && (
-                        <span className="inline-flex items-center gap-0.5" title={`${task.commentCount} comments`}>
-                            <MessageSquare className="size-3" />
-                            {task.commentCount}
-                        </span>
-                    )}
-                    {task.points !== null && <span title="Points">{task.points} pts</span>}
-                    <span className="flex-1" />
-                    <AvatarStack people={task.assignees} size={20} />
-                    <span
-                        onClick={(event) => event.stopPropagation()}
-                        onKeyDown={(event) => event.stopPropagation()}
-                        role="presentation"
-                        className="flex items-center opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100"
-                    >
-                        <TaskControls commands={commands} compact />
-                    </span>
-                </div>
+                {hasMeta && (
+                    <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                        <DueBadge dueDate={task.dueDate} statusType={task.statusType} timed={task.timed} format={format.date} />
+                        {task.subtaskCount > 0 && (
+                            <span className="inline-flex items-center gap-0.5" title={`${task.subtaskCount} subtasks`}>
+                                <Paperclip className="size-3" />
+                                {task.subtaskCount}
+                            </span>
+                        )}
+                        {task.commentCount > 0 && (
+                            <span className="inline-flex items-center gap-0.5" title={`${task.commentCount} comments`}>
+                                <MessageSquare className="size-3" />
+                                {task.commentCount}
+                            </span>
+                        )}
+                        {task.points !== null && <span title="Points">{task.points} pts</span>}
+                    </div>
+                )}
             </div>
         </li>
         </TaskMenu>

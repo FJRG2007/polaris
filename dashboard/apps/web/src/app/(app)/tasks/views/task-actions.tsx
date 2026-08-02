@@ -78,7 +78,7 @@ async function copy(value: string): Promise<void> {
  * stays visible - a due date nobody can see is a due date nobody meets - and
  * only the empty affordances fade in on hover.
  */
-export function TaskControls({ commands, compact }: { commands: TaskCommands; compact?: boolean }) {
+export function TaskControls({ commands }: { commands: TaskCommands }) {
     const { task, context, canEdit } = commands;
     const assigned = context.people.filter((person) => task.assignees.some((entry) => entry.id === person.id));
 
@@ -89,37 +89,33 @@ export function TaskControls({ commands, compact }: { commands: TaskCommands; co
                 disabled={!canEdit}
                 onChange={(priority) => commands.onEdit({ priority })}
             />
-            {!compact && (
-                <DuePicker
-                    dueDate={task.dueDate}
-                    timed={task.timed}
-                    disabled={!canEdit}
-                    onChange={(dueDate) => commands.onEdit({ dueDate })}
-                />
-            )}
+            <DuePicker
+                dueDate={task.dueDate}
+                timed={task.timed}
+                disabled={!canEdit}
+                onChange={(dueDate) => commands.onEdit({ dueDate })}
+            />
             <AssigneePicker
                 people={context.people}
                 selected={assigned.map((person) => person.id)}
                 disabled={!canEdit}
                 onChange={(assigneeIds) => commands.onEdit({ assigneeIds })}
             />
-            {!compact && (
-                <TagPicker
-                    tags={context.tags}
-                    selected={task.tags.map((tag) => tag.id)}
-                    disabled={!canEdit}
-                    onChange={(tagIds) => commands.onEdit({ tagIds })}
-                    onCreate={
-                        commands.onCreateTag
-                            ? async (name) => {
-                                  const id = await commands.onCreateTag?.(name, tagColorFor(name));
-                                  if (id) commands.onEdit({ tagIds: [...task.tags.map((tag) => tag.id), id] });
-                                  return id ?? null;
-                              }
-                            : undefined
-                    }
-                />
-            )}
+            <TagPicker
+                tags={context.tags}
+                selected={task.tags.map((tag) => tag.id)}
+                disabled={!canEdit}
+                onChange={(tagIds) => commands.onEdit({ tagIds })}
+                onCreate={
+                    commands.onCreateTag
+                        ? async (name) => {
+                              const id = await commands.onCreateTag?.(name, tagColorFor(name));
+                              if (id) commands.onEdit({ tagIds: [...task.tags.map((tag) => tag.id), id] });
+                              return id ?? null;
+                          }
+                        : undefined
+                }
+            />
         </>
     );
 }
