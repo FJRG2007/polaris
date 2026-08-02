@@ -9,19 +9,20 @@
  * order for a screen somebody opens at nine in the morning.
  */
 
-import Link from "next/link";
 import * as actions from "./actions";
 import * as core from "@polaris/core";
 import { TaskPanel } from "./task-panel";
-import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
-import { Card, CardBody, cn } from "@polaris/ui";
+import type { TaskEdit } from "./views/shared";
+import { Fragment, useMemo, useState } from "react";
 import type { RunningTimer } from "@/lib/tasks/time-service";
 import { useDisplayFormat } from "@/components/display-format";
+import { TaskMenu, type TaskCommands } from "./views/task-actions";
+import { Card, CardBody, ConfirmDeleteDialog, cn } from "@polaris/ui";
 import { CircleAlert, Clock, ListChecks, Play, Square } from "lucide-react";
 import { toFacts, type SpaceContext, type TaskRow } from "@/lib/tasks/facts";
-import { AvatarStack, DueBadge, PriorityFlag, StatusDot, StatusMarker } from "./pickers";
+import { AvatarStack, DueBadge, PriorityFlag, StatusDot, StatusMarker, TaskLocation } from "./pickers";
 
 export interface HomeCounts {
     readonly assigned: number;
@@ -59,13 +60,21 @@ export function HomeView({
     const router = useRouter();
     const format = useDisplayFormat();
     const [openTaskId, setOpenTaskId] = useState<string | null>(null);
+    const [deleting, setDeleting] = useState<TaskRow | null>(null);
     const [error, setError] = useState("");
 
     const groups = useMemo(() => {
         const now = new Date();
+        const byId = new Map(tasks.map((task) => [task.id, task]));
         const buckets = new Map<core.DueBucket, TaskRow[]>();
-        for (const task of tasks) {
-            const bucket = core.dueBucket(toFacts(task), now);
+        // Soonest first, which is what the screen says it is - and inside a pile
+        // where the dates are equal or absent, most urgent first. "No due date"
+        // has nothing else to go on, so without this it is in the order the
+        // database happened to return.
+        for (const facts of core.sortTasks(tasks.map(toFacts), { field: "dueDate", direction: "asc" })) {
+            const task = byId.get(facts.id);
+            if (!task) continue;
+            const bucket = core.dueBucket(facts, now);
             const existing = buckets.get(bucket);
             if (existing) existing.push(task);
             else buckets.set(bucket, [task]);
@@ -79,9 +88,35 @@ export function HomeView({
     const openSpaceId = tasks.find((task) => task.id === openTaskId)?.spaceId;
     const openContext = openSpaceId ? contexts[openSpaceId] : undefined;
 
-    const setStatus = async (task: TaskRow, statusId: string) => {
-        await runAction(() => actions.updateTaskAction({ taskId: task.id, statusId }), setError);
+    const edit = async (task: TaskRow, change: TaskEdit) => {
+        setError("");
+        const result = await runAction(() => actions.updateTaskAction({ taskId: task.id, ...change }), setError);
+        if (result?.error) setError(result.error);
         router.refresh();
+    };
+
+    /**
+     * The same verbs a task offers on a board or in a list. Work reached from
+     * here is the work somebody is actually doing today, so reassigning it or
+     * moving its date should not cost a trip into the list it came from.
+     */
+    const commandsFor = (task: TaskRow): TaskCommands | null => {
+        const context = contexts[task.spaceId];
+        if (!context) return null;
+        return {
+            task,
+            context,
+            canEdit: context.canEdit,
+            onOpen: () => setOpenTaskId(task.id),
+            onEdit: (change) => void edit(task, change),
+            onDuplicate: async () => {
+                setError("");
+                const result = await runAction(() => actions.duplicateTaskAction(task.id), setError);
+                if (result?.error) setError(result.error);
+                router.refresh();
+            },
+            onDelete: () => setDeleting(task)
+        };
     };
 
     return (
@@ -146,47 +181,62 @@ export function HomeView({
                         <span className="ml-2 text-xs font-normal text-muted-foreground">{group.tasks.length}</span>
                     </h2>
                     <ul className="divide-y divide-border rounded-lg border border-border">
-                        {group.tasks.map((task) => (
-                            <li key={task.id} className="flex items-center gap-2 px-3 py-2">
-                                <StatusMarker
-                                    statuses={contexts[task.spaceId]?.statuses ?? []}
-                                    statusId={task.statusId}
-                                    statusColor={task.statusColor}
-                                    statusType={task.statusType}
-                                    statusName={task.statusName}
-                                    spaceId={task.spaceId}
-                                    onChange={(statusId) => void setStatus(task, statusId)}
-                                />
-                                <button
-                                    type="button"
-                                    onClick={() => setOpenTaskId(task.id)}
-                                    className="flex min-w-0 flex-1 items-center gap-2 text-left"
-                                >
-                                    <span className="hidden font-mono text-[11px] text-muted-foreground sm:inline">
-                                        {task.reference}
+                        {group.tasks.map((task) => {
+                            const commands = commandsFor(task);
+                            const row = (
+                                <li className="flex items-center gap-2 px-3 py-2">
+                                    <StatusMarker
+                                        statuses={contexts[task.spaceId]?.statuses ?? []}
+                                        statusId={task.statusId}
+                                        statusColor={task.statusColor}
+                                        statusType={task.statusType}
+                                        statusName={task.statusName}
+                                        spaceId={task.spaceId}
+                                        onChange={(statusId) => void edit(task, { statusId })}
+                                    />
+                                    {/* Name and where it lives, stacked: this
+                                        screen mixes every space the reader can
+                                        reach, and a task name on its own does
+                                        not say which piece of work it is part
+                                        of. The trail stays on a phone, where
+                                        knowing that matters just as much. */}
+                                    <div className="flex min-w-0 flex-1 flex-col">
+                                        <button
+                                            type="button"
+                                            onClick={() => setOpenTaskId(task.id)}
+                                            className="flex min-w-0 items-center gap-2 text-left"
+                                        >
+                                            <span className="hidden font-mono text-[11px] text-muted-foreground sm:inline">
+                                                {task.reference}
+                                            </span>
+                                            <span className="truncate text-sm">{task.name}</span>
+                                            <PriorityFlag priority={task.priority} />
+                                        </button>
+                                        <TaskLocation task={task} />
+                                    </div>
+                                    <span className="hidden items-center gap-1 text-[11px] text-muted-foreground md:flex">
+                                        <StatusDot color={task.statusColor} />
+                                        {task.statusName}
                                     </span>
-                                    <span className="truncate text-sm">{task.name}</span>
-                                    <PriorityFlag priority={task.priority} />
-                                </button>
-                                <Link
-                                    href={`/tasks/l/${task.listId}`}
-                                    className="hidden max-w-32 truncate text-xs text-muted-foreground hover:text-foreground hover:underline md:block"
-                                >
-                                    {task.listName}
-                                </Link>
-                                <span className="hidden items-center gap-1 text-[11px] text-muted-foreground md:flex">
-                                    <StatusDot color={task.statusColor} />
-                                    {task.statusName}
-                                </span>
-                                <DueBadge
-                                    dueDate={task.dueDate}
-                                    statusType={task.statusType}
-                                    timed={task.timed}
-                                    format={format.date}
-                                />
-                                <AvatarStack people={task.assignees} size={20} />
-                            </li>
-                        ))}
+                                    <DueBadge
+                                        dueDate={task.dueDate}
+                                        statusType={task.statusType}
+                                        timed={task.timed}
+                                        format={format.date}
+                                    />
+                                    <AvatarStack people={task.assignees} size={20} />
+                                </li>
+                            );
+                            // Without its space's vocabulary there is nothing to
+                            // offer on a right-click, so the row stays a row.
+                            return commands ? (
+                                <TaskMenu key={task.id} commands={commands}>
+                                    {row}
+                                </TaskMenu>
+                            ) : (
+                                <Fragment key={task.id}>{row}</Fragment>
+                            );
+                        })}
                     </ul>
                 </section>
             ))}
@@ -199,6 +249,23 @@ export function HomeView({
                 onChanged={() => router.refresh()}
             />
             )}
+
+            <ConfirmDeleteDialog
+                open={deleting !== null}
+                onOpenChange={(open) => (open ? undefined : setDeleting(null))}
+                name={deleting?.name ?? ""}
+                kind="task"
+                requireTyping={false}
+                description="Comments, checklists and tracked time go with it. Archiving keeps all of that and takes it off the board."
+                confirmLabel="Delete task"
+                onConfirm={async () => {
+                    if (!deleting) return;
+                    const result = await runAction(() => actions.deleteTaskAction(deleting.id), setError);
+                    if (result?.error) setError(result.error);
+                    setDeleting(null);
+                    router.refresh();
+                }}
+            />
         </div>
     );
 }

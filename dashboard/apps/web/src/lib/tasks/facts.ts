@@ -36,8 +36,12 @@ export interface TaskRow {
     readonly name: string;
     readonly description: string;
     readonly spaceId: string;
+    readonly spaceName: string;
     readonly listId: string;
     readonly listName: string;
+    /** The folder the list sits in, which is what people call the project. Null
+     *  for a list kept at the root of its space. */
+    readonly folderName: string | null;
     readonly parentId: string | null;
     readonly statusId: string | null;
     readonly statusName: string;

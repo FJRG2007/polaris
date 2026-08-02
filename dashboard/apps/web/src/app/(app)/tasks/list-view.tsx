@@ -274,6 +274,9 @@ export function ListScreen({
         onEdit: editTask,
         onDuplicate: duplicateTask,
         onDelete: setDeleting,
+        // A screen with no list of its own is showing work from several, so each
+        // row has to name the one it came from.
+        showLocation: listId === null,
         onCreateTag: async (name, color) => {
             const created = await runAction(() => actions.createTagAction(context.spaceId, name, color), setError);
             if (created?.id) refresh();

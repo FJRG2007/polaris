@@ -18,13 +18,23 @@ import { CustomFieldValue } from "../custom-fields";
 import { useDisplayFormat } from "@/components/display-format";
 import { Ban, ChevronDown, ChevronRight, Plus } from "lucide-react";
 import { commandsFor, TaskControls, TaskMenu, TaskStatusMarker, type TaskCommands } from "./task-actions";
-import { AssigneePicker, AvatarStack, DueBadge, DuePicker, PriorityPicker, StatusDot, TagChip } from "../pickers";
+import {
+    AssigneePicker,
+    AvatarStack,
+    DueBadge,
+    DuePicker,
+    PriorityPicker,
+    StatusDot,
+    TagChip,
+    TaskLocation
+} from "../pickers";
 
 /** One task as a row. Shared by both views so a task reads the same in either. */
 function TaskLine({
     commands,
     depth,
     selected,
+    showLocation,
     onSelect,
     onDragStart,
     onDropBefore
@@ -32,6 +42,7 @@ function TaskLine({
     commands: TaskCommands;
     depth: number;
     selected: boolean;
+    showLocation?: boolean;
     onSelect: () => void;
     onDragStart?: () => void;
     onDropBefore?: () => void;
@@ -69,20 +80,23 @@ function TaskLine({
             style={{ paddingLeft: `${0.5 + depth * 1.25}rem` }}
         >
             <TaskStatusMarker commands={commands} />
-            <button
-                type="button"
-                onClick={(event) => (event.metaKey || event.ctrlKey ? onSelect() : onOpen())}
-                className="flex min-w-0 flex-1 items-center gap-2 text-left"
-            >
-                <span className="hidden font-mono text-[11px] text-muted-foreground sm:inline">{task.reference}</span>
-                <span className={cn("truncate text-sm", core.isFinishedStatus(task.statusType) && "text-muted-foreground line-through")}>
-                    {task.name}
-                </span>
-                {task.blocked && <Ban className="size-3.5 shrink-0 text-amber-500" aria-label="Blocked" />}
-                {task.tags.slice(0, 2).map((tag) => (
-                    <TagChip key={tag.id} tag={tag} />
-                ))}
-            </button>
+            <div className="flex min-w-0 flex-1 flex-col">
+                <button
+                    type="button"
+                    onClick={(event) => (event.metaKey || event.ctrlKey ? onSelect() : onOpen())}
+                    className="flex min-w-0 items-center gap-2 text-left"
+                >
+                    <span className="hidden font-mono text-[11px] text-muted-foreground sm:inline">{task.reference}</span>
+                    <span className={cn("truncate text-sm", core.isFinishedStatus(task.statusType) && "text-muted-foreground line-through")}>
+                        {task.name}
+                    </span>
+                    {task.blocked && <Ban className="size-3.5 shrink-0 text-amber-500" aria-label="Blocked" />}
+                    {task.tags.slice(0, 2).map((tag) => (
+                        <TagChip key={tag.id} tag={tag} />
+                    ))}
+                </button>
+                {showLocation && <TaskLocation task={task} />}
+            </div>
 
             <span className="hidden items-center gap-1 text-[11px] text-muted-foreground md:flex">
                 <StatusDot color={task.statusColor} />
@@ -188,6 +202,7 @@ export function ListView(props: ViewProps) {
                                             commands={commandsFor(props, task)}
                                             depth={node.depth}
                                             selected={selection.has(task.id)}
+                                            showLocation={props.showLocation}
                                             onSelect={() => onSelect(task.id)}
                                             onDragStart={() => setDragging(task.id)}
                                             onDropBefore={() => {
@@ -296,6 +311,7 @@ export function TableView(props: ViewProps) {
                                     <span className="font-mono text-[11px] text-muted-foreground">{task.reference}</span>
                                     <span className="truncate">{task.name}</span>
                                 </button>
+                                {props.showLocation && <TaskLocation task={task} />}
                             </td>
                             <td className="whitespace-nowrap px-2 py-1.5">
                                 <span className="inline-flex items-center gap-1.5 text-xs">

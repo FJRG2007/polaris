@@ -71,8 +71,10 @@ const ROW_SELECT = {
     createdById: true,
     createdAt: true,
     updatedAt: true,
-    space: { select: { prefix: true } },
-    list: { select: { name: true } },
+    space: { select: { prefix: true, name: true } },
+    // The folder comes with the list: a screen that spans spaces has to say
+    // where each task lives, and that is one join rather than a query per row.
+    list: { select: { name: true, folder: { select: { name: true } } } },
     status: { select: { id: true, name: true, color: true, type: true } },
     assignees: { select: { user: { select: { id: true, name: true, image: true } } } },
     tags: { select: { tag: { select: { id: true, name: true, color: true } } } },
@@ -120,8 +122,10 @@ function toRow(
         name: record.name,
         description: record.description,
         spaceId: record.spaceId,
+        spaceName: record.space.name,
         listId: record.listId,
         listName: record.list.name,
+        folderName: record.list.folder?.name ?? null,
         parentId: record.parentId,
         statusId: record.statusId,
         statusName: status?.name ?? "No status",

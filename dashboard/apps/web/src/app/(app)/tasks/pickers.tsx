@@ -13,8 +13,8 @@
 
 import Link from "next/link";
 import * as core from "@polaris/core";
-import type { PersonRef, TagRef } from "@/lib/tasks/facts";
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { PersonRef, TagRef, TaskRow } from "@/lib/tasks/facts";
 import type { StatusView, TagView } from "@/lib/tasks/space-service";
 import { Ban, CalendarPlus, Check, ChevronDown, Flag, Plus, Search, Settings2, UserPlus, X } from "lucide-react";
 import {
@@ -159,6 +159,53 @@ export function AssigneePicker({
 }
 
 // ---------------------------------------------------------------------------
+// Where a task lives
+// ---------------------------------------------------------------------------
+
+/**
+ * The trail to a task: its space, the folder people use as the project, and its
+ * list. Any screen that mixes work from more than one list needs it - a task
+ * called "Fix the header" says nothing about which piece of work it belongs to
+ * until you can see where it came from. The space and the list are links,
+ * because the next thing somebody wants is usually the rest of that list.
+ */
+export function TaskLocation({
+    task,
+    className
+}: {
+    task: Pick<TaskRow, "spaceId" | "spaceName" | "listId" | "listName" | "folderName">;
+    className?: string;
+}) {
+    const trail = [task.spaceName, task.folderName, task.listName].filter(Boolean).join(" / ");
+    return (
+        <span
+            title={trail}
+            className={cn("flex min-w-0 items-center gap-1 text-[11px] text-muted-foreground", className)}
+        >
+            <Link
+                href={`/tasks/s/${task.spaceId}`}
+                className="truncate transition-colors hover:text-foreground hover:underline"
+            >
+                {task.spaceName}
+            </Link>
+            {task.folderName && (
+                <>
+                    <span aria-hidden>/</span>
+                    <span className="truncate">{task.folderName}</span>
+                </>
+            )}
+            <span aria-hidden>/</span>
+            <Link
+                href={`/tasks/l/${task.listId}`}
+                className="truncate transition-colors hover:text-foreground hover:underline"
+            >
+                {task.listName}
+            </Link>
+        </span>
+    );
+}
+
+// ---------------------------------------------------------------------------
 // Status
 // ---------------------------------------------------------------------------
 
@@ -169,6 +216,76 @@ export function StatusDot({ color, className }: { color: string; className?: str
             className={cn("inline-block size-2.5 shrink-0 rounded-full", className)}
             style={{ backgroundColor: color }}
         />
+    );
+}
+
+/**
+ * What a state looks like, as a shape rather than only a colour.
+ *
+ * Three shapes, one per stage of the work, so a row is readable at a glance and
+ * stays readable to somebody who cannot tell the colours apart:
+ *
+ *   - not started: a broken ring, open and clearly empty
+ *   - under way: a ring with the middle filled in
+ *   - finished: a solid disc with a tick
+ *
+ * Drawn rather than composed out of borders because a dashed CSS border on a
+ * 20px circle renders as an uneven smudge, and the tick has to sit dead centre
+ * at every size a row, a card and a menu use.
+ */
+export function StatusIcon({
+    color,
+    type,
+    size = 20,
+    className
+}: {
+    color: string;
+    type: core.TaskStatusType;
+    size?: number;
+    className?: string;
+}) {
+    const finished = core.isFinishedStatus(type);
+    return (
+        <svg
+            aria-hidden
+            viewBox="0 0 20 20"
+            width={size}
+            height={size}
+            className={cn("shrink-0", className)}
+            style={{ color }}
+        >
+            {finished ? (
+                <>
+                    <circle cx="10" cy="10" r="9" fill="currentColor" />
+                    <path
+                        d="M5.8 10.3l2.7 2.7 5.7-5.7"
+                        fill="none"
+                        stroke="#fff"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                    />
+                </>
+            ) : (
+                <>
+                    <circle
+                        cx="10"
+                        cy="10"
+                        r="8"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        // Eight even dashes around the circumference: work that
+                        // has not started reads as an outline somebody has yet
+                        // to close, not as a state of its own.
+                        {...(type === "open"
+                            ? { strokeDasharray: "3.6 2.7", strokeLinecap: "round" as const }
+                            : {})}
+                    />
+                    {type !== "open" && <circle cx="10" cy="10" r="4" fill="currentColor" />}
+                </>
+            )}
+        </svg>
     );
 }
 
@@ -207,7 +324,7 @@ export function StatusPicker({
                         )}
                         style={current ? { color: current.color } : undefined}
                     >
-                        <StatusDot color={current?.color ?? "#64748b"} />
+                        <StatusIcon color={current?.color ?? "#64748b"} type={current?.type ?? "open"} size={14} />
                         <span className="truncate">{current?.name ?? "No status"}</span>
                         {!compact && <ChevronDown className="size-3 opacity-60" />}
                     </button>
@@ -216,7 +333,7 @@ export function StatusPicker({
             <DropdownMenuContent align="start" className="w-56">
                 {statuses.map((status) => (
                     <DropdownMenuItem key={status.id} onSelect={() => onChange(status.id)} className="gap-2">
-                        <StatusDot color={status.color} />
+                        <StatusIcon color={status.color} type={status.type} size={16} />
                         <span className="flex-1 truncate">{status.name}</span>
                         {status.id === value ? (
                             <Check className="size-3.5 text-primary" />
@@ -269,7 +386,6 @@ export function StatusMarker({
     disabled?: boolean;
     spaceId?: string;
 }) {
-    const done = core.isFinishedStatus(statusType);
     return (
         <StatusPicker
             statuses={statuses}
@@ -282,10 +398,9 @@ export function StatusMarker({
                     type="button"
                     title={statusName}
                     aria-label={`Status: ${statusName}`}
-                    className="inline-flex size-5 shrink-0 items-center justify-center rounded-full border-2 transition-transform hover:scale-110 disabled:cursor-not-allowed disabled:opacity-50"
-                    style={{ borderColor: statusColor, backgroundColor: done ? statusColor : "transparent" }}
+                    className="inline-flex size-5 shrink-0 items-center justify-center transition-transform hover:scale-110 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                    {done && <Check className="size-3 text-white" strokeWidth={3} />}
+                    <StatusIcon color={statusColor} type={statusType} />
                 </button>
             }
         />

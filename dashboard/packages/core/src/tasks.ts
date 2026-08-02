@@ -521,6 +521,20 @@ function compareNullable(left: number | null, right: number | null, direction: 1
     return (left - right) * direction;
 }
 
+/**
+ * How two tasks that share a deadline - or have none at all - are ordered.
+ *
+ * A date sort leaves every undated task tied, and a pile in no order is a pile
+ * nobody can work from. Urgency is what is left to go on, so the most urgent
+ * comes first; the manual order breaks the last tie so the result is stable
+ * rather than shuffling on every render. Deliberately not reversed with the
+ * sort's direction: pointing a date column the other way should not put the
+ * least urgent work at the top of the piece of it that has no dates.
+ */
+function byUrgency(left: TaskFacts, right: TaskFacts): number {
+    return work.priorityRank(left.priority) - work.priorityRank(right.priority) || left.order - right.order;
+}
+
 export function compareTasks(
     left: TaskFacts,
     right: TaskFacts,
@@ -544,10 +558,9 @@ export function compareTasks(
         case "priority":
             return (work.priorityRank(left.priority) - work.priorityRank(right.priority)) * direction;
         case "dueDate":
-            return compareNullable(
-                left.dueDate?.getTime() ?? null,
-                right.dueDate?.getTime() ?? null,
-                direction
+            return (
+                compareNullable(left.dueDate?.getTime() ?? null, right.dueDate?.getTime() ?? null, direction) ||
+                byUrgency(left, right)
             );
         case "startDate":
             return compareNullable(

@@ -19,7 +19,7 @@ import type { TaskRow } from "@/lib/tasks/facts";
 import type { TaskEdit, ViewProps } from "./shared";
 import type { SpaceContext } from "@/lib/tasks/facts";
 import { Ban, Check, Copy, ExternalLink, Flag, Link2, Tag, Trash2, UserPlus } from "lucide-react";
-import { AssigneePicker, DuePicker, PriorityPicker, StatusMarker, TagPicker, tagColorFor } from "../pickers";
+import { AssigneePicker, DuePicker, PriorityPicker, StatusIcon, StatusMarker, TagPicker, tagColorFor } from "../pickers";
 import {
     ContextMenu,
     ContextMenuContent,
@@ -177,11 +177,7 @@ export function TaskMenu({ commands, children }: { commands: TaskCommands; child
                                         onSelect={() => commands.onEdit({ statusId: status.id })}
                                         className="gap-2"
                                     >
-                                        <span
-                                            aria-hidden
-                                            className="inline-block size-2.5 shrink-0 rounded-full"
-                                            style={{ backgroundColor: status.color }}
-                                        />
+                                        <StatusIcon color={status.color} type={status.type} size={16} />
                                         <span className="flex-1 truncate">{status.name}</span>
                                         {status.id === task.statusId && <Check className="size-3.5 text-primary" />}
                                     </ContextMenuItem>

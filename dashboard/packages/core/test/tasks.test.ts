@@ -236,6 +236,22 @@ describe("sorting", () => {
         expect(engine.sortTasks([undated, dated], { field: "dueDate", direction: "asc" })[0]).toBe(dated);
         expect(engine.sortTasks([undated, dated], { field: "dueDate", direction: "desc" })[0]).toBe(dated);
     });
+
+    it("orders undated work by urgency, since there is no date to go on", () => {
+        const sorted = engine.sortTasks(
+            [task({ priority: "low" }), task({ priority: "urgent" }), task({ priority: "normal" })],
+            { field: "dueDate", direction: "asc" }
+        );
+        expect(sorted.map((entry) => entry.priority)).toEqual(["urgent", "normal", "low"]);
+    });
+
+    it("breaks a shared deadline by urgency, and does not flip it with the direction", () => {
+        const due = new Date("2026-08-10T00:00:00.000Z");
+        const low = task({ dueDate: due, priority: "low" });
+        const urgent = task({ dueDate: due, priority: "urgent" });
+        expect(engine.sortTasks([low, urgent], { field: "dueDate", direction: "asc" })[0]).toBe(urgent);
+        expect(engine.sortTasks([low, urgent], { field: "dueDate", direction: "desc" })[0]).toBe(urgent);
+    });
 });
 
 describe("grouping", () => {

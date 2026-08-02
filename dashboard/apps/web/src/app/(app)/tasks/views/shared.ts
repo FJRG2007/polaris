@@ -49,6 +49,10 @@ export interface ViewProps {
     readonly onDelete: (task: TaskRow) => void;
     /** Born where it is needed: a tag typed into a picker that matches nothing. */
     readonly onCreateTag?: (name: string, color: string) => Promise<string | null>;
+    /** Whether a row has to say where it lives. True on the screens that mix
+     *  several lists - Everything, a sprint, a space - where a task name alone
+     *  does not say which piece of work it belongs to. */
+    readonly showLocation?: boolean;
     /** What the board is grouped by, so it knows whether a new column is a
      *  status somebody can add or a slice of data it cannot invent. */
     readonly groupBy?: TaskGroupField;

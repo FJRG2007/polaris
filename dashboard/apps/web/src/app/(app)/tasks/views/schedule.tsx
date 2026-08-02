@@ -12,10 +12,11 @@ import { cn } from "@polaris/ui";
 import * as core from "@polaris/core";
 import { useMemo, useState } from "react";
 import type { ViewProps } from "./shared";
+import { PriorityFlag, StatusIcon } from "../pickers";
+import { commandsFor, TaskMenu } from "./task-actions";
 import { toFacts, type TaskRow } from "@/lib/tasks/facts";
 import { useDisplayFormat } from "@/components/display-format";
 import { ChevronLeft, ChevronRight, Diamond } from "lucide-react";
-import { PriorityFlag, StatusDot } from "../pickers";
 
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -23,7 +24,8 @@ const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 // Calendar
 // ---------------------------------------------------------------------------
 
-export function CalendarView({ rows, canEdit, onOpen, onQuickCreate }: ViewProps) {
+export function CalendarView(props: ViewProps) {
+    const { rows, canEdit, onOpen, onQuickCreate } = props;
     const format = useDisplayFormat();
     const [monthOffset, setMonthOffset] = useState(0);
 
@@ -116,17 +118,23 @@ export function CalendarView({ rows, canEdit, onOpen, onQuickCreate }: ViewProps
                                 </div>
                                 <ul className="flex flex-col gap-1">
                                     {tasks.slice(0, 4).map((task) => (
-                                        <li key={task.id}>
-                                            <button
-                                                type="button"
-                                                onClick={() => onOpen(task.id)}
-                                                title={task.name}
-                                                className="flex w-full items-center gap-1 truncate rounded px-1 py-0.5 text-left text-[11px] transition-colors hover:bg-muted"
-                                            >
-                                                <StatusDot color={task.statusColor} />
-                                                <span className="truncate">{task.name}</span>
-                                            </button>
-                                        </li>
+                                        <TaskMenu key={task.id} commands={commandsFor(props, task)}>
+                                            <li>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => onOpen(task.id)}
+                                                    title={task.name}
+                                                    className="flex w-full items-center gap-1 truncate rounded px-1 py-0.5 text-left text-[11px] transition-colors hover:bg-muted"
+                                                >
+                                                    <StatusIcon
+                                                        color={task.statusColor}
+                                                        type={task.statusType}
+                                                        size={12}
+                                                    />
+                                                    <span className="truncate">{task.name}</span>
+                                                </button>
+                                            </li>
+                                        </TaskMenu>
                                     ))}
                                     {tasks.length > 4 && (
                                         <li className="px-1 text-[10px] text-muted-foreground">
@@ -156,7 +164,8 @@ export function CalendarView({ rows, canEdit, onOpen, onQuickCreate }: ViewProps
 // Gantt
 // ---------------------------------------------------------------------------
 
-export function GanttView({ rows, onOpen }: ViewProps) {
+export function GanttView(props: ViewProps) {
+    const { rows, onOpen } = props;
     const format = useDisplayFormat();
     const now = new Date();
 
@@ -215,13 +224,14 @@ export function GanttView({ rows, onOpen }: ViewProps) {
                             const bar = bars.find((entry) => entry.taskId === task.id);
                             if (!bar) return null;
                             return (
-                                <li key={task.id} className="flex items-center border-b border-border last:border-0">
+                                <TaskMenu key={task.id} commands={commandsFor(props, task)}>
+                                <li className="flex items-center border-b border-border last:border-0">
                                     <button
                                         type="button"
                                         onClick={() => onOpen(task.id)}
                                         className="flex w-56 shrink-0 items-center gap-2 px-3 py-2 text-left"
                                     >
-                                        <StatusDot color={task.statusColor} />
+                                        <StatusIcon color={task.statusColor} type={task.statusType} size={14} />
                                         <span className="truncate text-xs">{task.name}</span>
                                         <PriorityFlag priority={task.priority} />
                                     </button>
@@ -245,6 +255,7 @@ export function GanttView({ rows, onOpen }: ViewProps) {
                                         </button>
                                     </div>
                                 </li>
+                                </TaskMenu>
                             );
                         })}
                         {scheduled.length === 0 && (

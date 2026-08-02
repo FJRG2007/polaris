@@ -21,7 +21,7 @@ import type { TaskRow } from "@/lib/tasks/facts";
 import type { BoardMove, ViewProps } from "./shared";
 import { useDisplayFormat } from "@/components/display-format";
 import { Ban, MessageSquare, Paperclip, Plus, Repeat } from "lucide-react";
-import { AvatarStack, DueBadge, PriorityFlag, StatusDot, TagChip } from "../pickers";
+import { AvatarStack, DueBadge, PriorityFlag, StatusDot, TagChip, TaskLocation } from "../pickers";
 import { commandsFor, TaskControls, TaskMenu, TaskStatusMarker, type TaskCommands } from "./task-actions";
 
 /** Where a card was dropped, as neighbours rather than an index. */
@@ -41,12 +41,14 @@ export function TaskCard({
     onDragStart,
     onDropBefore,
     selected,
+    showLocation,
     onSelect
 }: {
     commands: TaskCommands;
     onDragStart: () => void;
     onDropBefore: () => void;
     selected: boolean;
+    showLocation?: boolean;
     onSelect?: (event: React.MouseEvent) => void;
 }) {
     const format = useDisplayFormat();
@@ -110,6 +112,12 @@ export function TaskCard({
                 <p className={cn("text-sm leading-snug", core.isFinishedStatus(task.statusType) && "text-muted-foreground line-through")}>
                     {task.name}
                 </p>
+
+                {showLocation && (
+                    <span onClick={(event) => event.stopPropagation()} role="presentation">
+                        <TaskLocation task={task} />
+                    </span>
+                )}
 
                 {task.tags.length > 0 && (
                     <div className="flex flex-wrap gap-1">
@@ -230,6 +238,7 @@ export function BoardView(props: ViewProps) {
                                 key={task.id}
                                 commands={commandsFor(props, task)}
                                 selected={selection.has(task.id)}
+                                showLocation={props.showLocation}
                                 onSelect={() => onSelect(task.id)}
                                 onDragStart={() => setDragging(task.id)}
                                 onDropBefore={() => drop(group.key, group.tasks, task.id)}
