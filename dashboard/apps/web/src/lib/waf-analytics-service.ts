@@ -7,7 +7,12 @@
 
 import { readFile } from "node:fs/promises";
 import { parseHttpLogs } from "@polaris/deploy";
-import { summarizeWafTraffic, type WafTrafficSummary } from "@polaris/core";
+import {
+    summarizeWafAddress,
+    summarizeWafTraffic,
+    type WafAddressActivity,
+    type WafTrafficSummary
+} from "@polaris/core";
 
 const ACCESS_LOG_FILE = process.env.POLARIS_TRAEFIK_ACCESSLOG ?? "/traefik-log/access.log";
 
@@ -15,21 +20,40 @@ const ACCESS_LOG_FILE = process.env.POLARIS_TRAEFIK_ACCESSLOG ?? "/traefik-log/a
  *  starts later, which the summary reports rather than hides. */
 const TAIL_BYTES = 16 * 1024 * 1024;
 
-/** Traffic over the last `hours`, split into allowed and blocked, with the
- *  breakdowns of what was turned away. */
-export async function wafTraffic(hours = 24, now = Date.now()): Promise<WafTrafficSummary> {
-    const from = now - hours * 3600 * 1000;
+/** The last few megabytes of the edge's log, or nothing at all when there is no log
+ *  to read - not mounted, or a deployment where the edge is somewhere else. */
+async function readLogTail(): Promise<string> {
     let raw: string;
     try {
         raw = await readFile(ACCESS_LOG_FILE, "utf8");
     } catch {
-        // No edge log on this deployment (or not mounted): an empty summary, which
-        // the panel renders as "nothing recorded yet" rather than as zero attacks.
-        return summarizeWafTraffic([], from, now);
+        return "";
     }
-    if (raw.length > TAIL_BYTES) {
-        const cut = raw.slice(raw.length - TAIL_BYTES);
-        raw = cut.slice(cut.indexOf("\n") + 1);
-    }
-    return summarizeWafTraffic(parseHttpLogs(raw), from, now);
+    if (raw.length <= TAIL_BYTES) return raw;
+    const cut = raw.slice(raw.length - TAIL_BYTES);
+    // Drop the partial first line rather than hand the parser half a JSON object.
+    return cut.slice(cut.indexOf("\n") + 1);
+}
+
+/** Traffic over the last `hours`, split into allowed and blocked, with the
+ *  breakdowns of what was turned away. */
+export async function wafTraffic(hours = 24, now = Date.now()): Promise<WafTrafficSummary> {
+    const from = now - hours * 3600 * 1000;
+    // An empty log summarizes to "nothing recorded yet" rather than to zero attacks.
+    return summarizeWafTraffic(parseHttpLogs(await readLogTail()), from, now);
+}
+
+/**
+ * What one address did, over the same log.
+ *
+ * Read on demand rather than kept: the evidence behind a ban is looked at once, by one
+ * person, minutes after the ban - storing a per-address request history to serve that
+ * would be a write on every request for something almost nobody opens.
+ */
+export async function wafAddressActivity(
+    ip: string,
+    hours = 24,
+    now = Date.now()
+): Promise<WafAddressActivity> {
+    return summarizeWafAddress(parseHttpLogs(await readLogTail()), ip, now - hours * 3600 * 1000, now);
 }

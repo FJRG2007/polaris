@@ -12,14 +12,21 @@ import { requirePermission } from "@/lib/session";
 import { recordAudit } from "@/lib/audit-service";
 import { syncAppRoutes } from "@/lib/deploy-service";
 import { syncDashboardRoute } from "@/lib/domain-edge";
-import { wafTraffic } from "@/lib/waf-analytics-service";
+import { wafAddressActivity, wafTraffic } from "@/lib/waf-analytics-service";
+import { getWafRule, setWafRule, type WafRuleView } from "@/lib/waf-service";
+import {
+    getWafIgnoreList,
+    getWafJails,
+    setWafIgnoreList,
+    setWafJails,
+    type WafJailSettings
+} from "@/lib/waf-ban-service";
 import {
     currentWafAnomalies,
     getWafAnomalySettings,
     setWafAnomalySettings,
     type WafAnomalySettings
 } from "@/lib/waf-anomaly-service";
-import { getWafRule, setWafRule, type WafRuleView } from "@/lib/waf-service";
 import {
     getWafFeed,
     listWafBans,
@@ -29,16 +36,10 @@ import {
     setWafFeedEnabled
 } from "@/lib/waf-intel-service";
 import {
-    getWafIgnoreList,
-    getWafJails,
-    setWafIgnoreList,
-    setWafJails,
-    type WafJailSettings
-} from "@/lib/waf-ban-service";
-import {
     cidrOrIp,
     WAF_JAIL_IDS,
     WAF_LIST_MAX,
+    type WafAddressActivity,
     type WafCustomRule,
     type WafJail,
     type WafAnomaly,
@@ -178,6 +179,29 @@ function countEntries(json: string | undefined): number {
         return Array.isArray(parsed) ? parsed.length : 0;
     } catch {
         return 0;
+    }
+}
+
+/**
+ * Everything one address did, so a ban can be checked rather than believed.
+ *
+ * Its own round trip rather than part of the overview: the evidence for one address
+ * is hundreds of lines, nobody opens it for most bans, and loading it with the page
+ * would make every operator pay for the one who wanted it.
+ */
+export async function getWafAddressActivityAction(
+    ip: string,
+    hours = 24
+): Promise<{ activity?: WafAddressActivity; error?: string }> {
+    await requirePermission("system.manage");
+    const address = cidrOrIp.safeParse(ip);
+    if (!address.success) return { error: "That is not a valid address" };
+    const window = z.number().int().min(1).max(168).safeParse(hours);
+    if (!window.success) return { error: "That is not a valid window" };
+    try {
+        return { activity: await wafAddressActivity(address.data, window.data) };
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not read that address's activity" };
     }
 }
 

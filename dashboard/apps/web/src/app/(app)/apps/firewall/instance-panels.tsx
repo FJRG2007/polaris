@@ -17,11 +17,11 @@ import Link from "next/link";
 import { useDisplayFormat } from "@/components/display-format";
 import type { WafAnomalySettings } from "@/lib/waf-anomaly-service";
 import { useCallback, useEffect, useState, useTransition } from "react";
-import type { WafAnomaly, WafJail, WafTrafficSummary } from "@polaris/core";
+import type { WafAddressActivity, WafAnomaly, WafJail, WafTrafficSummary } from "@polaris/core";
 import { Activity, Ban, Globe, RadarIcon, RefreshCw, ShieldOff, Timer, TriangleAlert } from "lucide-react";
-import { Badge, Button, Card, CardBody, CardHeader, CardTitle, Skeleton, Switch, TimeSeriesChart } from "@polaris/ui";
 import {
     blockAnomalyAction,
+    getWafAddressActivityAction,
     getWafOverviewAction,
     liftWafBanAction,
     setTorBlockedAction,
@@ -29,6 +29,22 @@ import {
     setWafJailsAction,
     type WafBanView
 } from "./actions";
+import {
+    Badge,
+    Button,
+    Card,
+    CardBody,
+    CardHeader,
+    CardTitle,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    Skeleton,
+    Switch,
+    TimeSeriesChart
+} from "@polaris/ui";
 
 type Overview = Awaited<ReturnType<typeof getWafOverviewAction>>;
 
@@ -61,6 +77,10 @@ export function FirewallInstancePanels() {
     const [hours, setHours] = useState(24);
     const [data, setData] = useState<Overview | null>(null);
     const [failure, setFailure] = useState<string | null>(null);
+    // The address whose requests are open. Held here rather than in each panel so an
+    // address means the same thing wherever it appears - banned, anomalous, or just
+    // near the top of the blocked list.
+    const [inspecting, setInspecting] = useState<string | null>(null);
     const [refreshing, startRefresh] = useTransition();
 
     const load = useCallback((window: number) => {
@@ -104,19 +124,41 @@ export function FirewallInstancePanels() {
                 loading={!data}
                 refreshing={refreshing}
                 onRefresh={() => load(hours)}
+                onInspect={setInspecting}
             />
             <AnomaliesPanel
                 anomalies={data?.anomalies}
                 settings={data?.anomalySettings}
                 loading={!data}
                 mutate={mutate}
+                onInspect={setInspecting}
             />
-            <BansPanel bans={data?.bans} loading={!data} mutate={mutate} />
+            <BansPanel bans={data?.bans} loading={!data} mutate={mutate} onInspect={setInspecting} />
             <JailsPanel jails={data?.jails} loading={!data} onSaved={() => load(hours)} />
             <IntelPanel tor={data?.tor} loading={!data} mutate={mutate} />
             {failure ? <p className="text-sm text-danger">{failure}</p> : null}
             {data?.error ? <p className="text-sm text-danger">{data.error}</p> : null}
+            <AddressDialog ip={inspecting} hours={hours} onClose={() => setInspecting(null)} />
         </div>
+    );
+}
+
+/**
+ * An address, wherever one is shown. It opens what that address did rather than
+ * sitting there as text to be copied into a search somewhere else - the next question
+ * after seeing an address on this page is always "what did it do", and this is the
+ * only screen that can answer it.
+ */
+function AddressLink({ ip, onInspect }: { ip: string; onInspect: (ip: string) => void }) {
+    return (
+        <button
+            type="button"
+            onClick={() => onInspect(ip)}
+            title={`What ${ip} has been doing`}
+            className="rounded font-mono underline-offset-2 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+            {ip}
+        </button>
     );
 }
 
@@ -126,7 +168,8 @@ function TrafficPanel({
     onHours,
     loading,
     refreshing,
-    onRefresh
+    onRefresh,
+    onInspect
 }: {
     traffic: WafTrafficSummary | undefined;
     hours: number;
@@ -134,6 +177,7 @@ function TrafficPanel({
     loading: boolean;
     refreshing: boolean;
     onRefresh: () => void;
+    onInspect: (ip: string) => void;
 }) {
     const format = useDisplayFormat();
     return (
@@ -197,7 +241,7 @@ function TrafficPanel({
                             formatTime={(at) => format.dateTime(at)}
                         />
                         <div className="grid gap-4 md:grid-cols-3">
-                            <TopList title="Addresses" entries={traffic.topAddresses} />
+                            <TopList title="Addresses" entries={traffic.topAddresses} onInspect={onInspect} />
                             <TopList title="Paths" entries={traffic.topPaths} />
                             <TopList title="User agents" entries={traffic.topAgents} />
                         </div>
@@ -217,7 +261,16 @@ function Stat({ label, value, tone }: { label: string; value: string; tone?: "da
     );
 }
 
-function TopList({ title, entries }: { title: string; entries: readonly { value: string; count: number }[] }) {
+function TopList({
+    title,
+    entries,
+    onInspect
+}: {
+    title: string;
+    entries: readonly { value: string; count: number }[];
+    /** Given only for the address list; a path is not something to open. */
+    onInspect?: (ip: string) => void;
+}) {
     return (
         <div className="min-w-0">
             <div className="mb-1.5 text-xs font-medium text-muted-foreground">Top blocked {title.toLowerCase()}</div>
@@ -227,9 +280,13 @@ function TopList({ title, entries }: { title: string; entries: readonly { value:
                 <ul className="flex flex-col gap-1">
                     {entries.map((entry) => (
                         <li key={entry.value} className="flex items-baseline justify-between gap-2 text-xs">
-                            <span className="truncate font-mono" title={entry.value}>
-                                {entry.value}
-                            </span>
+                            {onInspect ? (
+                                <AddressLink ip={entry.value} onInspect={onInspect} />
+                            ) : (
+                                <span className="truncate font-mono" title={entry.value}>
+                                    {entry.value}
+                                </span>
+                            )}
                             <span className="shrink-0 tabular-nums text-muted-foreground">{entry.count}</span>
                         </li>
                     ))}
@@ -252,12 +309,14 @@ function AnomaliesPanel({
     anomalies,
     settings,
     loading,
-    mutate
+    mutate,
+    onInspect
 }: {
     anomalies: WafAnomaly[] | undefined;
     settings: WafAnomalySettings | undefined;
     loading: boolean;
     mutate: Mutate;
+    onInspect: (ip: string) => void;
 }) {
     const high = (anomalies ?? []).filter((anomaly) => anomaly.severity === "high").length;
 
@@ -308,7 +367,9 @@ function AnomaliesPanel({
                             >
                                 <div className="min-w-0">
                                     <div className="flex flex-wrap items-center gap-2 text-sm">
-                                        <span className="font-mono text-xs">{anomaly.ip}</span>
+                                        <span className="text-xs text-muted-foreground">
+                                            <AddressLink ip={anomaly.ip} onInspect={onInspect} />
+                                        </span>
                                         <Badge variant={anomaly.severity === "high" ? "danger" : "neutral"}>
                                             {anomaly.kind.replace(/-/g, " ")}
                                         </Badge>
@@ -393,7 +454,17 @@ function AnomaliesPanel({
     );
 }
 
-function BansPanel({ bans, loading, mutate }: { bans: WafBanView[] | undefined; loading: boolean; mutate: Mutate }) {
+function BansPanel({
+    bans,
+    loading,
+    mutate,
+    onInspect
+}: {
+    bans: WafBanView[] | undefined;
+    loading: boolean;
+    mutate: Mutate;
+    onInspect: (ip: string) => void;
+}) {
     const format = useDisplayFormat();
 
     return (
@@ -427,8 +498,8 @@ function BansPanel({ bans, loading, mutate }: { bans: WafBanView[] | undefined; 
                             <tbody>
                                 {bans.map((ban) => (
                                     <tr key={ban.ip} className="border-t border-border">
-                                        <td className="px-2 py-2 font-mono text-xs">
-                                            {ban.ip}
+                                        <td className="px-2 py-2 text-xs">
+                                            <AddressLink ip={ban.ip} onInspect={onInspect} />
                                             {ban.offences > 1 ? (
                                                 <span className="ml-2 text-muted-foreground">
                                                     {ban.offences}x
@@ -439,7 +510,14 @@ function BansPanel({ bans, loading, mutate }: { bans: WafBanView[] | undefined; 
                                             {ban.note ?? ban.source}
                                         </td>
                                         <td className="px-2 py-2 text-xs text-muted-foreground">
-                                            {ban.until ? format.dateTime(ban.until) : "Until removed"}
+                                            {/* A ban with no expiry is the strictest verdict the
+                                                firewall issues, so it says what it is rather than
+                                                leaving a blank where a date goes. */}
+                                            {ban.until ? (
+                                                format.dateTime(ban.until)
+                                            ) : (
+                                                <Badge variant="danger">Until you lift it</Badge>
+                                            )}
                                         </td>
                                         <td className="px-2 py-2 text-right">
                                             <button
@@ -681,5 +759,185 @@ function IntelPanel({
                 </p>
             </CardBody>
         </Card>
+    );
+}
+
+/** A response code, coloured by what it means: refused, missing, or served. */
+function statusTone(status: number): string {
+    if (status === 403 || status === 429) return "text-danger";
+    if (status >= 400) return "text-warning";
+    return "text-muted-foreground";
+}
+
+/**
+ * What one address did, opened from wherever that address was shown.
+ *
+ * A ban reads as a claim - "Exploit probing: 37 in 1m" - and a claim an operator
+ * cannot check is one they either believe or disable. So the requests behind it are
+ * here in full: what was asked for, what it got back, and when. It is also how the
+ * other direction gets settled, when the address turns out to be a monitoring probe
+ * or an office that should never have been banned at all.
+ */
+function AddressDialog({ ip, hours, onClose }: { ip: string | null; hours: number; onClose: () => void }) {
+    const format = useDisplayFormat();
+    const [activity, setActivity] = useState<WafAddressActivity | null>(null);
+    const [error, setError] = useState<string | null>(null);
+    const windowLabel = WINDOWS.find((entry) => entry.hours === hours)?.label ?? `${hours}h`;
+
+    useEffect(() => {
+        if (!ip) return;
+        let active = true;
+        setActivity(null);
+        setError(null);
+        void getWafAddressActivityAction(ip, hours).then((result) => {
+            if (!active) return;
+            if (result.error) setError(result.error);
+            else setActivity(result.activity ?? null);
+        });
+        return () => {
+            active = false;
+        };
+    }, [ip, hours]);
+
+    return (
+        <Dialog open={ip !== null} onOpenChange={(open) => (open ? undefined : onClose())}>
+            <DialogContent className="max-w-3xl">
+                <DialogHeader className="pr-8">
+                    <DialogTitle className="font-mono">{ip}</DialogTitle>
+                    <DialogDescription>
+                        Every request from this address in the last {windowLabel}, read from the edge&apos;s own log.
+                    </DialogDescription>
+                </DialogHeader>
+
+                {error ? (
+                    <p className="text-sm text-danger">{error}</p>
+                ) : !activity ? (
+                    <div className="flex flex-col gap-2">
+                        <Skeleton className="h-10 w-full" />
+                        <Skeleton className="h-40 w-full" />
+                    </div>
+                ) : activity.total === 0 ? (
+                    <p className="py-6 text-center text-sm text-muted-foreground">
+                        Nothing from this address in that window. A ban outlives the log it was made from, so an older
+                        one can be enforced with nothing left here to show for it.
+                    </p>
+                ) : (
+                    <div className="flex flex-col gap-4">
+                        <div className="flex flex-wrap gap-6">
+                            <Stat label="Requests" value={grouped(activity.total)} />
+                            <Stat label="Blocked" value={grouped(activity.blocked)} tone="danger" />
+                            {activity.firstSeen ? (
+                                <Stat label="First seen" value={format.dateTime(activity.firstSeen)} />
+                            ) : null}
+                            {activity.lastSeen ? (
+                                <Stat label="Last seen" value={format.dateTime(activity.lastSeen)} />
+                            ) : null}
+                        </div>
+
+                        {/* What it collected, at a glance. Thirty-seven 404s and one 200
+                            is a sweep that found something, which is not visible from a
+                            list you have to scroll. */}
+                        {activity.statuses.length > 0 ? (
+                            <div className="flex flex-wrap gap-1.5">
+                                {activity.statuses.map((entry) => (
+                                    <span
+                                        key={entry.value}
+                                        className="rounded-md border border-border px-1.5 py-0.5 font-mono text-xs"
+                                    >
+                                        <span className={statusTone(Number(entry.value))}>{entry.value}</span>
+                                        <span className="ml-1.5 text-muted-foreground">{grouped(entry.count)}</span>
+                                    </span>
+                                ))}
+                            </div>
+                        ) : null}
+
+                        <div className="grid gap-4 sm:grid-cols-2">
+                            {activity.topPaths.length > 0 ? (
+                                <div className="min-w-0">
+                                    <div className="mb-1 text-xs font-medium text-muted-foreground">
+                                        Most asked for
+                                    </div>
+                                    <ul className="flex flex-col gap-0.5">
+                                        {activity.topPaths.map((entry) => (
+                                            <li
+                                                key={entry.value}
+                                                className="flex items-baseline justify-between gap-2 text-xs"
+                                            >
+                                                <span className="truncate font-mono" title={entry.value}>
+                                                    {entry.value}
+                                                </span>
+                                                <span className="shrink-0 tabular-nums text-muted-foreground">
+                                                    {grouped(entry.count)}
+                                                </span>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            ) : null}
+                            {activity.agents.length > 0 ? (
+                                <div className="min-w-0">
+                                    <div className="mb-1 text-xs font-medium text-muted-foreground">Calling itself</div>
+                                    <ul className="flex flex-col gap-0.5">
+                                        {activity.agents.map((agent) => (
+                                            <li
+                                                key={agent.value}
+                                                className="truncate font-mono text-xs"
+                                                title={agent.value}
+                                            >
+                                                {agent.value}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            ) : null}
+                        </div>
+
+                        <div className="max-h-80 overflow-auto rounded-md border border-border">
+                            <table className="w-full min-w-[34rem] text-xs">
+                                <thead className="sticky top-0 bg-card">
+                                    <tr className="text-left text-muted-foreground">
+                                        <th className="px-2 py-1.5 font-medium">When</th>
+                                        <th className="px-2 py-1.5 font-medium">Method</th>
+                                        <th className="px-2 py-1.5 font-medium">Status</th>
+                                        <th className="px-2 py-1.5 font-medium">Path</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {activity.requests.map((request, index) => (
+                                        <tr
+                                            key={`${request.at}:${request.path}:${index}`}
+                                            className="border-t border-border"
+                                        >
+                                            {/* With seconds: a sweep puts dozens of these
+                                                inside one minute, and a column where every
+                                                row reads the same says nothing about it. */}
+                                            <td className="whitespace-nowrap px-2 py-1.5 text-muted-foreground">
+                                                {format.dateTime(request.at, { seconds: true })}
+                                            </td>
+                                            <td className="px-2 py-1.5 font-mono text-muted-foreground">
+                                                {request.method}
+                                            </td>
+                                            <td className={`px-2 py-1.5 font-mono tabular-nums ${statusTone(request.status)}`}>
+                                                {request.status}
+                                            </td>
+                                            <td className="max-w-0 truncate px-2 py-1.5 font-mono" title={request.path}>
+                                                {request.path}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {activity.truncated ? (
+                            <p className="text-xs text-muted-foreground">
+                                Showing the {grouped(activity.requests.length)} most recent of {grouped(activity.total)}.
+                                The counts above cover all of them.
+                            </p>
+                        ) : null}
+                    </div>
+                )}
+            </DialogContent>
+        </Dialog>
     );
 }

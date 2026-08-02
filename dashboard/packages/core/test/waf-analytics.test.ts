@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { summarizeWafTraffic, type WafTrafficEntry } from "../src/waf-analytics.js";
+import { summarizeWafAddress, summarizeWafTraffic, type WafTrafficEntry } from "../src/waf-analytics.js";
 
 const TO = Date.parse("2026-08-02T12:00:00.000Z");
 const FROM = TO - 3600 * 1000;
@@ -89,5 +89,85 @@ describe("summarizeWafTraffic", () => {
             entry({ status: 403, ip: `198.51.100.${index}` })
         );
         expect(summarizeWafTraffic(many, FROM, TO).topAddresses.length).toBeLessThanOrEqual(8);
+    });
+});
+
+describe("summarizeWafAddress", () => {
+    const SWEEP: WafTrafficEntry[] = [
+        entry({ ip: "198.51.100.9", path: "/wp-login.php", status: 404, method: "GET", userAgent: "sqlmap/1.7" }),
+        entry({
+            ip: "198.51.100.9",
+            path: "/wp-login.php",
+            status: 404,
+            method: "POST",
+            userAgent: "sqlmap/1.7",
+            time: new Date(TO - 30_000).toISOString()
+        }),
+        entry({
+            ip: "198.51.100.9",
+            path: "/.env",
+            status: 403,
+            method: "GET",
+            userAgent: "sqlmap/1.7",
+            time: new Date(TO - 10_000).toISOString()
+        }),
+        entry({ ip: "203.0.113.5", path: "/pricing", status: 200 })
+    ];
+
+    it("reports only the address that was asked about", () => {
+        const activity = summarizeWafAddress(SWEEP, "198.51.100.9", FROM, TO);
+        expect(activity.total).toBe(3);
+        expect(activity.blocked).toBe(1);
+        expect(activity.requests.every((request) => request.path !== "/pricing")).toBe(true);
+    });
+
+    it("lists the requests most recent first, with the method and status intact", () => {
+        const activity = summarizeWafAddress(SWEEP, "198.51.100.9", FROM, TO);
+        expect(activity.requests.map((request) => request.path)).toEqual([
+            "/.env",
+            "/wp-login.php",
+            "/wp-login.php"
+        ]);
+        expect(activity.requests[1]).toMatchObject({ method: "POST", status: 404 });
+    });
+
+    it("brackets the visit with a first and a last time", () => {
+        const activity = summarizeWafAddress(SWEEP, "198.51.100.9", FROM, TO);
+        expect(activity.firstSeen).toBe(TO - 60_000);
+        expect(activity.lastSeen).toBe(TO - 10_000);
+    });
+
+    it("counts the codes it collected and what it called itself", () => {
+        const activity = summarizeWafAddress(SWEEP, "198.51.100.9", FROM, TO);
+        expect(activity.statuses).toEqual([
+            { value: "404", count: 2 },
+            { value: "403", count: 1 }
+        ]);
+        expect(activity.agents).toEqual([{ value: "sqlmap/1.7", count: 3 }]);
+        expect(activity.topPaths[0]).toEqual({ value: "/wp-login.php", count: 2 });
+    });
+
+    it("says nothing at all for an address with no traffic in the window", () => {
+        const activity = summarizeWafAddress(SWEEP, "192.0.2.1", FROM, TO);
+        expect(activity).toMatchObject({ total: 0, blocked: 0, firstSeen: null, lastSeen: null, truncated: false });
+        expect(activity.requests).toEqual([]);
+    });
+
+    it("ignores traffic from outside the window", () => {
+        const old = entry({ ip: "198.51.100.9", time: new Date(FROM - 1000).toISOString() });
+        expect(summarizeWafAddress([old], "198.51.100.9", FROM, TO).total).toBe(0);
+    });
+
+    it("keeps the totals exact when the list is cut short", () => {
+        // A truncated list that also truncated the numbers would understate exactly
+        // the addresses worth looking at.
+        const many = Array.from({ length: 50 }, (_, index) =>
+            entry({ ip: "198.51.100.9", status: 404, time: new Date(TO - (index + 1) * 1000).toISOString() })
+        );
+        const activity = summarizeWafAddress(many, "198.51.100.9", FROM, TO, 10);
+        expect(activity.total).toBe(50);
+        expect(activity.requests).toHaveLength(10);
+        expect(activity.truncated).toBe(true);
+        expect(activity.requests[0]!.at).toBe(TO - 1000);
     });
 });
