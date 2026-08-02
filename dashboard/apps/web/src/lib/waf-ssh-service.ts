@@ -168,7 +168,7 @@ export async function runSshJails(now = Date.now()): Promise<{ hosts: number; ba
                     note: atHost
                         ? `${verdict.note} on ${host.name}`
                         : `${verdict.note} on ${host.name} (edge only - Polaris has no root there)`,
-                    until: new Date(verdict.until)
+                    until: verdict.until === null ? null : new Date(verdict.until)
                 });
                 banned += 1;
             }

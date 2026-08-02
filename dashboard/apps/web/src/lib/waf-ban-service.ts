@@ -113,7 +113,9 @@ export async function runWafJails(now = Date.now()): Promise<{ scanned: number; 
                 reason: "ban",
                 source: verdict.jail,
                 note: verdict.note,
-                until: new Date(verdict.until)
+                // Null travels through as null: a credential probe is held until an
+                // operator lifts it, and the intel snapshot already understands that.
+                until: verdict.until === null ? null : new Date(verdict.until)
             });
         }
 

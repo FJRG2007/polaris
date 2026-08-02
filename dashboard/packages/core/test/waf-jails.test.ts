@@ -87,7 +87,7 @@ describe("detectWafBans", () => {
     it("gives one address the longest of the jails it tripped", () => {
         const entries = [
             ...hits("198.51.100.3", 8),
-            ...hits("198.51.100.3", 3, { status: 200, path: "/.env" })
+            ...hits("198.51.100.3", 3, { status: 200, path: "/wp-login.php" })
         ];
         const bans = detectWafBans({ entries, jails: [NOT_FOUND, PROBES], now: NOW });
         expect(bans).toHaveLength(1);
@@ -95,14 +95,71 @@ describe("detectWafBans", () => {
         expect(bans[0]!.until).toBe(NOW + 86400 * 1000);
     });
 
+    it("holds a credential probe permanently, on one request", () => {
+        const entries = hits("198.51.100.4", 1, { status: 404, path: "/.env" });
+        const bans = detectWafBans({ entries, jails: [PROBES], now: NOW });
+        expect(bans).toHaveLength(1);
+        expect(bans[0]).toMatchObject({ ip: "198.51.100.4", jail: "probes", until: null, hits: 1 });
+        expect(bans[0]!.note).toContain("/.env");
+    });
+
+    it("treats the cloud metadata route and a private key the same way", () => {
+        for (const path of ["/latest/meta-data/iam/security-credentials/", "/.ssh/id_rsa", "/.git/config"]) {
+            const bans = detectWafBans({ entries: hits("198.51.100.5", 1, { path }), jails: [PROBES], now: NOW });
+            expect(bans[0]?.until).toBeNull();
+        }
+    });
+
+    it("does not hold an ordinary probe permanently", () => {
+        const bans = detectWafBans({
+            entries: hits("198.51.100.6", 3, { path: "/wp-admin/install.php" }),
+            jails: [PROBES],
+            now: NOW
+        });
+        expect(bans[0]?.until).toBe(NOW + 86400 * 1000);
+    });
+
+    it("prefers the permanent verdict over a timed one for the same address", () => {
+        const entries = [
+            ...hits("198.51.100.7", 8),
+            ...hits("198.51.100.7", 1, { status: 404, path: "/.aws/credentials" })
+        ];
+        const bans = detectWafBans({ entries, jails: [NOT_FOUND, PROBES], now: NOW });
+        expect(bans).toHaveLength(1);
+        expect(bans[0]!.until).toBeNull();
+    });
+
+    it("stops re-deriving a permanent ban once the evidence leaves the window", () => {
+        // Otherwise lifting one by hand would be undone on the next pass, for as long
+        // as the log tail still carried the request.
+        const stale = hits("198.51.100.8", 1, { path: "/.env", agoSec: PROBES.findTimeSec + 60 });
+        expect(detectWafBans({ entries: stale, jails: [PROBES], now: NOW })).toEqual([]);
+    });
+
+    it("does not ban for credential probing when the probes jail is off", () => {
+        const off: WafJail = { ...PROBES, enabled: false };
+        const entries = hits("198.51.100.9", 1, { path: "/.env" });
+        expect(detectWafBans({ entries, jails: [off, NOT_FOUND], now: NOW })).toEqual([]);
+    });
+
+    it("never bans an ignored address for a credential probe either", () => {
+        const bans = detectWafBans({
+            entries: hits("203.0.113.7", 1, { path: "/.env" }),
+            jails: [PROBES],
+            ignore: ["203.0.113.7"],
+            now: NOW
+        });
+        expect(bans).toEqual([]);
+    });
+
     it("holds a repeat offender for longer, up to the cap", () => {
         const entries = hits("203.0.113.9", 8);
         const first = detectWafBans({ entries, jails: [NOT_FOUND], now: NOW })[0]!;
         const third = detectWafBans({ entries, jails: [NOT_FOUND], priorBans: { "203.0.113.9": 2 }, now: NOW })[0]!;
         const many = detectWafBans({ entries, jails: [NOT_FOUND], priorBans: { "203.0.113.9": 99 }, now: NOW })[0]!;
-        expect(third.until - NOW).toBe(4 * 1800 * 1000);
-        expect(many.until - NOW).toBe(8 * 1800 * 1000);
-        expect(first.until).toBeLessThan(third.until);
+        expect(third.until! - NOW).toBe(4 * 1800 * 1000);
+        expect(many.until! - NOW).toBe(8 * 1800 * 1000);
+        expect(first.until!).toBeLessThan(third.until!);
     });
 });
 

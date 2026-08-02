@@ -59,6 +59,50 @@ const PROBE_MARKERS = [
     "/.ssh"
 ];
 
+/**
+ * The subset of those probes that is going after credentials specifically, and the
+ * reason a ban can be permanent.
+ *
+ * The rest of the probe list is a sweep: annoying, automated, and over in a minute. A
+ * request for `/.env`, for the AWS instance-metadata route, or for a private key is a
+ * different thing - it is someone reading for a secret, and if one is ever exposed the
+ * single request that finds it is the whole breach. There is no volume of them that is
+ * acceptable and no legitimate client that sends one by accident, so the count is one
+ * and the ban does not lift on a timer.
+ *
+ * Kept deliberately narrow. Everything here identifies a specific credential store, so
+ * a real visitor cannot produce one by mistyping a URL - which matters far more than
+ * usual for a ban nobody comes along to expire.
+ */
+const CREDENTIAL_MARKERS = [
+    "/.env",
+    "/.aws/credentials",
+    "/.aws/config",
+    // The link-local metadata service. Asked for through a public service, this is an
+    // SSRF attempt reaching for the instance's own role credentials.
+    "/latest/meta-data",
+    "/latest/user-data",
+    "/computemetadata/v1",
+    "/.git/config",
+    "/.git-credentials",
+    "/.ssh/id_",
+    "/id_rsa",
+    "/.npmrc",
+    "/.netrc",
+    "/.htpasswd",
+    "/wp-config.php",
+    "/.docker/config.json",
+    "/actuator/heapdump",
+    "/credentials.json",
+    "/secrets.json"
+];
+
+/** Whether a request was reaching for a credential store. */
+function credentialProbe(path: string): string | null {
+    const lowered = path.toLowerCase();
+    return CREDENTIAL_MARKERS.find((marker) => lowered.includes(marker)) ?? null;
+}
+
 /** Whether a log entry counts as a failure for a jail. */
 function counts(jail: WafJailId, entry: HttpLogLike): boolean {
     switch (jail) {
@@ -119,7 +163,8 @@ export const DEFAULT_WAF_JAILS: readonly WafJail[] = [
     {
         id: "probes",
         label: "Exploit probing",
-        description: "Bans an address that goes looking for WordPress, phpMyAdmin, .env or .git on a service that has none.",
+        description:
+            "Bans an address that goes looking for WordPress, phpMyAdmin or .git on a service that has none. One request for a credential store - .env, a private key, the cloud metadata route - is enough on its own, and that ban stands until you lift it.",
         enabled: true,
         maxRetry: 3,
         findTimeSec: 60,
@@ -148,8 +193,8 @@ const BAN_SECONDS_MAX = 7 * 24 * 3600;
 export interface WafBanVerdict {
     readonly ip: string;
     readonly jail: WafJailId;
-    /** Epoch ms the ban lifts. */
-    readonly until: number;
+    /** Epoch ms the ban lifts, or null for one that stands until it is lifted by hand. */
+    readonly until: number | null;
     /** What it was banned for, in a form a person can read. */
     readonly note: string;
     /** Matching requests that produced it. */
@@ -168,6 +213,12 @@ export interface WafJailInput {
     readonly now: number;
 }
 
+/** How long a verdict holds, for comparing two of them. A permanent ban outlasts
+ *  every timed one, so it sorts and wins as the largest value there is. */
+function holds(verdict: WafBanVerdict): number {
+    return verdict.until ?? Infinity;
+}
+
 /**
  * The bans the evidence supports right now.
  *
@@ -182,14 +233,31 @@ export function detectWafBans(input: WafJailInput): WafBanVerdict[] {
     const active = jails.filter((jail) => jail.enabled && jail.maxRetry > 0);
     if (active.length === 0 || entries.length === 0) return [];
 
+    // Credential probing rides on the probes jail rather than being its own switch:
+    // it is the same judgement about the same traffic, only drawn harder, so an
+    // operator who has turned that jail off has turned this off with it.
+    const probes = active.find((jail) => jail.id === "probes");
+
     // One pass over the log per jail window, counting per address.
     const counters = new Map<string, Map<string, number>>();
     for (const jail of active) counters.set(jail.id, new Map());
+    /** Addresses caught reading for a secret, and the first path that gave them away. */
+    const credentials = new Map<string, { marker: string; hits: number }>();
     for (const entry of entries) {
         const ip = entry.ip;
         if (!ip || ip === "-" || ignore.has(ip)) continue;
         const at = entry.time ? Date.parse(entry.time) : NaN;
         if (!Number.isFinite(at) || at > now) continue;
+        // Inside the probes window like any other evidence. A permanent ban that could
+        // be re-derived from a log line indefinitely would undo an operator lifting it.
+        if (probes && at >= now - probes.findTimeSec * 1000) {
+            const marker = credentialProbe(entry.path ?? "");
+            if (marker) {
+                const seen = credentials.get(ip);
+                if (seen) seen.hits += 1;
+                else credentials.set(ip, { marker, hits: 1 });
+            }
+        }
         for (const jail of active) {
             if (at < now - jail.findTimeSec * 1000) continue;
             if (!counts(jail.id, entry)) continue;
@@ -212,8 +280,26 @@ export function detectWafBans(input: WafJailInput): WafBanVerdict[] {
                 hits
             };
             const existing = best.get(ip);
-            if (!existing || verdict.until > existing.until) best.set(ip, verdict);
+            if (!existing || holds(verdict) > holds(existing)) best.set(ip, verdict);
         }
     }
-    return [...best.values()].sort((a, b) => b.until - a.until);
+
+    for (const [ip, found] of credentials) {
+        best.set(ip, {
+            ip,
+            jail: "probes",
+            until: null,
+            note: `Reading for credentials: ${found.marker}`,
+            hits: found.hits
+        });
+    }
+
+    // Longest-held first, by address where two are held equally - two permanent bans
+    // would otherwise be compared as Infinity minus Infinity and ordered arbitrarily.
+    return [...best.values()].sort((a, b) => {
+        const left = holds(a);
+        const right = holds(b);
+        if (left === right) return a.ip < b.ip ? -1 : a.ip > b.ip ? 1 : 0;
+        return right - left;
+    });
 }

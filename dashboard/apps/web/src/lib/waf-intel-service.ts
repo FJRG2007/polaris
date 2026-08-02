@@ -202,8 +202,10 @@ export interface WafBanInput {
 export async function recordWafBan(input: WafBanInput): Promise<void> {
     const existing = await prisma.wafBan.findUnique({ where: { ip: input.ip }, select: { until: true, offences: true } });
     // A ban that is still running is extended, not re-counted: one jail firing twice
-    // inside its own window is one offence, not two.
-    const stillRunning = existing?.until !== null && existing?.until !== undefined && existing.until > new Date();
+    // inside its own window is one offence, not two. A permanent ban is always still
+    // running - without that, re-detecting it on every pass would count an offence
+    // every thirty seconds for as long as the evidence stayed in the log window.
+    const stillRunning = existing !== null && (existing.until === null || existing.until > new Date());
     const offences = existing ? existing.offences + (stillRunning ? 0 : 1) : 1;
     await prisma.wafBan.upsert({
         where: { ip: input.ip },
