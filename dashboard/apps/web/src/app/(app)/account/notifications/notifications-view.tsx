@@ -8,23 +8,29 @@
  * whole feed.
  */
 
-import { useMemo, useState, useTransition, type ReactNode } from "react";
 import Link from "next/link";
-import { Bell, Check, CheckCheck, ChevronDown, Loader2, Trash2, X } from "lucide-react";
-import { Badge, Button, Card, CardBody, Select, cn } from "@polaris/ui";
-import { NOTIFICATION_EVENTS, notificationEvent } from "@polaris/core";
 import { RelativeTime } from "@/components/relative-time";
+import { loadNotificationHistoryAction } from "./actions";
+import type { NotificationView } from "@/lib/notification-service";
+import { NOTIFICATION_EVENTS, notificationEvent } from "@polaris/core";
+import { Badge, Button, Card, CardBody, Select, cn } from "@polaris/ui";
+import { useMemo, useState, useTransition, type ReactNode } from "react";
+import { Bell, Check, CheckCheck, ChevronDown, Loader2, Trash2, X } from "lucide-react";
 import { useNotificationFeed } from "@/components/notifications/notifications-provider";
 import { describeAudience, levelStyle } from "@/components/notifications/notification-visuals";
-import type { NotificationView } from "@/lib/notification-service";
-import { loadNotificationHistoryAction } from "./actions";
+
+/**
+ * The unfiltered choice. Radix forbids an empty-string item value, and event ids
+ * are dotted names, so this cannot collide with one.
+ */
+const ALL_EVENTS = "*";
 
 export function NotificationsView() {
     const { items, unread, markRead, markAllRead, remove, clearAll } = useNotificationFeed();
     const [older, setOlder] = useState<NotificationView[]>([]);
     const [ended, setEnded] = useState(false);
     const [loading, startLoading] = useTransition();
-    const [event, setEvent] = useState("");
+    const [event, setEvent] = useState(ALL_EVENTS);
 
     // The live feed owns the recent end of the list, so anything paged in that
     // it also holds is dropped rather than shown twice - and a row deleted from
@@ -32,20 +38,23 @@ export function NotificationsView() {
     const rows = useMemo(() => {
         const live = new Set(items.map((row) => row.id));
         const merged = [...items, ...older.filter((row) => !live.has(row.id))];
-        return event ? merged.filter((row) => row.type === event) : merged;
+        return event === ALL_EVENTS ? merged : merged.filter((row) => row.type === event);
     }, [items, older, event]);
 
     function loadOlder() {
         const oldest = rows.at(-1)?.createdAt ?? null;
         startLoading(async () => {
-            const page = await loadNotificationHistoryAction({ before: oldest, event: event || null });
+            const page = await loadNotificationHistoryAction({
+                before: oldest,
+                event: event === ALL_EVENTS ? null : event
+            });
             setOlder((current) => [...current, ...page.items]);
             if (!page.cursor) setEnded(true);
         });
     }
 
     const eventOptions = [
-        { value: "", label: "All events" },
+        { value: ALL_EVENTS, label: "All events" },
         ...NOTIFICATION_EVENTS.map((entry) => ({ value: entry.id, label: entry.label }))
     ];
 
@@ -77,7 +86,7 @@ export function NotificationsView() {
                 <Card>
                     <CardBody className="flex flex-col items-center gap-2 p-10 text-center text-sm text-muted-foreground">
                         <Bell className="size-6" />
-                        {event ? "Nothing of that kind yet." : "You have no notifications."}
+                        {event === ALL_EVENTS ? "You have no notifications." : "Nothing of that kind yet."}
                     </CardBody>
                 </Card>
             ) : (
@@ -97,7 +106,7 @@ export function NotificationsView() {
 
             {/* Still offered when a filter matched nothing on screen: the older
                 pages are exactly where its matches would be. */}
-            {!ended && (rows.length > 0 || event !== "") ? (
+            {!ended && (rows.length > 0 || event !== ALL_EVENTS) ? (
                 <div className="flex justify-center">
                     <Button size="sm" variant="ghost" onClick={loadOlder} disabled={loading}>
                         {loading ? <Loader2 className="size-4 animate-spin" /> : <ChevronDown className="size-4" />}
