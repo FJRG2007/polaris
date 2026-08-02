@@ -120,7 +120,7 @@ const CENTRED_TOLERANCE = 0.5;
  * with one card in it) sits against its left edge rather than centred, and keeps
  * the percentages, which is what actually follows the content there.
  */
-function columnOf(capture: CapturedLayout): { width: number; left: number; span: number } | null {
+export function columnOf(capture: CapturedLayout): { width: number; left: number; span: number } | null {
     if (capture.bones.length === 0) return null;
     const left = Math.min(...capture.bones.map((bone) => Number(bone[0]) || 0));
     const right = Math.max(...capture.bones.map((bone) => (Number(bone[0]) || 0) + (Number(bone[2]) || 0)));
