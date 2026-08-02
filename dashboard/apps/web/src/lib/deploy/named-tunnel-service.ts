@@ -15,11 +15,13 @@
 
 import { prisma } from "@polaris/db";
 import { loadEnv } from "@polaris/config";
-import type { ComposeSpec } from "@polaris/deploy";
+import { HostdPorts } from "./ports-hostd";
 import { shortHash } from "@polaris/deploy";
-import { decryptSecret, encryptSecret } from "@polaris/storage";
 import { getPublicIp } from "../domain-service";
+import type { ComposeSpec } from "@polaris/deploy";
 import { hostPortForApp } from "../deploy-service";
+import { decryptSecret, encryptSecret } from "@polaris/storage";
+import { requireCloudflareAccount } from "../integrations/cloudflare-account-service";
 import {
     createTunnel,
     deleteDnsRecord,
@@ -30,8 +32,6 @@ import {
     resolveZoneForHostname,
     upsertTunnelCname
 } from "../integrations/cloudflare-api";
-import { requireCloudflareAccount } from "../integrations/cloudflare-account-service";
-import { HostdPorts } from "./ports-hostd";
 
 const PROXY_NETWORK = "polaris-proxy";
 const IMAGE = "cloudflare/cloudflared:latest";
@@ -153,6 +153,10 @@ function tunnelSpec(project: string, service: string, token: string): ComposeSpe
             {
                 name: service,
                 image: IMAGE,
+                // A sidecar on a floating tag is still a registry image: without
+                // this it keeps running whatever copy the host first fetched, and
+                // a connector that has fallen behind the edge fails silently.
+                pullPolicy: "always",
                 env: { TUNNEL_TOKEN: token },
                 ports: [],
                 volumes: [],

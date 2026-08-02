@@ -12,11 +12,11 @@
  */
 
 import { prisma } from "@polaris/db";
-import type { ComposeSpec } from "@polaris/deploy";
-import { shortHash } from "@polaris/deploy";
-import { HostdPorts } from "./ports-hostd";
 import { newestUrl } from "./tunnel-url";
+import { HostdPorts } from "./ports-hostd";
+import { shortHash } from "@polaris/deploy";
 import { getPublicIp } from "../domain-service";
+import type { ComposeSpec } from "@polaris/deploy";
 import { hostPortForApp } from "../deploy-service";
 import { getIntegrationSecret, getIntegrationState } from "../integration-service";
 
@@ -62,6 +62,9 @@ function tunnelSpec(project: string, service: string, origin: string, token: str
             {
                 name: service,
                 image: IMAGE,
+                // Same reason as the cloudflared sidecar: a floating tag that is
+                // never re-resolved leaves an agent the service can no longer use.
+                pullPolicy: "always",
                 env: { NGROK_AUTHTOKEN: token },
                 ports: [],
                 volumes: [],

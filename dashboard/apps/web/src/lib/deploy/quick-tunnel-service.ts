@@ -12,13 +12,13 @@
  */
 
 import { prisma } from "@polaris/db";
-import type { ComposeSpec } from "@polaris/deploy";
-import { shortHash } from "@polaris/deploy";
 import { HostdPorts } from "./ports-hostd";
-import { newestUrl, tunnelReachable } from "./tunnel-url";
-import { parseStoredTunnel, type StoredTunnel } from "./quick-tunnel-store";
+import { shortHash } from "@polaris/deploy";
 import { getPublicIp } from "../domain-service";
 import { syncAppRoutes } from "../deploy-service";
+import type { ComposeSpec } from "@polaris/deploy";
+import { newestUrl, tunnelReachable } from "./tunnel-url";
+import { parseStoredTunnel, type StoredTunnel } from "./quick-tunnel-store";
 
 const PROXY_NETWORK = "polaris-proxy";
 const IMAGE = "cloudflare/cloudflared:latest";
@@ -92,6 +92,9 @@ function tunnelSpec(project: string, service: string, origin: string, hostHeader
             {
                 name: service,
                 image: IMAGE,
+                // Same reason as the named connector: a floating tag compose never
+                // re-resolves leaves an agent the edge has moved on from.
+                pullPolicy: "always",
                 env: {},
                 ports: [],
                 volumes: [],

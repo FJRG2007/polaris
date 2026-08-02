@@ -8,9 +8,9 @@
  * provider (e.g. the Cloudflare dashboard maps a hostname to http://<box-ip>:80).
  */
 
-import type { ComposeSpec } from "@polaris/deploy";
-import { HostdPorts } from "./deploy/ports-hostd";
 import { getPublicIp } from "./domain-service";
+import { HostdPorts } from "./deploy/ports-hostd";
+import type { ComposeSpec } from "@polaris/deploy";
 import { getIntegrationSecret, getIntegrationState } from "./integration-service";
 
 const PROJECT = "polaris-tunnel";
@@ -63,6 +63,9 @@ function tunnelSpec(provider: (typeof PROVIDERS)[number], token: string, boxIp: 
     const service = {
         name: SERVICE,
         image: isCloudflare ? "cloudflare/cloudflared:latest" : "ngrok/ngrok:latest",
+        // Both are floating tags from a registry, so compose has to re-resolve
+        // them rather than reuse the copy the host happens to hold.
+        pullPolicy: "always" as const,
         env,
         ports: [],
         volumes: [],

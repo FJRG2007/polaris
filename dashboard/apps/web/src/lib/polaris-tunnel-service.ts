@@ -12,9 +12,9 @@
  */
 
 import { prisma } from "@polaris/db";
-import type { ComposeSpec } from "@polaris/deploy";
-import { HostdPorts } from "./deploy/ports-hostd";
 import { newestUrl } from "./deploy/tunnel-url";
+import { HostdPorts } from "./deploy/ports-hostd";
+import type { ComposeSpec } from "@polaris/deploy";
 
 const PROJECT = "polaris-ptunnel";
 const SERVICE = "ptunnel";
@@ -39,6 +39,9 @@ function tunnelSpec(): ComposeSpec {
             {
                 name: SERVICE,
                 image: IMAGE,
+                // Same reason as every other sidecar on a floating tag: compose
+                // would otherwise keep the copy the host first fetched.
+                pullPolicy: "always",
                 env: {},
                 ports: [],
                 volumes: [],
