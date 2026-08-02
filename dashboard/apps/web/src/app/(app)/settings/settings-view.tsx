@@ -533,8 +533,8 @@ export function SettingsView({
                                 <Hammer className="size-4 text-muted-foreground" />
                                 <span>
                                     {status.buildingCount ?? "New"} commit
-                                    {status.buildingCount === 1 ? "" : "s"} still building. The update appears here once
-                                    the image is published.
+                                    {status.buildingCount === 1 ? "" : "s"} waiting on a build. Nothing is happening on
+                                    this deployment; the update appears here once the image is published.
                                 </span>
                             </>
                         ) : status.phase === "up-to-date" ? (
