@@ -25,6 +25,8 @@ export interface TraefikWaf {
     /** One IP allowlist per scope; each becomes a chained `ipAllowList` middleware. */
     readonly allowLists?: readonly (readonly string[])[];
     readonly deny?: readonly string[];
+    /** Managed rule-pack ids, expanded by the guard rather than sent expanded. */
+    readonly presets?: readonly string[];
     /** Ordered custom rules, carried to the guard in the same header as the denylist. */
     readonly rules?: readonly WafCustomRule[];
     readonly requireLogin?: boolean;
@@ -51,10 +53,15 @@ function guardUrl(): string {
     return process.env.POLARIS_EDGE_GUARD_URL ?? "http://polaris-edge-guard:8080";
 }
 
-/** True if a WAF rule needs the forwardAuth guard (has a denylist, custom rules, or
- *  requires login). An allowlist alone is enforced by Traefik itself. */
+/** True if a WAF rule needs the forwardAuth guard (has a denylist, rule packs, custom
+ *  rules, or requires login). An allowlist alone is enforced by Traefik itself. */
 function wafNeedsGuard(waf: TraefikWaf): boolean {
-    return (waf.deny?.length ?? 0) > 0 || (waf.rules?.length ?? 0) > 0 || waf.requireLogin === true;
+    return (
+        (waf.deny?.length ?? 0) > 0 ||
+        (waf.presets?.length ?? 0) > 0 ||
+        (waf.rules?.length ?? 0) > 0 ||
+        waf.requireLogin === true
+    );
 }
 
 /**
@@ -81,6 +88,7 @@ function wafMiddlewares(
         const ctx = `${serviceName}-waf-ctx`;
         labels[`traefik.http.middlewares.${ctx}.headers.customrequestheaders.X-Polaris-Waf`] = encodeGuardRule({
             deny: waf.deny ?? [],
+            presets: waf.presets ?? [],
             rules: waf.rules ?? [],
             requireLogin: waf.requireLogin === true
         });

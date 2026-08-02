@@ -149,6 +149,12 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
         { label: "Marketplace", href: "/apps/marketplace", icon: Store, keywords: ["install", "catalog"] },
         { label: "Servers", href: "/apps/servers", icon: Server, keywords: ["hosts", "machines", "ssh"] },
         { label: "Runners", href: "/apps/runners", icon: Workflow, keywords: ["github actions", "ci"] },
+        {
+            label: "Firewall",
+            href: "/apps/firewall",
+            icon: ShieldCheck,
+            keywords: ["waf", "ip", "allowlist", "denylist", "block", "access"]
+        },
         { label: "Containers", href: "/apps/containers", icon: Container, keywords: ["docker"] },
         { label: "Backups", href: "/apps/backups", icon: Database, keywords: ["restore", "snapshots"] }
     ],

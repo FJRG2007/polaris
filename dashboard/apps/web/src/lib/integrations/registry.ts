@@ -118,6 +118,18 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         apiKeyHelp: "Get one at https://tpe.li/new-api-key."
     },
     {
+        slug: "criminalip",
+        name: "Criminal IP",
+        category: "Security",
+        summary: "Block addresses already known for scanning or attacks.",
+        description:
+            "The firewall asks Criminal IP about addresses it sees in your traffic and blocks the ones that match the conditions you choose. Lookups happen in the background, never while a request is waiting, and the answer is cached - so a slow or unreachable provider can never slow down or open up your site.",
+        docsUrl: "https://www.criminalip.io/developer/api/get-ip-summary",
+        requiresApiKey: true,
+        apiKeyLabel: "API key",
+        apiKeyHelp: "From your Criminal IP account under My Information -> API Key."
+    },
+    {
         slug: "github",
         name: "GitHub",
         category: "Automation",

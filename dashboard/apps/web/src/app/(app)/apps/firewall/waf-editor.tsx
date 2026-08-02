@@ -19,11 +19,13 @@
 import { useEffect, useState, useTransition } from "react";
 import { Button, Input, Select, Switch } from "@polaris/ui";
 import { getWafRuleAction, setWafRuleAction } from "./actions";
-import { Ban, GripVertical, Loader2, Plus, ShieldCheck, Trash2, X } from "lucide-react";
+import { Ban, GripVertical, Loader2, Plus, ShieldCheck, ShieldPlus, Trash2, TriangleAlert, X } from "lucide-react";
 import {
     isCidr,
     isIpAddress,
+    WAF_PRESETS,
     WAF_RULES_MAX,
+    type WafPreset,
     type WafCondition,
     type WafCustomRule,
     type WafRuleField,
@@ -132,7 +134,9 @@ const OPERATOR_LABELS: Record<WafRuleOperator, string> = {
     contains: "contains",
     not_contains: "does not contain",
     starts_with: "starts with",
-    ends_with: "ends with"
+    not_starts_with: "does not start with",
+    ends_with: "ends with",
+    not_ends_with: "does not end with"
 };
 
 /** An address is matched by containment, not by string, so the operators that read a
@@ -375,6 +379,7 @@ export function WafEditor({
     const [allow, setAllow] = useState<string[]>([]);
     const [deny, setDeny] = useState<string[]>([]);
     const [requireLogin, setRequireLogin] = useState(false);
+    const [presets, setPresets] = useState<string[]>([]);
     const [rules, setRules] = useState<WafCustomRule[]>([]);
     const [saved, setSaved] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -388,12 +393,13 @@ export function WafEditor({
         setNote(null);
         void getWafRuleAction({ scopeType, scopeId }).then((result) => {
             if (!active) return;
-            const rule = result.rule ?? { ipAllowlist: [], ipDenylist: [], requireLogin: false, rules: [] };
+            const rule = result.rule ?? { ipAllowlist: [], ipDenylist: [], requireLogin: false, presets: [], rules: [] };
             setAllow(rule.ipAllowlist);
             setDeny(rule.ipDenylist);
             setRequireLogin(rule.requireLogin);
+            setPresets(rule.presets);
             setRules(rule.rules);
-            setSaved(snapshot(rule.ipAllowlist, rule.ipDenylist, rule.requireLogin, rule.rules));
+            setSaved(snapshot(rule.ipAllowlist, rule.ipDenylist, rule.requireLogin, rule.presets, rule.rules));
             if (result.error) setError(result.error);
             setLoaded(true);
         });
@@ -404,7 +410,7 @@ export function WafEditor({
 
     const overlap = allow.find((entry) => deny.includes(entry));
     const incomplete = incompleteRule(rules);
-    const dirty = saved !== null && saved !== snapshot(allow, deny, requireLogin, rules);
+    const dirty = saved !== null && saved !== snapshot(allow, deny, requireLogin, presets, rules);
     // An allowlist that does not include the address this page is being read over is
     // the one way to lose access to the thing being configured.
     const wouldLockOut =
@@ -420,13 +426,14 @@ export function WafEditor({
                 ipAllowlist: allow,
                 ipDenylist: deny,
                 requireLogin,
+                presets,
                 rules
             });
             if (result.error) {
                 setError(result.error);
                 return;
             }
-            setSaved(snapshot(allow, deny, requireLogin, rules));
+            setSaved(snapshot(allow, deny, requireLogin, presets, rules));
             setNote("Firewall rules saved.");
         });
     }
@@ -443,6 +450,33 @@ export function WafEditor({
     return (
         <div className="flex flex-col gap-5 py-2">
             {description ? <p className="text-sm text-muted-foreground">{description}</p> : null}
+
+            <section className="flex flex-col gap-2">
+                <div className="flex items-center gap-2 text-sm font-medium">
+                    <ShieldPlus className="size-4 text-muted-foreground" />
+                    Managed rules
+                </div>
+                <p className="text-xs text-muted-foreground">
+                    Lists Polaris keeps up to date. Enabling one costs nothing at the edge - only the name travels
+                    with the request.
+                </p>
+                <div className="flex flex-col divide-y divide-border overflow-hidden rounded-md border border-border">
+                    {WAF_PRESETS.map((preset) => (
+                        <PresetRow
+                            key={preset.id}
+                            preset={preset}
+                            checked={presets.includes(preset.id)}
+                            onChange={(on) =>
+                                setPresets(
+                                    on
+                                        ? [...presets, preset.id]
+                                        : presets.filter((id) => id !== preset.id)
+                                )
+                            }
+                        />
+                    ))}
+                </div>
+            </section>
 
             <section className="flex flex-col gap-2">
                 <div className="flex items-center gap-2 text-sm font-medium">
@@ -573,6 +607,33 @@ export function WafEditor({
     );
 }
 
+/** One managed pack: what it blocks, what it costs to turn on, and the switch. */
+function PresetRow({
+    preset,
+    checked,
+    onChange
+}: {
+    preset: WafPreset;
+    checked: boolean;
+    onChange: (on: boolean) => void;
+}) {
+    return (
+        <div className="flex items-start justify-between gap-3 px-3 py-2.5">
+            <div className="min-w-0">
+                <div className="text-sm">{preset.label}</div>
+                <p className="mt-0.5 text-xs text-muted-foreground">{preset.description}</p>
+                {preset.caution ? (
+                    <p className="mt-1 flex items-start gap-1.5 text-xs text-warning">
+                        <TriangleAlert className="mt-0.5 size-3 shrink-0" />
+                        {preset.caution}
+                    </p>
+                ) : null}
+            </div>
+            <Switch checked={checked} onChange={onChange} aria-label={preset.label} />
+        </div>
+    );
+}
+
 /** The whole editable state as one comparable string. A rule set is nested and
  *  reorderable, so field-by-field comparison would either miss a change or call an
  *  unchanged form dirty. */
@@ -580,9 +641,10 @@ function snapshot(
     allow: readonly string[],
     deny: readonly string[],
     requireLogin: boolean,
+    presets: readonly string[],
     rules: readonly WafCustomRule[]
 ): string {
-    return JSON.stringify({ allow, deny, requireLogin, rules });
+    return JSON.stringify({ allow, deny, requireLogin, presets: [...presets].sort(), rules });
 }
 
 /** The list with one entry moved, or unchanged when the target is off the ends. */

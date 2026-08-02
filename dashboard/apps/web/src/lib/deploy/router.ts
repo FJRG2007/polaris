@@ -40,6 +40,8 @@ export interface AppRoute {
      *  the header + forwardAuth guard middlewares carrying this rule to the edge
      *  guard. */
     readonly deny?: readonly string[];
+    /** Managed rule-pack ids, expanded by the guard rather than sent expanded. */
+    readonly presets?: readonly string[];
     readonly rules?: readonly WafCustomRule[];
     readonly requireLogin?: boolean;
 }
@@ -58,7 +60,12 @@ function guardUrl(): string {
 /** True if this route needs the forwardAuth guard (has a denylist, custom rules, or
  *  requires login). An allowlist alone does not: Traefik enforces that natively. */
 function needsGuard(route: AppRoute): boolean {
-    return (route.deny?.length ?? 0) > 0 || (route.rules?.length ?? 0) > 0 || route.requireLogin === true;
+    return (
+        (route.deny?.length ?? 0) > 0 ||
+        (route.presets?.length ?? 0) > 0 ||
+        (route.rules?.length ?? 0) > 0 ||
+        route.requireLogin === true
+    );
 }
 
 /** The middleware names to attach to a route's primary (app-serving) router, adding
@@ -77,6 +84,7 @@ function routeMiddlewares(route: AppRoute, name: string, defs: Map<string, strin
         const rule = encodeGuardRule({
             deny: route.deny ?? [],
             requireLogin: route.requireLogin === true,
+            presets: route.presets ?? [],
             rules: route.rules ?? []
         });
         defs.set(

@@ -23,8 +23,8 @@
  *      against another app even if it leaks via the callback URL.
  */
 
-import { evaluateWafRules, ipAllowed } from "@polaris/core";
 import { decodeGuardRule, verifyEdgeToken } from "@polaris/core/waf";
+import { evaluateWafRules, ipAllowed, type WafIntelIndex } from "@polaris/core";
 
 /** Path (on the app's own domain) the login handoff returns to. */
 const CALLBACK_PATH = "/edge/callback";
@@ -50,6 +50,9 @@ export interface GuardConfig {
     readonly cookieName: string;
     /** Current time in unix seconds (injected for deterministic tests). */
     readonly now: number;
+    /** Bans, Tor exits and flagged addresses, held in memory. Omitted in tests that
+     *  are not about it, which is the same as an empty list. */
+    readonly intel?: WafIntelIndex;
 }
 
 export type GuardDecision =
@@ -128,6 +131,15 @@ export function evaluate(req: GuardRequest, cfg: GuardConfig): GuardDecision {
         const ip = clientIp(req.forwardedFor);
         if (!ip) return { status: 403, reason: "client ip unknown" };
         if (ipAllowed(ip, rule.deny)) return { status: 403, reason: "denied ip" };
+    }
+
+    // Then the out-of-band list: an address Polaris banned for what it did, a Tor
+    // exit, or one a reputation provider flagged. Checked before the custom rules
+    // because it is the cheapest test here (one Map lookup) and because a banned
+    // address should not be able to talk its way past with a well-chosen header.
+    if (cfg.intel && cfg.intel.size > 0) {
+        const hit = cfg.intel.match(clientIp(req.forwardedFor), cfg.now * 1000);
+        if (hit) return { status: 403, reason: `intel: ${hit.reason}${hit.note ? ` (${hit.note})` : ""}` };
     }
 
     // Custom rules next, before the login handoff: a rule that admits a request is

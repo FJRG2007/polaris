@@ -16,21 +16,21 @@ const CUSTOM_RULE = {
 
 describe("guard rule codec", () => {
     it("round-trips a rule", () => {
-        const rule = { deny: ["10.0.0.0/8", "203.0.113.5"], requireLogin: true, rules: [CUSTOM_RULE] };
+        const rule = { deny: ["10.0.0.0/8", "203.0.113.5"], requireLogin: true, presets: [], rules: [CUSTOM_RULE] };
         expect(decodeGuardRule(encodeGuardRule(rule))).toEqual(rule);
     });
 
     it("treats an absent header as a no-op", () => {
-        expect(decodeGuardRule(undefined)).toEqual({ deny: [], requireLogin: false, rules: [] });
+        expect(decodeGuardRule(undefined)).toEqual({ deny: [], requireLogin: false, presets: [], rules: [] });
     });
 
     it("fails closed on a malformed header (requires login)", () => {
-        expect(decodeGuardRule("###not-valid###")).toEqual({ deny: [], requireLogin: true, rules: [] });
+        expect(decodeGuardRule("###not-valid###")).toEqual({ deny: [], requireLogin: true, presets: [], rules: [] });
     });
 
     it("drops non-string denylist entries", () => {
         const header = Buffer.from(JSON.stringify({ d: ["10.0.0.1", 5, null], l: false })).toString("base64");
-        expect(decodeGuardRule(header)).toEqual({ deny: ["10.0.0.1"], requireLogin: false, rules: [] });
+        expect(decodeGuardRule(header)).toEqual({ deny: ["10.0.0.1"], requireLogin: false, presets: [], rules: [] });
     });
 
     it("drops one unreadable custom rule and keeps the rest", () => {
@@ -84,7 +84,7 @@ describe("edge token", () => {
 describe("wafRuleInputSchema", () => {
     it("accepts a valid rule and applies defaults", () => {
         const parsed = wafRuleInputSchema.parse({ ipAllowlist: ["10.0.0.0/8"] });
-        expect(parsed).toEqual({ ipAllowlist: ["10.0.0.0/8"], ipDenylist: [], requireLogin: false, rules: [] });
+        expect(parsed).toEqual({ ipAllowlist: ["10.0.0.0/8"], ipDenylist: [], requireLogin: false, presets: [], rules: [] });
     });
 
     it("rejects a custom rule with no conditions", () => {

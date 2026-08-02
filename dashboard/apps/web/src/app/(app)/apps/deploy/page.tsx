@@ -1,9 +1,9 @@
+import type { ServiceKind } from "./deploy-view";
+import { listProjects } from "@/lib/deploy-service";
 import { refreshCapabilities } from "@polaris/hostd-client";
 import { requirePermission, userHasManage } from "@/lib/session";
 import { getOrCreateLocalTarget } from "@/lib/deploy-target-service";
-import { listProjects } from "@/lib/deploy-service";
 import { ProjectsGrid, type ProjectCardData } from "./projects-grid";
-import type { ServiceKind } from "./deploy-view";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +12,6 @@ const ONLINE_DB_STATES = new Set(["running", "active", "healthy", "ready"]);
 export default async function DeployPage() {
     const user = await requirePermission("deploy.read");
     const canManage = await userHasManage(user, "deploy.manage");
-    const canManageGlobal = await userHasManage(user, "system.manage");
 
     // Seed the local target so the first deploy needs no server setup, and report
     // whether the local host can actually build/deploy (full edition + daemon).
@@ -43,11 +42,6 @@ export default async function DeployPage() {
     });
 
     return (
-        <ProjectsGrid
-            projects={cards}
-            canManage={canManage}
-            canManageGlobal={canManageGlobal}
-            localReady={localReady}
-        />
+        <ProjectsGrid projects={cards} canManage={canManage} localReady={localReady} />
     );
 }

@@ -2020,6 +2020,10 @@ model WafRule {
     ipAllowlist  String   @default("[]")
     ipDenylist   String   @default("[]")
     requireLogin Boolean  @default(false)
+    // Enabled managed rule packs as a JSON array of ids (see waf-presets.ts). Ids,
+    // not their contents: the pack's rules are expanded at the edge, so improving a
+    // list ships as a release rather than a migration over everyone's saved rules.
+    presets      String   @default("[]")
     // Ordered custom rules as a JSON array (conditions -> block | allow), evaluated
     // first-match-wins after the IP lists.
     rules        String   @default("[]")
@@ -2028,6 +2032,49 @@ model WafRule {
 
     @@unique([scopeType, scopeId])
     @@index([scopeType, scopeId])
+}
+
+/// One address the edge blocks for what it did, rather than for what it claims to
+/// be: a jail ban, or an operator's own manual entry.
+///
+/// Individual entries only, and deliberately so. Bulk feeds (the Tor exit list is a
+/// few thousand addresses that turn over daily) live in WafIpFeed as one row each -
+/// putting them here would mean thousands of row writes per refresh to represent one
+/// list that is always replaced whole.
+model WafBan {
+    id       String  @id @default(uuid(7)) @db.Uuid
+    ip       String  @unique
+    /// ban | reputation | manual - mirrors WafIntelReason.
+    reason   String
+    /// Which jail decided it, the provider that flagged it, or "operator".
+    source   String
+    note     String?
+    /// When it lifts. Null for a manual entry meant to stand until it is removed.
+    until    DateTime?
+    /// Times this address has been banned, so a repeat offender is held longer.
+    offences Int      @default(1)
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@index([until])
+}
+
+/// A bulk address list Polaris fetches and republishes to the edge: the Tor exit
+/// list today, any other feed later. One row per feed, holding the whole list, so a
+/// refresh is one write and a stale feed is one timestamp to look at.
+model WafIpFeed {
+    /// Feed id ("tor").
+    id        String   @id
+    /// The addresses, as a JSON string array.
+    entries   String   @default("[]")
+    /// Whether the operator has this feed switched on.
+    enabled   Boolean  @default(false)
+    /// When it was last fetched successfully, so staleness is visible.
+    fetchedAt DateTime?
+    /// Why the last refresh failed, if it did.
+    error     String?
+    updatedAt DateTime @updatedAt
 }
 
 model Volume {

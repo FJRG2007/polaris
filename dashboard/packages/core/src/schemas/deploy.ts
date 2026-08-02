@@ -141,7 +141,16 @@ export type WafRuleField = (typeof WAF_RULE_FIELDS)[number];
 
 /** How a field is compared against the values. `ip` accepts an address or a CIDR
  *  range and ignores the string operators. */
-export const WAF_RULE_OPERATORS = ["equals", "not_equals", "contains", "not_contains", "starts_with", "ends_with"] as const;
+export const WAF_RULE_OPERATORS = [
+    "equals",
+    "not_equals",
+    "contains",
+    "not_contains",
+    "starts_with",
+    "not_starts_with",
+    "ends_with",
+    "not_ends_with"
+] as const;
 export type WafRuleOperator = (typeof WAF_RULE_OPERATORS)[number];
 
 /** What happens to a request the rule matches. `allow` stops evaluation and admits
@@ -175,11 +184,17 @@ export const wafCustomRuleSchema = z.object({
 
 export type WafCustomRule = z.infer<typeof wafCustomRuleSchema>;
 
+/** Managed rule packs enabled on a scope, stored as ids (see waf-presets.ts). Not
+ *  an enum: an id retired in a later release must still parse, so the reader can
+ *  drop it rather than fail the whole rule. */
+const wafPresetList = z.array(z.string().trim().min(1).max(64)).max(32);
+
 export const wafRuleInputSchema = z
     .object({
         ipAllowlist: wafCidrList.default([]),
         ipDenylist: wafCidrList.default([]),
         requireLogin: z.boolean().default(false),
+        presets: wafPresetList.default([]),
         rules: z.array(wafCustomRuleSchema).max(WAF_RULES_MAX).default([])
     })
     .superRefine((value, ctx) => {
@@ -209,6 +224,9 @@ export interface ResolvedWaf {
     readonly deny: readonly string[];
     /** True if any scope requires a Polaris login. */
     readonly requireLogin: boolean;
+    /** Union of every scope's enabled rule packs. Carried to the edge as ids and
+     *  expanded there, so a pack of forty user agents costs four bytes on the wire. */
+    readonly presets: readonly string[];
     /** Every scope's custom rules, broadest scope first, evaluated in order. */
     readonly rules: readonly WafCustomRule[];
 }

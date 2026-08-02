@@ -8,23 +8,47 @@
  * imported via "@polaris/core/waf" and never from the client-safe barrel.
  */
 
+import { expandWafPresets } from "./waf-presets.js";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { wafCustomRuleSchema, type WafCustomRule } from "./schemas/deploy.js";
 
-/** The per-route rule the guard enforces. Empty denylist, no custom rules and no
- *  login = a no-op. */
+/** The per-route rule the guard enforces. Empty denylist, no packs, no custom rules
+ *  and no login = a no-op. */
 export interface GuardRule {
     readonly deny: readonly string[];
     readonly requireLogin: boolean;
+    /** Managed rule-pack ids, expanded to rules on decode. Sending ids rather than
+     *  their contents is what keeps this header small: a pack of forty user agents
+     *  is four bytes here and is stamped onto every single request to the route.
+     *  Optional on the way in, always present on the way out. */
+    readonly presets?: readonly string[];
     /** Custom rules in evaluation order, broadest scope first. */
     readonly rules: readonly WafCustomRule[];
 }
 
 /** Encode a guard rule for the X-Polaris-Waf header (base64 of compact JSON:
- *  `d` = denylist, `l` = require-login, `r` = custom rules). */
+ *  `d` = denylist, `l` = require-login, `p` = pack ids, `r` = custom rules). */
 export function encodeGuardRule(rule: GuardRule): string {
-    return Buffer.from(JSON.stringify({ d: rule.deny, l: rule.requireLogin, r: rule.rules })).toString("base64");
+    return Buffer.from(
+        JSON.stringify({ d: rule.deny, l: rule.requireLogin, p: rule.presets ?? [], r: rule.rules })
+    ).toString("base64");
 }
+
+const EMPTY_RULE: GuardRule = { deny: [], requireLogin: false, presets: [], rules: [] };
+const FAIL_CLOSED: GuardRule = { deny: [], requireLogin: true, presets: [], rules: [] };
+
+/**
+ * Decoded headers, keyed by the header itself.
+ *
+ * Every request to a route carries the same header - Traefik stamps one constant
+ * string - so decoding it per request means base64, JSON.parse and a full Zod
+ * re-validation of every rule on the hot path, for a result that cannot have
+ * changed. The cache turns that into one Map lookup. It is bounded and evicts in
+ * insertion order because the key space is "routes on this edge", not user input:
+ * only Traefik can set this header, so it cannot be grown by an attacker.
+ */
+const DECODED = new Map<string, GuardRule>();
+const DECODED_MAX = 256;
 
 /**
  * Decode the X-Polaris-Waf header. Fails closed on a malformed value: a present but
@@ -37,20 +61,43 @@ export function encodeGuardRule(rule: GuardRule): string {
  * against every request on the route, and a half-decoded rule would either throw in
  * the guard's hot path or silently match nothing. One unreadable rule is dropped and
  * the rest still run.
+ *
+ * Rule packs are expanded here and appended *after* the operator's own rules, so a
+ * hand-written `allow` still takes precedence over a managed `block` - the pack is
+ * the broad policy and the custom rule above it is the exception.
  */
 export function decodeGuardRule(header: string | undefined | null): GuardRule {
-    if (!header) return { deny: [], requireLogin: false, rules: [] };
+    if (!header) return EMPTY_RULE;
+    const cached = DECODED.get(header);
+    if (cached) return cached;
+
+    const decoded = decodeUncached(header);
+    if (DECODED.size >= DECODED_MAX) {
+        const oldest = DECODED.keys().next();
+        if (!oldest.done) DECODED.delete(oldest.value);
+    }
+    DECODED.set(header, decoded);
+    return decoded;
+}
+
+function decodeUncached(header: string): GuardRule {
     try {
         const raw: unknown = JSON.parse(Buffer.from(header, "base64").toString("utf8"));
         if (raw && typeof raw === "object") {
-            const obj = raw as { d?: unknown; l?: unknown; r?: unknown };
+            const obj = raw as { d?: unknown; l?: unknown; p?: unknown; r?: unknown };
             const deny = Array.isArray(obj.d) ? obj.d.filter((v): v is string => typeof v === "string") : [];
-            return { deny, requireLogin: obj.l === true, rules: parseRules(obj.r) };
+            const presets = Array.isArray(obj.p) ? obj.p.filter((v): v is string => typeof v === "string") : [];
+            return {
+                deny,
+                requireLogin: obj.l === true,
+                presets,
+                rules: [...parseRules(obj.r), ...expandWafPresets(presets)]
+            };
         }
     } catch {
         // Fall through to the fail-closed default below.
     }
-    return { deny: [], requireLogin: true, rules: [] };
+    return FAIL_CLOSED;
 }
 
 /** The custom rules that survive validation, in the order they were encoded. */

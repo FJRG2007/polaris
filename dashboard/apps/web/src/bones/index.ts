@@ -29,6 +29,7 @@ import routeIntegrations from "./route-integrations.bones.json";
 import routeAdminDisplay from "./route-admin-display.bones.json";
 import routeAdminDomains from "./route-admin-domains.bones.json";
 import routeWatchServers from "./route-watch-servers.bones.json";
+import routeAppsFirewall from "./route-apps-firewall.bones.json";
 import routeAccountAccess from "./route-account-access.bones.json";
 import routeAdminActivity from "./route-admin-activity.bones.json";
 import routeAdminPolicies from "./route-admin-policies.bones.json";
@@ -46,7 +47,6 @@ import routeWatchContainers from "./route-watch-containers.bones.json";
 import routeDriveDropPoints from "./route-drive-drop-points.bones.json";
 import routeDriveSharedLinks from "./route-drive-shared-links.bones.json";
 import routeAccountPreferences from "./route-account-preferences.bones.json";
-import routeAppsDeployFirewall from "./route-apps-deploy-firewall.bones.json";
 import routeAccountNotifications from "./route-account-notifications.bones.json";
 import routeInboxChannelsConnect from "./route-inbox-channels-connect.bones.json";
 
@@ -69,7 +69,7 @@ export const ROUTE_BONES: Record<string, ResponsiveLayout | undefined> = {
     "route-apps-backups": routeAppsBackups,
     "route-apps-containers": routeAppsContainers,
     "route-apps-deploy": routeAppsDeploy,
-    "route-apps-deploy-firewall": routeAppsDeployFirewall,
+    "route-apps-firewall": routeAppsFirewall,
     "route-apps-marketplace": routeAppsMarketplace,
     "route-apps-runners": routeAppsRunners,
     "route-apps-servers": routeAppsServers,

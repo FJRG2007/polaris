@@ -93,6 +93,13 @@ export async function register(): Promise<void> {
     const { startRunnerReconciler } = await import("./lib/runners/runner-reconciler");
     startRunnerReconciler();
 
+    // Read the edge's access log on an interval and ban the addresses that have
+    // earned it - the fail2ban half of the firewall, which a forwardAuth guard cannot
+    // do itself because it is asked before the response (and its status) exists. Also
+    // refreshes the Tor exit list and republishes the snapshot the guard enforces.
+    const { startWafSentinel } = await import("./lib/waf-sentinel");
+    startWafSentinel();
+
     // Re-establish messaging channels in the bridge after a bridge or web restart:
     // the bridge holds adapters in memory, so without this a channel stays
     // "connected" in the DB but dead at the bridge until manually reconnected.

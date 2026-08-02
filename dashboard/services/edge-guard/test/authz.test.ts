@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { evaluate, type GuardConfig } from "../src/authz.js";
 import { encodeGuardRule, signEdgeToken } from "@polaris/core/waf";
+import { buildWafIntel, indexWafIntel, type WafIntelEntry } from "@polaris/core";
 
 const NOW = 1_800_000_000;
 const SECRET = "test-secret-at-least-16-chars";
@@ -199,5 +200,51 @@ describe("evaluate - login callback", () => {
         const decision = evaluate({ wafHeader, forwardedProto: "https", forwardedHost: HOST, forwardedUri: uri }, cfg);
         expect(decision.status).toBe(302);
         expect(decision).toMatchObject({ location: expect.stringContaining("/edge/authorize") });
+    });
+});
+
+describe("evaluate - address intelligence", () => {
+    const ban: WafIntelEntry = { reason: "ban", until: NOW * 1000 + 60_000, note: "404 flood" };
+    const withIntel = (entries: (readonly [string, WafIntelEntry])[]): GuardConfig => ({
+        ...cfg,
+        intel: indexWafIntel(buildWafIntel(entries, NOW * 1000))
+    });
+
+    it("blocks a banned address with no rule of any kind attached", () => {
+        const decision = evaluate({ forwardedFor: "203.0.113.7" }, withIntel([["203.0.113.7", ban]]));
+        expect(decision.status).toBe(403);
+        expect(decision).toMatchObject({ reason: expect.stringContaining("404 flood") });
+    });
+
+    it("lets everyone else through", () => {
+        expect(evaluate({ forwardedFor: "203.0.113.8" }, withIntel([["203.0.113.7", ban]]))).toEqual({
+            status: 200
+        });
+    });
+
+    it("blocks a Tor exit and says so", () => {
+        const tor: WafIntelEntry = { reason: "tor", until: null };
+        const decision = evaluate({ forwardedFor: "198.51.100.4" }, withIntel([["198.51.100.4", tor]]));
+        expect(decision).toMatchObject({ status: 403, reason: "intel: tor" });
+    });
+
+    it("stops blocking once the ban lapses", () => {
+        const config = withIntel([["203.0.113.7", ban]]);
+        const later: GuardConfig = { ...config, now: NOW + 120 };
+        expect(evaluate({ forwardedFor: "203.0.113.7" }, later)).toEqual({ status: 200 });
+    });
+
+    it("outranks a require-login route: a banned address is not offered the login", () => {
+        const wafHeader = encodeGuardRule({ deny: [], requireLogin: true, rules: [] });
+        const decision = evaluate(
+            { wafHeader, forwardedFor: "203.0.113.7", forwardedHost: HOST },
+            withIntel([["203.0.113.7", ban]])
+        );
+        expect(decision.status).toBe(403);
+    });
+
+    it("does not block when the snapshot could not be read", () => {
+        const empty: GuardConfig = { ...cfg, intel: indexWafIntel("corrupt") };
+        expect(evaluate({ forwardedFor: "203.0.113.7" }, empty)).toEqual({ status: 200 });
     });
 });

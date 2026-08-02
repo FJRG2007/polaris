@@ -9,7 +9,7 @@ import { notFound } from "next/navigation";
 import { clientIp } from "@/lib/request-context";
 import { requirePermission } from "@/lib/session";
 import { getProjectFull } from "@/lib/deploy-service";
-import { FirewallView, type FirewallScope } from "../../firewall-view";
+import { FirewallView, type FirewallScope } from "@/app/(app)/apps/firewall/firewall-view";
 
 export const dynamic = "force-dynamic";
 

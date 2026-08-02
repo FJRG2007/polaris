@@ -7,7 +7,6 @@
  * Reuses the existing terminal/files/logs building blocks.
  */
 
-import { WafEditor } from "./waf-editor";
 import { FilesPanel } from "./files-panel";
 import * as deployActions from "./actions";
 import { VolumesTab } from "./volumes-panel";
@@ -17,6 +16,7 @@ import type { HttpLogEntry } from "@polaris/deploy";
 import { isLocalDomain, primaryDomain } from "./domain-rank";
 import { stageServiceDeleteAction } from "./project-actions";
 import { useDisplayFormat } from "@/components/display-format";
+import { WafEditor } from "@/app/(app)/apps/firewall/waf-editor";
 import { isTunnelHostname, type DisplayFormat } from "@polaris/core";
 import { CloudflareMark, NgrokMark } from "@/components/brand-icons";
 import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";

@@ -107,8 +107,13 @@ services:
       - polaris-data:/var/lib/polaris
       # Traefik dynamic-config dir the dashboard writes deployed-app routes into.
       - polaris-traefik-dynamic:/dynamic
-      # Traefik's per-request access log, read by the HTTP Logs view (read-only).
+      # Traefik's per-request access log, read by the HTTP Logs view and by the
+      # firewall's jails (read-only).
       - polaris-traefik-log:/traefik-log:ro
+      # The firewall's address snapshot - bans, Tor exits, flagged addresses - which
+      # the dashboard writes and the edge guard reads. Its own volume rather than the
+      # dynamic dir: Traefik parses every .json it finds there as a route config.
+      - polaris-edge-intel:/edge-intel
       # Dedicated SSH key + pinned known_hosts for the Docker connector, mounted
       # read-only. Populated by `install.sh --ssh`; empty (and ignored) otherwise.
       # Absolute host path so the mount is correct even when compose runs inside the
@@ -292,6 +297,11 @@ services:
       POLARIS_AUTH_SECRET: ${POLARIS_AUTH_SECRET:?POLARIS_AUTH_SECRET is required}
       # Where the guard sends visitors to sign in for require-login routes.
       POLARIS_PUBLIC_URL: ${POLARIS_PUBLIC_URL:-https://polaris.local}
+      # Bans, Tor exits and flagged addresses, held in memory and re-read only when
+      # the file changes - so enforcing one costs a map lookup, never a query.
+      POLARIS_EDGE_INTEL_FILE: /edge-intel/waf-intel.json
+    volumes:
+      - polaris-edge-intel:/edge-intel:ro
     networks:
       polaris-proxy:
         aliases:
@@ -322,3 +332,4 @@ volumes:
   polaris-traefik:
   polaris-traefik-dynamic:
   polaris-traefik-log:
+  polaris-edge-intel:

@@ -12,7 +12,6 @@ import { loadEnv } from "@polaris/config";
 import { createWriteStream } from "node:fs";
 import { getPublicIp } from "./domain-service";
 import { commitUrl } from "./deploy/commit-url";
-import { isTunnelHostname } from "@polaris/core";
 import { decryptSecret } from "@polaris/storage";
 import { mkdir, readFile } from "node:fs/promises";
 import { ensureLocalCa } from "./local-ca-service";
@@ -27,6 +26,7 @@ import { notifyDeployFinished } from "./notifications/deploy-events";
 import { deployHostname, type ZoneMintFailure } from "./domain-zones";
 import { gitBuildContext, type GitSource } from "./git-build-service";
 import { getLatestCommit, githubCloneAuthHeader } from "./github-service";
+import { applicationDefaultWafPresets, isTunnelHostname } from "@polaris/core";
 import { getDriver, getPorts, toTargetInfo, type TargetRow } from "./deploy/runtime";
 import { getOrCreateHostTarget, getOrCreateLocalTarget } from "./deploy-target-service";
 import { quickTunnelAppIds, tunnelHostForApp, stopQuickTunnel } from "./deploy/quick-tunnel-service";
@@ -88,6 +88,20 @@ export async function listProjects(ownerId: string) {
                 include: { applications: { include: { domains: true } }, databases: true },
                 orderBy: { createdAt: "asc" }
             }
+        }
+    });
+}
+
+/** Project and environment names only - what the firewall's scope list needs, without
+ *  dragging every service and domain along for a nav of labels. */
+export async function listProjectScopes(ownerId: string) {
+    return prisma.project.findMany({
+        where: visibleProjectWhere(ownerId),
+        orderBy: { createdAt: "asc" },
+        select: {
+            id: true,
+            name: true,
+            environments: { select: { id: true, name: true }, orderBy: { createdAt: "asc" } }
         }
     });
 }
@@ -278,7 +292,7 @@ export async function createApplication(ownerId: string, input: CreateApplicatio
     if (!target) throw new Error("Deploy target not found");
     const slug = slugify(input.name);
     if (!slug) throw new Error("Application name must contain letters or digits");
-    return prisma.application.create({
+    const application = await prisma.application.create({
         data: {
             environmentId: input.environmentId,
             targetId: input.targetId,
@@ -291,6 +305,35 @@ export async function createApplication(ownerId: string, input: CreateApplicatio
             keepReleases: input.keepReleases ?? false
         }
     });
+    // Stack-specific rule packs are decided here, at the one moment the stack is
+    // known. Blocking /wp-login.php is a judgement call in general and an obvious one
+    // against a Node service, so the pack goes on where that is true rather than
+    // instance-wide, where a PHP app would have no way to be exempted from it.
+    const presets = applicationDefaultWafPresets(stackHint(input));
+    if (presets.length > 0) {
+        await prisma.wafRule
+            .create({
+                data: { scopeType: "application", scopeId: application.id, presets: JSON.stringify(presets) }
+            })
+            // A service that deploys without its default packs is worse than one that
+            // does not deploy at all only if nobody says so - the packs are visible
+            // and re-enablable on the firewall page either way.
+            .catch((error: unknown) => {
+                console.warn(
+                    `polaris: default firewall packs for ${application.id} were not applied:`,
+                    error instanceof Error ? error.message : error
+                );
+            });
+    }
+    return application;
+}
+
+/** What a service is built from, as a free-form hint for pack selection: the image
+ *  reference for an image deploy, the builder/provider for a repo one. */
+function stackHint(input: CreateApplicationInput): string {
+    const config = input.sourceConfig as Record<string, unknown> | undefined;
+    const parts = [input.sourceType, config?.imageRef, config?.provider, config?.builder, config?.repoUrl];
+    return parts.filter((part): part is string => typeof part === "string").join(" ");
 }
 
 /**
@@ -640,7 +683,7 @@ export async function syncAppRoutes(): Promise<void> {
             ...localDomains.map((domain) => domain.applicationId),
             ...localTunnelApps.map((app) => app.id)
         ]);
-        const emptyWaf = { allowLists: [], deny: [], requireLogin: false, rules: [] };
+        const emptyWaf = { allowLists: [], deny: [], requireLogin: false, presets: [], rules: [] };
         for (const domain of localDomains) {
             const rule = waf.get(domain.applicationId) ?? emptyWaf;
             localRoutes.push({
@@ -651,6 +694,7 @@ export async function syncAppRoutes(): Promise<void> {
                 dialPort: hostPortForApp(dialTarget(domain, isolated)),
                 allowLists: rule.allowLists,
                 deny: rule.deny,
+                presets: rule.presets,
                 rules: rule.rules,
                 requireLogin: rule.requireLogin
             });
@@ -665,6 +709,7 @@ export async function syncAppRoutes(): Promise<void> {
                 dialPort: hostPortForApp(app.id),
                 allowLists: rule.allowLists,
                 deny: rule.deny,
+                presets: rule.presets,
                 rules: rule.rules,
                 requireLogin: rule.requireLogin
             });
@@ -1140,6 +1185,7 @@ async function buildAppPlan(
     const waf =
         resolvedWaf.allowLists.length > 0 ||
         resolvedWaf.deny.length > 0 ||
+        resolvedWaf.presets.length > 0 ||
         resolvedWaf.rules.length > 0 ||
         resolvedWaf.requireLogin
             ? resolvedWaf

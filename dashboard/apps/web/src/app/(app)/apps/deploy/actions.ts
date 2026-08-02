@@ -14,14 +14,11 @@ import { requirePermission } from "@/lib/session";
 import { recordAudit } from "@/lib/audit-service";
 import * as deployService from "@/lib/deploy-service";
 import { parseGithubRepo } from "@/lib/repo-reference";
-import { syncDashboardRoute } from "@/lib/domain-edge";
 import { getNetworkStatus } from "@/lib/network-service";
-import type { WafCustomRule, WafScopeType } from "@polaris/core";
 import { listConnections, getDriver } from "@/lib/storage-service";
 import { getDomainZones, listDeployZones } from "@/lib/domain-zones";
 import { getFlagsForEnvironment } from "@/lib/deploy-project-service";
 import { ensurePublicIp, getDomainConfig } from "@/lib/domain-service";
-import { getWafRule, setWafRule, type WafRuleView } from "@/lib/waf-service";
 import { provisionHostnameDns, type HostnameDnsResult } from "@/lib/domain-dns";
 import { getOrCreateLocalTarget, getOrCreateHostTarget } from "@/lib/deploy-target-service";
 import { listVolumes, createVolume, updateVolume, deleteVolume, type VolumeView } from "@/lib/deploy-volume-service";
@@ -918,54 +915,6 @@ export async function listNasFoldersAction(
         // A driver is a live session to the storage; the picker opens one per
         // keystroke-driven browse, so leaving them open exhausts the NAS.
         await driver?.dispose().catch(() => undefined);
-    }
-}
-
-/** The two scopes nobody owns: they reach every service on the instance, or the
- *  dashboard itself, so `deploy.manage` (which an ordinary member holds) is not
- *  enough to read or write them - only `system.manage`. */
-const OPERATOR_SCOPES = new Set<WafScopeType>(["global", "polaris"]);
-
-export async function getWafRuleAction(input: {
-    scopeType: WafScopeType;
-    scopeId: string;
-}): Promise<{ rule?: WafRuleView; error?: string }> {
-    const user = await requirePermission("deploy.manage");
-    if (OPERATOR_SCOPES.has(input.scopeType)) await requirePermission("system.manage");
-    try {
-        return { rule: await getWafRule(user.id, input.scopeType, input.scopeId) };
-    } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not load the firewall rule" };
-    }
-}
-
-export async function setWafRuleAction(input: {
-    scopeType: WafScopeType;
-    scopeId: string;
-    ipAllowlist: string[];
-    ipDenylist: string[];
-    requireLogin: boolean;
-    rules: WafCustomRule[];
-}): Promise<{ error?: string }> {
-    const user = await requirePermission("deploy.manage");
-    if (OPERATOR_SCOPES.has(input.scopeType)) await requirePermission("system.manage");
-    try {
-        const { scopeType, scopeId, ...rule } = input;
-        await setWafRule(user.id, scopeType, scopeId, rule);
-        await recordAudit({ actorId: user.id, action: "deploy.waf.set", targetType: scopeType, targetId: scopeId || "global" });
-        // Polaris's own rule lives on the dashboard's route rather than an app's, so
-        // it is the dashboard route that has to be republished for it to take effect.
-        if (scopeType === "polaris") {
-            await syncDashboardRoute();
-        } else {
-            // The local edge applies instantly via the file provider; remote-server apps
-            // pick up the change on their next deploy (their rules ride on container labels).
-            await deployService.syncAppRoutes().catch(() => undefined);
-        }
-        revalidatePath(DEPLOY_PATH);
-        return {};
-    } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not save the firewall rule" };
     }
 }
 

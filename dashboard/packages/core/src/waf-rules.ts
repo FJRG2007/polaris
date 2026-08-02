@@ -28,7 +28,7 @@ export interface WafRequestFacts {
 }
 
 /** The operators that mean "none of the values match" rather than "one does". */
-const NEGATIVE = new Set(["not_equals", "not_contains"]);
+const NEGATIVE = new Set(["not_equals", "not_contains", "not_starts_with", "not_ends_with"]);
 
 /**
  * The fact a condition reads, lowercased where case is not meaningful. A path and a
@@ -70,8 +70,10 @@ function matchesValue(operator: WafCondition["operator"], fact: string, value: s
         case "not_contains":
             return fact.includes(value);
         case "starts_with":
+        case "not_starts_with":
             return fact.startsWith(value);
         case "ends_with":
+        case "not_ends_with":
             return fact.endsWith(value);
     }
 }

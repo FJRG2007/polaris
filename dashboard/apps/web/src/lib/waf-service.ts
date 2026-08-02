@@ -14,6 +14,7 @@
 
 import { prisma } from "@polaris/db";
 import {
+    instanceDefaultWafPresets,
     wafCustomRuleSchema,
     wafRuleInputSchema,
     type ResolvedWaf,
@@ -21,6 +22,20 @@ import {
     type WafRuleInput,
     type WafScopeType
 } from "@polaris/core";
+
+/**
+ * The two instance-wide scopes start protected rather than open: a fresh Polaris
+ * blocks vulnerability scanners, exposed dotfiles and CMS probing before anyone
+ * visits the firewall page. Only these two, because they are the only scopes that
+ * exist before an operator creates anything.
+ *
+ * The choice is recorded, never inferred. Once one of these rows exists its packs are
+ * authoritative - including an empty list, which is how "I turned them all off" is
+ * stored - so the row is kept even when it is otherwise empty. Inferring the default
+ * from an absent row would quietly re-enable every pack the operator had just
+ * switched off.
+ */
+const SCOPES_WITH_DEFAULTS = new Set<WafScopeType>(["global", "polaris"]);
 
 /** Parse a stored JSON string list, tolerating a malformed value as empty. */
 function parseList(json: string): string[] {
@@ -55,6 +70,7 @@ interface RuleRow {
     readonly ipAllowlist: string;
     readonly ipDenylist: string;
     readonly requireLogin: boolean;
+    readonly presets: string;
     readonly rules: string;
 }
 
@@ -64,6 +80,7 @@ const RULE_SELECT = {
     ipAllowlist: true,
     ipDenylist: true,
     requireLogin: true,
+    presets: true,
     rules: true
 } as const;
 
@@ -75,23 +92,45 @@ function mergeRules(rows: readonly RuleRow[]): ResolvedWaf {
     const ordered = [...rows].sort((a, b) => (SCOPE_ORDER[a.scopeType] ?? 99) - (SCOPE_ORDER[b.scopeType] ?? 99));
     const allowLists: string[][] = [];
     const deny = new Set<string>();
+    const presets = new Set<string>();
     const rules: WafCustomRule[] = [];
     let requireLogin = false;
     for (const row of ordered) {
         const allow = parseList(row.ipAllowlist);
         if (allow.length > 0) allowLists.push(allow);
         for (const entry of parseList(row.ipDenylist)) deny.add(entry);
+        // A pack union, not a per-scope list: a pack enabled anywhere above applies
+        // here too, and a child scope cannot switch off a parent's. Turning one off
+        // where it is wrong is done with an `allow` rule above it, which is the same
+        // exception mechanism every other block uses.
+        for (const id of parseList(row.presets)) presets.add(id);
         if (row.requireLogin) requireLogin = true;
         // Concatenated, not merged: a rule set is ordered and first-match-wins, so a
         // broader scope's rules have to be offered the request first - otherwise a
         // project could write an `allow` that overrides an instance-wide block.
         rules.push(...parseCustomRules(row.rules));
     }
-    return { allowLists, deny: [...deny], requireLogin, rules };
+    return { allowLists, deny: [...deny], requireLogin, presets: [...presets], rules };
 }
 
-/** An empty decision: allow all, deny none, no login required, no rules. */
-const EMPTY_WAF: ResolvedWaf = { allowLists: [], deny: [], requireLogin: false, rules: [] };
+/** An empty decision: allow all, deny none, no login required, no packs, no rules. */
+const EMPTY_WAF: ResolvedWaf = { allowLists: [], deny: [], requireLogin: false, presets: [], rules: [] };
+
+/** The global row a never-configured instance behaves as if it had. */
+const DEFAULT_GLOBAL_ROW: RuleRow = {
+    scopeType: "global",
+    ipAllowlist: "[]",
+    ipDenylist: "[]",
+    requireLogin: false,
+    presets: JSON.stringify(instanceDefaultWafPresets()),
+    rules: "[]"
+};
+
+/** The rows to merge, standing in the instance defaults when the global scope has
+ *  never been written. An existing row always wins, empty packs included. */
+function withInstanceDefaults(rows: readonly RuleRow[]): RuleRow[] {
+    return rows.some((row) => row.scopeType === "global") ? [...rows] : [DEFAULT_GLOBAL_ROW, ...rows];
+}
 
 /**
  * Resolve the effective WAF decision for one application by merging its own rule
@@ -115,8 +154,7 @@ export async function resolveWaf(applicationId: string): Promise<ResolvedWaf> {
         },
         select: RULE_SELECT
     });
-    if (rows.length === 0) return EMPTY_WAF;
-    return mergeRules(rows);
+    return mergeRules(withInstanceDefaults(rows));
 }
 
 /**
@@ -129,7 +167,9 @@ export async function resolvePolarisWaf(): Promise<ResolvedWaf> {
         where: { scopeType_scopeId: { scopeType: "polaris", scopeId: "" } },
         select: RULE_SELECT
     });
-    return row ? mergeRules([row]) : EMPTY_WAF;
+    // The dashboard's own ingress takes the instance defaults too, and for the same
+    // reason - it is reachable from the internet before anyone configures anything.
+    return mergeRules([row ?? { ...DEFAULT_GLOBAL_ROW, scopeType: "polaris" }]);
 }
 
 /**
@@ -180,7 +220,7 @@ export async function resolveWafBatch(applicationIds: readonly string[]): Promis
             ...(byScope.get(`environment:${app.environmentId}`) ?? []),
             ...(byScope.get(`application:${app.id}`) ?? [])
         ];
-        result.set(app.id, applicable.length === 0 ? EMPTY_WAF : mergeRules(applicable));
+        result.set(app.id, mergeRules(withInstanceDefaults(applicable)));
     }
     return result;
 }
@@ -190,6 +230,8 @@ export interface WafRuleView {
     readonly ipAllowlist: string[];
     readonly ipDenylist: string[];
     readonly requireLogin: boolean;
+    /** Managed rule packs enabled on this scope alone - not the union it inherits. */
+    readonly presets: string[];
     readonly rules: WafCustomRule[];
 }
 
@@ -228,13 +270,20 @@ export async function getWafRule(
     await assertScopeOwner(ownerId, scopeType, scopeId);
     const row = await prisma.wafRule.findUnique({
         where: { scopeType_scopeId: { scopeType, scopeId } },
-        select: { ipAllowlist: true, ipDenylist: true, requireLogin: true, rules: true }
+        select: { ipAllowlist: true, ipDenylist: true, requireLogin: true, presets: true, rules: true }
     });
-    if (!row) return { ipAllowlist: [], ipDenylist: [], requireLogin: false, rules: [] };
+    if (!row) {
+        // An unwritten instance scope must show the packs it is actually enforcing,
+        // or the page would offer to "enable" protection that is already on and the
+        // first save would look like it changed nothing.
+        const presets = SCOPES_WITH_DEFAULTS.has(scopeType) ? instanceDefaultWafPresets() : [];
+        return { ipAllowlist: [], ipDenylist: [], requireLogin: false, presets, rules: [] };
+    }
     return {
         ipAllowlist: parseList(row.ipAllowlist),
         ipDenylist: parseList(row.ipDenylist),
         requireLogin: row.requireLogin,
+        presets: parseList(row.presets),
         rules: parseCustomRules(row.rules)
     };
 }
@@ -252,12 +301,16 @@ export async function setWafRule(
 ): Promise<void> {
     await assertScopeOwner(ownerId, scopeType, scopeId);
     const parsed = wafRuleInputSchema.parse(input);
-    if (
+    const empty =
         parsed.ipAllowlist.length === 0 &&
         parsed.ipDenylist.length === 0 &&
         parsed.rules.length === 0 &&
-        !parsed.requireLogin
-    ) {
+        parsed.presets.length === 0 &&
+        !parsed.requireLogin;
+    // An instance scope keeps its row even when empty: absence there means "never
+    // configured" and re-applies the default packs, so deleting it would silently
+    // undo an operator who had just switched every one of them off.
+    if (empty && !SCOPES_WITH_DEFAULTS.has(scopeType)) {
         await prisma.wafRule.deleteMany({ where: { scopeType, scopeId } });
         return;
     }
@@ -265,6 +318,7 @@ export async function setWafRule(
         ipAllowlist: JSON.stringify(parsed.ipAllowlist),
         ipDenylist: JSON.stringify(parsed.ipDenylist),
         requireLogin: parsed.requireLogin,
+        presets: JSON.stringify(parsed.presets),
         rules: JSON.stringify(parsed.rules)
     };
     await prisma.wafRule.upsert({

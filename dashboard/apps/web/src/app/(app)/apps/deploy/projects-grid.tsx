@@ -23,7 +23,6 @@ import {
     Rocket,
     Search,
     Settings,
-    ShieldCheck,
     SquareArrowOutUpRight,
     Trash2
 } from "lucide-react";
@@ -56,12 +55,10 @@ export interface ProjectCardData {
 export function ProjectsGrid({
     projects,
     canManage,
-    canManageGlobal,
     localReady
 }: {
     projects: ProjectCardData[];
     canManage: boolean;
-    canManageGlobal: boolean;
     localReady: boolean;
 }) {
     const [layout, setLayout] = useState<"grid" | "list">("grid");
@@ -76,16 +73,6 @@ export function ProjectsGrid({
                 <h1 className="text-2xl font-semibold">Projects</h1>
                 {canManage && (
                     <div className="flex flex-wrap items-center gap-2">
-                        {canManageGlobal && (
-                            <Link
-                                href="/apps/deploy/firewall"
-                                aria-label="Firewall"
-                                title="Firewall"
-                                className="inline-flex size-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                            >
-                                <ShieldCheck className="size-4" />
-                            </Link>
-                        )}
                         <RegistryCredentialsButton />
                         <CreateProjectButton />
                     </div>

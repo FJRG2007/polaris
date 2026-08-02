@@ -1,0 +1,12 @@
+-- Managed rule packs enabled on a firewall scope.
+--
+-- Stored as a JSON array of pack ids, not as the rules the pack contains. The edge
+-- expands an id into its rules, so a pack of forty user agents costs four bytes on
+-- the wire per request, and improving that list ships as a release instead of a
+-- migration over every rule anyone has saved.
+--
+-- Default "[]" keeps every existing row exactly as it enforces today. The instance
+-- defaults (scanner and dotfile blocking) apply only where the global and polaris
+-- rows do not exist at all, which is how a fresh install starts protected without
+-- overriding an operator who has already been here.
+ALTER TABLE "WafRule" ADD COLUMN "presets" TEXT NOT NULL DEFAULT '[]';

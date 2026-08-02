@@ -7,16 +7,24 @@
  * tokens offline; deny-only routes need no secret at all.
  */
 
-import { createGuardServer } from "./server.js";
 import type { GuardConfig } from "./authz.js";
+import { createIntelSource } from "./intel.js";
+import { createGuardServer } from "./server.js";
+
+/** Bans, Tor exits and flagged addresses, published by Polaris into a shared volume
+ *  and held in memory here. Unset = the feature is not deployed; the guard then
+ *  enforces only what each request's own header carries. */
+const intel = createIntelSource(process.env.POLARIS_EDGE_INTEL_FILE);
 
 /** Resolve the guard config from the environment (re-read per request). */
 function loadConfig(): GuardConfig {
+    const now = Date.now();
     return {
         secret: process.env.POLARIS_AUTH_SECRET ?? "",
         authorizeUrl: (process.env.POLARIS_PUBLIC_URL ?? "").replace(/\/+$/, ""),
         cookieName: process.env.POLARIS_EDGE_COOKIE ?? "polaris.edge",
-        now: Math.floor(Date.now() / 1000)
+        now: Math.floor(now / 1000),
+        intel: intel.current(now)
     };
 }
 
