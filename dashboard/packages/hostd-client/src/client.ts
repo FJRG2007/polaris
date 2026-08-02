@@ -237,6 +237,17 @@ export class HostdClient {
         return this.callStream("POST", "/v1/deploy/volume/wipe", JSON.stringify({ container, path }));
     }
 
+    /** Run a command inside a container to completion, resolving its exit code
+     *  and combined output. For work whose result the caller has to act on -
+     *  unlike the interactive exec below, which only streams. */
+    public async execRun(container: string, argv: string[]): Promise<{ code: number; output: string }> {
+        const response = await this.call("POST", "/v1/deploy/exec/run", JSON.stringify({ container, argv }));
+        if (response.status !== 200) throw new Error(daemonMessage("exec", response));
+        const parsed = JSON.parse(response.body) as { code?: unknown; output?: unknown };
+        if (typeof parsed.code !== "number") throw new Error("the host daemon returned no exit status");
+        return { code: parsed.code, output: typeof parsed.output === "string" ? parsed.output : "" };
+    }
+
     /** Create an interactive exec in a container; returns the exec id. */
     public async execCreate(spec: {
         container: string;

@@ -125,3 +125,17 @@ body {
 .hljs-strong {
     font-weight: 600;
 }
+
+/*
+ * MariaDB's mark is a near-black teal (#003545), which vanishes on the dark
+ * theme's surfaces. The project publishes a white variant for exactly this, so
+ * the mark is white by default and returns to the brand color under the light
+ * theme. Every other engine's color reads on both and is set inline.
+ */
+.db-mark-mariadb {
+    color: #ffffff;
+}
+
+:root.light .db-mark-mariadb {
+    color: #003545;
+}

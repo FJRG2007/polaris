@@ -9,7 +9,7 @@
 import type { Client } from "ssh2";
 import { parseDuKilobytes } from "./ports-hostd";
 import { execCommand, openShell, openSshClient, type SshAuth } from "@polaris/ssh";
-import { quoteArg, renderComposeYaml, type ComposeSpec, type ExecSpec, type ExecStream, type LogOptions, type MountTarget, type OutputSink, type RuntimePorts } from "@polaris/deploy";
+import { quoteArg, renderComposeYaml, type ComposeSpec, type ExecResult, type ExecSpec, type ExecStream, type LogOptions, type MountTarget, type OutputSink, type RuntimePorts } from "@polaris/deploy";
 
 /** Where compose files and volume data live on a managed remote server. */
 const REMOTE_DEPLOY_ROOT = "/var/lib/polaris/deploy";
@@ -243,6 +243,17 @@ export class SshPorts implements RuntimePorts {
     public async dispose(): Promise<void> {
         this.client?.end();
         this.client = undefined;
+    }
+
+    public async runIn(container: string, argv: readonly string[]): Promise<ExecResult> {
+        const command = ["docker", "exec", quoteArg(container), ...argv.map(quoteArg)].join(" ");
+        const client = await this.connect();
+        let output = "";
+        const collect = (chunk: Buffer): void => {
+            output += chunk.toString("utf8");
+        };
+        const result = await execCommand(client, command, { onStdout: collect, onStderr: collect });
+        return { code: result.code, output };
     }
 
     private async run(command: string, onOutput?: OutputSink): Promise<void> {

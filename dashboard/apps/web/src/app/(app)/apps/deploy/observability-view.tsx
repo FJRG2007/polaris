@@ -16,8 +16,10 @@
 import Link from "next/link";
 import { useState } from "react";
 import { Button, cn } from "@polaris/ui";
+import { dbEngineLabel } from "@polaris/core";
 import { dbTone, StatusPill } from "./deploy-view";
-import { Activity, ChevronDown, Database, Layers } from "lucide-react";
+import { DbEngineIcon } from "@/components/db-engine-icon";
+import { Activity, ChevronDown, Layers } from "lucide-react";
 import { MetricsHistory, percent, ratioPercent, type MetricSpec } from "@/components/metrics-history";
 
 interface ServiceRef {
@@ -176,10 +178,10 @@ export function ObservabilityView({
                                         className="flex items-center justify-between gap-3 border-b border-border/40 px-3 py-2 last:border-0"
                                     >
                                         <span className="flex min-w-0 items-center gap-2">
-                                            <Database className="size-3.5 shrink-0 text-accent" />
+                                            <DbEngineIcon engine={database.engine} className="size-5" />
                                             <span className="truncate text-sm">{database.name}</span>
                                             <span className="shrink-0 text-xs text-muted-foreground">
-                                                {database.engine}
+                                                {dbEngineLabel(database.engine)}
                                             </span>
                                         </span>
                                         <StatusPill tone={dbTone(database.status)} label={database.status} />

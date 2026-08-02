@@ -114,7 +114,10 @@ export async function getProjectFull(projectId: string, ownerId: string) {
                     applications: {
                         include: { domains: true, target: true, volumes: { include: { connection: { select: { name: true } } } } }
                     },
-                    databases: true
+                    // The child count comes along so the screen can say, before an
+                    // instance is removed, that the databases hosted inside it go
+                    // with it - the one thing about this that is not recoverable.
+                    databases: { include: { _count: { select: { children: true } } } }
                 },
                 orderBy: { createdAt: "asc" }
             }

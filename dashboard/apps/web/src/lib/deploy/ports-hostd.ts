@@ -7,7 +7,7 @@
 
 import type { Readable } from "node:stream";
 import { HostdClient } from "@polaris/hostd-client";
-import type { BuildRequest, ComposeSpec, ExecSpec, ExecStream, LogOptions, MountTarget, OutputSink, RuntimePorts } from "@polaris/deploy";
+import type { BuildRequest, ComposeSpec, ExecResult, ExecSpec, ExecStream, LogOptions, MountTarget, OutputSink, RuntimePorts } from "@polaris/deploy";
 
 export class HostdPorts implements RuntimePorts {
     private readonly client = new HostdClient();
@@ -127,6 +127,10 @@ export class HostdPorts implements RuntimePorts {
                 socket.destroy();
             }
         };
+    }
+
+    public async runIn(container: string, argv: readonly string[]): Promise<ExecResult> {
+        return this.client.execRun(container, [...argv]);
     }
 
     public async dispose(): Promise<void> {

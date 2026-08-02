@@ -125,7 +125,9 @@ export default async function DeployProjectPage({
                 id: database.id,
                 name: database.name,
                 engine: database.engine,
-                status: database.status
+                status: database.status,
+                hostedOnInstance: database.parentId !== null,
+                hostedCount: database._count.children
             }))
         }))
     };

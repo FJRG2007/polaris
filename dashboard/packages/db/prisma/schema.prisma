@@ -1885,6 +1885,12 @@ model ManagedDatabase {
     containerName       String
     // Optional published TCP port for external access via a per-db forwarder.
     exposePort          Int?
+    // Set when this is a logical database living inside another instance's
+    // container rather than one of its own. It then has no image, volume or
+    // container: it is reached through its parent's, with its own credentials.
+    parentId            String?  @db.Uuid
+    // How much the database's own user may do inside it: owner | readwrite | readonly.
+    privileges          String   @default("owner")
     // Envelope-encrypted generated credentials (JSON: user/password/database).
     encryptedCredential Bytes?
     credentialNonce     Bytes?
@@ -1893,11 +1899,16 @@ model ManagedDatabase {
     createdAt           DateTime @default(now())
     updatedAt           DateTime @updatedAt
 
-    environment Environment  @relation(fields: [environmentId], references: [id], onDelete: Cascade)
-    target      DeployTarget @relation(fields: [targetId], references: [id], onDelete: Cascade)
+    environment Environment       @relation(fields: [environmentId], references: [id], onDelete: Cascade)
+    target      DeployTarget      @relation(fields: [targetId], references: [id], onDelete: Cascade)
+    // Removing an instance removes the databases that only existed inside it;
+    // there is nothing left for them to be reached through.
+    parent      ManagedDatabase?  @relation("DatabaseInstance", fields: [parentId], references: [id], onDelete: Cascade)
+    children    ManagedDatabase[] @relation("DatabaseInstance")
 
     @@unique([environmentId, slug])
     @@index([targetId])
+    @@index([parentId])
 }
 
 // One deploy run: a status row plus a pointer to its streamed log file. The log

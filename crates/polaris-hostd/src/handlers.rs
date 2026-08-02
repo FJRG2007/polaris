@@ -136,6 +136,13 @@ struct FsReadRequest {
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
+struct ExecRunRequest {
+    container: String,
+    argv: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct VolumeWipeRequest {
     container: String,
     path: String,
@@ -189,6 +196,7 @@ pub fn dispatch<R: Read>(state: &AppState, req: &Request, body: &mut R) -> Respo
         ("POST", "/v1/deploy/logs") => deploy_logs(state, req, body),
         ("POST", "/v1/deploy/build") => deploy_build(state, req, body),
         ("POST", "/v1/deploy/exec/create") => deploy_exec_create(state, req, body),
+        ("POST", "/v1/deploy/exec/run") => deploy_exec_run(req, body),
         ("POST", "/v1/deploy/exec/resize") => deploy_exec_resize(state, req, body),
         ("POST", "/v1/deploy/fs/read") => deploy_fs_read(req, body),
         ("POST", "/v1/deploy/fs/write") => deploy_fs_write(state, req, body),
@@ -650,6 +658,72 @@ fn deploy_fs_read<R: Read>(req: &Request, body: &mut R) -> Response {
             .with_header("Content-Type", "application/octet-stream"),
         Err(_) => Response::text(502, "Bad Gateway", "could not run the command"),
     }
+}
+
+/// The most output a one-shot exec may report back. These commands answer with a
+/// status line or an error, so anything past this is a runaway, not a result.
+const EXEC_RUN_MAX_OUTPUT: usize = 16 * 1024;
+
+/// Run a command inside a container, wait for it, and report how it went.
+///
+/// The interactive endpoint above already opens an arbitrary command in a
+/// container, so this grants nothing new; what it adds is an answer a caller can
+/// act on - the exit status and the output - which a streamed exec does not
+/// give. Provisioning a database inside an engine that is already running is
+/// what needs it: the caller has to know whether `CREATE DATABASE` worked.
+fn deploy_exec_run<R: Read>(req: &Request, body: &mut R) -> Response {
+    let raw = match read_control_body(req, body) {
+        Ok(b) => b,
+        Err(resp) => return resp,
+    };
+    let request: ExecRunRequest = match serde_json::from_slice(&raw) {
+        Ok(r) => r,
+        Err(_) => return Response::bad_request("invalid exec run request"),
+    };
+    if !deploy::valid_container_ref(&request.container) {
+        return Response::bad_request("invalid container reference");
+    }
+    if request.argv.is_empty() || request.argv.len() > 32 {
+        return Response::bad_request("argv must have 1-32 elements");
+    }
+    for arg in &request.argv {
+        if arg.len() > 16384 || arg.bytes().any(|b| b == 0) {
+            return Response::bad_request("argv element too long or contains a NUL");
+        }
+    }
+    match run_in_container(&request.container, &request.argv) {
+        Ok((code, output)) => {
+            let body = serde_json::json!({ "code": code, "output": output });
+            Response::json(200, "OK", &body)
+        }
+        Err(error) => Response::text(502, "Bad Gateway", &format!("could not run the command: {error}"))
+    }
+}
+
+/// `docker exec` the argv and collect what it said. stdout and stderr are joined
+/// because the caller wants the reason a statement was refused, and engines put
+/// that on either stream depending on the client.
+#[cfg(unix)]
+fn run_in_container(container: &str, argv: &[String]) -> std::io::Result<(i32, String)> {
+    use std::process::Command;
+    let mut cmd = Command::new("docker");
+    cmd.arg("exec").arg(container);
+    for arg in argv {
+        cmd.arg(arg);
+    }
+    let output = cmd.output()?;
+    let mut text = String::from_utf8_lossy(&output.stdout).into_owned();
+    text.push_str(&String::from_utf8_lossy(&output.stderr));
+    text.truncate(EXEC_RUN_MAX_OUTPUT);
+    Ok((output.status.code().unwrap_or(-1), text))
+}
+
+#[cfg(not(unix))]
+fn run_in_container(_container: &str, _argv: &[String]) -> std::io::Result<(i32, String)> {
+    Err(std::io::Error::new(
+        std::io::ErrorKind::Unsupported,
+        "exec is only supported on unix hosts"
+    ))
 }
 
 /// Write a file inside a container: stream the request body to the path via

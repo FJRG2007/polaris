@@ -40,6 +40,7 @@ export type {
     RuntimePorts,
     OutputSink,
     BuildRequest,
+    ExecResult,
     ExecSpec,
     ExecStream,
     LogOptions

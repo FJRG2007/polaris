@@ -14,6 +14,7 @@ import * as deployActions from "./actions";
 import { TerminalPanel } from "./terminal-panel";
 import { LogViewer } from "@/components/log-viewer";
 import { externalGitUrl } from "@/lib/repo-reference";
+import { DbEngineIcon } from "@/components/db-engine-icon";
 import { isLocalDomain, primaryDomain } from "./domain-rank";
 import { stageDatabaseDeleteAction } from "./project-actions";
 import { DockerMark, GitHubMark } from "@/components/brand-icons";
@@ -27,21 +28,13 @@ import {
     type ReactNode
 } from "react";
 import {
-    ArrowLeft,
-    ChevronRight,
-    Database,
-    FolderOpen,
-    GitBranch,
-    Globe,
-    Loader2,
-    Lock,
-    Plus,
-    RefreshCw,
-    Rocket,
-    Search,
-    TerminalSquare,
-    Trash2
-} from "lucide-react";
+    databaseCreateSchema,
+    dbEngineLabel,
+    DB_ENGINES,
+    DB_ENGINE_INFO,
+    type DatabaseCreateInput,
+    type DbEngine
+} from "@polaris/core";
 import {
     Badge,
     Button,
@@ -57,14 +50,36 @@ import {
     Switch,
     type SelectOption
 } from "@polaris/ui";
-
-const DB_ENGINES = ["postgres", "mysql", "mariadb", "mongo", "redis"] as const;
+import {
+    ArrowLeft,
+    CheckCircle2,
+    ChevronRight,
+    Copy,
+    Database,
+    Eye,
+    EyeOff,
+    FolderOpen,
+    GitBranch,
+    Globe,
+    Loader2,
+    Lock,
+    Plug,
+    Plus,
+    RefreshCw,
+    Rocket,
+    Search,
+    TerminalSquare,
+    Trash2
+} from "lucide-react";
 
 const ENGINE_OPTIONS: SelectOption[] = DB_ENGINES.map((engine) => ({
     value: engine,
-    label: engine,
-    icon: <Database className="size-4 text-muted-foreground" />
+    label: DB_ENGINE_INFO[engine].label,
+    icon: <DbEngineIcon engine={engine} className="size-5" />
 }));
+
+type DbInstance = Awaited<ReturnType<typeof deployActions.listDatabaseInstancesAction>>[number];
+type DbConnection = NonNullable<Awaited<ReturnType<typeof deployActions.databaseConnectionAction>>["connection"]>;
 
 /** The dotted board texture shared with the canvas, for empty states. */
 const DOT_BG: React.CSSProperties = {
@@ -124,7 +139,18 @@ export interface ProjectSummary {
                 sizeLimit: string | null;
             }[];
         }[];
-        databases: { id: string; name: string; engine: string; status: string }[];
+        databases: {
+            id: string;
+            name: string;
+            engine: string;
+            status: string;
+            /** True when this is a database living inside another instance rather
+             *  than a container of its own. */
+            hostedOnInstance?: boolean;
+            /** How many databases are hosted inside this one, which is what makes
+             *  removing it destroy more than itself. */
+            hostedCount?: number;
+        }[];
     }[];
 }
 
@@ -382,6 +408,7 @@ function DatabaseCard({
 }) {
     const [pending, startTransition] = useTransition();
     const [confirming, setConfirming] = useState(false);
+    const [connecting, setConnecting] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     function remove() {
@@ -405,9 +432,7 @@ function DatabaseCard({
         >
             <div className="flex items-start justify-between gap-2">
                 <div className="flex min-w-0 items-center gap-2.5">
-                    <span className="grid size-7 shrink-0 place-items-center rounded-md border border-border bg-surface text-accent">
-                        <Database className="size-3.5" />
-                    </span>
+                    <DbEngineIcon engine={database.engine} />
                     <span className="truncate text-sm font-medium">{database.name}</span>
                 </div>
                 <StatusPill tone={dbTone(database.status)} label={database.status} />
@@ -419,7 +444,13 @@ function DatabaseCard({
                         Removal pending
                     </span>
                 )}
-                <Badge>{database.engine}</Badge>
+                <Badge>{dbEngineLabel(database.engine)}</Badge>
+                {database.hostedOnInstance && <Badge>On a shared instance</Badge>}
+                {database.hostedCount ? (
+                    <Badge>
+                        Hosts {database.hostedCount} {database.hostedCount === 1 ? "database" : "databases"}
+                    </Badge>
+                ) : null}
             </div>
 
             {error && <p className="text-xs text-danger">{error}</p>}
@@ -443,6 +474,15 @@ function DatabaseCard({
                     <Button
                         variant="ghost"
                         size="icon"
+                        title="Connection details"
+                        aria-label="Connection details"
+                        onClick={() => setConnecting(true)}
+                    >
+                        <Plug className="size-4" />
+                    </Button>
+                    <Button
+                        variant="ghost"
+                        size="icon"
                         title={staged ? "Removal pending" : "Delete database"}
                         aria-label="Delete database"
                         disabled={staged}
@@ -453,18 +493,153 @@ function DatabaseCard({
                 </div>
             )}
 
+            <DatabaseConnectionDialog database={database} open={connecting} onOpenChange={setConnecting} />
+
             <ConfirmDeleteDialog
                 open={confirming}
                 onOpenChange={setConfirming}
                 name={database.name}
                 kind="database"
                 confirmLabel="Stage removal"
-                description="The container goes; the named volume holding its data is left on the server so it can still be recovered by hand."
+                description={
+                    database.hostedOnInstance
+                        ? "The database and its user are dropped from the instance hosting them. The instance itself is untouched."
+                        : database.hostedCount
+                          ? `The container goes, and with it the ${database.hostedCount} ${database.hostedCount === 1 ? "database" : "databases"} hosted inside it. The named volume holding the data is left on the server so it can still be recovered by hand.`
+                          : "The container goes; the named volume holding its data is left on the server so it can still be recovered by hand."
+                }
                 error={error}
                 pending={pending}
                 onConfirm={remove}
             />
         </div>
+    );
+}
+
+/**
+ * How to reach a database, once it exists.
+ *
+ * Creating one and then having to work out its address, its user and its
+ * password from three other screens is the gap this closes: the URI is here,
+ * ready to paste into a service's variables, and the password stays hidden until
+ * it is asked for so the panel can be opened in front of somebody.
+ */
+function DatabaseConnectionDialog({
+    database,
+    open,
+    onOpenChange
+}: {
+    database: ProjectDatabase;
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+}) {
+    const [connection, setConnection] = useState<DbConnection | null>(null);
+    const [error, setError] = useState<string | null>(null);
+    const [revealed, setRevealed] = useState(false);
+
+    useEffect(() => {
+        if (!open) return;
+        setConnection(null);
+        setError(null);
+        setRevealed(false);
+        let active = true;
+        void deployActions.databaseConnectionAction(database.id).then((result) => {
+            if (!active) return;
+            if (result.connection) setConnection(result.connection);
+            else setError(result.error ?? "Could not read the connection details");
+        });
+        return () => {
+            active = false;
+        };
+    }, [open, database.id]);
+
+    const hidden = "•".repeat(16);
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="max-w-lg">
+                <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2">
+                        <DbEngineIcon engine={database.engine} className="size-6" />
+                        {database.name}
+                    </DialogTitle>
+                </DialogHeader>
+                {error && <p className="text-sm text-danger">{error}</p>}
+                {!connection && !error && (
+                    <div className="flex justify-center py-8 text-muted-foreground">
+                        <Loader2 className="size-5 animate-spin" />
+                    </div>
+                )}
+                {connection && (
+                    <div className="flex flex-col gap-3">
+                        <Field
+                            label="Connection URI"
+                            hint="Reachable by name from any service in this environment."
+                        >
+                            <CopyRow value={connection.uri} secret={!revealed} />
+                        </Field>
+                        <div className="grid gap-3 sm:grid-cols-2">
+                            <Field label="Host">
+                                <CopyRow value={connection.host} />
+                            </Field>
+                            <Field label="Port">
+                                <CopyRow value={String(connection.port)} />
+                            </Field>
+                            <Field label="Database">
+                                <CopyRow value={connection.database} />
+                            </Field>
+                            <Field label="User">
+                                <CopyRow value={connection.username} />
+                            </Field>
+                        </div>
+                        <Field label="Password">
+                            <CopyRow value={revealed ? connection.password : hidden} copyValue={connection.password} />
+                        </Field>
+                        <div className="flex items-center justify-between gap-2">
+                            <Button variant="ghost" size="sm" onClick={() => setRevealed((value) => !value)}>
+                                {revealed ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                                {revealed ? "Hide password" : "Show password"}
+                            </Button>
+                            {connection.exposedPort && (
+                                <span className="text-xs text-muted-foreground">
+                                    Also published on the server at port {connection.exposedPort}
+                                </span>
+                            )}
+                        </div>
+                    </div>
+                )}
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+/** A read-only value with a copy button, for anything meant to be pasted. */
+function CopyRow({ value, secret, copyValue }: { value: string; secret?: boolean; copyValue?: string }) {
+    const [copied, setCopied] = useState(false);
+    const shown = secret ? value.replace(/:\/\/([^:]*):[^@]*@/, "://$1:********@") : value;
+
+    function copy() {
+        void navigator.clipboard.writeText(copyValue ?? value).then(() => {
+            setCopied(true);
+            setTimeout(() => setCopied(false), 1500);
+        });
+    }
+
+    return (
+        <span className="flex items-center gap-1 rounded-md border border-border bg-surface px-2 py-1.5">
+            <code className="min-w-0 flex-1 truncate font-mono text-xs" title={shown}>
+                {shown}
+            </code>
+            <button
+                type="button"
+                onClick={copy}
+                title="Copy"
+                aria-label="Copy"
+                className="shrink-0 rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            >
+                {copied ? <CheckCircle2 className="size-3.5 text-success" /> : <Copy className="size-3.5" />}
+            </button>
+        </span>
     );
 }
 
@@ -1073,17 +1248,81 @@ function RepoGroup({
     );
 }
 
+/** Picking this means "start an instance of its own", the default. */
+const DEDICATED = "__dedicated__";
+
+const PRIVILEGE_OPTIONS: SelectOption[] = [
+    { value: "owner", label: "Owner - full control of this database" },
+    { value: "readwrite", label: "Read and write - no schema changes" },
+    { value: "readonly", label: "Read only" }
+];
+
 function NewDatabaseForm({ environmentId, onDone }: { environmentId: string; onDone: () => void }) {
     const [name, setName] = useState("");
-    const [engine, setEngine] = useState<(typeof DB_ENGINES)[number]>("postgres");
+    const [engine, setEngine] = useState<DbEngine>("postgres");
     const { servers, serverId, setServerId } = useDeployServers();
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
 
+    // Advanced settings. Each empty value means "whatever the engine or Polaris
+    // would pick", so the plain path stays two fields long.
+    const [advanced, setAdvanced] = useState(false);
+    const [instanceId, setInstanceId] = useState(DEDICATED);
+    const [instances, setInstances] = useState<DbInstance[]>([]);
+    const [version, setVersion] = useState("");
+    const [exposePort, setExposePort] = useState("");
+    const [databaseName, setDatabaseName] = useState("");
+    const [username, setUsername] = useState("");
+    const [password, setPassword] = useState("");
+    const [privileges, setPrivileges] = useState("owner");
+
+    const info = DB_ENGINE_INFO[engine];
+    const hosted = instanceId !== DEDICATED;
+
+    // Which instances this engine could be placed on. Reloaded when the engine
+    // changes, because an instance only hosts databases of its own engine.
+    useEffect(() => {
+        setInstanceId(DEDICATED);
+        if (!info.namedDatabases) {
+            setInstances([]);
+            return;
+        }
+        let active = true;
+        void deployActions.listDatabaseInstancesAction(environmentId, engine).then((rows) => {
+            if (active) setInstances(rows);
+        });
+        return () => {
+            active = false;
+        };
+    }, [environmentId, engine, info.namedDatabases]);
+
+    /** The request as the schema sees it, so the form and the server agree on
+     *  what is valid instead of each having an opinion. */
+    function draft(): DatabaseCreateInput {
+        return {
+            environmentId,
+            name: name.trim(),
+            engine,
+            serverId: hosted ? undefined : serverId,
+            instanceId: hosted ? instanceId : undefined,
+            version: !hosted && version ? version : undefined,
+            exposePort: !hosted && exposePort.trim() ? Number(exposePort) : undefined,
+            databaseName: databaseName.trim() || undefined,
+            username: username.trim() || undefined,
+            password: password || undefined,
+            privileges: privileges as "owner" | "readwrite" | "readonly"
+        };
+    }
+
+    // Validated as it is typed, against the schema the action runs, so a value
+    // the server would refuse is refused here first.
+    const parsed = databaseCreateSchema.safeParse(draft());
+    const issue = name.trim() && !parsed.success ? parsed.error.issues[0] : null;
+
     function submit() {
         setError(null);
         startTransition(async () => {
-            const result = await deployActions.createDatabaseAction({ environmentId, engine, name, serverId });
+            const result = await deployActions.createDatabaseAction(draft());
             if (result.error) setError(result.error);
             else onDone();
         });
@@ -1095,16 +1334,118 @@ function NewDatabaseForm({ environmentId, onDone }: { environmentId: string; onD
                 <Input value={name} onChange={(event) => setName(event.target.value)} placeholder="my-db" autoFocus />
             </Field>
             <Field label="Engine">
-                <Select
-                    value={engine}
-                    onValueChange={(value) => setEngine(value as (typeof DB_ENGINES)[number])}
-                    options={ENGINE_OPTIONS}
-                />
+                <Select value={engine} onValueChange={(value) => setEngine(value as DbEngine)} options={ENGINE_OPTIONS} />
             </Field>
-            <ServerField servers={servers} value={serverId} onChange={setServerId} />
+            {!hosted && <ServerField servers={servers} value={serverId} onChange={setServerId} />}
+
+            <button
+                type="button"
+                onClick={() => setAdvanced((open) => !open)}
+                className="flex items-center gap-1 self-start text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+            >
+                <ChevronRight className={`size-3.5 transition-transform ${advanced ? "rotate-90" : ""}`} />
+                Advanced
+            </button>
+
+            {advanced && (
+                <div className="flex flex-col gap-3 rounded-md border border-border/60 p-3">
+                    {info.namedDatabases && (
+                        <Field
+                            label="Runs on"
+                            hint={
+                                hosted
+                                    ? "Created inside an instance that is already running, sharing its memory and its server."
+                                    : "Starts a container of its own, with its own data volume."
+                            }
+                        >
+                            <Select
+                                value={instanceId}
+                                onValueChange={setInstanceId}
+                                options={[
+                                    { value: DEDICATED, label: `A new ${info.label} instance` },
+                                    ...instances.map((instance) => ({
+                                        value: instance.id,
+                                        label: `${instance.name} (${info.label} ${instance.version}, ${instance.databases} ${instance.databases === 1 ? "database" : "databases"})`
+                                    }))
+                                ]}
+                            />
+                        </Field>
+                    )}
+
+                    {!hosted && (
+                        <>
+                            <Field label="Version">
+                                <Select
+                                    value={version}
+                                    onValueChange={setVersion}
+                                    placeholder="Latest tested"
+                                    options={info.versions.map((entry) => ({
+                                        value: entry,
+                                        label: `${info.label} ${entry}`
+                                    }))}
+                                />
+                            </Field>
+                            <Field
+                                label="Published port"
+                                hint="Blank keeps it reachable only by the services in this environment, which is what most databases want."
+                            >
+                                <Input
+                                    value={exposePort}
+                                    onChange={(event) => setExposePort(event.target.value)}
+                                    placeholder={String(info.port)}
+                                    inputMode="numeric"
+                                    className="w-32"
+                                />
+                            </Field>
+                        </>
+                    )}
+
+                    {info.namedUsers && (
+                        <>
+                            <Field label="Database name" hint="Defaults to the name above.">
+                                <Input
+                                    value={databaseName}
+                                    onChange={(event) => setDatabaseName(event.target.value)}
+                                    placeholder="my_db"
+                                />
+                            </Field>
+                            <Field label="User">
+                                <Input
+                                    value={username}
+                                    onChange={(event) => setUsername(event.target.value)}
+                                    placeholder={hosted ? "my_db" : "polaris"}
+                                />
+                            </Field>
+                            {/* An instance of its own hands its user the engine's
+                                administrative account, so there is nothing to scope
+                                down; the choice only exists on a shared instance. */}
+                            {hosted && (
+                                <Field label="Privileges" hint="What this user may do inside its own database.">
+                                    <Select
+                                        value={privileges}
+                                        onValueChange={setPrivileges}
+                                        options={PRIVILEGE_OPTIONS}
+                                    />
+                                </Field>
+                            )}
+                        </>
+                    )}
+
+                    <Field label="Password" hint="Blank generates a strong one and stores it encrypted.">
+                        <Input
+                            type="password"
+                            value={password}
+                            onChange={(event) => setPassword(event.target.value)}
+                            placeholder="Generated"
+                        />
+                    </Field>
+                </div>
+            )}
+
+            {issue && <p className="text-sm text-warning">{issue.message}</p>}
             {error && <p className="text-sm text-danger">{error}</p>}
             <div className="flex justify-end">
-                <Button onClick={submit} disabled={pending || !name.trim()}>
+                <Button onClick={submit} disabled={pending || !name.trim() || !parsed.success}>
                     {pending && <Loader2 className="size-4 animate-spin" />} Add database
                 </Button>
             </div>

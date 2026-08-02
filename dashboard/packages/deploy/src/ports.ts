@@ -45,6 +45,14 @@ export interface ExecStream {
     close(): Promise<void>;
 }
 
+export interface ExecResult {
+    /** Process exit status; 0 is success, everything else is the engine refusing. */
+    readonly code: number;
+    /** stdout and stderr together, bounded - the reason a statement was refused
+     *  lands on either one depending on the client. */
+    readonly output: string;
+}
+
 export interface LogOptions {
     readonly tail?: number;
     readonly follow?: boolean;
@@ -91,5 +99,10 @@ export interface RuntimePorts {
     wipePath(ref: string, path: string): Promise<void>;
     /** Open an interactive exec/attach stream. */
     exec(spec: ExecSpec): Promise<ExecStream>;
+    /** Run a command inside a container to completion and report how it went.
+     *  The counterpart to `exec` for work whose result decides what happens next -
+     *  provisioning a database inside an engine that is already running has to
+     *  know whether the statement was accepted. */
+    runIn(container: string, argv: readonly string[]): Promise<ExecResult>;
     dispose(): Promise<void>;
 }

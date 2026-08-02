@@ -10,8 +10,10 @@
 
 import { useRouter } from "next/navigation";
 import { primaryDomain } from "./domain-rank";
-import { VolumeDetailDialog } from "./volume-detail";
+import { dbEngineLabel } from "@polaris/core";
 import { useStagedChanges } from "./staged-changes";
+import { VolumeDetailDialog } from "./volume-detail";
+import { DbEngineIcon } from "@/components/db-engine-icon";
 import { duplicateApplicationAction, saveLayoutAction } from "./actions";
 import { NewVolumeDialog, EditVolumeDialog, type EditVolume } from "./volume-form";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -54,6 +56,11 @@ interface CanvasNode {
     id: string;
     name: string;
     kind: ServiceKind;
+    /** Set on a database, so the card carries the engine's own mark rather than
+     *  the generic database glyph every engine would otherwise share. */
+    engine?: string;
+    /** Databases hosted inside this one, which removing it would take with it. */
+    hostedCount?: number;
     subtitle: string;
     tone: Tone;
     statusLabel: string;
@@ -114,10 +121,16 @@ function nodesFromEnvironment(environment: ProjectSummary["environments"][number
         id: database.id,
         name: database.name,
         kind: "database",
-        subtitle: database.engine,
+        engine: database.engine,
+        subtitle: dbEngineLabel(database.engine),
         tone: dbTone(database.status),
         statusLabel: database.status,
-        volume: `${database.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-volume`
+        hostedCount: database.hostedCount ?? 0,
+        // A database living inside another instance has no volume of its own; the
+        // strip under the card would name one that does not exist.
+        volume: database.hostedOnInstance
+            ? undefined
+            : `${database.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-volume`
     }));
     return [...apps, ...databases];
 }
@@ -239,7 +252,12 @@ export function DeployCanvas({
     const router = useRouter();
     const { refresh: refreshStaged } = useStagedChanges();
     const staged = stagedIds ?? new Set<string>();
-    const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string; kind: "service" | "database" } | null>(
+    const [deleteTarget, setDeleteTarget] = useState<{
+        id: string;
+        name: string;
+        kind: "service" | "database";
+        hostedCount?: number;
+    } | null>(
         null
     );
     const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -616,9 +634,13 @@ export function DeployCanvas({
                             >
                                 <div className={`flex flex-1 flex-col p-4 ${removing ? "opacity-60" : ""}`}>
                                     <div className="flex items-center gap-3">
-                                        <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-muted text-foreground">
-                                            <ServiceIcon kind={node.kind} className="size-5" />
-                                        </span>
+                                        {node.engine ? (
+                                            <DbEngineIcon engine={node.engine} className="size-10 rounded-xl" />
+                                        ) : (
+                                            <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-muted text-foreground">
+                                                <ServiceIcon kind={node.kind} className="size-5" />
+                                            </span>
+                                        )}
                                         <span className="min-w-0 flex-1 truncate text-base font-semibold">{node.name}</span>
                                     </div>
                                     <p className="mt-1 truncate text-sm text-muted-foreground">{node.subtitle}</p>
@@ -672,7 +694,8 @@ export function DeployCanvas({
                                                     setDeleteTarget({
                                                         id: node.id,
                                                         name: node.name,
-                                                        kind: app ? "service" : "database"
+                                                        kind: app ? "service" : "database",
+                                                        hostedCount: node.hostedCount ?? 0
                                                     })
                                                 }
                                             >
@@ -757,7 +780,9 @@ export function DeployCanvas({
                 kind={deleteTarget?.kind ?? "service"}
                 description={
                     deleteTarget?.kind === "database"
-                        ? "The container goes; the named volume holding its data is left on the server so it can still be recovered by hand."
+                        ? deleteTarget.hostedCount
+                            ? `The container goes, and with it the ${deleteTarget.hostedCount} ${deleteTarget.hostedCount === 1 ? "database" : "databases"} hosted inside it. The named volume holding the data is left on the server so it can still be recovered by hand.`
+                            : "The container goes; the named volume holding its data is left on the server so it can still be recovered by hand."
                         : "This removes the service, its container, domains, and variables."
                 }
                 confirmLabel="Stage removal"

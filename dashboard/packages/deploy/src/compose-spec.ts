@@ -140,6 +140,7 @@ export function dbComposeSpec(plan: DbDeployPlan, network: string): ComposeSpec 
                 image: plan.image,
                 pullPolicy: "always",
                 env: { ...plan.env },
+                command: plan.command ? [...plan.command] : undefined,
                 ports,
                 volumes: [{ source: plan.volumeName, target: plan.dataPath, kind: "volume" }],
                 labels: {},

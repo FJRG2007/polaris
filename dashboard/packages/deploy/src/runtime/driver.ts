@@ -6,9 +6,9 @@
  * the implementations and the deploy pipeline that calls them come in P3/P5.
  */
 
+import type { BuildInput } from "../builders/types.js";
 import type { RuntimePorts, OutputSink } from "../ports.js";
 import type { TraefikDomain, TraefikWaf } from "../traefik.js";
-import type { BuildInput } from "../builders/types.js";
 
 export type RuntimeEngine = "compose" | "swarm";
 
@@ -99,6 +99,9 @@ export interface DbDeployPlan {
     readonly ref: ServiceRef;
     readonly image: string;
     readonly env: Readonly<Record<string, string>>;
+    /** Entrypoint arguments, for an engine whose image takes its configuration
+     *  there rather than from the environment. */
+    readonly command?: readonly string[];
     readonly volumeName: string;
     readonly dataPath: string;
     readonly exposePort?: number;

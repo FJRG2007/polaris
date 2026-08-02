@@ -23,7 +23,6 @@ import { getFlagsForEnvironment } from "@/lib/deploy-project-service";
 import { ensurePublicIp, getDomainConfig } from "@/lib/domain-service";
 import { getWafRule, setWafRule, type WafRuleView } from "@/lib/waf-service";
 import { provisionHostnameDns, type HostnameDnsResult } from "@/lib/domain-dns";
-import { createDatabase, deployDatabase, type DbEngine } from "@/lib/database-service";
 import { getOrCreateLocalTarget, getOrCreateHostTarget } from "@/lib/deploy-target-service";
 import { listVolumes, createVolume, updateVolume, deleteVolume, type VolumeView } from "@/lib/deploy-volume-service";
 import {
@@ -43,18 +42,19 @@ import {
     type NgrokTunnelStatus
 } from "@/lib/deploy/ngrok-tunnel-service";
 import {
-    canHostMount,
-    normalizeRelPath,
-    type DeployVolumeInput,
-    type DeployVolumeUpdateInput,
-    type StorageProviderKind
-} from "@polaris/core";
-import {
     deleteRegistryCredential,
     listRegistryCredentials,
     upsertRegistryCredential,
     type RegistryCredentialView
 } from "@/lib/registry-credential-service";
+import {
+    createDatabase,
+    databaseConnection,
+    deployDatabase,
+    listDatabaseInstances,
+    type DatabaseConnection,
+    type DbEngine
+} from "@/lib/database-service";
 import {
     deleteEnvVar,
     listEnvVars,
@@ -82,8 +82,16 @@ import {
     stopNamedTunnel,
     type NamedTunnelStatus
 } from "@/lib/deploy/named-tunnel-service";
-
-const DB_ENGINES: DbEngine[] = ["postgres", "mysql", "mariadb", "mongo", "redis"];
+import {
+    canHostMount,
+    databaseCreateSchema,
+    DB_ENGINES,
+    normalizeRelPath,
+    type DatabaseCreateInput,
+    type DeployVolumeInput,
+    type DeployVolumeUpdateInput,
+    type StorageProviderKind
+} from "@polaris/core";
 
 const DEPLOY_PATH = "/apps/deploy";
 
@@ -771,38 +779,50 @@ export async function stopNamedTunnelAction(applicationId: string): Promise<{ er
     }
 }
 
-export async function createDatabaseAction(input: {
-    environmentId: string;
-    engine: string;
-    name: string;
-    version?: string;
-    serverId?: string;
-}): Promise<{ error?: string }> {
+export async function createDatabaseAction(input: DatabaseCreateInput): Promise<{ error?: string }> {
     const user = await requirePermission("deploy.manage");
-    const name = input.name?.trim();
-    if (!name) return { error: "A database name is required" };
-    if (!DB_ENGINES.includes(input.engine as DbEngine)) return { error: "Unsupported database engine" };
+    const parsed = databaseCreateSchema.safeParse(input);
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "That database configuration is not valid" };
+    const { serverId, ...settings } = parsed.data;
     try {
         let target;
-        if (input.serverId && input.serverId !== "local") {
-            const host = (await listHosts(user.id)).find((item) => item.id === input.serverId);
+        if (serverId && serverId !== "local") {
+            const host = (await listHosts(user.id)).find((item) => item.id === serverId);
             if (!host) return { error: "The selected server was not found" };
             target = await getOrCreateHostTarget(host.id, user.id, host.name);
         } else {
             target = await getOrCreateLocalTarget(user.id);
         }
-        const database = await createDatabase(user.id, {
-            environmentId: input.environmentId,
-            targetId: target.id,
-            engine: input.engine as DbEngine,
-            name,
-            version: input.version
-        });
+        const database = await createDatabase(user.id, { ...settings, targetId: target.id });
         await recordAudit({ actorId: user.id, action: "deploy.db.create", targetType: "database", targetId: database.id });
         revalidatePath(DEPLOY_PATH);
         return {};
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Could not create the database" };
+    }
+}
+
+/** Instances in this environment a new database of `engine` could be created
+ *  inside, so the form can offer sharing one instead of starting another. */
+export async function listDatabaseInstancesAction(
+    environmentId: string,
+    engine: string
+): Promise<{ id: string; name: string; version: string; status: string; databases: number }[]> {
+    const user = await requirePermission("deploy.read");
+    if (!DB_ENGINES.includes(engine as DbEngine)) return [];
+    return listDatabaseInstances(environmentId, engine as DbEngine, user.id);
+}
+
+/** A database's address and credentials. Gated on deploy.manage rather than
+ *  deploy.read: this hands out the password, not a description of it. */
+export async function databaseConnectionAction(
+    databaseId: string
+): Promise<{ error?: string; connection?: DatabaseConnection }> {
+    const user = await requirePermission("deploy.manage");
+    try {
+        return { connection: await databaseConnection(databaseId, user.id) };
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not read the connection details" };
     }
 }
 
