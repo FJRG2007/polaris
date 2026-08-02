@@ -515,7 +515,7 @@ export function SettingsView({
                             <>
                                 <TriangleAlert className="size-4 text-warning" />
                                 <span>
-                                    The newest commit failed its checks, so it is not offered to install.{" "}
+                                    The build this would install failed its checks.{" "}
                                     {status.checksUrl ? (
                                         <a
                                             className="text-primary hover:underline"

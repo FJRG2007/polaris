@@ -25,6 +25,12 @@
  * exists. So a failed commit is reported as such instead of being offered, and a
  * branch waiting on a build that will never come is not called "building".
  *
+ * Only the suites behind the image being offered count, though. One commit builds
+ * several images from one repository, and judging the dashboard by a host-daemon
+ * failure blocks an install that failure has no bearing on - permanently, because
+ * the commits that fix it rebuild no dashboard image, so the tag never moves off
+ * the commit that is being held against it.
+ *
  * GitHub is best-effort throughout: the registry alone decides whether an update
  * exists, so a rate-limited or unreachable API costs the commit count, the
  * building hint and the CI verdict, never the answer.
@@ -72,7 +78,8 @@ export interface UpdateStatus {
     readonly buildingCount: number | null;
     /** When the published image was built (ISO 8601), when the registry records it. */
     readonly publishedAt: string | null;
-    /** How the newest commit fared in CI, or null when GitHub could not say. */
+    /** How the commit an update would install fared in the suites that gate it,
+     *  or null when GitHub could not say. */
     readonly checks: ChecksVerdict | null;
     /** The run to look at, when the checks failed. */
     readonly checksUrl: string | null;
@@ -93,6 +100,15 @@ const CACHE_TTL_MS = 10 * 60 * 1000;
  *  never produces a new image" - a daemon-only or docs commit is not an update. */
 const WEB_IMAGE_PATHS =
     /^dashboard\/(apps|packages|cli|patches)\/|^dashboard\/docker\/(Dockerfile|entrypoint\.sh)|^dashboard\/package(-lock)?\.json$|^\.github\/workflows\/dashboard-publish\.yml$/;
+
+/** Check runs that decide whether the dashboard image is safe to install
+ *  (mirrors dashboard-publish.yml: `web` needs `changes` and `dashboard-ci`, the
+ *  latter being dashboard-ci.yml's `build` job - named bare when it runs on the
+ *  push and prefixed when the publish calls it). `rust-ci` gates the host daemon
+ *  and every other image job gates its own image, so a failure there says nothing
+ *  about this one; letting it veto pinned a deployment to a commit it could never
+ *  move off, because the commits that fixed it rebuilt no dashboard image. */
+const WEB_IMAGE_CHECKS = /^(changes|web|build|dashboard-ci \/ .+)$/;
 
 let cache: { status: UpdateStatus; at: number; } | null = null;
 let inflight: Promise<UpdateStatus> | null = null;
@@ -157,13 +173,25 @@ interface ChecksResult {
  * yet, and a skipped job is one the push did not need - most of a publish is
  * skipped on any given commit, so treating that as anything but fine would call
  * every commit broken.
+ *
+ * `gates` narrows the answer to the suites that produce the artefact being
+ * offered. Without it every run counts, which is what a host building the whole
+ * checkout needs; with it, a suite covering a different artefact cannot veto
+ * this one. Filtering everything out is the same as finding nothing: unjudged,
+ * not failed.
  */
-async function checksFor(repo: string, ref: string): Promise<ChecksResult | null> {
+async function checksFor(repo: string, ref: string, gates?: RegExp): Promise<ChecksResult | null> {
     try {
         const data = (await github(`/repos/${repo}/commits/${encodeURIComponent(ref)}/check-runs?per_page=100`)) as {
-            check_runs?: { status?: string; conclusion?: string | null; html_url?: string | null; }[];
+            check_runs?: {
+                name?: string;
+                status?: string;
+                conclusion?: string | null;
+                html_url?: string | null;
+            }[];
         };
-        const runs = data.check_runs ?? [];
+        const all = data.check_runs ?? [];
+        const runs = gates ? all.filter((run) => gates.test(run.name ?? "")) : all;
         if (runs.length === 0) return null;
         const failed = runs.find((run) => run.conclusion === "failure" || run.conclusion === "timed_out");
         if (failed) return { verdict: "failed", url: failed.html_url ?? null };
@@ -279,7 +307,7 @@ async function query(): Promise<UpdateStatus> {
         // A commit that failed its suites is not a build on its way: publishing
         // waits on them, so no image is coming and "still building" would be a
         // wait with nothing at the end of it.
-        const checks = building ? await checksFor(repo, branch) : null;
+        const checks = building ? await checksFor(repo, branch, WEB_IMAGE_CHECKS) : null;
         const blocked = checks?.verdict === "failed";
         return {
             ...base,
@@ -301,7 +329,7 @@ async function query(): Promise<UpdateStatus> {
     }
     // There is something to install; whether it should be installed is the last
     // question, and only a verdict that came back failed answers it no.
-    const checks = await checksFor(repo, target);
+    const checks = await checksFor(repo, target, WEB_IMAGE_CHECKS);
     return {
         ...base,
         phase: checks?.verdict === "failed" ? "blocked" : "available",

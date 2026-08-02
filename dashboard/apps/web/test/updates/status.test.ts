@@ -33,6 +33,8 @@ interface Compare {
 
 /** One entry of a check-runs response. */
 interface CheckRun {
+    /** The job name, which is what says which image the run gates. */
+    readonly name?: string;
     readonly status: string;
     readonly conclusion: string | null;
     readonly html_url?: string;
@@ -160,12 +162,19 @@ describe("what counts as an update", () => {
 
 describe("a commit that failed its checks", () => {
     const PASSED: CheckRun[] = [
-        { status: "completed", conclusion: "success" },
-        { status: "completed", conclusion: "skipped" }
+        { name: "changes", status: "completed", conclusion: "success" },
+        { name: "dashboard-ci / build", status: "completed", conclusion: "success" },
+        // A job the push did not need is not a job that failed.
+        { name: "web", status: "completed", conclusion: "skipped" }
     ];
     const FAILED: CheckRun[] = [
-        { status: "completed", conclusion: "success" },
-        { status: "completed", conclusion: "failure", html_url: "https://github.com/o/p/actions/runs/1/job/2" }
+        { name: "changes", status: "completed", conclusion: "success" },
+        {
+            name: "dashboard-ci / build",
+            status: "completed",
+            conclusion: "failure",
+            html_url: "https://github.com/o/p/actions/runs/1/job/2"
+        }
     ];
 
     it("is not offered, even with the image already published", async () => {
@@ -206,11 +215,89 @@ describe("a commit that failed its checks", () => {
         const status = await check({
             published: IMAGE(NEWER),
             compare: { status: "ahead", ahead_by: 1 },
-            checks: [{ status: "in_progress", conclusion: null }]
+            checks: [{ name: "dashboard-ci / build", status: "in_progress", conclusion: null }]
         });
 
         expect(status.phase).toBe("available");
         expect(status.checks).toBe("running");
+    });
+});
+
+/**
+ * One commit builds several images. The dashboard is gated on its own suites, so
+ * a host-daemon failure on the same commit must not hold it back - and holding it
+ * back was permanent, because the commits that fix the daemon rebuild no dashboard
+ * image, leaving the tag parked on the commit being held against it.
+ */
+describe("a failure that belongs to another image", () => {
+    // The exact run names GitHub reported for the commit this was found on: the
+    // dashboard image built and published, the host daemon failed its formatting
+    // gate, and the card refused to offer the image because of it.
+    it("does not block the dashboard image", async () => {
+        const status = await check({
+            published: IMAGE(NEWER),
+            compare: { status: "ahead", ahead_by: 1 },
+            checks: [
+                { name: "bridge", status: "completed", conclusion: "skipped" },
+                { name: "web", status: "completed", conclusion: "success" },
+                { name: "hostd-manifest", status: "completed", conclusion: "skipped" },
+                { name: "hostd", status: "completed", conclusion: "skipped" },
+                { name: "updater", status: "completed", conclusion: "skipped" },
+                { name: "mdns", status: "completed", conclusion: "skipped" },
+                { name: "rust-ci / python", status: "completed", conclusion: "success" },
+                { name: "rust-ci / rust", status: "completed", conclusion: "failure", html_url: "https://ci/rust" },
+                { name: "dashboard-ci / build", status: "completed", conclusion: "success" },
+                { name: "changes", status: "completed", conclusion: "success" },
+                { name: "rust", status: "completed", conclusion: "failure", html_url: "https://ci/rust" },
+                { name: "python", status: "completed", conclusion: "success" },
+                { name: "build", status: "completed", conclusion: "success" }
+            ]
+        });
+
+        expect(status.phase).toBe("available");
+        expect(status.checks).toBe("passed");
+        expect(status.checksUrl).toBeNull();
+    });
+
+    it("still blocks when the failure is the dashboard's own", async () => {
+        const status = await check({
+            published: IMAGE(NEWER),
+            compare: { status: "ahead", ahead_by: 1 },
+            checks: [
+                { name: "rust", status: "completed", conclusion: "success" },
+                { name: "web", status: "completed", conclusion: "failure", html_url: "https://ci/web" }
+            ]
+        });
+
+        expect(status.phase).toBe("blocked");
+        expect(status.checksUrl).toBe("https://ci/web");
+    });
+
+    it("judges a host build by every suite, since it builds the whole checkout", async () => {
+        const status = await check({
+            source: "build",
+            published: IMAGE(RUNNING),
+            head: NEWER,
+            compare: { status: "ahead", ahead_by: 1 },
+            checks: [
+                { name: "web", status: "completed", conclusion: "success" },
+                { name: "rust", status: "completed", conclusion: "failure", html_url: "https://ci/rust" }
+            ]
+        });
+
+        expect(status.phase).toBe("blocked");
+        expect(status.checksUrl).toBe("https://ci/rust");
+    });
+
+    it("treats a commit with no dashboard suite at all as unjudged, not failed", async () => {
+        const status = await check({
+            published: IMAGE(NEWER),
+            compare: { status: "ahead", ahead_by: 1 },
+            checks: [{ name: "rust", status: "completed", conclusion: "failure", html_url: "https://ci/rust" }]
+        });
+
+        expect(status.phase).toBe("available");
+        expect(status.checks).toBeNull();
     });
 });
 
