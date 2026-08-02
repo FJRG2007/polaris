@@ -327,12 +327,18 @@ configure_edition() {
         # it at /run/polaris - which is where the dashboard reads the log from. No `$`
         # in this value, so Compose never tries to interpolate it.
         #
-        # `--pull=always` because `docker run` otherwise reuses whatever copy of
-        # `:latest` the host already has: the updater is the one image no update can
-        # refresh (it is what performs the update), so without this a deployment keeps
-        # running the updater it was installed with forever, and every fix to the
-        # update path lands everywhere except where it is needed.
-        update_cmd="docker rm -f polaris-updater >/dev/null 2>&1; docker run -d --pull=always --name polaris-updater --rm -e POLARIS_HOST_REPO=${host_repo} -e POLARIS_UPDATE_LOG=/run/polaris/update.log -v /var/run/docker.sock:/var/run/docker.sock -v polaris_polaris-run:/run/polaris -v ${host_repo}:/polaris -w /polaris/dashboard ghcr.io/fjrg2007/polaris-updater:latest sh scripts/update.sh"
+        # The explicit `docker pull` is there because `docker run` reuses whatever
+        # copy of `:latest` the host already has: the updater is the one image no
+        # update can refresh (it is what performs the update), so without it a
+        # deployment keeps running the updater it was installed with forever, and
+        # every fix to the update path lands everywhere except where it is needed.
+        #
+        # A pull rather than `--pull=always`, so a fetch that fails falls through to
+        # the copy already here instead of failing the run outright. A deployment
+        # that builds from its own checkout needs no registry at all, and
+        # `--pull=always` would take its update button away whenever ghcr.io is
+        # unreachable.
+        update_cmd="docker rm -f polaris-updater >/dev/null 2>&1; docker pull ghcr.io/fjrg2007/polaris-updater:latest >/dev/null 2>&1 || true; docker run -d --name polaris-updater --rm -e POLARIS_HOST_REPO=${host_repo} -e POLARIS_UPDATE_LOG=/run/polaris/update.log -v /var/run/docker.sock:/var/run/docker.sock -v polaris_polaris-run:/run/polaris -v ${host_repo}:/polaris -w /polaris/dashboard ghcr.io/fjrg2007/polaris-updater:latest sh scripts/update.sh"
         set_env_var "$env_file" "POLARIS_HOSTD_UPDATE_CMD" "$update_cmd"
         log "full edition (privileged host daemon, in-band updates, local Docker host)"
     else
