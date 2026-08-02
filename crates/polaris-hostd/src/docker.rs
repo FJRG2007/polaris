@@ -4,9 +4,9 @@
 //! root-equivalent on the host. Instead the container asks this daemon to
 //! perform a small, fixed set of read and lifecycle operations, and the daemon
 //! forwards only those to the socket. Even a fully compromised web container can
-//! therefore reach nothing beyond listing/inspecting containers and
-//! starting/stopping/restarting them - never `create`, `exec`, image pulls, or
-//! arbitrary bind-mounted runs.
+//! therefore reach nothing beyond listing/inspecting containers, starting,
+//! stopping, restarting and removing them - never `create`, `exec`, image
+//! pulls, or arbitrary bind-mounted runs.
 //!
 //! The request the container sends is a JSON envelope `{ method, path }` rather
 //! than the docker path in the URL, so the query string survives hostd's parser
@@ -67,6 +67,10 @@ pub fn validate<'a>(method: &'a str, path: &'a str) -> Result<AllowedRequest<'a>
         ("POST", ["containers", id, "start"]) => valid_container_id(id),
         ("POST", ["containers", id, "stop"]) => valid_container_id(id),
         ("POST", ["containers", id, "restart"]) => valid_container_id(id),
+        // Removal is destructive but stays within the same boundary as stopping:
+        // it acts on one already-existing container and creates nothing. The
+        // caller decides `force`/`v` in the query string, which is bounded above.
+        ("DELETE", ["containers", id]) => valid_container_id(id),
         _ => false,
     };
     if !allowed {
@@ -231,6 +235,7 @@ mod tests {
         assert!(validate("POST", "/containers/abc123/start").is_ok());
         assert!(validate("POST", "/containers/web.1/stop").is_ok());
         assert!(validate("POST", "/containers/a-b_c/restart").is_ok());
+        assert!(validate("DELETE", "/containers/abc123?force=1&v=0").is_ok());
     }
 
     #[test]
@@ -240,8 +245,13 @@ mod tests {
         assert!(validate("POST", "/containers/abc/exec").is_err());
         assert!(validate("GET", "/images/json").is_err());
         assert!(validate("POST", "/images/create?fromImage=x").is_err());
-        assert!(validate("DELETE", "/containers/abc").is_err());
         assert!(validate("GET", "/containers/abc/logs").is_err());
+        // Removal is allowed for one container, never for the whole collection
+        // or for anything else the DELETE verb reaches.
+        assert!(validate("DELETE", "/containers").is_err());
+        assert!(validate("DELETE", "/containers/abc/json").is_err());
+        assert!(validate("DELETE", "/volumes/data").is_err());
+        assert!(validate("DELETE", "/images/nginx").is_err());
         // Method must match the route.
         assert!(validate("GET", "/containers/abc/start").is_err());
         assert!(validate("POST", "/info").is_err());

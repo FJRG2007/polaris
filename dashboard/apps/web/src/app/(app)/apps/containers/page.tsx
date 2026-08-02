@@ -1,19 +1,12 @@
-import { loadEnv } from "@polaris/config";
-import type { DockerTransport } from "@polaris/docker";
-import { refreshCapabilities } from "@polaris/hostd-client";
 import { PageHeader } from "@polaris/ui";
-import { requireUser, userHasManage } from "@/lib/session";
-import {
-    getDockerDriver,
-    hostDockerDriver,
-    HOST_DOCKER_PREFIX,
-    listDockerConnections,
-    localDockerDriver,
-    LOCAL_DOCKER_CONNECTION_ID
-} from "@/lib/docker-service";
+import { loadEnv } from "@polaris/config";
 import { listHosts } from "@/lib/host-service";
 import { ContainersView } from "./containers-view";
-import type { ContainerRow, DockerConnectionSummary, LocalHostDiagnostic, OverviewData } from "./types";
+import type { DockerTransport } from "@polaris/docker";
+import { requireUser, userHasManage } from "@/lib/session";
+import { refreshCapabilities } from "@polaris/hostd-client";
+import type { DockerConnectionSummary, LocalHostDiagnostic } from "./types";
+import { HOST_DOCKER_PREFIX, listDockerConnections, LOCAL_DOCKER_CONNECTION_ID } from "@/lib/docker-service";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +14,14 @@ function pick(value: string | string[] | undefined): string | undefined {
     return Array.isArray(value) ? value[0] : value;
 }
 
+/**
+ * The Containers shell. Only what the page needs to draw itself is resolved
+ * here - which hosts exist, which one is selected, whether the caller may manage
+ * them - so the navigation paints immediately. The engine itself (an overview, a
+ * container list and a stats sample each) is fetched by the view from
+ * /api/containers, because that round trip can cross a network and must not sit
+ * in front of the first paint.
+ */
 export default async function ContainersPage({
     searchParams
 }: {
@@ -74,64 +75,12 @@ export default async function ContainersPage({
     }));
     const connections = [...localHost, ...stored, ...hostTargets];
 
-    const connectionId = pick(params.c) ?? connections[0]?.id ?? null;
-
-    let overview: OverviewData | null = null;
-    let containers: ContainerRow[] = [];
-    let error: string | null = null;
-
-    const isLocal = connectionId === LOCAL_DOCKER_CONNECTION_ID;
-    const isHost = connectionId?.startsWith(HOST_DOCKER_PREFIX) ?? false;
-    if (connectionId && isLocal && !canManage) {
-        // A non-manager forced ?c=local via the URL: deny, never resolve the driver.
-        error = "You do not have access to the local host.";
-    } else if (connectionId) {
-        try {
-            const driver = isLocal
-                ? localDockerDriver()
-                : isHost
-                  ? await hostDockerDriver(connectionId.slice(HOST_DOCKER_PREFIX.length), user.id)
-                  : await getDockerDriver(connectionId, user.id);
-            try {
-                const info = await driver.info();
-                const list = await driver.listContainers();
-                const samples = await Promise.all(
-                    list.map(async (container) =>
-                        container.state === "running"
-                            ? { id: container.id, stats: await driver.stats(container.id).catch(() => null) }
-                            : { id: container.id, stats: null }
-                    )
-                );
-                const byId = new Map(samples.map((sample) => [sample.id, sample.stats]));
-                containers = list.map((container) => {
-                    const stats = byId.get(container.id) ?? null;
-                    return {
-                        ...container,
-                        cpuPercent: stats?.cpuPercent ?? null,
-                        memUsage: stats?.memUsage ?? null,
-                        memPercent: stats?.memPercent ?? null
-                    };
-                });
-                overview = {
-                    name: info.name,
-                    serverVersion: info.serverVersion,
-                    containers: info.containers,
-                    running: info.containersRunning,
-                    stopped: info.containersStopped,
-                    images: info.images,
-                    ncpu: info.ncpu,
-                    memTotal: info.memTotal,
-                    aggregateCpuPercent:
-                        Math.round(containers.reduce((sum, row) => sum + (row.cpuPercent ?? 0), 0) * 100) / 100,
-                    aggregateMemUsage: containers.reduce((sum, row) => sum + (row.memUsage ?? 0), 0)
-                };
-            } finally {
-                await driver.dispose();
-            }
-        } catch (caught) {
-            error = caught instanceof Error ? caught.message : "Unable to reach this Docker host";
-        }
-    }
+    const requested = pick(params.c);
+    // A non-manager who forced ?c=local via the URL gets the first host they can
+    // actually reach, not a denial for a host they were never shown.
+    const selectable = connections.filter((connection) => !connection.local || canManage);
+    const connectionId =
+        selectable.find((connection) => connection.id === requested)?.id ?? selectable[0]?.id ?? null;
 
     return (
         <>
@@ -143,9 +92,7 @@ export default async function ContainersPage({
                 connections={connections}
                 connectionId={connectionId}
                 sshEnabled={sshEnabled}
-                overview={overview}
-                containers={containers}
-                error={error}
+                canManage={canManage}
                 localDiagnostic={localDiagnostic}
             />
         </>

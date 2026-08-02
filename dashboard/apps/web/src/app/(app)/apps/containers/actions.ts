@@ -8,18 +8,16 @@
  */
 
 import { revalidatePath } from "next/cache";
-import { createDockerConnectionSchema, createDockerDriver } from "@polaris/docker";
 import { requirePermission } from "@/lib/session";
+import { recordAudit } from "@/lib/audit-service";
+import { withDockerDriver } from "@/lib/container-service";
+import { createDockerConnectionSchema, createDockerDriver } from "@polaris/docker";
 import {
     createDockerConnection,
     deleteDockerConnection,
-    getDockerDriver,
-    hostDockerDriver,
     HOST_DOCKER_PREFIX,
-    localDockerDriver,
     LOCAL_DOCKER_CONNECTION_ID
 } from "@/lib/docker-service";
-import { recordAudit } from "@/lib/audit-service";
 
 const CONTAINERS_PATH = "/apps/containers";
 
@@ -75,20 +73,14 @@ export async function containerAction(
     action: "start" | "stop" | "restart"
 ): Promise<{ error?: string }> {
     const user = await requirePermission("system.manage");
-    const driver =
-        connectionId === LOCAL_DOCKER_CONNECTION_ID
-            ? localDockerDriver()
-            : connectionId.startsWith(HOST_DOCKER_PREFIX)
-              ? await hostDockerDriver(connectionId.slice(HOST_DOCKER_PREFIX.length), user.id)
-              : await getDockerDriver(connectionId, user.id);
     try {
-        if (action === "start") await driver.start(containerId);
-        else if (action === "stop") await driver.stop(containerId);
-        else await driver.restart(containerId);
+        await withDockerDriver(connectionId, user.id, async (driver) => {
+            if (action === "start") await driver.start(containerId);
+            else if (action === "stop") await driver.stop(containerId);
+            else await driver.restart(containerId);
+        });
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Action failed" };
-    } finally {
-        await driver.dispose();
     }
     await recordAudit({
         actorId: user.id,
@@ -96,6 +88,34 @@ export async function containerAction(
         targetType: "container",
         targetId: containerId,
         metadata: { connectionId }
+    });
+    revalidatePath(CONTAINERS_PATH);
+    return {};
+}
+
+/**
+ * Remove a container. `force` is what makes removing a running one possible;
+ * named volumes are never touched, and the anonymous ones a container owns go
+ * only when the caller asked - deleting data nobody asked to delete is the one
+ * mistake here that cannot be undone.
+ */
+export async function removeContainerAction(
+    connectionId: string,
+    containerId: string,
+    options: { force: boolean; volumes: boolean }
+): Promise<{ error?: string }> {
+    const user = await requirePermission("system.manage");
+    try {
+        await withDockerDriver(connectionId, user.id, (driver) => driver.remove(containerId, options));
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not remove this container" };
+    }
+    await recordAudit({
+        actorId: user.id,
+        action: "docker.container.remove",
+        targetType: "container",
+        targetId: containerId,
+        metadata: { connectionId, force: options.force, volumes: options.volumes }
     });
     revalidatePath(CONTAINERS_PATH);
     return {};

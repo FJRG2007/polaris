@@ -2,58 +2,146 @@
 
 /**
  * Containers view: a host overview (CPU/memory/counts) and a live table of
- * containers with lifecycle controls. Stats are refreshed on an interval by
- * re-fetching the server component, so a single code path renders both the
- * initial and the updated data. Actions call the server actions, which re-check
+ * containers with lifecycle controls, logs, files, a console and removal.
+ *
+ * The data is fetched from /api/containers rather than server-rendered, so the
+ * host list and the table chrome are on screen before a possibly-remote engine
+ * has answered. The same fetch backs the 5s refresh, so first load and live
+ * updates run one code path. Actions call the server actions, which re-check
  * permission before touching Docker.
  */
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { formatBytes } from "@polaris/core";
+import { useRouter } from "next/navigation";
+import { ContainerPanel } from "./container-panel";
 import { useConfirm } from "@/components/confirm-dialog";
-import { Badge, Button, Card, CardBody, cn } from "@polaris/ui";
 import { DockerConnectionDialog } from "./docker-connection-dialog";
-import { containerAction, deleteDockerConnectionAction } from "./actions";
-import { useEffect, useState, useTransition, type ReactNode } from "react";
-import type { ContainerRow, DockerConnectionSummary, LocalHostDiagnostic, OverviewData } from "./types";
-import { Boxes, Cpu, MemoryStick, Play, RefreshCw, RotateCw, Server, Square, Trash2 } from "lucide-react";
+import { Badge, Button, Card, CardBody, Skeleton, cn } from "@polaris/ui";
+import { useCallback, useEffect, useRef, useState, useTransition, type ReactNode } from "react";
+import { containerAction, deleteDockerConnectionAction, removeContainerAction } from "./actions";
+import type { ContainerRow, DockerConnectionSummary, HostSnapshot, LocalHostDiagnostic, OverviewData } from "./types";
+import {
+    Boxes,
+    Cpu,
+    FileText,
+    MemoryStick,
+    Play,
+    RefreshCw,
+    RotateCw,
+    ScrollText,
+    Server,
+    Square,
+    TerminalSquare,
+    Trash2
+} from "lucide-react";
 
 const REFRESH_MS = 5000;
+
+/** Which tab of the container panel an action opens. */
+type PanelTab = "details" | "logs" | "files" | "console";
 
 export function ContainersView({
     connections,
     connectionId,
     sshEnabled,
-    overview,
-    containers,
-    error,
+    canManage,
     localDiagnostic
 }: {
     connections: DockerConnectionSummary[];
     connectionId: string | null;
     sshEnabled: boolean;
-    overview: OverviewData | null;
-    containers: ContainerRow[];
-    error: string | null;
+    canManage: boolean;
     localDiagnostic: LocalHostDiagnostic | null;
 }) {
     const router = useRouter();
     const [pending, startTransition] = useTransition();
     const [live, setLive] = useState(true);
     const [confirm, confirmDialog] = useConfirm();
+    const [snapshot, setSnapshot] = useState<HostSnapshot | null>(null);
+    const [error, setError] = useState<string | null>(null);
+    const [loading, setLoading] = useState(connectionId !== null);
+    const [panel, setPanel] = useState<{ container: ContainerRow; tab: PanelTab } | null>(null);
+    // A refresh must never overwrite fresher data with a reply that raced it.
+    const requestRef = useRef(0);
 
-    // Poll for fresh stats by re-rendering the server component.
+    const load = useCallback(
+        async (id: string, showSkeleton: boolean) => {
+            const request = ++requestRef.current;
+            if (showSkeleton) setLoading(true);
+            try {
+                const response = await fetch(`/api/containers?c=${encodeURIComponent(id)}`);
+                const payload = (await response.json()) as HostSnapshot & { error?: string };
+                if (request !== requestRef.current) return;
+                if (!response.ok || payload.error) {
+                    setError(payload.error ?? `Could not reach this host (${response.status})`);
+                    setSnapshot(null);
+                } else {
+                    setError(null);
+                    setSnapshot(payload);
+                }
+            } catch {
+                if (request === requestRef.current) {
+                    setError("Could not reach Polaris");
+                    setSnapshot(null);
+                }
+            } finally {
+                if (request === requestRef.current) setLoading(false);
+            }
+        },
+        []
+    );
+
+    // First load for the selected host, and a fresh one whenever it changes.
+    useEffect(() => {
+        if (!connectionId) {
+            setSnapshot(null);
+            setLoading(false);
+            return;
+        }
+        setSnapshot(null);
+        void load(connectionId, true);
+    }, [connectionId, load]);
+
+    // Poll for fresh stats. A silent refresh, so the table never flashes back to
+    // a skeleton once it has data.
     useEffect(() => {
         if (!live || !connectionId) return;
-        const timer = setInterval(() => router.refresh(), REFRESH_MS);
+        const timer = setInterval(() => void load(connectionId, false), REFRESH_MS);
         return () => clearInterval(timer);
-    }, [live, connectionId, router]);
+    }, [live, connectionId, load]);
+
+    const refresh = useCallback(() => {
+        if (connectionId) void load(connectionId, false);
+    }, [connectionId, load]);
 
     function onAction(containerId: string, action: "start" | "stop" | "restart") {
         startTransition(async () => {
-            await containerAction(connectionId!, containerId, action);
-            router.refresh();
+            const result = await containerAction(connectionId!, containerId, action);
+            if (result.error) setError(result.error);
+            refresh();
+        });
+    }
+
+    async function onRemoveContainer(container: ContainerRow) {
+        const running = container.state === "running";
+        const confirmed = await confirm({
+            title: `Remove ${container.name}?`,
+            description: running
+                ? "It is still running, so it will be stopped first. Named volumes and images are left alone."
+                : "Named volumes and images are left alone.",
+            confirmLabel: "Remove",
+            danger: true
+        });
+        if (!confirmed) return;
+        startTransition(async () => {
+            const result = await removeContainerAction(connectionId!, container.id, {
+                force: running,
+                volumes: false
+            });
+            if (result.error) setError(result.error);
+            setPanel((open) => (open?.container.id === container.id ? null : open));
+            refresh();
         });
     }
 
@@ -64,6 +152,8 @@ export function ContainersView({
             router.refresh();
         });
     }
+
+    const containers = snapshot?.containers ?? [];
 
     return (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-[16rem_1fr]">
@@ -95,6 +185,7 @@ export function ContainersView({
                                         variant="ghost"
                                         onClick={() => onDeleteConnection(connection.id)}
                                         aria-label={`Remove ${connection.name}`}
+                                        title={`Remove ${connection.name}`}
                                         className="md:opacity-0 md:group-hover:opacity-100"
                                     >
                                         <Trash2 className="size-4" />
@@ -133,30 +224,31 @@ export function ContainersView({
                             remote engine.
                         </span>
                     </div>
-                ) : error ? (
-                    <div className="rounded-md border border-danger/40 bg-danger/10 p-3 text-sm text-danger">
-                        {error}
-                    </div>
                 ) : (
                     <>
-                        {overview ? (
-                            <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
-                                <Stat icon={<Boxes className="size-4" />} label="Containers" value={`${overview.running}/${overview.containers}`} hint="running / total" />
-                                <Stat icon={<Cpu className="size-4" />} label="CPU (containers)" value={`${overview.aggregateCpuPercent}%`} hint={`${overview.ncpu} cores`} />
-                                <Stat icon={<MemoryStick className="size-4" />} label="Memory (containers)" value={formatBytes(overview.aggregateMemUsage)} hint={`of ${formatBytes(overview.memTotal)}`} />
-                                <Stat icon={<Server className="size-4" />} label="Engine" value={overview.serverVersion || overview.name} hint={overview.name} />
+                        {error ? (
+                            <div className="mb-4 rounded-md border border-danger/40 bg-danger/10 p-3 text-sm text-danger">
+                                {error}
                             </div>
                         ) : null}
 
+                        <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+                            {snapshot ? (
+                                <Overview overview={snapshot.overview} />
+                            ) : (
+                                [0, 1, 2, 3].map((tile) => <Skeleton key={tile} className="h-[5.5rem] rounded-lg" />)
+                            )}
+                        </div>
+
                         <div className="mb-2 flex items-center justify-between">
                             <span className="text-xs text-muted-foreground">
-                                {live ? "Live - refreshing every 5s" : "Paused"}
+                                {loading && !snapshot ? "Loading" : live ? "Live - refreshing every 5s" : "Paused"}
                             </span>
                             <div className="flex items-center gap-2">
                                 <Button size="sm" variant="ghost" onClick={() => setLive((value) => !value)}>
                                     {live ? "Pause" : "Resume"}
                                 </Button>
-                                <Button size="sm" variant="ghost" onClick={() => router.refresh()} disabled={pending}>
+                                <Button size="sm" variant="ghost" onClick={refresh} disabled={pending}>
                                     <RefreshCw className="size-4" />
                                     Refresh
                                 </Button>
@@ -164,7 +256,7 @@ export function ContainersView({
                         </div>
 
                         <div className="overflow-x-auto rounded-lg border border-border">
-                            <table className="w-full min-w-[38rem] text-sm">
+                            <table className="w-full min-w-[44rem] text-sm">
                                 <thead className="bg-surface/60 text-left text-xs text-muted-foreground">
                                     <tr>
                                         <th className="px-3 py-2 font-medium">Container</th>
@@ -175,7 +267,15 @@ export function ContainersView({
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {containers.length === 0 ? (
+                                    {!snapshot ? (
+                                        [0, 1, 2, 3, 4].map((row) => (
+                                            <tr key={row} className="border-t border-border">
+                                                <td className="px-3 py-2" colSpan={5}>
+                                                    <Skeleton className="h-9 w-full" />
+                                                </td>
+                                            </tr>
+                                        ))
+                                    ) : containers.length === 0 ? (
                                         <tr>
                                             <td colSpan={5} className="px-3 py-8 text-center text-muted-foreground">
                                                 No containers on this host.
@@ -185,7 +285,13 @@ export function ContainersView({
                                         containers.map((container) => (
                                             <tr key={container.id} className="border-t border-border hover:bg-card-hover">
                                                 <td className="px-3 py-2">
-                                                    <span className="block font-medium">{container.name}</span>
+                                                    <button
+                                                        type="button"
+                                                        className="block max-w-full truncate text-left font-medium hover:underline"
+                                                        onClick={() => setPanel({ container, tab: "details" })}
+                                                    >
+                                                        {container.name}
+                                                    </button>
                                                     <span className="block truncate text-xs text-muted-foreground">
                                                         {container.image}
                                                     </span>
@@ -203,20 +309,62 @@ export function ContainersView({
                                                 </td>
                                                 <td className="px-3 py-2">
                                                     <div className="flex justify-end gap-1">
-                                                        {container.state === "running" ? (
+                                                        <IconButton
+                                                            label="Logs"
+                                                            onClick={() => setPanel({ container, tab: "logs" })}
+                                                        >
+                                                            <ScrollText className="size-4" />
+                                                        </IconButton>
+                                                        <IconButton
+                                                            label="Files"
+                                                            onClick={() => setPanel({ container, tab: "files" })}
+                                                        >
+                                                            <FileText className="size-4" />
+                                                        </IconButton>
+                                                        <IconButton
+                                                            label="Console"
+                                                            onClick={() => setPanel({ container, tab: "console" })}
+                                                            disabled={container.state !== "running"}
+                                                        >
+                                                            <TerminalSquare className="size-4" />
+                                                        </IconButton>
+                                                        {canManage ? (
                                                             <>
-                                                                <IconButton label="Restart" onClick={() => onAction(container.id, "restart")} disabled={pending}>
-                                                                    <RotateCw className="size-4" />
-                                                                </IconButton>
-                                                                <IconButton label="Stop" onClick={() => onAction(container.id, "stop")} disabled={pending}>
-                                                                    <Square className="size-4" />
+                                                                {container.state === "running" ? (
+                                                                    <>
+                                                                        <IconButton
+                                                                            label="Restart"
+                                                                            onClick={() => onAction(container.id, "restart")}
+                                                                            disabled={pending}
+                                                                        >
+                                                                            <RotateCw className="size-4" />
+                                                                        </IconButton>
+                                                                        <IconButton
+                                                                            label="Stop"
+                                                                            onClick={() => onAction(container.id, "stop")}
+                                                                            disabled={pending}
+                                                                        >
+                                                                            <Square className="size-4" />
+                                                                        </IconButton>
+                                                                    </>
+                                                                ) : (
+                                                                    <IconButton
+                                                                        label="Start"
+                                                                        onClick={() => onAction(container.id, "start")}
+                                                                        disabled={pending}
+                                                                    >
+                                                                        <Play className="size-4" />
+                                                                    </IconButton>
+                                                                )}
+                                                                <IconButton
+                                                                    label="Remove"
+                                                                    onClick={() => void onRemoveContainer(container)}
+                                                                    disabled={pending}
+                                                                >
+                                                                    <Trash2 className="size-4" />
                                                                 </IconButton>
                                                             </>
-                                                        ) : (
-                                                            <IconButton label="Start" onClick={() => onAction(container.id, "start")} disabled={pending}>
-                                                                <Play className="size-4" />
-                                                            </IconButton>
-                                                        )}
+                                                        ) : null}
                                                     </div>
                                                 </td>
                                             </tr>
@@ -228,8 +376,48 @@ export function ContainersView({
                     </>
                 )}
             </section>
+            {panel && connectionId ? (
+                <ContainerPanel
+                    connectionId={connectionId}
+                    container={panel.container}
+                    initialTab={panel.tab}
+                    canAttach={snapshot?.canAttach ?? false}
+                    onClose={() => setPanel(null)}
+                />
+            ) : null}
             {confirmDialog}
         </div>
+    );
+}
+
+function Overview({ overview }: { overview: OverviewData }) {
+    return (
+        <>
+            <Stat
+                icon={<Boxes className="size-4" />}
+                label="Containers"
+                value={`${overview.running}/${overview.containers}`}
+                hint="running / total"
+            />
+            <Stat
+                icon={<Cpu className="size-4" />}
+                label="CPU (containers)"
+                value={`${overview.aggregateCpuPercent}%`}
+                hint={`${overview.ncpu} cores`}
+            />
+            <Stat
+                icon={<MemoryStick className="size-4" />}
+                label="Memory (containers)"
+                value={formatBytes(overview.aggregateMemUsage)}
+                hint={`of ${formatBytes(overview.memTotal)}`}
+            />
+            <Stat
+                icon={<Server className="size-4" />}
+                label="Engine"
+                value={overview.serverVersion || overview.name}
+                hint={overview.name}
+            />
+        </>
     );
 }
 

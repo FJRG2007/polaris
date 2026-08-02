@@ -9,15 +9,18 @@
  * WebSocket); the ticket is redeemed and burned here, and the authorized target
  * and container are derived server-side - the client never sends the exec command.
  *
- * Two kinds of terminal arrive here. A container terminal is opened through
+ * Three kinds of terminal arrive here. A container terminal is opened through
  * polaris-hostd on the local box. A server terminal is an SSH shell on a
- * registered Host; the credentials for it come back from the redeem call, since
- * only the web app can decrypt them.
+ * registered Host. A docker terminal is an interactive exec on a container
+ * reached over its connection's own Docker transport, for the engines the daemon
+ * does not broker. The credentials for the last two come back from the redeem
+ * call, since only the web app can decrypt them.
  */
 
 import { WebSocketServer } from "ws";
 import { HostdClient } from "@polaris/hostd-client";
 import { clampDim, openRootShell, openShell, openSshClient } from "@polaris/ssh";
+import { DockerDriver, socketTransport, sshTransport, streamRpc, tcpTransport } from "@polaris/docker";
 
 const port = Number(process.env.POLARIS_WS_PORT || 3001);
 const appPort = Number(process.env.PORT || 3000);
@@ -35,14 +38,19 @@ wss.on("listening", () => console.error(`polaris deploy ws sidecar on :${port}`)
 wss.on("connection", async (ws, req) => {
     const token = (req.headers["sec-websocket-protocol"] || "").split(",")[0]?.trim();
     const ticket = token ? await redeem(token) : null;
-    if (!ticket || (ticket.mode !== "terminal" && ticket.mode !== "ssh" && ticket.mode !== "ssh-root")) {
+    const interactive = ["terminal", "ssh", "ssh-root", "docker"];
+    if (!ticket || !interactive.includes(ticket.mode)) {
         console.error(`polaris ws: rejecting connection - ${token ? "ticket redeem failed / wrong mode" : "no ticket"}`);
         ws.close(4001, "invalid ticket");
         return;
     }
 
-    const overSsh = ticket.mode === "ssh" || ticket.mode === "ssh-root";
-    const session = overSsh ? await openSshSession(ticket, ws) : await openContainerSession(ticket, ws);
+    const session =
+        ticket.mode === "ssh" || ticket.mode === "ssh-root"
+            ? await openSshSession(ticket, ws)
+            : ticket.mode === "docker"
+              ? await openDockerSession(ticket, ws)
+              : await openContainerSession(ticket, ws);
     if (!session) return;
 
     session.stream.on("data", (chunk) => {
@@ -88,6 +96,67 @@ async function openContainerSession(ticket, ws) {
         ws.close(4002, "could not open terminal");
         return null;
     }
+}
+
+/**
+ * An interactive exec on a container reached over its connection's own Docker
+ * transport (a socket, a TLS-secured TCP engine, or SSH). The transport is
+ * rebuilt from the target the redeem call resolved - the sidecar can decrypt
+ * nothing itself - and the shell falls back to `sh` on an image without bash,
+ * which is most of them.
+ */
+async function openDockerSession(ticket, ws) {
+    const target = ticket.docker;
+    if (!target) {
+        ws.close(4004, "connection unavailable");
+        return null;
+    }
+    let driver;
+    try {
+        driver = new DockerDriver(streamRpc(dockerTransport(target)));
+        // `exec` replaces the shell, so a failed one would end the session rather
+        // than fall through - hence the test before it, not a `||`.
+        const exec = await driver.attach(ticket.containerRef, [
+            "/bin/sh",
+            "-c",
+            "[ -x /bin/bash ] && exec /bin/bash; exec /bin/sh"
+        ]);
+        console.error(`polaris ws: docker terminal open for ${ticket.containerRef}`);
+        return {
+            stream: exec.stream,
+            resize: (cols, rows) => exec.resize(clampDim(cols, 80, 500), clampDim(rows, 24, 300)),
+            close: () => {
+                exec.close();
+                void driver.dispose();
+            }
+        };
+    } catch (error) {
+        console.error(`polaris ws: docker exec failed for ${ticket.containerRef}:`, error?.message ?? error);
+        void driver?.dispose();
+        ws.close(4002, "could not open terminal");
+        return null;
+    }
+}
+
+function dockerTransport(target) {
+    if (target.transport === "socket") return socketTransport(target.socketPath);
+    if (target.transport === "tcp") {
+        return tcpTransport({
+            host: target.host,
+            port: target.port,
+            tls: target.tls,
+            ca: target.ca,
+            cert: target.cert,
+            key: target.key
+        });
+    }
+    return sshTransport({
+        host: target.host,
+        port: target.port,
+        username: target.username,
+        auth: target.auth,
+        pinnedHostKey: target.pinnedHostKey
+    });
 }
 
 /**

@@ -6,16 +6,20 @@
  * the authorized target and container server-side - the client never names the
  * exec command.
  *
- * Two kinds of terminal share the mechanism. `terminal` and `logs` open a channel
- * on a container through the host daemon; `ssh` opens a shell on a registered
- * server, and there `targetId` holds the Host id. Redeeming an `ssh` ticket also
- * decrypts that host's credentials, because the sidecar runs outside the Next
- * bundle and cannot reach the master key or Prisma itself.
+ * Three kinds of terminal share the mechanism. `terminal` and `logs` open a
+ * channel on a container through the host daemon; `ssh` opens a shell on a
+ * registered server, and there `targetId` holds the Host id; `docker` opens a
+ * shell in a container on a Containers connection that is reached over its own
+ * Docker transport rather than through the daemon. Redeeming an `ssh` or
+ * `docker` ticket also decrypts that connection's credentials, because the
+ * sidecar runs outside the Next bundle and cannot reach the master key or Prisma
+ * itself.
  */
 
 import { prisma } from "@polaris/db";
 import { getHostConnection } from "@/lib/host-service";
 import { generateToken, hashToken } from "@polaris/core/tokens";
+import { resolveDockerTransport, type DockerTransportTarget } from "@/lib/docker-service";
 
 const TICKET_TTL_MS = 60_000;
 
@@ -24,7 +28,7 @@ const TICKET_TTL_MS = 60_000;
  *  sudo can offer. Kept as separate modes rather than a flag on the ticket because
  *  the mode is what the sidecar turns into a command, and the client never gets to
  *  name that command. */
-export type TerminalMode = "terminal" | "logs" | "ssh" | "ssh-root";
+export type TerminalMode = "terminal" | "logs" | "ssh" | "ssh-root" | "docker";
 
 export interface MintTicketInput {
     targetId: string;
@@ -66,6 +70,8 @@ export interface RedeemedTicket {
     mode: TerminalMode;
     /** Present only for `ssh`, and only when the host still resolves. */
     ssh?: SshTarget;
+    /** Present only for `docker`, and only when the connection still resolves. */
+    docker?: DockerTransportTarget;
 }
 
 /**
@@ -83,6 +89,20 @@ export async function redeemTerminalTicket(token: string): Promise<RedeemedTicke
     await prisma.deployTicket.update({ where: { id: ticket.id }, data: { usedAt: new Date() } });
 
     const mode = resolveMode(ticket.mode);
+    if (mode === "docker") {
+        try {
+            return {
+                targetId: ticket.targetId,
+                containerRef: ticket.containerRef,
+                mode,
+                docker: await resolveDockerTransport(ticket.targetId, ticket.userId)
+            };
+        } catch {
+            // The connection was removed, or was never this user's. The ticket is
+            // already burned, which is the right outcome either way.
+            return null;
+        }
+    }
     if (mode !== "ssh" && mode !== "ssh-root") {
         return { targetId: ticket.targetId, containerRef: ticket.containerRef, mode };
     }
@@ -114,6 +134,7 @@ function resolveMode(value: string): TerminalMode {
     if (value === "logs") return "logs";
     if (value === "ssh") return "ssh";
     if (value === "ssh-root") return "ssh-root";
+    if (value === "docker") return "docker";
     return "terminal";
 }
 

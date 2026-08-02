@@ -36,6 +36,14 @@ export interface ContainerRow {
     memPercent: number | null;
 }
 
+/** What /api/containers answers with for one host. `canAttach` is whether this
+ *  connection can open an interactive console at all. */
+export interface HostSnapshot {
+    overview: OverviewData;
+    containers: ContainerRow[];
+    canAttach: boolean;
+}
+
 export interface OverviewData {
     name: string;
     serverVersion: string;

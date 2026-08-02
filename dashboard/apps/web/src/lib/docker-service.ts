@@ -5,13 +5,15 @@
  * install-provisioned SSH key - carries no stored secret at all.
  */
 
-import { loadEnv } from "@polaris/config";
-import type { DockerConfig, DockerCredentials, DockerRpc } from "@polaris/docker";
-import { createDockerDriver, DockerDriver, sshTransport, streamRpc, type DockerConnectionRecord } from "@polaris/docker";
 import { prisma } from "@polaris/db";
+import { readFileSync } from "node:fs";
+import { loadEnv } from "@polaris/config";
+import type { SshAuth } from "@polaris/ssh";
+import { getHostConnection } from "./host-service";
 import { HostdClient } from "@polaris/hostd-client";
 import { decryptCredentials, encryptCredentials } from "@polaris/storage";
-import { getHostConnection } from "./host-service";
+import type { DockerConfig, DockerCredentials, DockerRpc } from "@polaris/docker";
+import { createDockerDriver, DockerDriver, sshTransport, streamRpc, type DockerConnectionRecord } from "@polaris/docker";
 
 /**
  * Reserved id of the auto-provisioned local host. It is not a stored row: it is
@@ -28,7 +30,14 @@ export const LOCAL_DOCKER_CONNECTION_ID = "local";
 export function localDockerDriver(): DockerDriver {
     const client = new HostdClient();
     const rpc: DockerRpc = {
-        request: (method, path) => client.dockerRequest(method, path),
+        // Everything the proxy allows answers with JSON or nothing at all, so the
+        // daemon's text envelope is the whole reply. No `hijack`: the daemon
+        // brokers one bounded call at a time and has its own exec endpoint, which
+        // is what the local console and file browser use instead.
+        request: async (method, path) => {
+            const response = await client.dockerRequest(method, path);
+            return { status: response.status, body: response.body, bytes: Buffer.from(response.body, "utf8") };
+        },
         dispose: async () => undefined
     };
     return new DockerDriver(rpc);
@@ -42,7 +51,12 @@ export async function listDockerConnections(ownerId: string) {
     });
 }
 
-export async function getDockerDriver(connectionId: string, ownerId: string) {
+/** Load a stored connection scoped to its owner and decrypt whatever secret
+ *  material it carries. A socket or install-key connection has none. */
+async function loadDockerConnection(
+    connectionId: string,
+    ownerId: string
+): Promise<{ id: string; config: DockerConfig; credentials: DockerCredentials }> {
     const row = await prisma.dockerConnection.findFirst({ where: { id: connectionId, ownerId } });
     if (!row) throw new Error("Docker connection not found");
     const config = JSON.parse(row.config) as DockerConfig;
@@ -57,7 +71,11 @@ export async function getDockerDriver(connectionId: string, ownerId: string) {
                   loadEnv().POLARIS_MASTER_KEY
               )
             : ({ transport: config.transport } as DockerCredentials);
-    const record: DockerConnectionRecord = { id: row.id, config, credentials };
+    return { id: row.id, config, credentials };
+}
+
+export async function getDockerDriver(connectionId: string, ownerId: string) {
+    const record: DockerConnectionRecord = await loadDockerConnection(connectionId, ownerId);
     return createDockerDriver(record);
 }
 
@@ -94,15 +112,111 @@ export const HOST_DOCKER_PREFIX = "host:";
 /** Docker driver for a global Host, over SSH via the shared, pinned primitive. */
 export async function hostDockerDriver(hostId: string, ownerId: string): Promise<DockerDriver> {
     const conn = await getHostConnection(hostId, ownerId);
-    return new DockerDriver(
-        streamRpc(
-            sshTransport({
-                host: conn.address,
-                port: conn.port,
-                username: conn.username,
-                auth: conn.auth,
-                pinnedHostKey: conn.hostKey
-            })
-        )
-    );
+    return new DockerDriver(streamRpc(sshTransport(hostSshTransportOptions(conn))));
+}
+
+function hostSshTransportOptions(conn: Awaited<ReturnType<typeof getHostConnection>>) {
+    return {
+        host: conn.address,
+        port: conn.port,
+        username: conn.username,
+        auth: conn.auth,
+        pinnedHostKey: conn.hostKey
+    };
+}
+
+/**
+ * A Docker connection resolved down to the material needed to open a transport,
+ * with every secret already decrypted. Only the terminal sidecar consumes this:
+ * it runs outside the Next bundle, so it can neither reach the master key nor
+ * read the mounted install key's known_hosts, and it must be handed a target it
+ * can connect to verbatim.
+ */
+export type DockerTransportTarget =
+    | { transport: "socket"; socketPath: string }
+    | { transport: "tcp"; host: string; port: number; tls: boolean; ca?: string; cert?: string; key?: string }
+    | { transport: "ssh"; host: string; port: number; username: string; auth: SshAuth; pinnedHostKey: string[] };
+
+/**
+ * Resolve a Containers connection id to that target. The local host has no
+ * transport of its own - it is brokered by the daemon - so it is refused here
+ * rather than silently handed a socket the web container is deliberately not
+ * given. Owner-scoped through the same resolvers the drivers use.
+ */
+export async function resolveDockerTransport(
+    connectionId: string,
+    ownerId: string
+): Promise<DockerTransportTarget> {
+    if (connectionId === LOCAL_DOCKER_CONNECTION_ID) {
+        throw new Error("The local host is reached through the host daemon, not a Docker transport");
+    }
+    if (connectionId.startsWith(HOST_DOCKER_PREFIX)) {
+        const conn = await getHostConnection(connectionId.slice(HOST_DOCKER_PREFIX.length), ownerId);
+        // An empty pin list is what the SSH client refuses outright. A registered
+        // server always has its key captured at enrollment, so this is a broken
+        // row rather than a case to connect blind for.
+        if (!conn.hostKey) throw new Error("This server has no pinned key to verify it with");
+        return {
+            transport: "ssh",
+            host: conn.address,
+            port: conn.port,
+            username: conn.username,
+            auth: conn.auth,
+            pinnedHostKey: [conn.hostKey]
+        };
+    }
+
+    const { config, credentials } = await loadDockerConnection(connectionId, ownerId);
+    switch (config.transport) {
+        case "socket":
+            return { transport: "socket", socketPath: config.socketPath };
+        case "tcp": {
+            const creds = credentials as Extract<DockerCredentials, { transport: "tcp" }>;
+            return {
+                transport: "tcp",
+                host: config.host,
+                port: config.port,
+                tls: config.tls,
+                ca: creds.ca,
+                cert: creds.cert,
+                key: creds.key
+            };
+        }
+        case "ssh": {
+            const env = loadEnv();
+            const creds = credentials as Extract<DockerCredentials, { transport: "ssh" }>;
+            const privateKey = config.useInstallKey ? readFileSync(env.POLARIS_SSH_KEY, "utf8") : (creds.privateKey ?? "");
+            if (!privateKey) throw new Error("SSH connection has no private key");
+            const pinnedHostKey = pinnedKeysFor(
+                readFileSync(env.POLARIS_SSH_KNOWN_HOSTS, "utf8"),
+                config.host,
+                config.port
+            );
+            if (pinnedHostKey.length === 0) throw new Error("This host has no pinned key to verify it with");
+            return {
+                transport: "ssh",
+                host: config.host,
+                port: config.port,
+                username: config.username,
+                auth: { method: "key", privateKey, passphrase: creds.passphrase },
+                pinnedHostKey
+            };
+        }
+    }
+}
+
+/** Every base64 host key pinned for a host (or its `[host]:port` form). A host
+ *  commonly has several and the client negotiates one, so all of them travel. */
+function pinnedKeysFor(knownHosts: string, host: string, port: number): string[] {
+    const aliases = new Set([host, `[${host}]:${port}`]);
+    const keys: string[] = [];
+    for (const line of knownHosts.split("\n")) {
+        const trimmed = line.trim();
+        if (trimmed === "" || trimmed.startsWith("#")) continue;
+        const [hostField, , keyField] = trimmed.split(/\s+/);
+        if (hostField && keyField && hostField.split(",").some((entry) => aliases.has(entry))) {
+            keys.push(keyField);
+        }
+    }
+    return keys;
 }

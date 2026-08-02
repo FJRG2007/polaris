@@ -6,18 +6,21 @@
  * it: server output -> terminal, keystrokes -> server, and a resize control frame
  * on fit. xterm is imported dynamically so it stays out of the server bundle.
  *
- * The same panel serves a container on a deploy target and a shell on a
- * registered server; which one is decided server-side from the ticket, so the
- * only difference here is what the ticket is minted for.
+ * The same panel serves a container on a deploy target, a container on a
+ * Containers connection, and a shell on a registered server; which one is
+ * decided server-side from the ticket, so the only difference here is what the
+ * ticket is minted for.
  */
 
 import "@xterm/xterm/css/xterm.css";
 import { useEffect, useRef, useState } from "react";
 
-/** What to attach to: a container on a target, or a registered server - as the
- *  Polaris login, or as root where that server granted it. */
+/** What to attach to: a container on a deploy target, a container on a
+ *  Containers connection, or a registered server - as the Polaris login, or as
+ *  root where that server granted it. */
 export type TerminalTarget =
     | { kind: "container"; targetId: string; containerRef: string }
+    | { kind: "docker"; connectionId: string; containerRef: string }
     | { kind: "host"; hostId: string; asRoot?: boolean };
 
 export function TerminalPanel({ target, label }: { target: TerminalTarget; label: string }) {
@@ -28,7 +31,9 @@ export function TerminalPanel({ target, label }: { target: TerminalTarget; label
     const key =
         target.kind === "host"
             ? `host:${target.hostId}:${target.asRoot ? "root" : "login"}`
-            : `${target.targetId}:${target.containerRef}`;
+            : target.kind === "docker"
+              ? `docker:${target.connectionId}:${target.containerRef}`
+              : `${target.targetId}:${target.containerRef}`;
 
     useEffect(() => {
         let disposed = false;
@@ -55,11 +60,16 @@ export function TerminalPanel({ target, label }: { target: TerminalTarget; label
                 body: JSON.stringify(
                     target.kind === "host"
                         ? { hostId: target.hostId, mode: target.asRoot ? "ssh-root" : "ssh" }
-                        : { targetId: target.targetId, containerRef: target.containerRef, mode: "terminal" }
+                        : target.kind === "docker"
+                          ? { connectionId: target.connectionId, containerRef: target.containerRef }
+                          : { targetId: target.targetId, containerRef: target.containerRef, mode: "terminal" }
                 )
             });
             if (!res.ok) {
-                setStatus("could not authorize terminal");
+                // The route says why (no such connection, no pinned key, not
+                // permitted), and that is more use than "could not authorize".
+                const reason = (await res.json().catch(() => null)) as { error?: string } | null;
+                setStatus(reason?.error ?? "could not authorize terminal");
                 return;
             }
             const { token } = (await res.json()) as { token: string };

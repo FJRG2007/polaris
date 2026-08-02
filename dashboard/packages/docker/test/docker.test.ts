@@ -1,7 +1,7 @@
 import { Duplex } from "node:stream";
+import { streamRpc } from "../src/rpc.js";
 import { describe, expect, it } from "vitest";
 import { DockerDriver } from "../src/driver.js";
-import { streamRpc } from "../src/rpc.js";
 import type { DockerTransportConn } from "../src/transports.js";
 
 /** A stream that answers each written request with a canned HTTP response. */
@@ -30,6 +30,33 @@ function driverReturning(response: Buffer): DockerDriver {
         close: async () => undefined
     };
     return new DockerDriver(streamRpc(conn));
+}
+
+/** A driver answering a scripted sequence, one canned reply per request. Exec
+ *  takes three round trips (create, start, inspect), so it needs this. */
+function driverReturningEach(responses: Buffer[]): DockerDriver {
+    let index = 0;
+    const conn: DockerTransportConn = {
+        stream: async () => new CannedStream(responses[index++] ?? Buffer.alloc(0)),
+        close: async () => undefined
+    };
+    return new DockerDriver(streamRpc(conn));
+}
+
+/** One frame of Docker's multiplexed stream format: an 8-byte header carrying
+ *  the stream id and a big-endian payload length, then the payload. */
+function frame(stream: 1 | 2, payload: string): Buffer {
+    const header = Buffer.alloc(8);
+    header[0] = stream;
+    header.writeUInt32BE(Buffer.byteLength(payload), 4);
+    return Buffer.concat([header, Buffer.from(payload)]);
+}
+
+function rawResponse(status: string, body: Buffer): Buffer {
+    return Buffer.concat([
+        Buffer.from(`HTTP/1.1 ${status}\r\nContent-Length: ${body.length}\r\nConnection: close\r\n\r\n`),
+        body
+    ]);
 }
 
 describe("docker driver", () => {
@@ -89,5 +116,66 @@ describe("docker driver", () => {
     it("treats 304 on lifecycle actions as success", async () => {
         const driver = driverReturning(Buffer.from("HTTP/1.1 304 Not Modified\r\nConnection: close\r\n\r\n"));
         await expect(driver.start("abc")).resolves.toBeUndefined();
+    });
+
+    it("de-multiplexes framed logs into what the container printed", async () => {
+        const driver = driverReturning(
+            rawResponse("200 OK", Buffer.concat([frame(1, "first\n"), frame(2, "warning\n"), frame(1, "second\n")]))
+        );
+        expect(await driver.logs("abc")).toBe("first\nwarning\nsecond\n");
+    });
+
+    it("passes an unframed (TTY) log through untouched", async () => {
+        const driver = driverReturning(rawResponse("200 OK", Buffer.from("plain tty output\n")));
+        expect(await driver.logs("abc")).toBe("plain tty output\n");
+    });
+
+    it("bounds the requested tail rather than trusting the caller", async () => {
+        let requested = "";
+        const conn: DockerTransportConn = {
+            stream: async () => {
+                const stream = new CannedStream(rawResponse("200 OK", frame(1, "x")));
+                stream.on("finish", () => undefined);
+                const original = stream._write.bind(stream);
+                stream._write = (chunk: Buffer, enc: string, cb: () => void) => {
+                    requested += chunk.toString();
+                    original(chunk, enc, cb);
+                };
+                return stream;
+            },
+            close: async () => undefined
+        };
+        await new DockerDriver(streamRpc(conn)).logs("abc", 10_000_000);
+        expect(requested).toContain("tail=5000");
+    });
+
+    it("keeps an exec's stdout and stderr apart and reports its exit code", async () => {
+        const driver = driverReturningEach([
+            httpResponse("201 Created", { Id: "exec1" }),
+            rawResponse("200 OK", Buffer.concat([frame(1, "bin/\netc/\n"), frame(2, "ignored\n")])),
+            httpResponse("200 OK", { ExitCode: 0 })
+        ]);
+        const result = await driver.exec("abc", ["ls"]);
+        expect(result.stdout).toBe("bin/\netc/\n");
+        expect(result.stderr).toBe("ignored\n");
+        expect(result.code).toBe(0);
+    });
+
+    it("refuses a removal the engine did not confirm", async () => {
+        const driver = driverReturning(httpResponse("409 Conflict", { message: "container is running" }));
+        await expect(driver.remove("abc")).rejects.toThrow(/409/);
+    });
+
+    it("accepts a 204 removal", async () => {
+        const driver = driverReturning(Buffer.from("HTTP/1.1 204 No Content\r\nConnection: close\r\n\r\n"));
+        await expect(driver.remove("abc", { force: true })).resolves.toBeUndefined();
+    });
+
+    it("reports that a proxied connection cannot attach a console", () => {
+        const driver = new DockerDriver({
+            request: async () => ({ status: 200, body: "{}", bytes: Buffer.from("{}") }),
+            dispose: async () => undefined
+        });
+        expect(driver.canAttach).toBe(false);
     });
 });
