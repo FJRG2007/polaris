@@ -9,8 +9,25 @@
  * the rest a dialog.
  */
 
-import { useEffect, useState, useTransition, type ComponentType } from "react";
 import Link from "next/link";
+import { MAIL_PROVIDER_INFO } from "@polaris/core";
+import type { ChannelView } from "@/lib/messaging-service";
+import type { EmailChannelView } from "@/lib/mail-service";
+import { DiscordSetupPanel } from "../discord-setup-panel";
+import { EmailChannelDialog } from "./email-channel-dialog";
+import { useEffect, useState, useTransition, type ComponentType } from "react";
+import {
+    CHANNEL_STATUS_TONE,
+    EMAIL_CHANNEL_MARK,
+    PLATFORM_LABEL,
+    PLATFORM_LOGO
+} from "../platform-meta";
+import {
+    channelStateAction,
+    deleteChannelAction,
+    reconnectChannelAction,
+    updateChannelAction
+} from "../actions";
 import {
     CheckCircle2,
     Loader2,
@@ -33,23 +50,6 @@ import {
     Input,
     cn
 } from "@polaris/ui";
-import { MAIL_PROVIDER_INFO } from "@polaris/core";
-import type { ChannelView } from "@/lib/messaging-service";
-import type { EmailChannelView } from "@/lib/mail-service";
-import {
-    channelStateAction,
-    deleteChannelAction,
-    reconnectChannelAction,
-    updateChannelAction
-} from "../actions";
-import {
-    CHANNEL_STATUS_TONE,
-    EMAIL_CHANNEL_MARK,
-    PLATFORM_LABEL,
-    PLATFORM_LOGO
-} from "../platform-meta";
-import { DiscordSetupPanel } from "../discord-setup-panel";
-import { EmailChannelDialog } from "./email-channel-dialog";
 
 type ChannelKind = "telegram" | "whatsapp-cloud" | "whatsapp-web" | "discord" | "slack";
 
@@ -117,7 +117,7 @@ export function ChannelsView({
     }
 
     return (
-        <div className="flex max-w-4xl flex-col gap-4">
+        <div className="mx-auto flex w-full max-w-4xl flex-col gap-4">
             <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
                     <h1 className="text-lg font-semibold">Channels</h1>
@@ -506,7 +506,7 @@ function ChannelManageDialog({
                                 autoComplete="off"
                                 value={token}
                                 onChange={(event) => setToken(event.target.value)}
-                                placeholder={`Saved - enter a new token to replace it`}
+                                placeholder="Saved - enter a new token to replace it"
                             />
                             <span className="text-xs text-muted-foreground">
                                 {spec.tokenPlaceholder}

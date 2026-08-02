@@ -9,12 +9,12 @@
  * they can even nominate it would be the wrong order to work in.
  */
 
-import { useState, useTransition } from "react";
 import Link from "next/link";
+import { useState, useTransition } from "react";
 import { MAIL_PROVIDER_INFO } from "@polaris/core";
-import { Button, Card, CardBody, PageHeader, Select } from "@polaris/ui";
-import type { EmailChannelView } from "@/lib/mail-service";
 import { setAuthMailChannelAction } from "./actions";
+import type { EmailChannelView } from "@/lib/mail-service";
+import { Button, Card, CardBody, PageHeader, Select } from "@polaris/ui";
 
 const NONE = "none";
 
@@ -56,13 +56,14 @@ export function AccountMailView({
     }
 
     return (
-        <>
+        // Narrow page: centre the column in the content area, header included.
+        <div className="mx-auto flex w-full max-w-2xl flex-col">
             <PageHeader
                 title="Account mail"
                 description="The email channel Polaris sends account messages through."
             />
             <Card>
-                <CardBody className="flex max-w-xl flex-col gap-3">
+                <CardBody className="flex flex-col gap-3">
                     {channels.length === 0 ? (
                         <p className="text-sm text-muted-foreground">
                             No email channel has been set up yet. Add one under{" "}
@@ -93,6 +94,6 @@ export function AccountMailView({
                     )}
                 </CardBody>
             </Card>
-        </>
+        </div>
     );
 }

@@ -5,10 +5,10 @@
 
 import { PageHeader } from "@polaris/ui";
 import { requireAdmin } from "@/lib/session";
-import { resolveDisplayPreferences } from "@polaris/core";
 import { savePlatformDisplayAction } from "./actions";
-import { DisplayPreferencesForm } from "@/components/display-preferences-form";
+import { resolveDisplayPreferences } from "@polaris/core";
 import { getPlatformDisplayPreferences } from "@/lib/display-prefs-service";
+import { DisplayPreferencesForm } from "@/components/display-preferences-form";
 
 export const dynamic = "force-dynamic";
 
@@ -17,19 +17,19 @@ export default async function DisplayAdminPage() {
     const platform = await getPlatformDisplayPreferences();
 
     return (
-        <>
+        // Narrow page: centre the column in the content area, header included, so
+        // the form does not sit against the rail with the width beside it empty.
+        <div className="mx-auto flex w-full max-w-2xl flex-col">
             <PageHeader
                 title="Display defaults"
                 description="Units and formats for the whole deployment. Each account can override them under Account > Preferences."
             />
-            <div className="max-w-2xl">
-                <DisplayPreferencesForm
-                    initial={resolveDisplayPreferences(platform)}
-                    fallback={resolveDisplayPreferences(platform)}
-                    allowInherit={false}
-                    save={savePlatformDisplayAction}
-                />
-            </div>
-        </>
+            <DisplayPreferencesForm
+                initial={resolveDisplayPreferences(platform)}
+                fallback={resolveDisplayPreferences(platform)}
+                allowInherit={false}
+                save={savePlatformDisplayAction}
+            />
+        </div>
     );
 }

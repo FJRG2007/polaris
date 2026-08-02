@@ -8,12 +8,12 @@
  */
 
 import { useState } from "react";
-import { Boxes, Database, Download, HardDriveDownload, Server, Trash2 } from "lucide-react";
 import { formatBytes } from "@polaris/core";
-import { Badge, Button, Card, CardBody, CardHeader, CardTitle } from "@polaris/ui";
 import type { BackupInfo } from "@/lib/backup-service";
 import { useDisplayFormat } from "@/components/display-format";
 import { createBackupAction, deleteBackupAction } from "./actions";
+import { Badge, Button, Card, CardBody, CardHeader, CardTitle } from "@polaris/ui";
+import { Boxes, Database, Download, HardDriveDownload, Server, Trash2 } from "lucide-react";
 
 export function BackupsView({ initialBackups }: { initialBackups: BackupInfo[] }) {
     const format = useDisplayFormat();
@@ -39,7 +39,7 @@ export function BackupsView({ initialBackups }: { initialBackups: BackupInfo[] }
     }
 
     return (
-        <div className="flex max-w-3xl flex-col gap-4">
+        <div className="flex flex-col gap-4">
             <Card>
                 <CardHeader>
                     <div className="flex items-center justify-between gap-2">

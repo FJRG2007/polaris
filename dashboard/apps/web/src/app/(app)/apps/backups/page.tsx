@@ -7,8 +7,8 @@
 
 import { PageHeader } from "@polaris/ui";
 import { requireAdmin } from "@/lib/session";
-import { listBackups } from "@/lib/backup-service";
 import { BackupsView } from "./backups-view";
+import { listBackups } from "@/lib/backup-service";
 
 export const dynamic = "force-dynamic";
 
@@ -17,12 +17,13 @@ export default async function BackupsPage() {
     const backups = await listBackups();
 
     return (
-        <>
+        // Narrow page: centre the column in the content area, header included.
+        <div className="mx-auto flex w-full max-w-3xl flex-col">
             <PageHeader
                 title="Backups"
                 description="Back up and restore Polaris and, soon, your NAS and other apps."
             />
             <BackupsView initialBackups={backups} />
-        </>
+        </div>
     );
 }

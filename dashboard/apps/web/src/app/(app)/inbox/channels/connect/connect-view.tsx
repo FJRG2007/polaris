@@ -10,17 +10,17 @@
  * a platform that quietly is not on the page reads as unsupported.
  */
 
-import { useState, type ReactElement } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useState, type ReactElement } from "react";
 import { ArrowLeft, ExternalLink } from "lucide-react";
-import { MAIL_PROVIDER_INFO, MAIL_PROVIDERS, type MailProvider } from "@polaris/core";
-import { Badge, Button, Card, CardBody } from "@polaris/ui";
 import type { EmailChannelView } from "@/lib/mail-service";
-import { CHANNEL_CATALOG, type ChannelKind } from "../../channel-catalog";
-import { ConnectChannelDialog } from "../../connect-channel-dialog";
-import { EMAIL_CHANNEL_MARK } from "../../platform-meta";
+import { Badge, Button, Card, CardBody } from "@polaris/ui";
 import { EmailChannelDialog } from "../email-channel-dialog";
+import { EMAIL_CHANNEL_MARK } from "@/app/(app)/inbox/platform-meta";
+import { ConnectChannelDialog } from "@/app/(app)/inbox/connect-channel-dialog";
+import { CHANNEL_CATALOG, type ChannelKind } from "@/app/(app)/inbox/channel-catalog";
+import { MAIL_PROVIDER_INFO, MAIL_PROVIDERS, type MailProvider } from "@polaris/core";
 
 export function ConnectChannelView({ bridgeReady }: { bridgeReady: boolean }) {
     const router = useRouter();
@@ -39,7 +39,7 @@ export function ConnectChannelView({ bridgeReady }: { bridgeReady: boolean }) {
     }
 
     return (
-        <div className="flex max-w-4xl flex-col gap-6">
+        <div className="mx-auto flex w-full max-w-4xl flex-col gap-6">
             <div className="flex flex-col gap-1">
                 <Link
                     href="/inbox/channels"

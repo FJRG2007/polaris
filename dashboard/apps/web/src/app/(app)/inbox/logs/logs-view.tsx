@@ -6,11 +6,11 @@
  * text, and outbound delivery state.
  */
 
+import { Card, CardBody } from "@polaris/ui";
+import { listActivityAction } from "../actions";
 import { useCallback, useEffect, useState } from "react";
 import { ArrowDownLeft, ArrowUpRight } from "lucide-react";
-import { Card, CardBody } from "@polaris/ui";
 import type { ActivityView } from "@/lib/messaging-service";
-import { listActivityAction } from "../actions";
 
 const PLATFORM_LABEL: Record<string, string> = {
     whatsapp: "WhatsApp",
@@ -45,7 +45,7 @@ export function LogsView({ initialActivity }: { initialActivity: ActivityView[] 
     }, [load]);
 
     return (
-        <div className="flex max-w-4xl flex-col gap-4">
+        <div className="mx-auto flex w-full max-w-4xl flex-col gap-4">
             <div>
                 <h1 className="text-lg font-semibold">Logs</h1>
                 <p className="text-sm text-muted-foreground">
