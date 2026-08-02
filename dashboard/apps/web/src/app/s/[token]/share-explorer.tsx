@@ -13,6 +13,20 @@
  * shareable and the back button works, without a server round-trip per folder.
  */
 
+import Fuse from "fuse.js";
+import { formatBytes } from "@polaris/core";
+import { useVirtualizer } from "@tanstack/react-virtual";
+import { RelativeTime } from "@/components/relative-time";
+import type { DriveEntry } from "@/app/(app)/drive/types";
+import { iconColorClass, iconComponent } from "@/app/(app)/drive/item-icons";
+import { matchesStructured, parseSearch } from "@/app/(app)/drive/search-query";
+import { FileViewer, isViewable, type ViewerTarget } from "@/app/(app)/drive/file-viewer";
+import {
+    FILE_CATEGORIES,
+    categoryOfExtension,
+    extensionOf,
+    type FileCategory
+} from "@/app/(app)/drive/file-categories";
 import {
     useCallback,
     useEffect,
@@ -22,8 +36,6 @@ import {
     type KeyboardEvent,
     type MouseEvent
 } from "react";
-import { useVirtualizer } from "@tanstack/react-virtual";
-import Fuse from "fuse.js";
 import {
     ArrowDownAZ,
     ArrowUpAZ,
@@ -47,7 +59,6 @@ import {
     Upload,
     X
 } from "lucide-react";
-import { formatBytes } from "@polaris/core";
 import {
     Badge,
     Button,
@@ -68,17 +79,6 @@ import {
     Skeleton,
     cn
 } from "@polaris/ui";
-import {
-    FILE_CATEGORIES,
-    categoryOfExtension,
-    extensionOf,
-    type FileCategory
-} from "@/app/(app)/drive/file-categories";
-import { FileViewer, isViewable, type ViewerTarget } from "@/app/(app)/drive/file-viewer";
-import { iconColorClass, iconComponent } from "@/app/(app)/drive/item-icons";
-import { matchesStructured, parseSearch } from "@/app/(app)/drive/search-query";
-import { RelativeTime } from "@/components/relative-time";
-import type { DriveEntry } from "@/app/(app)/drive/types";
 
 type SortKey = "name" | "created" | "modified" | "size";
 type SortDir = "asc" | "desc";
@@ -952,11 +952,7 @@ export function ShareExplorer({
                 ) : null}
 
                 {loading ? (
-                    <div className="flex flex-col gap-1">
-                        {Array.from({ length: 8 }).map((_, index) => (
-                            <Skeleton key={index} className="h-9 w-full" />
-                        ))}
-                    </div>
+                    <ListingSkeleton viewMode={viewMode} />
                 ) : error ? (
                     <p className="rounded-md border border-border bg-card p-8 text-center text-sm text-muted-foreground">
                         {error}
@@ -1181,6 +1177,53 @@ export function ShareExplorer({
                 urlFor={(target, inline) => fileUrl(token, target.path, inline)}
                 readOnly
             />
+        </div>
+    );
+}
+
+/**
+ * Placeholder while a folder loads, in the shape the view is set to. A grid of
+ * tiles reads nothing like a table of rows, so the listing has to be sketched as
+ * whichever one is about to arrive.
+ */
+function ListingSkeleton({ viewMode }: { viewMode: "list" | "grid" }) {
+    if (viewMode === "grid") {
+        return (
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+                {Array.from({ length: 12 }).map((_, index) => (
+                    <div key={index} className="flex flex-col items-center gap-2 rounded-lg border border-border p-3">
+                        <Skeleton className="size-10 rounded" />
+                        <Skeleton className="h-3 w-4/5" />
+                    </div>
+                ))}
+            </div>
+        );
+    }
+    return (
+        <div className="flex flex-col rounded-md border border-border">
+            <div className="flex items-center gap-3 border-b border-border bg-surface/40 px-3 py-2">
+                <Skeleton className="size-4 rounded" />
+                <Skeleton className="h-3 w-12 flex-none" />
+                <span className="flex-1" />
+                <Skeleton className="hidden h-3 w-20 sm:block" />
+                <Skeleton className="h-3 w-10" />
+                <span className="w-16" />
+            </div>
+            {Array.from({ length: 8 }).map((_, index) => (
+                <div
+                    key={index}
+                    className="flex items-center gap-3 border-b border-border px-3"
+                    style={{ height: ROW_HEIGHT }}
+                >
+                    <Skeleton className="size-4 rounded" />
+                    <Skeleton className="size-4 shrink-0 rounded" />
+                    <Skeleton className="h-4 w-1/3" />
+                    <span className="flex-1" />
+                    <Skeleton className="hidden h-3 w-32 sm:block" />
+                    <Skeleton className="h-3 w-14" />
+                    <span className="w-16" />
+                </div>
+            ))}
         </div>
     );
 }

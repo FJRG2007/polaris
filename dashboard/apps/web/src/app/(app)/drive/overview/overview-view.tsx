@@ -8,18 +8,18 @@
  * page, and each section links straight to that device's files.
  */
 
-import { useMemo } from "react";
 import Link from "next/link";
+import { useMemo } from "react";
+import { UnasMetrics } from "../unas-metrics";
+import { HardwarePanel } from "../hardware-panel";
+import type { ConnectionSummary } from "../types";
 import { FolderOpen, HardDrive } from "lucide-react";
 import { Button, Card, CardBody, Skeleton } from "@polaris/ui";
-import { formatBytes, temperatureSuffix, toDisplayTemperature, type TemperatureUnit } from "@polaris/core";
-import type { UnasMetrics as UnasMetricsData } from "@/lib/unifi-unas";
-import { useDisplayPreferences } from "@/components/display-format";
 import { useLiveResource } from "@/components/use-live-resource";
+import { useDisplayPreferences } from "@/components/display-format";
+import type { UnasMetrics as UnasMetricsData } from "@/lib/unifi-unas";
 import { MetricsHistory, percent, ratioPercent, type MetricSpec } from "@/components/metrics-history";
-import { HardwarePanel } from "../hardware-panel";
-import { UnasMetrics } from "../unas-metrics";
-import type { ConnectionSummary } from "../types";
+import { formatBytes, temperatureSuffix, toDisplayTemperature, type TemperatureUnit } from "@polaris/core";
 
 /** How often the live panel re-reads the device. Matched to the collector's own
  *  storage cadence: asking faster only re-renders the same numbers. */
@@ -102,13 +102,16 @@ function UnasSection({ connection }: { connection: ConnectionSummary }) {
 
     if (loading) {
         return (
-            <div className="flex flex-col gap-3">
-                <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-                    {Array.from({ length: 4 }).map((_, index) => (
-                        <Skeleton key={index} className="h-20" />
-                    ))}
+            // The order the readings arrive in: the two live gauges, the pair of
+            // stats beside each other, then the pool and bay cards.
+            <div className="flex flex-col gap-4">
+                <Skeleton className="h-44" />
+                <div className="grid grid-cols-2 gap-3">
+                    <Skeleton className="h-20" />
+                    <Skeleton className="h-20" />
                 </div>
-                <Skeleton className="h-40" />
+                <Skeleton className="h-52" />
+                <Skeleton className="h-48" />
             </div>
         );
     }

@@ -11,6 +11,7 @@ export { Input, type InputProps } from "./components/input.js";
 export { Badge, type BadgeProps } from "./components/badge.js";
 export { Card, CardHeader, CardTitle, CardBody } from "./components/card.js";
 export { Skeleton } from "./components/skeleton.js";
+export { BoneSkeleton, type CapturedLayout, type ResponsiveLayout } from "./components/bone-skeleton.js";
 export { Checkbox, type CheckboxProps } from "./components/checkbox.js";
 export { ConfirmDeleteDialog, type ConfirmDeleteDialogProps } from "./components/confirm-delete-dialog.js";
 export { Switch } from "./components/switch.js";

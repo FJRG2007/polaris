@@ -1776,7 +1776,7 @@ export function FilesView({
                             onDrop={onUploadDrop}
                         >
                             {loading ? (
-                                <ListingSkeleton />
+                                <ListingSkeleton viewMode={viewMode} />
                             ) : error ? (
                                 <div className="rounded-md border border-danger/40 bg-danger/10 p-3 text-sm text-danger">
                                     {error}
@@ -2873,15 +2873,62 @@ async function readDirectoryHandle(dir: FsDirectoryHandle, prefix: string): Prom
     return out;
 }
 
-/** Placeholder while a directory listing loads. */
-function ListingSkeleton() {
+/**
+ * Placeholder while a directory listing loads, in the shape the view is set to:
+ * a grid of tiles reads nothing like a table of rows, so a listing that is about
+ * to arrive as one must not be sketched as the other.
+ */
+function ListingSkeleton({ viewMode }: { viewMode: "list" | "grid" }) {
+    if (viewMode === "grid") {
+        return (
+            <div className="grid grid-cols-2 gap-2 p-1 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6">
+                {Array.from({ length: 12 }).map((_, index) => (
+                    <div key={index} className="flex flex-col items-center gap-1.5 p-3">
+                        <Skeleton className="size-10 rounded" />
+                        <Skeleton className="h-3 w-4/5" />
+                    </div>
+                ))}
+            </div>
+        );
+    }
     return (
         <div className="flex flex-col">
-            {Array.from({ length: 6 }).map((_, index) => (
-                <div key={index} className="flex items-center gap-3 px-3 py-2.5">
-                    <Skeleton className="size-4 rounded" />
-                    <Skeleton className="h-4 flex-1 max-w-[40%]" />
-                    <Skeleton className="ml-auto h-4 w-16" />
+            {/* The column widths track the real header and rows below, so the
+                listing lands on the same grid it was sketched on. */}
+            <div className="flex h-9 items-center border-b border-border">
+                <div className="w-9 shrink-0" />
+                <div className="min-w-0 flex-1 px-1">
+                    <Skeleton className="h-3 w-12" />
+                </div>
+                <div className="hidden w-44 shrink-0 px-2 lg:block">
+                    <Skeleton className="h-3 w-20" />
+                </div>
+                <div className="hidden w-44 shrink-0 px-2 sm:block">
+                    <Skeleton className="h-3 w-24" />
+                </div>
+                <div className="w-24 shrink-0 px-2">
+                    <Skeleton className="h-3 w-8" />
+                </div>
+                <div className="w-12 shrink-0" />
+            </div>
+            {Array.from({ length: 8 }).map((_, index) => (
+                <div key={index} className="flex h-10 items-center">
+                    <div className="flex w-9 shrink-0 items-center justify-center">
+                        <Skeleton className="size-4 rounded" />
+                    </div>
+                    <div className="min-w-0 flex-1 px-1">
+                        <Skeleton className="h-4 w-1/3" />
+                    </div>
+                    <div className="hidden w-44 shrink-0 px-2 lg:block">
+                        <Skeleton className="h-3 w-28" />
+                    </div>
+                    <div className="hidden w-44 shrink-0 px-2 sm:block">
+                        <Skeleton className="h-3 w-28" />
+                    </div>
+                    <div className="w-24 shrink-0 px-2">
+                        <Skeleton className="h-3 w-12" />
+                    </div>
+                    <div className="w-12 shrink-0" />
                 </div>
             ))}
         </div>

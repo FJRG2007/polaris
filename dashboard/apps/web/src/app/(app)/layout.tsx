@@ -9,6 +9,7 @@ import { CommandPalette } from "@/components/command-palette";
 import { listNotifications } from "@/lib/notification-service";
 import { UpdateIndicator } from "@/components/update-indicator";
 import { NotificationBell } from "@/components/notification-bell";
+import { RouteSkeletonCapture } from "@/components/route-skeleton";
 import { DisplayFormatProvider } from "@/components/display-format";
 import { AppShell, CapabilityProvider, EditionBadge } from "@polaris/ui";
 import { resolveDisplayPreferencesFor } from "@/lib/display-prefs-service";
@@ -52,7 +53,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
                             </>
                         }
                     >
-                        {children}
+                        <RouteSkeletonCapture>{children}</RouteSkeletonCapture>
                     </AppShell>
                 </NotificationsProvider>
             </DisplayFormatProvider>
