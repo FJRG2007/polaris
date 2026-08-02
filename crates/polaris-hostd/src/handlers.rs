@@ -896,7 +896,7 @@ fn mount_create<R: Read>(state: &AppState, req: &Request, body: &mut R) -> Respo
         Err(MountError::Unsupported) => {
             Response::not_implemented("mount is only supported on Linux hosts")
         }
-        Err(MountError::Failed) => Response::text(502, "Bad Gateway", "mount command failed"),
+        Err(MountError::Failed(reason)) => Response::text(502, "Bad Gateway", &reason),
     }
 }
 
@@ -916,7 +916,7 @@ fn mount_delete(state: &AppState, id: &str) -> Response {
         Err(MountError::Unsupported) => {
             Response::not_implemented("umount is only supported on Linux hosts")
         }
-        Err(MountError::Failed) => Response::text(502, "Bad Gateway", "umount command failed"),
+        Err(MountError::Failed(reason)) => Response::text(502, "Bad Gateway", &reason),
     }
 }
 
@@ -925,10 +925,11 @@ enum MountError {
     /// non-unix implementations, so it is dead code on a unix build.
     #[cfg_attr(unix, allow(dead_code))]
     Unsupported,
-    /// The `mount`/`umount` process returned a non-zero status. Only produced
-    /// by the unix implementations.
-    #[cfg_attr(not(unix), allow(dead_code))]
-    Failed,
+    /// The operation failed, carrying what the kernel or the mount helper said.
+    /// The reason reaches the caller verbatim: "mount command failed" tells an
+    /// operator nothing, while "Host is down" or "Permission denied" names the
+    /// thing they have to go and fix.
+    Failed(String),
 }
 
 /// Run `mount` with an argument vector (never a shell). Filesystem type is
@@ -942,13 +943,25 @@ enum MountError {
 fn run_mount(request: &MountRequest, target: &std::path::Path) -> Result<bool, MountError> {
     use std::process::Command;
 
-    if std::fs::create_dir_all(target).is_err() {
-        return Err(MountError::Failed);
-    }
     // Idempotent: a live mountpoint is already what the caller wants. Re-mounting
     // would stack mounts (SMB) or fail; deploys call this on every redeploy.
+    //
+    // A mountpoint whose session has died (the NAS rebooted, the share went away,
+    // the SMB session expired past reconnect) is the case that has to be cleared
+    // rather than reused. Nothing can even stat such a path - it answers
+    // EHOSTDOWN - so leaving it in place fails every later mount, and the failure
+    // lands on `create_dir_all` below, far from the cause.
     if is_mountpoint(target) {
-        return Ok(false);
+        if std::fs::metadata(target).is_ok() {
+            return Ok(false);
+        }
+        force_unmount(target)?;
+    }
+    if let Err(error) = std::fs::create_dir_all(target) {
+        return Err(MountError::Failed(format!(
+            "could not create the mount point {}: {error}",
+            target.to_string_lossy()
+        )));
     }
     let fstype = match request.kind {
         MountKind::Smb => "cifs",
@@ -963,8 +976,10 @@ fn run_mount(request: &MountRequest, target: &std::path::Path) -> Result<bool, M
         (&request.kind, &request.username, &request.password)
     {
         let path = std::path::Path::new("/run/polaris").join(format!("mount-creds-{}", request.id));
-        if write_creds_file(&path, user, pass).is_err() {
-            return Err(MountError::Failed);
+        if let Err(error) = write_creds_file(&path, user, pass) {
+            return Err(MountError::Failed(format!(
+                "could not write the credentials file: {error}"
+            )));
         }
         opts.push(format!("credentials={}", path.to_string_lossy()));
         creds_file = Some(path);
@@ -979,19 +994,76 @@ fn run_mount(request: &MountRequest, target: &std::path::Path) -> Result<bool, M
     if !opts.is_empty() {
         cmd.arg("-o").arg(opts.join(","));
     }
-    let status = cmd.status();
+    let output = cmd.output();
     if let Some(path) = creds_file {
         let _ = std::fs::remove_file(path);
     }
-    match status {
-        Ok(status) if status.success() => Ok(true),
-        _ => Err(MountError::Failed),
+    match output {
+        Ok(output) if output.status.success() => Ok(true),
+        Ok(output) => Err(MountError::Failed(format!(
+            "mounting {} failed: {}",
+            request.source,
+            command_message(&output)
+        ))),
+        Err(error) => Err(MountError::Failed(format!("could not run mount: {error}"))),
     }
 }
 
-/// True when `path` is a mount point (its device differs from its parent's).
+/// What a failed `mount`/`umount` said, as one line fit to show an operator.
+/// stderr first (that is where both the kernel reason and the helper's own
+/// diagnostics land), stdout as the fallback, and the exit status when the
+/// process printed nothing at all.
+#[cfg(unix)]
+fn command_message(output: &std::process::Output) -> String {
+    for stream in [&output.stderr, &output.stdout] {
+        let text = String::from_utf8_lossy(stream);
+        // The helper prints a usage banner under the real reason; the first
+        // non-empty line is the reason.
+        if let Some(line) = text.lines().map(str::trim).find(|line| !line.is_empty()) {
+            return line.to_string();
+        }
+    }
+    match output.status.code() {
+        Some(code) => format!("exit status {code}"),
+        None => "killed by a signal".to_string()
+    }
+}
+
+/// Detach a mount whose session is dead. A plain `umount` is enough once the
+/// filesystem has given up; a lazy detach is the fallback for the case where the
+/// kernel still holds references to it, and is safe here precisely because
+/// nothing can read through a dead mount anyway.
+#[cfg(unix)]
+fn force_unmount(target: &std::path::Path) -> Result<(), MountError> {
+    use std::process::Command;
+
+    for args in [vec!["-f"], vec!["-l"]] {
+        let output = Command::new("umount").args(&args).arg(target).output();
+        match output {
+            Ok(output) if output.status.success() => return Ok(()),
+            Ok(_) => continue,
+            Err(error) => {
+                return Err(MountError::Failed(format!("could not run umount: {error}")))
+            }
+        }
+    }
+    Err(MountError::Failed(format!(
+        "{} holds a dead mount that could not be detached; unmount it on the host and retry",
+        target.to_string_lossy()
+    )))
+}
+
+/// True when `path` is a mount point.
+///
+/// Read from the mount table rather than by comparing device numbers with the
+/// parent: a mount whose server is gone cannot be stat'ed at all, and that is
+/// exactly the mount this has to recognise. The device comparison stays as the
+/// fallback for a unix host without procfs.
 #[cfg(unix)]
 fn is_mountpoint(path: &std::path::Path) -> bool {
+    if let Ok(table) = std::fs::read_to_string("/proc/self/mountinfo") {
+        return mountinfo_lists(&table, &path.to_string_lossy());
+    }
     use std::os::unix::fs::MetadataExt;
     match (
         std::fs::metadata(path),
@@ -1000,6 +1072,17 @@ fn is_mountpoint(path: &std::path::Path) -> bool {
         (Ok(here), Some(Ok(parent))) => here.dev() != parent.dev(),
         _ => false,
     }
+}
+
+/// True when a `/proc/self/mountinfo` table carries `point` as a mount point.
+#[cfg(unix)]
+fn mountinfo_lists(table: &str, point: &str) -> bool {
+    table.lines().any(|line| {
+        // Field 5 is the mount point, with whitespace octal-escaped.
+        line.split(' ')
+            .nth(4)
+            .is_some_and(|field| field.replace("\\040", " ") == point)
+    })
 }
 
 /// Write a CIFS credentials file readable only by the daemon (mode 0600).
@@ -1024,9 +1107,12 @@ fn run_mount(_request: &MountRequest, _target: &std::path::Path) -> Result<bool,
 #[cfg(unix)]
 fn run_umount(target: &std::path::Path) -> Result<(), MountError> {
     use std::process::Command;
-    match Command::new("umount").arg(target).status() {
-        Ok(status) if status.success() => Ok(()),
-        _ => Err(MountError::Failed),
+    match Command::new("umount").arg(target).output() {
+        Ok(output) if output.status.success() => Ok(()),
+        // A mount the caller wants gone but whose server has died refuses a plain
+        // umount, so fall through to the same detach the mount path uses.
+        Ok(_) => force_unmount(target),
+        Err(error) => Err(MountError::Failed(format!("could not run umount: {error}")))
     }
 }
 
@@ -1065,6 +1151,41 @@ mod tests {
         let no_opts = br#"{"id":"nas","kind":"nfs","source":"srv:/x","target":"nas"}"#;
         let parsed: MountRequest = serde_json::from_slice(no_opts).unwrap();
         assert!(parsed.options.is_none());
+    }
+
+    /// A dead mount is unreadable, so it can only be recognised from the mount
+    /// table - the case that made every redeploy fail on a NAS that had gone away.
+    #[cfg(unix)]
+    #[test]
+    fn mountinfo_recognises_the_mount_point() {
+        let table = concat!(
+            "25 30 0:24 / /proc rw,relatime shared:5 - proc proc rw\n",
+            "31 30 0:29 / /mnt/polaris/nas-1 rw,relatime - cifs //nas/share rw\n",
+            "32 30 0:30 / /mnt/polaris/with\\040space rw,relatime - cifs //nas/other rw\n"
+        );
+        assert!(mountinfo_lists(table, "/mnt/polaris/nas-1"));
+        assert!(mountinfo_lists(table, "/mnt/polaris/with space"));
+        // A path under a mount point is not itself one.
+        assert!(!mountinfo_lists(table, "/mnt/polaris/nas-1/sub"));
+        assert!(!mountinfo_lists(table, "/mnt/polaris"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn command_message_prefers_the_first_stderr_line() {
+        use std::os::unix::process::ExitStatusExt;
+        let failed = std::process::ExitStatus::from_raw(256);
+        let with_stderr = std::process::Output {
+            status: failed,
+            stdout: b"ignored".to_vec(),
+            stderr: b"\nmount error(112): Host is down\nRefer to the mount.cifs(8) manual page\n"
+                .to_vec()
+        };
+        assert_eq!(command_message(&with_stderr), "mount error(112): Host is down");
+
+        // Nothing printed at all still names something actionable.
+        let silent = std::process::Output { status: failed, stdout: Vec::new(), stderr: Vec::new() };
+        assert_eq!(command_message(&silent), "exit status 1");
     }
 
     #[test]

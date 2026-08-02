@@ -41,6 +41,17 @@ interface RawResponse {
     readonly body: string;
 }
 
+/**
+ * A daemon rejection, phrased for whoever reads the deploy log. The daemon
+ * already answers with the reason the kernel or the mount helper gave, so that
+ * text is the message; the status code only appears when there is no body to
+ * show, which would otherwise leave nothing to act on.
+ */
+function daemonMessage(operation: string, response: RawResponse): string {
+    const reason = response.body.trim();
+    return reason ? reason : `${operation} was refused by the host daemon (${response.status})`;
+}
+
 export class HostdClient {
     private readonly socketPath?: string;
     private readonly tcpUrl?: string;
@@ -74,7 +85,7 @@ export class HostdClient {
     public async createMount(spec: MountSpec): Promise<MountResult> {
         const response = await this.call("POST", "/v1/mounts", JSON.stringify(spec));
         if (response.status !== 201) {
-            throw new Error(`hostd mount failed (${response.status}): ${response.body}`);
+            throw new Error(daemonMessage("mount", response));
         }
         const parsed = JSON.parse(response.body) as { id: string; mountpoint?: string; created?: boolean };
         return { id: parsed.id, mountPath: parsed.mountpoint ?? "", created: parsed.created ?? false };
@@ -84,7 +95,7 @@ export class HostdClient {
     public async deleteMount(id: string): Promise<void> {
         const response = await this.call("DELETE", `/v1/mounts/${encodeURIComponent(id)}`);
         if (response.status !== 200 && response.status !== 204) {
-            throw new Error(`hostd unmount failed (${response.status}): ${response.body}`);
+            throw new Error(daemonMessage("unmount", response));
         }
     }
 

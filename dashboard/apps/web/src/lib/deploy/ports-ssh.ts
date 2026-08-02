@@ -153,10 +153,19 @@ export class SshPorts implements RuntimePorts {
         const staticOpts = spec.options ?? "";
         // The script prints a sentinel so we can tell a fresh mount from a live one:
         // `polaris:already` when the target was mounted, `polaris:created` otherwise.
+        //
+        // A mount point whose server has gone away stays in the mount table but
+        // cannot be read or even stat'ed, so it is recognised from the table and
+        // detached - otherwise `mkdir -p` fails on it and every later deploy of
+        // the service dies on a path nobody can touch.
         const lines = [
             "set -e",
-            `mkdir -p ${quoteArg(target)}`,
-            `if mountpoint -q ${quoteArg(target)}; then echo polaris:already; exit 0; fi`
+            `t=${quoteArg(target)}`,
+            'if awk -v t="$t" \'$5 == t { found = 1 } END { exit !found }\' /proc/self/mountinfo 2>/dev/null; then',
+            '    if ls "$t" >/dev/null 2>&1; then echo polaris:already; exit 0; fi',
+            '    umount -f "$t" 2>/dev/null || umount -l "$t"',
+            "fi",
+            'mkdir -p "$t"'
         ];
         // For CIFS credentials, write a 0600 credentials file so the password never
         // reaches the mount argv; $creds expands in the mount `-o` value below.
