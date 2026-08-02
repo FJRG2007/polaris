@@ -326,7 +326,13 @@ configure_edition() {
         # The volume carries the compose project prefix, and both web and hostd mount
         # it at /run/polaris - which is where the dashboard reads the log from. No `$`
         # in this value, so Compose never tries to interpolate it.
-        update_cmd="docker rm -f polaris-updater >/dev/null 2>&1; docker run -d --name polaris-updater --rm -e POLARIS_HOST_REPO=${host_repo} -e POLARIS_UPDATE_LOG=/run/polaris/update.log -v /var/run/docker.sock:/var/run/docker.sock -v polaris_polaris-run:/run/polaris -v ${host_repo}:/polaris -w /polaris/dashboard ghcr.io/fjrg2007/polaris-updater:latest sh scripts/update.sh"
+        #
+        # `--pull=always` because `docker run` otherwise reuses whatever copy of
+        # `:latest` the host already has: the updater is the one image no update can
+        # refresh (it is what performs the update), so without this a deployment keeps
+        # running the updater it was installed with forever, and every fix to the
+        # update path lands everywhere except where it is needed.
+        update_cmd="docker rm -f polaris-updater >/dev/null 2>&1; docker run -d --pull=always --name polaris-updater --rm -e POLARIS_HOST_REPO=${host_repo} -e POLARIS_UPDATE_LOG=/run/polaris/update.log -v /var/run/docker.sock:/var/run/docker.sock -v polaris_polaris-run:/run/polaris -v ${host_repo}:/polaris -w /polaris/dashboard ghcr.io/fjrg2007/polaris-updater:latest sh scripts/update.sh"
         set_env_var "$env_file" "POLARIS_HOSTD_UPDATE_CMD" "$update_cmd"
         log "full edition (privileged host daemon, in-band updates, local Docker host)"
     else
