@@ -59,7 +59,10 @@ export const SelectContent = forwardRef<
             sideOffset={position === "popper" ? 6 : undefined}
             className={cn(
                 "relative z-50 max-h-[--radix-select-content-available-height] min-w-[8rem] overflow-hidden rounded-md border border-border bg-card text-foreground shadow-lg data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
-                position === "popper" && "w-[--radix-select-trigger-width]",
+                // The menu starts at the trigger's width but is allowed to grow
+                // past it: a narrow trigger must not clip the option it names.
+                // Capped to the viewport so a long option cannot push it off screen.
+                position === "popper" && "min-w-[--radix-select-trigger-width] max-w-[calc(100vw-2rem)]",
                 className
             )}
             {...props}

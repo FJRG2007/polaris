@@ -61,7 +61,10 @@ export function NotificationsView() {
     return (
         <div className="flex flex-col gap-2">
             <div className="flex flex-wrap items-center justify-end gap-2">
-                <div className="mr-auto w-48">
+                {/* Event names run long ("Someone locked out of their account"),
+                    so the filter gets the room to show one whole on a laptop and
+                    the full width of a phone. */}
+                <div className="mr-auto w-full sm:w-72">
                     <Select
                         value={event}
                         onValueChange={(value) => {
@@ -70,6 +73,7 @@ export function NotificationsView() {
                             setEnded(false);
                         }}
                         options={eventOptions}
+                        aria-label="Filter by event"
                     />
                 </div>
                 <Button size="sm" variant="ghost" onClick={markAllRead} disabled={unread === 0}>
