@@ -7,6 +7,7 @@
  * Reuses the existing terminal/files/logs building blocks.
  */
 
+import Link from "next/link";
 import { FilesPanel } from "./files-panel";
 import * as deployActions from "./actions";
 import { VolumesTab } from "./volumes-panel";
@@ -16,7 +17,6 @@ import type { HttpLogEntry } from "@polaris/deploy";
 import { isLocalDomain, primaryDomain } from "./domain-rank";
 import { stageServiceDeleteAction } from "./project-actions";
 import { useDisplayFormat } from "@/components/display-format";
-import { WafEditor } from "@/app/(app)/apps/firewall/waf-editor";
 import { isTunnelHostname, type DisplayFormat } from "@polaris/core";
 import { CloudflareMark, NgrokMark } from "@/components/brand-icons";
 import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
@@ -40,6 +40,8 @@ import {
     cn
 } from "@polaris/ui";
 import {
+    ArrowUpRight,
+    ChartColumn,
     CheckCircle2,
     ChevronDown,
     ChevronLeft,
@@ -58,13 +60,28 @@ import {
     Plus,
     RotateCw,
     Search,
+    ShieldCheck,
     Square,
     Trash2,
     X
 } from "lucide-react";
 
-const TABS = ["Deployments", "Variables", "Metrics", "Console", "Files", "Volumes", "Security", "Settings"] as const;
+/**
+ * The panel's own tabs, and the two screens that are not tabs.
+ *
+ * Security and Analytics are whole apps with a scope selector, jails, bans, feeds
+ * and history behind them. A copy of either squeezed into this panel is a second
+ * implementation that drifts from the real one - which is exactly what happened to
+ * Security, sitting here showing the rules while the firewall grew everything
+ * around them. So they link out with this service already selected instead.
+ */
+const TABS = ["Deployments", "Variables", "Metrics", "Console", "Files", "Volumes", "Settings"] as const;
 type Tab = (typeof TABS)[number];
+
+const LINKED_TABS = [
+    { label: "Security", icon: ShieldCheck, href: (id: string) => `/apps/firewall?scope=application&id=${id}` },
+    { label: "Analytics", icon: ChartColumn, href: (id: string) => `/apps/analytics?scope=application&id=${id}` }
+] as const;
 
 export function ServiceDetail({
     app,
@@ -127,6 +144,25 @@ export function ServiceDetail({
                             {name}
                         </button>
                     ))}
+                    <span className="mx-1 h-4 w-px shrink-0 bg-border" aria-hidden />
+                    {LINKED_TABS.map((entry) => {
+                        const Icon = entry.icon;
+                        return (
+                            <Link
+                                key={entry.label}
+                                href={entry.href(app.id)}
+                                // The arrow is the whole point: these leave the panel,
+                                // and a tab that closes what you were looking at without
+                                // saying so first is the worst kind of surprise.
+                                title={`Open ${entry.label.toLowerCase()} for ${app.name}`}
+                                className="-mb-px inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap border-b-2 border-transparent px-3 py-2 text-muted-foreground transition-colors hover:text-foreground"
+                            >
+                                <Icon className="size-3.5" />
+                                {entry.label}
+                                <ArrowUpRight className="size-3 opacity-60" />
+                            </Link>
+                        );
+                    })}
                 </div>
 
                 <div className="flex-1 overflow-y-auto px-5 py-3">
@@ -141,13 +177,6 @@ export function ServiceDetail({
                     )}
                     {tab === "Files" && <FilesPanel applicationId={app.id} />}
                     {tab === "Volumes" && <VolumesTab app={app} />}
-                    {tab === "Security" && (
-                        <WafEditor
-                            scopeType="application"
-                            scopeId={app.id}
-                            description="Restrict who can reach this service. Rules are enforced at the server's own edge, so they keep working even if the Polaris control plane goes down."
-                        />
-                    )}
                     {tab === "Settings" && (
                         <SettingsTab app={app} isGit={isGit} staged={staged ?? false} onChanged={onChanged} />
                     )}
