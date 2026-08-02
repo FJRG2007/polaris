@@ -142,31 +142,3 @@ export async function updateDoc(actorId: string, docId: string, input: core.DocI
 export async function deleteDoc(docId: string): Promise<void> {
     await prisma.taskDoc.delete({ where: { id: docId } });
 }
-
-/** Pages whose title or body mentions the query, for the docs search box. */
-export async function searchDocs(spaceIds: string[], query: string): Promise<{ id: string; title: string; excerpt: string }[]> {
-    const needle = query.trim();
-    if (needle.length < 2) return [];
-    const docs = await prisma.taskDoc.findMany({
-        where: {
-            archived: false,
-            spaceId: { in: spaceIds },
-            OR: [
-                { title: { contains: needle, mode: "insensitive" } },
-                { body: { contains: needle, mode: "insensitive" } }
-            ]
-        },
-        take: 25,
-        select: { id: true, title: true, body: true }
-    });
-
-    return docs.map((doc) => {
-        const at = doc.body.toLowerCase().indexOf(needle.toLowerCase());
-        const from = Math.max(0, at - 60);
-        return {
-            id: doc.id,
-            title: doc.title,
-            excerpt: at === -1 ? doc.body.slice(0, 120) : doc.body.slice(from, from + 160).trim()
-        };
-    });
-}

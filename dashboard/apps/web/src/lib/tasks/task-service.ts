@@ -38,7 +38,6 @@ export interface TaskScope {
 
 export interface TaskQueryOptions {
     readonly includeArchived?: boolean;
-    readonly search?: string;
     readonly limit?: number;
 }
 
@@ -157,8 +156,7 @@ export async function listTasks(scope: TaskScope, options: TaskQueryOptions = {}
             ...(scope.sprintId ? { sprintId: scope.sprintId } : {}),
             ...(scope.assigneeId ? { assignees: { some: { userId: scope.assigneeId } } } : {}),
             ...(scope.parentId !== undefined ? { parentId: scope.parentId } : {}),
-            ...(options.includeArchived ? {} : { archived: false }),
-            ...(options.search ? { name: { contains: options.search, mode: "insensitive" as const } } : {})
+            ...(options.includeArchived ? {} : { archived: false })
         },
         orderBy: [{ order: "asc" }, { createdAt: "asc" }],
         take: options.limit ?? 2000,
@@ -808,10 +806,14 @@ export async function bulkUpdate(actorId: string, spaceIds: string[], input: cor
     }
     if (Object.keys(data).length > 0) await prisma.task.updateMany({ where: { id: { in: ids } }, data });
 
+    // createMany's skipDuplicates is Postgres-only and the schema has to stay
+    // SQLite-portable, so whatever would collide is removed first. Same result,
+    // and adding somebody who is already on the task stays a no-op.
     if (input.addAssigneeIds?.length) {
+        const userIds = input.addAssigneeIds;
+        await prisma.taskAssignee.deleteMany({ where: { taskId: { in: ids }, userId: { in: userIds } } });
         await prisma.taskAssignee.createMany({
-            data: ids.flatMap((taskId) => input.addAssigneeIds!.map((userId) => ({ taskId, userId }))),
-            skipDuplicates: true
+            data: ids.flatMap((taskId) => userIds.map((userId) => ({ taskId, userId })))
         });
     }
     if (input.removeAssigneeIds?.length) {
@@ -820,9 +822,10 @@ export async function bulkUpdate(actorId: string, spaceIds: string[], input: cor
         });
     }
     if (input.addTagIds?.length) {
+        const tagIds = input.addTagIds;
+        await prisma.taskTagLink.deleteMany({ where: { taskId: { in: ids }, tagId: { in: tagIds } } });
         await prisma.taskTagLink.createMany({
-            data: ids.flatMap((taskId) => input.addTagIds!.map((tagId) => ({ taskId, tagId }))),
-            skipDuplicates: true
+            data: ids.flatMap((taskId) => tagIds.map((tagId) => ({ taskId, tagId })))
         });
     }
     if (input.removeTagIds?.length) {
