@@ -6,7 +6,13 @@
  */
 
 import { prisma } from "@polaris/db";
-import { MAX_POINTS, RAW_MAX_SPAN_MS, type MetricPoint, type MetricSubjectType } from "./metrics-shared";
+import {
+    LOCAL_HOST_SUBJECT,
+    MAX_POINTS,
+    RAW_MAX_SPAN_MS,
+    type MetricPoint,
+    type MetricSubjectType
+} from "./metrics-shared";
 
 /** Remove all history for a subject - called when the app/connection is deleted
  *  so orphaned series do not linger until retention sweeps them. */
@@ -27,6 +33,22 @@ async function subjectBelongsToOwner(
             select: { id: true }
         });
         return app != null;
+    }
+    if (subjectType === "host") {
+        // "local" is the box Polaris itself runs on, which belongs to whoever is
+        // asking - there is no Host row behind it to check ownership against.
+        if (subjectId === LOCAL_HOST_SUBJECT) return true;
+        const host = await prisma.host.findFirst({ where: { id: subjectId, ownerId }, select: { id: true } });
+        return host != null;
+    }
+    if (subjectType === "volume") {
+        // Ownership rides on the deploy target, which is where every other volume
+        // query checks it too.
+        const volume = await prisma.volume.findFirst({
+            where: { id: subjectId, target: { ownerId } },
+            select: { id: true }
+        });
+        return volume != null;
     }
     const connection = await prisma.storageConnection.findFirst({
         where: { id: subjectId, ownerId },

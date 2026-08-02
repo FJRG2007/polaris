@@ -10,11 +10,11 @@
  * shapes are validated before use and failures degrade to "daemon absent".
  */
 
-import { readFile } from "node:fs/promises";
-import { request as httpRequest, type IncomingMessage, type RequestOptions } from "node:http";
-import { connect as netConnect, type Socket } from "node:net";
 import { loadEnv } from "@polaris/config";
+import { readFile } from "node:fs/promises";
 import type { HostdHealth } from "@polaris/config";
+import { connect as netConnect, type Socket } from "node:net";
+import { request as httpRequest, type IncomingMessage, type RequestOptions } from "node:http";
 
 export interface MountSpec {
     readonly id: string;
@@ -219,6 +219,11 @@ export class HostdClient {
             "x-polaris-container": container,
             "x-polaris-path": path
         });
+    }
+
+    /** Empty a volume's mount point inside a container, keeping the directory. */
+    public async volumeWipe(container: string, path: string): Promise<IncomingMessage> {
+        return this.callStream("POST", "/v1/deploy/volume/wipe", JSON.stringify({ container, path }));
     }
 
     /** Create an interactive exec in a container; returns the exec id. */

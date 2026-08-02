@@ -11,13 +11,16 @@
  * never stops the others or the loop.
  */
 
-import { prisma, type Prisma } from "@polaris/db";
 import { serviceName } from "@polaris/deploy";
+import { prisma, type Prisma } from "@polaris/db";
 import type { DockerDriver } from "@polaris/docker";
+import { currentReleaseRef } from "./deploy/releases";
+import { getPorts, type TargetRow } from "./deploy/runtime";
 import { hostDockerDriver, localDockerDriver } from "./docker-service";
 import { getDriverForConnection, getUnasMetrics } from "./storage-service";
 import {
     COLLECT_TICK_MS,
+    LOCAL_HOST_SUBJECT,
     MAINTENANCE_EVERY_TICKS,
     RAW_RETENTION_MS,
     ROLLUP_RETENTION_MS,
@@ -69,6 +72,135 @@ async function collectApps(ts: Date): Promise<SampleRow[]> {
         }
     }
     return rows;
+}
+
+/**
+ * Sample each server's load: how much of it the containers running on it are
+ * using, against what the machine actually has.
+ *
+ * Measured through the Docker daemon already reachable on that server rather
+ * than by shelling in for `/proc` - it needs no extra privilege, works the same
+ * for the local box and a remote host, and answers the question Watch is
+ * actually asked, which is how hard a server is being worked.
+ */
+async function collectHosts(ts: Date): Promise<SampleRow[]> {
+    const hosts = await prisma.host.findMany({ select: { id: true, ownerId: true } });
+    const subjects: { subjectId: string; ownerId: string | null }[] = [
+        { subjectId: LOCAL_HOST_SUBJECT, ownerId: null },
+        ...hosts.map((host) => ({ subjectId: host.id, ownerId: host.ownerId }))
+    ];
+
+    const rows: SampleRow[] = [];
+    for (const subject of subjects) {
+        let driver: DockerDriver | null = null;
+        try {
+            driver =
+                subject.ownerId === null
+                    ? localDockerDriver()
+                    : await hostDockerDriver(subject.subjectId, subject.ownerId);
+            const info = await driver.info();
+            const running = (await driver.listContainers(false)).filter((entry) => entry.state === "running");
+
+            let cpu = 0;
+            let memory = 0;
+            for (const container of running) {
+                try {
+                    const stats = await driver.stats(container.id);
+                    cpu += stats.cpuPercent;
+                    memory += stats.memUsage;
+                } catch {
+                    // A container that stopped between the list and the read.
+                }
+            }
+            rows.push({
+                subjectType: "host",
+                subjectId: subject.subjectId,
+                ts,
+                // Normalized against the core count, so a 4-core box at 200% of one
+                // core reads as 50% busy rather than "200".
+                cpuPercent: info.ncpu > 0 ? round2(Math.min(100, cpu / info.ncpu)) : round2(cpu),
+                memUsedBytes: bigBytes(memory),
+                memTotalBytes: bigBytes(info.memTotal)
+            });
+        } catch {
+            // Daemon absent or host unreachable this tick.
+        } finally {
+            if (driver) await driver.dispose().catch(() => undefined);
+        }
+    }
+    return rows;
+}
+
+/**
+ * Sample how full every attached volume is, measured from inside the service
+ * that mounts it - the one place a named volume, a host bind and a NAS mount all
+ * resolve to the same path. Only volumes on a deployed service can be read, so
+ * the rest are skipped rather than written as an all-null row.
+ *
+ * `diskTotalBytes` carries the volume's declared cap where it has one, which is
+ * what turns the chart from a rising line into a percentage of something.
+ */
+async function collectVolumes(ts: Date): Promise<SampleRow[]> {
+    const volumes = await prisma.volume.findMany({
+        where: { application: { currentDeploymentId: { not: null } } },
+        include: {
+            target: true,
+            application: {
+                include: { environment: { include: { project: true } }, target: true, volumes: { select: { id: true } } }
+            }
+        }
+    });
+    const rows: SampleRow[] = [];
+    // One ports connection per target, not per volume: a server with a dozen
+    // volumes would otherwise open a dozen SSH sessions every tick.
+    const byTarget = new Map<string, typeof volumes>();
+    for (const volume of volumes) {
+        const group = byTarget.get(volume.targetId);
+        if (group) group.push(volume);
+        else byTarget.set(volume.targetId, [volume]);
+    }
+
+    for (const group of byTarget.values()) {
+        const first = group[0];
+        if (!first?.application) continue;
+        const ownerId = first.application.environment.project.ownerId;
+        let ports: Awaited<ReturnType<typeof getPorts>> | null = null;
+        try {
+            ports = await getPorts(first.target as TargetRow, ownerId);
+            for (const volume of group) {
+                if (!volume.application) continue;
+                try {
+                    const container = (await currentReleaseRef(volume.application)).name;
+                    const used = await ports.diskUsage(container, volume.mountPath);
+                    if (used == null) continue;
+                    rows.push({
+                        subjectType: "volume",
+                        subjectId: volume.id,
+                        ts,
+                        diskUsedBytes: bigBytes(used),
+                        diskTotalBytes: bigBytes(parseSizeLimit(volume.sizeLimit))
+                    });
+                } catch {
+                    // One unreadable volume must not cost the others their sample.
+                }
+            }
+        } catch {
+            // Host unreachable this tick.
+        } finally {
+            if (ports) await ports.dispose().catch(() => undefined);
+        }
+    }
+    return rows;
+}
+
+/** A declared cap like "10G" or "500M" as bytes, or null when there is none. */
+export function parseSizeLimit(limit: string | null): number | null {
+    if (!limit) return null;
+    const match = /^(\d+(?:\.\d+)?)\s*(K|M|G|T)i?B?$/i.exec(limit.trim());
+    if (!match) return null;
+    const scale: Record<string, number> = { k: 1024, m: 1024 ** 2, g: 1024 ** 3, t: 1024 ** 4 };
+    const factor = scale[(match[2] ?? "").toLowerCase()];
+    return factor ? Number(match[1]) * factor : null;
 }
 
 /** Sample every storage connection: rich CPU/memory/disk for a UniFi UNAS, disk
@@ -126,7 +258,10 @@ async function collectStorage(ts: Date): Promise<SampleRow[]> {
 export async function collectMetricsOnce(opts: { storage: boolean }): Promise<number> {
     const ts = new Date();
     const rows = await collectApps(ts);
-    if (opts.storage) rows.push(...(await collectStorage(ts)));
+    rows.push(...(await collectHosts(ts)));
+    // Volumes ride the slower cadence: measuring one walks its whole tree, which
+    // is far too expensive to do every minute beside a container stats read.
+    if (opts.storage) rows.push(...(await collectVolumes(ts)), ...(await collectStorage(ts)));
     if (rows.length === 0) return 0;
     // Every row in a tick shares one timestamp and each subject is unique, so the
     // composite PK never collides - no skipDuplicates needed (unsupported on the

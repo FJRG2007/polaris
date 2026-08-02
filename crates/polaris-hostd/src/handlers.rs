@@ -136,6 +136,13 @@ struct FsReadRequest {
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
+struct VolumeWipeRequest {
+    container: String,
+    path: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct ExecResizeRequest {
     #[serde(rename = "execId")]
     exec_id: String,
@@ -185,6 +192,7 @@ pub fn dispatch<R: Read>(state: &AppState, req: &Request, body: &mut R) -> Respo
         ("POST", "/v1/deploy/exec/resize") => deploy_exec_resize(state, req, body),
         ("POST", "/v1/deploy/fs/read") => deploy_fs_read(req, body),
         ("POST", "/v1/deploy/fs/write") => deploy_fs_write(state, req, body),
+        ("POST", "/v1/deploy/volume/wipe") => deploy_volume_wipe(req, body),
         _ if path.starts_with("/v1/fs/") => fs_handler(state, req, body),
         ("DELETE", _) if path.starts_with("/v1/mounts/") => {
             mount_delete(state, &path["/v1/mounts/".len()..])
@@ -606,9 +614,11 @@ fn stream_response(reader: Box<dyn std::io::Read + Send>) -> Response {
     Response::stream(200, "OK", reader).with_header("Content-Type", "text/plain; charset=utf-8")
 }
 
-/// Read-only container filesystem commands (list/stat/read/tar). argv[0] is held
-/// to a small allowlist; the file browser only ever uses these.
-const FS_READ_ALLOWED: &[&str] = &["ls", "stat", "cat", "tar", "find", "test"];
+/// Read-only container filesystem commands (list/stat/read/tar/measure). argv[0]
+/// is held to a small allowlist; the file browser and the volume usage sampler
+/// only ever use these. `du` reads sizes and writes nothing, so it belongs to the
+/// read set as much as `stat` does.
+const FS_READ_ALLOWED: &[&str] = &["ls", "stat", "cat", "tar", "find", "test", "du"];
 
 /// Run a read-only filesystem command inside a container and stream stdout. stderr
 /// is dropped so a binary read (cat/tar) is never corrupted by diagnostics.
@@ -686,6 +696,53 @@ fn deploy_fs_write<R: Read>(state: &AppState, req: &Request, body: &mut R) -> Re
     match deploy::exec_run(container, &argv, Some(reopened), true) {
         Ok(reader) => stream_response(reader),
         Err(_) => Response::text(502, "Bad Gateway", "could not write the file"),
+    }
+}
+
+/// Empty a volume's mount point inside a container, leaving the directory itself
+/// in place so the service still has somewhere to write when it comes back up.
+///
+/// The path is a positional argument (`$1`), never interpolated into the shell
+/// command, exactly as `deploy_fs_write` does it - so a path cannot inject a
+/// second command however it is spelled. The three globs cover ordinary, dotted,
+/// and `..`-prefixed entries; a shell that expands none of them leaves the glob
+/// itself as a literal, which `rm -f` then reports as missing and ignores.
+///
+/// This is the one destructive filesystem primitive the daemon offers, and it is
+/// deliberately not a general `rm`: the caller chooses which volume, never what
+/// the command is.
+fn deploy_volume_wipe<R: Read>(req: &Request, body: &mut R) -> Response {
+    let raw = match read_control_body(req, body) {
+        Ok(b) => b,
+        Err(resp) => return resp,
+    };
+    let request: VolumeWipeRequest = match serde_json::from_slice(&raw) {
+        Ok(r) => r,
+        Err(_) => return Response::bad_request("invalid volume wipe request"),
+    };
+    if !deploy::valid_container_ref(&request.container) {
+        return Response::bad_request("invalid container reference");
+    }
+    // An absolute mount path with no control bytes. Refusing "/" outright is the
+    // difference between emptying a volume and emptying the container.
+    let path = request.path.trim();
+    if !path.starts_with('/')
+        || path.len() < 2
+        || path.len() > 4096
+        || path.bytes().any(|b| b < 0x20 || b == 0x7f)
+    {
+        return Response::bad_request("invalid or missing mount path");
+    }
+    let argv = vec![
+        "sh".to_string(),
+        "-c".to_string(),
+        "rm -rf -- \"$1\"/* \"$1\"/.[!.]* \"$1\"/..?* 2>/dev/null; exit 0".to_string(),
+        "polaris".to_string(),
+        path.to_string(),
+    ];
+    match deploy::exec_run(&request.container, &argv, None, true) {
+        Ok(reader) => stream_response(reader),
+        Err(_) => Response::text(502, "Bad Gateway", "could not wipe the volume"),
     }
 }
 

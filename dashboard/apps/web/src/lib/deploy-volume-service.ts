@@ -13,6 +13,8 @@
 import { prisma } from "@polaris/db";
 import { slugify } from "@polaris/deploy";
 import { getDriver } from "./storage-service";
+import { currentReleaseRef } from "./deploy/releases";
+import { getPorts, type TargetRow } from "./deploy/runtime";
 import {
     canHostMount,
     deployVolumeInputSchema,
@@ -236,12 +238,133 @@ export async function updateVolume(ownerId: string, input: DeployVolumeUpdateInp
     };
 }
 
-/** Delete a volume, ownership-checked via its target. */
-export async function deleteVolume(id: string, ownerId: string): Promise<void> {
+/**
+ * Delete a volume, ownership-checked via its target.
+ *
+ * `wipe` destroys the data as well as detaching the mount. It defaults to off:
+ * removing a volume from a service and destroying what is inside it are two
+ * different intentions, and only one of them is recoverable.
+ */
+export async function deleteVolume(id: string, ownerId: string, options?: { wipe?: boolean }): Promise<void> {
     const volume = await prisma.volume.findFirst({
         where: { id, target: { ownerId } },
         select: { id: true }
     });
     if (!volume) throw new Error("Volume not found");
+    // Wipe before detaching: once the row is gone there is nothing left that
+    // knows where the data was.
+    if (options?.wipe) await wipeVolume(id, ownerId);
     await prisma.volume.delete({ where: { id } });
+}
+
+// --- usage and wiping -------------------------------------------------------
+
+/** A volume with everything the detail panel shows, including where it lives. */
+export interface VolumeDetail extends VolumeView {
+    applicationId: string | null;
+    applicationName: string | null;
+    /** The server it is stored on - Railway calls this the volume's region. */
+    serverName: string;
+    serverKind: string;
+    /** True when the service it is attached to is currently deployed, which is
+     *  what decides whether usage can be measured or the data reached at all. */
+    serviceRunning: boolean;
+}
+
+export async function getVolume(id: string, ownerId: string): Promise<VolumeDetail> {
+    const row = await prisma.volume.findFirst({
+        where: { id, target: { ownerId } },
+        include: {
+            connection: { select: { name: true } },
+            target: { select: { name: true, kind: true } },
+            application: { select: { id: true, name: true, currentDeploymentId: true } }
+        }
+    });
+    if (!row) throw new Error("Volume not found");
+    return {
+        id: row.id,
+        name: row.name,
+        mountPath: row.mountPath,
+        kind: row.kind === "bind" ? "bind" : row.kind === "nas" ? "nas" : "volume",
+        source: row.source ?? row.name,
+        connectionId: row.connectionId,
+        connectionName: row.connection?.name ?? null,
+        sizeLimit: row.sizeLimit,
+        applicationId: row.application?.id ?? null,
+        applicationName: row.application?.name ?? null,
+        serverName: row.target.name,
+        serverKind: row.target.kind,
+        serviceRunning: Boolean(row.application?.currentDeploymentId)
+    };
+}
+
+/**
+ * The container a volume's data is reachable through, plus the ports to reach it
+ * with. A volume is measured and emptied from inside the service that mounts it,
+ * because that is the one place all three kinds resolve to the same path - a
+ * named volume, a host bind and a NAS mount all appear at `mountPath` there.
+ */
+async function volumeRuntime(id: string, ownerId: string) {
+    const volume = await prisma.volume.findFirst({
+        where: { id, target: { ownerId } },
+        include: {
+            target: true,
+            application: {
+                include: { environment: { include: { project: true } }, target: true, volumes: { select: { id: true } } }
+            }
+        }
+    });
+    if (!volume) throw new Error("Volume not found");
+    if (!volume.application) throw new Error("This volume is not attached to a service");
+    if (!volume.application.currentDeploymentId) {
+        throw new Error("The service is not running, so its volume cannot be reached");
+    }
+    const ref = await currentReleaseRef(volume.application);
+    return { volume, container: ref.name, target: volume.target as TargetRow };
+}
+
+/**
+ * Bytes currently used by a volume, or null when it cannot be measured right now
+ * (the service is not up, or the image has no `du`). Never throws for the
+ * ordinary "nothing running" case - a chart with no data is the honest answer.
+ */
+export async function measureVolumeUsage(id: string, ownerId: string): Promise<number | null> {
+    let runtime;
+    try {
+        runtime = await volumeRuntime(id, ownerId);
+    } catch {
+        return null;
+    }
+    const ports = await getPorts(runtime.target, ownerId);
+    try {
+        return await ports.diskUsage(runtime.container, runtime.volume.mountPath);
+    } catch {
+        return null;
+    } finally {
+        await ports.dispose();
+    }
+}
+
+/**
+ * Destroy everything inside a volume, keeping the volume itself. The mount point
+ * survives so the service has somewhere to write when it comes back; only the
+ * contents go.
+ */
+export async function wipeVolume(id: string, ownerId: string): Promise<void> {
+    const runtime = await volumeRuntime(id, ownerId);
+    const ports = await getPorts(runtime.target, ownerId);
+    try {
+        await ports.wipePath(runtime.container, runtime.volume.mountPath);
+    } finally {
+        await ports.dispose();
+    }
+    // A NAS volume is also a Drive folder, and Drive keeps its own size cache -
+    // leaving it behind would report the old figure until something else evicts it.
+    if (runtime.volume.kind === "nas" && runtime.volume.connectionId && runtime.volume.source) {
+        await prisma.driveFolderSize
+            .deleteMany({
+                where: { connectionId: runtime.volume.connectionId, path: { startsWith: runtime.volume.source } }
+            })
+            .catch(() => undefined);
+    }
 }

@@ -7,8 +7,9 @@
  */
 
 import type { Client } from "ssh2";
-import { quoteArg, renderComposeYaml, type ComposeSpec, type ExecSpec, type ExecStream, type LogOptions, type MountTarget, type OutputSink, type RuntimePorts } from "@polaris/deploy";
+import { parseDuKilobytes } from "./ports-hostd";
 import { execCommand, openShell, openSshClient, type SshAuth } from "@polaris/ssh";
+import { quoteArg, renderComposeYaml, type ComposeSpec, type ExecSpec, type ExecStream, type LogOptions, type MountTarget, type OutputSink, type RuntimePorts } from "@polaris/deploy";
 
 /** Where compose files and volume data live on a managed remote server. */
 const REMOTE_DEPLOY_ROOT = "/var/lib/polaris/deploy";
@@ -186,6 +187,27 @@ export class SshPorts implements RuntimePorts {
         const client = await this.connect();
         // A PTY so the remote `logs -f` dies when the client disconnects.
         await execCommand(client, parts.join(" "), { pty: true, onStdout: onData, onStderr: onData });
+    }
+
+    public async diskUsage(ref: string, path: string): Promise<number | null> {
+        let out = "";
+        try {
+            await this.run(`docker exec ${quoteArg(ref)} du -sk -- ${quoteArg(path)}`, (chunk) => {
+                out += chunk.toString("utf8");
+            });
+        } catch {
+            // A stopped container, or an image without `du`. Not measurable is not
+            // an error: the chart says so rather than the sampler throwing.
+            return null;
+        }
+        return parseDuKilobytes(out);
+    }
+
+    public async wipePath(ref: string, path: string): Promise<void> {
+        // The path is a positional argument, never interpolated into the inner
+        // command, so the same guarantee holds here as on the local daemon.
+        const script = "rm -rf -- \"$1\"/* \"$1\"/.[!.]* \"$1\"/..?* 2>/dev/null; exit 0";
+        await this.run(`docker exec ${quoteArg(ref)} sh -c ${quoteArg(script)} polaris ${quoteArg(path)}`);
     }
 
     public async exec(spec: ExecSpec): Promise<ExecStream> {

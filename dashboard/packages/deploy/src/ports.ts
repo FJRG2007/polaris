@@ -82,6 +82,13 @@ export interface RuntimePorts {
      *  only the apps whose mount had to be re-established (e.g. after a host reboot). */
     ensureMount(spec: MountTarget): Promise<boolean>;
     logs(ref: string, onData: OutputSink, options?: LogOptions): Promise<void>;
+    /** Bytes in use under a path inside a running container, for volume usage
+     *  history. Resolves null rather than throwing when it cannot be measured -
+     *  a stopped container is the ordinary case, not an error worth a stack. */
+    diskUsage(ref: string, path: string): Promise<number | null>;
+    /** Empty a volume's mount point inside a running container, keeping the
+     *  directory itself so the service still has somewhere to write. */
+    wipePath(ref: string, path: string): Promise<void>;
     /** Open an interactive exec/attach stream. */
     exec(spec: ExecSpec): Promise<ExecStream>;
     dispose(): Promise<void>;

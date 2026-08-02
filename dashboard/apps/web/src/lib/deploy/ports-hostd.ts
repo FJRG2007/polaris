@@ -6,8 +6,8 @@
  */
 
 import type { Readable } from "node:stream";
-import type { BuildRequest, ComposeSpec, ExecSpec, ExecStream, LogOptions, MountTarget, OutputSink, RuntimePorts } from "@polaris/deploy";
 import { HostdClient } from "@polaris/hostd-client";
+import type { BuildRequest, ComposeSpec, ExecSpec, ExecStream, LogOptions, MountTarget, OutputSink, RuntimePorts } from "@polaris/deploy";
 
 export class HostdPorts implements RuntimePorts {
     private readonly client = new HostdClient();
@@ -97,6 +97,22 @@ export class HostdPorts implements RuntimePorts {
         await drain(res, onData);
     }
 
+    public async diskUsage(ref: string, path: string): Promise<number | null> {
+        try {
+            // `du -sk` is in every busybox and coreutils, and reports kilobytes -
+            // the one unit both agree on without a flag that one of them lacks.
+            const res = await this.client.fsRead(ref, ["du", "-sk", "--", path]);
+            return parseDuKilobytes(await collect(res));
+        } catch {
+            return null;
+        }
+    }
+
+    public async wipePath(ref: string, path: string): Promise<void> {
+        const res = await this.client.volumeWipe(ref, path);
+        await drain(res);
+    }
+
     public async exec(spec: ExecSpec): Promise<ExecStream> {
         const execId = await this.client.execCreate({
             container: spec.container,
@@ -148,6 +164,32 @@ function drain(stream: Readable & { statusCode?: number }, onOutput?: OutputSink
         });
         stream.on("error", reject);
     });
+}
+
+/** Collect a streamed response into a string, ignoring the exit trailer. */
+function collect(stream: Readable): Promise<string> {
+    return new Promise((resolve, reject) => {
+        const chunks: Buffer[] = [];
+        stream.on("data", (chunk: Buffer) => chunks.push(chunk));
+        stream.on("end", () => resolve(Buffer.concat(chunks).toString("utf8")));
+        stream.on("error", reject);
+    });
+}
+
+/**
+ * Read the byte total out of `du -sk` output. The first field of the last
+ * non-empty line is the figure: busybox prints one line, coreutils prints one
+ * per argument, and both put the total for the path last.
+ */
+export function parseDuKilobytes(output: string): number | null {
+    const line = output
+        .split("\n")
+        .map((entry) => entry.trim())
+        .filter((entry) => entry.length > 0 && /^\d/.test(entry))
+        .pop();
+    if (!line) return null;
+    const kilobytes = Number.parseInt(line.split(/\s+/)[0] ?? "", 10);
+    return Number.isFinite(kilobytes) ? kilobytes * 1024 : null;
 }
 
 /** Collect a readable stream into a single Buffer. */

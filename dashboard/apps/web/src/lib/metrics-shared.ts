@@ -4,7 +4,15 @@
  * so both the server services and client components can read it.
  */
 
-export type MetricSubjectType = "app" | "storage";
+export type MetricSubjectType = "app" | "storage" | "volume" | "host";
+
+/**
+ * Subject id for the machine Polaris itself runs on. It has no Host row until it
+ * is enrolled, but it is the one server every install has - so it gets a fixed,
+ * reserved id rather than being absent from its own monitoring. A uuid, because
+ * the column is one.
+ */
+export const LOCAL_HOST_SUBJECT = "00000000-0000-4000-8000-000000000001";
 
 /** One point of a series returned to the client. Bytes are plain numbers (a
  *  device's memory/disk stays well under 2^53), percentages are derived from the
