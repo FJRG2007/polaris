@@ -138,6 +138,34 @@ describe("enrollmentScript", () => {
         expect(script).toContain("collect_host_keys");
     });
 
+    // macOS ships with Remote Login off, so the login was configured and then
+    // nothing answered - and Polaris, which can only see a connect that times out,
+    // reported a firewall problem on a machine that had no SSH server running.
+    it("turns Remote Login on rather than handing back a machine nothing can reach", () => {
+        // Stdin closed because this script IS stdin: anything that reads from it
+        // swallows the rest of the script.
+        expect(script).toContain("systemsetup -setremotelogin on </dev/null");
+        // Read back rather than trusted - Full Disk Access can refuse the change,
+        // and systemsetup says so on stdout rather than in its exit code.
+        expect(script).toContain('grep -qi "remote login: on"');
+    });
+
+    // Stopping here leaves the token unspent, so the same command works again once
+    // the SSH server is on. Claiming first would burn it for nothing.
+    it("stops before the claim when nothing will answer on the SSH port", () => {
+        const preflight = script.indexOf("nothing is listening on port");
+        expect(preflight).toBeGreaterThan(-1);
+        expect(preflight).toBeLessThan(script.indexOf("telling Polaris about this machine"));
+        expect(script).toContain('die "Remote Login is off');
+    });
+
+    // A box with neither tool cannot answer the question, and a wrong "nothing is
+    // listening" would strand an enrollment that was fine.
+    it("only refuses on a listener check it could actually run", () => {
+        expect(script).toContain("SSH_LISTENING=unknown");
+        expect(script).toContain('if [ "$SSH_LISTENING" = "no" ]');
+    });
+
     it("locks the login it creates out of password authentication", () => {
         expect(script).toContain('passwd -l "$POLARIS_USER"');
     });

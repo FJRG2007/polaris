@@ -77,6 +77,8 @@ export function enrollmentScript(input: EnrollmentScriptInput): string {
 # Everything it changes:
 #   - the '${input.username}' user and its home directory
 #   - ~${input.username}/.ssh/authorized_keys
+#   - Remote Login, on macOS and only if it was off - nothing can connect until
+#     it is on, which is the whole point of running this
 #   - the docker group membership, only with --docker
 #   - /etc/sudoers.d/${input.username}, only with --root
 #
@@ -117,6 +119,8 @@ esac
 ${createUserSection()}
 
 ${authorizeKeySection()}
+
+${sshServiceSection()}
 
 ${dockerSection()}
 
@@ -188,16 +192,56 @@ else
 fi
 chmod 700 "\$HOME_DIR/.ssh"
 chmod 600 "\$HOME_DIR/.ssh/authorized_keys"
-chown -R "\$POLARIS_USER" "\$HOME_DIR/.ssh"
+chown -R "\$POLARIS_USER" "\$HOME_DIR/.ssh"`;
+}
+
+/**
+ * Make sure something will actually answer on the SSH port, and stop before the
+ * claim when nothing will.
+ *
+ * A machine whose login is configured but whose SSH server is not running is the
+ * one failure Polaris cannot diagnose from its end: the claim burns the token,
+ * the outbound connect times out, and the operator is told to go and look at a
+ * firewall that was never the problem. Catching it here leaves the token unspent,
+ * so the same command works again once the server is on.
+ *
+ * macOS is where this bites, because it ships with Remote Login off, so that one
+ * is switched on rather than only reported. Stdin is closed for it because this
+ * script IS stdin: anything that reads from it swallows the rest of the script.
+ * The result is re-read rather than assumed - since Catalina the change is refused
+ * unless the process running the command holds Full Disk Access, and `systemsetup`
+ * reports that on stdout rather than in its exit code.
+ */
+function sshServiceSection(): string {
+    return `SSH_PORT=\$(awk '/^[[:space:]]*Port[[:space:]]+[0-9]+/ { print \$2; exit }' /etc/ssh/sshd_config 2>/dev/null || true)
+[ -n "\${SSH_PORT:-}" ] || SSH_PORT=22
 
 if [ "\$PLATFORM" = "darwin" ]; then
-    # Remote Login off means nothing will answer, and turning it on needs Full
-    # Disk Access, which a piped script does not have. Say so instead of failing.
-    if ! systemsetup -getremotelogin 2>/dev/null | grep -qi "on"; then
-        say "WARNING: Remote Login is off. Turn it on in System Settings > General > Sharing"
+    if ! systemsetup -getremotelogin 2>/dev/null | grep -qi "remote login: on"; then
+        systemsetup -setremotelogin on </dev/null >/dev/null 2>&1 || true
+        if systemsetup -getremotelogin 2>/dev/null | grep -qi "remote login: on"; then
+            say "turned Remote Login on so Polaris can reach this machine"
+        else
+            die "Remote Login is off, so nothing answers on port \$SSH_PORT. Turn it on in System Settings > General > Sharing, then run this command again"
+        fi
     fi
     # Only matters when Remote Login is limited to named users.
     dseditgroup -o edit -a "\$POLARIS_USER" -t user com.apple.access_ssh >/dev/null 2>&1 || true
+else
+    # Only a listener this machine can see for itself counts. A box with neither
+    # tool skips the check: a wrong "nothing is listening" would strand an
+    # enrollment that was fine.
+    SSH_LISTENING=unknown
+    if command -v ss >/dev/null 2>&1; then
+        SSH_LISTENING=no
+        ss -ltn 2>/dev/null | grep -q ":\$SSH_PORT " && SSH_LISTENING=yes
+    elif command -v netstat >/dev/null 2>&1; then
+        SSH_LISTENING=no
+        netstat -lnt 2>/dev/null | grep -q ":\$SSH_PORT " && SSH_LISTENING=yes
+    fi
+    if [ "\$SSH_LISTENING" = "no" ]; then
+        die "nothing is listening on port \$SSH_PORT; start this machine's SSH server, then run this command again"
+    fi
 fi`;
 }
 
@@ -284,8 +328,6 @@ fi`;
  *  assembled in one place and every field is visible. */
 function reportSection(): string {
     return `HOSTNAME_VALUE=\$(hostname 2>/dev/null || echo "server")
-SSH_PORT=\$(awk '/^[[:space:]]*Port[[:space:]]+[0-9]+/ { print \$2; exit }' /etc/ssh/sshd_config 2>/dev/null || true)
-[ -n "\${SSH_PORT:-}" ] || SSH_PORT=22
 
 # The machine commits to its host keys here, while this script still has root on
 # it. Polaris refuses to trust any other key later, which is what stops something
