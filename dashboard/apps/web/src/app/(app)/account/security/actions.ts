@@ -11,8 +11,15 @@
  * a stolen session cannot quietly install its own way back in.
  */
 
+import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
+import { requireUser } from "@/lib/session";
+import { clientIp } from "@/lib/request-context";
+import { recordAudit } from "@/lib/audit-service";
+import { rateLimit } from "@/lib/rate-limit-service";
+import { revokeOtherSessions } from "@/lib/session-directory";
+import { recoverPasswordSchema, securityQuestionsSchema, sessionLimitsSchema, setPinSchema } from "@polaris/core";
 import {
     beginSessionRotation,
     changeUserPassword,
@@ -27,15 +34,9 @@ import {
     verifyAccountPassword,
     verifySecurityAnswers,
     verifyTotpForSession,
-    twoFactorEnabled
+    twoFactorEnabled,
+    revokeTrustedDevices
 } from "@polaris/auth";
-import { recoverPasswordSchema, securityQuestionsSchema, sessionLimitsSchema, setPinSchema } from "@polaris/core";
-import { auth } from "@/lib/auth";
-import { recordAudit } from "@/lib/audit-service";
-import { rateLimit } from "@/lib/rate-limit-service";
-import { clientIp } from "@/lib/request-context";
-import { requireUser } from "@/lib/session";
-import { revokeOtherSessions } from "@/lib/session-directory";
 
 type ActionResult = { error?: string };
 
@@ -191,4 +192,24 @@ export async function clearSecurityQuestionsAction(password: string): Promise<Ac
         revalidatePath("/account/security");
     }
     return result;
+}
+
+/**
+ * Stop remembering the browsers that asked to skip the challenge for 30 days.
+ *
+ * No password: this only narrows the ways in, and the moment somebody reaches
+ * for it is the moment a remembered device is somewhere it should not be - a
+ * control that asks for more before it can take access away is a control that
+ * arrives too late.
+ */
+export async function revokeTrustedDevicesAction(): Promise<ActionResult> {
+    const user = await requireUser();
+    const revoked = await revokeTrustedDevices(user.id);
+    await recordAudit({
+        actorId: user.id,
+        action: "account.2fa.trusted-devices-revoked",
+        metadata: { revoked }
+    });
+    revalidatePath("/account/security");
+    return {};
 }

@@ -14,13 +14,13 @@
  * names a passkey is bound to; on its own it is the attacker's to set.
  */
 
-import { randomUUID } from "node:crypto";
-import { betterAuth, type BetterAuthPlugin } from "better-auth";
-import { magicLink, twoFactor } from "better-auth/plugins";
-import { passkey } from "@better-auth/passkey";
-import { prismaAdapter } from "better-auth/adapters/prisma";
-import { loadEnv } from "@polaris/config";
 import { prisma } from "@polaris/db";
+import { randomUUID } from "node:crypto";
+import { loadEnv } from "@polaris/config";
+import { passkey } from "@better-auth/passkey";
+import { magicLink, twoFactor } from "better-auth/plugins";
+import { prismaAdapter } from "better-auth/adapters/prisma";
+import { betterAuth, type BetterAuthPlugin } from "better-auth";
 import {
     passkeyRelyingPartyId,
     TWO_FACTOR_CODE_ATTEMPTS,
@@ -73,26 +73,72 @@ function passkeyPlugin(address: string): BetterAuthPlugin | null {
  */
 function twoFactorPlugin(options: AuthOptions): BetterAuthPlugin {
     const send = options.sendTwoFactorCode;
-    if (!send) return twoFactor({ issuer: "Polaris" });
-    return twoFactor({
-        issuer: "Polaris",
-        otpOptions: {
-            period: TWO_FACTOR_CODE_TTL_MINUTES,
-            allowedAttempts: TWO_FACTOR_CODE_ATTEMPTS,
-            // The code is a short-lived, low-entropy secret; store it the way any
-            // other one is rather than in the clear next to the account it opens.
-            storeOTP: "hashed",
-            sendOTP: async ({ user, otp }, ctx) => {
-                const requested = ctx?.headers?.get(TWO_FACTOR_METHOD_HEADER) ?? null;
-                const result = await send({ userId: user.id, requested, code: otp });
-                // better-auth answers send-otp the same way whether or not this
-                // callback managed anything, so a failure is only ever recorded
-                // here. Telling the caller would say which methods an account
-                // has, to somebody who has not finished proving who they are.
-                if (result.error) console.error("two-factor code not sent:", result.error);
+    if (!send) return gateEmailedLink(twoFactor({ issuer: "Polaris" }));
+    return gateEmailedLink(
+        twoFactor({
+            issuer: "Polaris",
+            otpOptions: {
+                period: TWO_FACTOR_CODE_TTL_MINUTES,
+                allowedAttempts: TWO_FACTOR_CODE_ATTEMPTS,
+                // The code is a short-lived, low-entropy secret; store it the way
+                // any other one is rather than in the clear next to the account it
+                // opens.
+                storeOTP: "hashed",
+                sendOTP: async ({ user, otp }, ctx) => {
+                    const requested = ctx?.headers?.get(TWO_FACTOR_METHOD_HEADER) ?? null;
+                    const result = await send({ userId: user.id, requested, code: otp });
+                    // better-auth answers send-otp the same way whether or not this
+                    // callback managed anything, so a failure is only ever recorded
+                    // here. Telling the caller would say which methods an account
+                    // has, to somebody who has not finished proving who they are.
+                    if (result.error) console.error("two-factor code not sent:", result.error);
+                }
             }
+        })
+    );
+}
+
+/** Where an emailed sign-in link is redeemed. */
+export const MAGIC_LINK_VERIFY_PATH = "/magic-link/verify";
+
+/**
+ * Make an emailed sign-in link raise the second-factor challenge too.
+ *
+ * better-auth's two-factor plugin only watches the credential sign-in paths, so
+ * on its own an emailed link hands an account with an armed authenticator a full
+ * session - no password and no code - which makes the mailbox a single point of
+ * failure for exactly the accounts that asked for it not to be. The hook's own
+ * handler is path-agnostic (it takes back the session the endpoint just created,
+ * then starts the challenge), so covering the link is a matter of widening what
+ * it matches; reimplementing the challenge here instead would leave two copies
+ * of it to drift apart.
+ *
+ * A version of better-auth that moved the hook throws at start-up rather than
+ * quietly reopening the path - this is the only thing closing it, and the shape
+ * it depends on is pinned by a test.
+ */
+function gateEmailedLink(plugin: BetterAuthPlugin): BetterAuthPlugin {
+    const hooks = plugin.hooks?.after ?? [];
+    const signIn = hooks.find((hook) => hook.matcher({ path: "/sign-in/email" } as never));
+    if (!signIn) {
+        throw new Error("better-auth's two-factor plugin no longer gates sign-in where Polaris expects it");
+    }
+    const matches = signIn.matcher;
+    return {
+        ...plugin,
+        hooks: {
+            ...plugin.hooks,
+            after: hooks.map((hook) =>
+                hook === signIn
+                    ? {
+                          ...hook,
+                          matcher: (context) =>
+                              matches(context) || context.path === MAGIC_LINK_VERIFY_PATH
+                      }
+                    : hook
+            )
         }
-    });
+    };
 }
 
 /**

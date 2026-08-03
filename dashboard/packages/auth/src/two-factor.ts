@@ -39,3 +39,36 @@ export async function twoFactorEnabled(userId: string): Promise<boolean> {
     const row = await prisma.user.findUnique({ where: { id: userId }, select: { twoFactorEnabled: true } });
     return row?.twoFactorEnabled === true;
 }
+
+/**
+ * Browsers that answered the challenge and asked to be remembered.
+ *
+ * better-auth records each one as a verification row keyed by a random
+ * identifier and valued with the user id, and reads it back from a cookie before
+ * the challenge is raised - so while one stands, that browser signs in with the
+ * password alone. Nothing about the device is stored beyond when the pass runs
+ * out, which is why the account page can only count them and drop them.
+ */
+const TRUST_PREFIX = "trust-device-";
+
+export async function countTrustedDevices(userId: string): Promise<number> {
+    return prisma.verification.count({
+        where: { identifier: { startsWith: TRUST_PREFIX }, value: userId, expiresAt: { gt: new Date() } }
+    });
+}
+
+/**
+ * Stop remembering every browser at once, so the next sign-in on each asks for a
+ * code again. All of them rather than a chosen one: the rows carry nothing that
+ * would let somebody tell which is which, and the reason to reach for this is
+ * that a device is out of the owner's hands.
+ *
+ * Expired rows go with them - they no longer let anyone in, and leaving them
+ * would make the count on the page disagree with what it dropped.
+ */
+export async function revokeTrustedDevices(userId: string): Promise<number> {
+    const { count } = await prisma.verification.deleteMany({
+        where: { identifier: { startsWith: TRUST_PREFIX }, value: userId }
+    });
+    return count;
+}

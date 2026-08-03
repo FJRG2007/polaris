@@ -24,9 +24,13 @@
  * ways in.
  */
 
-import { useState, type FormEvent } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { Feedback } from "./setting-card";
+import { useRouter } from "next/navigation";
+import { useState, type FormEvent } from "react";
+import { saveTwoFactorPreferencesAction } from "./two-factor-actions";
+import type { TwoFactorMethodStatus } from "@/lib/two-factor-delivery";
+import { revokeTrustedDevicesAction, setLoginApprovalAction } from "./actions";
 import {
     TWO_FACTOR_DELIVERY_METHODS,
     TWO_FACTOR_METHOD_INFO,
@@ -47,10 +51,6 @@ import {
     Select,
     Switch
 } from "@polaris/ui";
-import type { TwoFactorMethodStatus } from "@/lib/two-factor-delivery";
-import { setLoginApprovalAction } from "./actions";
-import { saveTwoFactorPreferencesAction } from "./two-factor-actions";
-import { Feedback } from "./setting-card";
 
 /** What the sign-in approval gate can do for this account right now. */
 export interface LoginApprovalStatus {
@@ -64,14 +64,18 @@ export function TwoFactorMethodsCard({
     statuses,
     preferred,
     twoFactorEnabled,
+    trustedDevices,
     approval
 }: {
     statuses: TwoFactorMethodStatus[];
     preferred: TwoFactorMethod;
     twoFactorEnabled: boolean;
+    /** Browsers currently allowed to sign in without answering the challenge. */
+    trustedDevices: number;
     approval: LoginApprovalStatus;
 }) {
     const router = useRouter();
+    const [forgetting, setForgetting] = useState(false);
     const [methods, setMethods] = useState<TwoFactorDeliveryMethod[]>(
         TWO_FACTOR_DELIVERY_METHODS.filter(
             (method) => statuses.find((status) => status.method === method)?.enabled === true
@@ -198,6 +202,36 @@ export function TwoFactorMethodsCard({
                             })}
                         />
                     </label>
+                ) : null}
+
+                {/* Only worth a row while there is something to forget. A remembered
+                    browser is the one way a sign-in skips the challenge without any
+                    setting on this page saying so, so it says how many and offers to
+                    end them - nothing about the device itself is recorded. */}
+                {twoFactorEnabled && trustedDevices > 0 ? (
+                    <div className="flex items-start justify-between gap-3 rounded-md border border-border px-3 py-2">
+                        <div className="min-w-0">
+                            <p className="text-sm">Remembered devices</p>
+                            <p className="text-xs text-muted-foreground">
+                                {trustedDevices === 1
+                                    ? "One device signs in without a code until its 30 days run out."
+                                    : `${trustedDevices} devices sign in without a code until their 30 days run out.`}
+                            </p>
+                        </div>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={forgetting}
+                            onClick={async () => {
+                                setForgetting(true);
+                                await revokeTrustedDevicesAction();
+                                setForgetting(false);
+                                router.refresh();
+                            }}
+                        >
+                            {forgetting ? "Forgetting..." : "Forget them"}
+                        </Button>
+                    </div>
                 ) : null}
 
                 <p className="text-xs text-muted-foreground">

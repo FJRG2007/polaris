@@ -11,18 +11,19 @@
  * would be exactly the wrong time.
  */
 
-import { useEffect, useState, type ComponentType, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import { authClient } from "@/lib/auth-client";
+import { abandonChallengeAction } from "./actions";
 import { KeyRound, Mail, Smartphone } from "lucide-react";
+import { WhatsAppLogo } from "@/app/(app)/inbox/channel-logos";
+import type { ChallengeOptions } from "@/lib/two-factor-delivery";
+import { useEffect, useState, type ComponentType, type FormEvent } from "react";
+import { Button, Card, CardBody, CardHeader, CardTitle, Checkbox, Input, PolarisMark } from "@polaris/ui";
 import {
     TWO_FACTOR_METHOD_HEADER,
     TWO_FACTOR_METHOD_INFO,
     type TwoFactorMethod
 } from "@polaris/core";
-import { Button, Card, CardBody, CardHeader, CardTitle, Checkbox, Input, PolarisMark } from "@polaris/ui";
-import { WhatsAppLogo } from "@/app/(app)/inbox/channel-logos";
-import { authClient } from "@/lib/auth-client";
-import type { ChallengeOptions } from "@/lib/two-factor-delivery";
 
 /** Post-verification destination: a safe same-origin redirect, else the drive. */
 function target(): string {
@@ -188,6 +189,19 @@ export function TwoFactorView({ options }: { options: ChallengeOptions }) {
                     >
                         <KeyRound className="size-3" />
                         {backup ? "Go back to your usual method" : "Use a backup code instead"}
+                    </button>
+
+                    {/* The way out. Without it the sign-in page keeps resuming this
+                        challenge, so somebody who cannot finish it - wrong account,
+                        no authenticator to hand - would be stuck here until it
+                        expired. */}
+                    <button
+                        type="button"
+                        disabled={pending}
+                        className="mt-2 w-full text-center text-xs text-muted-foreground underline-offset-2 hover:underline"
+                        onClick={() => void abandonChallengeAction()}
+                    >
+                        Sign in as someone else
                     </button>
                 </CardBody>
             </Card>

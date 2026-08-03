@@ -14,10 +14,10 @@
  * because a check that is skipped once is a check nobody remembers was optional.
  */
 
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { prisma } from "@polaris/db";
 import { cookies } from "next/headers";
 import { loadEnv } from "@polaris/config";
-import { prisma } from "@polaris/db";
+import { createHmac, timingSafeEqual } from "node:crypto";
 
 /** better-auth's own name for the cookie, prefixed the way this app configures it. */
 const COOKIE_NAME = "two_factor";
@@ -52,19 +52,24 @@ function unsign(signed: string, secret: string): string | null {
     return value;
 }
 
+/** The verification row this browser's challenge cookie names, if it carries a
+ *  genuine one. Null covers all the ways it can fail: no cookie, a signature that
+ *  does not check out, or a value that never was an identifier. */
+async function challengeIdentifier(): Promise<string | null> {
+    const store = await cookies();
+    const raw = cookieNames()
+        .map((name) => store.get(name)?.value)
+        .find((value): value is string => Boolean(value));
+    return raw ? unsign(raw, loadEnv().POLARIS_AUTH_SECRET) : null;
+}
+
 /**
  * The account waiting on this challenge, or null when there is no valid one -
  * no cookie, a forged signature, or a challenge that has since expired or been
  * spent. Callers treat null as "offer nothing beyond the authenticator".
  */
 export async function pendingTwoFactorUserId(): Promise<string | null> {
-    const store = await cookies();
-    const raw = cookieNames()
-        .map((name) => store.get(name)?.value)
-        .find((value): value is string => Boolean(value));
-    if (!raw) return null;
-
-    const identifier = unsign(raw, loadEnv().POLARIS_AUTH_SECRET);
+    const identifier = await challengeIdentifier();
     if (!identifier) return null;
 
     const verification = await prisma.verification.findFirst({
@@ -81,4 +86,24 @@ export async function pendingTwoFactorUserId(): Promise<string | null> {
         .findFirst({ where: { id: verification.value, bannedAt: null }, select: { id: true } })
         .catch(() => null);
     return user?.id ?? null;
+}
+
+/**
+ * Abandon the challenge in this browser, so the sign-in page stops resuming it
+ * and somebody else can sign in on this device.
+ *
+ * The cookie is dropped and the rows behind it go with it: a challenge left
+ * standing for its full ten minutes is a half-finished sign-in that only needs a
+ * code, and the person walking away from it is not always the person who started
+ * it. The attempt counter better-auth keeps alongside it goes too, or it would
+ * outlive the challenge it belongs to.
+ */
+export async function clearPendingTwoFactor(): Promise<void> {
+    const identifier = await challengeIdentifier();
+    const store = await cookies();
+    for (const name of cookieNames()) store.delete(name);
+    if (!identifier) return;
+    await prisma.verification
+        .deleteMany({ where: { identifier: { in: [identifier, `2fa-attempts-${identifier}`] } } })
+        .catch(() => undefined);
 }

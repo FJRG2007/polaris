@@ -57,7 +57,12 @@ export {
     getEnforcedRules,
     type UserSecuritySettings
 } from "./security.js";
-export { verifyTotpForSession, twoFactorEnabled } from "./two-factor.js";
+export {
+    verifyTotpForSession,
+    twoFactorEnabled,
+    countTrustedDevices,
+    revokeTrustedDevices
+} from "./two-factor.js";
 export {
     getUserPhone,
     setUserPhone,

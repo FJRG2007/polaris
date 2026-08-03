@@ -11,23 +11,23 @@
 import { useState } from "react";
 import { Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { PasskeysCard } from "./passkeys-card";
+import type { PasskeyView } from "./passkey-actions";
+import { updateSessionLimitsAction } from "./actions";
+import { Feedback, SettingCard } from "./setting-card";
+import { Button, Card, CardBody, Select } from "@polaris/ui";
+import { RemovePinDialog, SetPinDialog } from "./pin-dialogs";
+import { TwoFactorMethodsCard } from "./two-factor-methods-card";
+import type { TwoFactorMethodStatus } from "@/lib/two-factor-delivery";
+import { ChangePasswordDialog, RecoverPasswordDialog } from "./password-dialogs";
+import { ClearQuestionsDialog, SecurityQuestionsDialog } from "./questions-dialog";
+import { DisableTwoFactorDialog, EnableTwoFactorDialog } from "./two-factor-dialogs";
 import {
     IDLE_LOCK_CHOICES,
     SECURITY_QUESTION_COUNT,
     SESSION_MAX_CHOICES,
     type TwoFactorMethod
 } from "@polaris/core";
-import { Button, Card, CardBody, Select } from "@polaris/ui";
-import type { TwoFactorMethodStatus } from "@/lib/two-factor-delivery";
-import { updateSessionLimitsAction } from "./actions";
-import { ChangePasswordDialog, RecoverPasswordDialog } from "./password-dialogs";
-import { DisableTwoFactorDialog, EnableTwoFactorDialog } from "./two-factor-dialogs";
-import { RemovePinDialog, SetPinDialog } from "./pin-dialogs";
-import { ClearQuestionsDialog, SecurityQuestionsDialog } from "./questions-dialog";
-import { TwoFactorMethodsCard } from "./two-factor-methods-card";
-import { PasskeysCard } from "./passkeys-card";
-import type { PasskeyView } from "./passkey-actions";
-import { Feedback, SettingCard } from "./setting-card";
 
 /** Human label for a minute count used by both limit dropdowns. */
 function describeMinutes(minutes: number, zeroLabel: string): string {
@@ -48,6 +48,7 @@ export function SecurityView({
     passkeys,
     twoFactorMethods,
     twoFactorPreferred,
+    trustedDevices,
     otherSessions
 }: {
     hasPin: boolean;
@@ -59,6 +60,8 @@ export function SecurityView({
     passkeys: PasskeyView[];
     twoFactorMethods: TwoFactorMethodStatus[];
     twoFactorPreferred: TwoFactorMethod;
+    /** Browsers allowed to sign in without answering the challenge. */
+    trustedDevices: number;
     /** Open sessions other than this one, which is what a sign-in is approved from. */
     otherSessions: number;
 }) {
@@ -114,6 +117,7 @@ export function SecurityView({
                 statuses={twoFactorMethods}
                 preferred={twoFactorPreferred}
                 twoFactorEnabled={twoFactorEnabled}
+                trustedDevices={trustedDevices}
                 approval={{ enabled: requireLoginApproval, hasPin, otherSessions }}
             />
 
