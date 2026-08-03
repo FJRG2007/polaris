@@ -12,6 +12,7 @@ interface Row {
     userId: string;
     email: string;
     recovery: boolean;
+    verifiedAt: Date | null;
     createdAt: Date;
 }
 
@@ -22,9 +23,9 @@ let password = "hunter22";
 const prisma = {
     user: {
         findUnique: async ({ where }: { where: { id: string } }) => users.get(where.id) ?? null,
-        findFirst: async ({ where }: { where: { email: string; id: { not: string } } }) => {
+        findFirst: async ({ where }: { where: { email: string; id?: { not: string } } }) => {
             for (const [id, user] of users) {
-                if (user.email === where.email && id !== where.id.not) return { id };
+                if (user.email === where.email && id !== where.id?.not) return { id };
             }
             return null;
         },
@@ -45,10 +46,11 @@ const prisma = {
             alternates.filter((row) => row.userId === where.userId),
         count: async ({ where }: { where: { userId: string } }) =>
             alternates.filter((row) => row.userId === where.userId).length,
-        create: async ({ data }: { data: { userId: string; email: string } }) => {
+        create: async ({ data }: { data: { userId: string; email: string; verifiedAt?: Date } }) => {
             const row = {
                 id: `id-${alternates.length + 1}`,
                 recovery: false,
+                verifiedAt: null,
                 createdAt: new Date("2026-07-29T10:00:00.000Z"),
                 ...data
             };
@@ -68,15 +70,20 @@ const prisma = {
             where,
             data
         }: {
-            where: { id: string; userId: string };
-            data: { recovery: boolean };
+            where: { id?: string; userId: string; email?: string; verifiedAt?: null };
+            data: { recovery?: boolean; verifiedAt?: Date };
         }) => {
             let count = 0;
             for (const row of alternates) {
-                if (row.id === where.id && row.userId === where.userId) {
-                    row.recovery = data.recovery;
-                    count += 1;
-                }
+                const matches =
+                    row.userId === where.userId &&
+                    (where.id === undefined || row.id === where.id) &&
+                    (where.email === undefined || row.email === where.email) &&
+                    (where.verifiedAt === undefined || row.verifiedAt === null);
+                if (!matches) continue;
+                if (data.recovery !== undefined) row.recovery = data.recovery;
+                if (data.verifiedAt !== undefined) row.verifiedAt = data.verifiedAt;
+                count += 1;
             }
             return { count };
         }
@@ -98,6 +105,8 @@ const auth = {
 
 const {
     addUserEmail,
+    adoptVerifiedEmail,
+    emailOwner,
     listUserEmails,
     promoteUserEmail,
     removeUserEmail,
@@ -135,6 +144,14 @@ describe("adding an address", () => {
         });
     });
 
+    it("refuses one this account already holds, rather than letting the column refuse it", async () => {
+        await addUserEmail("user-1", "spare@example.com");
+        expect(await addUserEmail("user-1", "spare@example.com")).toEqual({
+            error: "That email is already in use."
+        });
+        expect(await listUserEmails("user-1")).toHaveLength(2);
+    });
+
     it("refuses your own primary and anything that is not an address", async () => {
         expect((await addUserEmail("user-1", "owner@example.com")).error).toBe(
             "That is already your primary address."
@@ -147,6 +164,37 @@ describe("adding an address", () => {
             expect(await addUserEmail("user-1", `spare${index}@example.com`)).toEqual({});
         }
         expect((await addUserEmail("user-1", "one-too-many@example.com")).error).toContain("at most");
+    });
+});
+
+describe("an address a linked provider vouched for", () => {
+    it("is held for its owner, already proved, so nobody else can be given it", async () => {
+        expect(await adoptVerifiedEmail("user-1", " Work@Example.com ")).toEqual({});
+        const [, adopted] = await listUserEmails("user-1");
+        expect(adopted).toMatchObject({ email: "work@example.com", verified: true });
+        expect(await emailOwner("work@example.com")).toBe("user-1");
+        expect((await addUserEmail("user-2", "work@example.com")).error).toBe("That email is already in use.");
+    });
+
+    it("proves an address the account had already claimed but not confirmed", async () => {
+        await addUserEmail("user-1", "spare@example.com");
+        expect((await listUserEmails("user-1"))[1]?.verified).toBe(false);
+        expect(await adoptVerifiedEmail("user-1", "spare@example.com")).toEqual({});
+        expect((await listUserEmails("user-1"))[1]?.verified).toBe(true);
+    });
+
+    it("leaves an address somebody else holds exactly where it is", async () => {
+        await addUserEmail("user-2", "theirs@example.com");
+        expect((await adoptVerifiedEmail("user-1", "theirs@example.com")).error).toBe(
+            "That address is already on another account."
+        );
+        expect(await emailOwner("theirs@example.com")).toBe("user-2");
+        expect(await listUserEmails("user-1")).toHaveLength(1);
+    });
+
+    it("says nothing new about an address that is already the primary", async () => {
+        expect(await adoptVerifiedEmail("user-1", "owner@example.com")).toEqual({});
+        expect(await listUserEmails("user-1")).toHaveLength(1);
     });
 });
 

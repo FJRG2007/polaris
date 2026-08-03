@@ -45,6 +45,7 @@ export async function connectGithubTokenAction(rawToken: string): Promise<{ erro
             label: account.login,
             avatarUrl: account.avatarUrl,
             method: "token",
+            email: account.email,
             credential: { token: parsed.data }
         });
         revalidatePath(CONNECTIONS_PATH);

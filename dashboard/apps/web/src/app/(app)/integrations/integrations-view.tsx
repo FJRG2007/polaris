@@ -12,9 +12,14 @@ import { useState, useTransition } from "react";
 import * as integrationActions from "./actions";
 import { IntegrationLogo } from "@/components/logos";
 import { CopyButton } from "@/components/copy-button";
-import { DYMO_IP_RULES, SCAN_ACTIONS, type ScanAction } from "@/lib/integrations/registry";
-import { CheckCircle2, Circle, ExternalLink, Loader2, RefreshCw, ShieldCheck } from "lucide-react";
 import { isTunnelToken, tunnelTokenHint, type TunnelProviderSlug } from "@/lib/integrations/tunnel-token";
+import { CheckCircle2, Circle, ExternalLink, Loader2, RefreshCw, ShieldAlert, ShieldCheck } from "lucide-react";
+import {
+    DYMO_IP_RULES,
+    SCAN_ACTIONS,
+    type IntegrationSetupLink,
+    type ScanAction
+} from "@/lib/integrations/registry";
 import {
     CLOUDFLARE_TOKEN_LINKS,
     CLOUDFLARE_TOKEN_PERMISSIONS,
@@ -81,6 +86,13 @@ export interface IntegrationCard {
     googleCallbackUrl?: string;
     /** GitHub/Google: how many accounts of this service one person may connect. */
     accountLimit?: number;
+    /** Where the vendor makes the credential this dialog is asking for. */
+    setupLinks?: readonly IntegrationSetupLink[];
+    /** Whether a linked account of this service may sign anybody in here, for the
+     *  services people link an account of. Undefined for the rest. */
+    signInAllowed?: boolean;
+    /** Why this service is a poor way in, when it is. */
+    signInWarning?: string;
 }
 
 export function IntegrationsView({ cards }: { cards: IntegrationCard[] }) {
@@ -202,6 +214,101 @@ function AccountLimitField({ slug, current }: { slug: string; current: number })
 }
 
 /**
+ * Where to go and get what this dialog is asking for.
+ *
+ * Every one of these forms ends with a value pasted from somebody else's console,
+ * and finding that console is most of the work - so the steps are links, in the
+ * order they happen, rather than a sentence naming a menu path. What the vendor
+ * lets a URL carry it carries; the rest of the values stay on this screen to be
+ * copied, because none of these consoles accept them from a link.
+ */
+function SetupSteps({ links }: { links?: readonly IntegrationSetupLink[] }) {
+    if (!links || links.length === 0) return null;
+    return (
+        <div className="flex flex-col gap-2 rounded-md border border-border bg-muted/30 p-3">
+            {links.map((step) => (
+                <div key={step.url} className="flex flex-col gap-0.5">
+                    <a
+                        href={step.url}
+                        target="_blank"
+                        rel="noreferrer noopener"
+                        className="inline-flex w-fit items-center gap-1 text-sm font-medium text-primary hover:underline"
+                    >
+                        {step.label}
+                        <ExternalLink className="size-3 shrink-0" />
+                    </a>
+                    {step.help ? <span className="text-xs text-muted-foreground">{step.help}</span> : null}
+                </div>
+            ))}
+        </div>
+    );
+}
+
+/**
+ * Whether a linked account of this service may sign anybody in here.
+ *
+ * The operator's half of the decision. Each person still chooses for their own
+ * account under Account > Security, and both have to say yes - turning it off
+ * here refuses everybody at once, whatever they chose, which is what an operator
+ * reaching for this wants. Saves itself for the same reason the account limit
+ * does: it is a different subject from the credentials the dialog is about.
+ */
+function SignInSwitch({
+    slug,
+    name,
+    allowed,
+    warning
+}: {
+    slug: string;
+    name: string;
+    allowed: boolean;
+    warning?: string;
+}) {
+    const [value, setValue] = useState(allowed);
+    const [error, setError] = useState<string | null>(null);
+    const [pending, startTransition] = useTransition();
+
+    function toggle(next: boolean) {
+        setValue(next);
+        setError(null);
+        startTransition(async () => {
+            const result = await runAction(() => integrationActions.saveConnectionSignInAction(slug, next), setError);
+            if (!result || result.error) {
+                setValue(!next);
+                if (result?.error) setError(result.error);
+            }
+        });
+    }
+
+    return (
+        <div className="flex flex-col gap-2 rounded-md border border-border p-3 text-sm">
+            <div className="flex items-start justify-between gap-3">
+                <span>
+                    <span className="font-medium">Allow signing in with {name}</span>
+                    <span className="block text-xs text-muted-foreground">
+                        People who have connected a {name} account get a sign-in button for it. It never creates an
+                        account: only someone who already has one, and connected it themselves, can use it.
+                    </span>
+                </span>
+                <Switch
+                    checked={value}
+                    disabled={pending}
+                    onChange={toggle}
+                    aria-label={`Allow signing in with ${name}`}
+                />
+            </div>
+            {warning ? (
+                <p className="flex items-start gap-2 text-xs text-muted-foreground">
+                    <ShieldAlert className="mt-0.5 size-3.5 shrink-0 text-warning" />
+                    {warning}
+                </p>
+            ) : null}
+            {error ? <p className="text-xs text-danger">{error}</p> : null}
+        </div>
+    );
+}
+
+/**
  * Connect the Google Cloud OAuth client. Two fields and one thing to copy back:
  * Google refuses an authorization whose redirect URI was not registered on the
  * client, and that URI is decided by this deployment's address rather than by
@@ -246,6 +353,8 @@ function GoogleDialog({ card, onClose }: { card: IntegrationCard; onClose: () =>
                 </DialogHeader>
 
                 <div className="flex flex-col gap-4">
+                    <SetupSteps links={card.setupLinks} />
+
                     <div className="flex items-center justify-between gap-3 rounded-md border border-border p-3 text-sm">
                         <span>Enabled</span>
                         <Switch checked={enabled} onChange={setEnabled} aria-label="Enabled" />
@@ -277,6 +386,15 @@ function GoogleDialog({ card, onClose }: { card: IntegrationCard; onClose: () =>
 
                     <AccountLimitField slug="google" current={card.accountLimit ?? 1} />
 
+                    {card.signInAllowed === undefined ? null : (
+                        <SignInSwitch
+                            slug="google"
+                            name="Google"
+                            allowed={card.signInAllowed}
+                            warning={card.signInWarning}
+                        />
+                    )}
+
                     {card.googleCallbackUrl ? (
                         <div className="flex flex-col gap-1 rounded-md border border-border bg-muted/30 p-3 text-sm">
                             <span className="font-medium">Authorized redirect URI</span>
@@ -285,7 +403,8 @@ function GoogleDialog({ card, onClose }: { card: IntegrationCard; onClose: () =>
                                 <CopyButton value={card.googleCallbackUrl} label="Copy the redirect URI" />
                             </div>
                             <span className="text-xs text-muted-foreground">
-                                Add this to the OAuth client, and enable the Google Calendar API on the project.
+                                Paste this into the OAuth client under Authorized redirect URIs. Google refuses an
+                                authorization that arrives from any other address.
                             </span>
                         </div>
                     ) : null}
@@ -344,6 +463,8 @@ function TunnelDialog({ card, onClose }: { card: IntegrationCard; onClose: () =>
                     <DialogDescription>{card.description}</DialogDescription>
                 </DialogHeader>
                 <div className="flex flex-col gap-4">
+                    <SetupSteps links={card.setupLinks} />
+
                     <div className="flex items-center justify-between gap-3 rounded-md border border-border p-3 text-sm">
                         <span>Enabled</span>
                         <Switch checked={enabled} onChange={setEnabled} aria-label="Enabled" />
@@ -656,6 +777,8 @@ function DuckDnsDialog({ card, onClose }: { card: IntegrationCard; onClose: () =
                 </DialogHeader>
 
                 <div className="flex flex-col gap-4">
+                    <SetupSteps links={card.setupLinks} />
+
                     <label className="flex flex-col gap-1 text-sm">
                         <span className="font-medium">Subdomain</span>
                         <div className="flex items-center gap-2">
@@ -770,6 +893,8 @@ function DymoDialog({ card, onClose }: { card: IntegrationCard; onClose: () => v
                 </DialogHeader>
 
                 <div className="flex flex-col gap-4">
+                    <SetupSteps links={card.setupLinks} />
+
                     <label className="flex flex-col gap-1 text-sm">
                         <span className="font-medium">{card.apiKeyLabel ?? "API key"}</span>
                         <div className="flex gap-2">
@@ -913,6 +1038,15 @@ function GitHubConnected({ card, onClose }: { card: IntegrationCard; onClose: ()
                     <RunnerAccessNote card={card} />
 
                     <AccountLimitField slug="github" current={card.accountLimit ?? 1} />
+
+                    {card.signInAllowed === undefined ? null : (
+                        <SignInSwitch
+                            slug="github"
+                            name="GitHub"
+                            allowed={card.signInAllowed}
+                            warning={card.signInWarning}
+                        />
+                    )}
 
                     {isApp ? (
                         <div className="flex flex-col gap-2 text-sm">
@@ -1122,6 +1256,15 @@ function GitHubConnect({ card, onClose }: { card: IntegrationCard; onClose: () =
 
                     <AccountLimitField slug="github" current={card.accountLimit ?? 1} />
 
+                    {card.signInAllowed === undefined ? null : (
+                        <SignInSwitch
+                            slug="github"
+                            name="GitHub"
+                            allowed={card.signInAllowed}
+                            warning={card.signInWarning}
+                        />
+                    )}
+
                     {error ? <p className="text-sm text-danger">{error}</p> : null}
                 </div>
             </DialogContent>
@@ -1175,6 +1318,8 @@ function VirusTotalDialog({ card, onClose }: { card: IntegrationCard; onClose: (
                 </DialogHeader>
 
                 <div className="flex flex-col gap-4">
+                    <SetupSteps links={card.setupLinks} />
+
                     <label className="flex flex-col gap-1 text-sm">
                         <span className="font-medium">{card.apiKeyLabel ?? "API key"}</span>
                         <div className="flex gap-2">

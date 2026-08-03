@@ -117,6 +117,14 @@ export function TaskPanel({
         onChanged();
     };
 
+    /** A tag born where it is needed - in a picker or a menu - instead of in the
+     *  space's settings, which is where the reason for it gets forgotten. */
+    const createTag = async (name: string, color: string) => {
+        const created = await runAction(() => actions.createTagAction(context.spaceId, name, color), setError);
+        if (created?.id) onChanged();
+        return created?.id ?? null;
+    };
+
     const task = detail?.task;
     const watching = detail?.watchers.some((person) => person.id === context.currentUserId) ?? false;
     const runningHere = detail?.timeEntries.some((entry) => entry.running && entry.userId === context.currentUserId) ?? false;
@@ -267,14 +275,7 @@ export function TaskPanel({
                                         onChanged();
                                     }}
                                     onError={setError}
-                                    onCreateTag={async (name) => {
-                                        const created = await runAction(
-                                            () => actions.createTagAction(context.spaceId, name, tagColorFor(name)),
-                                            setError
-                                        );
-                                        if (created?.id) onChanged();
-                                        return created?.id ?? null;
-                                    }}
+                                    onCreateTag={(name) => createTag(name, tagColorFor(name))}
                                 />
 
                                 <section className="flex flex-col gap-1 border-t border-border pt-4">
@@ -310,14 +311,14 @@ export function TaskPanel({
                                     taskId={task.id}
                                     listId={task.listId}
                                     subtasks={detail?.subtasks ?? []}
-                                    statuses={context.statuses}
-                                    canEdit={context.canEdit}
+                                    context={context}
                                     onOpen={openTask}
                                     onChanged={() => {
                                         load(task.id);
                                         onChanged();
                                     }}
                                     onError={setError}
+                                    onCreateTag={createTag}
                                 />
 
                                 <ChecklistSection

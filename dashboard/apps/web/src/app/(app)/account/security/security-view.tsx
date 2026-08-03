@@ -28,6 +28,7 @@ import { Feedback, SettingCard, type SettingLock } from "./setting-card";
 import { setNewDeviceGraceAction, updateSessionLimitsAction } from "./actions";
 import { ChangePasswordDialog, RecoverPasswordDialog } from "./password-dialogs";
 import { ClearQuestionsDialog, SecurityQuestionsDialog } from "./questions-dialog";
+import { ConnectedSignInCard, type ConnectedSignIn } from "./connected-sign-in-card";
 import { DisableTwoFactorDialog, EnableTwoFactorDialog } from "./two-factor-dialogs";
 import {
     IDLE_LOCK_CHOICES,
@@ -70,6 +71,7 @@ export function SecurityView({
     twoFactorMethods,
     twoFactorPreferred,
     trustedDevices,
+    connections,
     otherSessions
 }: {
     /** Set while this browser is too new on the account to change any of this.
@@ -93,6 +95,9 @@ export function SecurityView({
     twoFactorPreferred: TwoFactorMethod;
     /** Browsers allowed to sign in without answering the challenge. */
     trustedDevices: number;
+    /** The outside accounts this person has connected, each with whether it may
+     *  sign them in. */
+    connections: ConnectedSignIn[];
     /** Open sessions other than this one, which is what a sign-in is approved from. */
     otherSessions: number;
 }) {
@@ -190,6 +195,10 @@ export function SecurityView({
                         trustedDevices={trustedDevices}
                         approval={{ enabled: requireLoginApproval, hasPin, otherSessions }}
                     />
+
+                    {/* Another way the account is proved, so it sits in the left
+                        column with the rest of them. */}
+                    <ConnectedSignInCard accounts={connections} lock={lock} />
                 </div>
 
                 <div className="flex flex-col gap-4">

@@ -7,6 +7,22 @@
 
 export type IntegrationCategory = "Security" | "Notifications" | "Storage" | "Automation" | "Productivity";
 
+/**
+ * A page on the vendor's own site that produces what the dialog is asking for.
+ *
+ * The point is to land the operator where the only thing left is to press the
+ * vendor's own button, so the URL carries whatever that vendor lets it carry.
+ * Most of them carry nothing, which is why the dialog still shows the values to
+ * paste; Cloudflare pre-ticks its permissions and GitHub creates the whole app.
+ */
+export interface IntegrationSetupLink {
+    /** What pressing it does, in the imperative. */
+    label: string;
+    url: string;
+    /** One line, when the step needs a word about why it exists. */
+    help?: string;
+}
+
 export interface IntegrationCatalogEntry {
     /** Stable slug; the Integration row's provider and the marketplace key. */
     slug: string;
@@ -16,8 +32,12 @@ export interface IntegrationCatalogEntry {
     summary: string;
     /** A short paragraph shown on the configure screen. */
     description: string;
-    /** Vendor docs / API key page. */
+    /** Vendor docs. */
     docsUrl: string;
+    /** Where the credential is actually created, in the order the steps happen.
+     *  Empty for an integration whose dialog creates it (GitHub) or builds the
+     *  link itself from what the operator picked (Cloudflare). */
+    setupLinks?: readonly IntegrationSetupLink[];
     /** Whether this integration authenticates with an API key. */
     requiresApiKey: boolean;
     apiKeyLabel?: string;
@@ -101,6 +121,7 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         description:
             "Automatically scans files uploaded to your drop points with the VirusTotal Public API and alerts you when something is flagged. Choose whether a detection blocks, quarantines, or just notifies.",
         docsUrl: "https://docs.virustotal.com/reference/overview",
+        setupLinks: [{ label: "Get your API key", url: "https://www.virustotal.com/gui/my-apikey" }],
         requiresApiKey: true,
         apiKeyLabel: "Public API key",
         apiKeyHelp: "Find it under your VirusTotal profile -> API key. The free Public API allows about 4 lookups per minute."
@@ -113,9 +134,9 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         description:
             "When someone opens a share link or a drop point, Polaris checks their IP with the Dymo API and blocks access if it matches the conditions you choose (fraudulent, proxy, VPN, ...). Fails open on an API error so a hiccup never locks out your visitors.",
         docsUrl: "https://docs.tpeoficial.com/docs/dymo-api/private/ip-validation",
+        setupLinks: [{ label: "Create an API key", url: "https://tpe.li/new-api-key" }],
         requiresApiKey: true,
-        apiKeyLabel: "API key",
-        apiKeyHelp: "Get one at https://tpe.li/new-api-key."
+        apiKeyLabel: "API key"
     },
     {
         slug: "criminalip",
@@ -125,17 +146,18 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         description:
             "The firewall asks Criminal IP about addresses it sees in your traffic and blocks the ones that match the conditions you choose. Lookups happen in the background, never while a request is waiting, and the answer is cached - so a slow or unreachable provider can never slow down or open up your site.",
         docsUrl: "https://www.criminalip.io/developer/api/get-ip-summary",
+        setupLinks: [{ label: "Get your API key", url: "https://www.criminalip.io/mypage/information" }],
         requiresApiKey: true,
         apiKeyLabel: "API key",
-        apiKeyHelp: "From your Criminal IP account under My Information -> API Key."
+        apiKeyHelp: "It is on the My Information page, under API Key."
     },
     {
         slug: "github",
         name: "GitHub",
         category: "Automation",
-        summary: "Let people connect their GitHub and deploy their repositories.",
+        summary: "Let people connect their GitHub, sign in with it, and deploy their repositories.",
         description:
-            "Create a GitHub App in one click and Polaris can build private repositories, register self-hosted runners, and give everyone here a Connect button for their own GitHub account. Each person then sees their own repositories and nobody else's.",
+            "Create a GitHub App in one click and Polaris can build private repositories, register self-hosted runners, and give everyone here a Connect button for their own GitHub account. Each person then sees their own repositories and nobody else's, and can sign in with the account they linked if you allow it.",
         docsUrl: "https://docs.github.com/apps/creating-github-apps",
         requiresApiKey: true,
         apiKeyLabel: "Personal Access Token",
@@ -146,25 +168,25 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         slug: "google",
         name: "Google",
         category: "Automation",
-        summary: "Let people connect their Google account and show their calendar.",
+        summary: "Let people connect their Google account, sign in with it, and show their calendar.",
         description:
-            "Connect a Google Cloud OAuth client and everyone here gets a Connect button for their own Google account. Polaris reads their calendar and nothing else, with their own authorization - it never holds a credential that reaches everybody's.",
-        docsUrl: "https://console.cloud.google.com/apis/credentials",
+            "Connect a Google Cloud OAuth client and everyone here gets a Connect button for their own Google account. Their events then appear in the Tasks calendar, read-only, and they can sign in with the account they linked if you allow it. Polaris never holds a credential that reaches everybody's calendar - only the access each person granted.",
+        docsUrl: "https://developers.google.com/identity/protocols/oauth2",
+        setupLinks: [
+            {
+                label: "Create an OAuth client",
+                url: "https://console.cloud.google.com/auth/clients/create",
+                help: "Application type: Web application. Google has no way to pre-fill the form, so paste the redirect URI below into it."
+            },
+            {
+                label: "Enable the Calendar API",
+                url: "https://console.cloud.google.com/apis/library/calendar-json.googleapis.com",
+                help: "On the same project. Without it the client authorizes fine and every calendar comes back empty."
+            }
+        ],
         requiresApiKey: true,
         apiKeyLabel: "Client secret",
-        apiKeyHelp: "From the OAuth 2.0 Client ID you create under APIs & Services -> Credentials."
-    },
-    {
-        slug: "google",
-        name: "Google Calendar",
-        category: "Productivity",
-        summary: "Let people see their own Google Calendar next to their tasks.",
-        description:
-            "Connect a Google Cloud OAuth client and each person can link their own Google account from their account settings. Their events then appear in the Tasks calendar, read-only: Polaris never writes to anybody's calendar and only ever holds the access each person granted.",
-        docsUrl: "https://console.cloud.google.com/apis/credentials",
-        requiresApiKey: true,
-        apiKeyLabel: "Client secret",
-        apiKeyHelp: "From the OAuth 2.0 Client ID you created, with the Google Calendar API enabled on the project."
+        apiKeyHelp: "Shown once when the client is created, and downloadable from the client afterwards."
     },
     {
         slug: "cloudflare",
@@ -185,10 +207,12 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         summary: "Expose deployed apps through an ngrok tunnel, no port-forwarding.",
         description:
             "Runs an ngrok agent from this server that forwards inbound traffic to Polaris. Good for quick public access; a reserved domain (ngrok paid) is recommended for a stable URL.",
-        docsUrl: "https://dashboard.ngrok.com/get-started/your-authtoken",
+        docsUrl: "https://ngrok.com/docs/agent/",
+        setupLinks: [
+            { label: "Get your authtoken", url: "https://dashboard.ngrok.com/get-started/your-authtoken" }
+        ],
         requiresApiKey: true,
-        apiKeyLabel: "Authtoken",
-        apiKeyHelp: "Your ngrok authtoken from the ngrok dashboard."
+        apiKeyLabel: "Authtoken"
     },
     {
         slug: "duckdns",
@@ -197,10 +221,11 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         summary: "Free dynamic DNS - keep a subdomain pointed at your changing IP.",
         description:
             "Points a free <name>.duckdns.org subdomain at this server's public IP and keeps it updated as your ISP address changes, so a home box stays reachable. DuckDNS also resolves *.<name>.duckdns.org, so it works as a wildcard base for app subdomains.",
-        docsUrl: "https://www.duckdns.org/",
+        docsUrl: "https://www.duckdns.org/spec.jsp",
+        setupLinks: [{ label: "Get your token", url: "https://www.duckdns.org/" }],
         requiresApiKey: true,
         apiKeyLabel: "Token",
-        apiKeyHelp: "The token shown at the top of your DuckDNS account page."
+        apiKeyHelp: "Shown at the top of the page once you sign in."
     }
 ];
 

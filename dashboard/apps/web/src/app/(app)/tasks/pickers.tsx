@@ -13,7 +13,7 @@
 
 import Link from "next/link";
 import * as core from "@polaris/core";
-import { Avatar } from "@/components/avatar";
+import { Avatar, preloadAvatars } from "@/components/avatar";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { PersonRef, TagRef, TaskRow } from "@/lib/tasks/facts";
 import type { StatusView, TagView } from "@/lib/tasks/space-service";
@@ -40,7 +40,7 @@ import {
  * re-exported here so the screens that have always taken their controls from
  * this module keep doing so.
  */
-export { Avatar, AvatarStack } from "@/components/avatar";
+export { Avatar, AvatarStack, preloadAvatars } from "@/components/avatar";
 
 /** A menu that filters as you type once the list stops being scannable. */
 function MenuSearch({
@@ -97,7 +97,9 @@ export function AssigneePicker({
         onChange(selected.includes(id) ? selected.filter((entry) => entry !== id) : [...selected, id]);
 
     return (
-        <DropdownMenu>
+        // The faces are asked for as the menu opens rather than as it draws, so
+        // the list is readable the moment it appears instead of filling in.
+        <DropdownMenu onOpenChange={(open) => (open ? preloadAvatars(people) : undefined)}>
             <DropdownMenuTrigger asChild disabled={disabled}>
                 {trigger ?? (
                     <button

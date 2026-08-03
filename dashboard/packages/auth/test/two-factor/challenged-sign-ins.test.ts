@@ -1,15 +1,21 @@
 /**
- * An emailed sign-in link must not be a way past the second factor.
+ * The ways in that stand in for a password must not be a way past the second
+ * factor.
  *
  * better-auth's two-factor plugin only watches the credential sign-in paths, so
- * Polaris widens that hook to cover the link as well (see gateEmailedLink). The
- * hole it closes is invisible from the outside - the link simply works - so what
- * is pinned here is the shape the widening depends on: an upgrade that moves or
- * renames the hook has to fail here rather than quietly hand an armed account a
- * full session for a click in a mailbox.
+ * Polaris widens that hook to cover the two that arrive by another door: an
+ * emailed sign-in link, and a linked GitHub or Google account. Both prove
+ * something in place of the password and neither is the second step the account
+ * asked for.
+ *
+ * The hole they would open is invisible from the outside - both simply work - so
+ * what is pinned here is the shape the widening depends on: an upgrade that
+ * moves or renames the hook has to fail here rather than quietly hand an armed
+ * account a full session for a click in a mailbox or a press on a button.
  */
 
 import { beforeAll, describe, expect, it } from "vitest";
+import { CONNECTION_SIGN_IN_PATH } from "../../src/connection-sign-in.js";
 
 const PUBLISHED = "https://polaris.example.com";
 
@@ -37,18 +43,18 @@ beforeAll(async () => {
 });
 
 describe("the second-factor gate", () => {
-    it("covers the emailed link as well as the password", () => {
+    it("covers the emailed link and a linked account as well as the password", () => {
         const claims = twoFactorMatchers(authModule.createAuth());
         expect(claims("/sign-in/email")).toBe(true);
         expect(claims(authModule.MAGIC_LINK_VERIFY_PATH)).toBe(true);
+        expect(claims(CONNECTION_SIGN_IN_PATH)).toBe(true);
     });
 
-    it("covers it on a deployment that can send codes by message", () => {
-        const claims = twoFactorMatchers(
-            authModule.createAuth({ sendTwoFactorCode: async () => ({}) })
-        );
+    it("covers them on a deployment that can send codes by message", () => {
+        const claims = twoFactorMatchers(authModule.createAuth({ sendTwoFactorCode: async () => ({}) }));
         expect(claims("/sign-in/email")).toBe(true);
         expect(claims(authModule.MAGIC_LINK_VERIFY_PATH)).toBe(true);
+        expect(claims(CONNECTION_SIGN_IN_PATH)).toBe(true);
     });
 
     it("leaves paths that issue no session alone", () => {

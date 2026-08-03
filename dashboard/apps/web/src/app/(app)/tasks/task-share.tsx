@@ -17,9 +17,9 @@
 
 import * as actions from "./actions";
 import * as core from "@polaris/core";
-import { AssigneePicker } from "./pickers";
 import { useEffect, useState } from "react";
 import { runAction } from "@/lib/run-action";
+import { AssigneePicker, Avatar } from "./pickers";
 import type { PersonRef } from "@/lib/tasks/facts";
 import { CopyButton } from "@/components/copy-button";
 import type { TaskShareView } from "@/lib/tasks/share-service";
@@ -206,8 +206,9 @@ export function ShareDialog({
                                     {chosen.map((person) => (
                                         <span
                                             key={person.id}
-                                            className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs"
+                                            className="inline-flex items-center gap-1 rounded-full bg-muted py-0.5 pl-0.5 pr-2 text-xs"
                                         >
+                                            <Avatar person={person} size={18} />
                                             {person.name}
                                             <button
                                                 type="button"

@@ -93,6 +93,29 @@ export function rebalanceOrders(count: number): number[] {
     return Array.from({ length: count }, (_, index) => (index + 1) * ORDER_STEP);
 }
 
+/**
+ * The sequence left behind by a task dropped between two others.
+ *
+ * Needed when a screen was in the order the engine chose rather than one anybody
+ * wrote down: the drop has to be applied to what was on screen before that
+ * arrangement can be kept, and the drop is described by its neighbours the same
+ * way every other move is. A neighbour that is not in the sequence - it was
+ * filtered out from under the pointer - puts the task at the end rather than
+ * dropping it.
+ */
+export function arrangeAround(
+    ids: readonly string[],
+    movedId: string,
+    position: { beforeId: string | null; afterId: string | null }
+): string[] {
+    const without = ids.filter((id) => id !== movedId);
+    const after = position.afterId ? without.indexOf(position.afterId) : -1;
+    const before = position.beforeId ? without.indexOf(position.beforeId) : -1;
+    const landing = after >= 0 ? after : before >= 0 ? before + 1 : without.length;
+    without.splice(landing, 0, movedId);
+    return without;
+}
+
 // ---------------------------------------------------------------------------
 // Durations
 // ---------------------------------------------------------------------------

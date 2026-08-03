@@ -22,6 +22,7 @@ interface Row {
     avatarUrl: string | null;
     method: string;
     scope: string;
+    signInEnabled: boolean;
     linkedAt: Date;
     encryptedToken: Buffer | null;
     tokenNonce: Buffer | null;
@@ -30,6 +31,7 @@ interface Row {
 
 let rows: Row[] = [];
 const settings = new Map<string, string>();
+const banned = new Set<string>();
 let nextId = 1;
 
 const key = (provider: string, accountId: string): string => `${provider}:${accountId}`;
@@ -46,10 +48,17 @@ vi.mock("@polaris/db", () => ({
             findFirst: async ({ where }: { where: { id: string; userId: string } }) =>
                 rows.find((row) => row.id === where.id && row.userId === where.userId) ?? null,
             findUnique: async ({ where }: { where: { provider_accountId?: { provider: string; accountId: string }; id?: string } }) => {
-                if (where.id) return rows.find((row) => row.id === where.id) ?? null;
-                const wanted = where.provider_accountId;
-                if (!wanted) return null;
-                return rows.find((row) => key(row.provider, row.accountId) === key(wanted.provider, wanted.accountId)) ?? null;
+                const found = where.id
+                    ? rows.find((row) => row.id === where.id)
+                    : where.provider_accountId
+                      ? rows.find(
+                            (row) =>
+                                key(row.provider, row.accountId) ===
+                                key(where.provider_accountId!.provider, where.provider_accountId!.accountId)
+                        )
+                      : undefined;
+                // The sign-in lookup reads the owner's standing alongside the row.
+                return found ? { ...found, user: { bannedAt: banned.has(found.userId) ? new Date() : null } } : null;
             },
             count: async ({ where }: { where: { userId: string; provider: string } }) =>
                 rows.filter((row) => row.userId === where.userId && row.provider === where.provider).length,
@@ -80,6 +89,12 @@ vi.mock("@polaris/db", () => ({
                     ...create
                 } as Row;
                 rows.push(row);
+                return row;
+            },
+            update: async ({ where, data }: { where: { id: string }; data: Record<string, unknown> }) => {
+                const row = rows.find((entry) => entry.id === where.id);
+                if (!row) throw new Error("no such row");
+                Object.assign(row, data);
                 return row;
             },
             delete: async ({ where }: { where: { id: string } }) => {
@@ -114,10 +129,13 @@ const {
     ConnectionClaimedError,
     ConnectionLimitError,
     connectionLimit,
+    connectionSignInAllowed,
     deleteConnection,
     listConnections,
     readCredential,
-    saveConnection
+    saveConnection,
+    setConnectionSignIn,
+    signInConnection
 } = await import("@/lib/connections/store");
 
 const account = (accountId: string, label: string) => ({
@@ -131,6 +149,7 @@ beforeEach(() => {
     rows = [];
     nextId = 1;
     settings.clear();
+    banned.clear();
 });
 
 describe("how many accounts one person may link", () => {
@@ -193,6 +212,46 @@ describe("who an outside account belongs to", () => {
         const linked = await saveConnection("ana", account("1", "ana"));
         expect(await deleteConnection("bruno", linked.id)).toBeNull();
         expect(await listConnections("ana", "github")).toHaveLength(1);
+    });
+});
+
+describe("whether a linked account may sign its owner in", () => {
+    it("takes the provider's own default until the operator says otherwise", async () => {
+        expect(await connectionSignInAllowed("github")).toBe(true);
+        settings.set("connections.github.signin", "false");
+        expect(await connectionSignInAllowed("github")).toBe(false);
+        // A provider nobody has heard of is never a way in.
+        expect(await connectionSignInAllowed("myspace")).toBe(false);
+    });
+
+    it("names the owner of an account that is allowed to sign in", async () => {
+        await saveConnection("ana", account("1", "ana"));
+        expect(await signInConnection("github", "1")).toMatchObject({ userId: "ana", label: "ana" });
+    });
+
+    it("says nothing at all about an account whose owner has closed it", async () => {
+        const linked = await saveConnection("ana", account("1", "ana"));
+        await setConnectionSignIn("ana", linked.id, false);
+        expect(await signInConnection("github", "1")).toBeNull();
+    });
+
+    it("does not reopen a closed account when it is authorized again", async () => {
+        const linked = await saveConnection("ana", account("1", "ana"));
+        await setConnectionSignIn("ana", linked.id, false);
+        await saveConnection("ana", { ...account("1", "ana"), scope: "repo" });
+        expect(await signInConnection("github", "1")).toBeNull();
+    });
+
+    it("reports a suspended owner rather than pretending the link is not there", async () => {
+        await saveConnection("ana", account("1", "ana"));
+        banned.add("ana");
+        expect(await signInConnection("github", "1")).toMatchObject({ userId: "ana", banned: true });
+    });
+
+    it("will not let one person open or close another person's account", async () => {
+        const linked = await saveConnection("ana", account("1", "ana"));
+        expect(await setConnectionSignIn("bruno", linked.id, false)).toBeNull();
+        expect(await signInConnection("github", "1")).toMatchObject({ userId: "ana" });
     });
 });
 

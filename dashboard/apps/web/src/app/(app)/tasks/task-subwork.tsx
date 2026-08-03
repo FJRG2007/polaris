@@ -14,12 +14,13 @@ import { useState } from "react";
 import * as actions from "./actions";
 import * as core from "@polaris/core";
 import { runAction } from "@/lib/run-action";
-import type { TaskRow } from "@/lib/tasks/facts";
-import type { StatusView } from "@/lib/tasks/space-service";
-import { Button, Card, CardBody, Checkbox, cn, Input } from "@polaris/ui";
+import type { TaskEdit } from "./views/shared";
+import type { SpaceContext, TaskRow } from "@/lib/tasks/facts";
+import { TaskMenu, type TaskCommands } from "./views/task-actions";
 import { AvatarStack, ProgressBar, StatusDot, StatusMarker } from "./pickers";
 import type { ChecklistView, DependencyView } from "@/lib/tasks/task-service";
 import { ArrowUpRight, Ban, Check, Link2, Plus, Trash2, X } from "lucide-react";
+import { Button, Card, CardBody, Checkbox, cn, ConfirmDeleteDialog, Input } from "@polaris/ui";
 
 /**
  * A row that can be picked up and put down somewhere else in its own list.
@@ -139,23 +140,26 @@ export function SubtaskSection({
     taskId,
     listId,
     subtasks,
-    statuses,
-    canEdit,
+    context,
     onOpen,
     onChanged,
-    onError
+    onError,
+    onCreateTag
 }: {
     taskId: string;
     listId: string;
     subtasks: readonly TaskRow[];
-    statuses: readonly StatusView[];
-    canEdit: boolean;
+    context: SpaceContext;
     onOpen: (taskId: string) => void;
     onChanged: () => void;
     onError: (message: string) => void;
+    /** Born where it is needed, the same way the pickers on a board offer it. */
+    onCreateTag?: (name: string, color: string) => Promise<string | null>;
 }) {
+    const canEdit = context.canEdit;
     const progress = core.rollupProgress(subtasks.map((task) => ({ statusType: task.statusType })));
     const [dragging, setDragging] = useState<string | null>(null);
+    const [deleting, setDeleting] = useState<TaskRow | null>(null);
 
     const move = async (targetId: string) => {
         if (!dragging || dragging === targetId) return;
@@ -166,6 +170,37 @@ export function SubtaskSection({
         await runAction(() => actions.moveTaskAction({ taskId: moved, ...position }), onError);
         onChanged();
     };
+
+    const edit = async (subtaskId: string, change: TaskEdit) => {
+        onError("");
+        const result = await runAction(() => actions.updateTaskAction({ taskId: subtaskId, ...change }), onError);
+        if (result?.error) onError(result.error);
+        onChanged();
+    };
+
+    const duplicate = async (subtaskId: string) => {
+        onError("");
+        const result = await runAction(() => actions.duplicateTaskAction(subtaskId), onError);
+        if (result?.error) onError(result.error);
+        onChanged();
+    };
+
+    /**
+     * A subtask is a task, so it answers to the same menu as one - right-click a
+     * row here and get the status, priority, people, tags, duplicate and delete
+     * that the board and the list offer. Anything less makes the work inside a
+     * task a second-class kind of work, reachable only by opening it first.
+     */
+    const commandsFor = (subtask: TaskRow): TaskCommands => ({
+        task: subtask,
+        context,
+        canEdit,
+        onOpen: () => onOpen(subtask.id),
+        onEdit: (change) => void edit(subtask.id, change),
+        onDuplicate: () => void duplicate(subtask.id),
+        onDelete: () => setDeleting(subtask),
+        onCreateTag
+    });
 
     return (
         <section className="flex flex-col gap-2">
@@ -194,38 +229,44 @@ export function SubtaskSection({
                         onDragStart={() => setDragging(subtask.id)}
                         onDragEnd={() => setDragging(null)}
                         onDropBefore={() => void move(subtask.id)}
-                        className="flex items-center gap-2 px-3 py-2"
                     >
-                        {/* The marker sets the state, rather than a checkbox that
-                            only ever meant done or not. It also used to write
-                            `archived: false`, which changed nothing at all. */}
-                        <StatusMarker
-                            statuses={statuses}
-                            statusId={subtask.statusId}
-                            statusColor={subtask.statusColor}
-                            statusType={subtask.statusType}
-                            statusName={subtask.statusName}
-                            disabled={!canEdit}
-                            onChange={async (statusId) => {
-                                onError("");
-                                await runAction(
-                                    () => actions.updateTaskAction({ taskId: subtask.id, statusId }),
-                                    onError
-                                );
-                                onChanged();
-                            }}
-                        />
-                        <button
-                            type="button"
-                            onClick={() => onOpen(subtask.id)}
-                            className="flex-1 truncate text-left text-sm hover:underline"
-                        >
-                            <span className="mr-2 font-mono text-[11px] text-muted-foreground">{subtask.reference}</span>
-                            <span className={cn(core.isFinishedStatus(subtask.statusType) && "text-muted-foreground")}>
-                                {subtask.name}
-                            </span>
-                        </button>
-                        <AvatarStack people={subtask.assignees} size={20} />
+                        {/* The menu wraps the row's contents rather than the row
+                            itself: the list item is what carries the drag, and a
+                            trigger that took its place would need a ref through
+                            Sortable to hold on to. */}
+                        <TaskMenu commands={commandsFor(subtask)}>
+                            <div className="flex items-center gap-2 px-3 py-2">
+                                {/* The marker sets the state, rather than a checkbox
+                                    that only ever meant done or not. It also used to
+                                    write `archived: false`, which changed nothing. */}
+                                <StatusMarker
+                                    statuses={context.statuses}
+                                    statusId={subtask.statusId}
+                                    statusColor={subtask.statusColor}
+                                    statusType={subtask.statusType}
+                                    statusName={subtask.statusName}
+                                    disabled={!canEdit}
+                                    onChange={(statusId) => void edit(subtask.id, { statusId })}
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => onOpen(subtask.id)}
+                                    className="flex-1 truncate text-left text-sm hover:underline"
+                                >
+                                    <span className="mr-2 font-mono text-[11px] text-muted-foreground">
+                                        {subtask.reference}
+                                    </span>
+                                    <span
+                                        className={cn(
+                                            core.isFinishedStatus(subtask.statusType) && "text-muted-foreground"
+                                        )}
+                                    >
+                                        {subtask.name}
+                                    </span>
+                                </button>
+                                <AvatarStack people={subtask.assignees} size={20} />
+                            </div>
+                        </TaskMenu>
                     </Sortable>
                 ))}
             </ul>
@@ -249,6 +290,24 @@ export function SubtaskSection({
                     }}
                 />
             )}
+
+            <ConfirmDeleteDialog
+                open={deleting !== null}
+                onOpenChange={(open) => (open ? undefined : setDeleting(null))}
+                name={deleting?.name ?? ""}
+                kind="task"
+                requireTyping={false}
+                description="Comments, checklists and tracked time go with it. Archiving keeps all of that and takes it off the board."
+                confirmLabel="Delete task"
+                onConfirm={async () => {
+                    if (!deleting) return;
+                    onError("");
+                    const result = await runAction(() => actions.deleteTaskAction(deleting.id), onError);
+                    if (result?.error) onError(result.error);
+                    setDeleting(null);
+                    onChanged();
+                }}
+            />
         </section>
     );
 }

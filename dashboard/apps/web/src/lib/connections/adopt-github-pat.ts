@@ -43,6 +43,14 @@ export async function adoptInstanceGithubPat(): Promise<void> {
             label: account.login,
             avatarUrl: account.avatarUrl,
             method: "token",
+            // Nobody authorized this link: it is a shared token being handed back
+            // to whoever most likely pasted it, and where that is a guess it is
+            // the oldest administrator. So it carries neither of the two things a
+            // link normally carries - it does not open a way into their Polaris
+            // account, and it does not claim that GitHub account's address for
+            // them. Both are theirs to turn on afterwards, by connecting the
+            // account themselves.
+            signIn: false,
             credential: { token }
         });
     } catch (caught) {

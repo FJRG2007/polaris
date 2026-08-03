@@ -15,9 +15,14 @@
  */
 
 import type { ConnectionCredential } from "./store";
-import { findConnectionProvider } from "./providers";
+import { findConnectionProvider } from "@polaris/core";
 import { authorizeGithubUser, getGithubUserAuth, githubLinkCallbackUrl } from "@/lib/github-service";
-import { getGoogleOAuthClient, googleAuthorizeUrl, exchangeGoogleCode } from "@/lib/google-calendar/service";
+import {
+    exchangeGoogleCode,
+    getGoogleOAuthClient,
+    googleAuthorizeUrl,
+    identifyGoogleAccount
+} from "@/lib/google-calendar/service";
 
 /** The operator's application, as a provider needs it to speak. */
 export interface OAuthClient {
@@ -30,9 +35,24 @@ export interface ConnectionAuthorization {
     readonly accountId: string;
     readonly label: string;
     readonly avatarUrl: string | null;
+    /** The address on that account, set only when the provider says it has
+     *  proved it. Null covers both "no address" and "one it has not proved" -
+     *  neither is something to hold for anybody. */
+    readonly email: string | null;
     readonly scope: string;
     readonly credential: ConnectionCredential;
 }
+
+/** Who authorized, and nothing else. What a sign-in needs and the most a sign-in
+ *  is allowed to ask for. */
+export interface ConnectionIdentity {
+    readonly accountId: string;
+}
+
+/** What the round trip is for. A sign-in asks for less than a link: it only has
+ *  to learn who is at the other end, and asking for more would put a permission
+ *  on the consent screen that nothing would use. */
+export type ConnectionFlow = "link" | "signin";
 
 interface ProviderOAuth {
     /** Where the provider returns somebody after they authorize. Registered on
@@ -40,8 +60,10 @@ interface ProviderOAuth {
     callbackUrl(baseUrl: string): string;
     /** The operator's application, or null when this deployment has none. */
     client(): Promise<OAuthClient | null>;
-    authorizeUrl(client: OAuthClient, redirectUri: string, state: string): string;
+    authorizeUrl(client: OAuthClient, redirectUri: string, state: string, flow: ConnectionFlow): string;
     exchange(client: OAuthClient, code: string, redirectUri: string): Promise<ConnectionAuthorization>;
+    /** Spend a sign-in's code and report whose account it was. */
+    identify(client: OAuthClient, code: string, redirectUri: string): Promise<ConnectionIdentity>;
 }
 
 const ADAPTERS: Record<string, ProviderOAuth> = {
@@ -64,6 +86,7 @@ const ADAPTERS: Record<string, ProviderOAuth> = {
                 accountId: String(account.id),
                 label: account.login,
                 avatarUrl: account.avatarUrl,
+                email: account.email,
                 scope: token.scope,
                 credential: {
                     accessToken: token.accessToken,
@@ -71,6 +94,12 @@ const ADAPTERS: Record<string, ProviderOAuth> = {
                     ...(token.expiresAt ? { expiresAt: token.expiresAt } : {})
                 }
             };
+        },
+        // The same round trip: a GitHub App's user token is the only way to learn
+        // which account authorized, and it is discarded the moment it has said so.
+        identify: async (_client, code, redirectUri) => {
+            const { account } = await authorizeGithubUser(code, redirectUri);
+            return { accountId: String(account.id) };
         }
     },
     google: {
@@ -83,10 +112,15 @@ const ADAPTERS: Record<string, ProviderOAuth> = {
                 accountId: granted.accountId,
                 label: granted.email || granted.accountId,
                 avatarUrl: null,
+                // Only an address Google has proved is worth holding for its
+                // owner: what reads this next makes it one of their addresses
+                // and sends account mail and codes to it.
+                email: granted.emailVerified ? granted.email || null : null,
                 scope: granted.scope,
                 credential: { refreshToken: granted.refreshToken }
             };
-        }
+        },
+        identify: identifyGoogleAccount
     }
 };
 
@@ -116,9 +150,10 @@ export function connectionAuthorizeUrl(
     provider: string,
     client: OAuthClient,
     redirectUri: string,
-    state: string
+    state: string,
+    flow: ConnectionFlow = "link"
 ): string {
-    return adapter(provider).authorizeUrl(client, redirectUri, state);
+    return adapter(provider).authorizeUrl(client, redirectUri, state, flow);
 }
 
 export function exchangeConnectionCode(
@@ -128,4 +163,15 @@ export function exchangeConnectionCode(
     redirectUri: string
 ): Promise<ConnectionAuthorization> {
     return adapter(provider).exchange(client, code, redirectUri);
+}
+
+/** Whose account a sign-in's code belongs to. Nothing is stored from it: the
+ *  link it matches already holds whatever Polaris needs to act as them. */
+export function connectionIdentity(
+    provider: string,
+    client: OAuthClient,
+    code: string,
+    redirectUri: string
+): Promise<ConnectionIdentity> {
+    return adapter(provider).identify(client, code, redirectUri);
 }

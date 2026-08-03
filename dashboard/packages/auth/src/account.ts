@@ -94,13 +94,22 @@ function isEmail(value: string): boolean {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
-/** Whether an address already belongs to somebody - as a primary or an alternate. */
-async function emailTaken(email: string, exceptUserId: string): Promise<boolean> {
+/**
+ * Which account holds an address, as a primary or an alternate, or null when
+ * nobody does.
+ *
+ * One question asked in one place, because an address is claimed by exactly one
+ * account and every path that would create or move one has to respect that -
+ * including provisioning, which is how an invited account is created and which
+ * would otherwise happily take an address somebody else has already proved.
+ */
+export async function emailOwner(email: string): Promise<string | null> {
+    const address = normalizeEmail(email);
     const [asPrimary, asAlternate] = await Promise.all([
-        prisma.user.findFirst({ where: { email, id: { not: exceptUserId } }, select: { id: true } }),
-        prisma.userEmail.findFirst({ where: { email }, select: { id: true } })
+        prisma.user.findFirst({ where: { email: address }, select: { id: true } }),
+        prisma.userEmail.findFirst({ where: { email: address }, select: { userId: true } })
     ]);
-    return Boolean(asPrimary || asAlternate);
+    return asPrimary?.id ?? asAlternate?.userId ?? null;
 }
 
 /** Every address a user holds, primary first. */
@@ -149,12 +158,55 @@ export async function addUserEmail(userId: string, newEmail: string): Promise<{ 
     if (!isEmail(email)) return { error: "Enter a valid email address." };
     const current = await prisma.user.findUnique({ where: { id: userId }, select: { email: true } });
     if (current?.email === email) return { error: "That is already your primary address." };
-    if (await emailTaken(email, userId)) return { error: "That email is already in use." };
+    // Anybody's, including this account's own alternates: the column is unique
+    // across the table, so an address the caller already holds is refused with a
+    // message rather than as a constraint violation on the way to the database.
+    if (await emailOwner(email)) return { error: "That email is already in use." };
     const held = await prisma.userEmail.count({ where: { userId } });
     if (held >= MAX_ALTERNATE_EMAILS) {
         return { error: `You can hold at most ${MAX_ALTERNATE_EMAILS} extra addresses.` };
     }
     await prisma.userEmail.create({ data: { userId, email } });
+    return {};
+}
+
+/**
+ * Record an address an outside provider has just vouched for as one of this
+ * account's own.
+ *
+ * Linking a Google or GitHub account says, on that provider's authority, that
+ * this person reads mail at that address - the same thing a confirmation link
+ * says, which is why it lands verified. Recording it is what reserves it: an
+ * address one account holds is one no other account can be created with, so
+ * somebody who signs in with their work Google cannot later be shadowed by a
+ * second Polaris account under the same address.
+ *
+ * Every way this can fail is a reason to leave things exactly as they are, never
+ * to fail the link that triggered it: an address somebody else already holds
+ * stays theirs, and an account already at its limit simply does not collect
+ * another. The caller treats the reason as a note, not an error.
+ */
+export async function adoptVerifiedEmail(userId: string, newEmail: string): Promise<{ error?: string }> {
+    const email = normalizeEmail(newEmail);
+    if (!isEmail(email)) return { error: "That is not an address Polaris can hold." };
+
+    const owner = await emailOwner(email);
+    if (owner === userId) {
+        // Already theirs. An alternate they had not proved yet is proved now;
+        // the primary's own flag is better-auth's and is left alone.
+        await prisma.userEmail.updateMany({
+            where: { userId, email, verifiedAt: null },
+            data: { verifiedAt: new Date() }
+        });
+        return {};
+    }
+    if (owner) return { error: "That address is already on another account." };
+
+    const held = await prisma.userEmail.count({ where: { userId } });
+    if (held >= MAX_ALTERNATE_EMAILS) {
+        return { error: `That account already holds ${MAX_ALTERNATE_EMAILS} extra addresses.` };
+    }
+    await prisma.userEmail.create({ data: { userId, email, verifiedAt: new Date() } });
     return {};
 }
 

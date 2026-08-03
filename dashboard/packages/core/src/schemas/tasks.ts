@@ -934,6 +934,21 @@ export const taskMoveSchema = z.object({
 
 export type TaskMoveInput = z.infer<typeof taskMoveSchema>;
 
+/**
+ * The order a screen is looking at, made permanent.
+ *
+ * A view opens in the order the engine decided - most urgent first - and nothing
+ * is written down until somebody drags a task somewhere. That drag means "I want
+ * it here", which only holds if the rest of the screen keeps the places it was
+ * showing, so the whole arrangement is sent rather than the one row that moved.
+ * The cap matches the most tasks a screen ever loads at once.
+ */
+export const taskArrangeSchema = z.object({
+    taskIds: z.array(uuid).min(2).max(2000)
+});
+
+export type TaskArrangeInput = z.infer<typeof taskArrangeSchema>;
+
 /** A change applied to a selection. Kept separate from taskUpdateSchema so the
  *  fields a bulk edit may touch are an explicit, reviewable list. */
 export const taskBulkSchema = z.object({

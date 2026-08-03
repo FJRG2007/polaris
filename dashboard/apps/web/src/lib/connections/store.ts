@@ -15,8 +15,8 @@
 import { prisma } from "@polaris/db";
 import { loadEnv } from "@polaris/config";
 import { getSetting } from "@/lib/setting-store";
-import { connectionLimitKey, findConnectionProvider } from "./providers";
 import { encryptSecret, decryptSecret, CredentialDecryptError } from "@polaris/storage";
+import { connectionLimitKey, connectionSignInKey, findConnectionProvider } from "@polaris/core";
 
 /** Auditing is imported where it is used rather than at the top, because the
  *  audit service reaches the auth instance and this module sits on the read path
@@ -44,6 +44,9 @@ export interface ConnectionView {
     readonly avatarUrl: string | null;
     readonly method: "oauth" | "token";
     readonly scope: string;
+    /** Whether the owner lets this account sign them in. The operator's own
+     *  switch is separate, and both have to allow it. */
+    readonly signInEnabled: boolean;
     readonly linkedAt: string;
 }
 
@@ -90,6 +93,7 @@ type ConnectionRow = {
     avatarUrl: string | null;
     method: string;
     scope: string;
+    signInEnabled: boolean;
     linkedAt: Date;
 };
 
@@ -102,6 +106,7 @@ function view(row: ConnectionRow): ConnectionView {
         avatarUrl: row.avatarUrl,
         method: row.method === "token" ? "token" : "oauth",
         scope: row.scope,
+        signInEnabled: row.signInEnabled,
         linkedAt: row.linkedAt.toISOString()
     };
 }
@@ -114,6 +119,7 @@ const VIEW_COLUMNS = {
     avatarUrl: true,
     method: true,
     scope: true,
+    signInEnabled: true,
     linkedAt: true
 } as const;
 
@@ -128,6 +134,22 @@ export async function connectionLimit(provider: string): Promise<number> {
     if (stored === null) return fallback;
     const parsed = Number.parseInt(stored, 10);
     return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
+}
+
+/**
+ * Whether this service may sign anybody in on this deployment at all.
+ *
+ * The operator's half of the decision, kept apart from each person's own: a
+ * service turned off here refuses everybody whatever they chose for themselves,
+ * which is what an operator reaching for it wants. Absent, the provider's own
+ * default applies - off for anything Polaris does not recommend as a way in, so
+ * a provider added later never arrives already open.
+ */
+export async function connectionSignInAllowed(provider: string): Promise<boolean> {
+    const fallback = findConnectionProvider(provider)?.signInDefault ?? false;
+    const stored = await getSetting(connectionSignInKey(provider));
+    if (stored === null) return fallback;
+    return stored === "true";
 }
 
 /** Somebody's linked accounts, newest first, optionally for one provider. */
@@ -154,6 +176,18 @@ export interface SaveConnectionInput {
     avatarUrl?: string | null;
     method: "oauth" | "token";
     scope?: string;
+    /** The address on that account, when the provider vouches for one. Recorded
+     *  as one of this person's own, which is what reserves it. */
+    email?: string | null;
+    /**
+     * Whether this account may sign its owner in, on the row's first write.
+     * Defaults to what the provider is worth as a way in.
+     *
+     * Set to false by anything writing a link on somebody's behalf rather than
+     * because they authorized it: a row nobody consented to must not arrive
+     * carrying a way into their account.
+     */
+    signIn?: boolean;
     /** Null keeps whatever is stored; a value replaces it. */
     credential?: ConnectionCredential | null;
 }
@@ -189,11 +223,20 @@ export async function saveConnection(userId: string, input: SaveConnectionInput)
     };
     const row = await prisma.userConnection.upsert({
         where: { provider_accountId: { provider: input.provider, accountId: input.accountId } },
-        create: { userId, provider: input.provider, accountId: input.accountId, ...stored },
+        create: {
+            userId,
+            provider: input.provider,
+            accountId: input.accountId,
+            // Only ever set here, on the row's first write. Re-authorizing an
+            // account must not put back a way in its owner turned off.
+            signInEnabled: input.signIn ?? findConnectionProvider(input.provider)?.signInDefault ?? false,
+            ...stored
+        },
         update: stored,
         select: VIEW_COLUMNS
     });
 
+    await reserveEmail(userId, input.email);
     await audit({
         actorId: userId,
         action: claimed ? "connection.refresh" : "connection.link",
@@ -202,6 +245,26 @@ export async function saveConnection(userId: string, input: SaveConnectionInput)
         metadata: { provider: input.provider, account: input.label, method: input.method }
     });
     return view(row);
+}
+
+/**
+ * Hold the address on a linked account for the person who linked it.
+ *
+ * The provider has just vouched for it, which is the same proof a confirmation
+ * link gives, so it is kept as one of their addresses - and an address one
+ * account holds is one no other account can be created with. Every way this can
+ * fail is a reason to leave things as they are rather than to fail the link: an
+ * address somebody else already holds simply stays theirs.
+ *
+ * Imported where it is used for the reason the audit service is: this module
+ * sits on the read path of every deploy, and the auth package is a large thing
+ * to pull into that build plan for something only a link ever does.
+ */
+async function reserveEmail(userId: string, email: string | null | undefined): Promise<void> {
+    if (!email) return;
+    const { adoptVerifiedEmail } = await import("@polaris/auth");
+    const result = await adoptVerifiedEmail(userId, email).catch((error: unknown) => ({ error: String(error) }));
+    if (result.error) console.warn("linked address not held:", result.error);
 }
 
 /**
@@ -236,6 +299,61 @@ export async function readCredential(connectionId: string): Promise<ConnectionCr
 /** Replace the credential on a link that was just refreshed against the provider. */
 export async function updateCredential(connectionId: string, credential: ConnectionCredential): Promise<void> {
     await prisma.userConnection.update({ where: { id: connectionId }, data: encryptCredential(credential) });
+}
+
+/**
+ * Let this account sign its owner in, or stop it doing so.
+ *
+ * Scoped to one link rather than to the provider, because a person with a work
+ * GitHub and a personal one has every reason to let one of them in and not the
+ * other. Turning it off never unlinks anything: whatever the account was linked
+ * for goes on working.
+ */
+export async function setConnectionSignIn(
+    userId: string,
+    id: string,
+    enabled: boolean
+): Promise<ConnectionView | null> {
+    const existing = await getConnection(userId, id);
+    if (!existing) return null;
+    if (existing.signInEnabled === enabled) return existing;
+
+    const row = await prisma.userConnection.update({
+        where: { id },
+        data: { signInEnabled: enabled },
+        select: VIEW_COLUMNS
+    });
+    await audit({
+        actorId: userId,
+        action: enabled ? "connection.signin.allowed" : "connection.signin.refused",
+        targetType: "user",
+        targetId: userId,
+        metadata: { provider: existing.provider, account: existing.label }
+    });
+    return view(row);
+}
+
+/**
+ * Whose Polaris account an outside account belongs to, for a sign-in.
+ *
+ * Answers with the owner only when the link itself allows a sign-in; a link the
+ * owner has closed is reported as no link at all, so the callback has one thing
+ * to decide rather than two. Never says whether the account exists here at all -
+ * that answer belongs to nobody but its owner.
+ */
+export async function signInConnection(
+    provider: string,
+    accountId: string
+): Promise<{ userId: string; connectionId: string; label: string; banned: boolean } | null> {
+    const row = await prisma.userConnection.findUnique({
+        where: { provider_accountId: { provider, accountId } },
+        select: { id: true, userId: true, label: true, signInEnabled: true, user: { select: { bannedAt: true } } }
+    });
+    if (!row?.signInEnabled) return null;
+    // A suspended account is reported rather than hidden, so the caller can say
+    // what a password sign-in would have said. Nothing is issued either way, and
+    // whoever is holding the linked account is its owner.
+    return { userId: row.userId, connectionId: row.id, label: row.label, banned: row.user.bannedAt !== null };
 }
 
 /**

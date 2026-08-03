@@ -19,8 +19,8 @@ import { setDomainConfig, syncDuckDns } from "@/lib/domain-service";
 import { isTunnelToken, tunnelTokenHint } from "@/lib/integrations/tunnel-token";
 import { getIntegrationState, upsertIntegration } from "@/lib/integration-service";
 import type { CloudflareTokenScope } from "@/lib/integrations/cloudflare-token-link";
-import { connectionLimitKey, findConnectionProvider } from "@/lib/connections/providers";
 import { DYMO_IP_RULES, findIntegration, type ScanAction } from "@/lib/integrations/registry";
+import { connectionLimitKey, connectionSignInKey, findConnectionProvider } from "@polaris/core";
 import { connectGithubApp, disconnectGithub, refreshInstallations } from "@/lib/github-service";
 import {
     connectCloudflareToken,
@@ -60,6 +60,31 @@ export async function saveConnectionLimitAction(provider: string, limit: number)
     });
     revalidatePath("/integrations");
     revalidatePath("/account/connections");
+    return {};
+}
+
+/**
+ * Whether a connected account of this service may sign its owner in here.
+ *
+ * The operator's half of the decision; each person still chooses for their own
+ * account, and both have to allow it. Turning it off leaves every link in place
+ * and only closes the door, so a service can be refused as a way in without
+ * anybody losing the repositories or the calendar it was linked for.
+ */
+export async function saveConnectionSignInAction(provider: string, allowed: boolean): Promise<{ error?: string }> {
+    const user = await requireAdmin();
+    if (!findConnectionProvider(provider)) return { error: "Unknown service" };
+
+    await setSetting(connectionSignInKey(provider), allowed === true ? "true" : "false");
+    await recordAudit({
+        actorId: user.id,
+        action: "integration.configure",
+        targetType: "integration",
+        targetId: provider,
+        metadata: { signIn: allowed === true }
+    });
+    revalidatePath("/integrations");
+    revalidatePath("/account/security");
     return {};
 }
 

@@ -1,9 +1,34 @@
-import { LoginForm } from "./login-form";
 import { redirect } from "next/navigation";
 import { hasAnyUser } from "@polaris/auth";
+import { CONNECTION_PROVIDERS } from "@polaris/core";
+import { LoginForm, type SignInProvider } from "./login-form";
+import { connectionSignInAllowed } from "@/lib/connections/store";
 import { pendingTwoFactorUserId } from "@/lib/two-factor-challenge";
+import { connectionOAuthClient, supportsOAuth } from "@/lib/connections/oauth";
 
 export const dynamic = "force-dynamic";
+
+/**
+ * The outside services this deployment can sign somebody in with right now:
+ * the operator allows them, and there is an application to authorize against.
+ *
+ * Says nothing about any account. A button appears for a service the deployment
+ * supports whether or not the person at the screen has one - a list that shrank
+ * to what a given browser could use would be a list of who has linked what.
+ */
+async function signInProviders(): Promise<SignInProvider[]> {
+    const offered = await Promise.all(
+        CONNECTION_PROVIDERS.map(async (provider): Promise<SignInProvider | null> => {
+            if (!supportsOAuth(provider.slug)) return null;
+            const [allowed, client] = await Promise.all([
+                connectionSignInAllowed(provider.slug),
+                connectionOAuthClient(provider.slug)
+            ]);
+            return allowed && client ? { slug: provider.slug, name: provider.name } : null;
+        })
+    );
+    return offered.filter((provider): provider is SignInProvider => provider !== null);
+}
 
 export default async function LoginPage() {
     // A sign-in already half done belongs on the challenge screen, not back at the
@@ -15,5 +40,9 @@ export default async function LoginPage() {
     // Where to get an account from is only worth saying while there is no way in
     // at all. Once the instance has its first account the answer is "ask whoever
     // runs it", and the setup command has stopped working anyway.
-    return <LoginForm awaitingSetup={!(await hasAnyUser())} />;
+    const [awaitingSetup, providers] = await Promise.all([
+        hasAnyUser().then((exists) => !exists),
+        signInProviders()
+    ]);
+    return <LoginForm awaitingSetup={awaitingSetup} providers={providers} />;
 }

@@ -10,9 +10,9 @@
 
 import { requireUser } from "@/lib/session";
 import { ConnectionsView } from "./connections-view";
-import { CONNECTION_PROVIDERS } from "@/lib/connections/providers";
-import { connectionLimit, listConnections } from "@/lib/connections/store";
+import { CONNECTION_PROVIDERS } from "@polaris/core";
 import { connectionOAuthClient, supportsOAuth } from "@/lib/connections/oauth";
+import { connectionLimit, connectionSignInAllowed, listConnections } from "@/lib/connections/store";
 
 export const dynamic = "force-dynamic";
 
@@ -36,7 +36,13 @@ export default async function ConnectionsPage() {
             // against. Without one there is no screen to send anybody to, so the
             // card says what to ask for instead of offering a button that fails.
             canAuthorize: supportsOAuth(provider.slug) && (await connectionOAuthClient(provider.slug)) !== null,
-            accounts: linked.filter((account) => account.provider === provider.slug)
+            // Whether the operator allows this service as a way in. Without it,
+            // the card says nothing about signing in rather than pointing at a
+            // switch that would do nothing.
+            canSignIn: await connectionSignInAllowed(provider.slug),
+            accounts: linked
+                .filter((account) => account.provider === provider.slug)
+                .map((account) => ({ ...account, signsIn: account.signInEnabled }))
         }))
     );
 

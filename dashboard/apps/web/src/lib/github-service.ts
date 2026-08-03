@@ -285,6 +285,10 @@ export interface GithubAccount {
     id: number;
     login: string;
     avatarUrl: string | null;
+    /** The account's public address, when it has one. GitHub only lets a verified
+     *  address be published, so this is one GitHub has proved - but most accounts
+     *  publish none, which is why nothing here depends on it. */
+    email: string | null;
 }
 
 /** A user-to-server token, as GitHub issues it. The refresh token and expiry are
@@ -337,9 +341,14 @@ export async function readGithubAccount(token: string): Promise<GithubAccount> {
     const res = await fetch(`${API}/user`, { headers: apiHeaders(token), cache: "no-store" });
     if (res.status === 401) throw new Error("GitHub rejected the token (unauthorized)");
     if (!res.ok) throw new Error(`GitHub returned ${res.status} reading the account`);
-    const body = (await res.json()) as { id?: number; login?: string; avatar_url?: string };
+    const body = (await res.json()) as { id?: number; login?: string; avatar_url?: string; email?: string | null };
     if (typeof body.id !== "number" || !body.login) throw new Error("GitHub did not return an account");
-    return { id: body.id, login: body.login, avatarUrl: body.avatar_url ?? null };
+    return {
+        id: body.id,
+        login: body.login,
+        avatarUrl: body.avatar_url ?? null,
+        email: typeof body.email === "string" && body.email.includes("@") ? body.email.trim().toLowerCase() : null
+    };
 }
 
 async function exchangeUserToken(

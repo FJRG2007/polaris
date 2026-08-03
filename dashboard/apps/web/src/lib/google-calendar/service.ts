@@ -30,6 +30,10 @@ const CALENDAR_API = "https://www.googleapis.com/calendar/v3";
 /** Read the calendar, learn who authorized, and nothing else. */
 export const GOOGLE_SCOPES = ["openid", "email", "https://www.googleapis.com/auth/calendar.readonly"];
 
+/** What a sign-in asks for: who is at the other end. Nothing more belongs on a
+ *  consent screen whose whole job is to name an account. */
+export const GOOGLE_SIGN_IN_SCOPES = ["openid", "email"];
+
 export interface GoogleOAuthClient {
     readonly clientId: string;
     readonly clientSecret: string;
@@ -50,18 +54,31 @@ export async function getGoogleOAuthClient(): Promise<GoogleOAuthClient | null> 
 /**
  * Google's consent screen for this deployment.
  *
- * `access_type=offline` with `prompt=consent` is what returns a refresh token:
- * without both, a second authorization comes back with an access token that
- * expires in an hour and the calendar stops loading the same afternoon.
+ * Linking asks for lasting access: `access_type=offline` with `prompt=consent`
+ * is what returns a refresh token, and without both, a second authorization
+ * comes back with an access token that expires in an hour and the calendar stops
+ * loading the same afternoon.
+ *
+ * A sign-in asks for neither. It needs the account's name once, so it asks for
+ * no offline access and no repeated consent - what it does ask for is which
+ * account, because somebody signed into two of them has to be able to say. The
+ * result is that signing in shows an account chooser rather than the calendar
+ * consent screen all over again.
  */
-export function googleAuthorizeUrl(client: GoogleOAuthClient, redirectUri: string, state: string): string {
+export function googleAuthorizeUrl(
+    client: GoogleOAuthClient,
+    redirectUri: string,
+    state: string,
+    flow: "link" | "signin" = "link"
+): string {
+    const signIn = flow === "signin";
     const url = new URL(OAUTH_AUTHORIZE);
     url.searchParams.set("client_id", client.clientId);
     url.searchParams.set("redirect_uri", redirectUri);
     url.searchParams.set("response_type", "code");
-    url.searchParams.set("scope", GOOGLE_SCOPES.join(" "));
-    url.searchParams.set("access_type", "offline");
-    url.searchParams.set("prompt", "consent");
+    url.searchParams.set("scope", (signIn ? GOOGLE_SIGN_IN_SCOPES : GOOGLE_SCOPES).join(" "));
+    if (!signIn) url.searchParams.set("access_type", "offline");
+    url.searchParams.set("prompt", signIn ? "select_account" : "consent");
     url.searchParams.set("include_granted_scopes", "true");
     url.searchParams.set("state", state);
     return url.toString();
@@ -79,7 +96,12 @@ const userinfoSchema = z.object({
     // Normalized on the way in: this address is only ever shown back as a label
     // for the linked account, and a stray case difference should not make the
     // same account look like two.
-    email: z.string().trim().toLowerCase().pipe(z.string().email()).optional()
+    email: z.string().trim().toLowerCase().pipe(z.string().email()).optional(),
+    // Google's own answer to "has this person proved they read mail there". An
+    // address is only worth anything to Polaris when this is true, so it is asked
+    // for rather than assumed - Google returns false for an address somebody has
+    // typed into their profile and never confirmed.
+    email_verified: z.boolean().optional()
 });
 
 export interface GoogleAuthorization {
@@ -87,7 +109,12 @@ export interface GoogleAuthorization {
     readonly accessToken: string;
     readonly scope: string;
     readonly accountId: string;
+    /** The address on the account, for the label on the card. */
     readonly email: string;
+    /** Whether Google says its owner has proved they read mail there. Kept apart
+     *  from the address itself because the two are used for different things: the
+     *  address is a label, and only a proved one is held for its owner. */
+    readonly emailVerified: boolean;
 }
 
 /** Spend the authorization code and learn whose account it was. */
@@ -117,8 +144,31 @@ export async function exchangeGoogleCode(
         accessToken: token.access_token,
         scope: token.scope ?? "",
         accountId: who.sub,
-        email: who.email ?? ""
+        email: who.email ?? "",
+        emailVerified: who.email_verified === true
     };
+}
+
+/**
+ * Spend a sign-in's code and report whose Google account it was.
+ *
+ * Deliberately narrower than the link exchange: no refresh token is asked for,
+ * so there is none to keep, and the access token is spent on the one question
+ * this has to answer and then dropped. The subject is what identifies the
+ * account - an address can move between accounts, and Google says so itself.
+ */
+export async function identifyGoogleAccount(
+    client: GoogleOAuthClient,
+    code: string,
+    redirectUri: string
+): Promise<{ accountId: string }> {
+    const token = await postToken(client, {
+        code,
+        redirect_uri: redirectUri,
+        grant_type: "authorization_code"
+    });
+    const who = await fetchJson(USERINFO, userinfoSchema, { Authorization: `Bearer ${token.access_token}` });
+    return { accountId: who.sub };
 }
 
 /** Access tokens live an hour; minting one per page view would spend a request

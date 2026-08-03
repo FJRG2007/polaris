@@ -6,11 +6,11 @@
  * about in advance.
  */
 
-import { finishConnectionLink } from "@/lib/connections/link-flow";
+import { finishConnectionCallback } from "@/lib/connections/link-flow";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request): Promise<Response> {
-    return finishConnectionLink(request, "google");
+    return finishConnectionCallback(request, "google");
 }

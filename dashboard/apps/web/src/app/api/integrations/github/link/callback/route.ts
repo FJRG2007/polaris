@@ -8,11 +8,11 @@
  * connected. The flow behind it is the shared one.
  */
 
-import { finishConnectionLink } from "@/lib/connections/link-flow";
+import { finishConnectionCallback } from "@/lib/connections/link-flow";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request): Promise<Response> {
-    return finishConnectionLink(request, "github");
+    return finishConnectionCallback(request, "github");
 }
