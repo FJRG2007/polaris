@@ -15,11 +15,12 @@ import { FilesView } from "./files-view";
 import * as driveActions from "./actions";
 import { useRouter } from "next/navigation";
 import { UnifiConsoleButton } from "./unifi-console-button";
-import type { ConnectionSummary, DriveEntry } from "./types";
 import { ShareDialog, type ShareTarget } from "./share-dialog";
+import { RemoveConnectionDialog } from "./remove-connection-dialog";
 import { RequestDialog, type RequestTarget } from "./request-dialog";
 import { ConnectionDialog, EditConnectionDialog } from "./connection-dialog";
 import { AccessDialog, UnlockPanel, type AccessTarget } from "./access-dialog";
+import { isSavedConnection, type ConnectionSummary, type DriveEntry } from "./types";
 import { useCallback, useEffect, useRef, useState, useTransition, type FormEvent } from "react";
 import {
     AlertTriangle,
@@ -363,17 +364,6 @@ export function DriveExplorer({
         runOp(label, () => driveActions.emptyFolderAction(connectionId, entry.path, permanent));
     }
 
-    function confirmDeleteConnection() {
-        if (!deleteConn) return;
-        const target = deleteConn;
-        setDeleteConn(null);
-        startTransition(async () => {
-            await driveActions.deleteConnectionAction(target.id);
-            router.push("/drive");
-            router.refresh();
-        });
-    }
-
     return (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-[16rem_1fr]">
             <aside className="flex flex-col gap-3">
@@ -513,16 +503,22 @@ export function DriveExplorer({
                         onEmptyFolder={(entry, permanent) => setEmptyTarget({ entry, permanent })}
                         onScheduleDelete={(items) => setScheduleTargets(items)}
                         onRename={onRename}
-                        onShare={(entry) =>
-                            setShareTarget({
-                                connectionId,
-                                path: entry.path,
-                                name: entry.name,
-                                isDir: entry.kind === "dir"
-                            })
+                        onShare={
+                            isSavedConnection(connectionId)
+                                ? (entry) =>
+                                      setShareTarget({
+                                          connectionId,
+                                          path: entry.path,
+                                          name: entry.name,
+                                          isDir: entry.kind === "dir"
+                                      })
+                                : undefined
                         }
-                        onRequestFiles={(target, name) =>
-                            setRequestTarget({ connectionId, path: target, name })
+                        onRequestFiles={
+                            isSavedConnection(connectionId)
+                                ? (target, name) =>
+                                      setRequestTarget({ connectionId, path: target, name })
+                                : undefined
                         }
                         onToggleHidden={onToggleHidden}
                         onSetFavorite={onSetFavorite}
@@ -793,28 +789,20 @@ export function DriveExplorer({
                 />
             ) : null}
 
-            <Dialog
-                open={deleteConn !== null}
-                onOpenChange={(open) => !open && setDeleteConn(null)}
-            >
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>Remove connection</DialogTitle>
-                        <DialogDescription>
-                            {deleteConn?.name} will be removed from Polaris. The device itself and
-                            its data are not touched - you can add it again anytime.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div className="flex justify-end gap-2">
-                        <Button type="button" variant="ghost" onClick={() => setDeleteConn(null)}>
-                            Cancel
-                        </Button>
-                        <Button type="button" variant="danger" onClick={confirmDeleteConnection}>
-                            Remove
-                        </Button>
-                    </div>
-                </DialogContent>
-            </Dialog>
+            <RemoveConnectionDialog
+                connection={deleteConn}
+                onClose={() => setDeleteConn(null)}
+                onRemoved={(result) => {
+                    // The connection is gone, and with it the location the browser
+                    // was on. Anything the removal could not finish rides along to
+                    // the page it lands on rather than disappearing with the dialog;
+                    // what went right needs no notice, the files are simply there.
+                    const warnings = result.warnings ?? [];
+                    if (warnings.length > 0) setOpError(warnings.join(" "));
+                    router.push("/drive");
+                    router.refresh();
+                }}
+            />
         </div>
     );
 }

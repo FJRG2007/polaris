@@ -9,14 +9,15 @@
  */
 
 import { revalidatePath } from "next/cache";
-import {
-    baseName,
-    createConnectionSchema,
-    normalizeRelPath,
-    storageConfigSchema,
-    storageCredentialsSchema
-} from "@polaris/core";
+import { recordAudit } from "@/lib/audit-service";
+import { fetchUnasMetrics } from "@/lib/unifi-unas";
+import { listLocks } from "@/lib/access-lock-service";
 import { requirePermission, requireUser } from "@/lib/session";
+import { invalidateFolderSizes } from "@/lib/drive-folder-size";
+import { detectHost, type NasDetection } from "@/lib/nas-detect";
+import { writeArchiveToDriver, zipSourcesFor } from "@/lib/drive-archive";
+import { createScheduledDeletion } from "@/lib/scheduled-deletion-service";
+import { deleteTrashForever, emptyTrash, moveToTrash, restoreTrash } from "@/lib/trash-service";
 import {
     authorizeDrive,
     requireDriveDriver,
@@ -24,24 +25,18 @@ import {
     DriveLockedError
 } from "@/lib/drive-authz";
 import {
-    createConnection,
-    deleteConnection,
-    discoverUnasShares,
-    getDriver,
-    setUnasSmbShare,
-    updateConnection
-} from "@/lib/storage-service";
-import { detectHost, type NasDetection } from "@/lib/nas-detect";
-import { fetchUnasMetrics } from "@/lib/unifi-unas";
-import { listLocks } from "@/lib/access-lock-service";
-import { writeArchiveToDriver, zipSourcesFor } from "@/lib/drive-archive";
-import {
     archiveFormatOf,
     extractArchiveTo,
     listArchiveEntries,
     type ArchiveEntry
 } from "@/lib/drive-archive-read";
-import { invalidateFolderSizes } from "@/lib/drive-folder-size";
+import {
+    createConnection,
+    discoverUnasShares,
+    getDriver,
+    setUnasSmbShare,
+    updateConnection
+} from "@/lib/storage-service";
 import {
     moveItemMeta,
     recordItemCreator,
@@ -50,9 +45,21 @@ import {
     setItemIcon,
     setItemNote
 } from "@/lib/drive-meta-service";
-import { deleteTrashForever, emptyTrash, moveToTrash, restoreTrash } from "@/lib/trash-service";
-import { createScheduledDeletion } from "@/lib/scheduled-deletion-service";
-import { recordAudit } from "@/lib/audit-service";
+import {
+    baseName,
+    createConnectionSchema,
+    normalizeRelPath,
+    removeConnectionSchema,
+    storageConfigSchema,
+    storageCredentialsSchema
+} from "@polaris/core";
+import {
+    getConnectionRemovalPlan,
+    removeConnection,
+    type ConnectionRemovalMode,
+    type ConnectionRemovalPlan,
+    type RemoveConnectionResult
+} from "@/lib/connection-removal-service";
 
 /** Result of a UNAS connection dry-run: what the console reported, or why not. */
 export interface UnasTestResult {
@@ -213,16 +220,37 @@ export async function setUnasShareAction(
     return {};
 }
 
-export async function deleteConnectionAction(connectionId: string): Promise<void> {
+/** What removing this connection would take with it, for the confirmation dialog. */
+export async function connectionRemovalPlanAction(connectionId: string): Promise<ConnectionRemovalPlan | null> {
     const user = await requirePermission("connections.manage");
-    await deleteConnection(user.id, connectionId);
+    return getConnectionRemovalPlan(user.id, connectionId);
+}
+
+/**
+ * Remove a connection the way the operator chose. Copying every file to another
+ * device and redeploying what mounted it can take a long time, so this is one long
+ * action the dialog waits on rather than a fire-and-forget.
+ */
+export async function removeConnectionAction(
+    connectionId: string,
+    input: { mode: ConnectionRemovalMode; destinationId?: string }
+): Promise<RemoveConnectionResult> {
+    const user = await requirePermission("connections.manage");
+    const parsed = removeConnectionSchema.safeParse(input);
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid removal" };
+
+    const result = await removeConnection(user.id, connectionId, user.id, parsed.data);
+    if (result.error) return result;
+
     await recordAudit({
         actorId: user.id,
         action: "connection.delete",
         targetType: "connection",
-        targetId: connectionId
+        targetId: connectionId,
+        metadata: { mode: parsed.data.mode, movedTo: parsed.data.destinationId ?? null }
     });
     revalidatePath("/drive");
+    return result;
 }
 
 /** Create a folder. Returns a structured error (never throws) so an unsupported

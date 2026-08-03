@@ -95,6 +95,24 @@ export const createConnectionSchema = z.object({
 
 export type CreateConnectionInput = z.infer<typeof createConnectionSchema>;
 
+/**
+ * Payload for taking a storage connection out of Polaris. `forget` stops using the
+ * device and touches nothing on it; `move` copies its content to another
+ * connection, repoints the services that mount it, and only then forgets it - so
+ * that one needs a destination.
+ */
+export const removeConnectionSchema = z
+    .object({
+        mode: z.enum(["forget", "move"]),
+        destinationId: z.string().uuid().optional()
+    })
+    .refine((value) => value.mode !== "move" || Boolean(value.destinationId), {
+        message: "Choose where the content should go",
+        path: ["destinationId"]
+    });
+
+export type RemoveConnectionInput = z.infer<typeof removeConnectionSchema>;
+
 /** Whether a provider kind must route through the host daemon to function. */
 export function requiresHostd(kind: StorageProviderKind): boolean {
     return HOSTD_REQUIRED_KINDS.includes(kind);
