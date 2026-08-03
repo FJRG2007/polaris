@@ -229,7 +229,7 @@ export async function createSpace(
         });
 
         const list = await tx.taskList.create({
-            data: { spaceId: space.id, name: "Tasks", order: core.ORDER_STEP },
+            data: { spaceId: space.id, name: core.DEFAULT_LIST_NAME, order: core.ORDER_STEP },
             select: { id: true }
         });
 
@@ -689,6 +689,23 @@ export async function createList(input: core.ListInput): Promise<string> {
         select: { id: true }
     });
     return list.id;
+}
+
+/**
+ * Where a task asked for here goes, making the list if there is none.
+ *
+ * A folder holds tasks through a list, which is an arrangement people should not
+ * have to know about before they can write down the first thing. Asking for a
+ * task in a container that holds no list used to be refused with "make one
+ * first"; the list is made here instead, named the same as the one a new space
+ * starts with, so the two are the same thing however they came about.
+ */
+export async function ensureList(input: core.ListInput): Promise<{ id: string; name: string }> {
+    const existing = await branchLists(input.spaceId, input.folderId);
+    const first = existing[0];
+    if (first) return first;
+    const id = await createList(input);
+    return { id, name: input.name };
 }
 
 export async function renameList(listId: string, name: string): Promise<void> {

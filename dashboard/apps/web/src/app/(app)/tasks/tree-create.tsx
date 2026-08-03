@@ -313,12 +313,22 @@ export function TreeCreate({
                 onClose();
                 return;
             }
-            // A task has to live in a list, and nothing here has one yet. Said
-            // now, where it can name the folder, rather than by opening a dialog
-            // whose list picker is empty.
+            // A task has to live in a list, and nothing here has one yet. That
+            // is an arrangement, not a decision worth interrupting somebody for:
+            // the list is made where the task was asked for and the dialog opens
+            // on it, rather than sending them off to create one and come back.
             if (!at.listId && result.context.lists.length === 0) {
-                onError(`${at.name} has no list yet - make one first and the task goes in it.`);
-                onClose();
+                const made = await runAction(() => actions.ensureListAction(at.spaceId, at.folderId), onError);
+                if (made?.error) {
+                    onError(made.error);
+                    onClose();
+                    return;
+                }
+                if (!made?.list) {
+                    onClose();
+                    return;
+                }
+                setContext({ ...result.context, lists: [made.list] });
                 return;
             }
             setContext(result.context);
@@ -335,7 +345,7 @@ export function TreeCreate({
                 </div>
             );
         }
-        // Refused above, where it can be said out loud; here it is only a guard.
+        // Made above when the container held none, so this is only a guard.
         const defaultListId = at.listId ?? context.lists[0]?.id ?? "";
         if (!defaultListId) return null;
         return (

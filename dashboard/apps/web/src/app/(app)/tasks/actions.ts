@@ -339,6 +339,29 @@ export async function createListAction(input: unknown): Promise<{ id?: string; e
     }
 }
 
+/**
+ * The list a task created on a space or a folder goes into, made if that
+ * container holds none. Authorized exactly as creating a list is, because when
+ * there is nothing there yet that is what this does.
+ */
+export async function ensureListAction(
+    spaceId: unknown,
+    folderId: unknown
+): Promise<{ list?: { id: string; name: string }; error?: string }> {
+    const caller = await actor();
+    const parsed = core.listSchema.safeParse({ spaceId, folderId, name: core.DEFAULT_LIST_NAME });
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    try {
+        if (parsed.data.folderId) await access.requireFolder(caller, parsed.data.folderId, "member");
+        else await access.requireSpace(caller, parsed.data.spaceId, "member");
+        const list = await spaces.ensureList(parsed.data);
+        refresh();
+        return { list };
+    } catch (caught) {
+        return failure(caught, "Could not make a list for the task");
+    }
+}
+
 export async function updateListAction(listId: string, input: unknown): Promise<{ error?: string }> {
     const caller = await actor();
     try {

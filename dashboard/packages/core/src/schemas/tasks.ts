@@ -151,6 +151,13 @@ export const DEFAULT_TASK_STATUSES: readonly { name: string; type: TaskStatusTyp
     { name: "Cancelled", type: "closed", color: "#71717a" }
 ];
 
+/**
+ * What the list a container starts with is called. A space is created with one,
+ * and a folder that is asked for a task before it holds anywhere to put one gets
+ * the same, so the two are never a different thing under a different name.
+ */
+export const DEFAULT_LIST_NAME = "Tasks";
+
 // ---------------------------------------------------------------------------
 // Custom fields
 // ---------------------------------------------------------------------------
