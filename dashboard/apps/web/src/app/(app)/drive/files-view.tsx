@@ -594,13 +594,14 @@ export function FilesView({
     /** Drop a dragged row onto a folder to move it there (never into itself). */
     function onFolderDrop(event: React.DragEvent, folder: DriveEntry) {
         const source = dragPath.current ?? event.dataTransfer.getData("application/x-polaris-path");
-        dragPath.current = null;
-        setDropFolder(null);
-        if (!source || source === folder.path || folder.path.startsWith(`${source}/`)) return;
+        if (!source || source === folder.path || folder.path.startsWith(`${source}/`)) {
+            dragPath.current = null;
+            setDropFolder(null);
+            return;
+        }
         event.preventDefault();
         event.stopPropagation();
-        const dragged = entries.find((entry) => entry.path === source);
-        if (dragged) onMove(dragged, folder.path);
+        moveDraggedTo(folder.path, source);
     }
 
     // Create and upload shortcuts. They listen on the window so they work wherever
@@ -807,19 +808,27 @@ export function FilesView({
     );
 
     /**
-     * Move whatever is being dragged into `targetPath` (a breadcrumb folder). If the
-     * dragged item is part of the selection, the whole selection moves; items already
-     * in the target, or a folder dropped onto itself or a descendant, are skipped.
+     * What a drag carries: the whole selection when the grabbed item belongs to it,
+     * the way a file manager drags every highlighted file rather than the one under
+     * the pointer; otherwise just that item.
      */
-    function moveDraggedTo(targetPath: string) {
-        const source = dragPath.current;
+    function draggedGroup(source: string): DriveEntry[] {
+        if (selected.has(source)) return selectedEntries;
+        const dragged = visible.find((entry) => entry.path === source);
+        return dragged ? [dragged] : [];
+    }
+
+    /**
+     * Move whatever is being dragged into `targetPath` (a breadcrumb segment or a
+     * folder row). Items already in the target, or a folder dropped onto itself or a
+     * descendant, are skipped.
+     */
+    function moveDraggedTo(targetPath: string, source: string | null = dragPath.current) {
         dragPath.current = null;
         setDropSegment(null);
+        setDropFolder(null);
         if (source === null) return;
-        const group = selected.has(source)
-            ? selectedEntries
-            : visible.filter((entry) => entry.path === source);
-        for (const item of group) {
+        for (const item of draggedGroup(source)) {
             if (parentOf(item.path) === targetPath) continue;
             if (movesIntoSelf(item.path, targetPath)) continue;
             onMove(item, targetPath);
@@ -857,6 +866,8 @@ export function FilesView({
                 dragPath.current = entry.path;
                 event.dataTransfer.setData("application/x-polaris-path", entry.path);
                 event.dataTransfer.effectAllowed = "move";
+                const carried = draggedGroup(entry.path).length;
+                if (carried > 1) showCountDragImage(event, carried);
             },
             onDragEnd: () => {
                 dragPath.current = null;
@@ -2825,6 +2836,23 @@ function readAllEntries(reader: {
         };
         next();
     });
+}
+
+/**
+ * Replace the drag ghost with the number of items being carried. The browser
+ * draws only the row under the pointer, which reads as though the rest of the
+ * selection stayed behind - and the whole selection is what moves.
+ */
+function showCountDragImage(event: React.DragEvent, count: number) {
+    const ghost = document.createElement("div");
+    ghost.textContent = `${count} items`;
+    ghost.style.cssText = `position:fixed;top:-1000px;left:-1000px;padding:4px 10px;border-radius:6px;
+        font:500 12px/1.4 system-ui,sans-serif;white-space:nowrap;
+        background:hsl(var(--primary));color:hsl(var(--primary-foreground))`;
+    document.body.append(ghost);
+    event.dataTransfer.setDragImage(ghost, 12, 12);
+    // The image is snapshotted synchronously, so the node is only needed for this frame.
+    requestAnimationFrame(() => ghost.remove());
 }
 
 /**
