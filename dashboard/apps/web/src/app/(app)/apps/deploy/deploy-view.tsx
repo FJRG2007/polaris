@@ -1060,8 +1060,8 @@ function NewGithubForm({ environmentId, onDone }: { environmentId: string; onDon
             {!connected && !loading && (
                 <p className="rounded-md border border-border/60 bg-surface/40 px-3 py-2 text-xs text-muted-foreground">
                     Searching public repositories.{" "}
-                    <a href="/integrations" className="text-primary hover:underline">
-                        Connect GitHub
+                    <a href="/account/connections" className="text-primary hover:underline">
+                        Connect your GitHub account
                     </a>{" "}
                     to reach private ones and your own list.
                 </p>

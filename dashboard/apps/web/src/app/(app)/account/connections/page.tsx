@@ -10,10 +10,9 @@
 
 import { requireUser } from "@/lib/session";
 import { ConnectionsView } from "./connections-view";
-import { supportsOAuth } from "@/lib/connections/oauth";
-import { connectionOAuthClient } from "@/lib/connections/oauth";
 import { CONNECTION_PROVIDERS } from "@/lib/connections/providers";
 import { connectionLimit, listConnections } from "@/lib/connections/store";
+import { connectionOAuthClient, supportsOAuth } from "@/lib/connections/oauth";
 
 export const dynamic = "force-dynamic";
 

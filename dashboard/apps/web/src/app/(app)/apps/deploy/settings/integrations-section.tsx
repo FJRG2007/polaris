@@ -63,7 +63,7 @@ export function IntegrationsSection({ projectId }: { projectId: string }) {
         <div className="flex flex-col gap-4">
             <SettingsCard
                 title="Integrations"
-                description="These are connected once for the whole instance. Every project uses the same ones."
+                description="What this project can reach. GitHub is whichever accounts you have connected; the rest are set once for the whole instance."
             >
                 <div className="flex flex-col gap-2">
                     <IntegrationRow
@@ -75,7 +75,9 @@ export function IntegrationsSection({ projectId }: { projectId: string }) {
                                 ? `${state.github.login ?? "Connected"} - ${state.github.repos} ${state.github.repos === 1 ? "repository" : "repositories"} available`
                                 : "Deploy from a private repository, and redeploy when a commit lands."
                         }
-                        href="/integrations"
+                        // GitHub is the one here that is not instance-wide: it is
+                        // whichever accounts the reader has connected themselves.
+                        href="/account/connections"
                     />
                     <IntegrationRow
                         icon={<CloudflareMark className="size-5" />}
