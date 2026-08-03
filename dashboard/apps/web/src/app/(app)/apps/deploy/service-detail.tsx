@@ -1658,7 +1658,7 @@ const EXPOSURE_OPTIONS: { value: ExposureKind; label: string; icon: ReactNode }[
     { value: "cf-named", label: "Cloudflare tunnel - custom domain", icon: <CloudflareMark className="size-4" /> },
     { value: "cf-quick", label: "Cloudflare quick link (free)", icon: <CloudflareMark className="size-4" /> },
     { value: "ngrok", label: "ngrok tunnel", icon: <NgrokMark className="size-4" /> },
-    { value: "duckdns", label: "DuckDNS subdomain", icon: <img src="/logos/duckdns.webp" alt="" className="size-4" /> },
+    { value: "duckdns", label: "DuckDNS subdomain", icon: <img src="/logos/duckdns.webp" alt="" className="size-4 shrink-0" /> },
     { value: "proxy", label: "Behind a tunnel/proxy", icon: <Globe className="size-4 text-muted-foreground" /> }
 ];
 

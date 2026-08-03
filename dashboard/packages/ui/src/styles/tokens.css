@@ -65,6 +65,17 @@ body {
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
 }
 
+/* An icon is a fixed size, not slack to be taken up when a row runs out of room.
+   Beside a long file name a flex row shares the shortfall between everything in
+   it, and an SVG shrinks along with the text - which is how one folder ends up
+   drawn smaller than the folder on the row above it. Every icon already carries
+   the size class it should be, so that class is both its minimum and its maximum
+   and nothing may take space off it. Scoped to the icon set rather than to svg,
+   so a chart or an inline illustration can still be sized by its container. */
+.lucide {
+    flex-shrink: 0;
+}
+
 /* Themed scrollbars everywhere, so scroll regions match the surface instead of
    showing the platform default. Firefox uses the standard properties; WebKit and
    Chromium use the pseudo-elements. The thumb is a low-chroma neutral that lifts

@@ -5,6 +5,7 @@
  * ./brand-icons.
  */
 
+import { mark } from "./brand-icons";
 import type { SVGProps } from "react";
 
 const DYMO_PATH =
@@ -12,7 +13,7 @@ const DYMO_PATH =
 
 export function DymoMark(props: SVGProps<SVGSVGElement>) {
     return (
-        <svg viewBox="0 0 1000 1000" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" {...props}>
+        <svg viewBox="0 0 1000 1000" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" {...mark(props)}>
             <path fill="currentColor" d={DYMO_PATH} />
         </svg>
     );

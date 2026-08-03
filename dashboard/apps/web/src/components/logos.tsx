@@ -4,9 +4,10 @@
  * external requests. Add a new mark here when adding an integration.
  */
 
+import { cn } from "@polaris/ui";
 import { Blocks } from "lucide-react";
-import { CloudflareMark, GitHubMark, NgrokMark } from "./brand-icons";
 import { DymoMark } from "./dymo-mark";
+import { CloudflareMark, GitHubMark, NgrokMark } from "./brand-icons";
 
 interface LogoProps {
     className?: string;
@@ -20,7 +21,7 @@ export function VirusTotalLogo({ className = "size-6", brand }: LogoProps) {
             role="img"
             viewBox="0 0 24 24"
             xmlns="http://www.w3.org/2000/svg"
-            className={className}
+            className={cn("shrink-0", className)}
             fill={brand ? "#394EFF" : "currentColor"}
             aria-hidden="true"
         >
@@ -37,6 +38,6 @@ export function IntegrationLogo({ slug, className }: { slug: string; className?:
     if (slug === "ngrok") return <NgrokMark className={className} />;
     if (slug === "dymo") return <DymoMark className={className} />;
     // DuckDNS ships only an official raster mark; served from public/ as a static asset.
-    if (slug === "duckdns") return <img src="/logos/duckdns.webp" alt="" className={className} />;
+    if (slug === "duckdns") return <img src="/logos/duckdns.webp" alt="" className={cn("shrink-0", className)} />;
     return <Blocks className={className} />;
 }

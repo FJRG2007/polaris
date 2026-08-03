@@ -87,7 +87,7 @@ export function GithubCard({ login, avatarUrl, canLink }: GithubIdentityCardProp
                     <div className="flex items-center gap-3 rounded-md border border-border/60 px-3 py-2">
                         {avatarUrl ? (
                             // eslint-disable-next-line @next/next/no-img-element -- one remote avatar, no loader needed
-                            <img src={avatarUrl} alt="" className="size-6 rounded-full" />
+                            <img src={avatarUrl} alt="" className="size-6 shrink-0 rounded-full" />
                         ) : (
                             <GitHubMark className="size-5 text-muted-foreground" />
                         )}
