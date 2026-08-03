@@ -10,11 +10,13 @@
  */
 
 import Link from "next/link";
+import { SmsSenderCard } from "./sms-sender-card";
 import { MAIL_PROVIDER_INFO } from "@polaris/core";
 import type { ChannelView } from "@/lib/messaging-service";
 import type { EmailChannelView } from "@/lib/mail-service";
 import { DiscordSetupPanel } from "../discord-setup-panel";
 import { EmailChannelDialog } from "./email-channel-dialog";
+import type { SmsSenderView } from "@/lib/notifications/sms-service";
 import { useEffect, useState, useTransition, type ComponentType } from "react";
 import {
     CHANNEL_STATUS_TONE,
@@ -99,10 +101,12 @@ function channelKind(channel: ChannelView): ChannelKind {
 export function ChannelsView({
     initialChannels,
     initialEmailChannels,
+    smsSenders,
     bridgeReady
 }: {
     initialChannels: ChannelView[];
     initialEmailChannels: EmailChannelView[];
+    smsSenders: SmsSenderView[];
     bridgeReady: boolean;
 }) {
     const [channels, setChannels] = useState(initialChannels);
@@ -199,6 +203,8 @@ export function ChannelsView({
                     ))}
                 </div>
             )}
+
+            <SmsSenderCard senders={smsSenders} />
 
             {emailDialog && (
                 <EmailChannelDialog

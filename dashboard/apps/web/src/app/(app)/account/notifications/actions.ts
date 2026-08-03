@@ -10,21 +10,10 @@
 
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
-import {
-    destinationInputSchema,
-    isNotificationEvent,
-    notificationRuleSchema,
-    smsChannelInputSchema
-} from "@polaris/core";
 import { requireUser } from "@/lib/session";
-import {
-    clearNotifications,
-    deleteNotification,
-    listNotificationHistory,
-    markAllNotificationsRead,
-    markNotificationRead,
-    type NotificationPage
-} from "@/lib/notification-service";
+import { rateLimit } from "@/lib/rate-limit-service";
+import { testDestination } from "@/lib/notifications/dispatch";
+import { destinationInputSchema, isNotificationEvent, notificationRuleSchema } from "@polaris/core";
 import { getNotificationPreferences, saveNotificationPreferences } from "@/lib/notifications/preferences";
 import {
     createDestination,
@@ -33,9 +22,14 @@ import {
     setDestinationEnabled,
     type DestinationView
 } from "@/lib/notifications/destinations";
-import { testDestination } from "@/lib/notifications/dispatch";
-import { deleteSmsSender, saveSmsSender, type SmsSenderView } from "@/lib/notifications/sms-service";
-import { rateLimit } from "@/lib/rate-limit-service";
+import {
+    clearNotifications,
+    deleteNotification,
+    listNotificationHistory,
+    markAllNotificationsRead,
+    markNotificationRead,
+    type NotificationPage
+} from "@/lib/notification-service";
 
 /** How many test alerts one account may send, and over what span. */
 const TEST_LIMIT = 10;
@@ -140,21 +134,4 @@ export async function testDestinationAction(id: string): Promise<{ error?: strin
     const result = await testDestination(user.id, id);
     revalidatePath("/account/notifications");
     return result;
-}
-
-export async function saveSmsSenderAction(
-    input: unknown
-): Promise<{ sender?: SmsSenderView; error?: string }> {
-    const user = await requireUser();
-    const parsed = smsChannelInputSchema.extend({ id: z.string().uuid().optional() }).safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the form." };
-    const result = await saveSmsSender(user.id, parsed.data);
-    if (!result.error) revalidatePath("/account/notifications");
-    return result;
-}
-
-export async function deleteSmsSenderAction(id: string): Promise<void> {
-    const user = await requireUser();
-    await deleteSmsSender(user.id, id);
-    revalidatePath("/account/notifications");
 }

@@ -1,18 +1,25 @@
 "use client";
 
 /**
- * The account the texts go out through. Only needed if a phone number is among
- * the destinations above, so the card says so plainly instead of demanding
- * credentials from somebody who only wanted a Discord webhook.
+ * The account the texts go out through, listed with the other things Polaris
+ * sends through rather than on anybody's own settings page: it is a connected
+ * service an operator configures once, not a preference.
+ *
+ * Only needed if something is being alerted to a phone number, so the card says
+ * so plainly instead of demanding provider credentials from somebody who came
+ * here to link a Discord server.
  *
  * The auth token is write-only: saving without it keeps the stored one, so the
  * sending number can be corrected without going back to the provider for the
  * credential.
  */
 
-import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Trash2 } from "lucide-react";
+import { useState, useTransition } from "react";
+import { SMS_PROVIDER_INFO } from "@polaris/core";
+import type { SmsSenderView } from "@/lib/notifications/sms-service";
+import { deleteSmsSenderAction, saveSmsSenderAction } from "./sms-actions";
 import {
     Badge,
     Button,
@@ -27,9 +34,6 @@ import {
     DialogTitle,
     Input
 } from "@polaris/ui";
-import { SMS_PROVIDER_INFO } from "@polaris/core";
-import type { SmsSenderView } from "@/lib/notifications/sms-service";
-import { deleteSmsSenderAction, saveSmsSenderAction } from "./actions";
 
 /** Only one provider exists today; the catalogue keeps the form data-driven. */
 const PROVIDER = SMS_PROVIDER_INFO.twilio;
@@ -58,7 +62,8 @@ export function SmsSenderCard({ senders }: { senders: SmsSenderView[] }) {
             <CardBody className="p-0">
                 {senders.length === 0 ? (
                     <p className="px-4 py-6 text-center text-sm text-muted-foreground">
-                        No sender connected. Webhooks and email work without one.
+                        No sender connected. Alerts to a phone number will not send until there
+                        is one; every other destination works without it.
                     </p>
                 ) : (
                     <ul className="divide-y divide-border">

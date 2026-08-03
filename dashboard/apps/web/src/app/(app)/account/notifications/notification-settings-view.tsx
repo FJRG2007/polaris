@@ -12,7 +12,6 @@
  */
 
 import { DeliveryLog } from "./delivery-log";
-import { SmsSenderCard } from "./sms-sender-card";
 import { DestinationsCard } from "./destinations-card";
 import { saveNotificationRuleAction } from "./actions";
 import { useEffect, useState, useTransition } from "react";
@@ -90,7 +89,6 @@ export function NotificationSettingsView({
             ))}
 
             <DestinationsCard destinations={destinations} smsReady={senders.some((s) => s.status === "connected")} />
-            <SmsSenderCard senders={senders} />
             <DeliveryLog deliveries={deliveries} />
         </div>
     );

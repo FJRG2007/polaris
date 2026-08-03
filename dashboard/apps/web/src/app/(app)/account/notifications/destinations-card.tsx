@@ -7,9 +7,19 @@
  * "I added a webhook" from silently redirecting every alert you have.
  */
 
-import { useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useState, useTransition } from "react";
+import { RelativeTime } from "@/components/relative-time";
 import { Plus, Send, Smartphone, Trash2, Webhook } from "lucide-react";
+import { destinationInputSchema, WEBHOOK_FORMATS } from "@polaris/core";
+import type { DestinationView } from "@/lib/notifications/destinations";
+import {
+    createDestinationAction,
+    deleteDestinationAction,
+    setDestinationEnabledAction,
+    testDestinationAction
+} from "./actions";
 import {
     Badge,
     Button,
@@ -26,15 +36,6 @@ import {
     Select,
     Switch
 } from "@polaris/ui";
-import { destinationInputSchema, WEBHOOK_FORMATS } from "@polaris/core";
-import { RelativeTime } from "@/components/relative-time";
-import type { DestinationView } from "@/lib/notifications/destinations";
-import {
-    createDestinationAction,
-    deleteDestinationAction,
-    setDestinationEnabledAction,
-    testDestinationAction
-} from "./actions";
 
 export function DestinationsCard({
     destinations,
@@ -139,7 +140,11 @@ export function DestinationsCard({
                                 </div>
                                 {destination.kind === "sms" && !smsReady ? (
                                     <p className="text-xs text-warning">
-                                        Texts will not send until an SMS sender is configured below.
+                                        Texts will not send until an SMS sender is connected under{" "}
+                                        <Link href="/inbox/channels" className="underline">
+                                            Channels
+                                        </Link>
+                                        .
                                     </p>
                                 ) : null}
                                 {testResult?.id === destination.id ? (
