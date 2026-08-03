@@ -18,6 +18,13 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 
 interface TwoFactorEndpoints {
     verifyTOTP(input: { body: { code: string }; headers: Headers }): Promise<unknown>;
+    generateBackupCodes(input: {
+        body: { password: string };
+        headers: Headers;
+    }): Promise<{ backupCodes?: string[] }>;
+    /** Server-only in better-auth: it has no route and no client method, so the
+     *  decrypted codes can only ever be reached from trusted server code. */
+    viewBackupCodes(input: { body: { userId: string } }): Promise<{ backupCodes?: string[] }>;
 }
 
 /**
@@ -40,6 +47,67 @@ export async function verifyTotpForSession(auth: Auth, headers: Headers, code: s
 export async function twoFactorEnabled(userId: string): Promise<boolean> {
     const row = await prisma.user.findUnique({ where: { id: userId }, select: { twoFactorEnabled: true } });
     return row?.twoFactorEnabled === true;
+}
+
+/**
+ * Backup codes: the way in when the authenticator is not to hand.
+ *
+ * better-auth mints them with the factor, stores them encrypted under this
+ * instance's secret, and strikes each one off as it is spent - so the stored set
+ * is exactly the codes still worth keeping. Both functions below go through its
+ * endpoints rather than reading the column, because the encryption is the
+ * library's and a second reader of it would be a second thing to keep in step.
+ */
+
+/**
+ * How many codes the account has left, or null when there is no set to count -
+ * no authenticator armed, or a stored set this instance cannot read.
+ *
+ * The count only, never the codes. A page that says "3 left" is telling somebody
+ * to go and make more; a page that hands the codes back would make every open
+ * session a way to read them, which is the one thing they are not meant to be.
+ */
+export async function backupCodesRemaining(auth: Auth, userId: string): Promise<number | null> {
+    const api = auth.api as unknown as TwoFactorEndpoints;
+    try {
+        const { backupCodes } = await api.viewBackupCodes({ body: { userId } });
+        return Array.isArray(backupCodes) ? backupCodes.length : null;
+    } catch {
+        // Thrown for an account with no two-factor row, which is not a failure -
+        // it is what "no codes" looks like from here.
+        return null;
+    }
+}
+
+/**
+ * Mint a fresh set, replacing whatever is left of the old one.
+ *
+ * The password is asked for because this is the control that decides what the
+ * account's spare keys are: the codes it returns open the account on their own,
+ * and the ones it silently invalidates were somebody's printout. better-auth
+ * checks the password itself and answers the same way whether it was wrong or
+ * the factor was never armed, so the two are told apart here from what the
+ * account actually has rather than from the message.
+ *
+ * Returned once, to the caller that asked. Nothing stores them and nothing logs
+ * them - the encrypted set better-auth wrote is the only copy that survives this
+ * call, and it cannot be read back as plaintext by anything but the count above.
+ */
+export async function regenerateBackupCodes(
+    auth: Auth,
+    headers: Headers,
+    password: string
+): Promise<{ codes?: string[]; error?: string }> {
+    const api = auth.api as unknown as TwoFactorEndpoints;
+    try {
+        const { backupCodes } = await api.generateBackupCodes({ body: { password }, headers });
+        if (!Array.isArray(backupCodes) || backupCodes.length === 0) {
+            return { error: "No codes were issued. Try again." };
+        }
+        return { codes: backupCodes };
+    } catch {
+        return { error: "Current password is incorrect." };
+    }
 }
 
 /**

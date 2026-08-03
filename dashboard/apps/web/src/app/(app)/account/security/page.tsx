@@ -12,6 +12,7 @@
  * never going to be accepted.
  */
 
+import { auth } from "@/lib/auth";
 import { requireUser } from "@/lib/session";
 import { SecurityView } from "./security-view";
 import { listPasskeys } from "./passkey-actions";
@@ -19,6 +20,7 @@ import { currentDeviceStanding } from "@/lib/device-grace";
 import { listUserSessions } from "@/lib/session-directory";
 import { describeTwoFactorMethods } from "@/lib/two-factor-delivery";
 import {
+    backupCodesRemaining,
     countTrustedDevices,
     getUserSecurity,
     listSecurityQuestions,
@@ -30,19 +32,30 @@ export const dynamic = "force-dynamic";
 
 export default async function SecurityPage() {
     const user = await requireUser();
-    const [settings, questions, hasTwoFactor, passkeys, methods, sessions, trustedDevices, standing] =
-        await Promise.all([
-            getUserSecurity(user.id),
-            listSecurityQuestions(user.id),
-            twoFactorEnabled(user.id),
-            listPasskeys(),
-            describeTwoFactorMethods(user.id),
-            // Approving a sign-in is done from another open session, so the card says
-            // how many there are rather than offering a gate with nothing behind it.
-            listUserSessions(user.id, user.sessionId),
-            countTrustedDevices(user.id),
-            currentDeviceStanding(user)
-        ]);
+    const [
+        settings,
+        questions,
+        hasTwoFactor,
+        passkeys,
+        methods,
+        sessions,
+        trustedDevices,
+        backupCodes,
+        standing
+    ] = await Promise.all([
+        getUserSecurity(user.id),
+        listSecurityQuestions(user.id),
+        twoFactorEnabled(user.id),
+        listPasskeys(),
+        describeTwoFactorMethods(user.id),
+        // Approving a sign-in is done from another open session, so the card says
+        // how many there are rather than offering a gate with nothing behind it.
+        listUserSessions(user.id, user.sessionId),
+        countTrustedDevices(user.id),
+        // The count only. The codes are never read out to a page.
+        backupCodesRemaining(auth, user.id),
+        currentDeviceStanding(user)
+    ]);
     const lock = standing.settled ? undefined : { reason: newDeviceWaitMessage(standing) };
 
     return (
@@ -61,6 +74,7 @@ export default async function SecurityPage() {
                 sessionMaxMinutes={settings.sessionMaxMinutes}
                 requireLoginApproval={settings.requireLoginApproval}
                 twoFactorEnabled={hasTwoFactor}
+                backupCodesRemaining={backupCodes}
                 questions={questions.map((entry) => entry.question)}
                 passkeys={passkeys}
                 twoFactorMethods={methods}

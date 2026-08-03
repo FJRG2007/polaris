@@ -8,8 +8,9 @@
  * Enrollment is deliberately three steps - password, then the secret, then a code
  * that proves the authenticator actually works. The factor is only armed after
  * that last step, so a mis-copied secret cannot lock anyone out. Backup codes are
- * shown once, in the same breath, because that is the only moment they exist -
- * hence the copy, download and print controls sitting right next to them.
+ * shown once, in the same breath, through the shared panel that carries every way
+ * of keeping them; the Security page uses the same panel to hand over a
+ * replacement set, so a format added there is offered here too.
  *
  * Arming and removing the factor both end the current session and issue a fresh
  * one, so both announce the replacement first; otherwise an account that asks
@@ -17,9 +18,13 @@
  * their own, already-approved session.
  */
 
-import { useState, type FormEvent } from "react";
-import { Copy, Download, Printer } from "lucide-react";
+import { Copy } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
+import { Feedback } from "./setting-card";
+import { authClient } from "@/lib/auth-client";
+import { useState, type FormEvent } from "react";
+import { beginSessionRotationAction } from "./actions";
+import { BackupCodesPanel } from "./backup-codes-panel";
 import {
     Button,
     Dialog,
@@ -27,21 +32,8 @@ import {
     DialogDescription,
     DialogHeader,
     DialogTitle,
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuTrigger,
     Input
 } from "@polaris/ui";
-import { authClient } from "@/lib/auth-client";
-import {
-    backupCodesFile,
-    backupCodesHtml,
-    BACKUP_CODE_FORMATS,
-    type BackupCodeFormat
-} from "@/lib/backup-codes";
-import { beginSessionRotationAction } from "./actions";
-import { Feedback } from "./setting-card";
 
 /** The `secret` query parameter of an otpauth:// URI, for manual entry. */
 function secretFromUri(uri: string): string {
@@ -55,35 +47,6 @@ function secretFromUri(uri: string): string {
 /** Format a base32 secret in groups of four so it can be typed without losing place. */
 function groupSecret(secret: string): string {
     return secret.replace(/(.{4})/g, "$1 ").trim();
-}
-
-/** Hand a generated file to the browser as a download. */
-function download(codes: string[], format: BackupCodeFormat): void {
-    const file = backupCodesFile(codes, format);
-    const url = URL.createObjectURL(new Blob([file.body], { type: file.type }));
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = file.name;
-    link.click();
-    URL.revokeObjectURL(url);
-}
-
-/**
- * Print the codes from an offscreen frame. A frame rather than a second window,
- * because a popup blocker would swallow the window and the codes are only shown
- * once - there is no second chance to get them onto paper.
- */
-function printCodes(codes: string[]): void {
-    const frame = document.createElement("iframe");
-    frame.setAttribute("aria-hidden", "true");
-    frame.style.cssText = "position:fixed;width:0;height:0;border:0;visibility:hidden";
-    frame.srcdoc = backupCodesHtml(codes);
-    frame.onload = () => {
-        frame.contentWindow?.print();
-        // Outlives the print dialog, which is modal on the frame's window.
-        setTimeout(() => frame.remove(), 60_000);
-    };
-    document.body.append(frame);
 }
 
 export function EnableTwoFactorDialog({
@@ -212,54 +175,7 @@ export function EnableTwoFactorDialog({
                             </a>
                         </div>
 
-                        <div className="flex flex-col gap-1">
-                            <span className="text-xs text-muted-foreground">
-                                Backup codes - each works once, store them somewhere safe. They are not shown again.
-                            </span>
-                            <div className="grid grid-cols-2 gap-1 rounded-md border border-border bg-muted/30 p-2 font-mono text-xs">
-                                {backupCodes.map((code) => (
-                                    <span key={code}>{code}</span>
-                                ))}
-                            </div>
-                            <div className="flex flex-wrap gap-1">
-                                <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => void navigator.clipboard.writeText(backupCodes.join("\n"))}
-                                >
-                                    <Copy className="size-4" />
-                                    Copy
-                                </Button>
-                                <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                        <Button type="button" variant="ghost" size="sm">
-                                            <Download className="size-4" />
-                                            Download
-                                        </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="start">
-                                        {BACKUP_CODE_FORMATS.map((entry) => (
-                                            <DropdownMenuItem
-                                                key={entry.format}
-                                                onSelect={() => download(backupCodes, entry.format)}
-                                            >
-                                                {entry.label}
-                                            </DropdownMenuItem>
-                                        ))}
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
-                                <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => printCodes(backupCodes)}
-                                >
-                                    <Printer className="size-4" />
-                                    Print
-                                </Button>
-                            </div>
-                        </div>
+                        <BackupCodesPanel codes={backupCodes} />
 
                         <label className="flex flex-col gap-1 text-sm">
                             Code from your app

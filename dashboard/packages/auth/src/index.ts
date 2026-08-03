@@ -78,6 +78,8 @@ export {
 export {
     verifyTotpForSession,
     twoFactorEnabled,
+    backupCodesRemaining,
+    regenerateBackupCodes,
     adoptTrustedDevice,
     countTrustedDevices,
     currentTrustedDevice,

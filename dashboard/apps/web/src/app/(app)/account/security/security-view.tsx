@@ -12,6 +12,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { PasskeysCard } from "./passkeys-card";
 import { ShieldAlert, Trash2 } from "lucide-react";
+import { BackupCodesCard } from "./backup-codes-card";
 import type { PasskeyView } from "@/lib/passkey-directory";
 import { Button, Card, CardBody, Select } from "@polaris/ui";
 import { RemovePinDialog, SetPinDialog } from "./pin-dialogs";
@@ -56,6 +57,7 @@ export function SecurityView({
     sessionMaxMinutes,
     requireLoginApproval,
     twoFactorEnabled,
+    backupCodesRemaining,
     questions,
     passkeys,
     twoFactorMethods,
@@ -73,6 +75,8 @@ export function SecurityView({
     sessionMaxMinutes: number;
     requireLoginApproval: boolean;
     twoFactorEnabled: boolean;
+    /** Backup codes still unspent, or null when there is no readable set. */
+    backupCodesRemaining: number | null;
     questions: string[];
     passkeys: PasskeyView[];
     twoFactorMethods: TwoFactorMethodStatus[];
@@ -165,6 +169,12 @@ export function SecurityView({
                     </Button>
                 )}
             </SettingCard>
+
+            <BackupCodesCard
+                lock={lock}
+                twoFactorEnabled={twoFactorEnabled}
+                remaining={backupCodesRemaining}
+            />
 
             <TwoFactorMethodsCard
                 lock={lock}

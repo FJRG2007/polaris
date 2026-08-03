@@ -13,6 +13,7 @@
 import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { prisma } from "@polaris/db";
+import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/session";
 import { recordAudit } from "@/lib/audit-service";
@@ -22,19 +23,20 @@ import { normalizePeerId } from "@/lib/messaging-service";
 import { bridgeSend } from "@/lib/messaging/bridge-client";
 import { describeTwoFactorMethods } from "@/lib/two-factor-delivery";
 import {
-    issuePhoneCode,
-    removeUserPhone,
-    setTwoFactorPreferences,
-    setUserPhone,
-    verifyPhoneCode
-} from "@polaris/auth";
-import {
     otpCodeField,
     phoneField,
     TWO_FACTOR_CODE_TTL_MINUTES,
     TWO_FACTOR_METHOD_INFO,
     twoFactorPreferencesSchema
 } from "@polaris/core";
+import {
+    issuePhoneCode,
+    regenerateBackupCodes,
+    removeUserPhone,
+    setTwoFactorPreferences,
+    setUserPhone,
+    verifyPhoneCode
+} from "@polaris/auth";
 
 type ActionResult = { error?: string };
 
@@ -129,6 +131,52 @@ export async function verifyPhoneAction(code: unknown): Promise<ActionResult> {
     const result = await verifyPhoneCode(auth, user.id, parsed.data);
     if (!result.error) {
         await recordAudit({ actorId: user.id, action: "account.phone.verified" });
+        revalidatePath("/account/security");
+    }
+    return result;
+}
+
+/** How often one account may mint a set of backup codes. The endpoint checks a
+ *  password, so it is a guessing surface as much as it is a control. */
+const BACKUP_CODES_LIMIT = 5;
+const BACKUP_CODES_WINDOW_MS = 15 * 60 * 1000;
+
+const regenerateBackupCodesSchema = z.object({
+    password: z.string().min(1, "Password is required")
+});
+
+/**
+ * Mint a fresh set of backup codes and hand them back once.
+ *
+ * The only path by which a user gets codes after enrolment, and the only way to
+ * replace a set that has been spent, printed and lost, or read over somebody's
+ * shoulder. It invalidates whatever is left of the old set, which is the point:
+ * the answer to "my printout is compromised" has to be one action, not turning
+ * the authenticator off and on again.
+ *
+ * The codes are returned to the caller and nowhere else - the audit line records
+ * that a set was issued and how many, never the codes themselves.
+ */
+export async function regenerateBackupCodesAction(
+    input: unknown
+): Promise<{ codes?: string[]; error?: string }> {
+    const user = await requireUser();
+    const blocked = await newDeviceRefusal(user);
+    if (blocked) return { error: blocked };
+    const parsed = regenerateBackupCodesSchema.safeParse(input);
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the form." };
+    const throttle = await rateLimit(`backup-codes:${user.id}`, BACKUP_CODES_LIMIT, BACKUP_CODES_WINDOW_MS);
+    if (!throttle.ok) {
+        return { error: `Too many attempts. Try again in ${Math.ceil(throttle.retryAfterMs / 60000)} minutes.` };
+    }
+
+    const result = await regenerateBackupCodes(auth, await headers(), parsed.data.password);
+    if (result.codes) {
+        await recordAudit({
+            actorId: user.id,
+            action: "account.2fa.backup-codes-issued",
+            metadata: { count: result.codes.length }
+        });
         revalidatePath("/account/security");
     }
     return result;

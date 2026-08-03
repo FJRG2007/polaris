@@ -654,6 +654,11 @@ export function createRequestAuth(options: AuthOptions = {}): RequestAuth {
  * arming or dropping the authenticator. Everything equivalent that goes through
  * a server action is guarded there; this is the same rule applied where the
  * browser talks to better-auth directly.
+ *
+ * Minting backup codes is listed even though Polaris asks for them through a
+ * server action that already refuses a waiting device: the route stays reachable
+ * from the browser, and a set of codes is a set of ways in whichever way it was
+ * asked for.
  */
 const PROTECTED_ENDPOINTS: ReadonlySet<string> = new Set([
     "/passkey/generate-register-options",
@@ -661,7 +666,8 @@ const PROTECTED_ENDPOINTS: ReadonlySet<string> = new Set([
     "/passkey/delete-passkey",
     "/passkey/update-passkey",
     "/two-factor/enable",
-    "/two-factor/disable"
+    "/two-factor/disable",
+    "/two-factor/generate-backup-codes"
 ]);
 
 /** Registering a passkey is the one that also wants the password proved. The
