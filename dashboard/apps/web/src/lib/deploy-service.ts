@@ -707,7 +707,15 @@ export async function syncAppRoutes(): Promise<void> {
             ...localDomains.map((domain) => domain.applicationId),
             ...localTunnelApps.map((app) => app.id)
         ]);
-        const emptyWaf = { allowLists: [], deny: [], requireLogin: false, presets: [], rules: [] };
+        const emptyWaf = {
+            allowLists: [],
+            deny: [],
+            requireLogin: false,
+            browserIntegrity: false,
+            emailObfuscation: true,
+            presets: [],
+            rules: []
+        };
         for (const domain of localDomains) {
             const rule = waf.get(domain.applicationId) ?? emptyWaf;
             localRoutes.push({
@@ -720,7 +728,9 @@ export async function syncAppRoutes(): Promise<void> {
                 deny: rule.deny,
                 presets: rule.presets,
                 rules: rule.rules,
-                requireLogin: rule.requireLogin
+                requireLogin: rule.requireLogin,
+                browserIntegrity: rule.browserIntegrity,
+                emailObfuscation: rule.emailObfuscation
             });
         }
         for (const app of localTunnelApps) {
@@ -735,7 +745,9 @@ export async function syncAppRoutes(): Promise<void> {
                 deny: rule.deny,
                 presets: rule.presets,
                 rules: rule.rules,
-                requireLogin: rule.requireLogin
+                requireLogin: rule.requireLogin,
+                browserIntegrity: rule.browserIntegrity,
+                emailObfuscation: rule.emailObfuscation
             });
         }
     }
@@ -1239,12 +1251,17 @@ async function buildAppPlan(
     // Resolved WAF rules for this service, materialized into edge labels on deploy so
     // a remote server's own Traefik enforces them without the control plane.
     const resolvedWaf = await resolveWaf(app.id);
+    // Email obfuscation is deliberately absent from this test even though it is on by
+    // default: it would be true for every service, so including it would put the guard
+    // in front of every route on the instance to deliver a control the forwardAuth
+    // path cannot apply anyway. It rides on the proxy wiring instead.
     const waf =
         resolvedWaf.allowLists.length > 0 ||
         resolvedWaf.deny.length > 0 ||
         resolvedWaf.presets.length > 0 ||
         resolvedWaf.rules.length > 0 ||
-        resolvedWaf.requireLogin
+        resolvedWaf.requireLogin ||
+        resolvedWaf.browserIntegrity
             ? resolvedWaf
             : undefined;
 

@@ -17,7 +17,7 @@ import { notFound } from "next/navigation";
 import { ScopePicker } from "./scope-picker";
 import { listHosts } from "@/lib/host-service";
 import { clientIp } from "@/lib/request-context";
-import { FirewallScopeEditor } from "./scope-editor";
+import { WafEditor } from "./waf-editor";
 import { listProjectScopes } from "@/lib/deploy-service";
 import { listHostGroups } from "@/lib/host-group-service";
 import { FirewallInstancePanels } from "./instance-panels";
@@ -125,7 +125,7 @@ export default async function FirewallPage({
                     here.
                 </p>
             ) : (
-                <FirewallScopeEditor
+                <WafEditor
                     key={`${kind}:${scopeId}`}
                     scopeType={kind}
                     scopeId={scopeId}

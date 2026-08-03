@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { evaluate, type GuardConfig } from "../src/authz.js";
 import { encodeGuardRule, signEdgeToken } from "@polaris/core/waf";
-import { buildWafIntel, indexWafIntel, type WafIntelEntry } from "@polaris/core";
+import { buildWafIntel, indexWafIntel, type WafCustomRule, type WafIntelEntry } from "@polaris/core";
 
 const NOW = 1_800_000_000;
 const SECRET = "test-secret-at-least-16-chars";
@@ -246,5 +246,80 @@ describe("evaluate - address intelligence", () => {
     it("does not block when the snapshot could not be read", () => {
         const empty: GuardConfig = { ...cfg, intel: indexWafIntel("corrupt") };
         expect(evaluate({ forwardedFor: "203.0.113.7" }, empty)).toEqual({ status: 200 });
+    });
+});
+
+/**
+ * The browser integrity check sits after the custom rules on purpose: it is a
+ * heuristic, and an operator who finds the case it is wrong about must be able to
+ * write an exception above it rather than switch the whole thing off.
+ */
+describe("browser integrity", () => {
+    const CHROME =
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36";
+
+    function armed(rules: WafCustomRule[] = []) {
+        return encodeGuardRule({ deny: [], requireLogin: false, browserIntegrity: true, rules });
+    }
+
+    it("does nothing until it is armed", () => {
+        const wafHeader = encodeGuardRule({ deny: [], requireLogin: false, rules: [] });
+
+        expect(evaluate({ wafHeader, forwardedHost: "app.test" }, cfg).status).toBe(200);
+    });
+
+    it("blocks a request with no user agent", () => {
+        const decision = evaluate({ wafHeader: armed(), forwardedHost: "app.test" }, cfg);
+
+        expect(decision.status).toBe(403);
+    });
+
+    it("blocks a forged browser that sends no Accept header", () => {
+        const decision = evaluate(
+            { wafHeader: armed(), forwardedHost: "app.test", userAgent: CHROME },
+            cfg
+        );
+
+        expect(decision.status).toBe(403);
+    });
+
+    it("admits a real browser", () => {
+        const decision = evaluate(
+            {
+                wafHeader: armed(),
+                forwardedHost: "app.test",
+                userAgent: CHROME,
+                accept: "text/html",
+                acceptLanguage: "es-ES",
+                acceptEncoding: "gzip"
+            },
+            cfg
+        );
+
+        expect(decision.status).toBe(200);
+    });
+
+    it("admits an honest non-browser client, so an API on the same scope keeps working", () => {
+        const decision = evaluate(
+            { wafHeader: armed(), forwardedHost: "app.test", userAgent: "curl/8.7.1" },
+            cfg
+        );
+
+        expect(decision.status).toBe(200);
+    });
+
+    it("lets a custom allow rule carve out an exception above it", () => {
+        const allow: WafCustomRule = {
+            name: "uptime probe",
+            enabled: true,
+            action: "allow",
+            conditions: [{ field: "path", operator: "equals", values: ["/healthz"] }]
+        };
+        const decision = evaluate(
+            { wafHeader: armed([allow]), forwardedHost: "app.test", forwardedUri: "/healthz" },
+            cfg
+        );
+
+        expect(decision.status).toBe(200);
     });
 });

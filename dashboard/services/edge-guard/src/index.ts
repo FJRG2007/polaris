@@ -9,6 +9,7 @@
 
 import type { GuardConfig } from "./authz.js";
 import { createIntelSource } from "./intel.js";
+import { createProxyServer } from "./proxy.js";
 import { createGuardServer } from "./server.js";
 
 /** Bans, Tor exits and flagged addresses, published by Polaris into a shared volume
@@ -39,4 +40,18 @@ if (!startup.authorizeUrl) {
 
 createGuardServer(loadConfig).listen(port, () => {
     console.log(`polaris-edge-guard listening on :${port}`);
+});
+
+/**
+ * The proxy listens separately, on its own port.
+ *
+ * Two ports rather than one server telling the two apart by path, because they are
+ * reached for opposite reasons and confusing them is expensive: :8080 answers Traefik's
+ * forwardAuth question about a request, and :8081 IS the upstream for a route whose
+ * response gets rewritten. A route that reached the wrong one would either have its
+ * page served as an auth check or its auth check served as a page.
+ */
+const proxyPort = Number(process.env.POLARIS_EDGE_PROXY_PORT ?? 8081);
+createProxyServer(loadConfig).listen(proxyPort, () => {
+    console.log(`polaris-edge-guard proxy listening on :${proxyPort}`);
 });

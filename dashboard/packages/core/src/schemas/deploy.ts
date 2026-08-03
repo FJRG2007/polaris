@@ -223,6 +223,22 @@ export const wafRuleInputSchema = z
         ipAllowlist: wafCidrList.default([]),
         ipDenylist: wafCidrList.default([]),
         requireLogin: z.boolean().default(false),
+        /**
+         * Refuse requests whose headers do not hold together as a browser's.
+         *
+         * Off by default, unlike the rule packs, and deliberately: it is a heuristic
+         * over what a client sent rather than a statement about what it asked for, and
+         * plenty of legitimate non-browser traffic - a CLI, a health check, a webhook -
+         * looks exactly like the thing it refuses. Armed by an operator who knows the
+         * scope serves browsers.
+         */
+        browserIntegrity: z.boolean().default(false),
+        /**
+         * Rewrite email addresses in served HTML so a harvester reading the source
+         * finds an encoded token instead. On everywhere unless something switches it
+         * off (see `emailObfuscation` in ResolvedWaf for how the scopes combine).
+         */
+        emailObfuscation: z.boolean().default(true),
         presets: wafPresetList.default([]),
         rules: z.array(wafCustomRuleSchema).max(WAF_RULES_MAX).default([])
     })
@@ -253,6 +269,20 @@ export interface ResolvedWaf {
     readonly deny: readonly string[];
     /** True if any scope requires a Polaris login. */
     readonly requireLogin: boolean;
+    /** True if any scope arms the browser integrity check. Unions like requireLogin:
+     *  it refuses traffic, so a narrower scope must not be able to switch off a
+     *  broader one's decision to refuse it. */
+    readonly browserIntegrity: boolean;
+    /**
+     * True only if EVERY scope leaves email obfuscation on.
+     *
+     * The one control here that intersects rather than unions, because it is the one
+     * that is not a refusal: it rewrites the page, so getting it wrong breaks a
+     * working site rather than exposing one. Any scope can therefore switch it off for
+     * what that scope covers, and a narrower scope cannot switch it back on - which is
+     * also what lets it default on everywhere without becoming impossible to escape.
+     */
+    readonly emailObfuscation: boolean;
     /** Union of every scope's enabled rule packs. Carried to the edge as ids and
      *  expanded there, so a pack of forty user agents costs four bytes on the wire. */
     readonly presets: readonly string[];

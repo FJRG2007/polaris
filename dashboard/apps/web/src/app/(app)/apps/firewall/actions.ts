@@ -77,15 +77,28 @@ export async function getWafRuleAction(input: {
     }
 }
 
-export async function setWafRuleAction(input: {
-    scopeType: WafScopeType;
-    scopeId: string;
+/**
+ * One scope's rule as the editor holds and writes it - the same shape `getWafRuleAction`
+ * returns, so the screen never has to translate between a read and a write.
+ *
+ * Every field is written on every save because the action takes the whole scope. That
+ * is why the editor composes each change against the last saved value rather than
+ * against what is on screen: a partial write here would be a silent revert of whatever
+ * the caller left out.
+ */
+export interface WafScopeRule {
     ipAllowlist: string[];
     ipDenylist: string[];
     requireLogin: boolean;
+    browserIntegrity: boolean;
+    emailObfuscation: boolean;
     presets: string[];
     rules: WafCustomRule[];
-}): Promise<{ error?: string }> {
+}
+
+export async function setWafRuleAction(
+    input: WafScopeRule & { scopeType: WafScopeType; scopeId: string }
+): Promise<{ error?: string }> {
     const user = await requirePermission("deploy.manage");
     if (OPERATOR_SCOPES.has(input.scopeType)) await requirePermission("system.manage");
     try {

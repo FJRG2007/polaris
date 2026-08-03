@@ -2351,6 +2351,14 @@ model WafRule {
     ipAllowlist  String   @default("[]")
     ipDenylist   String   @default("[]")
     requireLogin Boolean  @default(false)
+    // Refuse requests whose headers do not hold together as a browser's. Unions
+    // across scopes like requireLogin - it refuses traffic, so a narrower scope
+    // cannot switch off a broader one's decision to refuse it.
+    browserIntegrity Boolean @default(false)
+    // Rewrite email addresses in served HTML. Intersects across scopes instead of
+    // unioning: it rewrites the page rather than refusing it, so any scope can turn
+    // it off for what it covers. Default true is what makes it on everywhere.
+    emailObfuscation Boolean @default(true)
     // Enabled managed rule packs as a JSON array of ids (see waf-presets.ts). Ids,
     // not their contents: the pack's rules are expanded at the edge, so improving a
     // list ships as a release rather than a migration over everyone's saved rules.

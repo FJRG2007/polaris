@@ -19,7 +19,7 @@
 
 import { writeFile } from "node:fs/promises";
 import type { WafCustomRule } from "@polaris/core";
-import { encodeGuardRule } from "@polaris/core/waf";
+import { encodeGuardRule, signEdgeOrigin } from "@polaris/core/waf";
 
 /** One app hostname to route, with the origin the edge should dial. */
 export interface AppRoute {
@@ -44,6 +44,13 @@ export interface AppRoute {
     readonly presets?: readonly string[];
     readonly rules?: readonly WafCustomRule[];
     readonly requireLogin?: boolean;
+    /** Refuse requests whose headers do not hold together as a browser's. Needs the
+     *  guard, like the denylist and the custom rules. */
+    readonly browserIntegrity?: boolean;
+    /** Rewrite email addresses in served HTML. Carried to the guard for completeness
+     *  but does NOT on its own put the guard in front of the route: forwardAuth never
+     *  sees a response, so this one is applied by the guard's proxy mode instead. */
+    readonly emailObfuscation?: boolean;
 }
 
 /** An edge that can be told the full set of app routes it should serve. */
@@ -64,8 +71,28 @@ function needsGuard(route: AppRoute): boolean {
         (route.deny?.length ?? 0) > 0 ||
         (route.presets?.length ?? 0) > 0 ||
         (route.rules?.length ?? 0) > 0 ||
-        route.requireLogin === true
+        route.requireLogin === true ||
+        route.browserIntegrity === true
     );
+}
+
+/** Base URL of the guard's proxy listener, which is the upstream for a route whose
+ *  response gets rewritten. Same container as the forwardAuth guard, second port. */
+function guardProxyUrl(): string {
+    return process.env.POLARIS_EDGE_PROXY_URL ?? "http://polaris-edge-guard:8081";
+}
+
+/**
+ * Whether this route's response is served through the guard rather than straight from
+ * the app.
+ *
+ * Only email obfuscation needs it, and only when there is a secret to sign the upstream
+ * with. No secret means the proxy could not verify where to forward even if we pointed
+ * at it, so the route goes direct and simply does not get obfuscated - losing a
+ * cosmetic rewrite is the right failure here, taking the route down is not.
+ */
+function proxied(route: AppRoute): boolean {
+    return route.emailObfuscation === true && (process.env.POLARIS_AUTH_SECRET ?? "") !== "";
 }
 
 /** The middleware names to attach to a route's primary (app-serving) router, adding
@@ -79,11 +106,17 @@ function routeMiddlewares(route: AppRoute, name: string, defs: Map<string, strin
         defs.set(mw, `    ${mw}:\n      ipAllowList:\n        sourceRange: [${ranges}]`);
         names.push(mw);
     });
-    if (needsGuard(route)) {
+    // The rule header is stamped whenever the guard will read it - either because
+    // forwardAuth is about to ask it a question, or because the guard IS the upstream
+    // and needs to know what to do to the response.
+    const isProxied = proxied(route);
+    if (needsGuard(route) || isProxied) {
         const ctx = `${name}-waf-ctx`;
         const rule = encodeGuardRule({
             deny: route.deny ?? [],
             requireLogin: route.requireLogin === true,
+            browserIntegrity: route.browserIntegrity === true,
+            emailObfuscation: route.emailObfuscation === true,
             presets: route.presets ?? [],
             rules: route.rules ?? []
         });
@@ -91,11 +124,31 @@ function routeMiddlewares(route: AppRoute, name: string, defs: Map<string, strin
             ctx,
             `    ${ctx}:\n      headers:\n        customRequestHeaders:\n          X-Polaris-Waf: "${rule}"`
         );
-        defs.set(
-            "polaris-waf-guard",
-            `    polaris-waf-guard:\n      forwardAuth:\n        address: "${guardUrl()}/authz"`
+        names.push(ctx);
+        // A proxied route gets no forwardAuth: the proxy runs the same decision on the
+        // same rule inline, so asking the guard a second time per request would be the
+        // same answer for twice the work.
+        if (needsGuard(route) && !isProxied) {
+            defs.set(
+                "polaris-waf-guard",
+                `    polaris-waf-guard:\n      forwardAuth:\n        address: "${guardUrl()}/authz"`
+            );
+            names.push("polaris-waf-guard");
+        }
+    }
+    if (isProxied) {
+        // Where the guard should forward to, signed so a client cannot point it
+        // somewhere else. Traefik overwrites whatever value the client sent.
+        const upstream = `${name}-origin`;
+        const signed = signEdgeOrigin(
+            `http://${route.dialHost}:${route.dialPort}`,
+            process.env.POLARIS_AUTH_SECRET ?? ""
         );
-        names.push(ctx, "polaris-waf-guard");
+        defs.set(
+            upstream,
+            `    ${upstream}:\n      headers:\n        customRequestHeaders:\n          X-Polaris-Origin: "${signed}"`
+        );
+        names.push(upstream);
     }
     return names;
 }
@@ -132,7 +185,11 @@ export function renderDynamicConfig(routes: readonly AppRoute[]): string {
                 `    ${name}-http:\n      rule: "Host(\`${route.hostname}\`)"\n      entryPoints: [web]\n      service: ${name}\n      middlewares: [${httpMw.join(", ")}]`
             );
         }
-        services.push(`    ${name}:\n      loadBalancer:\n        servers:\n          - url: "http://${dial}"`);
+        // A proxied route dials the guard instead of the app; the app's own address
+        // travels in the signed header above, so the guard is the only thing that
+        // learns it.
+        const upstream = proxied(route) ? guardProxyUrl() : `http://${dial}`;
+        services.push(`    ${name}:\n      loadBalancer:\n        servers:\n          - url: "${upstream}"`);
     }
     if (routers.length === 0) return "http: {}\n";
     const middlewares = [...defs.values()].join("\n");

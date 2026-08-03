@@ -17,6 +17,14 @@ import { wafCustomRuleSchema, type WafCustomRule } from "./schemas/deploy.js";
 export interface GuardRule {
     readonly deny: readonly string[];
     readonly requireLogin: boolean;
+    /** Refuse requests whose headers do not hold together as a browser's. Optional on
+     *  the way in (an older edge config predates it), always present on the way out. */
+    readonly browserIntegrity?: boolean;
+    /** Rewrite email addresses in served HTML. Carried here rather than in a config of
+     *  its own so one header describes everything the guard does to a route - but note
+     *  it is the only entry the forwardAuth path ignores, because it changes the
+     *  response and forwardAuth never sees one. */
+    readonly emailObfuscation?: boolean;
     /** Managed rule-pack ids, expanded to rules on decode. Sending ids rather than
      *  their contents is what keeps this header small: a pack of forty user agents
      *  is four bytes here and is stamped onto every single request to the route.
@@ -27,15 +35,37 @@ export interface GuardRule {
 }
 
 /** Encode a guard rule for the X-Polaris-Waf header (base64 of compact JSON:
- *  `d` = denylist, `l` = require-login, `p` = pack ids, `r` = custom rules). */
+ *  `d` = denylist, `l` = require-login, `b` = browser integrity, `e` = email
+ *  obfuscation, `p` = pack ids, `r` = custom rules). */
 export function encodeGuardRule(rule: GuardRule): string {
     return Buffer.from(
-        JSON.stringify({ d: rule.deny, l: rule.requireLogin, p: rule.presets ?? [], r: rule.rules })
+        JSON.stringify({
+            d: rule.deny,
+            l: rule.requireLogin,
+            b: rule.browserIntegrity === true,
+            e: rule.emailObfuscation === true,
+            p: rule.presets ?? [],
+            r: rule.rules
+        })
     ).toString("base64");
 }
 
-const EMPTY_RULE: GuardRule = { deny: [], requireLogin: false, presets: [], rules: [] };
-const FAIL_CLOSED: GuardRule = { deny: [], requireLogin: true, presets: [], rules: [] };
+const EMPTY_RULE: GuardRule = {
+    deny: [],
+    requireLogin: false,
+    browserIntegrity: false,
+    emailObfuscation: false,
+    presets: [],
+    rules: []
+};
+const FAIL_CLOSED: GuardRule = {
+    deny: [],
+    requireLogin: true,
+    browserIntegrity: false,
+    emailObfuscation: false,
+    presets: [],
+    rules: []
+};
 
 /**
  * Decoded headers, keyed by the header itself.
@@ -84,12 +114,14 @@ function decodeUncached(header: string): GuardRule {
     try {
         const raw: unknown = JSON.parse(Buffer.from(header, "base64").toString("utf8"));
         if (raw && typeof raw === "object") {
-            const obj = raw as { d?: unknown; l?: unknown; p?: unknown; r?: unknown };
+            const obj = raw as { d?: unknown; l?: unknown; b?: unknown; e?: unknown; p?: unknown; r?: unknown };
             const deny = Array.isArray(obj.d) ? obj.d.filter((v): v is string => typeof v === "string") : [];
             const presets = Array.isArray(obj.p) ? obj.p.filter((v): v is string => typeof v === "string") : [];
             return {
                 deny,
                 requireLogin: obj.l === true,
+                browserIntegrity: obj.b === true,
+                emailObfuscation: obj.e === true,
                 presets,
                 rules: [...parseRules(obj.r), ...expandWafPresets(presets)]
             };
@@ -109,6 +141,43 @@ function parseRules(value: unknown): WafCustomRule[] {
         if (parsed.success) rules.push(parsed.data);
     }
     return rules;
+}
+
+/**
+ * The upstream a proxied route forwards to, signed.
+ *
+ * The guard is normally a forwardAuth check and never learns where the request is
+ * really going. Email obfuscation changes the response, so for those routes the guard
+ * IS the target and Traefik tells it the real upstream in a header - which turns an
+ * unsigned header into an open proxy into the server's own network the moment anything
+ * lets a client-supplied one through. Traefik's `customRequestHeaders` overwrites a
+ * client's value, so that alone would probably hold; "probably" is not the standard
+ * for something whose failure mode is arbitrary internal requests, so it is signed
+ * with the secret the guard already has.
+ */
+export function signEdgeOrigin(origin: string, secret: string): string {
+    const payload = Buffer.from(origin).toString("base64url");
+    return `${payload}.${createHmac("sha256", secret).update(`origin:${payload}`).digest("base64url")}`;
+}
+
+/** The upstream from a signed value, or null if it is missing, malformed, tampered
+ *  with, or not an http(s) URL. An empty secret is rejected outright, for the same
+ *  reason it is in verifyEdgeToken: an empty HMAC key makes any value forgeable. */
+export function verifyEdgeOrigin(value: string | undefined | null, secret: string): string | null {
+    if (!value || !secret) return null;
+    const dot = value.indexOf(".");
+    if (dot <= 0 || dot === value.length - 1) return null;
+    const payload = value.slice(0, dot);
+    const provided = Buffer.from(value.slice(dot + 1));
+    const expected = Buffer.from(createHmac("sha256", secret).update(`origin:${payload}`).digest("base64url"));
+    if (provided.length !== expected.length || !timingSafeEqual(provided, expected)) return null;
+    try {
+        const origin = Buffer.from(payload, "base64url").toString("utf8");
+        const url = new URL(origin);
+        return url.protocol === "http:" || url.protocol === "https:" ? origin : null;
+    } catch {
+        return null;
+    }
 }
 
 /**

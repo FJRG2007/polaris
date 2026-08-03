@@ -35,6 +35,11 @@ export function createGuardServer(config: () => GuardConfig): Server {
                 // request is always a GET, so `req.method` would say nothing.
                 forwardedMethod: header(req, "x-forwarded-method"),
                 userAgent: header(req, "user-agent"),
+                // forwardAuth copies the original request's headers onto the guard's
+                // check, so these are the visitor's own rather than Traefik's.
+                accept: header(req, "accept"),
+                acceptLanguage: header(req, "accept-language"),
+                acceptEncoding: header(req, "accept-encoding"),
                 cookie: header(req, "cookie")
             },
             config()

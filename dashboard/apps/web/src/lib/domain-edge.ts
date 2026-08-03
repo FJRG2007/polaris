@@ -98,6 +98,7 @@ export function renderDashboardConfig(hosts: readonly string[], waf?: DashboardW
     const deny = waf?.deny ?? [];
     const rules = waf?.rules ?? [];
     const presets = waf?.presets ?? [];
+    const browserIntegrity = waf?.browserIntegrity === true;
 
     const middlewares: string[] = [];
     const definitions: string[] = [
@@ -110,13 +111,13 @@ export function renderDashboardConfig(hosts: readonly string[], waf?: DashboardW
         middlewares.push(mw);
         definitions.push(`    ${mw}:`, "      ipAllowList:", `        sourceRange: [${allow.map((entry) => `"${entry}"`).join(", ")}]`);
     }
-    if (deny.length > 0 || presets.length > 0 || rules.length > 0) {
+    if (deny.length > 0 || presets.length > 0 || rules.length > 0 || browserIntegrity) {
         middlewares.push(WAF_CTX, WAF_GUARD);
         definitions.push(
             `    ${WAF_CTX}:`,
             "      headers:",
             "        customRequestHeaders:",
-            `          X-Polaris-Waf: "${encodeGuardRule({ deny, presets, rules, requireLogin: false })}"`,
+            `          X-Polaris-Waf: "${encodeGuardRule({ deny, presets, rules, requireLogin: false, browserIntegrity })}"`,
             `    ${WAF_GUARD}:`,
             "      forwardAuth:",
             `        address: "${guardUrl()}/authz"`
@@ -164,6 +165,8 @@ export interface DashboardWaf {
     /** Managed rule-pack ids, expanded by the guard rather than sent expanded. */
     readonly presets?: readonly string[];
     readonly rules?: readonly WafCustomRule[];
+    /** Refuse requests whose headers do not hold together as a browser's. */
+    readonly browserIntegrity?: boolean;
 }
 
 /**
@@ -216,7 +219,13 @@ export async function syncDashboardRoute(): Promise<void> {
         const [hosts, waf] = await Promise.all([dashboardHosts(), resolvePolarisWaf()]);
         // One scope, so at most one allowlist - Polaris's own rule has no parent to
         // narrow it further.
-        const rule = { allow: waf.allowLists[0] ?? [], deny: waf.deny, presets: waf.presets, rules: waf.rules };
+        const rule = {
+            allow: waf.allowLists[0] ?? [],
+            deny: waf.deny,
+            presets: waf.presets,
+            rules: waf.rules,
+            browserIntegrity: waf.browserIntegrity
+        };
         await writeFile(join(dynamicDir(), FILE), renderDashboardConfig(hosts, rule), "utf8");
     } catch (error) {
         console.error("polaris: publishing the dashboard route failed:", error instanceof Error ? error.message : error);

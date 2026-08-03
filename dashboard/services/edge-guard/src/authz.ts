@@ -24,7 +24,7 @@
  */
 
 import { decodeGuardRule, verifyEdgeToken } from "@polaris/core/waf";
-import { evaluateWafRules, ipAllowed, type WafIntelIndex } from "@polaris/core";
+import { browserIntegrityFailure, evaluateWafRules, ipAllowed, type WafIntelIndex } from "@polaris/core";
 
 /** Path (on the app's own domain) the login handoff returns to. */
 const CALLBACK_PATH = "/edge/callback";
@@ -38,6 +38,11 @@ export interface GuardRequest {
     readonly forwardedUri?: string;
     readonly forwardedMethod?: string;
     readonly userAgent?: string;
+    /** Read only by the browser integrity check, which is about the shape of the
+     *  request rather than about what it asked for. */
+    readonly accept?: string;
+    readonly acceptLanguage?: string;
+    readonly acceptEncoding?: string;
     readonly cookie?: string;
 }
 
@@ -157,6 +162,20 @@ export function evaluate(req: GuardRequest, cfg: GuardConfig): GuardDecision {
         });
         if (verdict?.action === "block") return { status: 403, reason: `rule: ${verdict.rule.name}` };
         if (verdict?.action === "allow") return { status: 200 };
+    }
+
+    // After the custom rules, deliberately. This is a heuristic and every heuristic is
+    // wrong about something; putting it here means an operator who finds the thing it
+    // is wrong about writes an `allow` above it, which is the same exception mechanism
+    // every other block on this path already has.
+    if (rule.browserIntegrity === true) {
+        const failure = browserIntegrityFailure({
+            userAgent: req.userAgent,
+            accept: req.accept,
+            acceptLanguage: req.acceptLanguage,
+            acceptEncoding: req.acceptEncoding
+        });
+        if (failure) return { status: 403, reason: `browser integrity: ${failure}` };
     }
 
     if (rule.requireLogin) {

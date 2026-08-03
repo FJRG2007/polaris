@@ -30,6 +30,26 @@ export interface TraefikWaf {
     /** Ordered custom rules, carried to the guard in the same header as the denylist. */
     readonly rules?: readonly WafCustomRule[];
     readonly requireLogin?: boolean;
+    /** Refuse requests whose headers do not hold together as a browser's. Needs the
+     *  guard, like the denylist and the custom rules. */
+    readonly browserIntegrity?: boolean;
+    /**
+     * Rewrite email addresses in served HTML.
+     *
+     * Carried to the guard for completeness, and NOT materialized into a route here -
+     * which is the one place this builder cannot match what the local edge does, so it
+     * is written down rather than left to be discovered.
+     *
+     * Obfuscation needs the route to dial the guard's proxy instead of the container.
+     * The local edge expresses that with the file provider's `loadBalancer.server.url`.
+     * These are docker-provider labels, where the address is derived from the container
+     * Traefik found rather than stated, so there is no equivalent to point elsewhere.
+     * Reaching parity means giving an enrolled server's Traefik a file provider too,
+     * which is an onboarding change and a Traefik restart on every existing server.
+     * Until then a service on a remote server is routed direct and simply is not
+     * obfuscated; nothing else about its firewall differs.
+     */
+    readonly emailObfuscation?: boolean;
 }
 
 export interface TraefikServiceInput {
@@ -60,7 +80,8 @@ function wafNeedsGuard(waf: TraefikWaf): boolean {
         (waf.deny?.length ?? 0) > 0 ||
         (waf.presets?.length ?? 0) > 0 ||
         (waf.rules?.length ?? 0) > 0 ||
-        waf.requireLogin === true
+        waf.requireLogin === true ||
+        waf.browserIntegrity === true
     );
 }
 
@@ -90,7 +111,9 @@ function wafMiddlewares(
             deny: waf.deny ?? [],
             presets: waf.presets ?? [],
             rules: waf.rules ?? [],
-            requireLogin: waf.requireLogin === true
+            requireLogin: waf.requireLogin === true,
+            browserIntegrity: waf.browserIntegrity === true,
+            emailObfuscation: waf.emailObfuscation === true
         });
         labels["traefik.http.middlewares.polaris-waf-guard.forwardauth.address"] = `${guardUrl()}/authz`;
         app.push(`${ctx}@docker`, "polaris-waf-guard@docker");

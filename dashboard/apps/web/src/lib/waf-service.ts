@@ -87,6 +87,8 @@ interface RuleRow {
     readonly ipAllowlist: string;
     readonly ipDenylist: string;
     readonly requireLogin: boolean;
+    readonly browserIntegrity: boolean;
+    readonly emailObfuscation: boolean;
     readonly presets: string;
     readonly rules: string;
 }
@@ -97,6 +99,8 @@ const RULE_SELECT = {
     ipAllowlist: true,
     ipDenylist: true,
     requireLogin: true,
+    browserIntegrity: true,
+    emailObfuscation: true,
     presets: true,
     rules: true
 } as const;
@@ -110,6 +114,11 @@ function mergeRules(rows: readonly RuleRow[]): ResolvedWaf {
     const presets = new Set<string>();
     const rules: WafCustomRule[] = [];
     let requireLogin = false;
+    let browserIntegrity = false;
+    // Intersected, so it starts true and any scope can clear it. Every other control
+    // here unions; this is the one that changes the page instead of refusing it, and
+    // the asymmetry is what keeps "on by default" from meaning "impossible to escape".
+    let emailObfuscation = true;
     for (const row of ordered) {
         const allow = parseList(row.ipAllowlist);
         if (allow.length > 0) allowLists.push(allow);
@@ -120,16 +129,31 @@ function mergeRules(rows: readonly RuleRow[]): ResolvedWaf {
         // exception mechanism every other block uses.
         for (const id of parseList(row.presets)) presets.add(id);
         if (row.requireLogin) requireLogin = true;
+        if (row.browserIntegrity) browserIntegrity = true;
+        if (!row.emailObfuscation) emailObfuscation = false;
         // Concatenated, not merged: a rule set is ordered and first-match-wins, so a
         // broader scope's rules have to be offered the request first - otherwise a
         // project could write an `allow` that overrides an instance-wide block.
         rules.push(...parseCustomRules(row.rules));
     }
-    return { allowLists, deny: [...deny], requireLogin, presets: [...presets], rules };
+    return { allowLists, deny: [...deny], requireLogin, browserIntegrity, emailObfuscation, presets: [...presets], rules };
 }
 
-/** An empty decision: allow all, deny none, no login required, no packs, no rules. */
-const EMPTY_WAF: ResolvedWaf = { allowLists: [], deny: [], requireLogin: false, presets: [], rules: [] };
+/**
+ * An empty decision: allow all, deny none, no login required, no packs, no rules.
+ *
+ * `emailObfuscation` is true here for the same reason it is true in the schema - it is
+ * the state of an instance nobody has configured, and that state is "on".
+ */
+const EMPTY_WAF: ResolvedWaf = {
+    allowLists: [],
+    deny: [],
+    requireLogin: false,
+    browserIntegrity: false,
+    emailObfuscation: true,
+    presets: [],
+    rules: []
+};
 
 /** The global row a never-configured instance behaves as if it had. */
 const DEFAULT_GLOBAL_ROW: RuleRow = {
@@ -137,6 +161,8 @@ const DEFAULT_GLOBAL_ROW: RuleRow = {
     ipAllowlist: "[]",
     ipDenylist: "[]",
     requireLogin: false,
+    browserIntegrity: false,
+    emailObfuscation: true,
     presets: JSON.stringify(defaultPresets("global")),
     rules: "[]"
 };
@@ -295,6 +321,8 @@ export interface WafRuleView {
     readonly ipAllowlist: string[];
     readonly ipDenylist: string[];
     readonly requireLogin: boolean;
+    readonly browserIntegrity: boolean;
+    readonly emailObfuscation: boolean;
     /** Managed rule packs enabled on this scope alone - not the union it inherits. */
     readonly presets: string[];
     readonly rules: WafCustomRule[];
@@ -347,18 +375,37 @@ export async function getWafRule(
     await assertScopeOwner(ownerId, scopeType, scopeId);
     const row = await prisma.wafRule.findUnique({
         where: { scopeType_scopeId: { scopeType, scopeId } },
-        select: { ipAllowlist: true, ipDenylist: true, requireLogin: true, presets: true, rules: true }
+        select: {
+            ipAllowlist: true,
+            ipDenylist: true,
+            requireLogin: true,
+            browserIntegrity: true,
+            emailObfuscation: true,
+            presets: true,
+            rules: true
+        }
     });
     if (!row) {
         // An unwritten instance scope must show the packs it is actually enforcing,
         // or the page would offer to "enable" protection that is already on and the
-        // first save would look like it changed nothing.
-        return { ipAllowlist: [], ipDenylist: [], requireLogin: false, presets: defaultPresets(scopeType), rules: [] };
+        // first save would look like it changed nothing. The same applies to email
+        // obfuscation, which is on before anyone has been here.
+        return {
+            ipAllowlist: [],
+            ipDenylist: [],
+            requireLogin: false,
+            browserIntegrity: false,
+            emailObfuscation: true,
+            presets: defaultPresets(scopeType),
+            rules: []
+        };
     }
     return {
         ipAllowlist: parseList(row.ipAllowlist),
         ipDenylist: parseList(row.ipDenylist),
         requireLogin: row.requireLogin,
+        browserIntegrity: row.browserIntegrity,
+        emailObfuscation: row.emailObfuscation,
         presets: parseList(row.presets),
         rules: parseCustomRules(row.rules)
     };
@@ -418,12 +465,17 @@ export async function setWafRule(
 ): Promise<void> {
     await assertScopeOwner(ownerId, scopeType, scopeId);
     const parsed = wafRuleInputSchema.parse(input);
+    // "Empty" is the state a never-configured scope is in, not merely a falsy one:
+    // email obfuscation is ON when nothing has been saved, so a scope that switches it
+    // OFF is carrying a decision and its row has to survive.
     const empty =
         parsed.ipAllowlist.length === 0 &&
         parsed.ipDenylist.length === 0 &&
         parsed.rules.length === 0 &&
         parsed.presets.length === 0 &&
-        !parsed.requireLogin;
+        !parsed.requireLogin &&
+        !parsed.browserIntegrity &&
+        parsed.emailObfuscation;
     // An instance scope keeps its row even when empty: absence there means "never
     // configured" and re-applies the default packs, so deleting it would silently
     // undo an operator who had just switched every one of them off.
@@ -435,6 +487,8 @@ export async function setWafRule(
         ipAllowlist: JSON.stringify(parsed.ipAllowlist),
         ipDenylist: JSON.stringify(parsed.ipDenylist),
         requireLogin: parsed.requireLogin,
+        browserIntegrity: parsed.browserIntegrity,
+        emailObfuscation: parsed.emailObfuscation,
         presets: JSON.stringify(parsed.presets),
         rules: JSON.stringify(parsed.rules)
     };
