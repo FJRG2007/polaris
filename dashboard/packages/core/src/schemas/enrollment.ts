@@ -112,6 +112,7 @@ export type ClaimEnrollmentInput = z.infer<typeof claimEnrollmentSchema>;
 export const ENROLLMENT_REFUSAL_REASONS = [
     "ssh-not-listening",
     "remote-login-off",
+    "remote-login-unrestricted",
     "no-ssh-host-keys",
     "no-home-directory",
     "no-user-tooling",
@@ -140,6 +141,8 @@ export const ENROLLMENT_REFUSAL_MESSAGES: Record<EnrollmentRefusalReason, string
         "The machine stopped before registering: nothing Polaris could reach is listening on its SSH port. Start its SSH server, or bind it to something other than loopback.",
     "remote-login-off":
         "The machine stopped before registering: Remote Login is off, so nothing would answer Polaris. Turn it on under System Settings > General > Sharing.",
+    "remote-login-unrestricted":
+        `The machine stopped before registering: Remote Login could not be limited to the '${ENROLLMENT_USERNAME}' login, and turning it on for every account there is wider than this command grants. Turn it on and restrict it under System Settings > General > Sharing.`,
     "no-ssh-host-keys":
         "The machine stopped before registering: it has no SSH host keys and none could be generated. Install an SSH server there.",
     "no-home-directory":

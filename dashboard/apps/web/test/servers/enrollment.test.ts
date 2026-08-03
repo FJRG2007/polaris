@@ -240,17 +240,46 @@ describe("enrollmentScript", () => {
             darwin.indexOf("systemsetup -setremotelogin on")
         );
         // Every narrowing call sits inside the "there was no list" branch, and the
-        // branch for a list that was already here - or one nothing could read - adds
-        // to it and leaves it otherwise alone, exactly like the already-on path.
+        // branch for a list that was already here adds to it and leaves it
+        // otherwise alone, exactly like the already-on path.
         const branch = script.slice(script.indexOf('if [ "$ACCESS_LIST" = "no" ]'));
-        const split = branch.indexOf("\n            else");
+        const split = branch.indexOf("\n        else");
         const narrowing = branch.slice(0, split);
-        const kept = branch.slice(split, branch.indexOf("\n            fi"));
+        const kept = branch.slice(split, branch.indexOf("\n        fi"));
         expect(narrowing).toContain("-o create");
         expect(narrowing).toContain("-d everyone");
         expect(kept).toContain('dseditgroup -o edit -a "$POLARIS_USER"');
         expect(kept).not.toContain("-d everyone");
         expect(kept).not.toContain("-o create");
+    });
+
+    // A group read that failed is not a group that is absent, and the two used to
+    // be the same answer: any output that did not name the group was "no", so a
+    // directory service that would not answer got the operator's list narrowed.
+    // Only a refusal that says the record is not there is an absence.
+    it("tells an access list that is not there from one it could not read", () => {
+        const reader = script.slice(script.indexOf("access_ssh_exists() {"));
+        const body = reader.slice(0, reader.indexOf("\n    }"));
+        expect(body).toContain("if _read=$(dseditgroup -o read com.apple.access_ssh 2>&1); then");
+        expect(body).toContain('*"not found"*|*"edsrecordnotfound"*|*"no such"*) echo no ;;');
+        // Every other ending, including a tool that is not installed, is unknown.
+        expect(body.match(/echo unknown/g)).toHaveLength(3);
+    });
+
+    // Turning Remote Login on is the one thing here that widens the machine, and it
+    // is only safe on a reading this can act on. An access list nothing could read
+    // is not a list known to be safe to open, and the previous shape decided that
+    // after the switch was already flipped - so an unreadable group left SSH open
+    // to every account on the machine with a printed warning for company.
+    it("refuses to enable Remote Login when the access list cannot be read", () => {
+        const darwin = script.slice(script.indexOf("read_remote_login\n"));
+        const gate = darwin.indexOf('if [ "$ACCESS_LIST" = "unknown" ]');
+        expect(gate).toBeGreaterThan(-1);
+        // The decision is made while the machine is still as its operator left it.
+        expect(gate).toBeLessThan(darwin.indexOf("systemsetup -setremotelogin on"));
+        const stop = darwin.slice(gate, darwin.indexOf("systemsetup -setremotelogin on"));
+        expect(stop).toContain("die remote-login-off");
+        expect(stop).toContain("would not say whether it has an SSH access list");
     });
 
     // Remote Login is on by the time this is decided either way, so what it says
@@ -274,10 +303,29 @@ describe("enrollmentScript", () => {
         const decided = enabled.slice(0, enabled.indexOf('say "turned Remote Login on'));
         expect(decided).toContain('[ "$(access_ssh_member "$POLARIS_USER" user)" = "yes" ]');
         expect(decided).toContain('[ "$(access_ssh_member everyone group)" != "yes" ]');
-        // An unreadable answer is not a yes, so the honest warning is what is left.
-        expect(script).toContain("WARNING: turned Remote Login on, but SSH could not be limited");
         const reader = script.slice(script.indexOf("access_ssh_member() {"));
         expect(reader.slice(0, reader.indexOf("\n    }"))).toContain("*) echo unknown ;;");
+    });
+
+    // A warning was all that stood between an unreadable narrowing and a machine
+    // reachable over SSH by every account on it - and nobody is obliged to be
+    // watching the terminal. An unreadable answer is not a yes, so what was turned
+    // on goes back off, the group this script made goes with it, and the stop is
+    // reported like any other rather than printed and walked past.
+    it("puts Remote Login back off when it cannot read back the narrowing it made", () => {
+        const enabled = script.slice(script.indexOf("dseditgroup -o create -q"));
+        const failed = enabled.slice(enabled.indexOf("\n            else"), enabled.indexOf("\n        else"));
+        expect(failed).toContain("dseditgroup -o delete com.apple.access_ssh");
+        // -f suppresses the confirmation, which systemsetup only asks on the way
+        // off - and stdin is this script, so nothing can answer it.
+        expect(failed).toContain("systemsetup -setremotelogin -f off </dev/null");
+        expect(failed).toContain("die remote-login-unrestricted");
+        expect(failed).not.toContain("say ");
+        // 'off' is claimed only on a machine that says it is off; anything else is
+        // told to the operator as a machine that may be open right now.
+        expect(failed).toContain('if [ "$REMOTE_LOGIN" = "no" ]');
+        expect(failed).toContain("could not confirm it went back off");
+        expect(script).not.toContain("WARNING: turned Remote Login on, but SSH could not be limited");
     });
 
     it("says how to undo the Remote Login changes it can make", () => {
@@ -300,13 +348,13 @@ describe("enrollmentScript", () => {
     // is the exact misdiagnosis this check exists to prevent.
     it("wants a bind Polaris could dial, not merely a listener", () => {
         const probe = script.slice(script.indexOf("reachable_listener() {"));
-        const matcher = probe.slice(0, probe.indexOf("listeners() {"));
+        const matcher = probe.slice(0, probe.indexOf("owned_by() {"));
         expect(matcher).toContain("/^\\[?127\\./");
         expect(matcher).toContain('addr == "::1"');
         expect(matcher).toContain('addr == "[::1]"');
         // The port alone is not the match any more; the address column decides.
         expect(script).not.toContain('grep -q ":$1 "');
-        expect(script).toContain('[ -n "$(listeners plain | reachable_listener "$1" "")" ]');
+        expect(script).toContain('"$LISTENERS_PLAIN" | reachable_listener "$1" ""');
     });
 
     // Neither tool takes -p on every vintage, and one that does not prints nothing
@@ -316,8 +364,20 @@ describe("enrollmentScript", () => {
         expect(script).toContain("ss -ltn 2>/dev/null");
         expect(script).toContain("netstat -lntp 2>/dev/null");
         expect(script).toContain("netstat -lnt 2>/dev/null");
-        // Called with no argument from listening_on, and 'set -u' is on.
-        expect(script).toContain('[ "${1:-}" = "owners" ]');
+    });
+
+    // Neither table changes while the preflight runs, and re-deriving them per
+    // candidate port meant up to 2N+1 ss/netstat runs and a check reasoning about
+    // several snapshots taken milliseconds apart instead of one.
+    it("takes the listener tables once rather than once per candidate port", () => {
+        expect(script).toContain("LISTENERS_OWNED=$(ss -ltnp 2>/dev/null || true)");
+        expect(script).toContain("LISTENERS_PLAIN=$(ss -ltn 2>/dev/null || true)");
+        expect(script).toContain("LISTENERS_OWNED=$(netstat -lntp 2>/dev/null || true)");
+        expect(script).toContain("LISTENERS_PLAIN=$(netstat -lnt 2>/dev/null || true)");
+        const probe = script.slice(script.indexOf("SSH_PROBE=none"));
+        // Taken before anything reads them, and read from the variable after.
+        expect(probe.indexOf("LISTENERS_OWNED=$(ss -ltnp")).toBeLessThan(probe.indexOf("for port in $SSH_PORTS; do"));
+        expect(probe).not.toContain("$(listeners ");
     });
 
     // A box with neither tool cannot answer the question, and a wrong "nothing is
@@ -365,7 +425,7 @@ describe("enrollmentScript", () => {
     // 812/sshd, which with the quotes dropped is the name behind a '(' or a '/'.
     it("matches the owner as a process name rather than anywhere in the line", () => {
         const probe = script.slice(script.indexOf("reachable_listener() {"));
-        const matcher = probe.slice(0, probe.indexOf("listeners() {"));
+        const matcher = probe.slice(0, probe.indexOf("owned_by() {"));
         expect(matcher).not.toContain("index($0, owner)");
         expect(matcher).toContain('gsub(/"/, "", named)');
         expect(matcher).toContain('named !~ "[(/]" owner "([^A-Za-z0-9_-]|$)"');
@@ -388,7 +448,7 @@ describe("enrollmentScript", () => {
     // move SSH is `systemctl edit ssh.socket`, which never touches sshd_config at
     // all. Reading only `Port` made both of those look like a machine on 22.
     it("reads the port out of every place one can be declared", () => {
-        expect(script).toContain('tolower($1) == "listenaddress" && match($2, /:[0-9]+$/)');
+        expect(script).toContain('tolower($1) == "listenaddress" && match(_value, /:[0-9]+$/)');
         expect(script).toContain('if (tolower(_key) != "listenstream") next');
         // What `systemctl edit ssh.socket` actually writes.
         expect(script).toContain("/etc/systemd/system/ssh.socket.d/*.conf");
@@ -400,13 +460,24 @@ describe("enrollmentScript", () => {
         expect(script).toContain("''|*[!0-9]*) continue ;;");
     });
 
+    // sshd_config permits quoting a directive's value, and a quote left on it is
+    // neither a number nor a path that resolves: `Include "sshd_config.d/*.conf"`
+    // globbed against a pattern with the quotes still in it, matched nothing, and
+    // silently dropped the files a hardened port usually lives in.
+    it("reads a directive whose value is quoted, which sshd_config allows", () => {
+        expect(script).toContain('_value = $i; gsub(/"/, "", _value)');
+        expect(script).toContain('{ _value = $2; gsub(/"/, "", _value) }');
+        // The socket unit strips them in the same pass as its whitespace.
+        expect(script).toContain('gsub(/[ \\t\\r"]/, "", _value)');
+    });
+
     // The parse is the fallback, not the answer. This runs as root, so the process
     // holding a socket is readable, and sshd's own socket settles the port without
     // caring where it was written down - which is what makes a config shape nobody
     // anticipated stop being a machine that cannot enroll.
     it("prefers the port sshd is observed on over anything the config says", () => {
         const probe = script.slice(script.indexOf("SSH_PROBE=none"));
-        expect(probe).toContain('OBSERVED_PORT=$(listeners owners | reachable_listener "" sshd) || OBSERVED_PORT=""');
+        expect(probe).toContain('"$LISTENERS_OWNED" | reachable_listener "" sshd)');
         // The candidate sweep is the else, so it only runs when the owner was mute.
         expect(probe.indexOf('if [ -n "$OBSERVED_PORT" ]')).toBeLessThan(probe.indexOf("for port in $SSH_PORTS; do"));
         expect(probe).toContain("SSH_PORT=$OBSERVED_PORT");
@@ -446,6 +517,7 @@ describe("enrollmentScript", () => {
             expect.arrayContaining([
                 "ssh-not-listening",
                 "remote-login-off",
+                "remote-login-unrestricted",
                 "no-ssh-host-keys",
                 "no-home-directory",
                 "no-user-tooling",
@@ -513,8 +585,8 @@ describe("enrollmentScript", () => {
     it("does not promise a re-run the command may be too old for", () => {
         expect(script).not.toContain("then run this command again\"");
         const dies =
-            script.match(/die (?:ssh-not-listening|remote-login-off) "[^"]*"/g) ?? [];
-        expect(dies).toHaveLength(2);
+            script.match(/die (?:ssh-not-listening|remote-login-off|remote-login-unrestricted) "[^"]*"/g) ?? [];
+        expect(dies).toHaveLength(5);
         for (const message of dies) expect(message).toContain("$POLARIS_RETRY_HINT");
     });
 
