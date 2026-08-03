@@ -220,9 +220,16 @@ describe("enrollmentScript", () => {
         // The already-on path adds and never removes.
         const alreadyOn = script.slice(script.indexOf('if [ "$REMOTE_LOGIN" = "unknown" ]'));
         const untilEnd = alreadyOn.slice(0, alreadyOn.indexOf("SSH_PROBE"));
-        expect(untilEnd).toContain('dseditgroup -o edit -a "$POLARIS_USER"');
+        expect(untilEnd).toContain("add_to_access_list");
         expect(untilEnd).not.toContain("-d everyone");
         expect(untilEnd).not.toContain("-o create");
+        // And the one thing that helper does to a list is put a login on it.
+        const adder = script.slice(script.indexOf("add_to_access_list() {"));
+        const body = adder.slice(0, adder.indexOf("\n    }"));
+        expect(body).toContain('dseditgroup -o edit -a "$POLARIS_USER" -t user com.apple.access_ssh');
+        expect(body).not.toContain("-d ");
+        expect(body).not.toContain("-o create");
+        expect(body).not.toContain("-o delete");
     });
 
     // "Remote Login was off" was never the same question as "this access list is
@@ -248,9 +255,14 @@ describe("enrollmentScript", () => {
         const kept = branch.slice(split, branch.indexOf("\n        fi"));
         expect(narrowing).toContain("-o create");
         expect(narrowing).toContain("-d everyone");
-        expect(kept).toContain('dseditgroup -o edit -a "$POLARIS_USER"');
         expect(kept).not.toContain("-d everyone");
         expect(kept).not.toContain("-o create");
+        // The list that was already here is only ever added to, and that happens
+        // before the switch moves rather than in this arm.
+        const decided = script.slice(script.indexOf('if [ "$ACCESS_LIST" = "yes" ]'));
+        expect(decided.slice(0, decided.indexOf("systemsetup -setremotelogin on"))).toContain(
+            "ADDED=$(add_to_access_list)"
+        );
     });
 
     // A group read that failed is not a group that is absent, and the two used to
@@ -293,14 +305,54 @@ describe("enrollmentScript", () => {
     });
 
     // Remote Login is on by the time this is decided either way, so what it says
-    // has to be what happened: a list left open is the operator's to go and fix,
-    // and being told nothing about it is how it stays open.
+    // has to be what happened: which of the two lists it ended up with, and whether
+    // the login it added is one it could actually read back.
     it("says which of the two access lists it ended up with", () => {
         expect(script).toContain("turned Remote Login on, limited to the '$POLARIS_USER' login");
-        expect(script).toContain("added '$POLARIS_USER' to the SSH access list this machine already had");
-        expect(script).toContain("WARNING: turned Remote Login on, and left the SSH access list alone");
-        // The calm sentence is only reachable on a positive "everyone is not in it".
-        expect(script).toContain('[ "$(access_ssh_member everyone group)" = "no" ]');
+        expect(script).toContain(
+            "turned Remote Login on and added '$POLARIS_USER' to the SSH access list this machine already had"
+        );
+        expect(script).toContain("whether '$POLARIS_USER' is on it could not be read back");
+    });
+
+    // A list that already admits everyone makes the switch the thing that hands the
+    // network every password-bearing account on the machine - wider than either
+    // argument this command makes people opt into, and a printed warning afterwards
+    // does not take it back, since nobody is obliged to be reading the terminal.
+    // Narrowing that list is not this script's call either, so the switch is left
+    // where it was found and the choice goes back to whoever built the list.
+    it("will not open a machine whose existing access list admits everyone", () => {
+        const darwin = script.slice(script.indexOf("read_remote_login\n"));
+        const gate = darwin.indexOf('[ "$(access_ssh_member everyone group)" != "no" ]');
+        expect(gate).toBeGreaterThan(-1);
+        // Decided while the machine is still as its operator left it.
+        expect(gate).toBeLessThan(darwin.indexOf("systemsetup -setremotelogin on"));
+        expect(darwin.slice(gate, darwin.indexOf("systemsetup -setremotelogin on"))).toContain(
+            "die remote-login-off"
+        );
+        // And the warning it used to carry on past is gone.
+        expect(script).not.toContain("WARNING: turned Remote Login on, and left the SSH access list alone");
+    });
+
+    // The access list is what macOS turns an unlisted login away with, so an add
+    // that quietly did nothing is a machine that answers Polaris and then refuses
+    // it - a spent token and "check the firewall", which is the misdiagnosis this
+    // whole preflight exists to catch on the machine instead. It used to be
+    // announced on somebody else's membership and never read back.
+    it("reads back the login's own membership before announcing it", () => {
+        const adder = script.slice(script.indexOf("add_to_access_list() {"));
+        expect(adder.slice(0, adder.indexOf("\n    }"))).toContain('access_ssh_member "$POLARIS_USER" user');
+        expect(script.match(/die not-in-ssh-access-list/g)).toHaveLength(2);
+        // The already-on path refuses only on a list that was read and says no: an
+        // answer nobody got has never been allowed to strand an enrollment.
+        const alreadyOn = script.slice(script.indexOf('if [ "$REMOTE_LOGIN" = "unknown" ]'));
+        const untilEnd = alreadyOn.slice(0, alreadyOn.indexOf("SSH_PROBE"));
+        expect(untilEnd).toContain('[ "$ADDED" = "no" ]');
+        expect(untilEnd).toContain("could not read back whether '$POLARIS_USER' is on");
+        expect(untilEnd.slice(untilEnd.indexOf("could not read back"))).not.toContain("die ");
+        // And a list that lets everybody in lets this login in too, so that one is
+        // not a machine to refuse either.
+        expect(untilEnd).toContain("already lets every account here in");
     });
 
     // Each dseditgroup call can fail quietly on a managed Mac, and by then Remote
@@ -417,6 +469,19 @@ describe("enrollmentScript", () => {
         // Taken before anything reads them, and read from the variable after.
         expect(probe.indexOf("LISTENERS_OWNED=$(ss -ltnp")).toBeLessThan(probe.indexOf("for port in $SSH_PORTS; do"));
         expect(probe).not.toContain("$(listeners ");
+    });
+
+    // awk is part of the instrument, not a detail of it: the candidate ports, the
+    // listener table and the owner match all go through one, so a machine without it
+    // found nothing on every candidate and refused an sshd that was running fine.
+    it("counts awk among the tools the check needs before it may refuse", () => {
+        const probe = script.slice(script.indexOf("SSH_PROBE=none"));
+        const select = probe.slice(0, probe.indexOf("reachable_listener() {"));
+        expect(select).toContain("command -v awk");
+        // And nothing selects a probe without it.
+        expect(select.indexOf("command -v awk")).toBeLessThan(select.indexOf("command -v ss"));
+        expect(select).toMatch(/command -v awk[\s\S]*SSH_PROBE=ss/);
+        expect(script).toContain("no awk, ss or netstat here");
     });
 
     // A box with neither tool cannot answer the question, and a wrong "nothing is
@@ -573,6 +638,7 @@ describe("enrollmentScript", () => {
                 "remote-login-off",
                 "remote-login-unrestricted",
                 "remote-login-left-open",
+                "not-in-ssh-access-list",
                 "no-ssh-host-keys",
                 "no-home-directory",
                 "no-user-tooling",
@@ -641,9 +707,9 @@ describe("enrollmentScript", () => {
         expect(script).not.toContain("then run this command again\"");
         const dies =
             script.match(
-                /die (?:ssh-not-listening|remote-login-off|remote-login-unrestricted|remote-login-left-open) "[^"]*"/g
+                /die (?:ssh-not-listening|remote-login-off|remote-login-unrestricted|remote-login-left-open|not-in-ssh-access-list) "[^"]*"/g
             ) ?? [];
-        expect(dies).toHaveLength(5);
+        expect(dies).toHaveLength(8);
         for (const message of dies) expect(message).toContain("$POLARIS_RETRY_HINT");
     });
 

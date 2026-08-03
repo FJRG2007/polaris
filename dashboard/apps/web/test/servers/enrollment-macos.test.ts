@@ -41,7 +41,10 @@ const dieHelper = (() => {
 const darwinBranch = (() => {
     const opening = 'if [ "$PLATFORM" = "darwin" ]; then\n    read_remote_login() {';
     const start = script.indexOf(opening);
-    const end = script.indexOf("\nelse\n    SSH_PROBE=none");
+    // The `else` that hands over to the Linux half, found from the first thing that
+    // half declares rather than from the line right after it - a comment moving in
+    // above it is not a reason for this to slice the branch in the wrong place.
+    const end = script.lastIndexOf("\nelse\n", script.indexOf("SSH_PROBE=none"));
     expect(start).toBeGreaterThan(-1);
     expect(end).toBeGreaterThan(start);
     return script.slice(start + 'if [ "$PLATFORM" = "darwin" ]; then\n'.length, end);
@@ -109,6 +112,9 @@ case "\$2" in
         rm -f "\$STATE/group" "\$STATE/member" "\$STATE/everyone"
         exit 0 ;;
     edit)
+        # 'refuse-add' is the managed Mac whose list this cannot be put on: the call
+        # reports nothing, and only reading the membership back says it did nothing.
+        if [ "\${DSEDIT_MODE:-ok}" = "refuse-add" ]; then exit 1; fi
         case "\$*" in
             *"-d everyone"*) rm -f "\$STATE/everyone" ;;
             *"-a polaris"*) : > "\$STATE/member" ;;
@@ -140,9 +146,9 @@ interface Mac {
     /** Whether the machine already carries an SSH access list, and whether it can
      *  even be asked: `fail` is a directory service that would not answer. */
     readonly groups?: "stock" | "existing" | "fail" | "empty";
-    /** Whether the group edits can be read back afterwards, and whether the tool is
-     *  even resolvable under the sudo PATH. */
-    readonly dseditgroup?: "ok" | "unreadable" | "missing";
+    /** Whether the group edits take and can be read back afterwards, and whether the
+     *  tool is even resolvable under the sudo PATH. */
+    readonly dseditgroup?: "ok" | "unreadable" | "missing" | "refuse-add";
     /** Whether the toggle refuses, the way it does without Full Disk Access. */
     readonly systemsetup?: "ok" | "refuse-enable" | "refuse-disable";
     /** Whether the machine already lets every account in over SSH. */
@@ -348,14 +354,86 @@ describe.runIf(shell)("the macOS branch, run against a simulated Mac", () => {
         expect(outcome.refused).toEqual(["remote-login-unrestricted"]);
     });
 
-    // An access list that already lets everybody in is the operator's to keep, but
-    // Remote Login is on now because of this script, so who it lets in is said.
-    it("says out loud when the list it was not allowed to narrow lets everybody in", () => {
+    // An access list that already lets everybody in is the operator's to keep - and
+    // it is also what Remote Login lets in the moment this switches it on, which is
+    // every password-bearing account on the machine, wider than either argument this
+    // command makes people opt into. Narrowing it is not this script's call and
+    // neither is opening it, so the switch stays where it was found.
+    it("will not turn Remote Login on against a list that lets every account in", () => {
         const outcome = run({ groups: "existing", everyone: true });
-        expect(outcome.status).toBe(0);
-        expect(outcome.stdout).toContain(
-            "WARNING: turned Remote Login on, and left the SSH access list alone"
-        );
+        expect(outcome.status).toBe(1);
+        expect(outcome.refused).toEqual(["remote-login-off"]);
+        // Left exactly as found: the switch untouched and the list unnarrowed.
+        expect(outcome.remoteLoginOn).toBe(false);
+        expect(outcome.accessGroup).toBe(true);
+        expect(outcome.stderr).toContain("lets every account here in");
+    });
+
+    // Same reading, same answer: a list whose membership nothing could report is not
+    // a list known to be safe to open either.
+    it("will not turn Remote Login on against a list it cannot read the members of", () => {
+        const outcome = run({ groups: "existing", dseditgroup: "unreadable" });
+        expect(outcome.status).toBe(1);
+        expect(outcome.refused).toEqual(["remote-login-off"]);
+        expect(outcome.remoteLoginOn).toBe(false);
+    });
+
+    // The list is what macOS turns an unlisted login away with, so a machine whose
+    // list this login cannot be put on would answer Polaris and then refuse it - the
+    // spent token and the report about the wrong thing that this whole preflight
+    // exists to catch here instead. Opening the machine for that is the worse half.
+    it("does not open a machine for a login its access list would turn away", () => {
+        const outcome = run({ groups: "existing", dseditgroup: "refuse-add" });
+        expect(outcome.status).toBe(1);
+        expect(outcome.refused).toEqual(["not-in-ssh-access-list"]);
+        expect(outcome.remoteLoginOn).toBe(false);
+        expect(outcome.stdout).not.toContain("added 'polaris'");
+    });
+
+    // Remote Login here is nobody's doing but the operator's, so nothing is left
+    // wider than it was found - but the login still has to be on the list, and this
+    // was announced on somebody else's membership rather than read back.
+    it("stops on an already-on Mac whose access list will not take the login", () => {
+        const outcome = run({ remoteLogin: true, groups: "existing", dseditgroup: "refuse-add" });
+        expect(outcome.status).toBe(1);
+        expect(outcome.refused).toEqual(["not-in-ssh-access-list"]);
         expect(outcome.remoteLoginOn).toBe(true);
+        expect(outcome.stdout).not.toContain("added 'polaris'");
+    });
+
+    // A list that already admits everyone admits the Polaris login too, so an add
+    // that did not take costs nothing there.
+    it("carries on when the list it could not be added to lets everybody in anyway", () => {
+        const outcome = run({
+            remoteLogin: true,
+            groups: "existing",
+            everyone: true,
+            dseditgroup: "refuse-add"
+        });
+        expect(outcome.status).toBe(0);
+        expect(outcome.stdout).toContain("already lets every account here in");
+        expect(outcome.stdout).toContain("reached: the claim");
+    });
+
+    // A membership nobody could read is the question going unasked, and stranding an
+    // enrollment on one is what every check here is written not to do - the more so
+    // on the path that leaves the machine exactly as it found it.
+    it("does not refuse an already-on Mac over a membership it could not read", () => {
+        const outcome = run({ remoteLogin: true, groups: "existing", dseditgroup: "unreadable" });
+        expect(outcome.status).toBe(0);
+        expect(outcome.refused).toEqual([]);
+        expect(outcome.stdout).toContain("could not read back whether 'polaris' is on");
+        expect(outcome.stdout).toContain("reached: the claim");
+    });
+
+    // No list at all means macOS gates SSH on nothing, so there is nothing to be on
+    // and nothing to create - creating one would narrow a machine whose SSH this
+    // script did not turn on.
+    it("leaves an already-on Mac with no access list alone", () => {
+        const outcome = run({ remoteLogin: true });
+        expect(outcome.status).toBe(0);
+        expect(outcome.refused).toEqual([]);
+        expect(outcome.accessGroup).toBe(false);
+        expect(outcome.stdout).toContain("reached: the claim");
     });
 });

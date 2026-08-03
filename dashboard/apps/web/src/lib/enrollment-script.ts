@@ -85,10 +85,14 @@ export function enrollmentScript(input: EnrollmentScriptInput): string {
 #     the one that creates the SSH access list, it limits that list to the
 #     '${input.username}' login. An access list this machine already had is added
 #     to and never narrowed, and so is a Mac that already had Remote Login on -
-#     the script says which of the two it did. If it cannot read that list, or
-#     cannot read back the limit it just set, it stops and puts Remote Login back
-#     off rather than leaving the machine open to every account on it - and says
-#     so, loudly, in the one case where even that could not be confirmed.
+#     the script says which of the two it did. It will not switch Remote Login on
+#     against a list it cannot read, one that already admits every account here, or
+#     one the '${input.username}' login could not be added to: none of those is a
+#     machine to open on this script's say-so, so it leaves the switch alone and
+#     says why. And if it cannot read back the limit it just set, it stops and puts
+#     Remote Login back off rather than leaving the machine open to every account
+#     on it - and says so, loudly, in the one case where even that could not be
+#     confirmed.
 #   - the docker group membership, only with --docker
 #   - /etc/sudoers.d/${input.username}, only with --root
 #
@@ -274,9 +278,10 @@ chown -R "\$POLARIS_USER" "\$HOME_DIR/.ssh"`;
  * the claim through and produce the firewall report this check exists to prevent.
  *
  * Refusing is reserved for the case where the check ran and found nothing reachable
- * at all. A machine with neither `ss` nor `netstat`, and one whose listeners have no
- * readable owner, have both failed to answer rather than answered no - and a wrong
- * "nothing is listening" would strand an enrollment that was fine.
+ * at all. A machine missing any of the tools the reading is made of - `ss` or
+ * `netstat`, and the `awk` every part of it goes through - and one whose listeners
+ * have no readable owner, have both failed to answer rather than answered no, and a
+ * wrong "nothing is listening" would strand an enrollment that was fine.
  *
  * macOS is where this bites, because it ships with Remote Login off, so that one
  * is switched on rather than only reported. Stdin is closed for it because this
@@ -400,6 +405,25 @@ fi`;
  * a refusal, and a stock Mac - the machine this whole check was written for - is
  * never mistaken for a directory that would not answer.
  *
+ * A list that was already here is read for two things before the switch moves, for
+ * the same reason and in the same place. It gates SSH the instant Remote Login goes
+ * on, so a list that admits `everyone` makes the switch the thing that hands the
+ * network every password-bearing account on the machine - wider than either
+ * argument this command makes people opt into, and not something a printed warning
+ * after the fact takes back, since nobody is obliged to be reading the terminal. And
+ * a list the Polaris login could not be added to is a machine that answers Polaris
+ * and then turns it away, which arrives as a spent token and a report about the
+ * wrong thing entirely - the failure this whole section exists to catch on the
+ * machine. Either way the switch stays where it was found and the operator is told
+ * what to fix. Neither is a narrowing: the list is left exactly as it was.
+ *
+ * The already-on path asks the second of those too, because it is the same
+ * question - Remote Login there is nobody's doing but the operator's, so the only
+ * thing left to establish is whether Polaris gets in. It refuses only on a list that
+ * was read and says no, though. A membership nobody could read has never been
+ * grounds to strand an enrollment, and on that path the machine is not one this
+ * script widened.
+ *
  * The same rule governs the other end. If the narrowing cannot be read back, the
  * machine is wider than it was found and a printed warning does not fix that;
  * nobody is obliged to be watching the terminal. So what was turned on is turned
@@ -446,6 +470,16 @@ function darwinRemoteLoginSection(): string {
         if printf '%s\\n' "\$_groups" | grep -qxF com.apple.access_ssh; then echo yes; else echo no; fi
     }
 
+    # Put the login on a list that was already here, and say whether it is on it -
+    # yes/no/unknown once more, because this is the same silent 'dseditgroup' the
+    # narrowing uses and an add that quietly did nothing is a machine that answers
+    # Polaris and then refuses it. Adding is the whole of it: a list somebody else
+    # built is not this script's to narrow, on either path that gets here.
+    add_to_access_list() {
+        dseditgroup -o edit -a "\$POLARIS_USER" -t user com.apple.access_ssh >/dev/null 2>&1 || true
+        access_ssh_member "\$POLARIS_USER" user
+    }
+
     read_remote_login
     if [ "\$REMOTE_LOGIN" = "no" ]; then
         # Read while the machine is still as its operator left it, because it
@@ -455,6 +489,27 @@ function darwinRemoteLoginSection(): string {
         ACCESS_LIST=\$(access_ssh_exists)
         if [ "\$ACCESS_LIST" = "unknown" ]; then
             die remote-login-off "Remote Login is off, so nothing answers on port \$SSH_PORT, and this machine would not say whether it has an SSH access list - turning it on could open every account here. Turn it on yourself in System Settings > General > Sharing, \$POLARIS_RETRY_HINT"
+        fi
+        ADDED=unknown
+        if [ "\$ACCESS_LIST" = "yes" ]; then
+            # The list decides who the switch lets in, so it is read before the
+            # switch moves and not after, while this machine is still the one its
+            # operator left. A list that admits everyone turns Remote Login into the
+            # thing that opens every password-bearing account here to the network,
+            # which is wider than anything the arguments to this command grant - and
+            # it is not this script's list to narrow instead, so the choice goes back
+            # to whoever built it.
+            if [ "\$(access_ssh_member everyone group)" != "no" ]; then
+                die remote-login-off "Remote Login is off, so nothing answers on port \$SSH_PORT, and this machine's SSH access list either lets every account here in or would not say - turning it on is not this command's call to make. Turn it on yourself in System Settings > General > Sharing, \$POLARIS_RETRY_HINT"
+            fi
+            # And the login has to be on that list before the switch moves too,
+            # because the list is what macOS turns an unlisted login away with:
+            # opening the machine for an enrollment that would then be refused is
+            # both the wider outcome and the useless one.
+            ADDED=\$(add_to_access_list)
+            if [ "\$ADDED" = "no" ]; then
+                die not-in-ssh-access-list "this machine limits SSH to a list of logins, '\$POLARIS_USER' could not be added to it, and Remote Login was left off rather than opened for a login it would turn away. Add '\$POLARIS_USER' under System Settings > General > Sharing > Remote Login, \$POLARIS_RETRY_HINT"
+            fi
         fi
         systemsetup -setremotelogin on </dev/null >/dev/null 2>&1 || true
         read_remote_login
@@ -510,26 +565,42 @@ function darwinRemoteLoginSection(): string {
                 die remote-login-left-open "turned Remote Login on, could not limit SSH to the '\$POLARIS_USER' login, and could not confirm it went back off - every account on this machine may be reachable over SSH right now. Turn it off, or restrict it, in System Settings > General > Sharing, \$POLARIS_RETRY_HINT"
             fi
         else
-            # The list was here first, so it is added to and never narrowed:
-            # withdrawing access somebody else granted is not this script's call,
-            # and that holds whether Remote Login was on or off when this started.
-            # Remote Login is on now either way, so who it lets in is said out loud
-            # rather than left to be discovered.
-            dseditgroup -o edit -a "\$POLARIS_USER" -t user com.apple.access_ssh >/dev/null 2>&1 || true
-            if [ "\$(access_ssh_member everyone group)" = "no" ]; then
+            # The list was here first, so it was added to and never narrowed - and
+            # it was read before the switch moved, so the only thing left to report
+            # is which of those two answers the add gave.
+            if [ "\$ADDED" = "yes" ]; then
                 say "turned Remote Login on and added '\$POLARIS_USER' to the SSH access list this machine already had, which is otherwise left as it was"
             else
-                say "WARNING: turned Remote Login on, and left the SSH access list alone because it was not this script's to narrow - whoever it already allowed, which may be every account here, can now be reached over SSH. Check it under System Settings > General > Sharing > Remote Login"
+                say "turned Remote Login on; the SSH access list this machine already had is left as it was, and whether '\$POLARIS_USER' is on it could not be read back"
             fi
         fi
     else
         if [ "\$REMOTE_LOGIN" = "unknown" ]; then
             say "could not read whether Remote Login is on, so it was left alone"
         fi
-        # Only matters when Remote Login is limited to named users. Adds, never
-        # removes: this list is the operator's, and somebody else's access is not
-        # this script's to withdraw.
-        dseditgroup -o edit -a "\$POLARIS_USER" -t user com.apple.access_ssh >/dev/null 2>&1 || true
+        # Nothing on this path moves the switch, so nothing here can leave the
+        # machine wider than it was found; the list is the operator's and is added
+        # to, never narrowed. What the add settles is only whether Polaris gets in:
+        # where a list exists it is what macOS turns an unlisted login away with,
+        # and that refusal would arrive after the claim, on a spent token, reported
+        # as a machine nothing could reach.
+        ACCESS_LIST=\$(access_ssh_exists)
+        ADDED=\$(add_to_access_list)
+        if [ "\$ACCESS_LIST" = "yes" ]; then
+            if [ "\$ADDED" = "yes" ]; then
+                say "added '\$POLARIS_USER' to the SSH access list this machine already had, which is otherwise left as it was"
+            elif [ "\$ADDED" = "no" ] && [ "\$(access_ssh_member everyone group)" != "yes" ]; then
+                # Read, and it says no: this machine would answer Polaris and then
+                # refuse it. Only that reading refuses - an answer nobody got is the
+                # question going unasked, and stranding an enrollment on one is what
+                # every check here is written not to do.
+                die not-in-ssh-access-list "this machine limits SSH to a list of logins and '\$POLARIS_USER' could not be added to it, so Polaris would be turned away on connecting. Add '\$POLARIS_USER' under System Settings > General > Sharing > Remote Login, \$POLARIS_RETRY_HINT"
+            elif [ "\$ADDED" = "no" ]; then
+                say "this machine's SSH access list already lets every account here in, so '\$POLARIS_USER' needs no entry of its own"
+            else
+                say "could not read back whether '\$POLARIS_USER' is on this machine's SSH access list; if SSH here is limited to named logins, add it under System Settings > General > Sharing > Remote Login"
+            fi
+        fi
     fi`;
 }
 
@@ -560,11 +631,17 @@ function darwinRemoteLoginSection(): string {
  * wildcard or a real address, never loopback.
  */
 function linuxListenerSection(): string {
-    return `SSH_PROBE=none
-    if command -v ss >/dev/null 2>&1; then
-        SSH_PROBE=ss
-    elif command -v netstat >/dev/null 2>&1; then
-        SSH_PROBE=netstat
+    return `# awk is part of the instrument and not a detail of it: every reading below goes
+    # through one, so a machine without awk cannot answer the question any more than
+    # a machine without ss or netstat can - and a check that could not run has never
+    # been allowed to refuse.
+    SSH_PROBE=none
+    if command -v awk >/dev/null 2>&1; then
+        if command -v ss >/dev/null 2>&1; then
+            SSH_PROBE=ss
+        elif command -v netstat >/dev/null 2>&1; then
+            SSH_PROBE=netstat
+        fi
     fi
 
     # Both tools put the local address in the fourth column, in every spelling of a
@@ -628,9 +705,9 @@ function linuxListenerSection(): string {
     }
 
     if [ "\$SSH_PROBE" = "none" ]; then
-        # Neither tool, so the question cannot be asked. Reporting the configured
-        # port and carrying on beats stranding an enrollment on a guess.
-        say "no ss or netstat here, so whether anything is listening could not be checked"
+        # Nothing to ask with, so the question cannot be asked. Reporting the
+        # configured port and carrying on beats stranding an enrollment on a guess.
+        say "no awk, ss or netstat here, so whether anything is listening could not be checked"
     else
         SSH_LISTENING=unknown
         # What sshd is bound to, whatever declared it. An empty answer on the way

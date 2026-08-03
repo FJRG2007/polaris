@@ -120,6 +120,7 @@ export const ENROLLMENT_REFUSAL_REASONS = [
     "remote-login-off",
     "remote-login-unrestricted",
     "remote-login-left-open",
+    "not-in-ssh-access-list",
     "no-ssh-host-keys",
     "no-home-directory",
     "no-user-tooling",
@@ -147,11 +148,13 @@ export const ENROLLMENT_REFUSAL_MESSAGES: Record<EnrollmentRefusalReason, string
     "ssh-not-listening":
         "The machine stopped before registering: nothing Polaris could reach is listening on its SSH port. Start its SSH server, or bind it to something other than loopback.",
     "remote-login-off":
-        "The machine stopped before registering: Remote Login is off, so nothing would answer Polaris. Turn it on under System Settings > General > Sharing.",
+        "The machine stopped before registering: Remote Login is off, so nothing would answer Polaris. Turn it on under System Settings > General > Sharing, where you can also see which logins it lets in.",
     "remote-login-unrestricted":
         `The machine stopped before registering: Remote Login could not be limited to the '${ENROLLMENT_USERNAME}' login, and turning it on for every account there is wider than this command grants, so it was put back off the way the command found it. Turn it on and restrict it to that login under System Settings > General > Sharing.`,
     "remote-login-left-open":
         `The machine stopped before registering: Remote Login was turned on there, could not be limited to the '${ENROLLMENT_USERNAME}' login, and could not be confirmed back off - every account on that machine may be reachable over SSH right now. Turn Remote Login off, or restrict it to that login, under System Settings > General > Sharing.`,
+    "not-in-ssh-access-list":
+        `The machine stopped before registering: it limits SSH to a list of logins, '${ENROLLMENT_USERNAME}' is not on it, and the command could not add it - so the machine would have turned Polaris away. Add that login under System Settings > General > Sharing > Remote Login. Remote Login itself was left exactly as the command found it.`,
     "no-ssh-host-keys":
         "The machine stopped before registering: it has no SSH host keys and none could be generated. Install an SSH server there.",
     "no-home-directory":
