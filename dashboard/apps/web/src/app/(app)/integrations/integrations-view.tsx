@@ -11,6 +11,7 @@ import { runAction } from "@/lib/run-action";
 import { useState, useTransition } from "react";
 import * as integrationActions from "./actions";
 import { IntegrationLogo } from "@/components/logos";
+import { CopyButton } from "@/components/copy-button";
 import { DYMO_IP_RULES, SCAN_ACTIONS, type ScanAction } from "@/lib/integrations/registry";
 import { CheckCircle2, Circle, ExternalLink, Loader2, RefreshCw, ShieldCheck } from "lucide-react";
 import { isTunnelToken, tunnelTokenHint, type TunnelProviderSlug } from "@/lib/integrations/tunnel-token";
@@ -74,6 +75,12 @@ export interface IntegrationCard {
     githubRunnersReady?: boolean;
     /** GitHub: what to change so it can, when it cannot. */
     githubRunnersAdvice?: string;
+    /** Google: the OAuth client id, which is not a secret. */
+    googleClientId?: string;
+    /** Google: the redirect URI to register on that client. */
+    googleCallbackUrl?: string;
+    /** GitHub/Google: how many accounts of this service one person may connect. */
+    accountLimit?: number;
 }
 
 export function IntegrationsView({ cards }: { cards: IntegrationCard[] }) {
@@ -131,8 +138,170 @@ export function IntegrationsView({ cards }: { cards: IntegrationCard[] }) {
                 <TunnelDialog card={configuring} onClose={() => setConfiguring(null)} />
             ) : configuring?.slug === "duckdns" ? (
                 <DuckDnsDialog card={configuring} onClose={() => setConfiguring(null)} />
+            ) : configuring?.slug === "google" ? (
+                <GoogleDialog card={configuring} onClose={() => setConfiguring(null)} />
             ) : null}
         </>
+    );
+}
+
+/**
+ * How many accounts of this service one person may connect.
+ *
+ * It saves itself rather than riding on the dialog's Save, because it is a
+ * different subject from the application's credentials and the GitHub dialog has
+ * three ways to reach that button. Unchanged values are not written at all - a
+ * field somebody clicked into and left alone is not a change.
+ */
+function AccountLimitField({ slug, current }: { slug: string; current: number }) {
+    const [value, setValue] = useState(String(current));
+    const [saved, setSaved] = useState(current);
+    const [error, setError] = useState<string | null>(null);
+    const [pending, startTransition] = useTransition();
+
+    function commit() {
+        const parsed = Number.parseInt(value, 10);
+        if (!Number.isFinite(parsed) || parsed < 0) {
+            setValue(String(saved));
+            return;
+        }
+        if (parsed === saved) return;
+        setError(null);
+        startTransition(async () => {
+            const result = await runAction(() => integrationActions.saveConnectionLimitAction(slug, parsed), setError);
+            if (!result) return;
+            if (result.error) {
+                setError(result.error);
+                setValue(String(saved));
+                return;
+            }
+            setSaved(parsed);
+        });
+    }
+
+    return (
+        <label className="flex flex-col gap-1 text-sm">
+            <span className="font-medium">Accounts per person</span>
+            <Input
+                type="number"
+                min={0}
+                max={20}
+                inputMode="numeric"
+                value={value}
+                disabled={pending}
+                onChange={(event) => setValue(event.target.value)}
+                onBlur={commit}
+            />
+            <span className="text-xs text-muted-foreground">
+                How many of these accounts one person may connect. Zero turns connecting off; lowering it never
+                disconnects anybody already over the limit.
+            </span>
+            {error ? <span className="text-xs text-danger">{error}</span> : null}
+        </label>
+    );
+}
+
+/**
+ * Connect the Google Cloud OAuth client. Two fields and one thing to copy back:
+ * Google refuses an authorization whose redirect URI was not registered on the
+ * client, and that URI is decided by this deployment's address rather than by
+ * anything the operator can guess - so it is shown here to be pasted in.
+ */
+function GoogleDialog({ card, onClose }: { card: IntegrationCard; onClose: () => void }) {
+    const [enabled, setEnabled] = useState(card.hasSecret ? card.enabled : true);
+    const [clientId, setClientId] = useState(card.googleClientId ?? "");
+    const [clientSecret, setClientSecret] = useState("");
+    const [error, setError] = useState<string | null>(null);
+    const [pending, startTransition] = useTransition();
+
+    const canSave = clientId.trim().length > 0 && (card.hasSecret || clientSecret.trim().length > 0);
+
+    function onSave() {
+        setError(null);
+        startTransition(async () => {
+            const result = await runAction(
+                () =>
+                    integrationActions.saveGoogleCalendarAction({
+                        enabled,
+                        clientId: clientId.trim(),
+                        clientSecret: clientSecret.trim() || undefined
+                    }),
+                setError
+            );
+            if (!result) return;
+            if (result.error) setError(result.error);
+            else onClose();
+        });
+    }
+
+    return (
+        <Dialog open onOpenChange={(open) => !open && onClose()}>
+            <DialogContent className="max-w-md">
+                <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2">
+                        <IntegrationLogo slug="google" className="size-5" />
+                        {card.name}
+                    </DialogTitle>
+                    <DialogDescription>{card.description}</DialogDescription>
+                </DialogHeader>
+
+                <div className="flex flex-col gap-4">
+                    <div className="flex items-center justify-between gap-3 rounded-md border border-border p-3 text-sm">
+                        <span>Enabled</span>
+                        <Switch checked={enabled} onChange={setEnabled} aria-label="Enabled" />
+                    </div>
+
+                    <label className="flex flex-col gap-1 text-sm">
+                        <span className="font-medium">Client ID</span>
+                        <Input
+                            value={clientId}
+                            onChange={(event) => setClientId(event.target.value)}
+                            placeholder="1234567890-abc.apps.googleusercontent.com"
+                            autoComplete="off"
+                        />
+                    </label>
+
+                    <label className="flex flex-col gap-1 text-sm">
+                        <span className="font-medium">{card.apiKeyLabel ?? "Client secret"}</span>
+                        <Input
+                            type="password"
+                            value={clientSecret}
+                            onChange={(event) => setClientSecret(event.target.value)}
+                            placeholder={card.hasSecret ? "Saved - enter a new secret to replace it" : "Paste the secret"}
+                            autoComplete="off"
+                        />
+                        {card.apiKeyHelp ? (
+                            <span className="text-xs text-muted-foreground">{card.apiKeyHelp}</span>
+                        ) : null}
+                    </label>
+
+                    <AccountLimitField slug="google" current={card.accountLimit ?? 1} />
+
+                    {card.googleCallbackUrl ? (
+                        <div className="flex flex-col gap-1 rounded-md border border-border bg-muted/30 p-3 text-sm">
+                            <span className="font-medium">Authorized redirect URI</span>
+                            <div className="flex items-center gap-2">
+                                <code className="min-w-0 flex-1 truncate text-xs">{card.googleCallbackUrl}</code>
+                                <CopyButton value={card.googleCallbackUrl} label="Copy the redirect URI" />
+                            </div>
+                            <span className="text-xs text-muted-foreground">
+                                Add this to the OAuth client, and enable the Google Calendar API on the project.
+                            </span>
+                        </div>
+                    ) : null}
+
+                    {error ? <p className="text-sm text-danger">{error}</p> : null}
+                    <div className="flex justify-end gap-2">
+                        <Button variant="ghost" onClick={onClose}>
+                            Cancel
+                        </Button>
+                        <Button onClick={onSave} disabled={pending || !canSave}>
+                            {pending ? "Saving..." : "Save"}
+                        </Button>
+                    </div>
+                </div>
+            </DialogContent>
+        </Dialog>
     );
 }
 
@@ -743,6 +912,8 @@ function GitHubConnected({ card, onClose }: { card: IntegrationCard; onClose: ()
 
                     <RunnerAccessNote card={card} />
 
+                    <AccountLimitField slug="github" current={card.accountLimit ?? 1} />
+
                     {isApp ? (
                         <div className="flex flex-col gap-2 text-sm">
                             <span className="font-medium">Installations</span>
@@ -819,28 +990,25 @@ function GitHubConnected({ card, onClose }: { card: IntegrationCard; onClose: ()
     );
 }
 
-type ConnectMethod = "app" | "existing" | "token";
+type ConnectMethod = "app" | "existing";
 
-/** Disconnected state: choose how to connect (create an app, paste one, or a token). */
+/**
+ * Disconnected state: create a GitHub App for this instance, or paste one that
+ * already exists.
+ *
+ * A personal access token is deliberately not offered here. It authenticates one
+ * person, and connecting one instance-wide meant everybody on the box listed and
+ * cloned that person's repositories with it. People paste their own token under
+ * Connected accounts instead, where it only ever speaks for them.
+ */
 function GitHubConnect({ card, onClose }: { card: IntegrationCard; onClose: () => void }) {
     const [method, setMethod] = useState<ConnectMethod>("app");
-    const [token, setToken] = useState("");
     const [appId, setAppId] = useState("");
     const [pem, setPem] = useState("");
     const [clientId, setClientId] = useState("");
     const [clientSecret, setClientSecret] = useState("");
     const [error, setError] = useState<string | null>(null);
     const [saving, startSave] = useTransition();
-
-    function onConnectToken() {
-        setError(null);
-        startSave(async () => {
-            const result = await runAction(() => integrationActions.connectGithubAction(token), setError);
-            if (!result) return;
-            if (result.error) setError(result.error);
-            else onClose();
-        });
-    }
 
     function onConnectExisting() {
         setError(null);
@@ -867,12 +1035,11 @@ function GitHubConnect({ card, onClose }: { card: IntegrationCard; onClose: () =
                 </DialogHeader>
 
                 <div className="flex flex-col gap-4">
-                    <div className="grid grid-cols-3 gap-1 rounded-md bg-muted p-1 text-sm">
+                    <div className="grid grid-cols-2 gap-1 rounded-md bg-muted p-1 text-sm">
                         {(
                             [
                                 ["app", "Create app"],
-                                ["existing", "Existing app"],
-                                ["token", "Token"]
+                                ["existing", "Existing app"]
                             ] as const
                         ).map(([value, label]) => (
                             <button
@@ -951,36 +1118,9 @@ function GitHubConnect({ card, onClose }: { card: IntegrationCard; onClose: () =
                                 </Button>
                             </div>
                         </div>
-                    ) : (
-                        <div className="flex flex-col gap-3 text-sm">
-                            <label className="flex flex-col gap-1">
-                                <span className="font-medium">{card.apiKeyLabel}</span>
-                                <Input
-                                    type="password"
-                                    autoComplete="off"
-                                    value={token}
-                                    onChange={(event) => setToken(event.target.value)}
-                                    placeholder="ghp_... or github_pat_..."
-                                />
-                                {card.apiKeyHelp ? (
-                                    <span className="text-xs text-muted-foreground">{card.apiKeyHelp}</span>
-                                ) : null}
-                                <a
-                                    href={card.docsUrl}
-                                    target="_blank"
-                                    rel="noreferrer noopener"
-                                    className="inline-flex w-fit items-center gap-1 text-xs text-primary hover:underline"
-                                >
-                                    Create a token <ExternalLink className="size-3" />
-                                </a>
-                            </label>
-                            <div className="flex justify-end">
-                                <Button type="button" onClick={onConnectToken} disabled={saving || !token.trim()}>
-                                    {saving ? <Loader2 className="size-4 animate-spin" /> : "Connect"}
-                                </Button>
-                            </div>
-                        </div>
-                    )}
+                    ) : null}
+
+                    <AccountLimitField slug="github" current={card.accountLimit ?? 1} />
 
                     {error ? <p className="text-sm text-danger">{error}</p> : null}
                 </div>

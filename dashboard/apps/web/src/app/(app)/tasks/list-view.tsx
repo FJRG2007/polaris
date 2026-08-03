@@ -22,13 +22,15 @@ import { TaskPanel } from "./task-panel";
 import { BoardView } from "./views/board";
 import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
+import { GanttView } from "./views/schedule";
+import { CalendarView } from "./views/calendar";
 import { ListView, TableView } from "./views/rows";
 import { TaskCreateDialog } from "./task-create-dialog";
 import { useMemo, useState, useTransition } from "react";
 import { AssigneePicker, StatusPicker } from "./pickers";
 import type { TaskEdit, ViewProps } from "./views/shared";
 import type { SavedView } from "@/lib/tasks/view-service";
-import { CalendarView, GanttView } from "./views/schedule";
+import { useDisplayFormat } from "@/components/display-format";
 import { Button, ConfirmDeleteDialog, Select, cn } from "@polaris/ui";
 import { toFacts, type SpaceContext, type TaskRow } from "@/lib/tasks/facts";
 import { CalendarDays, GanttChart, LayoutList, Plus, Rows3, Search, Table2, X } from "lucide-react";
@@ -68,6 +70,7 @@ export function ListScreen({
     initialTaskId = null
 }: ListScreenProps) {
     const router = useRouter();
+    const format = useDisplayFormat();
     const [, startRefresh] = useTransition();
 
     const initial = savedViews[0];
@@ -136,11 +139,11 @@ export function ListScreen({
         const working = matched
             .filter((task) => showClosed || task.statusType !== "closed")
             .map(toFacts)
-            .filter((facts) => core.matchesFilter(facts, filter, now));
+            .filter((facts) => core.matchesFilter(facts, filter, now, format.weekStartsOn));
         // A search is already ranked by how well each row matched; re-sorting it
         // by due date would throw that away.
         return needle ? working : core.sortTasks(working, sort, statusOrder);
-    }, [rows, index, filter, showClosed, search, sort, statusOrder]);
+    }, [rows, index, filter, showClosed, search, sort, statusOrder, format.weekStartsOn]);
 
     const visible = useMemo(
         () => visibleFacts.map((facts) => rowById.get(facts.id)).filter((task): task is TaskRow => task !== undefined),
@@ -150,19 +153,25 @@ export function ListScreen({
     const groups = useMemo<ViewProps["groups"]>(
         () =>
             core
-                .groupTasks(visibleFacts, groupBy, {
-                    statuses: context.statuses,
-                    people: context.people.map((person) => ({ id: person.id, name: person.name })),
-                    tags: context.tags,
-                    lists
-                })
+                .groupTasks(
+                    visibleFacts,
+                    groupBy,
+                    {
+                        statuses: context.statuses,
+                        people: context.people.map((person) => ({ id: person.id, name: person.name })),
+                        tags: context.tags,
+                        lists
+                    },
+                    new Date(),
+                    format.weekStartsOn
+                )
                 .map((group) => ({
                     ...group,
                     tasks: group.tasks
                         .map((facts) => rowById.get(facts.id))
                         .filter((task): task is TaskRow => task !== undefined)
                 })),
-        [visibleFacts, rowById, groupBy, context.statuses, context.people, context.tags, lists]
+        [visibleFacts, rowById, groupBy, context.statuses, context.people, context.tags, lists, format.weekStartsOn]
     );
 
     /**

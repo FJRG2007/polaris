@@ -4,10 +4,12 @@
  */
 
 import { requireAdmin } from "@/lib/session";
-import { getDomainConfig } from "@/lib/domain-service";
 import { getGithubStatus } from "@/lib/github-service";
 import { getRunnerAccess } from "@/lib/github-runners";
+import { connectionLimit } from "@/lib/connections/store";
+import { connectionCallbackUrl } from "@/lib/connections/oauth";
 import { listIntegrationStates } from "@/lib/integration-service";
+import { appBaseUrl, getDomainConfig } from "@/lib/domain-service";
 import { IntegrationsView, type IntegrationCard } from "./integrations-view";
 import { getCloudflareAccountStatus } from "@/lib/integrations/cloudflare-account-service";
 import { INTEGRATIONS, readDymoConfig, readVirusTotalConfig } from "@/lib/integrations/registry";
@@ -19,14 +21,21 @@ export default async function IntegrationsPage() {
     // Three of these reach outside the box (GitHub twice, Cloudflare once), so
     // they are awaited together rather than one after another - in sequence the
     // page took as long as all of them added up.
-    const [states, github, domains, cloudflare] = await Promise.all([
+    const [states, github, domains, cloudflare, baseUrl, githubLimit, googleLimit] = await Promise.all([
         listIntegrationStates(),
         getGithubStatus(),
         // DuckDNS config lives with the domain settings (Setting keys), not an Integration row.
         getDomainConfig(),
         // Cloudflare's API tokens (DNS records and named tunnels) are separate from the
         // marketplace connector token that runs the server-wide tunnel.
-        getCloudflareAccountStatus()
+        getCloudflareAccountStatus(),
+        // The address the deployment is reachable at, which is what decides the
+        // redirect URI an operator has to register on their Google client.
+        appBaseUrl(),
+        // How many accounts of each service one person may connect, shown in the
+        // dialog that sets it.
+        connectionLimit("github"),
+        connectionLimit("google")
     ]);
     // Whether that connection can also register self-hosted runners. Neither
     // method asks for the permission by default, so this is where the operator
@@ -65,7 +74,14 @@ export default async function IntegrationsPage() {
             githubRunnersAdvice: entry.slug === "github" ? runners?.advice ?? undefined : undefined,
             cloudflareApiConnected: entry.slug === "cloudflare" ? cloudflare.connected : undefined,
             cloudflareDnsConnected: entry.slug === "cloudflare" ? cloudflare.dnsReady : undefined,
-            cloudflareAccountName: entry.slug === "cloudflare" ? cloudflare.accountName ?? undefined : undefined
+            cloudflareAccountName: entry.slug === "cloudflare" ? cloudflare.accountName ?? undefined : undefined,
+            googleClientId:
+                entry.slug === "google" && typeof state?.config.clientId === "string"
+                    ? state.config.clientId
+                    : undefined,
+            googleCallbackUrl: entry.slug === "google" ? connectionCallbackUrl("google", baseUrl) : undefined,
+            accountLimit:
+                entry.slug === "github" ? githubLimit : entry.slug === "google" ? googleLimit : undefined
         };
     });
 

@@ -9,6 +9,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/session";
+import { setSetting } from "@/lib/setting-store";
 import { recordAudit } from "@/lib/audit-service";
 import { verifyIp } from "@/lib/integrations/dymo";
 import { applyTunnel } from "@/lib/tunnel-service";
@@ -18,20 +19,95 @@ import { setDomainConfig, syncDuckDns } from "@/lib/domain-service";
 import { isTunnelToken, tunnelTokenHint } from "@/lib/integrations/tunnel-token";
 import { getIntegrationState, upsertIntegration } from "@/lib/integration-service";
 import type { CloudflareTokenScope } from "@/lib/integrations/cloudflare-token-link";
+import { connectionLimitKey, findConnectionProvider } from "@/lib/connections/providers";
 import { DYMO_IP_RULES, findIntegration, type ScanAction } from "@/lib/integrations/registry";
+import { connectGithubApp, disconnectGithub, refreshInstallations } from "@/lib/github-service";
 import {
     connectCloudflareToken,
     disconnectCloudflareToken
 } from "@/lib/integrations/cloudflare-account-service";
-import {
-    connectGithubApp,
-    connectGithubPat,
-    disconnectGithub,
-    refreshInstallations,
-    verifyGithubToken
-} from "@/lib/github-service";
 
 const SCAN_ACTIONS = new Set<ScanAction>(["block", "quarantine", "notify"]);
+
+/** Nobody needs more than this, and an unbounded number is a way to make one
+ *  account hold a hundred credentials. */
+const MAX_ACCOUNTS_PER_USER = 20;
+
+/**
+ * How many accounts of one service a person may connect. One by default, which
+ * covers everybody with a single GitHub or Google account; raised for a
+ * deployment where people keep work and personal accounts apart, and set to zero
+ * to turn connecting that service off without disconnecting the application.
+ *
+ * Lowering it never removes anything already linked - the people over the new
+ * limit simply cannot add another - because silently disconnecting somebody's
+ * account would stop their deployments with no warning.
+ */
+export async function saveConnectionLimitAction(provider: string, limit: number): Promise<{ error?: string }> {
+    const user = await requireAdmin();
+    if (!findConnectionProvider(provider)) return { error: "Unknown service" };
+    if (!Number.isInteger(limit) || limit < 0 || limit > MAX_ACCOUNTS_PER_USER) {
+        return { error: `Choose a number between 0 and ${MAX_ACCOUNTS_PER_USER}` };
+    }
+
+    await setSetting(connectionLimitKey(provider), String(limit));
+    await recordAudit({
+        actorId: user.id,
+        action: "integration.configure",
+        targetType: "integration",
+        targetId: provider,
+        metadata: { accountsPerUser: limit }
+    });
+    revalidatePath("/integrations");
+    revalidatePath("/account/connections");
+    return {};
+}
+
+/**
+ * Connect the Google Cloud OAuth client people authorize their own calendars
+ * against. The client id is not a secret and lives in the config; the client
+ * secret is stored encrypted and is tri-state, so an operator can flip the
+ * switch without re-typing it.
+ *
+ * Enabling it with no secret on file is refused here rather than at the first
+ * link attempt, where the person hitting the error would be somebody who cannot
+ * fix it.
+ */
+export async function saveGoogleCalendarAction(input: {
+    enabled: boolean;
+    clientId: string;
+    clientSecret?: string;
+}): Promise<{ error?: string }> {
+    const user = await requireAdmin();
+    const clientId = input.clientId.trim();
+    const clientSecret = input.clientSecret?.trim() ? input.clientSecret.trim() : undefined;
+
+    try {
+        const existing = await getIntegrationState("google");
+        if (input.enabled && !clientId) return { error: "Add the client ID before enabling it" };
+        if (input.enabled && !clientSecret && !existing?.hasSecret) {
+            return { error: "Add the client secret before enabling it" };
+        }
+        await upsertIntegration("google", {
+            enabled: input.enabled,
+            config: { ...existing?.config, clientId },
+            secret: clientSecret,
+            installedById: user.id
+        });
+        await recordAudit({
+            actorId: user.id,
+            action: "integration.configure",
+            targetType: "integration",
+            targetId: "google",
+            metadata: { enabled: input.enabled }
+        });
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "The Google settings could not be saved" };
+    }
+
+    revalidatePath("/integrations");
+    return {};
+}
 
 /**
  * Configure a tunnel provider (cloudflare/ngrok). Enabling one runs the tunnel
@@ -303,31 +379,6 @@ export async function testVirusTotalKeyAction(apiKey: string): Promise<{ ok: boo
     await requireAdmin();
     if (!apiKey.trim()) return { ok: false, error: "Enter an API key first" };
     return verifyKey(apiKey.trim());
-}
-
-/** Validate a GitHub token without saving it (the connect dialog's Test button). */
-export async function testGithubTokenAction(token: string): Promise<{ ok: boolean; login?: string; error?: string }> {
-    await requireAdmin();
-    if (!token.trim()) return { ok: false, error: "Enter a token first" };
-    try {
-        const { login } = await verifyGithubToken(token.trim());
-        return { ok: true, login };
-    } catch (caught) {
-        return { ok: false, error: caught instanceof Error ? caught.message : "The token was rejected" };
-    }
-}
-
-/** Connect GitHub with a Personal Access Token (validated before it is stored). */
-export async function connectGithubAction(token: string): Promise<{ error?: string; login?: string }> {
-    const user = await requireAdmin();
-    try {
-        const { login } = await connectGithubPat(token, user.id);
-        await recordAudit({ actorId: user.id, action: "integration.configure", targetType: "integration", targetId: "github", metadata: { login } });
-        revalidatePath("/integrations");
-        return { login };
-    } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not connect GitHub" };
-    }
 }
 
 /** Connect an existing GitHub App by App ID + private key (validated before storing). */

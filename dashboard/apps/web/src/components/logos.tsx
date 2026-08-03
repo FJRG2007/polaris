@@ -7,7 +7,7 @@
 import { cn } from "@polaris/ui";
 import { Blocks } from "lucide-react";
 import { DymoMark } from "./dymo-mark";
-import { CloudflareMark, GitHubMark, NgrokMark } from "./brand-icons";
+import { CloudflareMark, GitHubMark, GoogleMark, NgrokMark } from "./brand-icons";
 
 interface LogoProps {
     className?: string;
@@ -34,6 +34,7 @@ export function VirusTotalLogo({ className = "size-6", brand }: LogoProps) {
 export function IntegrationLogo({ slug, className }: { slug: string; className?: string }) {
     if (slug === "virustotal") return <VirusTotalLogo className={className} brand />;
     if (slug === "github") return <GitHubMark className={className} />;
+    if (slug === "google") return <GoogleMark className={className} />;
     if (slug === "cloudflare") return <CloudflareMark className={className} />;
     if (slug === "ngrok") return <NgrokMark className={className} />;
     if (slug === "dymo") return <DymoMark className={className} />;

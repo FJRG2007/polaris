@@ -5,7 +5,7 @@
  * operator has enabled it. New integrations are added here.
  */
 
-export type IntegrationCategory = "Security" | "Notifications" | "Storage" | "Automation";
+export type IntegrationCategory = "Security" | "Notifications" | "Storage" | "Automation" | "Productivity";
 
 export interface IntegrationCatalogEntry {
     /** Stable slug; the Integration row's provider and the marketplace key. */
@@ -133,14 +133,38 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         slug: "github",
         name: "GitHub",
         category: "Automation",
-        summary: "Deploy from your repositories, including private ones.",
+        summary: "Let people connect their GitHub and deploy their repositories.",
         description:
-            "Connect a GitHub account so Deploy can list your repositories and build private ones. Today this uses a Personal Access Token; a one-click GitHub App is on the way.",
-        docsUrl: "https://github.com/settings/tokens",
+            "Create a GitHub App in one click and Polaris can build private repositories, register self-hosted runners, and give everyone here a Connect button for their own GitHub account. Each person then sees their own repositories and nobody else's.",
+        docsUrl: "https://docs.github.com/apps/creating-github-apps",
         requiresApiKey: true,
         apiKeyLabel: "Personal Access Token",
         apiKeyHelp:
             "A fine-grained token with Contents: Read on the repositories you want to deploy (or a classic token with the 'repo' scope)."
+    },
+    {
+        slug: "google",
+        name: "Google",
+        category: "Automation",
+        summary: "Let people connect their Google account and show their calendar.",
+        description:
+            "Connect a Google Cloud OAuth client and everyone here gets a Connect button for their own Google account. Polaris reads their calendar and nothing else, with their own authorization - it never holds a credential that reaches everybody's.",
+        docsUrl: "https://console.cloud.google.com/apis/credentials",
+        requiresApiKey: true,
+        apiKeyLabel: "Client secret",
+        apiKeyHelp: "From the OAuth 2.0 Client ID you create under APIs & Services -> Credentials."
+    },
+    {
+        slug: "google",
+        name: "Google Calendar",
+        category: "Productivity",
+        summary: "Let people see their own Google Calendar next to their tasks.",
+        description:
+            "Connect a Google Cloud OAuth client and each person can link their own Google account from their account settings. Their events then appear in the Tasks calendar, read-only: Polaris never writes to anybody's calendar and only ever holds the access each person granted.",
+        docsUrl: "https://console.cloud.google.com/apis/credentials",
+        requiresApiKey: true,
+        apiKeyLabel: "Client secret",
+        apiKeyHelp: "From the OAuth 2.0 Client ID you created, with the Google Calendar API enabled on the project."
     },
     {
         slug: "cloudflare",

@@ -49,6 +49,31 @@ export function NgrokMark(props: SVGProps<SVGSVGElement>) {
     );
 }
 
+export function GoogleMark(props: SVGProps<SVGSVGElement>) {
+    // Google's "G" in its four brand colours, as the brand guide requires
+    // wherever the mark stands for signing in with a Google account.
+    return (
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" {...mark(props)}>
+            <path
+                fill="#4285F4"
+                d="M23.52 12.273c0-.851-.076-1.67-.218-2.455H12v4.642h6.458a5.52 5.52 0 01-2.394 3.622v3.01h3.878c2.269-2.09 3.578-5.166 3.578-8.82z"
+            />
+            <path
+                fill="#34A853"
+                d="M12 24c3.24 0 5.956-1.075 7.942-2.908l-3.878-3.01c-1.075.72-2.45 1.145-4.064 1.145-3.125 0-5.77-2.11-6.715-4.947H1.276v3.108A11.995 11.995 0 0012 24z"
+            />
+            <path
+                fill="#FBBC05"
+                d="M5.285 14.28A7.212 7.212 0 014.909 12c0-.79.136-1.559.376-2.28V6.612H1.276A11.995 11.995 0 000 12c0 1.936.464 3.769 1.276 5.388l4.009-3.108z"
+            />
+            <path
+                fill="#EA4335"
+                d="M12 4.773c1.762 0 3.344.605 4.589 1.794l3.442-3.442C17.951 1.19 15.235 0 12 0 7.31 0 3.255 2.69 1.276 6.612l4.009 3.108C6.23 6.883 8.875 4.773 12 4.773z"
+            />
+        </svg>
+    );
+}
+
 export function GitHubMark(props: SVGProps<SVGSVGElement>) {
     return (
         <svg viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" {...mark(props)}>
