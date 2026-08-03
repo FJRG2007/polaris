@@ -96,7 +96,12 @@ const userinfoSchema = z.object({
     // Normalized on the way in: this address is only ever shown back as a label
     // for the linked account, and a stray case difference should not make the
     // same account look like two.
-    email: z.string().trim().toLowerCase().pipe(z.string().email()).optional()
+    email: z.string().trim().toLowerCase().pipe(z.string().email()).optional(),
+    // Google's own answer to "has this person proved they read mail there". An
+    // address is only worth anything to Polaris when this is true, so it is asked
+    // for rather than assumed - Google returns false for an address somebody has
+    // typed into their profile and never confirmed.
+    email_verified: z.boolean().optional()
 });
 
 export interface GoogleAuthorization {
@@ -104,7 +109,12 @@ export interface GoogleAuthorization {
     readonly accessToken: string;
     readonly scope: string;
     readonly accountId: string;
+    /** The address on the account, for the label on the card. */
     readonly email: string;
+    /** Whether Google says its owner has proved they read mail there. Kept apart
+     *  from the address itself because the two are used for different things: the
+     *  address is a label, and only a proved one is held for its owner. */
+    readonly emailVerified: boolean;
 }
 
 /** Spend the authorization code and learn whose account it was. */
@@ -134,7 +144,8 @@ export async function exchangeGoogleCode(
         accessToken: token.access_token,
         scope: token.scope ?? "",
         accountId: who.sub,
-        email: who.email ?? ""
+        email: who.email ?? "",
+        emailVerified: who.email_verified === true
     };
 }
 

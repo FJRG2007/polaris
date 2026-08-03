@@ -144,6 +144,14 @@ describe("adding an address", () => {
         });
     });
 
+    it("refuses one this account already holds, rather than letting the column refuse it", async () => {
+        await addUserEmail("user-1", "spare@example.com");
+        expect(await addUserEmail("user-1", "spare@example.com")).toEqual({
+            error: "That email is already in use."
+        });
+        expect(await listUserEmails("user-1")).toHaveLength(2);
+    });
+
     it("refuses your own primary and anything that is not an address", async () => {
         expect((await addUserEmail("user-1", "owner@example.com")).error).toBe(
             "That is already your primary address."

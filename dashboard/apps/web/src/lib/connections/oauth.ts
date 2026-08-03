@@ -35,7 +35,9 @@ export interface ConnectionAuthorization {
     readonly accountId: string;
     readonly label: string;
     readonly avatarUrl: string | null;
-    /** The address on that account, when the provider vouches for one. */
+    /** The address on that account, set only when the provider says it has
+     *  proved it. Null covers both "no address" and "one it has not proved" -
+     *  neither is something to hold for anybody. */
     readonly email: string | null;
     readonly scope: string;
     readonly credential: ConnectionCredential;
@@ -110,7 +112,10 @@ const ADAPTERS: Record<string, ProviderOAuth> = {
                 accountId: granted.accountId,
                 label: granted.email || granted.accountId,
                 avatarUrl: null,
-                email: granted.email || null,
+                // Only an address Google has proved is worth holding for its
+                // owner: what reads this next makes it one of their addresses
+                // and sends account mail and codes to it.
+                email: granted.emailVerified ? granted.email || null : null,
                 scope: granted.scope,
                 credential: { refreshToken: granted.refreshToken }
             };

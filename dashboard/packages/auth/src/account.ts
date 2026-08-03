@@ -112,12 +112,6 @@ export async function emailOwner(email: string): Promise<string | null> {
     return asPrimary?.id ?? asAlternate?.userId ?? null;
 }
 
-/** Whether an address already belongs to somebody else. */
-async function emailTaken(email: string, exceptUserId: string): Promise<boolean> {
-    const owner = await emailOwner(email);
-    return owner !== null && owner !== exceptUserId;
-}
-
 /** Every address a user holds, primary first. */
 export async function listUserEmails(userId: string): Promise<UserEmailView[]> {
     const [user, alternates] = await Promise.all([
@@ -164,7 +158,10 @@ export async function addUserEmail(userId: string, newEmail: string): Promise<{ 
     if (!isEmail(email)) return { error: "Enter a valid email address." };
     const current = await prisma.user.findUnique({ where: { id: userId }, select: { email: true } });
     if (current?.email === email) return { error: "That is already your primary address." };
-    if (await emailTaken(email, userId)) return { error: "That email is already in use." };
+    // Anybody's, including this account's own alternates: the column is unique
+    // across the table, so an address the caller already holds is refused with a
+    // message rather than as a constraint violation on the way to the database.
+    if (await emailOwner(email)) return { error: "That email is already in use." };
     const held = await prisma.userEmail.count({ where: { userId } });
     if (held >= MAX_ALTERNATE_EMAILS) {
         return { error: `You can hold at most ${MAX_ALTERNATE_EMAILS} extra addresses.` };

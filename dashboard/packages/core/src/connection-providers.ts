@@ -33,11 +33,14 @@ export interface ConnectionProvider {
     /** What the operator has to connect first, named so the empty state can say it. */
     requires: string;
     /**
-     * Whether a newly linked account of this service may sign its owner in
-     * before anybody says otherwise, on the platform and on the account.
+     * Whether this service arrives allowed as a way in, on the platform and on
+     * each newly linked account.
      *
-     * Off is the safe default for a service whose own account is easier to take
-     * over than a Polaris one: linking it should not silently widen the ways in.
+     * True for the services Polaris trusts with a sign-in, so an operator who
+     * connects the application does not then have to find two more switches
+     * before anybody can use it. False for one whose own account is easier to
+     * take over than a Polaris one: that arrives closed on both sides, with
+     * signInWarning saying why, and only opens if somebody decides it should.
      */
     signInDefault: boolean;
     /**

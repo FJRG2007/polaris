@@ -48,7 +48,11 @@ function sessionNotice(): string | null {
     for (const [key, message] of Object.entries(SESSION_NOTICES)) {
         if (params.get(key) === "1") return message;
     }
-    return CONNECTION_NOTICES[params.get("signin") ?? ""] ?? null;
+    // Checked for ownership rather than indexed straight: the value is the
+    // caller's to write, and "toString" would otherwise resolve through the
+    // prototype into something that is not a message at all.
+    const outcome = params.get("signin") ?? "";
+    return Object.hasOwn(CONNECTION_NOTICES, outcome) ? CONNECTION_NOTICES[outcome]! : null;
 }
 
 /** An outside service this deployment can sign somebody in with. */

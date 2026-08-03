@@ -179,6 +179,15 @@ export interface SaveConnectionInput {
     /** The address on that account, when the provider vouches for one. Recorded
      *  as one of this person's own, which is what reserves it. */
     email?: string | null;
+    /**
+     * Whether this account may sign its owner in, on the row's first write.
+     * Defaults to what the provider is worth as a way in.
+     *
+     * Set to false by anything writing a link on somebody's behalf rather than
+     * because they authorized it: a row nobody consented to must not arrive
+     * carrying a way into their account.
+     */
+    signIn?: boolean;
     /** Null keeps whatever is stored; a value replaces it. */
     credential?: ConnectionCredential | null;
 }
@@ -220,7 +229,7 @@ export async function saveConnection(userId: string, input: SaveConnectionInput)
             accountId: input.accountId,
             // Only ever set here, on the row's first write. Re-authorizing an
             // account must not put back a way in its owner turned off.
-            signInEnabled: findConnectionProvider(input.provider)?.signInDefault ?? false,
+            signInEnabled: input.signIn ?? findConnectionProvider(input.provider)?.signInDefault ?? false,
             ...stored
         },
         update: stored,
