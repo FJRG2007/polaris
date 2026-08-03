@@ -17,14 +17,15 @@
 import Link from "next/link";
 import { HostDialog } from "./host-dialog";
 import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import { QuickEnroll } from "./quick-enroll";
-import { deleteHostAction } from "./actions";
 import { ServerGroups } from "./server-groups";
 import { ServerDialog } from "./server-dialog";
 import { ENVIRONMENT_META } from "./environment-meta";
 import { TerminalPanel } from "../deploy/terminal-panel";
-import { useEffect, useState, useTransition } from "react";
+import { RemoveServerDialog } from "./remove-server-dialog";
 import { useLiveResource } from "@/components/use-live-resource";
+import type { RemoveServerResult } from "@/lib/server-removal-service";
 import type { ServerRow, ServerStatus, ServerStatusPayload } from "./types";
 import { EnvironmentDialog, type EnvironmentTarget } from "./environment-dialog";
 import { FolderOpen, MapPin, Server, Settings2, SquareTerminal, Trash2, TriangleAlert } from "lucide-react";
@@ -45,8 +46,8 @@ const STATUS_POLL_MS = 30_000;
 
 export function ServersView({ servers }: { servers: ServerRow[] }) {
     const router = useRouter();
-    const [pending, startTransition] = useTransition();
-    const [confirmId, setConfirmId] = useState<string | null>(null);
+    const [removing, setRemoving] = useState<{ id: string; name: string } | null>(null);
+    const [outcome, setOutcome] = useState<RemoveServerResult | null>(null);
     const [target, setTarget] = useState<EnvironmentTarget | null>(null);
     const [shell, setShell] = useState<ServerRow | null>(null);
     const [details, setDetails] = useState<ServerRow | null>(null);
@@ -63,14 +64,6 @@ export function ServersView({ servers }: { servers: ServerRow[] }) {
 
     const unset = servers.filter((server) => server.environment === "unknown");
     const remotes = servers.filter((server) => server.kind === "host");
-
-    function onDelete(id: string) {
-        startTransition(async () => {
-            await deleteHostAction(id);
-            setConfirmId(null);
-            router.refresh();
-        });
-    }
 
     function askEnvironment(server: ServerRow) {
         setTarget({
@@ -89,6 +82,12 @@ export function ServersView({ servers }: { servers: ServerRow[] }) {
                 <h2 className="text-sm font-medium text-muted-foreground">Servers</h2>
                 <HostDialog />
             </div>
+
+            {/* What the removal could not finish on the machine itself. The row is
+                already gone by now, so there is nowhere else for this to be said -
+                and "the login is still authorized over there" is exactly the kind
+                of thing that must not be swallowed. */}
+            {outcome ? <RemovalOutcome result={outcome} onDismiss={() => setOutcome(null)} /> : null}
 
             {unset.length > 0 ? (
                 <p className="flex items-start gap-2 rounded-md border border-warning/30 bg-warning/5 px-3 py-2 text-xs text-muted-foreground">
@@ -169,87 +168,65 @@ export function ServersView({ servers }: { servers: ServerRow[] }) {
                                 </td>
                                 <td className="px-3 py-2">
                                     <div className="flex justify-end gap-1">
-                                        {confirmId === server.id ? (
+                                        {server.hostId ? (
                                             <>
-                                                <Button
-                                                    size="sm"
-                                                    variant="ghost"
-                                                    onClick={() => setConfirmId(null)}
-                                                    disabled={pending}
-                                                >
-                                                    Cancel
-                                                </Button>
-                                                {/* The Host, not the row: the local row's own id is
-                                                    a placeholder, and what is being given up is the
-                                                    login behind it. */}
-                                                <Button
-                                                    size="sm"
-                                                    onClick={() => onDelete(server.hostId ?? server.id)}
-                                                    disabled={pending}
-                                                >
-                                                    Remove
-                                                </Button>
-                                            </>
-                                        ) : (
-                                            <>
-                                                {server.hostId ? (
-                                                    <>
-                                                        <Button
-                                                            size="icon"
-                                                            variant="ghost"
-                                                            aria-label={`Open a shell on ${server.name}`}
-                                                            title="Open a shell"
-                                                            onClick={() => setShell(server)}
-                                                        >
-                                                            <SquareTerminal className="size-4" />
-                                                        </Button>
-                                                        <Button size="icon" variant="ghost" asChild>
-                                                            <Link
-                                                                href={`/drive?c=host:${server.hostId}`}
-                                                                aria-label={`Browse the files on ${server.name}`}
-                                                                title="Browse its files"
-                                                            >
-                                                                <FolderOpen className="size-4" />
-                                                            </Link>
-                                                        </Button>
-                                                    </>
-                                                ) : server.kind === "local" ? (
-                                                    // Polaris reaches its own machine through the container
-                                                    // engine only, so a shell there has to be granted the
-                                                    // same way any other server grants one.
-                                                    <Button size="sm" variant="secondary" onClick={() => setEnrollLocal(true)}>
-                                                        <SquareTerminal className="size-3.5" /> Enable shell and files
-                                                    </Button>
-                                                ) : null}
                                                 <Button
                                                     size="icon"
                                                     variant="ghost"
-                                                    aria-label={`Rename ${server.name} and see how to connect to it`}
-                                                    title="Name and connection details"
-                                                    onClick={() => setDetails(server)}
+                                                    aria-label={`Open a shell on ${server.name}`}
+                                                    title="Open a shell"
+                                                    onClick={() => setShell(server)}
                                                 >
-                                                    <Settings2 className="size-4" />
+                                                    <SquareTerminal className="size-4" />
                                                 </Button>
-                                                {/* The local machine is never removed - it is the
-                                                    box Polaris runs on - but the login it was
-                                                    reached by can be given back. */}
-                                                {server.kind === "host" || server.hostId ? (
-                                                    <Button
-                                                        size="icon"
-                                                        variant="ghost"
-                                                        aria-label={
-                                                            server.kind === "local"
-                                                                ? `Stop reaching ${server.name} over SSH`
-                                                                : `Remove ${server.name}`
-                                                        }
-                                                        title={server.kind === "local" ? "Give up the login" : "Remove"}
-                                                        onClick={() => setConfirmId(server.id)}
+                                                <Button size="icon" variant="ghost" asChild>
+                                                    <Link
+                                                        href={`/drive?c=host:${server.hostId}`}
+                                                        aria-label={`Browse the files on ${server.name}`}
+                                                        title="Browse its files"
                                                     >
-                                                        <Trash2 className="size-4" />
-                                                    </Button>
-                                                ) : null}
+                                                        <FolderOpen className="size-4" />
+                                                    </Link>
+                                                </Button>
                                             </>
-                                        )}
+                                        ) : server.kind === "local" ? (
+                                            // Polaris reaches its own machine through the container
+                                            // engine only, so a shell there has to be granted the
+                                            // same way any other server grants one.
+                                            <Button size="sm" variant="secondary" onClick={() => setEnrollLocal(true)}>
+                                                <SquareTerminal className="size-3.5" /> Enable shell and files
+                                            </Button>
+                                        ) : null}
+                                        <Button
+                                            size="icon"
+                                            variant="ghost"
+                                            aria-label={`Rename ${server.name} and see how to connect to it`}
+                                            title="Name and connection details"
+                                            onClick={() => setDetails(server)}
+                                        >
+                                            <Settings2 className="size-4" />
+                                        </Button>
+                                        {/* The local machine is never removed - it is the box
+                                            Polaris runs on - but the login it was reached by can
+                                            be given back. The Host, not the row: the local row's
+                                            own id is a placeholder. */}
+                                        {server.hostId ? (
+                                            <Button
+                                                size="icon"
+                                                variant="ghost"
+                                                aria-label={
+                                                    server.kind === "local"
+                                                        ? `Stop reaching ${server.name} over SSH`
+                                                        : `Remove ${server.name}`
+                                                }
+                                                title={server.kind === "local" ? "Give up the login" : "Remove"}
+                                                onClick={() =>
+                                                    setRemoving({ id: server.hostId ?? server.id, name: server.name })
+                                                }
+                                            >
+                                                <Trash2 className="size-4" />
+                                            </Button>
+                                        ) : null}
                                     </div>
                                 </td>
                             </tr>
@@ -266,6 +243,14 @@ export function ServersView({ servers }: { servers: ServerRow[] }) {
 
             <EnvironmentDialog target={target} onClose={() => setTarget(null)} />
             <ShellDialog server={shell} onClose={() => setShell(null)} />
+            <RemoveServerDialog
+                server={removing}
+                onClose={() => setRemoving(null)}
+                onRemoved={(result) => {
+                    setOutcome(result);
+                    router.refresh();
+                }}
+            />
             <Dialog open={enrollLocal} onOpenChange={setEnrollLocal}>
                 <DialogContent className="max-w-lg">
                     <DialogHeader>
@@ -293,6 +278,38 @@ export function ServersView({ servers }: { servers: ServerRow[] }) {
                 machines exist - and it is the firewall that consumes it, not this
                 screen. */}
             <ServerGroups servers={servers} />
+        </div>
+    );
+}
+
+/** How the removal went, once the server itself is off the list: what moved, and
+ *  anything Polaris could not finish on the machine and the operator now owns. */
+function RemovalOutcome({ result, onDismiss }: { result: RemoveServerResult; onDismiss: () => void }) {
+    const moved = result.moved ?? [];
+    const warnings = result.warnings ?? [];
+    if (moved.length === 0 && warnings.length === 0) return null;
+    return (
+        <div
+            className={`flex flex-col gap-1.5 rounded-md border px-3 py-2 text-xs ${
+                warnings.length > 0 ? "border-warning/30 bg-warning/5" : "border-border bg-surface/60"
+            }`}
+        >
+            <div className="flex items-start justify-between gap-2">
+                <p className="text-muted-foreground">
+                    {moved.length > 0
+                        ? `Moved to the new server: ${moved.join(", ")}.`
+                        : "The server was removed."}
+                </p>
+                <Button size="sm" variant="ghost" onClick={onDismiss}>
+                    Dismiss
+                </Button>
+            </div>
+            {warnings.map((warning) => (
+                <p key={warning} className="flex items-start gap-2 text-foreground/80">
+                    <TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-warning" />
+                    {warning}
+                </p>
+            ))}
         </div>
     );
 }

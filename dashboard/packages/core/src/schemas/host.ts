@@ -122,3 +122,22 @@ export const renameServerSchema = z.object({
 });
 
 export type RenameServerInput = z.infer<typeof renameServerSchema>;
+
+/**
+ * Payload for taking a server out of Polaris. `disconnect` only forgets it;
+ * `clean` also stops what Polaris deployed there and takes its login back off the
+ * machine; `move` puts the services on another server first, and is the only mode
+ * that needs a destination - "local" for the box Polaris runs on, or another
+ * server's id.
+ */
+export const removeServerSchema = z
+    .object({
+        mode: z.enum(["disconnect", "clean", "move"]),
+        destinationId: z.string().trim().min(1).max(64).optional()
+    })
+    .refine((value) => value.mode !== "move" || Boolean(value.destinationId), {
+        message: "Choose where the services should move to",
+        path: ["destinationId"]
+    });
+
+export type RemoveServerInput = z.infer<typeof removeServerSchema>;

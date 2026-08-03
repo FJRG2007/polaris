@@ -10,6 +10,24 @@
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/session";
+import { recordAudit } from "@/lib/audit-service";
+import { setLocalEnvironment } from "@/lib/network-service";
+import { getLocalHostId, setLocalHostId, setLocalServerName } from "@/lib/local-server";
+import { createHost, renameHost, setHostEnvironment, setHostWildcardDomain } from "@/lib/host-service";
+import {
+    createEnrollmentSchema,
+    createHostSchema,
+    removeServerSchema,
+    renameServerSchema,
+    setServerEnvironmentSchema
+} from "@polaris/core";
+import {
+    cancelEnrollment,
+    getEnrollmentStatus,
+    openEnrollment,
+    type EnrollmentStatus,
+    type OpenedEnrollment
+} from "@/lib/enrollment-service";
 import {
     createHostGroup,
     deleteHostGroup,
@@ -18,18 +36,13 @@ import {
     setHostGroupMembers,
     type HostGroupView
 } from "@/lib/host-group-service";
-import { recordAudit } from "@/lib/audit-service";
-import { setLocalEnvironment } from "@/lib/network-service";
-import { getLocalHostId, setLocalHostId, setLocalServerName } from "@/lib/local-server";
-import { createHost, deleteHost, renameHost, setHostEnvironment, setHostWildcardDomain } from "@/lib/host-service";
-import { createEnrollmentSchema, createHostSchema, renameServerSchema, setServerEnvironmentSchema } from "@polaris/core";
 import {
-    cancelEnrollment,
-    getEnrollmentStatus,
-    openEnrollment,
-    type EnrollmentStatus,
-    type OpenedEnrollment
-} from "@/lib/enrollment-service";
+    getServerRemovalPlan,
+    removeServer,
+    type RemoveServerResult,
+    type ServerRemovalMode,
+    type ServerRemovalPlan
+} from "@/lib/server-removal-service";
 
 const SERVERS_PATH = "/apps/servers";
 
@@ -172,14 +185,38 @@ export async function cancelEnrollmentAction(id: string): Promise<void> {
     await cancelEnrollment(id, user.id);
 }
 
-export async function deleteHostAction(hostId: string): Promise<void> {
+/** What removing this server would take with it, for the confirmation dialog. */
+export async function serverRemovalPlanAction(hostId: string): Promise<ServerRemovalPlan | null> {
     const user = await requirePermission("system.manage");
-    await deleteHost(user.id, hostId);
-    // Removing the host Polaris reaches its own machine by leaves the pointer to
-    // it dangling, and the local row would then show a server that is gone.
+    return getServerRemovalPlan(user.id, hostId);
+}
+
+/**
+ * Remove a server the way the operator chose. Moving services can take minutes -
+ * it is a real deploy per service, waited on - so this is one long action rather
+ * than a fire-and-forget: the dialog stays open on it and reports what happened.
+ */
+export async function removeServerAction(
+    hostId: string,
+    input: { mode: ServerRemovalMode; destinationId?: string }
+): Promise<RemoveServerResult> {
+    const user = await requirePermission("system.manage");
+    const parsed = removeServerSchema.safeParse(input);
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid removal" };
+
+    const result = await removeServer(user.id, hostId, user.id, parsed.data);
+    if (result.error) return result;
+
     if ((await getLocalHostId()) === hostId) await setLocalHostId(null);
-    await recordAudit({ actorId: user.id, action: "host.delete", targetType: "host", targetId: hostId });
+    await recordAudit({
+        actorId: user.id,
+        action: "host.delete",
+        targetType: "host",
+        targetId: hostId,
+        metadata: { mode: parsed.data.mode, moved: result.moved?.length ?? 0 }
+    });
     revalidatePath(SERVERS_PATH);
+    return result;
 }
 
 /** The owner's server groups, with membership, for the groups panel. */

@@ -1051,6 +1051,39 @@ export async function setApplicationRunning(
 }
 
 /**
+ * Take a service's containers down on ONE named server, whichever server it now
+ * belongs to.
+ *
+ * Every other teardown works from the app's current target, which is right until
+ * the app has just been moved: then the containers still to remove are the ones on
+ * the server it came from, and the app is already pointing at the new one. Moving a
+ * service without a gap needs exactly that order - up over there, then down over
+ * here - so the old server has to be nameable on its own. Deployment rows are left
+ * alone: the app's live release is the new server's, and that is the one they
+ * describe.
+ */
+export async function stopApplicationOnTarget(
+    applicationId: string,
+    ownerId: string,
+    targetId: string
+): Promise<void> {
+    const [app, target] = await Promise.all([
+        prisma.application.findFirst({
+            where: { id: applicationId, environment: { project: { ownerId } } },
+            include: { environment: { include: { project: true } } }
+        }),
+        prisma.deployTarget.findFirst({ where: { id: targetId, ownerId } })
+    ]);
+    if (!app || !target) return;
+    const ports = await getPorts(target as TargetRow, ownerId);
+    try {
+        await downAllReleases(app, ports, target.runtime === "swarm");
+    } finally {
+        await ports.dispose();
+    }
+}
+
+/**
  * Remove the running deployment entirely: tear the project down (compose down /
  * stack rm) and mark its releases removed, clearing the app's current pointer.
  * The application config stays, so it can be deployed again later.
@@ -1422,6 +1455,44 @@ export async function deployApplication(
     // new one is up (zero-downtime cutover, the way Railway does it).
     queue.enqueue(target.id, () => runDeployment(deployment.id, planned, target, ownerId, gitSource));
     return deployment.id;
+}
+
+/** A deploy that has not finished in this long is reported as failed to whoever is
+ *  waiting on it, so one wedged build cannot hold an operation open forever. */
+const DEPLOY_WAIT_TIMEOUT_MS = 20 * 60_000;
+const DEPLOY_WAIT_POLL_MS = 2_000;
+
+/**
+ * Deploy and wait for the verdict: null when it is up, or why it is not.
+ *
+ * Deploys are normally fire-and-forget - the UI follows the log - but a migration
+ * cannot be: whether the new one came up is what decides if the old one may be
+ * taken down, and getting that order wrong is what turns a move into an outage.
+ */
+export async function deployAndWait(
+    applicationId: string,
+    ownerId: string,
+    userId: string
+): Promise<string | null> {
+    let deploymentId: string;
+    try {
+        deploymentId = await deployApplication(applicationId, ownerId, userId);
+    } catch (caught) {
+        return caught instanceof Error ? caught.message : "the deploy could not be started";
+    }
+    const deadline = Date.now() + DEPLOY_WAIT_TIMEOUT_MS;
+    while (Date.now() < deadline) {
+        await new Promise((resolve) => setTimeout(resolve, DEPLOY_WAIT_POLL_MS));
+        const row = await prisma.deployment.findUnique({
+            where: { id: deploymentId },
+            select: { status: true, error: true }
+        });
+        if (!row) return "the deploy disappeared";
+        if (row.status === "running") return null;
+        if (row.status === "failed") return row.error ?? "the deploy failed";
+        if (row.status === "removed") return "the deploy was removed";
+    }
+    return "the deploy did not finish in time";
 }
 
 export interface DeploymentSummary {

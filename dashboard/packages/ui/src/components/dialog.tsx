@@ -2,8 +2,8 @@
 
 /** Modal dialog built on Radix, used for connection/share/request forms. */
 
-import { X } from "lucide-react";
 import { cn } from "../lib/cn";
+import { X } from "lucide-react";
 import * as RadixDialog from "@radix-ui/react-dialog";
 import { forwardRef, type ComponentPropsWithoutRef, type ElementRef } from "react";
 
@@ -22,7 +22,12 @@ export const DialogContent = forwardRef<
         <RadixDialog.Content
             ref={ref}
             className={cn(
-                "fixed left-1/2 top-1/2 z-50 w-full max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-lg border border-border bg-card p-5 shadow-xl focus:outline-none data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95",
+                // Centred, so a dialog taller than the window would hang off both
+                // ends of it with no way to reach either - including the buttons.
+                // Capping it and letting the content scroll is what keeps a long
+                // one (a confirmation that explains itself, a form with options)
+                // usable on a laptop in a small window and on a phone.
+                "fixed left-1/2 top-1/2 z-50 max-h-[85vh] w-full max-w-lg -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-lg border border-border bg-card p-5 shadow-xl focus:outline-none data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95",
                 className
             )}
             {...props}
