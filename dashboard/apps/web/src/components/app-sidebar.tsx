@@ -11,16 +11,15 @@
 import Link from "next/link";
 import { cn } from "@polaris/ui";
 import { usePathname } from "next/navigation";
-import { APP_SECTIONS, resolveActiveApp } from "@/lib/apps";
-
-/** Section roots that must match their own path exactly, so they do not stay
- *  highlighted while a sibling sub-route is open. */
-const EXACT_MATCH = new Set(["/drive", "/admin", "/inbox", "/account", "/watch"]);
+import { APP_SECTIONS, isSectionActive, resolveActiveApp } from "@/lib/apps";
 
 export function AppSidebar() {
     const pathname = usePathname();
     const app = resolveActiveApp(pathname);
-    const items = (APP_SECTIONS[app.id] ?? []).filter((section) => !section.hidden);
+    // Hidden sections still nest under a root, so the whole list decides what is
+    // an exact match even though only some of it is drawn.
+    const sections = APP_SECTIONS[app.id] ?? [];
+    const items = sections.filter((section) => !section.hidden);
     if (items.length === 0) return null;
 
     return (
@@ -29,9 +28,7 @@ export function AppSidebar() {
                 {app.label}
             </p>
             {items.map((item) => {
-                const active = EXACT_MATCH.has(item.href)
-                    ? pathname === item.href
-                    : pathname === item.href || pathname.startsWith(`${item.href}/`);
+                const active = isSectionActive(pathname, item.href, sections);
                 const Icon = item.icon;
                 return (
                     <Link

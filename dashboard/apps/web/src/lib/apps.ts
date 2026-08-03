@@ -242,3 +242,23 @@ export function resolveActiveApp(pathname: string): AppEntry {
     // POLARIS_APPS is a non-empty literal, so [0] is always present.
     return POLARIS_APPS.find((app) => appOwnsPath(app, pathname)) ?? POLARIS_APPS[0]!;
 }
+
+/**
+ * Whether a section owns the path currently open, which is what the rail marks.
+ *
+ * A section normally covers everything below it, so a folder deep inside Drive
+ * still shows Files as where you are. The exception is a section another one
+ * sits underneath - "/tasks" with "/tasks/everything" below it - which would
+ * otherwise stay lit on every screen of its app. Those match their own path
+ * exactly, and which ones they are is read off the list rather than kept as a
+ * second set somebody has to remember: the entry that gets forgotten there is
+ * precisely the one that ends up wrongly highlighted.
+ *
+ * `sections` is the app's whole list, hidden entries included - a hidden page
+ * still nests under a root and still decides the question.
+ */
+export function isSectionActive(pathname: string, href: string, sections: readonly AppSection[]): boolean {
+    if (pathname === href) return true;
+    if (sections.some((section) => section.href !== href && section.href.startsWith(`${href}/`))) return false;
+    return pathname.startsWith(`${href}/`);
+}
