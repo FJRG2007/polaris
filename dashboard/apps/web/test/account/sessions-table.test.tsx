@@ -25,7 +25,6 @@ function session(overrides: Partial<SessionView> = {}): SessionView {
         publicIp: null,
         country: "ES",
         host: "polaris.local",
-        signIn: { method: "password", secondFactor: null },
         lastSeenAt: "2026-08-03T10:00:00.000Z",
         createdAt: "2026-08-01T10:00:00.000Z",
         expiresAt: "2026-08-08T10:00:00.000Z",
