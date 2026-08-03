@@ -35,6 +35,7 @@ function TaskLine({
     depth,
     selected,
     showLocation,
+    positioned = true,
     onSelect,
     onDragStart,
     onDropBefore
@@ -43,6 +44,9 @@ function TaskLine({
     depth: number;
     selected: boolean;
     showLocation?: boolean;
+    /** Whether dropping here would actually put the row here. False under a sort
+     *  that decides the order itself. */
+    positioned?: boolean;
     onSelect: () => void;
     onDragStart?: () => void;
     onDropBefore?: () => void;
@@ -75,7 +79,7 @@ function TaskLine({
             className={cn(
                 "group flex items-center gap-2 border-b border-border px-2 py-1.5 transition-colors hover:bg-muted/50",
                 selected && "bg-primary/5",
-                over && "border-t-2 border-t-primary"
+                over && positioned && "border-t-2 border-t-primary"
             )}
             style={{ paddingLeft: `${0.5 + depth * 1.25}rem` }}
         >
@@ -123,7 +127,7 @@ function TaskLine({
 }
 
 export function ListView(props: ViewProps) {
-    const { groups, canEdit, selection, onSelect, onMove, onQuickCreate } = props;
+    const { groups, canEdit, selection, onSelect, onMove, onQuickCreate, manualOrder } = props;
     const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set());
     const [dragging, setDragging] = useState<string | null>(null);
     const [addingTo, setAddingTo] = useState<string | null>(null);
@@ -203,18 +207,24 @@ export function ListView(props: ViewProps) {
                                             depth={node.depth}
                                             selected={selection.has(task.id)}
                                             showLocation={props.showLocation}
+                                            positioned={manualOrder}
                                             onSelect={() => onSelect(task.id)}
                                             onDragStart={() => setDragging(task.id)}
                                             onDropBefore={() => {
                                                 if (!dragging) return;
                                                 const without = group.tasks.filter((entry) => entry.id !== dragging);
-                                                const index = without.findIndex((entry) => entry.id === task.id);
+                                                // Only the group is honoured when the
+                                                // sort owns the order; the row landed on
+                                                // says which one, not where in it.
+                                                const index = manualOrder
+                                                    ? without.findIndex((entry) => entry.id === task.id)
+                                                    : without.length;
                                                 onMove({
                                                     taskId: dragging,
                                                     groupKey: group.key,
                                                     position: {
                                                         beforeId: without[index - 1]?.id ?? null,
-                                                        afterId: task.id
+                                                        afterId: manualOrder ? task.id : null
                                                     }
                                                 });
                                                 setDragging(null);

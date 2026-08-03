@@ -37,6 +37,16 @@ export interface ViewProps {
     readonly groups: readonly TaskGroup<TaskRow>[];
     readonly context: SpaceContext;
     readonly canEdit: boolean;
+    /**
+     * Whether what is on screen is in the order somebody dragged it into.
+     *
+     * False under any other sort, and the views owe the difference to whoever is
+     * dragging: a card dropped between two others cannot stay there when the
+     * screen is ordered by priority, so they stop promising a position they
+     * would immediately re-sort away. The drag still moves the task to the group
+     * it was dropped on - that part is honoured either way.
+     */
+    readonly manualOrder: boolean;
     readonly selection: ReadonlySet<string>;
     readonly onOpen: (taskId: string) => void;
     readonly onSelect: (taskId: string) => void;

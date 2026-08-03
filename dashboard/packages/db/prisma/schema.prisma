@@ -3018,7 +3018,7 @@ model TaskView {
     // list | board | table | calendar | gantt.
     type          String   @default("list")
     groupBy       String   @default("status")
-    sortField     String   @default("manual")
+    sortField     String   @default("priority")
     sortDirection String   @default("asc")
     // Stringified JSON; see taskFilterSchema in @polaris/core.
     filter        String   @default("{}")

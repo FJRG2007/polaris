@@ -73,7 +73,7 @@ export function ListScreen({
     const initial = savedViews[0];
     const [viewType, setViewType] = useState<core.TaskViewType>(initial?.type ?? "board");
     const [groupBy, setGroupBy] = useState<core.TaskGroupField>(initial?.groupBy ?? "status");
-    const [sort, setSort] = useState<core.TaskSort>(initial?.sort ?? { field: "manual", direction: "asc" });
+    const [sort, setSort] = useState<core.TaskSort>(initial?.sort ?? { field: "priority", direction: "asc" });
     const [filter, setFilter] = useState<core.TaskFilter>(initial?.filter ?? core.EMPTY_FILTER);
     const [showClosed, setShowClosed] = useState(initial?.showClosed ?? false);
     const [search, setSearch] = useState("");
@@ -278,6 +278,9 @@ export function ListScreen({
         groups,
         context,
         canEdit: context.canEdit,
+        // A search is ranked by how well each row matched, so its order is no
+        // more the manual one than a sorted screen's is.
+        manualOrder: sort.field === "manual" && search.trim() === "",
         selection,
         onOpen: setOpenTaskId,
         onSelect: toggleSelect,

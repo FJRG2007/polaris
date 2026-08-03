@@ -59,6 +59,7 @@ export function TaskCard({
     commands,
     onDragStart,
     onDropBefore,
+    positioned,
     selected,
     showLocation,
     onSelect
@@ -66,6 +67,10 @@ export function TaskCard({
     commands: TaskCommands;
     onDragStart: () => void;
     onDropBefore: () => void;
+    /** Whether dropping here would actually put the card here. False under a
+     *  sort that decides the order itself, where the insert line would be a
+     *  promise the next render breaks. */
+    positioned: boolean;
     selected: boolean;
     showLocation?: boolean;
     onSelect?: (event: React.MouseEvent) => void;
@@ -96,7 +101,12 @@ export function TaskCard({
                 setOver(false);
                 onDropBefore();
             }}
-            className={cn("relative", over && "before:absolute before:-top-1 before:h-0.5 before:w-full before:rounded before:bg-primary")}
+            className={cn(
+                "relative",
+                over &&
+                    positioned &&
+                    "before:absolute before:-top-1 before:h-0.5 before:w-full before:rounded before:bg-primary"
+            )}
         >
             <div
                 role="button"
@@ -209,7 +219,7 @@ export function TaskCard({
 }
 
 export function BoardView(props: ViewProps) {
-    const { groups, selection, onSelect, onMove, onQuickCreate, canEdit } = props;
+    const { groups, selection, onSelect, onMove, onQuickCreate, canEdit, manualOrder } = props;
     const [dragging, setDragging] = useState<string | null>(null);
     const [addingTo, setAddingTo] = useState<string | null>(null);
     const [draft, setDraft] = useState("");
@@ -223,7 +233,12 @@ export function BoardView(props: ViewProps) {
 
     const drop = (groupKey: string, tasks: readonly TaskRow[], targetId: string | null) => {
         if (!dragging) return;
-        onMove({ taskId: dragging, groupKey, position: neighbours(tasks, targetId, dragging) });
+        // Under a sort that decides the order, the card the drop landed on says
+        // which column was meant and nothing more - the position goes to the end,
+        // where the sort will move it from anyway. Recording the drop point
+        // instead would write a manual order nobody asked for and nobody sees.
+        const target = manualOrder ? targetId : null;
+        onMove({ taskId: dragging, groupKey, position: neighbours(tasks, target, dragging) });
         setDragging(null);
     };
 
@@ -288,6 +303,7 @@ export function BoardView(props: ViewProps) {
                                 commands={commandsFor(props, task)}
                                 selected={selection.has(task.id)}
                                 showLocation={props.showLocation}
+                                positioned={manualOrder}
                                 onSelect={() => onSelect(task.id)}
                                 onDragStart={() => setDragging(task.id)}
                                 onDropBefore={() => drop(group.key, group.tasks, task.id)}

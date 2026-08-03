@@ -1,0 +1,12 @@
+-- What a task view opens on when nothing said otherwise.
+--
+-- Manual order only means something once somebody has dragged a card: on a list
+-- nobody has arranged by hand it is creation order, which puts the most urgent
+-- work wherever it happened to be typed. Priority is what a board should open
+-- on, with deadline and estimate breaking the tie inside each band.
+--
+-- Only the default changes. Existing rows keep whatever they were saved with,
+-- including the ones that say "manual" - a view somebody arranged by hand is a
+-- deliberate choice, and a migration that overwrote it would be rearranging
+-- their board for them.
+ALTER TABLE "TaskView" ALTER COLUMN "sortField" SET DEFAULT 'priority';

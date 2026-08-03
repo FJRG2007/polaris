@@ -522,17 +522,37 @@ function compareNullable(left: number | null, right: number | null, direction: 1
 }
 
 /**
+ * How work is ordered once urgency has been decided: soonest deadline, then
+ * quickest to finish, then wherever somebody put it by hand.
+ *
+ * That last term is what makes the result stable rather than reshuffling on
+ * every render, and the two before it are the questions a person actually asks
+ * of a pile of equally urgent work - when is it due, and can I clear it now.
+ * Undated and unestimated tasks sink under compareNullable rather than floating
+ * to the top on a missing value.
+ */
+function byDeadlineThenEffort(left: TaskFacts, right: TaskFacts): number {
+    return (
+        compareNullable(left.dueDate?.getTime() ?? null, right.dueDate?.getTime() ?? null, 1) ||
+        compareNullable(left.timeEstimate, right.timeEstimate, 1) ||
+        left.order - right.order
+    );
+}
+
+/**
  * How two tasks that share a deadline - or have none at all - are ordered.
  *
  * A date sort leaves every undated task tied, and a pile in no order is a pile
  * nobody can work from. Urgency is what is left to go on, so the most urgent
- * comes first; the manual order breaks the last tie so the result is stable
- * rather than shuffling on every render. Deliberately not reversed with the
- * sort's direction: pointing a date column the other way should not put the
- * least urgent work at the top of the piece of it that has no dates.
+ * comes first. Deliberately not reversed with the sort's direction: pointing a
+ * date column the other way should not put the least urgent work at the top of
+ * the piece of it that has no dates.
  */
 function byUrgency(left: TaskFacts, right: TaskFacts): number {
-    return work.priorityRank(left.priority) - work.priorityRank(right.priority) || left.order - right.order;
+    return (
+        work.priorityRank(left.priority) - work.priorityRank(right.priority) ||
+        byDeadlineThenEffort(left, right)
+    );
 }
 
 export function compareTasks(
@@ -555,8 +575,17 @@ export function compareTasks(
                     direction
                 ) || left.order - right.order
             );
+        // The default, and the one a board opens on. Equal urgency is the common
+        // case rather than the edge - most work sits on "normal" - so the tie is
+        // broken by deadline and then by how long the thing takes, which is the
+        // order somebody would pick the next task in anyway. Only the priority
+        // term follows the sort's direction: asking for least urgent first is
+        // not asking for the furthest deadline first within each band.
         case "priority":
-            return (work.priorityRank(left.priority) - work.priorityRank(right.priority)) * direction;
+            return (
+                (work.priorityRank(left.priority) - work.priorityRank(right.priority)) * direction ||
+                byDeadlineThenEffort(left, right)
+            );
         case "dueDate":
             return (
                 compareNullable(left.dueDate?.getTime() ?? null, right.dueDate?.getTime() ?? null, direction) ||

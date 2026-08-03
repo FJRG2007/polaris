@@ -164,7 +164,7 @@ export function defaultView(views: readonly SavedView[], listId: string | null):
             listId,
             spaceId: null,
             groupBy: "status",
-            sort: { field: "manual", direction: "asc" },
+            sort: { field: "priority", direction: "asc" },
             filter: core.EMPTY_FILTER,
             columns: [],
             showSubtasks: true,

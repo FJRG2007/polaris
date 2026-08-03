@@ -1,7 +1,13 @@
 import * as engine from "../src/tasks.js";
 import { describe, expect, it } from "vitest";
 import type { Recurrence, TaskFilter } from "../src/schemas/tasks.js";
-import { FOLDER_DEPTH_LIMIT, strongerRole, taskShareEmailSchema, taskShareSchema } from "../src/schemas/tasks.js";
+import {
+    FOLDER_DEPTH_LIMIT,
+    strongerRole,
+    taskShareEmailSchema,
+    taskShareSchema,
+    taskSortSchema
+} from "../src/schemas/tasks.js";
 
 /** Wednesday, so "this week" has days on both sides of it. */
 const NOW = new Date("2026-08-05T12:00:00.000Z");
@@ -222,6 +228,10 @@ describe("filters", () => {
 });
 
 describe("sorting", () => {
+    it("opens on priority when nothing says how the view is sorted", () => {
+        expect(taskSortSchema.parse({})).toEqual({ field: "priority", direction: "asc" });
+    });
+
     it("sorts by urgency, not alphabetically, on priority", () => {
         const sorted = engine.sortTasks(
             [task({ priority: "low" }), task({ priority: "urgent" }), task({ priority: "normal" })],
@@ -251,6 +261,57 @@ describe("sorting", () => {
         const urgent = task({ dueDate: due, priority: "urgent" });
         expect(engine.sortTasks([low, urgent], { field: "dueDate", direction: "asc" })[0]).toBe(urgent);
         expect(engine.sortTasks([low, urgent], { field: "dueDate", direction: "desc" })[0]).toBe(urgent);
+    });
+
+    it("breaks equal priority by deadline, soonest first", () => {
+        const later = task({ priority: "high", dueDate: new Date("2026-08-20T00:00:00.000Z") });
+        const sooner = task({ priority: "high", dueDate: new Date("2026-08-10T00:00:00.000Z") });
+        const sorted = engine.sortTasks([later, sooner], { field: "priority", direction: "asc" });
+        expect(sorted).toEqual([sooner, later]);
+    });
+
+    it("breaks an equal priority and deadline by the shorter estimate", () => {
+        const due = new Date("2026-08-10T00:00:00.000Z");
+        const long = task({ priority: "high", dueDate: due, timeEstimate: 480 });
+        const short = task({ priority: "high", dueDate: due, timeEstimate: 30 });
+        const sorted = engine.sortTasks([long, short], { field: "priority", direction: "asc" });
+        expect(sorted).toEqual([short, long]);
+    });
+
+    it("sinks a task with no deadline under one that has a deadline of the same priority", () => {
+        const dated = task({ priority: "normal", dueDate: new Date("2026-09-01T00:00:00.000Z") });
+        const undated = task({ priority: "normal" });
+        expect(engine.sortTasks([undated, dated], { field: "priority", direction: "asc" })[0]).toBe(dated);
+    });
+
+    it("sinks a task with no estimate under an estimated one of the same priority and deadline", () => {
+        const due = new Date("2026-08-10T00:00:00.000Z");
+        const estimated = task({ priority: "normal", dueDate: due, timeEstimate: 120 });
+        const open = task({ priority: "normal", dueDate: due });
+        expect(engine.sortTasks([open, estimated], { field: "priority", direction: "asc" })[0]).toBe(estimated);
+    });
+
+    it("reverses only the priority bands, never the order inside one", () => {
+        const due = new Date("2026-08-10T00:00:00.000Z");
+        const laterLow = task({ priority: "low", dueDate: new Date("2026-08-20T00:00:00.000Z") });
+        const soonerLow = task({ priority: "low", dueDate: due });
+        const urgent = task({ priority: "urgent", dueDate: due });
+        const sorted = engine.sortTasks([urgent, laterLow, soonerLow], {
+            field: "priority",
+            direction: "desc"
+        });
+        // Low before urgent, but the soonest low still leads its own band.
+        expect(sorted).toEqual([soonerLow, laterLow, urgent]);
+    });
+
+    it("falls back to the manual order once nothing else separates two tasks", () => {
+        const due = new Date("2026-08-10T00:00:00.000Z");
+        const second = task({ priority: "high", dueDate: due, timeEstimate: 60, order: 2048 });
+        const first = task({ priority: "high", dueDate: due, timeEstimate: 60, order: 1024 });
+        expect(engine.sortTasks([second, first], { field: "priority", direction: "asc" })).toEqual([
+            first,
+            second
+        ]);
     });
 });
 

@@ -325,8 +325,15 @@ export const TASK_SORT_LABELS: Record<TaskSortField, string> = {
     timeEstimate: "Estimate"
 };
 
+/**
+ * Priority rather than manual order, because manual order is only meaningful
+ * once somebody has dragged something: on a list nobody has arranged by hand it
+ * is creation order wearing a different name, which puts the most urgent work
+ * wherever it happened to be typed. A view that was arranged by hand still says
+ * so - this is only what an unarranged one opens on.
+ */
 export const taskSortSchema = z.object({
-    field: z.enum(TASK_SORT_FIELDS).default("manual"),
+    field: z.enum(TASK_SORT_FIELDS).default("priority"),
     direction: z.enum(["asc", "desc"]).default("asc")
 });
 
