@@ -185,6 +185,13 @@ describe("enrollmentScript", () => {
         // Stdin closed because this script IS stdin: anything that reads from it
         // swallows the rest of the script.
         expect(script).toContain("systemsetup -setremotelogin on </dev/null");
+        // Which holds for the read too, and that one runs on every macOS enrollment
+        // before anything else has happened - so a systemsetup that touched stdin
+        // would swallow the script from its very first line.
+        expect(script).toContain("systemsetup -getremotelogin </dev/null");
+        const calls = script.slice(script.indexOf("read_remote_login() {")).match(/systemsetup -[a-z]+[^\n]*/g) ?? [];
+        expect(calls).toHaveLength(3);
+        for (const call of calls) expect(call).toContain("</dev/null");
         // Read back rather than trusted - Full Disk Access can refuse the change,
         // and systemsetup says so on stdout rather than in its exit code.
         expect(script).toContain('*"remote login: on"*) REMOTE_LOGIN=yes');
@@ -418,6 +425,33 @@ describe("enrollmentScript", () => {
         const untilDie = stop.slice(0, stop.indexOf("die remote-login-off"));
         expect(untilDie).toContain('[ "$ACCESS_LIST" = "no" ] && [ "$REMOTE_LOGIN" = "no" ]');
         expect(untilDie).toContain("dseditgroup -o delete com.apple.access_ssh");
+    });
+
+    // A group that stays is a change to the machine that outlives the run, and
+    // 'remote-login-off' renders as "turn Remote Login on" - which would send its
+    // operator to enable SSH against a list they never made and be turned away from
+    // their own Mac by it. So the state the machine is actually left in gets said,
+    // in the terminal and in the sentence the dashboard stores.
+    it("says it left the list it built behind rather than only that the switch is off", () => {
+        const darwin = script.slice(script.indexOf("read_remote_login\n"));
+        const stop = darwin.slice(darwin.indexOf('if [ "$REMOTE_LOGIN" != "yes" ]'));
+        const untilDie = stop.slice(0, stop.indexOf("die remote-login-off"));
+        // The arm of the same reading whose other half deletes the group: this one
+        // keeps it, because an unconfirmed switch may well be on.
+        expect(untilDie).toContain('elif [ "$ACCESS_LIST" = "no" ]; then');
+        expect(untilDie).toContain("die ssh-access-list-left-behind");
+        const message = ENROLLMENT_REFUSAL_MESSAGES["ssh-access-list-left-behind"];
+        // The terminal and the dashboard say the same thing, which is the whole
+        // point of the code: only one of the two is guaranteed to be read.
+        for (const part of [
+            "limited to the",
+            "would not say whether Remote Login is on or off",
+            "dseditgroup -o delete com.apple.access_ssh"
+        ]) {
+            expect(untilDie).toContain(part);
+            expect(message).toContain(part);
+        }
+        expect(message).not.toMatch(/turn it on under/i);
     });
 
     // A warning was all that stood between an unreadable narrowing and a machine
@@ -709,6 +743,7 @@ describe("enrollmentScript", () => {
                 "ssh-access-list-unrestricted",
                 "remote-login-unrestricted",
                 "remote-login-left-open",
+                "ssh-access-list-left-behind",
                 "not-in-ssh-access-list",
                 "no-ssh-host-keys",
                 "no-home-directory",
@@ -778,9 +813,9 @@ describe("enrollmentScript", () => {
         expect(script).not.toContain("then run this command again\"");
         const dies =
             script.match(
-                /die (?:ssh-not-listening|remote-login-off|ssh-access-list-unrestricted|remote-login-unrestricted|remote-login-left-open|not-in-ssh-access-list) "[^"]*"/g
+                /die (?:ssh-not-listening|remote-login-off|ssh-access-list-unrestricted|remote-login-unrestricted|remote-login-left-open|ssh-access-list-left-behind|not-in-ssh-access-list) "[^"]*"/g
             ) ?? [];
-        expect(dies).toHaveLength(9);
+        expect(dies).toHaveLength(10);
         for (const message of dies) expect(message).toContain("$POLARIS_RETRY_HINT");
     });
 

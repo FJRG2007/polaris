@@ -414,6 +414,10 @@ fi`;
  * the switch never moves on at all. The group made for a switch that then would not
  * move goes again, on the same rule the revert below follows: only once the machine
  * says Remote Login is off, because until it does that group is what gates SSH.
+ * And a group that therefore stays is a change to the machine that outlives this
+ * run, so it is reported under a code of its own rather than folded into "Remote
+ * Login is off, go and turn it on" - which would send its operator to enable SSH
+ * against a list they never made, and be turned away from their own Mac by it.
  *
  * A list that was already here is read for two things before the switch moves, for
  * the same reason and in the same place. It gates SSH the instant Remote Login goes
@@ -446,7 +450,7 @@ fi`;
 function darwinRemoteLoginSection(): string {
     return `read_remote_login() {
         REMOTE_LOGIN=unknown
-        case "\$(systemsetup -getremotelogin 2>/dev/null | tr '[:upper:]' '[:lower:]')" in
+        case "\$(systemsetup -getremotelogin </dev/null 2>/dev/null | tr '[:upper:]' '[:lower:]')" in
             *"remote login: on"*) REMOTE_LOGIN=yes ;;
             *"remote login: off"*) REMOTE_LOGIN=no ;;
         esac
@@ -554,6 +558,16 @@ function darwinRemoteLoginSection(): string {
             # that group is what holds SSH to the one login.
             if [ "\$ACCESS_LIST" = "no" ] && [ "\$REMOTE_LOGIN" = "no" ]; then
                 dseditgroup -o delete com.apple.access_ssh >/dev/null 2>&1 || true
+            elif [ "\$ACCESS_LIST" = "no" ]; then
+                # The machine answered once and then stopped saying whether the
+                # switch moved, so the group stays: if Remote Login is on, it is
+                # the only thing holding SSH to one login. Staying is not the same
+                # as going unmentioned, though. It was not here before this ran,
+                # and 'Remote Login is off, go and turn it on' would send its
+                # operator to enable SSH against a list they never made and be
+                # turned away from their own Mac. So this state gets said, in its
+                # own words, on the dashboard as well as here.
+                die ssh-access-list-left-behind "SSH here was limited to the '\$POLARIS_USER' login before Remote Login was turned on, and this machine then would not say whether Remote Login is on or off - so that limit was left in place rather than taken off a machine that may be reachable. Until you remove it, SSH here admits that login and nothing else: run 'sudo dseditgroup -o delete com.apple.access_ssh' to put SSH back to every account, and check Remote Login in System Settings > General > Sharing, \$POLARIS_RETRY_HINT"
             fi
             die remote-login-off "Remote Login is off, so nothing answers on port \$SSH_PORT. Turn it on in System Settings > General > Sharing, \$POLARIS_RETRY_HINT"
         fi

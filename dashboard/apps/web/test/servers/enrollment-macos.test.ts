@@ -73,7 +73,11 @@ const STUBS: Record<string, string> = {
     systemsetup: `#!/bin/sh
 case "\$1" in
     -getremotelogin)
-        if [ -f "\$STATE/on" ]; then echo "Remote Login: On"; else echo "Remote Login: Off"; fi ;;
+        # A machine that answers while the switch is off and then stops: the toggle
+        # moved, or it did not, and this one will no longer say which.
+        if [ "\${SYSTEMSETUP_MODE:-ok}" = "mute-once-on" ] && [ -f "\$STATE/on" ]; then
+            echo "setremotelogin: this operation requires Full Disk Access"
+        elif [ -f "\$STATE/on" ]; then echo "Remote Login: On"; else echo "Remote Login: Off"; fi ;;
     -setremotelogin)
         shift
         if [ "\${1:-}" = "-f" ]; then shift; fi
@@ -166,8 +170,10 @@ interface Mac {
      *  tool is even resolvable under the sudo PATH. `unreadable-once-on` is a
      *  directory that answers until Remote Login goes on and then stops. */
     readonly dseditgroup?: "ok" | "unreadable" | "unreadable-once-on" | "missing" | "refuse-add";
-    /** Whether the toggle refuses, the way it does without Full Disk Access. */
-    readonly systemsetup?: "ok" | "refuse-enable" | "refuse-disable";
+    /** Whether the toggle refuses, the way it does without Full Disk Access.
+     *  `mute-once-on` is a machine that reports the switch until it is asked to
+     *  move it and then stops saying whether it did. */
+    readonly systemsetup?: "ok" | "refuse-enable" | "refuse-disable" | "mute-once-on";
     /** Whether the machine already lets every account in over SSH. */
     readonly everyone?: boolean;
 }
@@ -326,6 +332,33 @@ describe.runIf(shell)("the macOS branch, run against a simulated Mac", () => {
         expect(outcome.refused).toEqual(["remote-login-off"]);
         expect(outcome.remoteLoginOn).toBe(false);
         expect(outcome.accessGroup).toBe(false);
+    });
+
+    // A machine that will not say whether the switch moved is one whose group has
+    // to stay - it is the only thing holding SSH to one login if it did move. What
+    // it cannot be is left there unmentioned: the group was not here before this
+    // ran, and 'Remote Login is off, go and turn it on' would send the operator to
+    // enable SSH against a list they never made and be turned away by it.
+    it("says it left the list it built behind when the toggle cannot be confirmed", () => {
+        const outcome = run({ systemsetup: "mute-once-on" });
+        expect(outcome.status).toBe(1);
+        expect(outcome.accessGroup).toBe(true);
+        // Its own code, and never the one that renders as "turn Remote Login on".
+        expect(outcome.refused).toEqual(["ssh-access-list-left-behind"]);
+        expect(outcome.stderr).toContain("SSH here was limited to the 'polaris' login");
+        expect(outcome.stderr).toContain("dseditgroup -o delete com.apple.access_ssh");
+        // The window this branch exists to close stays closed on the way through.
+        expect(outcome.enabledOpen).toBe(false);
+        expect(outcome.stdout).not.toContain("reached: the claim");
+    });
+
+    // Only where the list is this script's own, though: a machine that already had
+    // one had nothing left behind on it, so there is nothing new to report.
+    it("does not report a leftover list on a machine that already had one", () => {
+        const outcome = run({ groups: "existing", systemsetup: "mute-once-on" });
+        expect(outcome.status).toBe(1);
+        expect(outcome.refused).toEqual(["remote-login-off"]);
+        expect(outcome.accessGroup).toBe(true);
     });
 
     // A Mac can have the toggle off and still carry the list its operator built

@@ -121,6 +121,7 @@ export const ENROLLMENT_REFUSAL_REASONS = [
     "ssh-access-list-unrestricted",
     "remote-login-unrestricted",
     "remote-login-left-open",
+    "ssh-access-list-left-behind",
     "not-in-ssh-access-list",
     "no-ssh-host-keys",
     "no-home-directory",
@@ -156,6 +157,8 @@ export const ENROLLMENT_REFUSAL_MESSAGES: Record<EnrollmentRefusalReason, string
         `The machine stopped before registering: Remote Login could not be limited to the '${ENROLLMENT_USERNAME}' login, and turning it on for every account there is wider than this command grants, so it was left off the way the command found it. Turn it on and restrict it to that login under System Settings > General > Sharing.`,
     "remote-login-left-open":
         `The machine stopped before registering: Remote Login was turned on there, could not be limited to the '${ENROLLMENT_USERNAME}' login, and could not be confirmed back off - every account on that machine may be reachable over SSH right now. Turn Remote Login off, or restrict it to that login, under System Settings > General > Sharing.`,
+    "ssh-access-list-left-behind":
+        `The machine stopped before registering: SSH there was limited to the '${ENROLLMENT_USERNAME}' login before Remote Login was turned on, and the machine then would not say whether Remote Login is on or off - so that limit was left in place rather than taken off a machine that may be reachable. Until it is removed, SSH there admits that login and nothing else: run 'sudo dseditgroup -o delete com.apple.access_ssh' on the machine to put SSH back to every account, and check Remote Login under System Settings > General > Sharing.`,
     "not-in-ssh-access-list":
         `The machine stopped before registering: it limits SSH to a list of logins, '${ENROLLMENT_USERNAME}' is not on it, and the command could not add it - so the machine would have turned Polaris away. Add that login under System Settings > General > Sharing > Remote Login. Remote Login itself was left exactly as the command found it.`,
     "no-ssh-host-keys":
