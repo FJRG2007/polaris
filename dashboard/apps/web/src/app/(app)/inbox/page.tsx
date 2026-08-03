@@ -5,7 +5,7 @@
  * client over the messaging service.
  */
 
-import { requireUser } from "@/lib/session";
+import { requirePermission } from "@/lib/session";
 import { bridgeConfigured } from "@/lib/messaging/bridge-client";
 import { listChannels, listConversations } from "@/lib/messaging-service";
 import { InboxView } from "./inbox-view";
@@ -13,7 +13,7 @@ import { InboxView } from "./inbox-view";
 export const dynamic = "force-dynamic";
 
 export default async function InboxPage() {
-    const user = await requireUser();
+    const user = await requirePermission("inbox.read");
     const [ready, channels, conversations] = await Promise.all([
         bridgeConfigured(),
         listChannels(user.id),

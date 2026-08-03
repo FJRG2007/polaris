@@ -1,15 +1,18 @@
 "use client";
 
-/** Wraps the app switcher, marking the active app from the current path.
- *  Admin-only apps (Management) are hidden from non-admins. */
+/** Wraps the app switcher, marking the active app from the current path. Which
+ *  apps are listed is decided on the server from what this account may open, so
+ *  an account whose role reaches nothing sees an empty switcher rather than a row
+ *  of links that turn it away. */
 
-import { usePathname } from "next/navigation";
 import { AppSwitcher } from "@polaris/ui";
+import { usePathname } from "next/navigation";
 import { POLARIS_APPS, resolveActiveApp } from "@/lib/apps";
 
-export function AppNav({ isAdmin = false }: { isAdmin?: boolean }) {
+export function AppNav({ appIds }: { appIds: string[] }) {
     const pathname = usePathname();
-    const apps = POLARIS_APPS.filter((app) => !app.hidden && (!app.adminOnly || isAdmin));
+    const allowed = new Set(appIds);
+    const apps = POLARIS_APPS.filter((app) => allowed.has(app.id));
     const current = resolveActiveApp(pathname);
     return (
         <AppSwitcher

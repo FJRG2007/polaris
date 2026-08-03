@@ -5,14 +5,14 @@
  * opening the shared file in Drive, and revoking.
  */
 
-import { requireUser } from "@/lib/session";
+import { requirePermission } from "@/lib/session";
 import { listSharesForOwner } from "@/lib/share-service";
 import { SharedView, type ShareRow } from "./shared-links-view";
 
 export const dynamic = "force-dynamic";
 
 export default async function SharedPage() {
-    const user = await requireUser();
+    const user = await requirePermission("drive.read");
     const shares = await listSharesForOwner(user.id);
     const rows: ShareRow[] = shares.map((share) => {
         let allowedCidrs: string[] = [];

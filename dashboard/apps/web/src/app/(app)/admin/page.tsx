@@ -7,6 +7,7 @@ import {
     ChevronRight,
     Globe,
     HardDrive,
+    IdCard,
     Mail,
     Settings,
     ShieldCheck,
@@ -22,6 +23,12 @@ import {
 const SECTIONS = [
     { href: "/admin/users", icon: Users, title: "Users", description: "Accounts, admin rights, and invites." },
     { href: "/admin/groups", icon: UsersRound, title: "Groups", description: "Group membership for shared access." },
+    {
+        href: "/admin/roles",
+        icon: IdCard,
+        title: "Roles",
+        description: "What a member, a viewer or a guest may do, and which apps they see."
+    },
     {
         href: "/admin/policies",
         icon: ShieldCheck,

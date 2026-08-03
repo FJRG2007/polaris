@@ -25,6 +25,14 @@ vi.mock("@polaris/db", () => ({
     }
 }));
 vi.mock("@polaris/auth", () => ({ userHasPermission }));
+// Drive asks its capability questions through the request's effective access, so
+// that a previewed role does not inherit the administrator's bypass. What that
+// resolves to is its own concern (see test/access); here it is the plain answer,
+// which keeps these cases about how a server source is routed.
+vi.mock("@/lib/effective-access", () => ({
+    effectiveCan: (userId: string, permission: string) => userHasPermission(userId, permission),
+    effectiveIsAdmin: async (_userId: string, isAdmin: boolean) => isAdmin
+}));
 vi.mock("@polaris/config", () => ({ loadEnv: () => ({ POLARIS_AUTH_SECRET: "secret" }) }));
 vi.mock("next/headers", () => ({ cookies: async () => ({ get: () => undefined }) }));
 vi.mock("@/lib/storage-service", () => ({

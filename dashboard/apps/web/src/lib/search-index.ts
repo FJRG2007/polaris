@@ -63,11 +63,18 @@ const RESOURCE_GROUPS: Record<SearchResourceKind, string> = {
     installed: "Apps"
 };
 
-/** Every page the user can reach, grouped by the app that owns it. */
-export function navigationEntries(isAdmin: boolean): CommandEntry[] {
+/**
+ * Every page the user can reach, grouped by the app that owns it. `appIds` is
+ * what this account may actually open, resolved on the server; search must not
+ * offer a screen that turns the person away when they pick it. The account's own
+ * pages are always in, since everybody has an account.
+ */
+export function navigationEntries(isAdmin: boolean, appIds: readonly string[]): CommandEntry[] {
     const entries: CommandEntry[] = [];
+    const allowed = new Set([...appIds, "account"]);
     for (const app of POLARIS_APPS) {
         if (app.adminOnly && !isAdmin) continue;
+        if (!allowed.has(app.id)) continue;
         const sections = APP_SECTIONS[app.id] ?? [];
         // An app whose landing page is already one of its sections would otherwise
         // be listed twice under the same href.
@@ -104,6 +111,9 @@ export function navigationEntries(isAdmin: boolean): CommandEntry[] {
     // way to reach Runs would be to already be in Runners - which is exactly the
     // sort of page search exists for.
     for (const subapp of APP_SUBAPPS) {
+        // A subject lives inside an app, so it is only findable when that app is.
+        const owner = POLARIS_APPS.find((app) => subapp.base.startsWith(app.href) || app.match?.some((base) => subapp.base.startsWith(base)));
+        if (owner && !allowed.has(owner.id)) continue;
         for (const section of subapp.sections) {
             if (entries.some((entry) => entry.href === section.href)) continue;
             entries.push({

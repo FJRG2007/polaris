@@ -5,14 +5,14 @@
  * the (network-bound) recent lookup itself so the page paints instantly.
  */
 
-import { requireUser } from "@/lib/session";
+import { requirePermission } from "@/lib/session";
 import { listAccessibleConnections } from "@/lib/storage-service";
 import { RecentView } from "./recent-view";
 
 export const dynamic = "force-dynamic";
 
 export default async function RecentPage() {
-    const user = await requireUser();
+    const user = await requirePermission("drive.read");
     const connections = (await listAccessibleConnections(user.id)).map((row) => ({ id: row.id, name: row.name }));
 
     return (

@@ -17,15 +17,25 @@
 import { prisma } from "@polaris/db";
 import { recordAudit } from "@/lib/audit-service";
 import { notify } from "@/lib/notifications/dispatch";
+import type { ViewAsRow } from "@/lib/view-as-service";
 import { describeOrigin } from "@/lib/session-directory";
 import { evaluateAccountAccess } from "@/lib/network-rules";
 import { clientHost, clientIp, clientUserAgent, clientUserAgentBrands } from "@/lib/request-context";
 import { consumeSessionRotation, rememberAccountDevice, resolveSignInRules, takeSignInRecord } from "@polaris/auth";
 
-/** Where a refused session is sent, or null when the session may proceed. */
-export type SessionVerdict = { ok: true } | { ok: false; redirect: string };
+/**
+ * Where a refused session is sent, or - when it may proceed - whether it is
+ * currently looking at Polaris as somebody else. The view rides along with the
+ * verdict because the row it lives on is one this function already reads: an
+ * administrator viewing an account must not cost every request a second query.
+ */
+export type SessionVerdict = { ok: true; view: ViewAsRow } | { ok: false; redirect: string };
 
-const ALLOWED: SessionVerdict = { ok: true };
+/** A session that is simply itself. */
+const ALLOWED: SessionVerdict = {
+    ok: true,
+    view: { viewAsUserId: null, viewAsRoleId: null, viewAsAt: null }
+};
 
 /** How stale the activity stamp may get before it is worth a write. */
 const ACTIVITY_WRITE_INTERVAL_MS = 60_000;
@@ -152,7 +162,7 @@ export async function guardSession({
             .catch(() => undefined);
     }
 
-    return ALLOWED;
+    return { ok: true, view: state };
 }
 
 /**

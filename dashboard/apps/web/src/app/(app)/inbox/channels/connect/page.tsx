@@ -5,13 +5,13 @@
  * the two X happens to be.
  */
 
-import { requireUser } from "@/lib/session";
+import { requirePermission } from "@/lib/session";
 import { bridgeConfigured } from "@/lib/messaging/bridge-client";
 import { ConnectChannelView } from "./connect-view";
 
 export const dynamic = "force-dynamic";
 
 export default async function ConnectChannelPage() {
-    await requireUser();
+    await requirePermission("inbox.read");
     return <ConnectChannelView bridgeReady={await bridgeConfigured()} />;
 }

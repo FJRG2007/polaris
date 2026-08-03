@@ -17,14 +17,14 @@
 
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
-import { requireUser } from "@/lib/session";
+import { requirePermission } from "@/lib/session";
 import { smsChannelInputSchema } from "@polaris/core";
 import { deleteSmsSender, saveSmsSender, type SmsSenderView } from "@/lib/notifications/sms-service";
 
 export async function saveSmsSenderAction(
     input: unknown
 ): Promise<{ sender?: SmsSenderView; error?: string }> {
-    const user = await requireUser();
+    const user = await requirePermission("inbox.manage");
     const parsed = smsChannelInputSchema.extend({ id: z.string().uuid().optional() }).safeParse(input);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the form." };
     const result = await saveSmsSender(user.id, parsed.data);
@@ -33,7 +33,7 @@ export async function saveSmsSenderAction(
 }
 
 export async function deleteSmsSenderAction(id: unknown): Promise<void> {
-    const user = await requireUser();
+    const user = await requirePermission("inbox.manage");
     const parsed = z.string().uuid().safeParse(id);
     if (!parsed.success) return;
     await deleteSmsSender(user.id, parsed.data);

@@ -28,7 +28,7 @@ import {
 /** Post-verification destination: a safe same-origin redirect, else the drive. */
 function target(): string {
     const redirect = new URLSearchParams(window.location.search).get("redirect");
-    return redirect && redirect.startsWith("/") && !redirect.startsWith("//") ? redirect : "/drive";
+    return redirect && redirect.startsWith("/") && !redirect.startsWith("//") ? redirect : "/";
 }
 
 const METHOD_ICON: Record<TwoFactorMethod, ComponentType<{ className?: string }>> = {

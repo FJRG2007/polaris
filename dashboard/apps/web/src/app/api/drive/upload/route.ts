@@ -6,8 +6,7 @@
  */
 
 import { normalizeRelPath } from "@polaris/core";
-import { userHasPermission } from "@polaris/auth";
-import { requireUser } from "@/lib/session";
+import { requireUser, sessionCan } from "@/lib/session";
 import { requireDriveDriver, DriveAccessError, DriveLockedError } from "@/lib/drive-authz";
 import { recordItemCreator } from "@/lib/drive-meta-service";
 import { invalidateFolderSizes } from "@/lib/drive-folder-size";
@@ -18,7 +17,7 @@ export const dynamic = "force-dynamic";
 
 export async function PUT(request: Request): Promise<Response> {
     const user = await requireUser();
-    if (!(await userHasPermission(user.id, "drive.write"))) {
+    if (!(await sessionCan(user, "drive.write"))) {
         return new Response("Forbidden", { status: 403 });
     }
 

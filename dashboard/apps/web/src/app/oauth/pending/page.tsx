@@ -23,7 +23,7 @@ export default async function PendingPage() {
         where: { sessionId: session.sessionId },
         select: { approval: true, createdAt: true }
     });
-    if (!state || state.approval === "approved") redirect("/drive");
+    if (!state || state.approval === "approved") redirect("/");
     if (state.approval === "denied") redirect("/oauth/login?denied=1");
 
     return <PendingView requestedAt={state.createdAt.toISOString()} />;

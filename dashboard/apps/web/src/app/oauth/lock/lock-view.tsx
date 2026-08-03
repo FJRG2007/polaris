@@ -29,7 +29,7 @@ export function LockView({ name, email, hasPin }: { name: string; email: string;
             setError(result.error);
             return;
         }
-        router.push("/drive");
+        router.push("/");
         router.refresh();
     }
 

@@ -1,5 +1,5 @@
 import { PageHeader } from "@polaris/ui";
-import { requireUser } from "@/lib/session";
+import { requirePermission } from "@/lib/session";
 import { DriveExplorer } from "./drive-explorer";
 import type { StorageProviderKind } from "@polaris/core";
 import { isSavedConnection, type ConnectionSummary } from "./types";
@@ -26,7 +26,7 @@ export default async function DrivePage({
 }: {
     searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-    const user = await requireUser();
+    const user = await requirePermission("drive.read");
     const params = await searchParams;
 
     // Only the fast, local query runs on the server so the page paints instantly.

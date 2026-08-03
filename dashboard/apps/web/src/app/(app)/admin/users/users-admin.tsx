@@ -15,6 +15,7 @@ import { useRouter } from "next/navigation";
 import { Avatar } from "@/components/avatar";
 import { InviteDialog } from "./invite-dialog";
 import { revokeInviteAction } from "./actions";
+import type { RoleOption } from "@/lib/role-service";
 import { RecoveryRequests } from "./recovery-requests";
 import { UserDetailDialog } from "./user-detail-dialog";
 import type { InviteListItem } from "@/lib/invite-service";
@@ -57,6 +58,7 @@ export function UsersAdmin({
     invites,
     recoveries,
     groups,
+    roles,
     canSendMail,
     viewerId
 }: {
@@ -64,6 +66,8 @@ export function UsersAdmin({
     invites: InviteListItem[];
     recoveries: RecoveryRequestView[];
     groups: AccessGroupOption[];
+    /** Every role this instance defines, for the invite and the role picker. */
+    roles: RoleOption[];
     canSendMail: boolean;
     viewerId: string;
 }) {
@@ -259,12 +263,13 @@ export function UsersAdmin({
             </Card>
 
             {inviting ? (
-                <InviteDialog groups={groups} canSendMail={canSendMail} onOpenChange={(next) => setInviting(next)} />
+                <InviteDialog groups={groups} roles={roles} canSendMail={canSendMail} onOpenChange={(next) => setInviting(next)} />
             ) : null}
             {open ? (
                 <UserDetailDialog
                     user={open}
                     groups={groups}
+                    roles={roles}
                     isSelf={open.id === viewerId}
                     onOpenChange={(next) => !next && setOpenId(null)}
                 />

@@ -25,7 +25,7 @@ import { rateLimit } from "@/lib/rate-limit-service";
 import { evaluateNetworkRules } from "@/lib/network-rules";
 import { generateShortCode, generateToken, hashToken } from "@polaris/core/tokens";
 import { hashLinkPassword, verifyLinkPassword } from "@polaris/core/link-password";
-import { assignRole, provisionUser, seedDefaultRoles, updateEnforcedRules } from "@polaris/auth";
+import { assignRole, emailOwner, provisionUser, seedDefaultRoles, updateEnforcedRules } from "@polaris/auth";
 import {
     INVITE_CODE_LENGTH,
     normalizeInviteCode,
@@ -119,6 +119,31 @@ export interface CreatedInvite {
     code?: string;
     /** Why Polaris could not email it, when it was asked to. */
     sendError?: string;
+    /** Why nothing was created at all. */
+    error?: string;
+}
+
+/**
+ * Refuse an invite that cannot become an account. Both checks are the same
+ * refusal the claim would end in anyway - provisionUser will not create a second
+ * account under an address somebody already holds - so they are made here, where
+ * the administrator can still do something about it, instead of days later in
+ * front of the person who followed the link.
+ *
+ * The address is judged against every address an account holds, alternates
+ * included: an alternate is one its owner has proved, and inviting it would be
+ * inviting them a second time.
+ */
+async function inviteRefusal(email: string): Promise<string | null> {
+    if (await emailOwner(email)) {
+        return "That address already has an account. Change their role from the people list instead.";
+    }
+    const open = await prisma.invite.findFirst({
+        where: { email, acceptedAt: null, expiresAt: { gt: new Date() } },
+        select: { id: true }
+    });
+    if (open) return "There is already an open invite for that address. Revoke it before sending another.";
+    return null;
 }
 
 export async function createInvite(
@@ -127,7 +152,13 @@ export async function createInvite(
 ): Promise<CreatedInvite> {
     await seedDefaultRoles();
     const email = input.email.trim().toLowerCase();
+    const refusal = await inviteRefusal(email);
+    if (refusal) return { id: "", error: refusal };
+
+    // Roles are rows an operator can add to, so an unknown name is a mistake to
+    // report rather than an invite that quietly hands out nothing.
     const role = await prisma.role.findUnique({ where: { name: input.role }, select: { id: true } });
+    if (!role) return { id: "", error: "That role no longer exists." };
     const token = generateToken();
     // Only the groups the inviting administrator owns; a foreign id is dropped
     // rather than rejected, the same way every other rule editor treats one.
@@ -144,7 +175,7 @@ export async function createInvite(
             codeHash: code ? hashToken(code) : null,
             passwordHash: input.oneTimePassword ? await hashLinkPassword(input.oneTimePassword) : null,
             method: input.method,
-            roleId: role?.id ?? null,
+            roleId: role.id,
             invitedById,
             expiresAt: new Date(Date.now() + INVITE_TTL_MS),
             allowedCidrs: stringifyList(input.allowedCidrs),

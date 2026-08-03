@@ -1,6 +1,6 @@
 import type { StorageProviderKind } from "@polaris/core";
 import { PageHeader } from "@polaris/ui";
-import { requireUser } from "@/lib/session";
+import { requirePermission } from "@/lib/session";
 import { connectionWebUrl, listConnections } from "@/lib/storage-service";
 import type { ConnectionSummary } from "../types";
 import { OverviewView } from "./overview-view";
@@ -8,7 +8,7 @@ import { OverviewView } from "./overview-view";
 export const dynamic = "force-dynamic";
 
 export default async function OverviewPage() {
-    const user = await requireUser();
+    const user = await requirePermission("drive.read");
     const connections: ConnectionSummary[] = (await listConnections(user.id)).map((row) => ({
         id: row.id,
         name: row.name,

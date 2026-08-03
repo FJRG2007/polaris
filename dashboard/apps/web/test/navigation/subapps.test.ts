@@ -12,7 +12,14 @@
 
 import { describe, expect, it } from "vitest";
 import { navigationEntries } from "@/lib/search-index";
-import { APP_SECTIONS, APP_SUBAPPS, isSectionActive, resolveActiveApp, resolveSubapp } from "@/lib/apps";
+import {
+    APP_SECTIONS,
+    APP_SUBAPPS,
+    isSectionActive,
+    POLARIS_APPS,
+    resolveActiveApp,
+    resolveSubapp
+} from "@/lib/apps";
 
 describe("resolveSubapp", () => {
     it("claims its own base and everything under it", () => {
@@ -82,7 +89,7 @@ describe("every subject with its own rail", () => {
 });
 
 describe("what search can find", () => {
-    const hrefs = navigationEntries(true).map((entry) => entry.href);
+    const hrefs = navigationEntries(true, POLARIS_APPS.map((app) => app.id)).map((entry) => entry.href);
 
     it("indexes every screen of a subject, not just its front page", () => {
         for (const subapp of APP_SUBAPPS) {

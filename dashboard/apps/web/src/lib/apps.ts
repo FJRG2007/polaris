@@ -5,6 +5,7 @@
  * Everything installable lives under Apps rather than sprawling the switcher.
  */
 
+import type { Permission } from "@polaris/core";
 import {
     Activity,
     Bell,
@@ -22,6 +23,7 @@ import {
     Globe,
     HardDrive,
     History,
+    IdCard,
     Inbox,
     KeyRound,
     LayoutDashboard,
@@ -61,6 +63,11 @@ export interface AppEntry {
     icon: LucideIcon;
     href: string;
     locked?: boolean;
+    /** The capability that opens this app. An account that does not hold it does
+     *  not see the app in the switcher, is not offered its screens in search, and
+     *  is turned away by every page inside it. An app with none is open to anyone
+     *  signed in - only "My account" is. */
+    permission?: Permission;
     /** Only visible to administrators (filtered out of the switcher otherwise). */
     adminOnly?: boolean;
     /** Kept out of the switcher list: a personal section reached from the account
@@ -78,7 +85,8 @@ export const POLARIS_APPS: AppEntry[] = [
         label: "Drive",
         description: "Files across every NAS",
         icon: HardDrive,
-        href: "/drive"
+        href: "/drive",
+        permission: "drive.read"
     },
     {
         id: "apps",
@@ -90,28 +98,32 @@ export const POLARIS_APPS: AppEntry[] = [
         href: "/apps/deploy",
         // Owns the whole /apps subtree: the marketplace, installed-app dashboards,
         // and the built-in Deploy / Servers / Containers / Backups rails.
-        match: ["/apps"]
+        match: ["/apps"],
+        permission: "deploy.read"
     },
     {
         id: "tasks",
         label: "Tasks",
         description: "Plan and track work: spaces, lists, boards & goals",
         icon: SquareCheckBig,
-        href: "/tasks"
+        href: "/tasks",
+        permission: "tasks.read"
     },
     {
         id: "inbox",
         label: "Inbox",
         description: "Customer conversations across every channel",
         icon: MessagesSquare,
-        href: "/inbox"
+        href: "/inbox",
+        permission: "inbox.read"
     },
     {
         id: "watch",
         label: "Watch",
         description: "Alarms on app health, spikes and outages",
         icon: Activity,
-        href: "/watch"
+        href: "/watch",
+        permission: "deploy.read"
     },
     {
         id: "admin",
@@ -261,7 +273,13 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
     admin: [
         { label: "Overview", href: "/admin", icon: LayoutDashboard },
         { label: "Users", href: "/admin/users", icon: Users, keywords: ["accounts", "invites"] },
-        { label: "Groups", href: "/admin/groups", icon: UsersRound, keywords: ["teams", "roles"] },
+        { label: "Groups", href: "/admin/groups", icon: UsersRound, keywords: ["teams"] },
+        {
+            label: "Roles",
+            href: "/admin/roles",
+            icon: IdCard,
+            keywords: ["permissions", "member", "viewer", "guest", "what they can do", "capabilities", "view as"]
+        },
         { label: "Policies", href: "/admin/policies", icon: ShieldCheck, keywords: ["permissions", "access"] },
         { label: "Activity", href: "/admin/activity", icon: Activity, keywords: ["audit", "logs"] },
         { label: "Domains", href: "/admin/domains", icon: Globe, keywords: ["dns", "tunnels", "certificates"] },

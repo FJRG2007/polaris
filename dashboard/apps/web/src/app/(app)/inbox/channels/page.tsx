@@ -9,7 +9,7 @@
  * hunting for where mail and texts are set up.
  */
 
-import { requireUser } from "@/lib/session";
+import { requirePermission } from "@/lib/session";
 import { ChannelsView } from "./channels-view";
 import { listChannels } from "@/lib/messaging-service";
 import { listEmailChannels } from "@/lib/mail-service";
@@ -19,7 +19,7 @@ import { listSmsSenders } from "@/lib/notifications/sms-service";
 export const dynamic = "force-dynamic";
 
 export default async function ChannelsPage() {
-    const user = await requireUser();
+    const user = await requirePermission("inbox.read");
     const [ready, channels, emailChannels, smsSenders] = await Promise.all([
         bridgeConfigured(),
         listChannels(user.id),

@@ -57,7 +57,7 @@ function groupEntries(entries: CommandEntry[]): Group[] {
     return groups;
 }
 
-export function CommandPalette({ isAdmin = false }: { isAdmin?: boolean }) {
+export function CommandPalette({ isAdmin = false, appIds }: { isAdmin?: boolean; appIds: string[] }) {
     const router = useRouter();
     const [open, setOpen] = useState(false);
     const [query, setQuery] = useState("");
@@ -109,7 +109,10 @@ export function CommandPalette({ isAdmin = false }: { isAdmin?: boolean }) {
         loadResources();
     }, [open, loadResources]);
 
-    const navigation = useMemo(() => navigationEntries(isAdmin), [isAdmin]);
+    // Keyed on the joined ids: the array is rebuilt on every render of the layout
+    // above, so identity alone would rebuild the index for nothing.
+    const appKey = appIds.join(",");
+    const navigation = useMemo(() => navigationEntries(isAdmin, appKey ? appKey.split(",") : []), [isAdmin, appKey]);
     const entries = useMemo(
         () => [...navigation, ...resourceEntries(resources)],
         [navigation, resources]

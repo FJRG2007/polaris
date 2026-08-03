@@ -24,7 +24,7 @@ export default async function LockPage() {
         where: { sessionId: session.sessionId },
         select: { lockedAt: true }
     });
-    if (!state?.lockedAt) redirect("/drive");
+    if (!state?.lockedAt) redirect("/");
 
     const settings = await getUserSecurity(session.id);
     return <LockView name={session.name} email={session.email} hasPin={settings.hasPin} />;

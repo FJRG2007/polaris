@@ -54,7 +54,7 @@ export function AcceptInviteForm({
             return;
         }
         await signIn.email({ email: result.email, password: parsed.password });
-        router.push("/drive");
+        router.push("/");
         router.refresh();
     }
 

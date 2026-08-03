@@ -20,6 +20,8 @@ export const PERMISSIONS = [
     "deploy.manage",
     "tasks.read",
     "tasks.manage",
+    "inbox.read",
+    "inbox.manage",
     "users.manage",
     "settings.manage",
     "system.manage"
@@ -32,7 +34,16 @@ export const ALL_PERMISSIONS = "*" as const;
 
 export type GrantedPermission = Permission | typeof ALL_PERMISSIONS;
 
-/** The built-in roles seeded on first run. */
+/**
+ * The built-in roles seeded on first run. Seeding never overwrites a role that
+ * already exists, so these are starting points an operator is free to rewrite
+ * under Management > Roles - what a member may do is a decision about one
+ * instance, not a constant.
+ *
+ * `guest` grants nothing on purpose. It is an account that exists so a person can
+ * be identified - to sign in at a share link or a drop point, or at something
+ * outside Polaris that asks for a Polaris account - and reaches no app at all.
+ */
 export const DEFAULT_ROLES: Record<string, readonly GrantedPermission[]> = {
     admin: [ALL_PERMISSIONS],
     member: [
@@ -45,9 +56,46 @@ export const DEFAULT_ROLES: Record<string, readonly GrantedPermission[]> = {
         "deploy.read",
         "deploy.manage",
         "tasks.read",
-        "tasks.manage"
+        "tasks.manage",
+        "inbox.read",
+        "inbox.manage"
     ],
-    viewer: ["drive.read", "deploy.read", "tasks.read"]
+    viewer: ["drive.read", "deploy.read", "tasks.read", "inbox.read"],
+    guest: []
+};
+
+/** Roles Polaris seeds itself. They may be rewritten but never deleted: an
+ *  invite, a policy, or an account may still point at one. */
+export const SYSTEM_ROLES = Object.keys(DEFAULT_ROLES);
+
+/** The role whose grants are fixed. It holds the wildcard, so editing it would
+ *  only ever narrow the one role that exists to be unrestricted. */
+export const UNEDITABLE_ROLE = "admin";
+
+/** Role names are typed by hand and read back in invites, policies and audit
+ *  entries, so they stay short and predictable. */
+export const MAX_ROLE_NAME_LENGTH = 32;
+
+/** What each permission is called, and the area it belongs to, so a role editor
+ *  can group them the way the dashboard is grouped rather than listing keys. */
+export const PERMISSION_META: Readonly<Record<Permission, { area: string; label: string }>> = {
+    "drive.read": { area: "Drive", label: "See files and download them" },
+    "drive.write": { area: "Drive", label: "Upload, rename and move files" },
+    "drive.delete": { area: "Drive", label: "Delete files" },
+    "connections.manage": { area: "Drive", label: "Add and configure storage connections" },
+    "shares.create": { area: "Sharing", label: "Create share links" },
+    "shares.manage": { area: "Sharing", label: "Manage everyone's share links" },
+    "requests.create": { area: "Sharing", label: "Create drop points" },
+    "requests.manage": { area: "Sharing", label: "Manage everyone's drop points" },
+    "deploy.read": { area: "Apps", label: "See deployments, servers and containers" },
+    "deploy.manage": { area: "Apps", label: "Deploy, restart and configure apps" },
+    "tasks.read": { area: "Tasks", label: "See spaces, lists and tasks" },
+    "tasks.manage": { area: "Tasks", label: "Create and change tasks" },
+    "inbox.read": { area: "Inbox", label: "Read conversations" },
+    "inbox.manage": { area: "Inbox", label: "Reply and manage channels" },
+    "users.manage": { area: "Management", label: "Invite people and change accounts" },
+    "settings.manage": { area: "Management", label: "Change instance settings" },
+    "system.manage": { area: "Management", label: "Updates, backups and maintenance" }
 };
 
 /**
@@ -66,7 +114,8 @@ export const IMPLIED_PERMISSIONS: Readonly<Partial<Record<Permission, readonly P
     "shares.manage": ["shares.create"],
     "requests.manage": ["requests.create"],
     "deploy.manage": ["deploy.read"],
-    "tasks.manage": ["tasks.read"]
+    "tasks.manage": ["tasks.read"],
+    "inbox.manage": ["inbox.read"]
 };
 
 /** The permissions one grant carries with it, itself excluded. */

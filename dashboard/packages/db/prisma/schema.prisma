@@ -695,6 +695,16 @@ model SessionState {
     // than reading an absent second factor as "no second step".
     signInMethod String?
     secondFactor String?
+    // An administrator looking at Polaris as somebody else. Exactly one of the
+    // two is set: viewAsUserId is another account this session is acting as,
+    // viewAsRoleId is a role whose grants stand in for the administrator's own.
+    // Both hang off the administrator's own session on purpose - the account
+    // being acted as gets no session of its own, so nothing appears on their
+    // devices list and nothing survives the administrator signing out.
+    // viewAsAt is when it started; the pretence lapses on its own after a while.
+    viewAsUserId String?  @db.Uuid
+    viewAsRoleId String?  @db.Uuid
+    viewAsAt     DateTime?
     createdAt  DateTime  @default(now())
 
     session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)

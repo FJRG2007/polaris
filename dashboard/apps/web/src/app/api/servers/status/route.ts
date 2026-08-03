@@ -10,8 +10,7 @@
  * expected JSON. Node runtime: the probe opens sockets.
  */
 
-import { requireUser } from "@/lib/session";
-import { userHasPermission } from "@polaris/auth";
+import { requireUser, sessionCan } from "@/lib/session";
 import { serverStatuses } from "@/lib/server-status";
 import { localMachineName } from "@/lib/local-server";
 
@@ -20,7 +19,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET(): Promise<Response> {
     const user = await requireUser();
-    if (!user.isAdmin && !(await userHasPermission(user.id, "system.manage"))) {
+    if (!user.isAdmin && !(await sessionCan(user, "system.manage"))) {
         return Response.json({ error: "Forbidden" }, { status: 403 });
     }
 

@@ -44,6 +44,19 @@ export function AppSwitcher({
     const current = currentApp ?? apps.find((app) => app.id === currentAppId) ?? apps[0];
     if (!current) return null;
     const CurrentIcon = current.icon;
+    // An account whose role opens no app has nothing to switch to. It still needs
+    // to be told where it is, but a menu that opens onto an empty list is a
+    // control that does nothing - so it becomes a plain label instead.
+    if (apps.length === 0) {
+        return (
+            <span className="flex shrink-0 items-center gap-2 px-1.5 py-1.5 text-sm font-medium sm:px-2">
+                <span className="grid size-6 shrink-0 place-items-center rounded bg-primary/15 text-primary">
+                    <CurrentIcon className="size-4" />
+                </span>
+                <span className="sr-only sm:not-sr-only">{current.label}</span>
+            </span>
+        );
+    }
     return (
         <DropdownMenu>
             {/* On a phone the bar also carries the page's own controls, so the

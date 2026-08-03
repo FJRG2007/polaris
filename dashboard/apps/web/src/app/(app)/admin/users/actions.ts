@@ -14,9 +14,9 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/session";
 import { recordAudit } from "@/lib/audit-service";
+import { accessRulesSchema, createInviteSchema } from "@polaris/core";
 import { decideRecoveryRequest } from "@/lib/account-recovery-service";
 import { listUserSessions, type SessionView } from "@/lib/session-directory";
-import { accessRulesSchema, createInviteSchema, INVITE_ROLES } from "@polaris/core";
 import { createInvite, revokeInvite, type CreatedInvite } from "@/lib/invite-service";
 import {
     banUser,
@@ -39,6 +39,9 @@ export async function createInviteAction(input: unknown): Promise<CreatedInvite 
     if (!parsed.success) return { id: "", error: parsed.error.issues[0]?.message ?? "Invalid input" };
 
     const created = await createInvite(admin.id, parsed.data);
+    // A refused invite created nothing, so there is nothing to record and nothing
+    // to refresh - only a reason to hand back.
+    if (created.error) return created;
     await recordAudit({
         actorId: admin.id,
         action: "invite.create",
@@ -101,8 +104,9 @@ export async function setAdminAccessAction(userId: string, isAdmin: boolean): Pr
 
 export async function setUserRoleAction(userId: string, role: string): Promise<{ error?: string }> {
     const admin = await requireAdmin();
-    if (!(INVITE_ROLES as readonly string[]).includes(role)) return { error: "Unknown role." };
-    const result = await setUserRole(admin.id, userId, role);
+    // Roles are rows, not a fixed list: the service settles whether this one
+    // exists rather than a copy of the names kept here.
+    const result = await setUserRole(admin.id, userId, String(role));
     revalidatePath("/admin/users");
     return result;
 }

@@ -18,7 +18,7 @@
 import { prisma } from "@polaris/db";
 import { cookies } from "next/headers";
 import { loadEnv } from "@polaris/config";
-import { userHasPermission } from "@polaris/auth";
+import { effectiveCan, effectiveIsAdmin } from "@/lib/effective-access";
 import type { StorageDriver } from "@polaris/storage";
 import { canAccessDrive } from "@/lib/drive-acl-service";
 import type { DriveAction, Permission } from "@polaris/core";
@@ -94,9 +94,9 @@ export async function authorizeDrive(
             })
         ]);
         if (!app) throw new DriveAccessError();
-        if (!user?.isAdmin) {
+        if (!(await effectiveIsAdmin(userId, user?.isAdmin === true))) {
             if (app.environment.project.ownerId !== userId) throw new DriveAccessError();
-            if (!(await userHasPermission(userId, OWNER_CAPABILITY[action]))) throw new DriveAccessError();
+            if (!(await effectiveCan(userId, OWNER_CAPABILITY[action]))) throw new DriveAccessError();
         }
         return;
     }
@@ -112,9 +112,9 @@ export async function authorizeDrive(
             prisma.host.findUnique({ where: { id: hostId }, select: { ownerId: true } })
         ]);
         if (!host) throw new DriveAccessError();
-        if (!user?.isAdmin) {
+        if (!(await effectiveIsAdmin(userId, user?.isAdmin === true))) {
             if (host.ownerId !== userId) throw new DriveAccessError();
-            if (!(await userHasPermission(userId, OWNER_CAPABILITY[action]))) throw new DriveAccessError();
+            if (!(await effectiveCan(userId, OWNER_CAPABILITY[action]))) throw new DriveAccessError();
         }
         return;
     }
@@ -125,10 +125,10 @@ export async function authorizeDrive(
     ]);
     if (!connection) throw new DriveAccessError();
 
-    if (!user?.isAdmin) {
+    if (!(await effectiveIsAdmin(userId, user?.isAdmin === true))) {
         if (connection.ownerId === userId) {
             // Owner: gated by the coarse global capability, as the app always has.
-            if (!(await userHasPermission(userId, OWNER_CAPABILITY[action]))) throw new DriveAccessError();
+            if (!(await effectiveCan(userId, OWNER_CAPABILITY[action]))) throw new DriveAccessError();
         } else if (!(await canAccessDrive(userId, connectionId, path, action))) {
             // Non-owner: needs an explicit ACL/policy allow for this resource.
             throw new DriveAccessError();

@@ -11,10 +11,14 @@
  * useless for joining an instance.
  */
 
-import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import { createInviteAction } from "./actions";
+import { useZodForm } from "@/lib/use-zod-form";
+import { useState, type FormEvent } from "react";
+import type { RoleOption } from "@/lib/role-service";
+import { CopyButton } from "@/components/copy-button";
 import { ChevronDown, Mail, Wand2 } from "lucide-react";
-import { createInviteSchema, formatInviteCode, INVITE_ROLES, type InviteMethod } from "@polaris/core";
+import { createInviteSchema, formatInviteCode, type InviteMethod } from "@polaris/core";
 import {
     Button,
     Dialog,
@@ -34,9 +38,6 @@ import {
     type AccessGroupOption,
     type AccessRulesValue
 } from "@/components/access-rules-editor";
-import { CopyButton } from "@/components/copy-button";
-import { useZodForm } from "@/lib/use-zod-form";
-import { createInviteAction } from "./actions";
 
 /** How an invite can travel, in the order an operator is likely to want them. */
 const METHODS: { value: InviteMethod; label: string; hint: string }[] = [
@@ -54,10 +55,13 @@ interface Issued {
 
 export function InviteDialog({
     groups,
+    roles,
     canSendMail,
     onOpenChange
 }: {
     groups: AccessGroupOption[];
+    /** The roles this instance defines, and whether each opens anything. */
+    roles: RoleOption[];
     /** Whether this deployment can send mail at all, which gates the magic link. */
     canSendMail: boolean;
     onOpenChange: (open: boolean) => void;
@@ -140,8 +144,13 @@ export function InviteDialog({
                                     aria-label="Role"
                                     value={values.role}
                                     onValueChange={(value) => update("role", value)}
-                                    options={INVITE_ROLES.map((role) => ({ value: role, label: role }))}
+                                    options={roles.map((role) => ({ value: role.name, label: role.name }))}
                                 />
+                                <p className="text-xs text-muted-foreground">
+                                    {roles.find((role) => role.name === values.role)?.grants === 0
+                                        ? "Opens no app. The account exists so they can be identified - at a share link, a drop point, or anywhere that asks for a Polaris sign-in."
+                                        : "What each role may do is set under Management > Roles."}
+                                </p>
                             </div>
                         </div>
 

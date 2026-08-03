@@ -16,7 +16,7 @@ import { z } from "zod";
 import { emailField } from "@polaris/core";
 import { prisma } from "@polaris/db";
 import { recordAudit } from "@/lib/audit-service";
-import { requireUser } from "@/lib/session";
+import { requirePermission } from "@/lib/session";
 import { rateLimit } from "@/lib/rate-limit-service";
 import {
     createEmailChannel,
@@ -55,7 +55,7 @@ async function requireOwnedChannel(userId: string, channelId: string): Promise<b
 }
 
 export async function createEmailChannelAction(input: unknown): Promise<ChannelResult> {
-    const user = await requireUser();
+    const user = await requirePermission("inbox.manage");
     const parsed = channelInputSchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the form." };
     const result = await createEmailChannel(user.id, parsed.data);
@@ -73,7 +73,7 @@ export async function createEmailChannelAction(input: unknown): Promise<ChannelR
 }
 
 export async function updateEmailChannelAction(channelId: unknown, input: unknown): Promise<ChannelResult> {
-    const user = await requireUser();
+    const user = await requirePermission("inbox.manage");
     const id = channelIdSchema.safeParse(channelId);
     const parsed = channelInputSchema.safeParse(input);
     if (!id.success || !parsed.success) return { error: "Check the form." };
@@ -92,7 +92,7 @@ export async function updateEmailChannelAction(channelId: unknown, input: unknow
 }
 
 export async function deleteEmailChannelAction(channelId: unknown): Promise<{ error?: string }> {
-    const user = await requireUser();
+    const user = await requirePermission("inbox.manage");
     const id = channelIdSchema.safeParse(channelId);
     if (!id.success) return { error: "Unknown channel." };
     if (!(await requireOwnedChannel(user.id, id.data))) return { error: "That channel no longer exists." };
@@ -109,7 +109,7 @@ export async function deleteEmailChannelAction(channelId: unknown): Promise<{ er
 
 /** Re-run the credential check, for a channel whose key was rotated elsewhere. */
 export async function recheckEmailChannelAction(channelId: unknown): Promise<{ error?: string }> {
-    const user = await requireUser();
+    const user = await requirePermission("inbox.manage");
     const id = channelIdSchema.safeParse(channelId);
     if (!id.success) return { error: "Unknown channel." };
     if (!(await requireOwnedChannel(user.id, id.data))) return { error: "That channel no longer exists." };
@@ -125,7 +125,7 @@ export async function recheckEmailChannelAction(channelId: unknown): Promise<{ e
  * been told the From address belongs to you.
  */
 export async function sendTestEmailAction(channelId: unknown, to: unknown): Promise<{ error?: string }> {
-    const user = await requireUser();
+    const user = await requirePermission("inbox.manage");
     const id = channelIdSchema.safeParse(channelId);
     const address = emailField.safeParse(to);
     if (!id.success) return { error: "Unknown channel." };

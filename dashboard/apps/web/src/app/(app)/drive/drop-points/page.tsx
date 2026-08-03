@@ -6,7 +6,7 @@
  * itself is only shown once at creation, so it is never listed here.
  */
 
-import { requireUser } from "@/lib/session";
+import { requirePermission } from "@/lib/session";
 import { listFileRequestsForOwner } from "@/lib/file-request-service";
 import { listConnections } from "@/lib/storage-service";
 import { NewDropPointButton } from "./new-drop-point-button";
@@ -15,7 +15,7 @@ import { DropPointsView, type DropPointRow } from "./drop-points-view";
 export const dynamic = "force-dynamic";
 
 export default async function DropPointsPage() {
-    const user = await requireUser();
+    const user = await requirePermission("drive.read");
     const [requests, connections] = await Promise.all([
         listFileRequestsForOwner(user.id),
         listConnections(user.id)

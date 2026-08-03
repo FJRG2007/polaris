@@ -49,7 +49,7 @@ export function SetupForm({
         }
         // Sign the new administrator straight in - no second login step.
         await signIn.email({ email: parsed.email, password: parsed.password });
-        router.push("/drive");
+        router.push("/");
         router.refresh();
     }
 

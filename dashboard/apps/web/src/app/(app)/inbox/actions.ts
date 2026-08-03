@@ -10,7 +10,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { PLATFORMS, interactivePromptSchema } from "@polaris/messaging";
 import type { TargetGroup } from "@polaris/messaging";
-import { requireUser } from "@/lib/session";
+import { requirePermission } from "@/lib/session";
 import { bridgeConfigured } from "@/lib/messaging/bridge-client";
 import {
     addContactIdentity,
@@ -64,7 +64,7 @@ export async function inboxStateAction(): Promise<{
     channels: ChannelView[];
     conversations: ConversationView[];
 }> {
-    const user = await requireUser();
+    const user = await requirePermission("inbox.read");
     const [ready, channels, conversations] = await Promise.all([
         bridgeConfigured(),
         listChannels(user.id),
@@ -76,7 +76,7 @@ export async function inboxStateAction(): Promise<{
 export async function connectChannelAction(
     input: z.infer<typeof connectChannelSchema>
 ): Promise<{ error?: string; channelId?: string; status?: string }> {
-    const user = await requireUser();
+    const user = await requirePermission("inbox.manage");
     const parsed = connectChannelSchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the form" };
     try {
@@ -94,7 +94,7 @@ export async function connectChannelAction(
 export async function channelStateAction(
     channelId: string
 ): Promise<ChannelLiveState & { error?: string }> {
-    const user = await requireUser();
+    const user = await requirePermission("inbox.read");
     try {
         return await channelState(user.id, channelId);
     } catch (caught) {
@@ -106,7 +106,7 @@ export async function channelStateAction(
 }
 
 export async function deleteChannelAction(channelId: string): Promise<{ error?: string }> {
-    const user = await requireUser();
+    const user = await requirePermission("inbox.manage");
     try {
         await deleteChannel(user.id, channelId);
         revalidatePath("/inbox");
@@ -130,7 +130,7 @@ const updateChannelSchema = z.object({
 export async function updateChannelAction(
     input: z.infer<typeof updateChannelSchema>
 ): Promise<{ error?: string; status?: string }> {
-    const user = await requireUser();
+    const user = await requirePermission("inbox.manage");
     const parsed = updateChannelSchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the form" };
     const { channelId, ...patch } = parsed.data;
@@ -149,7 +149,7 @@ export async function updateChannelAction(
 export async function reconnectChannelAction(
     channelId: string
 ): Promise<{ error?: string; status?: string }> {
-    const user = await requireUser();
+    const user = await requirePermission("inbox.manage");
     try {
         const { status } = await reconnectChannel(user.id, channelId);
         revalidatePath("/inbox");
@@ -162,14 +162,14 @@ export async function reconnectChannelAction(
 }
 
 export async function listConversationsAction(): Promise<ConversationView[]> {
-    const user = await requireUser();
+    const user = await requirePermission("inbox.read");
     return listConversations(user.id);
 }
 
 /** Send targets (servers -> channels) for a channel whose adapter enumerates them
  *  (Discord), for the recipient picker. Empty for other platforms or an old bridge. */
 export async function listChannelTargetsAction(channelId: string): Promise<TargetGroup[]> {
-    const user = await requireUser();
+    const user = await requirePermission("inbox.read");
     if (!z.string().uuid().safeParse(channelId).success) return [];
     try {
         return await listChannelTargets(user.id, channelId);
@@ -182,19 +182,19 @@ export async function listChannelTargetsAction(channelId: string): Promise<Targe
  *  channel picker when a specific bot channel is not already in context (Contacts).
  *  Null when no Discord bot is connected. */
 export async function firstDiscordChannelAction(): Promise<string | null> {
-    const user = await requireUser();
+    const user = await requirePermission("inbox.read");
     const channels = await listChannels(user.id);
     return channels.find((c) => c.platform === "discord" && c.status === "connected")?.id ?? null;
 }
 
 /** Recent messaging activity across the owner's channels, for the Logs view. */
 export async function listActivityAction(): Promise<ActivityView[]> {
-    const user = await requireUser();
+    const user = await requirePermission("inbox.read");
     return listMessagingActivity(user.id);
 }
 
 export async function getMessagesAction(conversationId: string): Promise<MessageView[]> {
-    const user = await requireUser();
+    const user = await requirePermission("inbox.read");
     return getConversationMessages(user.id, conversationId);
 }
 
@@ -202,7 +202,7 @@ export async function getMessagesAction(conversationId: string): Promise<Message
 export async function deleteConversationAction(
     conversationId: string
 ): Promise<{ error?: string }> {
-    const user = await requireUser();
+    const user = await requirePermission("inbox.manage");
     if (!z.string().uuid().safeParse(conversationId).success) return { error: "Invalid request" };
     try {
         await deleteConversation(user.id, conversationId);
@@ -217,7 +217,7 @@ export async function deleteConversationAction(
 
 /** Workspace users a conversation can be assigned to (support agents). */
 export async function listAgentsAction(): Promise<AgentView[]> {
-    await requireUser();
+    await requirePermission("inbox.read");
     return listAgents();
 }
 
@@ -231,7 +231,7 @@ const assignSchema = z.object({
 export async function assignConversationAction(
     input: z.infer<typeof assignSchema>
 ): Promise<{ error?: string }> {
-    const user = await requireUser();
+    const user = await requirePermission("inbox.manage");
     const parsed = assignSchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid request" };
     try {
@@ -250,7 +250,7 @@ export async function assignConversationAction(
 export async function sendMessageAction(
     input: z.infer<typeof sendSchema>
 ): Promise<{ error?: string }> {
-    const user = await requireUser();
+    const user = await requirePermission("inbox.manage");
     const parsed = sendSchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Nothing to send" };
     if (!parsed.data.text && !parsed.data.interactive) return { error: "Type a message first" };
@@ -276,7 +276,7 @@ const startConversationSchema = z.object({
 export async function startConversationAction(
     input: z.infer<typeof startConversationSchema>
 ): Promise<{ error?: string; conversationId?: string }> {
-    const user = await requireUser();
+    const user = await requirePermission("inbox.manage");
     const parsed = startConversationSchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the form" };
     try {
@@ -289,7 +289,7 @@ export async function startConversationAction(
 }
 
 export async function listContactsAction(): Promise<ContactView[]> {
-    const user = await requireUser();
+    const user = await requirePermission("inbox.read");
     return listContacts(user.id);
 }
 
@@ -305,7 +305,7 @@ const createContactSchema = z.object({
 export async function createContactAction(
     input: z.infer<typeof createContactSchema>
 ): Promise<{ error?: string; contact?: ContactView }> {
-    const user = await requireUser();
+    const user = await requirePermission("inbox.manage");
     const parsed = createContactSchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the form" };
     try {
@@ -325,7 +325,7 @@ const updateContactSchema = z.object({
 export async function updateContactAction(
     input: z.infer<typeof updateContactSchema>
 ): Promise<{ error?: string; contact?: ContactView }> {
-    const user = await requireUser();
+    const user = await requirePermission("inbox.manage");
     const parsed = updateContactSchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the form" };
     try {
@@ -346,7 +346,7 @@ const addIdentitySchema = z.object({
 export async function addContactIdentityAction(
     input: z.infer<typeof addIdentitySchema>
 ): Promise<{ error?: string; contact?: ContactView }> {
-    const user = await requireUser();
+    const user = await requirePermission("inbox.manage");
     const parsed = addIdentitySchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the form" };
     try {
@@ -367,7 +367,7 @@ const updateIdentitySchema = z.object({
 export async function updateContactIdentityAction(
     input: z.infer<typeof updateIdentitySchema>
 ): Promise<{ error?: string; contact?: ContactView }> {
-    const user = await requireUser();
+    const user = await requirePermission("inbox.manage");
     const parsed = updateIdentitySchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the form" };
     try {
@@ -382,7 +382,7 @@ export async function updateContactIdentityAction(
 export async function deleteContactIdentityAction(
     identityId: string
 ): Promise<{ error?: string; contact?: ContactView }> {
-    const user = await requireUser();
+    const user = await requirePermission("inbox.manage");
     if (!z.string().uuid().safeParse(identityId).success) return { error: "Invalid request" };
     try {
         return { contact: await deleteContactIdentity(user.id, identityId) };
@@ -392,7 +392,7 @@ export async function deleteContactIdentityAction(
 }
 
 export async function deleteContactAction(id: string): Promise<{ error?: string }> {
-    const user = await requireUser();
+    const user = await requirePermission("inbox.manage");
     try {
         await deleteContact(user.id, id);
         return {};

@@ -7,7 +7,7 @@
  */
 
 import { notFound } from "next/navigation";
-import { requireUser } from "@/lib/session";
+import { requirePermission } from "@/lib/session";
 import {
     getFileRequestForOwner,
     listSubmissionsForRequest,
@@ -27,7 +27,7 @@ export const dynamic = "force-dynamic";
 
 export default async function DropPointDetailPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params;
-    const user = await requireUser();
+    const user = await requirePermission("drive.read");
 
     const request = await getFileRequestForOwner(user.id, id);
     if (!request) notFound();

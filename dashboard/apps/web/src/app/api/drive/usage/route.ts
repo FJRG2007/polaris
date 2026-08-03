@@ -5,8 +5,8 @@
  * the meter. Auth is re-checked. Node runtime for Prisma and the drivers.
  */
 
-import { userHasPermission } from "@polaris/auth";
-import { requireUser } from "@/lib/session";
+
+import { requireUser, sessionCan } from "@/lib/session";
 import { requireDriveDriver, DriveAccessError, DriveLockedError } from "@/lib/drive-authz";
 
 export const runtime = "nodejs";
@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request: Request): Promise<Response> {
     const user = await requireUser();
-    if (!(await userHasPermission(user.id, "drive.read"))) {
+    if (!(await sessionCan(user, "drive.read"))) {
         return Response.json({ error: "Forbidden" }, { status: 403 });
     }
 

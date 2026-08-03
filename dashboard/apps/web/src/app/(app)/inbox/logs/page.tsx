@@ -4,14 +4,14 @@
  * state - useful for confirming a channel works end to end.
  */
 
-import { requireUser } from "@/lib/session";
+import { requirePermission } from "@/lib/session";
 import { listMessagingActivity } from "@/lib/messaging-service";
 import { LogsView } from "./logs-view";
 
 export const dynamic = "force-dynamic";
 
 export default async function LogsPage() {
-    const user = await requireUser();
+    const user = await requirePermission("inbox.read");
     const activity = await listMessagingActivity(user.id);
     return <LogsView initialActivity={activity} />;
 }

@@ -3,7 +3,7 @@ import { loadEnv } from "@polaris/config";
 import { listHosts } from "@/lib/host-service";
 import { ContainersView } from "./containers-view";
 import type { DockerTransport } from "@polaris/docker";
-import { requireUser, userHasManage } from "@/lib/session";
+import { requirePermission, userHasManage } from "@/lib/session";
 import { refreshCapabilities } from "@polaris/hostd-client";
 import type { DockerConnectionSummary, LocalHostDiagnostic } from "./types";
 import { HOST_DOCKER_PREFIX, listDockerConnections, LOCAL_DOCKER_CONNECTION_ID } from "@/lib/docker-service";
@@ -27,7 +27,7 @@ export default async function ContainersPage({
 }: {
     searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-    const user = await requireUser();
+    const user = await requirePermission("deploy.read");
     const params = await searchParams;
     const sshEnabled = loadEnv().POLARIS_SSH_ENABLED;
 

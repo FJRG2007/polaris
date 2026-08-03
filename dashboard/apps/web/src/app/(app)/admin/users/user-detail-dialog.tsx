@@ -11,13 +11,14 @@
  */
 
 import { useRouter } from "next/navigation";
-import { INVITE_ROLES } from "@polaris/core";
+import type { RoleOption } from "@/lib/role-service";
 import { useConfirm } from "@/components/confirm-dialog";
 import type { SessionView } from "@/lib/session-directory";
 import { SessionsTable } from "@/components/sessions-table";
 import type { DirectoryUser } from "@/lib/user-admin-service";
+import { viewAsUserAction } from "@/app/(app)/view-as-actions";
 import { useDisplayFormat } from "@/components/display-format";
-import { Ban, LogOut, Shield, Trash2, Undo2 } from "lucide-react";
+import { Ban, Eye, LogOut, Shield, Trash2, Undo2 } from "lucide-react";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import {
     AccessRulesEditor,
@@ -64,11 +65,14 @@ function Fact({ label, children }: { label: string; children: ReactNode }) {
 export function UserDetailDialog({
     user,
     groups,
+    roles,
     isSelf,
     onOpenChange
 }: {
     user: DirectoryUser;
     groups: AccessGroupOption[];
+    /** Every role this instance defines, for the picker. */
+    roles: RoleOption[];
     isSelf: boolean;
     onOpenChange: (open: boolean) => void;
 }) {
@@ -107,6 +111,12 @@ export function UserDetailDialog({
         await loadSessions();
         router.refresh();
         return true;
+    }
+
+    /** Leave the operator screens behind and carry on as this person. The root
+     *  resolves where their own access starts, which is rarely where you are. */
+    async function onViewAs() {
+        if (await run(() => viewAsUserAction(user.id))) router.push("/");
     }
 
     async function onDelete() {
@@ -161,8 +171,29 @@ export function UserDetailDialog({
                                 placeholder="No role"
                                 disabled={busy}
                                 onValueChange={(next) => void run(() => setUserRoleAction(user.id, next))}
-                                options={INVITE_ROLES.map((name) => ({ value: name, label: name }))}
+                                options={roles.map((option) => ({ value: option.name, label: option.name }))}
                             />
+                        </div>
+                        <div className="flex items-center justify-between gap-3">
+                            <div className="min-w-0">
+                                <p className="flex items-center gap-1.5 text-sm">
+                                    <Eye className="size-4 text-muted-foreground" />
+                                    Open their account
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                    Use Polaris as {user.name}, to see what they see and fix it where they are.
+                                    Nothing is signed in on their side and it is written to the activity log.
+                                </p>
+                            </div>
+                            <Button
+                                size="sm"
+                                variant="ghost"
+                                disabled={busy || isSelf}
+                                onClick={() => void onViewAs()}
+                            >
+                                <Eye className="size-4" />
+                                Open
+                            </Button>
                         </div>
                         <div className="flex items-center justify-between gap-3">
                             <div className="min-w-0">

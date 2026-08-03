@@ -24,6 +24,8 @@ export const SCOPE_LABELS: Readonly<Record<Permission, string>> = {
     "deploy.manage": "Manage deployments",
     "tasks.read": "Read tasks",
     "tasks.manage": "Manage tasks",
+    "inbox.read": "Read conversations",
+    "inbox.manage": "Manage conversations",
     "users.manage": "Manage users",
     "settings.manage": "Manage settings",
     "system.manage": "Manage the system"
@@ -43,6 +45,8 @@ export const SCOPE_HINTS: Readonly<Record<Permission, string>> = {
     "deploy.manage": "Deploy, restart, and remove apps.",
     "tasks.read": "Read spaces, lists, and tasks.",
     "tasks.manage": "Create and change tasks, lists, and spaces.",
+    "inbox.read": "Read conversations, contacts, and channel activity.",
+    "inbox.manage": "Reply, assign, and connect or remove channels.",
     "users.manage": "Invite, edit, and remove users.",
     "settings.manage": "Change instance settings.",
     "system.manage": "Run updates and system operations."
@@ -60,5 +64,6 @@ export const SCOPE_GROUPS: readonly ScopeGroup[] = [
     { title: "Sharing", scopes: ["shares.create", "shares.manage", "requests.create", "requests.manage"] },
     { title: "Deployments", scopes: ["deploy.read", "deploy.manage"] },
     { title: "Tasks", scopes: ["tasks.read", "tasks.manage"] },
+    { title: "Inbox", scopes: ["inbox.read", "inbox.manage"] },
     { title: "Administration", scopes: ["users.manage", "settings.manage", "system.manage"] }
 ];

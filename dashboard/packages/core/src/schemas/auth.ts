@@ -6,6 +6,7 @@
 
 import { z } from "zod";
 import { accessRulesSchema } from "./account-security.js";
+import { MAX_ROLE_NAME_LENGTH, PERMISSIONS } from "../permissions.js";
 
 export const emailField = z.string().trim().min(1, "Email is required").email("Enter a valid email");
 export const nameField = z.string().trim().min(1, "Name is required").max(120);
@@ -44,7 +45,18 @@ export const acceptInviteSchema = z.object({
     password: passwordField
 });
 
-export const INVITE_ROLES = ["admin", "member", "viewer"] as const;
+/**
+ * The role an invite hands out. Roles are rows an operator can add to, so this
+ * is a name rather than a closed list; that the name exists is settled against
+ * the database when the invite is created, not by the shape of the form.
+ */
+export const roleNameField = z
+    .string()
+    .trim()
+    .toLowerCase()
+    .min(1, "Pick a role")
+    .max(MAX_ROLE_NAME_LENGTH, `At most ${MAX_ROLE_NAME_LENGTH} characters`)
+    .regex(/^[a-z0-9 _-]+$/, "Use letters, numbers, spaces, - or _");
 
 /**
  * How an invite travels and what its recipient presents to claim it:
@@ -99,10 +111,18 @@ export const inviteOneTimePasswordField = z
  */
 export const createInviteSchema = accessRulesSchema.extend({
     email: emailField,
-    role: z.enum(INVITE_ROLES).default("member"),
+    role: roleNameField.default("member"),
     method: z.enum(INVITE_METHODS).default("link"),
     oneTimePassword: inviteOneTimePasswordField.optional()
 });
+
+/** A role's grants, as the roles editor saves them. The wildcard is not offered:
+ *  it belongs to the one role that is not editable. */
+export const roleGrantsSchema = z.object({
+    permissions: z.array(z.enum(PERMISSIONS)).max(PERMISSIONS.length)
+});
+
+export const createRoleSchema = roleGrantsSchema.extend({ name: roleNameField });
 
 /**
  * Why an invite cannot be claimed, and what the join page says about it. Every
@@ -131,4 +151,5 @@ export type LoginInput = z.infer<typeof loginSchema>;
 export type SetupInput = z.infer<typeof setupSchema>;
 export type AcceptInviteInput = z.infer<typeof acceptInviteSchema>;
 export type CreateInviteInput = z.infer<typeof createInviteSchema>;
+export type CreateRoleInput = z.infer<typeof createRoleSchema>;
 export type ClaimInviteInput = z.infer<typeof claimInviteSchema>;

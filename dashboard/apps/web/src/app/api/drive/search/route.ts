@@ -9,8 +9,7 @@
  */
 
 import { normalizeRelPath } from "@polaris/core";
-import { userHasPermission } from "@polaris/auth";
-import { requireUser } from "@/lib/session";
+import { requireUser, sessionCan } from "@/lib/session";
 import { getDriverForConnection, SmbShareRequiredError } from "@/lib/storage-service";
 import { authorizeDrive, DriveAccessError, DriveLockedError } from "@/lib/drive-authz";
 import { listLocks } from "@/lib/access-lock-service";
@@ -28,7 +27,7 @@ const MAX_NODES = 20000;
 
 export async function GET(request: Request): Promise<Response> {
     const user = await requireUser();
-    if (!(await userHasPermission(user.id, "drive.read"))) {
+    if (!(await sessionCan(user, "drive.read"))) {
         return Response.json({ error: "Forbidden" }, { status: 403 });
     }
 

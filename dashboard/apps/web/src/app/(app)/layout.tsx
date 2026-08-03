@@ -1,11 +1,14 @@
 import type { ReactNode } from "react";
-import { requireUser } from "@/lib/session";
 import { AppNav } from "@/components/app-nav";
 import { appBaseUrl } from "@/lib/domain-service";
 import { getCapabilities } from "@polaris/config";
+import { reachableAppIds } from "@/lib/app-access";
 import { AppSidebar } from "@/components/app-sidebar";
 import { AppUrlProvider } from "@/components/app-url";
+import { accessFor, requireUser } from "@/lib/session";
 import { AccountMenu } from "@/components/account-menu";
+import { DeniedNotice } from "@/components/denied-notice";
+import { ViewAsBanner } from "@/components/view-as-banner";
 import { AppNavDrawer } from "@/components/app-nav-drawer";
 import { CommandPalette } from "@/components/command-palette";
 import { listNotifications } from "@/lib/notification-service";
@@ -30,10 +33,11 @@ import { NotificationsProvider } from "@/components/notifications/notifications-
 export default async function AppLayout({ children }: { children: ReactNode }) {
     const user = await requireUser();
     const capabilities = getCapabilities();
-    const [notifications, display, baseUrl] = await Promise.all([
+    const [notifications, display, baseUrl, apps] = await Promise.all([
         listNotifications(user.id),
         resolveDisplayPreferencesFor(user.id),
-        appBaseUrl()
+        appBaseUrl(),
+        reachableAppIds(accessFor(user))
     ]);
 
     return (
@@ -42,9 +46,9 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
                 <DisplayFormatProvider preferences={display}>
                     <NotificationsProvider initial={notifications}>
                         <AppShell
-                            switcher={<AppNav isAdmin={user.isAdmin} />}
+                            switcher={<AppNav appIds={apps} />}
                             navButton={<AppNavDrawer />}
-                            search={<CommandPalette isAdmin={user.isAdmin} />}
+                            search={<CommandPalette isAdmin={user.isAdmin} appIds={apps} />}
                             sidebar={<AppSidebar />}
                             account={
                                 <>
@@ -59,7 +63,15 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
                                 </>
                             }
                         >
+                            <DeniedNotice />
                             <RouteSkeletonCapture>{children}</RouteSkeletonCapture>
+                            {user.viewingAs ? (
+                                <ViewAsBanner
+                                    mode={user.viewingAs.mode}
+                                    label={user.viewingAs.label}
+                                    actorName={user.viewingAs.actorName}
+                                />
+                            ) : null}
                         </AppShell>
                     </NotificationsProvider>
                 </DisplayFormatProvider>
