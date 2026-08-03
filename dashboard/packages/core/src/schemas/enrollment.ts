@@ -105,6 +105,12 @@ export type ClaimEnrollmentInput = z.infer<typeof claimEnrollmentSchema>;
  * one of these codes and nothing else, and there is one for every way the script
  * can stop rather than only for the SSH checks.
  *
+ * A code stands for the state the machine was left in and not only for what went
+ * wrong, so two stops that fail the same way but leave the machine differently
+ * exposed cannot share one - the operator reading this may never see the terminal,
+ * and "go and turn it on" is the wrong thing to tell somebody whose machine is
+ * already on and open.
+ *
  * The endpoint that takes them is unauthenticated, so a free-text reason would be
  * a stranger writing into an operator's dashboard. Polaris keeps its own copy of
  * every sentence below and the machine only chooses between them.
@@ -113,6 +119,7 @@ export const ENROLLMENT_REFUSAL_REASONS = [
     "ssh-not-listening",
     "remote-login-off",
     "remote-login-unrestricted",
+    "remote-login-left-open",
     "no-ssh-host-keys",
     "no-home-directory",
     "no-user-tooling",
@@ -142,7 +149,9 @@ export const ENROLLMENT_REFUSAL_MESSAGES: Record<EnrollmentRefusalReason, string
     "remote-login-off":
         "The machine stopped before registering: Remote Login is off, so nothing would answer Polaris. Turn it on under System Settings > General > Sharing.",
     "remote-login-unrestricted":
-        `The machine stopped before registering: Remote Login could not be limited to the '${ENROLLMENT_USERNAME}' login, and turning it on for every account there is wider than this command grants. Turn it on and restrict it under System Settings > General > Sharing.`,
+        `The machine stopped before registering: Remote Login could not be limited to the '${ENROLLMENT_USERNAME}' login, and turning it on for every account there is wider than this command grants, so it was put back off the way the command found it. Turn it on and restrict it to that login under System Settings > General > Sharing.`,
+    "remote-login-left-open":
+        `The machine stopped before registering: Remote Login was turned on there, could not be limited to the '${ENROLLMENT_USERNAME}' login, and could not be confirmed back off - every account on that machine may be reachable over SSH right now. Turn Remote Login off, or restrict it to that login, under System Settings > General > Sharing.`,
     "no-ssh-host-keys":
         "The machine stopped before registering: it has no SSH host keys and none could be generated. Install an SSH server there.",
     "no-home-directory":

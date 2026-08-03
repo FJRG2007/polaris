@@ -232,7 +232,7 @@ describe("enrollmentScript", () => {
     // group existed, read before anything touches it.
     it("narrows only the access list it created itself, never one already here", () => {
         expect(script).toContain("access_ssh_exists() {");
-        expect(script).toContain("dseditgroup -o read com.apple.access_ssh");
+        expect(script).toContain("dscl . -list /Groups");
         expect(script).toContain("ACCESS_LIST=$(access_ssh_exists)");
         // Read before the toggle is changed, so it is the state this script found.
         const darwin = script.slice(script.indexOf("read_remote_login\n"));
@@ -254,16 +254,26 @@ describe("enrollmentScript", () => {
     });
 
     // A group read that failed is not a group that is absent, and the two used to
-    // be the same answer: any output that did not name the group was "no", so a
-    // directory service that would not answer got the operator's list narrowed.
-    // Only a refusal that says the record is not there is an absence.
+    // be the same answer twice over: first any output that did not name the group
+    // was "no", and then absence was a refusal whose exact prose had to be
+    // recognized - so a wording Apple never promised to keep decided whether a
+    // stock Mac could enroll at all. Asking which groups exist makes absence
+    // something the answer contains, and leaves only a listing that failed
+    // outright as the thing nobody learned.
     it("tells an access list that is not there from one it could not read", () => {
         const reader = script.slice(script.indexOf("access_ssh_exists() {"));
         const body = reader.slice(0, reader.indexOf("\n    }"));
-        expect(body).toContain("if _read=$(dseditgroup -o read com.apple.access_ssh 2>&1); then");
-        expect(body).toContain('*"not found"*|*"edsrecordnotfound"*|*"no such"*) echo no ;;');
-        // Every other ending, including a tool that is not installed, is unknown.
-        expect(body.match(/echo unknown/g)).toHaveLength(3);
+        expect(body).toContain("_groups=$(dscl . -list /Groups 2>/dev/null) || _groups=\"\"");
+        // Absence is the listing not naming it, matched whole rather than anywhere
+        // in a line, and never parsed out of an error message.
+        expect(body).toContain("grep -qxF com.apple.access_ssh");
+        expect(body).not.toContain("not found");
+        expect(body).not.toContain("edsrecordnotfound");
+        // A tool that is not installed and a listing that answered nothing are the
+        // only two ways to learn nothing.
+        expect(body.match(/echo unknown/g)).toHaveLength(2);
+        expect(body).toContain("command -v dscl");
+        expect(body).toContain('[ -n "$_groups" ] || { echo unknown; return; }');
     });
 
     // Turning Remote Login on is the one thing here that widens the machine, and it
@@ -321,11 +331,40 @@ describe("enrollmentScript", () => {
         expect(failed).toContain("systemsetup -setremotelogin -f off </dev/null");
         expect(failed).toContain("die remote-login-unrestricted");
         expect(failed).not.toContain("say ");
+        // The switch goes first and the group second, because the switch is the one
+        // that can refuse: until the machine says Remote Login is off, that group is
+        // whatever still gates SSH to one login, and deleting it first turned a
+        // failed switch-off into a machine open to every account on it.
+        expect(failed.indexOf("systemsetup -setremotelogin -f off")).toBeLessThan(
+            failed.indexOf("dseditgroup -o delete")
+        );
         // 'off' is claimed only on a machine that says it is off; anything else is
         // told to the operator as a machine that may be open right now.
         expect(failed).toContain('if [ "$REMOTE_LOGIN" = "no" ]');
         expect(failed).toContain("could not confirm it went back off");
         expect(script).not.toContain("WARNING: turned Remote Login on, but SSH could not be limited");
+    });
+
+    // One code for both halves told the dashboard to go and turn Remote Login on -
+    // right for the machine that was put back off, and the exact wrong thing to say
+    // about one that is on and open right now. The terminal is not where this gets
+    // read, so the state the machine was left in is what the code has to carry.
+    it("does not report a machine left open as one that was put back safely", () => {
+        const enabled = script.slice(script.indexOf("dseditgroup -o create -q"));
+        const failed = enabled.slice(enabled.indexOf("\n            else"), enabled.indexOf("\n        else"));
+        const reverted = failed.indexOf("die remote-login-unrestricted");
+        const open = failed.indexOf("die remote-login-left-open");
+        expect(reverted).toBeGreaterThan(-1);
+        expect(open).toBeGreaterThan(reverted);
+        // The reverted one is the arm of the read-back, and the open one is what is
+        // left when that read did not say "off".
+        expect(failed.slice(reverted, open)).toContain("was put back off");
+        expect(failed.slice(open)).toContain("may be reachable over SSH right now");
+        expect(ENROLLMENT_REFUSAL_MESSAGES["remote-login-left-open"]).toContain("may be reachable over SSH right now");
+        // And Polaris's own sentence for it does not send anybody to switch on what
+        // is already on.
+        expect(ENROLLMENT_REFUSAL_MESSAGES["remote-login-left-open"]).not.toMatch(/turn it on/i);
+        expect(ENROLLMENT_REFUSAL_MESSAGES["remote-login-unrestricted"]).toContain("put back off");
     });
 
     it("says how to undo the Remote Login changes it can make", () => {
@@ -483,6 +522,21 @@ describe("enrollmentScript", () => {
         expect(probe).toContain("SSH_PORT=$OBSERVED_PORT");
     });
 
+    // `set -e` is on, so an assignment from a pipeline that exits non-zero takes the
+    // script down where it stands - before the claim, without reaching `die`, and
+    // therefore without telling Polaris anything. An awk that is not on root's PATH
+    // is enough to do it, and the dialog would go back to waiting the command out
+    // and blaming the clock.
+    it("cannot be killed by the listener probe itself failing", () => {
+        const probe = script.slice(script.indexOf("SSH_PROBE=none"));
+        const observed = probe.slice(probe.indexOf("OBSERVED_PORT="));
+        expect(observed.slice(0, observed.indexOf("\n"))).toContain('|| OBSERVED_PORT=""');
+        // The two candidate sweeps read their tables inside an `if`, where a
+        // non-zero status is the condition rather than a fatal error.
+        expect(probe).toContain('if [ -n "$OBSERVED_PORT" ]');
+        expect(probe).toContain('if owned_by "$port" systemd');
+    });
+
     // An observed listener beats a parse. This is also what makes the port Polaris
     // dials right on a box where the parse was wrong but nothing was ever broken.
     it("lets the port sshd is actually on win, and refuses only if nothing is there", () => {
@@ -518,6 +572,7 @@ describe("enrollmentScript", () => {
                 "ssh-not-listening",
                 "remote-login-off",
                 "remote-login-unrestricted",
+                "remote-login-left-open",
                 "no-ssh-host-keys",
                 "no-home-directory",
                 "no-user-tooling",
@@ -585,7 +640,9 @@ describe("enrollmentScript", () => {
     it("does not promise a re-run the command may be too old for", () => {
         expect(script).not.toContain("then run this command again\"");
         const dies =
-            script.match(/die (?:ssh-not-listening|remote-login-off|remote-login-unrestricted) "[^"]*"/g) ?? [];
+            script.match(
+                /die (?:ssh-not-listening|remote-login-off|remote-login-unrestricted|remote-login-left-open) "[^"]*"/g
+            ) ?? [];
         expect(dies).toHaveLength(5);
         for (const message of dies) expect(message).toContain("$POLARIS_RETRY_HINT");
     });

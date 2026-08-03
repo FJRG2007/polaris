@@ -86,8 +86,9 @@ export function enrollmentScript(input: EnrollmentScriptInput): string {
 #     '${input.username}' login. An access list this machine already had is added
 #     to and never narrowed, and so is a Mac that already had Remote Login on -
 #     the script says which of the two it did. If it cannot read that list, or
-#     cannot read back the limit it just set, it stops and leaves Remote Login
-#     off rather than opening the machine to every account on it.
+#     cannot read back the limit it just set, it stops and puts Remote Login back
+#     off rather than leaving the machine open to every account on it - and says
+#     so, loudly, in the one case where even that could not be confirmed.
 #   - the docker group membership, only with --docker
 #   - /etc/sudoers.d/${input.username}, only with --root
 #
@@ -390,16 +391,23 @@ fi`;
  * be able to say "I do not know". Turning Remote Login on is the one thing here
  * that widens the machine, and it is only safe on an answer this can act on: a
  * list that was not there is one this script may shape, and a list that was there
- * belongs to whoever built it and gates SSH already. Anything else - `dseditgroup`
- * missing under the sudo PATH, a directory service that would not answer - is not
- * a machine to open on a guess, so it stops with the machine exactly as it was
- * found and tells the operator to make that call themselves.
+ * belongs to whoever built it and gates SSH already. Anything else - `dscl` missing
+ * under the sudo PATH, a directory service that would not answer - is not a machine
+ * to open on a guess, so it stops with the machine exactly as it was found and
+ * tells the operator to make that call themselves. Which is also why the question
+ * is "which groups are there" and not "read me this group": absence is then
+ * something the answer contains rather than something inferred from the wording of
+ * a refusal, and a stock Mac - the machine this whole check was written for - is
+ * never mistaken for a directory that would not answer.
  *
  * The same rule governs the other end. If the narrowing cannot be read back, the
  * machine is wider than it was found and a printed warning does not fix that;
  * nobody is obliged to be watching the terminal. So what was turned on is turned
  * back off, the group this script made goes with it, and the stop is reported like
- * any other.
+ * any other. In that order, because turning off is the step that can refuse: the
+ * group is what still gates SSH until it does. And a machine left on because even
+ * the switch back could not be confirmed is not the same news as one put safely
+ * back, so the two stops do not share a code.
  */
 function darwinRemoteLoginSection(): string {
     return `read_remote_login() {
@@ -425,23 +433,17 @@ function darwinRemoteLoginSection(): string {
     # nobody could read is not a group known to be absent, and only a positive "it
     # was not there" makes the list this script's own.
     #
-    # Which is why the read is judged on how it ended and not on its output alone.
-    # A group that is not there is a refusal that names it; a read that failed for
-    # any other reason prints nothing to match either, and calling that "not there"
-    # is how a list somebody else built gets narrowed.
+    # Asked as "which groups are there" rather than "read me this one", because the
+    # difference between a group that is absent and a read that failed is the whole
+    # question, and reading one group answers both with a refusal whose wording
+    # Apple has never contracted to keep. A listing answers it by what it contains:
+    # a stock Mac has no such group and says so by not naming it, and only a listing
+    # that failed outright is nothing having been learned.
     access_ssh_exists() {
-        command -v dseditgroup >/dev/null 2>&1 || { echo unknown; return; }
-        if _read=\$(dseditgroup -o read com.apple.access_ssh 2>&1); then
-            case "\$_read" in
-                *com.apple.access_ssh*) echo yes ;;
-                *) echo unknown ;;
-            esac
-            return
-        fi
-        case "\$(printf '%s' "\$_read" | tr '[:upper:]' '[:lower:]')" in
-            *"not found"*|*"edsrecordnotfound"*|*"no such"*) echo no ;;
-            *) echo unknown ;;
-        esac
+        command -v dscl >/dev/null 2>&1 || { echo unknown; return; }
+        _groups=\$(dscl . -list /Groups 2>/dev/null) || _groups=""
+        [ -n "\$_groups" ] || { echo unknown; return; }
+        if printf '%s\\n' "\$_groups" | grep -qxF com.apple.access_ssh; then echo yes; else echo no; fi
     }
 
     read_remote_login
@@ -480,7 +482,16 @@ function darwinRemoteLoginSection(): string {
                 # turned on goes back off and the group this script made goes with
                 # it - it was not here a moment ago, and half of one is worse than
                 # none the next time somebody enables Remote Login by hand.
-                dseditgroup -o delete com.apple.access_ssh >/dev/null 2>&1 || true
+                #
+                # The switch first and the group second, because the switch is the
+                # one that can refuse. Until Remote Login is off that group is
+                # whatever still gates SSH to one login - the narrowing may well have
+                # taken and only the reading of it failed - so deleting it first and
+                # then failing to switch off would open the machine to every account
+                # on it, on precisely the path this branch exists to close. Once the
+                # machine says it is off the group gates nothing, and only then does
+                # it go.
+                #
                 # -f only suppresses the confirmation on the way off, which is
                 # exactly where it is needed: stdin is this script and cannot answer.
                 systemsetup -setremotelogin -f off </dev/null >/dev/null 2>&1 || true
@@ -489,9 +500,14 @@ function darwinRemoteLoginSection(): string {
                 # machine that says it is off.
                 read_remote_login
                 if [ "\$REMOTE_LOGIN" = "no" ]; then
+                    dseditgroup -o delete com.apple.access_ssh >/dev/null 2>&1 || true
                     die remote-login-unrestricted "SSH could not be limited to the '\$POLARIS_USER' login, so Remote Login was put back off, the way this found it. Turn it on and restrict it to that login in System Settings > General > Sharing, \$POLARIS_RETRY_HINT"
                 fi
-                die remote-login-unrestricted "turned Remote Login on, could not limit SSH to the '\$POLARIS_USER' login, and could not confirm it went back off - every account on this machine may be reachable over SSH right now. Turn it off, or restrict it, in System Settings > General > Sharing, \$POLARIS_RETRY_HINT"
+                # A machine that is on and may be open to everybody is a different
+                # thing to be told than one that was put back off, and the dashboard
+                # is where this gets read - so it carries its own code rather than
+                # sending somebody to switch on what is already on.
+                die remote-login-left-open "turned Remote Login on, could not limit SSH to the '\$POLARIS_USER' login, and could not confirm it went back off - every account on this machine may be reachable over SSH right now. Turn it off, or restrict it, in System Settings > General > Sharing, \$POLARIS_RETRY_HINT"
             fi
         else
             # The list was here first, so it is added to and never narrowed:
@@ -617,8 +633,11 @@ function linuxListenerSection(): string {
         say "no ss or netstat here, so whether anything is listening could not be checked"
     else
         SSH_LISTENING=unknown
-        # What sshd is bound to, whatever declared it.
-        OBSERVED_PORT=\$(printf '%s\\n' "\$LISTENERS_OWNED" | reachable_listener "" sshd)
+        # What sshd is bound to, whatever declared it. An empty answer on the way
+        # out too: with 'set -e' on, an awk that is not on root's PATH would take
+        # the script down here rather than through 'die', and a stop that reports
+        # nothing is the one thing this whole section is built not to have.
+        OBSERVED_PORT=\$(printf '%s\\n' "\$LISTENERS_OWNED" | reachable_listener "" sshd) || OBSERVED_PORT=""
         if [ -n "\$OBSERVED_PORT" ]; then
             SSH_PORT=\$OBSERVED_PORT
             SSH_LISTENING=yes
