@@ -10,6 +10,10 @@ export interface ServerRow {
     /** The SSH user for a registered host, empty for the local box - whose machine
      *  name arrives with the status poll rather than blocking the page. */
     detail: string;
+    /** What the machine last said it runs ("Ubuntu 24.04.1 LTS"). Empty until it
+     *  has been probed once, which is every server registered before Polaris
+     *  started asking. */
+    os: string;
     address: string;
     port: number | null;
     authMethod: string | null;

@@ -1013,6 +1013,12 @@ model Host {
     wildcardDomain      String?
     // Server public key (base64) pinned on the trust-on-add test connect.
     hostKey             String?
+    // What the machine says it runs, as it words it ("Ubuntu 24.04.1 LTS",
+    // "macOS 15.3"). Reported at enrollment and refreshed whenever the machine is
+    // probed. Kept rather than asked for on every render so the list still says
+    // what a server is while the server is unreachable.
+    os                  String?
+    osProbedAt          DateTime?
     // Envelope-encrypted credentials (password, or private key + passphrase).
     encryptedCredential Bytes?
     credentialNonce     Bytes?

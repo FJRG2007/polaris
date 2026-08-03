@@ -11,7 +11,9 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/session";
 import { recordAudit } from "@/lib/audit-service";
+import type { ServerMetrics } from "@/lib/server-probe";
 import { setLocalEnvironment } from "@/lib/network-service";
+import { getServerMetrics } from "@/lib/server-metrics-service";
 import { getLocalHostId, setLocalHostId, setLocalServerName } from "@/lib/local-server";
 import { createHost, renameHost, setHostEnvironment, setHostWildcardDomain } from "@/lib/host-service";
 import {
@@ -183,6 +185,22 @@ export async function enrollmentStatusAction(id: string): Promise<EnrollmentStat
 export async function cancelEnrollmentAction(id: string): Promise<void> {
     const user = await requirePermission("system.manage");
     await cancelEnrollment(id, user.id);
+}
+
+/**
+ * What a server is running and what is eating it, for the panel behind a row.
+ *
+ * A machine that is off, unreachable or slow is an ordinary outcome here, not an
+ * error worth throwing: the panel says it could not read the server and everything
+ * else on screen stays usable.
+ */
+export async function serverMetricsAction(hostId: string): Promise<ServerMetrics | null> {
+    const user = await requirePermission("system.manage");
+    try {
+        return await getServerMetrics(hostId, user.id);
+    } catch {
+        return null;
+    }
 }
 
 /** What removing this server would take with it, for the confirmation dialog. */

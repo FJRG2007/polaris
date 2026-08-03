@@ -24,11 +24,11 @@ const DARWIN_UID_FLOOR = 300;
  * The one-liner an operator pastes. `sh` rather than `bash`, so it runs on a
  * minimal Alpine box and on a Mac without assuming a shell either one ships.
  *
- * Container-engine access and root are separate, visible arguments rather than
- * things the script decides for itself. Both are effectively root on the machine,
- * and neither is a thing to grant because a socket happened to be present or
- * because it would be convenient - they stay in the command where whoever runs it
- * can read what they are agreeing to.
+ * Container-engine access and root are always granted, and stay spelled out as
+ * arguments rather than being folded into the URL. A server Polaris can reach but
+ * cannot deploy to, run jobs on, or read the filesystem of is a server it can do
+ * nothing with, so this is what adding one means; the arguments keep it readable
+ * to whoever runs the command, and the script still prints each grant it makes.
  *
  * No `-f`. A refusal from this endpoint is a shell script that explains itself and
  * exits non-zero, and `-f` throws that body away: the operator gets `curl: (22)
@@ -36,15 +36,8 @@ const DARWIN_UID_FLOOR = 300;
  * successful run and the dialog waits forever. Errors curl raises itself are still
  * printed - that is what `-S` is for.
  */
-export function enrollmentCommand(
-    baseUrl: string,
-    token: string,
-    grantDocker = false,
-    grantRoot = false
-): string {
-    const url = `${baseUrl}/api/servers/enroll/${token}`;
-    const flags = [grantDocker ? "--docker" : null, grantRoot ? "--root" : null].filter(Boolean);
-    return flags.length > 0 ? `curl -sSL ${url} | sudo sh -s -- ${flags.join(" ")}` : `curl -sSL ${url} | sudo sh`;
+export function enrollmentCommand(baseUrl: string, token: string): string {
+    return `curl -sSL ${baseUrl}/api/servers/enroll/${token} | sudo sh -s -- --docker --root`;
 }
 
 export interface EnrollmentScriptInput {
@@ -69,8 +62,10 @@ export function enrollmentScript(input: EnrollmentScriptInput): string {
 # This adds a dedicated, password-less login called '${input.username}' to this
 # machine and authorizes one SSH key for it - the key Polaris generated and kept.
 #
-# On its own that login can do no more than any ordinary account. Two arguments
-# widen it, and both are opt-in because both amount to root:
+# Two arguments widen that login, and adding a server passes both - a server
+# Polaris cannot deploy to, run jobs on, or read the filesystem of is one it can
+# do nothing with. They are spelled out rather than implied so this command says
+# what it does before you run it:
 #   --docker  lets the login use the container engine, which on most systems is
 #             equivalent to root
 #   --root    lets the login run any command as root without a password, which
@@ -909,6 +904,20 @@ fi`;
 function reportSection(): string {
     return `HOSTNAME_VALUE=\$(hostname 2>/dev/null || echo "server")
 
+# What this machine calls itself, in its own words. Reported now so the server
+# says what it is from the moment it appears, instead of staying blank until
+# something goes and asks it. Quotes and backslashes are dropped rather than
+# escaped: the value is spliced into a JSON string below, and there is no version
+# of an operating system name that needs either.
+OS_NAME=""
+if [ -r /etc/os-release ]; then
+    OS_NAME=\$(. /etc/os-release 2>/dev/null; printf '%s' "\${PRETTY_NAME:-\${NAME:-}}")
+elif command -v sw_vers >/dev/null 2>&1; then
+    OS_NAME="\$(sw_vers -productName 2>/dev/null) \$(sw_vers -productVersion 2>/dev/null)"
+fi
+[ -n "\$OS_NAME" ] || OS_NAME=\$(uname -s 2>/dev/null || echo "")
+OS_NAME=\$(printf '%s' "\$OS_NAME" | tr -d '"\\\\' | cut -c1-200)
+
 # The machine commits to its host keys here, while this script still has root on
 # it. Polaris refuses to trust any other key later, which is what stops something
 # else on the network from answering in its place.
@@ -955,8 +964,8 @@ done`;
  *  see, because the machine is already configured and only the call home broke. */
 function claimSection(): string {
     return `say "telling Polaris about this machine..."
-BODY=\$(printf '{"hostname":"%s","platform":"%s","arch":"%s","username":"%s","port":%s,"docker":%s,"root":%s,"hostKeys":[%s],"addresses":[%s]}' \\
-    "\$HOSTNAME_VALUE" "\$PLATFORM" "\$ARCH" "\$POLARIS_USER" "\$SSH_PORT" "\$DOCKER_PRESENT" "\$HAS_ROOT" "\$HOST_KEYS" "\$ADDRESSES")
+BODY=\$(printf '{"hostname":"%s","platform":"%s","arch":"%s","os":"%s","username":"%s","port":%s,"docker":%s,"root":%s,"hostKeys":[%s],"addresses":[%s]}' \\
+    "\$HOSTNAME_VALUE" "\$PLATFORM" "\$ARCH" "\$OS_NAME" "\$POLARIS_USER" "\$SSH_PORT" "\$DOCKER_PRESENT" "\$HAS_ROOT" "\$HOST_KEYS" "\$ADDRESSES")
 
 # No -f: a refusal from Polaris carries a body explaining itself, and -f would
 # throw it away and leave the operator with nothing but an exit code.

@@ -39,22 +39,20 @@ export const ENROLLMENT_RETRY_HINT =
 /** The login the script provisions. A dedicated account, never the operator's. */
 export const ENROLLMENT_USERNAME = "polaris";
 
-/** Opening an enrollment. The name is a placeholder until the machine reports its
- *  own hostname; the environment is the one question no probe can answer. */
+/**
+ * Opening an enrollment. The name is a placeholder until the machine reports its
+ * own hostname; the environment is the one question no probe can answer.
+ *
+ * Container access and root are not asked for. A server Polaris cannot deploy to,
+ * run jobs on, or reach the filesystem of is a server Polaris cannot do anything
+ * with, so adding one has always meant granting both - offering them as choices
+ * only produced servers that were registered and then useless. The command still
+ * carries them as visible arguments, and the script still says what it granted.
+ */
 export const createEnrollmentSchema = z.object({
     kind: enrollmentKindSchema.default("server"),
     name: z.string().trim().min(1).max(120).default("New server"),
-    environment: serverEnvironmentSchema.default("unknown"),
-    /** Whether the printed command also grants the login container-engine access.
-     *  On most systems that is equivalent to root, so it is asked for rather than
-     *  inferred, and it stays visible as an argument in the command itself. */
-    grantDocker: z.boolean().default(false),
-    /** Whether the login may act as root through password-less sudo. This is the
-     *  widest thing an enrollment can grant - it makes the key Polaris holds a root
-     *  credential for the machine - so like container access it is an explicit
-     *  argument in the command rather than something inferred, and the script says
-     *  out loud when it grants it. */
-    grantRoot: z.boolean().default(false)
+    environment: serverEnvironmentSchema.default("unknown")
 });
 
 export type CreateEnrollmentInput = z.infer<typeof createEnrollmentSchema>;
@@ -79,6 +77,11 @@ export const claimEnrollmentSchema = z.object({
         .regex(/^[A-Za-z0-9][A-Za-z0-9.\-_]*$/, "Not a hostname"),
     platform: z.enum(ENROLLMENT_PLATFORMS),
     arch: z.string().trim().min(1).max(32),
+    /** What the machine calls the system it runs ("Ubuntu 24.04.1 LTS"). Free text
+     *  because every distribution words it differently, so it is bounded and shown
+     *  as the machine's own claim rather than parsed into fields Polaris invented.
+     *  Absent from an older script, and from anything that has no answer. */
+    os: z.string().trim().max(200).optional(),
     username: z.string().trim().min(1).max(64),
     port: z.coerce.number().int().positive().max(65535).default(22),
     hostKeys: z.array(hostKeyLineSchema).min(1).max(10),

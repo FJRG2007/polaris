@@ -324,6 +324,12 @@ export async function claimEnrollment(
             username: payload.username,
             authMethod: "key",
             sudo: payload.root,
+            // The machine's own words for what it runs, so the list says what this
+            // server is from the moment it appears rather than after something has
+            // gone and asked it. Absent from an older script, and refreshed by
+            // every later probe.
+            os: payload.os || null,
+            osProbedAt: payload.os ? new Date() : null,
             environment: resolveEnvironment(row.environment, address),
             hostKey,
             encryptedCredential: credentials.ciphertext,

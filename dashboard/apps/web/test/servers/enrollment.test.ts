@@ -101,7 +101,7 @@ describe("ENROLLMENT_RETRY_HINT", () => {
 describe("enrollmentCommand", () => {
     it("stays a plain pipe into sh so it runs on a minimal box", () => {
         expect(enrollmentCommand("https://polaris.example.com", "tok")).toBe(
-            "curl -sSL https://polaris.example.com/api/servers/enroll/tok | sudo sh"
+            "curl -sSL https://polaris.example.com/api/servers/enroll/tok | sudo sh -s -- --docker --root"
         );
     });
 
@@ -110,18 +110,14 @@ describe("enrollmentCommand", () => {
     // pipeline that exits 0 - the command looks like it worked and nothing arrives.
     it("does not throw away the body a refusal explains itself in", () => {
         expect(enrollmentCommand("https://polaris.example.com", "tok")).not.toContain("-f");
-        expect(enrollmentCommand("https://polaris.example.com", "tok", true, true)).not.toContain("-f");
     });
 
-    it("keeps container access visible as an argument rather than hiding it", () => {
-        expect(enrollmentCommand("https://polaris.example.com", "tok", true)).toContain("-- --docker");
-    });
-
-    // Both are root on the machine in practice, so neither is ever conceded by a
-    // command that does not say so on its face.
-    it("keeps root visible too, alongside or without container access", () => {
-        expect(enrollmentCommand("https://polaris.example.com", "tok", false, true)).toContain("-- --root");
-        expect(enrollmentCommand("https://polaris.example.com", "tok", true, true)).toContain("-- --docker --root");
+    // A server Polaris cannot deploy to, run jobs on, or read the filesystem of is
+    // one it can do nothing with, so adding a server grants both rather than
+    // offering choices that produced registered-but-useless machines. They stay
+    // spelled out as arguments so the command still says what it does.
+    it("grants container access and root without asking", () => {
+        expect(enrollmentCommand("https://polaris.example.com", "tok")).toContain("-- --docker --root");
     });
 });
 
@@ -164,6 +160,22 @@ describe("enrollmentScript", () => {
 
     it("refuses to run unprivileged rather than failing halfway through", () => {
         expect(script).toContain('[ "$(id -u)" = "0" ] || die not-root "run this with sudo"');
+    });
+
+    // Reported at enrollment so a new server says what it runs the moment it
+    // appears, instead of staying blank until something goes and asks it.
+    it("reports what the machine runs, in the machine's own words", () => {
+        expect(script).toContain("/etc/os-release");
+        expect(script).toContain("sw_vers -productName");
+        expect(script).toContain('"os":"%s"');
+        expect(script).toContain('"$OS_NAME"');
+    });
+
+    // The value is spliced into a JSON string, and it is free text from a file on
+    // somebody else's machine.
+    it("strips what would break the JSON it splices the system name into", () => {
+        expect(script).toContain("tr -d '\"\\\\'");
+        expect(script).toContain("cut -c1-200");
     });
 
     it("makes the machine commit to its host keys", () => {

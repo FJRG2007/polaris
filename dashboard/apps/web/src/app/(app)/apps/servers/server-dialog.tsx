@@ -12,6 +12,7 @@
  */
 
 import { useState } from "react";
+import { ServerUsage } from "./server-usage";
 import { renameServerAction } from "./actions";
 import { CopyButton } from "@/components/copy-button";
 import type { ServerRow, ServerStatus } from "./types";
@@ -71,6 +72,10 @@ function Body({
                     server's name instead of carrying the previous one over. */}
                 <RenameForm key={server.id} server={server} onRenamed={onRenamed} />
                 <Reachability server={server} status={status} />
+                {/* Only a registered server has a login to read itself through.
+                    Keyed by host so switching rows reads the new machine instead
+                    of leaving the previous one's numbers on screen. */}
+                {server.hostId ? <ServerUsage key={server.hostId} hostId={server.hostId} /> : null}
                 {local ? <LocalNote /> : <Connect server={server} />}
             </div>
         </>

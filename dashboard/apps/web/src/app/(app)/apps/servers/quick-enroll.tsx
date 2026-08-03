@@ -17,8 +17,8 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Button, Input, Select } from "@polaris/ui";
 import type { ServerEnvironment } from "@polaris/core";
-import { Button, Checkbox, Input, Select } from "@polaris/ui";
 import { Check, Copy, Terminal, TriangleAlert } from "lucide-react";
 import { ENVIRONMENT_CHOICES, ENVIRONMENT_META } from "./environment-meta";
 import { cancelEnrollmentAction, enrollmentStatusAction, openEnrollmentAction } from "./actions";
@@ -43,12 +43,6 @@ export function QuickEnroll({ onDone, kind = "server" }: { onDone: () => void; k
     const router = useRouter();
     const isLocal = kind === "local";
     const [environment, setEnvironment] = useState<ServerEnvironment>("unknown");
-    // On by default: without it the server can be reached but not deployed to and
-    // not given CI jobs, which is what almost everybody is adding one for.
-    const [grantDocker, setGrantDocker] = useState(true);
-    // Off by default, unlike containers: this one is not needed to deploy or to run
-    // jobs, and it is the widest thing the command can grant.
-    const [grantRoot, setGrantRoot] = useState(false);
     const [name, setName] = useState("");
     const [opened, setOpened] = useState<Opened | null>(null);
     const [pending, setPending] = useState(false);
@@ -117,9 +111,7 @@ export function QuickEnroll({ onDone, kind = "server" }: { onDone: () => void; k
             name: name.trim() || (isLocal ? "This server" : "New server"),
             // This machine's location is already settled elsewhere (it is where
             // Polaris runs), so enrolling it never re-asks.
-            environment: isLocal ? "unknown" : environment,
-            grantDocker,
-            grantRoot
+            environment: isLocal ? "unknown" : environment
         });
         setPending(false);
         if (result.error || !result.enrollment) {
@@ -238,33 +230,11 @@ export function QuickEnroll({ onDone, kind = "server" }: { onDone: () => void; k
                 </label>
             )}
 
-            <label className="flex items-start gap-2 text-sm">
-                <Checkbox
-                    checked={grantDocker}
-                    onChange={(event) => setGrantDocker(event.target.checked)}
-                />
-                <span>
-                    Let Polaris manage containers on this server
-                    <span className="block text-xs text-muted-foreground">
-                        Needed to deploy there or run CI jobs on it. Adds the login to the docker
-                        group, which on most systems is the same as giving it root - turn it off for a
-                        server you only want a shell and files on.
-                    </span>
-                </span>
-            </label>
-
-            <label className="flex items-start gap-2 text-sm">
-                <Checkbox checked={grantRoot} onChange={(event) => setGrantRoot(event.target.checked)} />
-                <span>
-                    Let Polaris act as root on this server
-                    <span className="block text-xs text-muted-foreground">
-                        Password-less sudo for the login. You get a root shell and the whole filesystem
-                        in Drive, and the key Polaris holds becomes a root credential for this machine -
-                        so whoever can reach Polaris can reach root here. Undo it later by deleting
-                        /etc/sudoers.d/polaris.
-                    </span>
-                </span>
-            </label>
+            <p className="text-xs text-muted-foreground">
+                The command adds a dedicated login, lets it manage containers and gives it
+                password-less sudo, which is what deploying, CI jobs and the file browser need. Undo
+                it later by deleting the login and /etc/sudoers.d/polaris.
+            </p>
 
             {error ? <p className="text-sm text-danger">{error}</p> : null}
 

@@ -141,6 +141,12 @@ export function ServersView({ servers }: { servers: ServerRow[] }) {
                                             // height so the row does not jump when it lands.
                                             <Skeleton className="mt-0.5 inline-block h-3 w-24 align-middle" />
                                         )}
+                                        {/* On this line rather than in a column of its own: the
+                                            table already carries six, and a seventh is what makes
+                                            it unreadable on a laptop. */}
+                                        {server.os ? (
+                                            <span className="ml-1.5 border-l border-border pl-1.5">{server.os}</span>
+                                        ) : null}
                                     </span>
                                 </td>
                                 <td className="px-3 py-2 text-muted-foreground">
