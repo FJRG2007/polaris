@@ -2373,6 +2373,11 @@ model Domain {
     healthCode    Int?
     healthLatencyMs Int?
     healthDetail  String?
+    // Consecutive failed probes, so one bad minute does not page anybody, and the
+    // timestamp of the alert that was actually sent - which is also what says the
+    // recovery is worth mentioning. Null = nobody has been told this is down.
+    healthFailures  Int      @default(0)
+    healthAlertedAt DateTime?
 
     application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
 

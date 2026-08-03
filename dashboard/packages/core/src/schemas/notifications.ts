@@ -85,6 +85,24 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         defaults: { inapp: false, email: false }
     },
     {
+        id: "domain.down",
+        group: "deploy",
+        label: "A domain stopped serving",
+        description: "A domain pointed at one of your services stopped answering.",
+        level: "danger",
+        // Mail on by default, and deliberately so: this one is noticed by whoever is
+        // looking at the site, and the owner is usually not.
+        defaults: { inapp: true, email: true }
+    },
+    {
+        id: "domain.up",
+        group: "deploy",
+        label: "A domain started serving again",
+        description: "A domain that had stopped answering is reachable again.",
+        level: "success",
+        defaults: { inapp: true, email: false }
+    },
+    {
         id: "tasks.assigned",
         group: "tasks",
         label: "Assigned a task",
