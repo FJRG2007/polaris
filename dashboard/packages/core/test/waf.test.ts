@@ -20,7 +20,8 @@ describe("guard rule codec", () => {
             deny: ["10.0.0.0/8", "203.0.113.5"],
             requireLogin: true,
             browserIntegrity: false,
-            injectionProtection: true,
+            sqlInjectionProtection: true,
+            xssProtection: true,
             emailObfuscation: false,
             presets: [],
             rules: [CUSTOM_RULE]
@@ -33,7 +34,8 @@ describe("guard rule codec", () => {
             deny: [],
             requireLogin: false,
             browserIntegrity: false,
-            injectionProtection: false,
+            sqlInjectionProtection: false,
+            xssProtection: false,
             emailObfuscation: false,
             presets: [],
             rules: []
@@ -45,7 +47,8 @@ describe("guard rule codec", () => {
             deny: [],
             requireLogin: true,
             browserIntegrity: false,
-            injectionProtection: true,
+            sqlInjectionProtection: true,
+            xssProtection: true,
             emailObfuscation: false,
             presets: [],
             rules: []
@@ -58,11 +61,21 @@ describe("guard rule codec", () => {
             deny: ["10.0.0.1"],
             requireLogin: false,
             browserIntegrity: false,
-            injectionProtection: false,
+            sqlInjectionProtection: false,
+            xssProtection: false,
             emailObfuscation: false,
             presets: [],
             rules: []
         });
+    });
+
+    it("reads a pre-split header as both injection checks", () => {
+        // An edge materialized before the split still stamps the single `i` flag, and
+        // keeps both protections until its route is rewritten.
+        const header = Buffer.from(JSON.stringify({ d: [], l: false, i: true })).toString("base64");
+        const rule = decodeGuardRule(header);
+        expect(rule.sqlInjectionProtection).toBe(true);
+        expect(rule.xssProtection).toBe(true);
     });
 
     it("drops one unreadable custom rule and keeps the rest", () => {
@@ -116,14 +129,15 @@ describe("edge token", () => {
 describe("wafRuleInputSchema", () => {
     it("accepts a valid rule and applies defaults", () => {
         const parsed = wafRuleInputSchema.parse({ ipAllowlist: ["10.0.0.0/8"] });
-        // Injection protection and email obfuscation default ON, which is what "on
+        // The two injection checks and email obfuscation default ON, which is what "on
         // everywhere" means at the schema level rather than at the UI's.
         expect(parsed).toEqual({
             ipAllowlist: ["10.0.0.0/8"],
             ipDenylist: [],
             requireLogin: false,
             browserIntegrity: false,
-            injectionProtection: true,
+            sqlInjectionProtection: true,
+            xssProtection: true,
             emailObfuscation: true,
             presets: [],
             rules: []

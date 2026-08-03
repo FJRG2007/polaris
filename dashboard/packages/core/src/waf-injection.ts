@@ -6,6 +6,12 @@
  * carrying an attack in its own URL. `/product?id=1' OR 1=1--` is a legitimate path
  * with a payload glued to it, so no path list and no user-agent list can see it.
  *
+ * The two classes are separate controls - a scope can arm one and leave the other off -
+ * because they fail differently. A site whose query strings legitimately carry SQL-ish
+ * text has no reason to also stop refusing script tags, and one that renders untrusted
+ * markup on purpose has no reason to stop refusing `UNION SELECT`. They are still read
+ * in a single pass: the class that is off is not matched, not matched-and-ignored.
+ *
  * Three properties matter more than breadth here, in this order:
  *
  *  - It costs nothing. One pass over the request line, no allocation at all for the
@@ -36,6 +42,17 @@ export interface WafInjectionRequest {
     readonly path?: string | null;
     readonly query?: string | null;
     readonly userAgent?: string | null;
+}
+
+/** Which classes of payload to look for. Both off is not a check that finds nothing, it
+ *  is a check that never runs - the caller is expected to skip it entirely. */
+export interface WafInjectionChecks {
+    /** Match SQL injection signatures: quoted conditions, `UNION SELECT`, stacked
+     *  statements, metadata tables, timing functions. */
+    readonly sql: boolean;
+    /** Match cross-site scripting signatures: script-capable tags, inline event
+     *  handlers, `javascript:` URLs, script calls and document/window access. */
+    readonly xss: boolean;
 }
 
 /**
@@ -444,31 +461,39 @@ function endsStatement(text: string, start: number): boolean {
  * `union` and `select` are the two that need to remember something, so they are
  * carried in rather than looked up: both are ordinary English words and only count
  * when the other one is in the same run of text (see `scan` for what breaks a run).
+ *
+ * A word belonging to a class that is switched off is skipped rather than matched and
+ * discarded, so leaving one class on costs nothing for the other's keywords.
  */
 function keywordVerdict(
     word: string,
     text: string,
     end: number,
     sawUnion: boolean,
-    sawSelect: boolean
+    sawSelect: boolean,
+    checks: WafInjectionChecks
 ): string | null {
-    if (sawUnion && word === "select") return "sql union select";
-    if (sawSelect && word === "from") return "sql select";
-    if (SQL_MARKERS.has(word)) return "sql metadata access";
-    if (COMPARISON_HEADS.has(word) && comparesConstants(text, end)) return "sql always-true condition";
-    if (SQL_CALLS.has(word) && codeAfterFiller(text, end) === 40) return "sql function call";
-    const tail = STATEMENT_TAILS.get(word);
-    if (tail) {
-        const next = wordAfterFiller(text, end);
-        if (next && tail.has(next)) return `sql ${word} statement`;
+    if (checks.sql) {
+        if (sawUnion && word === "select") return "sql union select";
+        if (sawSelect && word === "from") return "sql select";
+        if (SQL_MARKERS.has(word)) return "sql metadata access";
+        if (COMPARISON_HEADS.has(word) && comparesConstants(text, end)) return "sql always-true condition";
+        if (SQL_CALLS.has(word) && codeAfterFiller(text, end) === 40) return "sql function call";
+        const tail = STATEMENT_TAILS.get(word);
+        if (tail) {
+            const next = wordAfterFiller(text, end);
+            if (next && tail.has(next)) return `sql ${word} statement`;
+        }
     }
-    if (SCRIPT_CALLS.has(word) && codeAfterFiller(text, end) === 40) return "script call";
-    if (EVENT_HANDLERS.has(word) && codeAfterFiller(text, end) === 61) return "html event handler";
-    if (SCRIPT_SCHEMES.has(word) && text.charCodeAt(end) === 58) return "script url";
-    if (word === "data" && text.startsWith(":text/html", end)) return "script url";
-    if (SCRIPT_OBJECTS.has(word) && text.charCodeAt(end) === 46) {
-        const member = wordAfterFiller(text, end + 1);
-        if (member && SCRIPT_MEMBERS.has(member)) return "script object access";
+    if (checks.xss) {
+        if (SCRIPT_CALLS.has(word) && codeAfterFiller(text, end) === 40) return "script call";
+        if (EVENT_HANDLERS.has(word) && codeAfterFiller(text, end) === 61) return "html event handler";
+        if (SCRIPT_SCHEMES.has(word) && text.charCodeAt(end) === 58) return "script url";
+        if (word === "data" && text.startsWith(":text/html", end)) return "script url";
+        if (SCRIPT_OBJECTS.has(word) && text.charCodeAt(end) === 46) {
+            const member = wordAfterFiller(text, end + 1);
+            if (member && SCRIPT_MEMBERS.has(member)) return "script object access";
+        }
     }
     return null;
 }
@@ -482,7 +507,7 @@ function keywordVerdict(
  * `?sort=select&group=from` from reading as SQL: a real injection writes its keywords
  * inside one value, separated by spaces or comments, and never across a parameter.
  */
-function scan(text: string): string | null {
+function scan(text: string, checks: WafInjectionChecks): string | null {
     let sawUnion = false;
     let sawSelect = false;
     let sawQuote = false;
@@ -492,7 +517,7 @@ function scan(text: string): string | null {
         if (code < 128 && WORD[code] === 1) {
             const end = wordEnd(text, index);
             const word = text.slice(index, end);
-            const verdict = keywordVerdict(word, text, end, sawUnion, sawSelect);
+            const verdict = keywordVerdict(word, text, end, sawUnion, sawSelect, checks);
             if (verdict) return verdict;
             if (word === "union") sawUnion = true;
             else if (word === "select") sawSelect = true;
@@ -521,23 +546,25 @@ function scan(text: string): string | null {
                 if (text.charCodeAt(index + 1) === 42) {
                     // `/*!` is MySQL's versioned comment: code that only the database
                     // runs, which is the point of writing it.
-                    if (text.charCodeAt(index + 2) === 33) return "sql comment";
+                    if (checks.sql && text.charCodeAt(index + 2) === 33) return "sql comment";
                     const close = text.indexOf("*/", index + 2);
                     index = close < 0 ? text.length : close + 2;
                     continue;
                 }
                 break;
             case 45:
-                if (text.charCodeAt(index + 1) === 45 && sawQuote && endsStatement(text, index + 2)) {
+                if (checks.sql && text.charCodeAt(index + 1) === 45 && sawQuote && endsStatement(text, index + 2)) {
                     return "sql comment";
                 }
                 break;
             case 59: {
+                if (!checks.sql) break;
                 const next = wordAfterFiller(text, index + 1);
                 if (next && STACKED.has(next)) return "stacked sql statement";
                 break;
             }
             case 60: {
+                if (!checks.xss) break;
                 const tag = tagAt(text, index);
                 if (tag) return `html <${tag}> tag`;
                 break;
@@ -554,9 +581,14 @@ function scan(text: string): string | null {
 }
 
 /** One part of the request, gated then scanned. */
-function inspect(value: string | null | undefined, where: string, gate: Uint8Array): string | null {
+function inspect(
+    value: string | null | undefined,
+    where: string,
+    gate: Uint8Array,
+    checks: WafInjectionChecks
+): string | null {
     if (!value || !suspicious(value, gate)) return null;
-    const verdict = scan(normalize(value));
+    const verdict = scan(normalize(value), checks);
     return verdict ? `${verdict} in the ${where}` : null;
 }
 
@@ -572,11 +604,16 @@ function inspect(value: string | null | undefined, where: string, gate: Uint8Arr
  * through the stricter header gate: it is where an injection aimed at whatever logs
  * or displays the request goes instead, and it is also the one part of this that is
  * present on every single request.
+ *
+ * `checks` says which of the two classes are armed. Neither reads nothing at all,
+ * which keeps a caller that forwards a scope's settings honest without having to
+ * remember to skip the call.
  */
-export function injectionFailure(request: WafInjectionRequest): string | null {
+export function injectionFailure(request: WafInjectionRequest, checks: WafInjectionChecks): string | null {
+    if (!checks.sql && !checks.xss) return null;
     return (
-        inspect(request.query, "query", SUSPECT) ??
-        inspect(request.path, "path", SUSPECT) ??
-        inspect(request.userAgent, "user agent", SUSPECT_HEADER)
+        inspect(request.query, "query", SUSPECT, checks) ??
+        inspect(request.path, "path", SUSPECT, checks) ??
+        inspect(request.userAgent, "user agent", SUSPECT_HEADER, checks)
     );
 }

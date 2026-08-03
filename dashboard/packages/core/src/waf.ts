@@ -20,9 +20,12 @@ export interface GuardRule {
     /** Refuse requests whose headers do not hold together as a browser's. Optional on
      *  the way in (an older edge config predates it), always present on the way out. */
     readonly browserIntegrity?: boolean;
-    /** Refuse requests whose URL carries a SQL injection or XSS payload. Optional on
-     *  the way in (an older edge config predates it), always present on the way out. */
-    readonly injectionProtection?: boolean;
+    /** Refuse requests whose URL carries a SQL injection payload. Optional on the way
+     *  in (an older edge config predates it), always present on the way out. */
+    readonly sqlInjectionProtection?: boolean;
+    /** Refuse requests whose URL carries a cross-site scripting payload. Separate from
+     *  the SQL check above: a scope can arm either on its own. */
+    readonly xssProtection?: boolean;
     /** Rewrite email addresses in served HTML. Carried here rather than in a config of
      *  its own so one header describes everything the guard does to a route - but note
      *  it is the only entry the forwardAuth path ignores, because it changes the
@@ -38,15 +41,17 @@ export interface GuardRule {
 }
 
 /** Encode a guard rule for the X-Polaris-Waf header (base64 of compact JSON:
- *  `d` = denylist, `l` = require-login, `b` = browser integrity, `i` = injection
- *  protection, `e` = email obfuscation, `p` = pack ids, `r` = custom rules). */
+ *  `d` = denylist, `l` = require-login, `b` = browser integrity, `s` = SQL injection
+ *  protection, `x` = XSS protection, `e` = email obfuscation, `p` = pack ids,
+ *  `r` = custom rules). */
 export function encodeGuardRule(rule: GuardRule): string {
     return Buffer.from(
         JSON.stringify({
             d: rule.deny,
             l: rule.requireLogin,
             b: rule.browserIntegrity === true,
-            i: rule.injectionProtection === true,
+            s: rule.sqlInjectionProtection === true,
+            x: rule.xssProtection === true,
             e: rule.emailObfuscation === true,
             p: rule.presets ?? [],
             r: rule.rules
@@ -58,19 +63,22 @@ const EMPTY_RULE: GuardRule = {
     deny: [],
     requireLogin: false,
     browserIntegrity: false,
-    injectionProtection: false,
+    sqlInjectionProtection: false,
+    xssProtection: false,
     emailObfuscation: false,
     presets: [],
     rules: []
 };
-/** Everything a rule can refuse with, for a header that arrived unreadable. Injection
- *  protection is on here even though the empty rule leaves it off: the empty rule is
- *  "no rule was attached", this one is "a rule was attached and we cannot read it". */
+/** Everything a rule can refuse with, for a header that arrived unreadable. Both
+ *  injection checks are on here even though the empty rule leaves them off: the empty
+ *  rule is "no rule was attached", this one is "a rule was attached and we cannot read
+ *  it". */
 const FAIL_CLOSED: GuardRule = {
     deny: [],
     requireLogin: true,
     browserIntegrity: false,
-    injectionProtection: true,
+    sqlInjectionProtection: true,
+    xssProtection: true,
     emailObfuscation: false,
     presets: [],
     rules: []
@@ -128,17 +136,25 @@ function decodeUncached(header: string): GuardRule {
                 l?: unknown;
                 b?: unknown;
                 i?: unknown;
+                s?: unknown;
+                x?: unknown;
                 e?: unknown;
                 p?: unknown;
                 r?: unknown;
             };
             const deny = Array.isArray(obj.d) ? obj.d.filter((v): v is string => typeof v === "string") : [];
             const presets = Array.isArray(obj.p) ? obj.p.filter((v): v is string => typeof v === "string") : [];
+            // `i` is the single injection flag the two below were split out of. A route
+            // materialized before the split still carries it, and keeps both checks
+            // until its edge is rewritten - dropping one silently on upgrade would be a
+            // protection removed by a deploy nobody asked to change anything.
+            const legacy = obj.i === true;
             return {
                 deny,
                 requireLogin: obj.l === true,
                 browserIntegrity: obj.b === true,
-                injectionProtection: obj.i === true,
+                sqlInjectionProtection: obj.s === true || legacy,
+                xssProtection: obj.x === true || legacy,
                 emailObfuscation: obj.e === true,
                 presets,
                 rules: [...parseRules(obj.r), ...expandWafPresets(presets)]

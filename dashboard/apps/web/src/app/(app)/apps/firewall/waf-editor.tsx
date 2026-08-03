@@ -34,7 +34,7 @@ import { getWafRuleAction, setWafRuleAction, type WafScopeRule } from "./actions
 import { Ban, Loader2, Mail, ScanFace, ShieldCheck, TriangleAlert } from "lucide-react";
 import { WAF_PRESETS, WAF_RULES_MAX, type WafCustomRule, type WafPreset, type WafScopeType } from "@polaris/core";
 
-/** The scope as nothing has ever been written to it. Injection protection and
+/** The scope as nothing has ever been written to it. The injection checks and
  *  obfuscation are on here for the same reason they are on in the schema: that is the
  *  state of an unconfigured Polaris. */
 const BLANK: WafScopeRule = {
@@ -42,7 +42,8 @@ const BLANK: WafScopeRule = {
     ipDenylist: [],
     requireLogin: false,
     browserIntegrity: false,
-    injectionProtection: true,
+    sqlInjectionProtection: true,
+    xssProtection: true,
     emailObfuscation: true,
     presets: [],
     rules: []
@@ -254,11 +255,18 @@ export function WafEditor({
             >
                 <div className="-mx-4 -mb-4 flex flex-col divide-y divide-border border-t border-border">
                     <ToggleRow
-                        title="Block SQL injection and cross-site scripting"
-                        description="Checks the URL of every request against injection signatures and refuses the ones carrying a payload: quoted conditions, UNION SELECT, script tags, event handlers. Encoded payloads are decoded first. It reads the request line, so a payload in a POST body is not visible to it."
-                        checked={saved.injectionProtection}
+                        title="Block SQL injection"
+                        description="Refuses a request whose URL carries a SQL payload: quoted always-true conditions, UNION SELECT, stacked statements, metadata tables, timing functions. Encoded payloads are decoded first. It reads the request line, so a payload in a POST body is not visible to it."
+                        checked={saved.sqlInjectionProtection}
                         disabled={busy}
-                        onChange={(on) => persist({ injectionProtection: on })}
+                        onChange={(on) => persist({ sqlInjectionProtection: on })}
+                    />
+                    <ToggleRow
+                        title="Block cross-site scripting"
+                        description="Refuses a request whose URL carries a script payload: script tags, inline event handlers, javascript: URLs, document.cookie access. Encoded payloads are decoded first. It reads the request line, so a payload in a POST body is not visible to it."
+                        checked={saved.xssProtection}
+                        disabled={busy}
+                        onChange={(on) => persist({ xssProtection: on })}
                     />
                     {WAF_PRESETS.map((preset) => (
                         <PresetRow

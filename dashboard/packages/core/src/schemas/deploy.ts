@@ -234,15 +234,24 @@ export const wafRuleInputSchema = z
          */
         browserIntegrity: z.boolean().default(false),
         /**
-         * Refuse a request whose own URL carries a SQL injection or XSS payload.
+         * Refuse a request whose own URL carries a SQL injection payload.
          *
          * On by default, unlike the integrity check above, because it is not a
          * heuristic about the client: every signature it matches is a string that
          * cannot occur in an honest request line (see waf-injection.ts). It combines
          * across scopes the way email obfuscation does rather than the way the other
-         * refusals do - see `injectionProtection` in ResolvedWaf.
+         * refusals do - see `sqlInjectionProtection` in ResolvedWaf.
          */
-        injectionProtection: z.boolean().default(true),
+        sqlInjectionProtection: z.boolean().default(true),
+        /**
+         * Refuse a request whose own URL carries a cross-site scripting payload.
+         *
+         * Its own control rather than half of the one above: the two are armed and
+         * switched off for different reasons, and a scope that has to allow SQL-ish
+         * text in a query string has no reason to also stop refusing script tags.
+         * Defaults and scope combination match the SQL check exactly.
+         */
+        xssProtection: z.boolean().default(true),
         /**
          * Rewrite email addresses in served HTML so a harvester reading the source
          * finds an encoded token instead. On everywhere unless something switches it
@@ -284,7 +293,7 @@ export interface ResolvedWaf {
      *  broader one's decision to refuse it. */
     readonly browserIntegrity: boolean;
     /**
-     * True only if EVERY scope leaves injection protection on.
+     * True only if EVERY scope leaves SQL injection protection on.
      *
      * It refuses traffic, so unioning is the shape the rest of this file argues for -
      * and it is on by default, which is what changes the answer. A default that unions
@@ -295,7 +304,11 @@ export interface ResolvedWaf {
      * switch it back on. Exempting a single URL rather than a whole scope is what the
      * custom `allow` rules above it are for.
      */
-    readonly injectionProtection: boolean;
+    readonly sqlInjectionProtection: boolean;
+    /** True only if EVERY scope leaves XSS protection on. Resolved separately from the
+     *  SQL check and for the same reasons - the scope that has to allow one of them
+     *  rarely has to allow the other. */
+    readonly xssProtection: boolean;
     /**
      * True only if EVERY scope leaves email obfuscation on.
      *

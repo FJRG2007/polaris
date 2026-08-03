@@ -99,7 +99,8 @@ export function renderDashboardConfig(hosts: readonly string[], waf?: DashboardW
     const rules = waf?.rules ?? [];
     const presets = waf?.presets ?? [];
     const browserIntegrity = waf?.browserIntegrity === true;
-    const injectionProtection = waf?.injectionProtection === true;
+    const sqlInjectionProtection = waf?.sqlInjectionProtection === true;
+    const xssProtection = waf?.xssProtection === true;
 
     const middlewares: string[] = [];
     const definitions: string[] = [
@@ -112,13 +113,20 @@ export function renderDashboardConfig(hosts: readonly string[], waf?: DashboardW
         middlewares.push(mw);
         definitions.push(`    ${mw}:`, "      ipAllowList:", `        sourceRange: [${allow.map((entry) => `"${entry}"`).join(", ")}]`);
     }
-    if (deny.length > 0 || presets.length > 0 || rules.length > 0 || browserIntegrity || injectionProtection) {
+    if (
+        deny.length > 0 ||
+        presets.length > 0 ||
+        rules.length > 0 ||
+        browserIntegrity ||
+        sqlInjectionProtection ||
+        xssProtection
+    ) {
         middlewares.push(WAF_CTX, WAF_GUARD);
         definitions.push(
             `    ${WAF_CTX}:`,
             "      headers:",
             "        customRequestHeaders:",
-            `          X-Polaris-Waf: "${encodeGuardRule({ deny, presets, rules, requireLogin: false, browserIntegrity, injectionProtection })}"`,
+            `          X-Polaris-Waf: "${encodeGuardRule({ deny, presets, rules, requireLogin: false, browserIntegrity, sqlInjectionProtection, xssProtection })}"`,
             `    ${WAF_GUARD}:`,
             "      forwardAuth:",
             `        address: "${guardUrl()}/authz"`
@@ -168,8 +176,10 @@ export interface DashboardWaf {
     readonly rules?: readonly WafCustomRule[];
     /** Refuse requests whose headers do not hold together as a browser's. */
     readonly browserIntegrity?: boolean;
-    /** Refuse requests whose URL carries a SQL injection or XSS payload. */
-    readonly injectionProtection?: boolean;
+    /** Refuse requests whose URL carries a SQL injection payload. */
+    readonly sqlInjectionProtection?: boolean;
+    /** Refuse requests whose URL carries a cross-site scripting payload. */
+    readonly xssProtection?: boolean;
 }
 
 /**
@@ -228,7 +238,8 @@ export async function syncDashboardRoute(): Promise<void> {
             presets: waf.presets,
             rules: waf.rules,
             browserIntegrity: waf.browserIntegrity,
-            injectionProtection: waf.injectionProtection
+            sqlInjectionProtection: waf.sqlInjectionProtection,
+            xssProtection: waf.xssProtection
         };
         await writeFile(join(dynamicDir(), FILE), renderDashboardConfig(hosts, rule), "utf8");
     } catch (error) {

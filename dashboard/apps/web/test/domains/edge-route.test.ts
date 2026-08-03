@@ -113,10 +113,13 @@ describe("guarding the dashboard itself", () => {
     it("carries injection protection on its own", () => {
         // On by default, so this is the dashboard's normal state rather than a
         // configured one, and it is the only thing putting the guard in front of it.
-        const config = renderDashboardConfig(["polaris.fjrg2007.com"], { injectionProtection: true });
+        // Either check alone is enough, since either can be the one left on.
+        for (const waf of [{ sqlInjectionProtection: true }, { xssProtection: true }]) {
+            const config = renderDashboardConfig(["polaris.fjrg2007.com"], waf);
 
-        expect(config).toContain("X-Polaris-Waf");
-        expect(config).toContain("polaris-dashboard-waf-guard");
+            expect(config).toContain("X-Polaris-Waf");
+            expect(config).toContain("polaris-dashboard-waf-guard");
+        }
     });
 
     it("narrows the route to an allowlist natively", () => {

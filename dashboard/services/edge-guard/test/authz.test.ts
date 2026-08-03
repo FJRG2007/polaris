@@ -331,7 +331,13 @@ describe("browser integrity", () => {
  */
 describe("injection protection", () => {
     function armed(rules: WafCustomRule[] = []) {
-        return encodeGuardRule({ deny: [], requireLogin: false, injectionProtection: true, rules });
+        return encodeGuardRule({
+            deny: [],
+            requireLogin: false,
+            sqlInjectionProtection: true,
+            xssProtection: true,
+            rules
+        });
     }
 
     it("does nothing until it is armed", () => {
@@ -399,5 +405,35 @@ describe("injection protection", () => {
         );
 
         expect(decision.status).toBe(200);
+    });
+
+    it("enforces each class on its own", () => {
+        const sqlOnly = encodeGuardRule({
+            deny: [],
+            requireLogin: false,
+            sqlInjectionProtection: true,
+            xssProtection: false,
+            rules: []
+        });
+        const xssOnly = encodeGuardRule({
+            deny: [],
+            requireLogin: false,
+            sqlInjectionProtection: false,
+            xssProtection: true,
+            rules: []
+        });
+
+        expect(
+            evaluate({ wafHeader: sqlOnly, forwardedHost: HOST, forwardedUri: "/p?id=1' or 1=1--" }, cfg).status
+        ).toBe(403);
+        expect(
+            evaluate({ wafHeader: sqlOnly, forwardedHost: HOST, forwardedUri: "/p?q=<script>" }, cfg).status
+        ).toBe(200);
+        expect(
+            evaluate({ wafHeader: xssOnly, forwardedHost: HOST, forwardedUri: "/p?q=<script>" }, cfg).status
+        ).toBe(403);
+        expect(
+            evaluate({ wafHeader: xssOnly, forwardedHost: HOST, forwardedUri: "/p?id=1' or 1=1--" }, cfg).status
+        ).toBe(200);
     });
 });

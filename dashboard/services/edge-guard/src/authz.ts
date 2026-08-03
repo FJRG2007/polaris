@@ -178,14 +178,17 @@ export function evaluate(req: GuardRequest, cfg: GuardConfig): GuardDecision {
     // check that runs for every request on every route, and the raw request line is
     // what should be scanned anyway - the signatures are matched against the bytes the
     // client actually sent, after this check's own decoding.
-    if (rule.injectionProtection === true) {
+    if (rule.sqlInjectionProtection === true || rule.xssProtection === true) {
         const uri = req.forwardedUri ?? "";
         const split = uri.indexOf("?");
-        const failure = injectionFailure({
-            path: split < 0 ? uri : uri.slice(0, split),
-            query: split < 0 ? null : uri.slice(split + 1),
-            userAgent: req.userAgent
-        });
+        const failure = injectionFailure(
+            {
+                path: split < 0 ? uri : uri.slice(0, split),
+                query: split < 0 ? null : uri.slice(split + 1),
+                userAgent: req.userAgent
+            },
+            { sql: rule.sqlInjectionProtection === true, xss: rule.xssProtection === true }
+        );
         if (failure) return { status: 403, reason: `injection: ${failure}` };
     }
 
