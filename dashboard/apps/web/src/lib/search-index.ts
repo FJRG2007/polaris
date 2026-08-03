@@ -9,7 +9,7 @@
  * covers both.
  */
 
-import { APP_SECTIONS, POLARIS_APPS } from "@/lib/apps";
+import { APP_SECTIONS, APP_SUBAPPS, POLARIS_APPS } from "@/lib/apps";
 import {
     Boxes,
     Database,
@@ -95,6 +95,24 @@ export function navigationEntries(isAdmin: boolean): CommandEntry[] {
                     section === root
                         ? [...(section.keywords ?? []), app.label, app.description]
                         : section.keywords
+            });
+        }
+    }
+
+    // Screens that live one level down, inside a section big enough to have its
+    // own rail. They are not in any app's section list, so without this the only
+    // way to reach Runs would be to already be in Runners - which is exactly the
+    // sort of page search exists for.
+    for (const subapp of APP_SUBAPPS) {
+        for (const section of subapp.sections) {
+            if (entries.some((entry) => entry.href === section.href)) continue;
+            entries.push({
+                id: `section:${section.href}`,
+                label: `${subapp.label}: ${section.label}`,
+                group: subapp.label,
+                href: section.href,
+                icon: section.icon,
+                keywords: section.keywords
             });
         }
     }

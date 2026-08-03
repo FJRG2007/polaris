@@ -51,6 +51,11 @@ plugins/*/homeassistant/custom_components/*/bin/polaris-unas-agent-*
 # Generated SSH access keys for the Docker connector (never commit)
 secrets/
 **/secrets/ssh/
+# ...but a screen *about* secrets is source, not a secret. Without this the whole
+# route is silently dropped: it builds locally and 404s wherever it is deployed.
+# The directory itself has to be re-included - a rule inside one that is excluded
+# is never even looked at.
+!dashboard/apps/web/src/app/(app)/apps/runners/secrets/
 id_ed25519
 id_ed25519.pub
 known_hosts

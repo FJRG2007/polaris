@@ -18,6 +18,7 @@
  * out is a delay with nothing on the other side of it.
  */
 
+import Link from "next/link";
 import { Notice } from "./notice";
 import { PoolDialog } from "./pool-dialog";
 import { useRouter } from "next/navigation";
@@ -141,6 +142,9 @@ export function RunnersView({
                         labels={["self-hosted"]}
                         label="Once a pool exists, this is what sends a job to it:"
                     />
+                    <Link href="/apps/runners/guide" className="text-xs text-muted-foreground underline">
+                        What to set up first, and what to be careful with
+                    </Link>
                 </div>
             ) : (
                 visible.map((pool) => (
@@ -321,7 +325,14 @@ function TargetRow({ target, pool }: { target: RunnerTargetView; pool: RunnerPoo
     return (
         <li className="flex items-start justify-between gap-3 border-t border-border pt-1 first:border-0 first:pt-0">
             <span className="flex min-w-0 flex-col">
-                <span className="truncate font-mono text-muted-foreground">{target.key}</span>
+                {/* The repository's own settings are the thing anybody reading this
+                    row wants next, and doubly so when it says why it is blocked. */}
+                <Link
+                    href={`/apps/runners/repos#${encodeURIComponent(target.key)}`}
+                    className="truncate font-mono text-muted-foreground hover:text-foreground hover:underline"
+                >
+                    {target.key}
+                </Link>
                 {target.blocked ? <span className="text-danger">{target.blocked}</span> : null}
             </span>
             <span className="flex shrink-0 items-center gap-2 text-muted-foreground">

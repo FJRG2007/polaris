@@ -6,12 +6,14 @@
 import { MobileNav } from "@polaris/ui";
 import { usePathname } from "next/navigation";
 import { AppSidebar } from "@/components/app-sidebar";
-import { APP_SECTIONS, resolveActiveApp } from "@/lib/apps";
+import { APP_SECTIONS, resolveActiveApp, resolveSubapp } from "@/lib/apps";
 
 export function AppNavDrawer() {
     const pathname = usePathname();
+    const subapp = resolveSubapp(pathname);
     const app = resolveActiveApp(pathname);
-    const hasSections = (APP_SECTIONS[app.id] ?? []).some((section) => !section.hidden);
+    const sections = subapp ? subapp.sections : (APP_SECTIONS[app.id] ?? []);
+    const hasSections = sections.some((section) => !section.hidden);
     if (!hasSections) return null;
     return (
         <MobileNav>

@@ -9,6 +9,7 @@ import {
     Activity,
     Bell,
     Blocks,
+    BookOpen,
     CalendarRange,
     ChartColumn,
     Clock,
@@ -16,9 +17,11 @@ import {
     Container,
     Database,
     FileText,
+    FolderGit2,
     FolderOpen,
     Globe,
     HardDrive,
+    History,
     Inbox,
     KeyRound,
     LayoutDashboard,
@@ -231,6 +234,79 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
         { label: "Updates & settings", href: "/settings", icon: Settings, keywords: ["version", "upgrade"] }
     ]
 };
+
+/**
+ * A section that grew into an app of its own.
+ *
+ * Most sections are one screen. A few are a whole subject with several: Runners
+ * is pools, the repositories they serve, what has run, and the secrets those runs
+ * can read - four screens that belong together and have nothing to say to the
+ * rest of Apps. Listing them all in the Apps rail would bury Deploy and Servers
+ * under one feature's internals, and hiding them behind one entry means nobody
+ * finds Runs at all.
+ *
+ * So the rail follows the path down: inside one of these it shows that subject's
+ * screens and a way back out, and everywhere else it is the app's own list. The
+ * way back matters - a rail that swaps its contents without one is a place a
+ * person gets stuck.
+ */
+export interface AppSubapp {
+    /** The section id in APP_SECTIONS this replaces the rail for. */
+    id: string;
+    label: string;
+    icon: LucideIcon;
+    /** The path it owns, and where "back" comes back to. */
+    base: string;
+    parent: { label: string; href: string };
+    sections: AppSection[];
+}
+
+export const APP_SUBAPPS: AppSubapp[] = [
+    {
+        id: "runners",
+        label: "Runners",
+        icon: Workflow,
+        base: "/apps/runners",
+        parent: { label: "Apps", href: "/apps/deploy" },
+        sections: [
+            {
+                label: "Pools",
+                href: "/apps/runners",
+                icon: Workflow,
+                keywords: ["runners", "github actions", "ci", "machines", "self-hosted"]
+            },
+            {
+                label: "Repositories",
+                href: "/apps/runners/repos",
+                icon: FolderGit2,
+                keywords: ["repos", "who can run", "forks", "pull requests", "public", "private", "events"]
+            },
+            {
+                label: "Runs",
+                href: "/apps/runners/runs",
+                icon: History,
+                keywords: ["history", "jobs", "workflow runs", "builds", "logs", "failed"]
+            },
+            {
+                label: "Secrets",
+                href: "/apps/runners/secrets",
+                icon: KeyRound,
+                keywords: ["variables", "env", "credentials", "tokens", "passwords"]
+            },
+            {
+                label: "How it works",
+                href: "/apps/runners/guide",
+                icon: BookOpen,
+                keywords: ["help", "setup", "runs-on", "getting started", "guide", "docs"]
+            }
+        ]
+    }
+];
+
+/** The subject a path is inside, or null when it is not inside one. */
+export function resolveSubapp(pathname: string): AppSubapp | null {
+    return APP_SUBAPPS.find((sub) => pathname === sub.base || pathname.startsWith(`${sub.base}/`)) ?? null;
+}
 
 /** Whether a path belongs to an app: its own subtree, or one of its extra
  *  `match` prefixes (exact segment or a nested path under it). */
