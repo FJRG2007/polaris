@@ -151,8 +151,11 @@ export async function exchangeDeviceCode(
     }
 }
 
-/** Every Set-Cookie the exchange produced, ready to be put on a response. */
-function readIssuedCookies(headers: Headers): IssuedCookie[] {
+/** Every Set-Cookie a better-auth call produced, ready to be put on a response.
+ *  Shared with the connection sign-in, which carries cookies across the same way
+ *  and for the same reason: the session cookie is signed, and a second
+ *  implementation of that signing is a second thing to get wrong. */
+export function readIssuedCookies(headers: Headers): IssuedCookie[] {
     const cookies: IssuedCookie[] = [];
     for (const header of headers.getSetCookie()) {
         for (const [name, attributes] of parseSetCookieHeader(header)) {

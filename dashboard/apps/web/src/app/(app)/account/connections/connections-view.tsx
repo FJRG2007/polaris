@@ -9,6 +9,7 @@
  * takes their deployments and their runner pools with it.
  */
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
 import { IntegrationLogo } from "@/components/logos";
@@ -35,6 +36,10 @@ export interface LinkedAccount {
     label: string;
     avatarUrl: string | null;
     method: "oauth" | "token";
+    /** Whether this account is also a way into Polaris. Decided under Security,
+     *  and shown here because this is the screen where somebody has just added
+     *  one and is wondering what it now does. */
+    signsIn: boolean;
     linkedAt: string;
 }
 
@@ -53,6 +58,8 @@ export interface ConnectionProviderCard {
     limit: number;
     /** Whether this deployment can send anybody to the provider's own screen. */
     canAuthorize: boolean;
+    /** Whether the operator allows this service as a way into Polaris at all. */
+    canSignIn: boolean;
     accounts: LinkedAccount[];
 }
 
@@ -168,6 +175,11 @@ function ProviderCard({
                                     <IntegrationLogo slug={provider.slug} className="size-5 shrink-0" />
                                 )}
                                 <span className="min-w-0 flex-1 truncate text-sm">{account.label}</span>
+                                {account.signsIn ? (
+                                    <Badge variant="neutral" title="This account can sign you in">
+                                        Signs you in
+                                    </Badge>
+                                ) : null}
                                 {account.method === "token" ? (
                                     <Badge variant="neutral" title="Connected with a personal access token">
                                         Token
@@ -193,7 +205,19 @@ function ProviderCard({
                     <p className="text-sm text-muted-foreground">No {provider.name} account connected.</p>
                 )}
 
-                <p className="text-xs text-muted-foreground">{provider.description}</p>
+                <p className="text-xs text-muted-foreground">
+                    {provider.description}
+                    {provider.canSignIn ? (
+                        <>
+                            {" "}
+                            An account you connect can also sign you in - choose which under{" "}
+                            <Link href="/account/security" className="underline underline-offset-2 hover:text-foreground">
+                                Security
+                            </Link>
+                            .
+                        </>
+                    ) : null}
+                </p>
 
                 {provider.canAuthorize || provider.acceptsToken ? (
                     <div className="flex flex-wrap items-center gap-2">

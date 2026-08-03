@@ -18,7 +18,10 @@ import { SecurityView } from "./security-view";
 import { listPasskeys } from "./passkey-actions";
 import { currentDeviceStanding } from "@/lib/device-grace";
 import { listUserSessions } from "@/lib/session-directory";
+import type { ConnectedSignIn } from "./connected-sign-in-card";
 import { describeTwoFactorMethods } from "@/lib/two-factor-delivery";
+import { CONNECTION_PROVIDERS, findConnectionProvider } from "@polaris/core";
+import { connectionSignInAllowed, listConnections } from "@/lib/connections/store";
 import {
     backupCodesRemaining,
     countTrustedDevices,
@@ -29,6 +32,35 @@ import {
 } from "@polaris/auth";
 
 export const dynamic = "force-dynamic";
+
+/**
+ * The accounts this person has connected, each with what the operator has
+ * decided about that service. Both halves travel together because the switch is
+ * meaningless without the other: on, under a service the operator has closed, it
+ * would sit there looking like a way in that works.
+ */
+async function connectedSignIns(userId: string): Promise<ConnectedSignIn[]> {
+    const linked = await listConnections(userId);
+    const allowed = new Map<string, boolean>(
+        await Promise.all(
+            CONNECTION_PROVIDERS.map(
+                async (provider) => [provider.slug, await connectionSignInAllowed(provider.slug)] as const
+            )
+        )
+    );
+    return linked.map((account) => {
+        const provider = findConnectionProvider(account.provider);
+        return {
+            id: account.id,
+            provider: account.provider,
+            providerName: provider?.name ?? account.provider,
+            label: account.label,
+            signInEnabled: account.signInEnabled,
+            allowedHere: allowed.get(account.provider) ?? false,
+            warning: provider?.signInWarning
+        };
+    });
+}
 
 export default async function SecurityPage() {
     const user = await requireUser();
@@ -41,7 +73,8 @@ export default async function SecurityPage() {
         sessions,
         trustedDevices,
         backupCodes,
-        standing
+        standing,
+        connections
     ] = await Promise.all([
         getUserSecurity(user.id),
         listSecurityQuestions(user.id),
@@ -54,7 +87,10 @@ export default async function SecurityPage() {
         countTrustedDevices(user.id),
         // The count only. The codes are never read out to a page.
         backupCodesRemaining(auth, user.id),
-        currentDeviceStanding(user)
+        currentDeviceStanding(user),
+        // The outside accounts this person has connected, and whether each may
+        // sign them in - which is theirs to decide and the operator's to allow.
+        connectedSignIns(user.id)
     ]);
     const lock = standing.settled ? undefined : { reason: newDeviceWaitMessage(standing) };
 
@@ -81,6 +117,7 @@ export default async function SecurityPage() {
                 twoFactorMethods={methods}
                 trustedDevices={trustedDevices}
                 twoFactorPreferred={settings.twoFactorPreferred}
+                connections={connections}
                 otherSessions={sessions.filter((session) => !session.current).length}
             />
         </div>

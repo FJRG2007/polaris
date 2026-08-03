@@ -6,6 +6,7 @@ import { QrSignInPanel } from "./qr-panel";
 import { useRouter } from "next/navigation";
 import { loginSchema } from "@polaris/core";
 import { useZodForm } from "@/lib/use-zod-form";
+import { IntegrationLogo } from "@/components/logos";
 import { postLoginTarget } from "./post-login-target";
 import { authClient, signIn } from "@/lib/auth-client";
 import { useEffect, useState, type FormEvent } from "react";
@@ -26,15 +27,45 @@ const SESSION_NOTICES: Readonly<Record<string, string>> = {
     denied: "That sign-in was denied from another device."
 };
 
+/**
+ * How a sign-in with a linked account ended, when it did not end signed in.
+ *
+ * `refused` is deliberately one answer for several: the account is not linked
+ * here, its owner does not allow it as a way in, or the operator does not. Any
+ * more detail would tell whoever holds that account something about this
+ * deployment that is not theirs to know.
+ */
+const CONNECTION_NOTICES: Readonly<Record<string, string>> = {
+    refused: "That account cannot sign in here. Sign in another way, then connect it and allow it under Security.",
+    unavailable: "That way of signing in is turned off here.",
+    cancelled: "That sign-in was cancelled.",
+    state_error: "That sign-in did not start on this page. Try again.",
+    error: "That service could not complete the sign-in."
+};
+
 function sessionNotice(): string | null {
     const params = new URLSearchParams(window.location.search);
     for (const [key, message] of Object.entries(SESSION_NOTICES)) {
         if (params.get(key) === "1") return message;
     }
-    return null;
+    return CONNECTION_NOTICES[params.get("signin") ?? ""] ?? null;
 }
 
-export function LoginForm({ awaitingSetup }: { awaitingSetup: boolean }) {
+/** An outside service this deployment can sign somebody in with. */
+export interface SignInProvider {
+    slug: string;
+    name: string;
+}
+
+export function LoginForm({
+    awaitingSetup,
+    providers
+}: {
+    awaitingSetup: boolean;
+    /** The services offered as a way in. Empty on a deployment whose operator
+     *  has connected none or allows none. */
+    providers: SignInProvider[];
+}) {
     const router = useRouter();
     const form = useZodForm(loginSchema);
     const [values, setValues] = useState({ identifier: "", password: "" });
@@ -76,6 +107,18 @@ export function LoginForm({ awaitingSetup }: { awaitingSetup: boolean }) {
             clearTimeout(timer);
         };
     }, [values.identifier]);
+
+    /**
+     * Hand the browser to a provider's own screen.
+     *
+     * A full navigation rather than a fetch: what comes back is a redirect chain
+     * that ends by setting this deployment's own cookies, and where it lands is
+     * decided by the callback - the app, or the second-factor challenge.
+     */
+    function signInWithProvider(slug: string) {
+        setPending(true);
+        window.location.href = `/api/connections/${slug}/signin?redirect=${encodeURIComponent(postLoginTarget())}`;
+    }
 
     /** Sign in with the device's passkey. The ceremony is the browser's; a
      *  cancelled prompt just leaves the form as it was. */
@@ -208,6 +251,23 @@ export function LoginForm({ awaitingSetup }: { awaitingSetup: boolean }) {
                                 <KeyRound className="size-4" />
                                 Use your passkey
                             </Button>
+                        ) : null}
+                        {providers.length > 0 ? (
+                            <div className="flex flex-col gap-2">
+                                <span className="text-center text-xs text-muted-foreground">or</span>
+                                {providers.map((provider) => (
+                                    <Button
+                                        key={provider.slug}
+                                        type="button"
+                                        variant="secondary"
+                                        disabled={pending}
+                                        onClick={() => signInWithProvider(provider.slug)}
+                                    >
+                                        <IntegrationLogo slug={provider.slug} className="size-4" />
+                                        Continue with {provider.name}
+                                    </Button>
+                                ))}
+                            </div>
                         ) : null}
                         {canEmailLink ? (
                             linkSent ? (

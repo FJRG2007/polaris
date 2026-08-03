@@ -8,6 +8,7 @@
 
 import { prisma } from "@polaris/db";
 import type { Auth } from "./auth.js";
+import { emailOwner } from "./account.js";
 
 export interface ProvisionInput {
     readonly email: string;
@@ -25,7 +26,11 @@ export async function hasAnyUser(): Promise<boolean> {
 export async function provisionUser(auth: Auth, input: ProvisionInput): Promise<{ id: string }> {
     const email = input.email.trim().toLowerCase();
     const username = input.username?.trim().toLowerCase();
-    if (await prisma.user.findUnique({ where: { email }, select: { id: true } })) {
+    // Every address an account holds, not only the one it signs in with: an
+    // alternate is an address its owner has proved - or that a provider they
+    // linked vouched for - and a second account under it would be a way to
+    // receive that person's mail.
+    if (await emailOwner(email)) {
         throw new Error("An account with that email already exists");
     }
     if (username && (await prisma.user.findUnique({ where: { username }, select: { id: true } }))) {

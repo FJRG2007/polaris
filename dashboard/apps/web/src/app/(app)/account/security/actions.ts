@@ -16,6 +16,7 @@
  * should not have it.
  */
 
+import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
@@ -24,6 +25,7 @@ import { clientIp } from "@/lib/request-context";
 import { recordAudit } from "@/lib/audit-service";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { newDeviceRefusal } from "@/lib/device-grace";
+import { setConnectionSignIn } from "@/lib/connections/store";
 import { revokeOtherSessions, sessionSignInRecord } from "@/lib/session-directory";
 import {
     newDeviceGraceSchema,
@@ -52,6 +54,28 @@ import {
 } from "@polaris/auth";
 
 type ActionResult = { error?: string };
+
+/**
+ * Allow, or stop allowing, one connected account as a way into this Polaris.
+ *
+ * A way in, so it is gated like the rest of this page: a browser the account has
+ * only just met waits it out first. Turning it off never unlinks anything - what
+ * the account was connected for goes on working - and turning it on is worth
+ * nothing on its own unless the operator allows that service too.
+ */
+export async function setConnectionSignInAction(connectionId: string, enabled: boolean): Promise<ActionResult> {
+    const user = await requireUser();
+    const blocked = await newDeviceRefusal(user);
+    if (blocked) return { error: blocked };
+
+    const parsed = z.string().uuid().safeParse(connectionId);
+    if (!parsed.success) return { error: "That account is no longer connected." };
+
+    const updated = await setConnectionSignIn(user.id, parsed.data, enabled === true);
+    if (!updated) return { error: "That account is no longer connected." };
+    revalidatePath("/account/security");
+    return {};
+}
 
 /** Guess-throttling for the identity proofs that stand in for the password. */
 const RECOVERY_LIMIT = 5;

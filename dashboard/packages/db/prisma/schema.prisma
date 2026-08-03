@@ -1345,6 +1345,11 @@ model UserConnection {
     // What the provider actually granted, so a declined scope is visible rather
     // than showing up as an empty list.
     scope          String   @default("")
+    // Whether this account may also sign its owner in here. Seeded from the
+    // provider's own default when the link is written and the owner's from then
+    // on, so linking an account never silently adds a way into Polaris. The
+    // operator's switch is judged separately: both have to allow it.
+    signInEnabled  Boolean  @default(false)
     linkedAt       DateTime @default(now())
     updatedAt      DateTime @updatedAt
 

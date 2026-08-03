@@ -19,10 +19,25 @@
  * can place.
  */
 
-/** How the account was identified. */
-export const SIGN_IN_METHODS = ["password", "passkey", "email-link", "qr-code"] as const;
+import { CONNECTION_PROVIDERS, type ConnectionProviderSlug } from "./connection-providers.js";
 
-export type SignInMethod = (typeof SIGN_IN_METHODS)[number];
+/** The ways in that Polaris itself proves. */
+const OWN_SIGN_IN_METHODS = ["password", "passkey", "email-link", "qr-code"] as const;
+
+/**
+ * How the account was identified. A linked outside account is one of these too,
+ * named by the service that proved it, so the sessions list says "GitHub" rather
+ * than lumping every provider under one label.
+ *
+ * Derived from the provider catalog rather than written out again: a service
+ * added there becomes a recordable sign-in method with nothing else to remember.
+ */
+export const SIGN_IN_METHODS = [
+    ...OWN_SIGN_IN_METHODS,
+    ...CONNECTION_PROVIDERS.map((provider) => provider.slug)
+] as const satisfies readonly string[];
+
+export type SignInMethod = (typeof OWN_SIGN_IN_METHODS)[number] | ConnectionProviderSlug;
 
 /**
  * What answered the second-factor step, when there was one.
@@ -44,12 +59,16 @@ export const SECOND_FACTORS = [
 export type SecondFactor = (typeof SECOND_FACTORS)[number];
 
 /** How each one reads on a screen. Short: these sit as badges next to a device
- *  name, beside "This device" and "Locked". */
+ *  name, beside "This device" and "Locked". A provider is called what it calls
+ *  itself, which the catalog already knows. */
 export const SIGN_IN_METHOD_LABELS: Record<SignInMethod, string> = {
     password: "Password",
     passkey: "Passkey",
     "email-link": "Email link",
-    "qr-code": "QR code"
+    "qr-code": "QR code",
+    ...(Object.fromEntries(
+        CONNECTION_PROVIDERS.map((provider) => [provider.slug, provider.name])
+    ) as Record<ConnectionProviderSlug, string>)
 };
 
 export const SECOND_FACTOR_LABELS: Record<SecondFactor, string> = {

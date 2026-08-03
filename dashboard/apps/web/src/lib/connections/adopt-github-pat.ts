@@ -43,6 +43,7 @@ export async function adoptInstanceGithubPat(): Promise<void> {
             label: account.login,
             avatarUrl: account.avatarUrl,
             method: "token",
+            email: account.email,
             credential: { token }
         });
     } catch (caught) {

@@ -27,6 +27,8 @@ export {
     removeUserEmail,
     setUserEmailRecovery,
     promoteUserEmail,
+    adoptVerifiedEmail,
+    emailOwner,
     MAX_ALTERNATE_EMAILS,
     type UserEmailView
 } from "./account.js";
@@ -76,6 +78,7 @@ export {
     type DeviceExchange,
     type IssuedCookie
 } from "./device-login.js";
+export { signInWithConnection, type ConnectionSignInResult } from "./connection-sign-in.js";
 export {
     verifyTotpForSession,
     twoFactorEnabled,
