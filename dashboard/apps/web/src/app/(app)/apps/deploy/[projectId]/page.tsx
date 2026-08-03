@@ -29,6 +29,17 @@ function portOf(sourceConfig: string): number | null {
     }
 }
 
+/** A string field out of the stored source config (the repository paths a git service
+ *  builds from), or null when it is unset or the config will not parse. */
+function sourceText(sourceConfig: string, key: "rootDirectory" | "dockerfilePath"): string | null {
+    try {
+        const value = (JSON.parse(sourceConfig) as Record<string, unknown>)[key];
+        return typeof value === "string" && value ? value : null;
+    } catch {
+        return null;
+    }
+}
+
 function pick(value: string | string[] | undefined): string | null {
     return (Array.isArray(value) ? value[0] : value) ?? null;
 }
@@ -90,7 +101,10 @@ export default async function DeployProjectPage({
                 autoDeploy: app.autoDeploy,
                 deployBranch: app.deployBranch,
                 commitFilter: app.commitFilter,
+                watchPaths: app.watchPaths,
                 keepReleases: app.keepReleases,
+                rootDirectory: sourceText(app.sourceConfig, "rootDirectory"),
+                dockerfilePath: sourceText(app.sourceConfig, "dockerfilePath"),
                 port: portOf(app.sourceConfig),
                 ipUrl: serverIp ? `http://${serverIp}:${hostPortForApp(serving.get(app.id)?.portSubject ?? app.id)}` : null,
                 domains: mergeTunnelDomains(

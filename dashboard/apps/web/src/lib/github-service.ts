@@ -803,6 +803,45 @@ export async function getLatestCommit(
     }
 }
 
+/**
+ * The repository-relative paths that changed between two commits, for deciding which
+ * services in a monorepo a push actually concerns.
+ *
+ * Returns an empty list on any failure, which the watch-path matcher reads as "could
+ * not tell" and deploys anyway. That is the right way round: a compare call GitHub
+ * would not answer must not quietly stop a service deploying, because a service that
+ * stops deploying and says nothing is indistinguishable from a broken integration.
+ *
+ * GitHub caps the file list at 300 per page. Past that the answer is truncated rather
+ * than paged: a push touching more than 300 files is one that concerns everything.
+ */
+export async function getChangedFiles(
+    owner: string,
+    repo: string,
+    base: string,
+    head: string,
+    token: string | null
+): Promise<string[]> {
+    const headers = optionalAuthHeaders(token);
+    try {
+        const res = await fetch(
+            `${API}/repos/${owner}/${repo}/compare/${encodeURIComponent(base)}...${encodeURIComponent(head)}`,
+            { headers, cache: "no-store" }
+        );
+        if (!res.ok) return [];
+        const data = (await res.json()) as { files?: Array<{ filename?: string; previous_filename?: string }> };
+        const files = data.files ?? [];
+        if (files.length >= 300) return [];
+        return files.flatMap((file) =>
+            // A rename touches both sides: a service watching the path a file moved out
+            // of has as much reason to rebuild as the one it moved into.
+            [file.filename, file.previous_filename].filter((path): path is string => typeof path === "string")
+        );
+    } catch {
+        return [];
+    }
+}
+
 /** The GitHub App's webhook secret (app method only), used to verify push events. */
 export async function getGithubWebhookSecret(): Promise<string | null> {
     const secrets = await getAppSecrets();

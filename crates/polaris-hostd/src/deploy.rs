@@ -688,18 +688,31 @@ fn parse_exposed_ports(raw: &[u8]) -> Vec<u16> {
 }
 
 /// Build an image from a source directory with Nixpacks, which auto-detects the
-/// framework (no Dockerfile required). The context directory is removed once the
-/// build finishes. Path/tag are positional args so nothing is shell-interpolated.
+/// framework (no Dockerfile required). Path/tag are positional args so nothing is
+/// shell-interpolated.
+///
+/// `root` is the subdirectory of the context Nixpacks should look at, empty for the
+/// context itself. It exists for monorepos: the app to build is one directory of a
+/// checkout that has to arrive whole, because the shared packages and the lockfile it
+/// builds against are outside it. So what is built and what is cleaned up afterwards
+/// are deliberately two different paths.
 pub fn build_nixpacks(
     tag: &str,
     context_dir: &std::path::Path,
+    root: &str,
 ) -> io::Result<Box<dyn Read + Send>> {
+    let source = if root.is_empty() {
+        context_dir.to_path_buf()
+    } else {
+        context_dir.join(root)
+    };
     let mut cmd = Command::new("sh");
     cmd.arg("-c")
-        .arg("nixpacks build \"$1\" --name \"$2\" 2>&1; code=$?; rm -rf \"$1\"; exit $code")
+        .arg("nixpacks build \"$1\" --name \"$2\" 2>&1; code=$?; rm -rf \"$3\"; exit $code")
         .arg("sh")
-        .arg(context_dir)
+        .arg(&source)
         .arg(tag)
+        .arg(context_dir)
         .stdin(Stdio::null());
     stream_command(cmd)
 }

@@ -1704,6 +1704,9 @@ function SettingsTab({
     const [autoDeploy, setAutoDeploy] = useState(app.autoDeploy);
     const [branch, setBranch] = useState(app.deployBranch ?? "");
     const [filter, setFilter] = useState(app.commitFilter ?? "");
+    const [watchPaths, setWatchPaths] = useState(app.watchPaths ?? "");
+    const [rootDirectory, setRootDirectory] = useState(app.rootDirectory ?? "");
+    const [dockerfilePath, setDockerfilePath] = useState(app.dockerfilePath ?? "");
     const [keepReleases, setKeepReleases] = useState(app.keepReleases);
     // Empty means "not pinned": the deploy detects the container port from the image
     // (see buildAppPlan). Only a value the user types here pins it.
@@ -1809,11 +1812,23 @@ function SettingsTab({
                     return;
                 }
             }
+            if (isGit) {
+                const paths = await deployActions.setAppSourcePathsAction({
+                    applicationId: app.id,
+                    rootDirectory: rootDirectory.trim(),
+                    dockerfilePath: dockerfilePath.trim()
+                });
+                if (paths.error) {
+                    setError(paths.error);
+                    return;
+                }
+            }
             const result = await deployActions.setAutoDeployAction({
                 applicationId: app.id,
                 autoDeploy,
                 deployBranch: branch.trim() || undefined,
                 commitFilter: filter.trim() || undefined,
+                watchPaths: watchPaths.trim() || undefined,
                 keepReleases
             });
             if (result.error) setError(result.error);
@@ -2205,6 +2220,45 @@ function SettingsTab({
 
             {isGit && (
                 <section className="flex flex-col gap-3">
+                    <h3 className="text-sm font-medium">Source</h3>
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                            Root directory
+                            <Input
+                                value={rootDirectory}
+                                onChange={(event) => setRootDirectory(event.target.value)}
+                                placeholder="apps/web"
+                                autoCapitalize="none"
+                                autoCorrect="off"
+                                spellCheck={false}
+                            />
+                            <span>
+                                Where this service lives in the repository. The build still gets the whole repository, so
+                                shared packages and the lockfile above it are available. Blank = the repository root.
+                            </span>
+                        </label>
+                        <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                            Dockerfile path
+                            <Input
+                                value={dockerfilePath}
+                                onChange={(event) => setDockerfilePath(event.target.value)}
+                                placeholder="Dockerfile"
+                                autoCapitalize="none"
+                                autoCorrect="off"
+                                spellCheck={false}
+                            />
+                            <span>
+                                {rootDirectory.trim()
+                                    ? `Relative to ${rootDirectory.trim()}.`
+                                    : "Relative to the repository root."}
+                            </span>
+                        </label>
+                    </div>
+                </section>
+            )}
+
+            {isGit && (
+                <section className="flex flex-col gap-3">
                     <h3 className="text-sm font-medium">Auto-deploy</h3>
                     <div className="flex items-center justify-between gap-3 rounded-md border border-border p-3 text-sm">
                         <span>Deploy on push</span>
@@ -2220,6 +2274,23 @@ function SettingsTab({
                             <Input value={filter} onChange={(event) => setFilter(event.target.value)} placeholder="build:" />
                         </label>
                     </div>
+                    <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                        Watch paths
+                        <Textarea
+                            value={watchPaths}
+                            onChange={(event) => setWatchPaths(event.target.value)}
+                            placeholder={"apps/web/**\npackages/ui/**\n!**/*.md"}
+                            rows={3}
+                            autoCapitalize="none"
+                            autoCorrect="off"
+                            spellCheck={false}
+                        />
+                        <span>
+                            One glob per line. Deploy only when the push touched one of them, so a repository holding
+                            several services rebuilds just the ones that changed. Prefix with ! to exclude. Blank = any
+                            change.
+                        </span>
+                    </label>
                 </section>
             )}
 

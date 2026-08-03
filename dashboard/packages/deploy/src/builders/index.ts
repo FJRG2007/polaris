@@ -28,6 +28,7 @@ export function buildSpec(input: BuildInput): BuildSpec {
         imageTag: tag,
         imageRef: input.imageRef,
         contextPath: input.contextPath,
+        rootDirectory: normalizeRoot(input.rootDirectory),
         dockerfilePath: input.dockerfilePath ?? (input.method === "dockerfile" ? DEFAULT_DOCKERFILE : undefined),
         targetStage: input.targetStage,
         buildArgs,
@@ -52,7 +53,14 @@ export function buildCommand(spec: BuildSpec): string[] {
             // the build itself is an ordinary docker build of that context.
             return dockerBuild(spec.imageTag, spec.contextPath, DEFAULT_DOCKERFILE, undefined, spec.buildArgs);
         case "nixpacks":
-            return ["nixpacks", "build", spec.contextPath, "--name", spec.imageTag, ...envArgs("--env", spec.buildArgs)];
+            return [
+                "nixpacks",
+                "build",
+                joinRoot(spec.contextPath, spec.rootDirectory),
+                "--name",
+                spec.imageTag,
+                ...envArgs("--env", spec.buildArgs)
+            ];
         case "buildpacks":
             return [
                 "pack",
@@ -80,6 +88,52 @@ function dockerBuild(
     for (const [key, value] of Object.entries(buildArgs)) argv.push("--build-arg", `${key}=${value}`);
     argv.push(contextPath);
     return argv;
+}
+
+/**
+ * A root directory as the rest of the build model expects it: forward slashes, no
+ * leading or trailing separator, and never a path that climbs out of the context.
+ *
+ * Normalized here rather than trusted from the stored source config, because this one
+ * value reaches a shell argument on the target and a header the host daemon reads.
+ * Empty (the repository root) for anything that does not survive the rules.
+ */
+export function normalizeRoot(value: string | undefined): string | undefined {
+    if (!value) return undefined;
+    const cleaned = value.trim().replace(/\\/g, "/").replace(/^\/+/, "").replace(/\/+$/, "");
+    if (!cleaned || cleaned === ".") return undefined;
+    if (cleaned.split("/").some((segment) => segment === "..")) return undefined;
+    return cleaned;
+}
+
+/**
+ * The Dockerfile path to build with, relative to the context (the repository root),
+ * given the application's root directory.
+ *
+ * A path is stated the way it would be inside the root directory, so a service rooted
+ * at `apps/web` that says `Dockerfile` builds `apps/web/Dockerfile` - which is what
+ * somebody setting a root directory means, and what makes the field worth having for a
+ * Dockerfile build at all.
+ *
+ * A path that already carries the root is left alone rather than nested inside itself:
+ * services configured before there was a root directory have the full path stored, and
+ * setting the root on one of those must not break it.
+ */
+export function resolveDockerfilePath(
+    root: string | undefined,
+    dockerfilePath: string | undefined
+): string | undefined {
+    const normalized = normalizeRoot(root);
+    const file = dockerfilePath?.trim().replace(/\\/g, "/").replace(/^\/+/, "");
+    if (!normalized) return file || undefined;
+    if (file && (file === normalized || file.startsWith(`${normalized}/`))) return file;
+    return `${normalized}/${file || DEFAULT_DOCKERFILE}`;
+}
+
+/** The context path with a root directory appended, for a builder that takes one
+ *  directory rather than a context plus a path inside it. */
+function joinRoot(contextPath: string, root: string | undefined): string {
+    return root ? `${contextPath.replace(/\/+$/, "")}/${root}` : contextPath;
 }
 
 /** Expand a key/value map into repeated `<flag> KEY=VALUE` argv pairs. */

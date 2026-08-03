@@ -495,6 +495,17 @@ fn deploy_build<R: Read>(state: &AppState, req: &Request, body: &mut R) -> Respo
     if builder != "docker" && builder != "nixpacks" {
         return Response::bad_request("invalid X-Polaris-Builder");
     }
+    // Subdirectory of the context the build is rooted at (a monorepo's one app).
+    // Confined to the context by the same rules as the dockerfile path: a value that
+    // can climb out of it would let a build read the deploy root.
+    let root = req.header("x-polaris-root").unwrap_or("");
+    if root.bytes().any(|b| b < 0x20 || b == 0x7f)
+        || root.contains("..")
+        || root.starts_with('/')
+        || root.starts_with('\\')
+    {
+        return Response::bad_request("invalid X-Polaris-Root");
+    }
 
     // Stream the tar context to a private file under the deploy root, bounded.
     let build_dir = state.config.deploy_root.join("_build");
@@ -535,7 +546,7 @@ fn deploy_build<R: Read>(state: &AppState, req: &Request, body: &mut R) -> Respo
             let _ = std::fs::remove_dir_all(&extract_dir);
             return Response::text(502, "Bad Gateway", "could not unpack the build context");
         }
-        return match deploy::build_nixpacks(tag, &extract_dir) {
+        return match deploy::build_nixpacks(tag, &extract_dir, root) {
             Ok(reader) => stream_response(reader),
             Err(_) => {
                 let _ = std::fs::remove_dir_all(&extract_dir);

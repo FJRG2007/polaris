@@ -2249,6 +2249,11 @@ model Application {
     // Only auto-deploy when the head commit message matches this (substring, or
     // "regex:<pattern>"); empty = any commit. e.g. "build:".
     commitFilter        String?
+    // Globs (one per line, "!" to exclude) a push must have touched for this service
+    // to redeploy. Empty = any change in the repository, which is what a repository
+    // holding one service wants. This is what stops a monorepo redeploying every
+    // service it holds every time anything in it changes.
+    watchPaths          String?
     // Last git SHA deployed, for the polling fallback and change detection.
     lastDeployedSha     String?
     // Keep previous deployments running (Railway-style multi-version). Off by

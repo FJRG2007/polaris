@@ -210,13 +210,18 @@ export class HostdClient {
         tag: string,
         dockerfile: string,
         contextTar: Buffer,
-        builder: "docker" | "nixpacks" = "docker"
+        builder: "docker" | "nixpacks" = "docker",
+        root = ""
     ): Promise<IncomingMessage> {
         return this.callStream("POST", "/v1/deploy/build", contextTar, {
             "content-type": "application/x-tar",
             "x-polaris-tag": tag,
             "x-polaris-dockerfile": dockerfile,
-            "x-polaris-builder": builder
+            "x-polaris-builder": builder,
+            // The subdirectory of the context to build (a monorepo's one app). The
+            // context itself stays the whole checkout, so a build can still reach the
+            // shared packages and the lockfile that live above it.
+            "x-polaris-root": root
         });
     }
 

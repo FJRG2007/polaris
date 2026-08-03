@@ -27,6 +27,20 @@ interface PushPayload {
     after?: string;
     repository?: { full_name?: string };
     head_commit?: { id?: string; message?: string };
+    /** GitHub carries the file lists inline, capped at 20 commits and 3000 files per
+     *  push. Past either cap the payload is truncated, which the watch-path matcher
+     *  reads as "could not tell" and deploys on - see `changedPaths`. */
+    commits?: Array<{ added?: string[]; modified?: string[]; removed?: string[] }>;
+}
+
+/** Every repository-relative path this push touched, across all of its commits. */
+function changedPaths(payload: PushPayload): string[] {
+    const paths = (payload.commits ?? []).flatMap((commit) => [
+        ...(commit.added ?? []),
+        ...(commit.modified ?? []),
+        ...(commit.removed ?? [])
+    ]);
+    return [...new Set(paths)];
 }
 
 interface WorkflowJobPayload {
@@ -89,7 +103,8 @@ export async function POST(request: Request): Promise<Response> {
         repoFullName,
         branch: branchFromRef(ref),
         commitMessage: payload.head_commit?.message ?? "",
-        commitSha: payload.head_commit?.id ?? payload.after ?? ""
+        commitSha: payload.head_commit?.id ?? payload.after ?? "",
+        changedPaths: changedPaths(payload)
     });
     return Response.json({ deployed: started });
 }

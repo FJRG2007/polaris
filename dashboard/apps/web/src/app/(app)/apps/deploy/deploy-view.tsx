@@ -48,6 +48,7 @@ import {
     Input,
     Select,
     Switch,
+    Textarea,
     type SelectOption
 } from "@polaris/ui";
 import {
@@ -114,7 +115,13 @@ export interface ProjectSummary {
             autoDeploy: boolean;
             deployBranch: string | null;
             commitFilter: string | null;
+            /** Globs a push must touch to redeploy this one, for a shared repository. */
+            watchPaths: string | null;
             keepReleases: boolean;
+            /** Where in the repository this service lives, for one holding several. */
+            rootDirectory: string | null;
+            /** Dockerfile it builds, as stored (relative to the root directory). */
+            dockerfilePath: string | null;
             /** The container port the app listens on (for the IP:port link and routes). */
             port: number | null;
             /** Direct LAN/intranet URL (host IP + published port), when a public IP is known. */
@@ -915,6 +922,7 @@ function NewGithubForm({ environmentId, onDone }: { environmentId: string; onDon
     const [branch, setBranch] = useState("");
     const [builder, setBuilder] = useState<Builder>("dockerfile");
     const [dockerfilePath, setDockerfilePath] = useState("Dockerfile");
+    const [rootDirectory, setRootDirectory] = useState("");
     const [framework, setFramework] = useState<string | null>(null);
     const [inspecting, setInspecting] = useState(false);
     const { servers, serverId, setServerId } = useDeployServers();
@@ -1046,6 +1054,7 @@ function NewGithubForm({ environmentId, onDone }: { environmentId: string; onDon
                 repoUrl: choice.url,
                 branch: branch.trim() || undefined,
                 dockerfilePath: builder === "dockerfile" ? dockerfilePath.trim() || undefined : undefined,
+                rootDirectory: rootDirectory.trim() || undefined,
                 // Only a GitHub repository can be cloned with the stored credentials.
                 provider: connected && choice.fullName ? "github" : undefined,
                 serverId
@@ -1190,8 +1199,24 @@ function NewGithubForm({ environmentId, onDone }: { environmentId: string; onDon
                             options={BUILDER_OPTIONS}
                         />
                     </Field>
+                    <Field
+                        label="Root directory"
+                        hint="For a repository holding several apps. The build still gets the whole repository, so shared packages and the lockfile above it are available."
+                    >
+                        <Input
+                            value={rootDirectory}
+                            onChange={(event) => setRootDirectory(event.target.value)}
+                            placeholder="apps/web"
+                            autoCapitalize="none"
+                            autoCorrect="off"
+                            spellCheck={false}
+                        />
+                    </Field>
                     {builder === "dockerfile" && (
-                        <Field label="Dockerfile path">
+                        <Field
+                            label="Dockerfile path"
+                            hint={rootDirectory.trim() ? `Relative to ${rootDirectory.trim()}.` : undefined}
+                        >
                             <Input
                                 value={dockerfilePath}
                                 onChange={(event) => setDockerfilePath(event.target.value)}
@@ -1467,6 +1492,7 @@ function AutoDeployDialog({
     const [enabled, setEnabled] = useState(app.autoDeploy);
     const [branch, setBranch] = useState(app.deployBranch ?? "");
     const [filter, setFilter] = useState(app.commitFilter ?? "");
+    const [watchPaths, setWatchPaths] = useState(app.watchPaths ?? "");
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
 
@@ -1477,7 +1503,8 @@ function AutoDeployDialog({
                 applicationId: app.id,
                 autoDeploy: enabled,
                 deployBranch: branch.trim() || undefined,
-                commitFilter: filter.trim() || undefined
+                commitFilter: filter.trim() || undefined,
+                watchPaths: watchPaths.trim() || undefined
             });
             if (result.error) setError(result.error);
             else {
@@ -1512,6 +1539,20 @@ function AutoDeployDialog({
                         hint='Deploy only when the commit message contains this (e.g. "build:"), or "regex:<pattern>". Blank = any commit.'
                     >
                         <Input value={filter} onChange={(event) => setFilter(event.target.value)} placeholder="build:" />
+                    </Field>
+                    <Field
+                        label="Watch paths"
+                        hint="One glob per line. Deploy only when the push touched one of them, so a repository holding several services rebuilds just the ones that changed. Prefix with ! to exclude. Blank = any change."
+                    >
+                        <Textarea
+                            value={watchPaths}
+                            onChange={(event) => setWatchPaths(event.target.value)}
+                            placeholder={"apps/web/**\npackages/ui/**\n!**/*.md"}
+                            rows={4}
+                            autoCapitalize="none"
+                            autoCorrect="off"
+                            spellCheck={false}
+                        />
                     </Field>
                     {error && <p className="text-sm text-danger">{error}</p>}
                     <div className="flex justify-end gap-2">

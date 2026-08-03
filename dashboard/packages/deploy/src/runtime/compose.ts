@@ -72,6 +72,7 @@ export class ComposeRuntime implements RuntimeDriver {
                     tag: imageTag,
                     dockerfile: plan.build.dockerfilePath,
                     contextTar,
+                    root: plan.build.rootDirectory,
                     builder: plan.build.method === "nixpacks" ? "nixpacks" : "docker"
                 },
                 sink

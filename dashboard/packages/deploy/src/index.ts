@@ -30,12 +30,15 @@ export { traefikLabels, configHash, type TraefikDomain, type CertResolver, type 
 export {
     buildSpec,
     buildCommand,
+    normalizeRoot,
+    resolveDockerfilePath,
     DEFAULT_BUILDPACKS_BUILDER,
     DEFAULT_DOCKERFILE,
     type BuildMethod,
     type BuildInput,
     type BuildSpec
 } from "./builders/index.js";
+export { parseWatchPaths, shouldDeployForPaths } from "./watch-paths.js";
 export type {
     RuntimePorts,
     OutputSink,

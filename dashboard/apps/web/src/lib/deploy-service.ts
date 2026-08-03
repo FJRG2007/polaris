@@ -32,7 +32,7 @@ import { getDriver, getPorts, toTargetInfo, type TargetRow } from "./deploy/runt
 import { getOrCreateHostTarget, getOrCreateLocalTarget } from "./deploy-target-service";
 import { quickTunnelAppIds, tunnelHostForApp, stopQuickTunnel } from "./deploy/quick-tunnel-service";
 import { KEPT_RELEASES, currentReleaseRef, keepsReleases, portSubject, releaseMarker, releaseRef, serviceRef } from "./deploy/releases";
-import { bucketHttpMetrics, normalizeZoneName, parseHttpLogs, releaseDomain, shortHash, slugify, type AppDeployPlan, type DeployResult, type HttpLogEntry, type HttpMetricPoint, type RuntimeContext, type RuntimeDriver } from "@polaris/deploy";
+import { bucketHttpMetrics, normalizeRoot, normalizeZoneName, parseHttpLogs, parseWatchPaths, releaseDomain, resolveDockerfilePath, shortHash, shouldDeployForPaths, slugify, type AppDeployPlan, type DeployResult, type HttpLogEntry, type HttpMetricPoint, type RuntimeContext, type RuntimeDriver } from "@polaris/deploy";
 
 /** A locally-installed messaging hub (this catalog app) joins a dedicated web<->hub
  *  network and POSTs inbound events to the web by service DNS - the public app URL
@@ -1312,7 +1312,15 @@ async function buildAppPlan(
             method: (app.sourceType as AppDeployPlan["build"]["method"]) ?? "image",
             name: app.slug,
             imageRef: typeof source.imageRef === "string" ? source.imageRef : undefined,
-            dockerfilePath: typeof source.dockerfilePath === "string" ? source.dockerfilePath : undefined,
+            // Both derived from the root directory: a monorepo's one app is built from a
+            // context that stays the whole repository (the lockfile and the shared
+            // packages it needs are above it), with the builder pointed at its own
+            // directory inside that context.
+            dockerfilePath: resolveDockerfilePath(
+                typeof source.rootDirectory === "string" ? source.rootDirectory : undefined,
+                typeof source.dockerfilePath === "string" ? source.dockerfilePath : undefined
+            ),
+            rootDirectory: normalizeRoot(typeof source.rootDirectory === "string" ? source.rootDirectory : undefined),
             contextPath: ".",
             composeYaml: typeof source.composeYaml === "string" ? source.composeYaml : undefined
         },
@@ -1626,6 +1634,34 @@ export async function setApplicationPort(applicationId: string, ownerId: string,
 }
 
 /**
+ * Set where in its repository an application lives, and which Dockerfile it builds.
+ *
+ * Editable after creation because a repository grows a second service long after the
+ * first one was added, and the alternative - delete the service and make it again -
+ * loses its domains, its variables and its history to change one string.
+ *
+ * The root directory is normalized here as well as on create: this is the other door
+ * into the same stored value, and one that validates and one that does not is not a
+ * validated value. Takes effect on the next deploy.
+ */
+export async function setApplicationSourcePaths(
+    applicationId: string,
+    ownerId: string,
+    paths: { rootDirectory?: string | null; dockerfilePath?: string | null }
+): Promise<void> {
+    const app = await prisma.application.findFirst({
+        where: { id: applicationId, environment: { project: { ownerId } } },
+        select: { id: true, sourceConfig: true }
+    });
+    if (!app) throw new Error("Application not found");
+    const source = JSON.parse(app.sourceConfig) as Record<string, unknown>;
+    source.rootDirectory = normalizeRoot(paths.rootDirectory ?? undefined);
+    const dockerfile = paths.dockerfilePath?.trim();
+    if (dockerfile !== undefined) source.dockerfilePath = dockerfile || undefined;
+    await prisma.application.update({ where: { id: app.id }, data: { sourceConfig: JSON.stringify(source) } });
+}
+
+/**
  * Move an application to a different server (deploy target): the local host or a
  * connected SSH Host. The current deployment is torn down on the OLD server first
  * so it does not keep running orphaned, then the app is retargeted; it redeploys
@@ -1675,7 +1711,13 @@ export async function setApplicationServer(applicationId: string, ownerId: strin
 export async function updateAutoDeploy(
     applicationId: string,
     ownerId: string,
-    settings: { autoDeploy: boolean; deployBranch?: string | null; commitFilter?: string | null; keepReleases?: boolean }
+    settings: {
+        autoDeploy: boolean;
+        deployBranch?: string | null;
+        commitFilter?: string | null;
+        watchPaths?: string | null;
+        keepReleases?: boolean;
+    }
 ): Promise<void> {
     const app = await prisma.application.findFirst({
         where: { id: applicationId, environment: { project: { ownerId } } }
@@ -1687,6 +1729,9 @@ export async function updateAutoDeploy(
             autoDeploy: settings.autoDeploy,
             deployBranch: settings.deployBranch?.trim() || null,
             commitFilter: settings.commitFilter?.trim() || null,
+            // Stored as typed (one glob per line); parsed where it is matched, so the
+            // field reads back exactly as it was written.
+            watchPaths: settings.watchPaths?.trim() || null,
             ...(settings.keepReleases !== undefined ? { keepReleases: settings.keepReleases } : {})
         }
     });
@@ -1772,6 +1817,9 @@ export async function triggerAutoDeploysForPush(input: {
     branch: string;
     commitMessage: string;
     commitSha: string;
+    /** Repository-relative paths the push touched, for the per-service watch paths.
+     *  Empty means they could not be determined, and every matching service deploys. */
+    changedPaths?: readonly string[];
 }): Promise<number> {
     const apps = await prisma.application.findMany({
         where: { autoDeploy: true, sourceType: { in: ["dockerfile", "nixpacks"] } },
@@ -1795,6 +1843,17 @@ export async function triggerAutoDeploysForPush(input: {
         const configuredBranch = (app.deployBranch?.trim() || (typeof source.branch === "string" ? source.branch : "")).trim();
         if (configuredBranch && configuredBranch !== input.branch) continue;
         if (!commitPassesFilter(input.commitMessage, app.commitFilter)) continue;
+        // Several services can track the same repository. Without this every one of
+        // them redeploys on every push, which is what makes a monorepo unusable here.
+        const watch = parseWatchPaths(app.watchPaths);
+        if (!shouldDeployForPaths(input.changedPaths ?? [], watch)) {
+            // Said out loud: a service that stops deploying reads as a broken webhook
+            // unless something states it was a deliberate skip.
+            console.info(
+                `polaris: skipping auto-deploy of ${app.slug}; the push touched nothing it watches (${watch.join(", ")})`
+            );
+            continue;
+        }
         const ownerId = app.environment.project.ownerId;
         try {
             await deployApplication(app.id, ownerId, ownerId, {

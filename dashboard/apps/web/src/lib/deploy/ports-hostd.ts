@@ -38,7 +38,8 @@ export class HostdPorts implements RuntimePorts {
             request.tag,
             request.dockerfile ?? "Dockerfile",
             tar,
-            request.builder ?? "docker"
+            request.builder ?? "docker",
+            request.root ?? ""
         );
         await drain(res, onOutput);
         return request.tag;

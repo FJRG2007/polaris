@@ -4,11 +4,15 @@
  * application with auto-deploy on, it reads the latest commit on the tracked
  * branch and deploys when the SHA changes (and the commit-message filter passes).
  * Deduped per repo+branch so many services on one repo cost a single API call.
+ *
+ * A service with watch paths costs one extra call, to compare what moved since it last
+ * deployed. Only that service pays for it, and only when it has paths set.
  */
 
 import { prisma } from "@polaris/db";
-import { getLatestCommit } from "../github-service";
 import { githubTokenForOwner } from "../github-access";
+import { getChangedFiles, getLatestCommit } from "../github-service";
+import { parseWatchPaths, shouldDeployForPaths } from "@polaris/deploy";
 import { commitPassesFilter, deployApplication } from "../deploy-service";
 
 const INTERVAL_MS = Number(process.env.POLARIS_AUTODEPLOY_POLL_MS) || 60_000;
@@ -61,6 +65,21 @@ export async function pollAutoDeploys(): Promise<void> {
             continue;
         }
         if (!commitPassesFilter(latest.message, app.commitFilter)) continue;
+
+        // Which files moved since this service last deployed - not since the previous
+        // poll. A service that skipped the last three pushes still deploys when the
+        // fourth touches it, because the range it is judged on grows until it does.
+        const watch = parseWatchPaths(app.watchPaths);
+        if (watch.length > 0) {
+            const token = await githubTokenForOwner(ownerId, parsed.owner);
+            const changed = await getChangedFiles(parsed.owner, parsed.repo, app.lastDeployedSha, latest.sha, token);
+            if (!shouldDeployForPaths(changed, watch)) {
+                console.info(
+                    `polaris: skipping auto-deploy of ${app.slug}; nothing it watches changed since ${app.lastDeployedSha.slice(0, 7)}`
+                );
+                continue;
+            }
+        }
 
         try {
             await deployApplication(app.id, ownerId, ownerId, {

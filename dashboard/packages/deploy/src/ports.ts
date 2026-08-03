@@ -22,6 +22,10 @@ export interface BuildRequest {
     readonly dockerfile?: string;
     /** A tar stream of the build context. */
     readonly contextTar: NodeJS.ReadableStream;
+    /** Subdirectory of the context the build is rooted at, for a monorepo. Only the
+     *  auto-detecting builder needs it - a Dockerfile build states its own path and
+     *  keeps the whole context, which is what a shared package is built from. */
+    readonly root?: string;
     readonly buildArgs?: Readonly<Record<string, string>>;
     /** Build strategy: "docker" uses the Dockerfile, "nixpacks" auto-detects the
      *  framework and builds without one. Defaults to "docker". */

@@ -14,6 +14,16 @@ export interface BuildInput {
     readonly commitSha?: string;
     /** Directory the build runs in on the target (clone dir or context root). */
     readonly contextPath: string;
+    /**
+     * Subdirectory of the context this application lives in, for a repository that
+     * holds several. Empty means the repository root.
+     *
+     * The context stays the whole checkout either way: an app in a monorepo is built
+     * from a lockfile and shared packages that sit above it, so narrowing the context
+     * to its own directory would break the build it is meant to enable. This says
+     * where to look, not what to send.
+     */
+    readonly rootDirectory?: string;
     /** method "image": the image reference to pull and run. */
     readonly imageRef?: string;
     /** method "dockerfile": path relative to the context (default "Dockerfile"). */
@@ -36,6 +46,7 @@ export interface BuildSpec {
     readonly imageTag: string;
     readonly imageRef?: string;
     readonly contextPath: string;
+    readonly rootDirectory?: string;
     readonly dockerfilePath?: string;
     readonly targetStage?: string;
     readonly buildArgs: Readonly<Record<string, string>>;

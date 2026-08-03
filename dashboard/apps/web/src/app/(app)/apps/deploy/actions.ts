@@ -10,6 +10,7 @@ import { z } from "zod";
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { listHosts } from "@/lib/host-service";
+import { normalizeRoot } from "@polaris/deploy";
 import { requirePermission } from "@/lib/session";
 import { recordAudit } from "@/lib/audit-service";
 import * as deployService from "@/lib/deploy-service";
@@ -178,6 +179,7 @@ export async function createApplicationAction(input: {
     repoUrl?: string;
     branch?: string;
     dockerfilePath?: string;
+    rootDirectory?: string;
     provider?: string;
     port?: number;
     serverId?: string;
@@ -202,6 +204,9 @@ export async function createApplicationAction(input: {
             repoUrl,
             branch: input.branch?.trim() || undefined,
             dockerfilePath: isNixpacks ? undefined : input.dockerfilePath?.trim() || "Dockerfile",
+            // The service's own directory in a repository that holds several. Normalized
+            // on the way in so what is stored is already confined to the build context.
+            rootDirectory: normalizeRoot(input.rootDirectory),
             // Mark GitHub-sourced repos so the build authenticates its clone with the
             // connected token (private repos), transparently for public ones too.
             provider: input.provider === "github" ? "github" : undefined,
@@ -271,6 +276,7 @@ export async function setAutoDeployAction(input: {
     autoDeploy: boolean;
     deployBranch?: string;
     commitFilter?: string;
+    watchPaths?: string;
     keepReleases?: boolean;
 }): Promise<{ error?: string }> {
     const user = await requirePermission("deploy.manage");
@@ -279,6 +285,7 @@ export async function setAutoDeployAction(input: {
             autoDeploy: input.autoDeploy,
             deployBranch: input.deployBranch,
             commitFilter: input.commitFilter,
+            watchPaths: input.watchPaths,
             keepReleases: input.keepReleases
         });
         revalidatePath(DEPLOY_PATH);
@@ -384,6 +391,24 @@ export async function setAppPortAction(applicationId: string, port: number): Pro
         return {};
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Could not update the port" };
+    }
+}
+
+export async function setAppSourcePathsAction(input: {
+    applicationId: string;
+    rootDirectory?: string;
+    dockerfilePath?: string;
+}): Promise<{ error?: string }> {
+    const user = await requirePermission("deploy.manage");
+    try {
+        await deployService.setApplicationSourcePaths(input.applicationId, user.id, {
+            rootDirectory: input.rootDirectory,
+            dockerfilePath: input.dockerfilePath
+        });
+        revalidatePath(DEPLOY_PATH);
+        return {};
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not update the source paths" };
     }
 }
 
