@@ -122,6 +122,11 @@ export interface ProjectSummary {
             rootDirectory: string | null;
             /** Dockerfile it builds, as stored (relative to the root directory). */
             dockerfilePath: string | null;
+            /** Set on this service to override what the build detected. Null leaves
+             *  the phase to detection, which is what almost every service wants. */
+            installCommand: string | null;
+            buildCommand: string | null;
+            startCommand: string | null;
             /** The container port the app listens on (for the IP:port link and routes). */
             port: number | null;
             /** Direct LAN/intranet URL (host IP + published port), when a public IP is known. */

@@ -1707,6 +1707,9 @@ function SettingsTab({
     const [watchPaths, setWatchPaths] = useState(app.watchPaths ?? "");
     const [rootDirectory, setRootDirectory] = useState(app.rootDirectory ?? "");
     const [dockerfilePath, setDockerfilePath] = useState(app.dockerfilePath ?? "");
+    const [installCommand, setInstallCommand] = useState(app.installCommand ?? "");
+    const [buildCommand, setBuildCommand] = useState(app.buildCommand ?? "");
+    const [startCommand, setStartCommand] = useState(app.startCommand ?? "");
     const [keepReleases, setKeepReleases] = useState(app.keepReleases);
     // Empty means "not pinned": the deploy detects the container port from the image
     // (see buildAppPlan). Only a value the user types here pins it.
@@ -1816,7 +1819,10 @@ function SettingsTab({
                 const paths = await deployActions.setAppSourcePathsAction({
                     applicationId: app.id,
                     rootDirectory: rootDirectory.trim(),
-                    dockerfilePath: dockerfilePath.trim()
+                    dockerfilePath: dockerfilePath.trim(),
+                    installCommand: installCommand.trim(),
+                    buildCommand: buildCommand.trim(),
+                    startCommand: startCommand.trim()
                 });
                 if (paths.error) {
                     setError(paths.error);
@@ -2252,6 +2258,52 @@ function SettingsTab({
                                     ? `Relative to ${rootDirectory.trim()}.`
                                     : "Relative to the repository root."}
                             </span>
+                        </label>
+                    </div>
+                </section>
+            )}
+
+            {app.sourceType === "nixpacks" && (
+                <section className="flex flex-col gap-3">
+                    <h3 className="text-sm font-medium">Build</h3>
+                    <p className="text-xs text-muted-foreground">
+                        Polaris reads the repository and works these out - the framework, the package manager, and the
+                        workspace when there is one. Fill one in only to override what it found; the deployment log says
+                        what it detected.
+                    </p>
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                        <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                            Install command
+                            <Input
+                                value={installCommand}
+                                onChange={(event) => setInstallCommand(event.target.value)}
+                                placeholder="pnpm install --frozen-lockfile"
+                                autoCapitalize="none"
+                                autoCorrect="off"
+                                spellCheck={false}
+                            />
+                        </label>
+                        <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                            Build command
+                            <Input
+                                value={buildCommand}
+                                onChange={(event) => setBuildCommand(event.target.value)}
+                                placeholder="pnpm run build"
+                                autoCapitalize="none"
+                                autoCorrect="off"
+                                spellCheck={false}
+                            />
+                        </label>
+                        <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                            Start command
+                            <Input
+                                value={startCommand}
+                                onChange={(event) => setStartCommand(event.target.value)}
+                                placeholder="next start"
+                                autoCapitalize="none"
+                                autoCorrect="off"
+                                spellCheck={false}
+                            />
                         </label>
                     </div>
                 </section>

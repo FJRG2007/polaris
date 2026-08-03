@@ -25,11 +25,11 @@ import { getFlagsForEnvironment } from "./deploy-project-service";
 import { resolveRegistryLogin } from "./registry-credential-service";
 import { notifyDeployFinished } from "./notifications/deploy-events";
 import { deployHostname, type ZoneMintFailure } from "./domain-zones";
-import { gitBuildContext, type GitSource } from "./git-build-service";
 import { githubCloneAuthHeader, githubTokenForOwner } from "./github-access";
 import { applicationDefaultWafPresets, isTunnelHostname } from "@polaris/core";
 import { getDriver, getPorts, toTargetInfo, type TargetRow } from "./deploy/runtime";
 import { getOrCreateHostTarget, getOrCreateLocalTarget } from "./deploy-target-service";
+import { gitBuildContext, type BuildCommands, type GitSource } from "./git-build-service";
 import { quickTunnelAppIds, tunnelHostForApp, stopQuickTunnel } from "./deploy/quick-tunnel-service";
 import { KEPT_RELEASES, currentReleaseRef, keepsReleases, portSubject, releaseMarker, releaseRef, serviceRef } from "./deploy/releases";
 import { bucketHttpMetrics, normalizeRoot, normalizeZoneName, parseHttpLogs, parseWatchPaths, releaseDomain, resolveDockerfilePath, shortHash, shouldDeployForPaths, slugify, type AppDeployPlan, type DeployResult, type HttpLogEntry, type HttpMetricPoint, type RuntimeContext, type RuntimeDriver } from "@polaris/deploy";
@@ -1229,7 +1229,13 @@ async function buildAppPlan(
     applicationId: string,
     ownerId: string,
     release?: { id: string; commitSha: string | null }
-): Promise<{ plan: AppDeployPlan; target: TargetRow; gitSource?: GitSource; keepsHistory: boolean }> {
+): Promise<{
+    plan: AppDeployPlan;
+    target: TargetRow;
+    gitSource?: GitSource;
+    buildCommands?: BuildCommands;
+    keepsHistory: boolean;
+}> {
     const app = await prisma.application.findFirst({
         where: { id: applicationId, environment: { project: { ownerId } } },
         include: { environment: { include: { project: true } }, target: true, volumes: true, domains: true }
@@ -1241,6 +1247,7 @@ async function buildAppPlan(
     const kept = release !== undefined && keepsReleases(app);
     const ref = kept ? releaseRef(base, releaseMarker(release)) : base;
     const source = JSON.parse(app.sourceConfig) as Record<string, unknown>;
+    const build = JSON.parse(app.buildConfig) as Record<string, unknown>;
     const env = await mergedEnv(app.environmentId, app.id);
     // A locally-targeted messaging hub reaches the web's ingest over the dedicated
     // hub network by service DNS; detected from the install + target here (not
@@ -1286,6 +1293,14 @@ async function buildAppPlan(
     // consistent across redeploys without a schema column.
     const storedPort = typeof source.port === "number" ? source.port : undefined;
     const containerPort = storedPort ?? app.domains[0]?.targetPort ?? (app.sourceType === "image" ? 80 : 3000);
+
+    // Everything a builder produces from source reads PORT to decide where to
+    // listen - it is the convention every framework and every buildpack follows -
+    // and until now nothing set it, so a service only answered on the port the plan
+    // published because that port and the framework's own default happened to be
+    // 3000. Set it to what the plan actually publishes, and never over a value the
+    // owner set for themselves.
+    if (app.sourceType !== "image" && env.PORT === undefined) env.PORT = String(containerPort);
 
     // NAS mounts the volumes bind onto: one per distinct storage connection a nas
     // volume uses, so the deploy kernel-mounts each at `<mount_root>/<id>` before the
@@ -1366,7 +1381,25 @@ async function buildAppPlan(
             if (authHeader) gitSource.authHeader = authHeader;
         }
     }
-    return { plan, target: app.target, gitSource, keepsHistory: keepsReleases(app) };
+    // What this service says about building itself, over and above what the clone
+    // turns out to contain. Only a source build without a Dockerfile consults it:
+    // a Dockerfile states its own everything.
+    const buildCommands: BuildCommands | undefined =
+        plan.build.method === "nixpacks"
+            ? {
+                  rootDirectory: plan.build.rootDirectory,
+                  installCommand: stringOrNull(build.installCommand),
+                  buildCommand: stringOrNull(build.buildCommand),
+                  startCommand: stringOrNull(build.startCommand)
+              }
+            : undefined;
+    return { plan, target: app.target, gitSource, buildCommands, keepsHistory: keepsReleases(app) };
+}
+
+/** A stored setting as a command, or null when it was never set. Blank is not an
+ *  instruction to run nothing - it is the field left alone. */
+function stringOrNull(value: unknown): string | null {
+    return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
 /** Merge environment-scoped and application-scoped env vars (app wins), decrypting
@@ -1440,7 +1473,7 @@ export async function deployApplication(
     userId: string,
     meta?: { commitMessage?: string; commitSha?: string; authorName?: string; authorAvatarUrl?: string }
 ): Promise<string> {
-    const { plan, target, gitSource, keepsHistory } = await buildAppPlan(applicationId, ownerId);
+    const { plan, target, gitSource, buildCommands, keepsHistory } = await buildAppPlan(applicationId, ownerId);
 
     // Resolve the commit + author so the deployment shows who shipped it, Railway-
     // style. The provided meta (webhook / poller) wins; otherwise resolve the branch
@@ -1498,7 +1531,7 @@ export async function deployApplication(
     // actually succeeds (see executeDeployment) - so history never shows a build
     // as "current" before it finishes, and the old version stays active until the
     // new one is up (zero-downtime cutover, the way Railway does it).
-    queue.enqueue(target.id, () => runDeployment(deployment.id, planned, target, ownerId, gitSource));
+    queue.enqueue(target.id, () => runDeployment(deployment.id, planned, target, ownerId, gitSource, buildCommands));
     return deployment.id;
 }
 
@@ -1647,18 +1680,37 @@ export async function setApplicationPort(applicationId: string, ownerId: string,
 export async function setApplicationSourcePaths(
     applicationId: string,
     ownerId: string,
-    paths: { rootDirectory?: string | null; dockerfilePath?: string | null }
+    paths: {
+        rootDirectory?: string | null;
+        dockerfilePath?: string | null;
+        installCommand?: string | null;
+        buildCommand?: string | null;
+        startCommand?: string | null;
+    }
 ): Promise<void> {
     const app = await prisma.application.findFirst({
         where: { id: applicationId, environment: { project: { ownerId } } },
-        select: { id: true, sourceConfig: true }
+        select: { id: true, sourceConfig: true, buildConfig: true }
     });
     if (!app) throw new Error("Application not found");
     const source = JSON.parse(app.sourceConfig) as Record<string, unknown>;
     source.rootDirectory = normalizeRoot(paths.rootDirectory ?? undefined);
     const dockerfile = paths.dockerfilePath?.trim();
     if (dockerfile !== undefined) source.dockerfilePath = dockerfile || undefined;
-    await prisma.application.update({ where: { id: app.id }, data: { sourceConfig: JSON.stringify(source) } });
+
+    // The commands live on the build config rather than the source: they are how
+    // this service is built, not where it is. Cleared back to undefined when blank,
+    // which is what hands the phase back to detection.
+    const build = JSON.parse(app.buildConfig) as Record<string, unknown>;
+    for (const key of ["installCommand", "buildCommand", "startCommand"] as const) {
+        const value = paths[key];
+        if (value !== undefined) build[key] = value?.trim() || undefined;
+    }
+
+    await prisma.application.update({
+        where: { id: app.id },
+        data: { sourceConfig: JSON.stringify(source), buildConfig: JSON.stringify(build) }
+    });
 }
 
 /**
@@ -1874,7 +1926,8 @@ function runDeployment(
     plan: AppDeployPlan,
     target: TargetRow,
     ownerId: string,
-    gitSource?: GitSource
+    gitSource?: GitSource,
+    buildCommands?: BuildCommands
 ): Promise<void> {
     // Only an image source pulls a registry image that may need a login.
     const pullImages = plan.build.method === "image" && plan.build.imageRef ? [plan.build.imageRef] : [];
@@ -1884,7 +1937,8 @@ function runDeployment(
         ownerId,
         (ctx, driver) => driver.deployApplication(plan, ctx),
         gitSource,
-        pullImages
+        pullImages,
+        buildCommands
     );
 }
 
@@ -1911,7 +1965,8 @@ export async function executeDeployment(
     ownerId: string,
     run: (ctx: RuntimeContext, driver: RuntimeDriver) => Promise<DeployResult>,
     buildSource?: GitSource,
-    pullImages: string[] = []
+    pullImages: string[] = [],
+    buildCommands?: BuildCommands
 ): Promise<void> {
     await mkdir(logDir(), { recursive: true });
     const logStream = createWriteStream(deployLogPath(deploymentId), { flags: "a" });
@@ -1926,7 +1981,7 @@ export async function executeDeployment(
 
     const ports = await getPorts(target, ownerId);
     const driver = getDriver(target);
-    const buildContext = buildSource ? gitBuildContext(buildSource, log) : undefined;
+    const buildContext = buildSource ? gitBuildContext(buildSource, log, buildCommands) : undefined;
     try {
         // Authenticate to any private registry whose image this deploy pulls, so the
         // pull below (inside the driver) is authorized. A login failure is logged but

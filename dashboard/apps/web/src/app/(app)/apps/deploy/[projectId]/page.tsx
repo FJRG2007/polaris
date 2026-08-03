@@ -31,9 +31,10 @@ function portOf(sourceConfig: string): number | null {
 
 /** A string field out of the stored source config (the repository paths a git service
  *  builds from), or null when it is unset or the config will not parse. */
-function sourceText(sourceConfig: string, key: "rootDirectory" | "dockerfilePath"): string | null {
+/** A string setting out of one of the stored JSON blobs, or null when unset. */
+function storedText(json: string, key: string): string | null {
     try {
-        const value = (JSON.parse(sourceConfig) as Record<string, unknown>)[key];
+        const value = (JSON.parse(json) as Record<string, unknown>)[key];
         return typeof value === "string" && value ? value : null;
     } catch {
         return null;
@@ -103,8 +104,11 @@ export default async function DeployProjectPage({
                 commitFilter: app.commitFilter,
                 watchPaths: app.watchPaths,
                 keepReleases: app.keepReleases,
-                rootDirectory: sourceText(app.sourceConfig, "rootDirectory"),
-                dockerfilePath: sourceText(app.sourceConfig, "dockerfilePath"),
+                rootDirectory: storedText(app.sourceConfig, "rootDirectory"),
+                dockerfilePath: storedText(app.sourceConfig, "dockerfilePath"),
+                installCommand: storedText(app.buildConfig, "installCommand"),
+                buildCommand: storedText(app.buildConfig, "buildCommand"),
+                startCommand: storedText(app.buildConfig, "startCommand"),
                 port: portOf(app.sourceConfig),
                 ipUrl: serverIp ? `http://${serverIp}:${hostPortForApp(serving.get(app.id)?.portSubject ?? app.id)}` : null,
                 domains: mergeTunnelDomains(

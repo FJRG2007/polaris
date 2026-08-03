@@ -36,13 +36,15 @@ export class SwarmRuntime implements RuntimeDriver {
             await ctx.ports.pull(imageTag, sink);
         } else if ((plan.build.method === "dockerfile" || plan.build.method === "nixpacks") && ctx.buildContext) {
             imageTag = toImageTag(plan.build.name, plan.build.commitSha);
-            const contextTar = await ctx.buildContext();
+            const context = await ctx.buildContext();
             await ctx.ports.build(
                 {
                     tag: imageTag,
                     dockerfile: plan.build.dockerfilePath,
-                    contextTar,
-                    root: plan.build.rootDirectory,
+                    contextTar: context.tar,
+                    // Detection may have moved the build up to the repository root -
+                    // a workspace cannot install from inside one of its members.
+                    root: context.root ?? plan.build.rootDirectory,
                     builder: plan.build.method === "nixpacks" ? "nixpacks" : "docker"
                 },
                 sink

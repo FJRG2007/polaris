@@ -64,15 +64,17 @@ export class ComposeRuntime implements RuntimeDriver {
             // framework (no Dockerfile needed). Then run the built image.
             imageTag = toImageTag(plan.build.name, plan.build.commitSha);
             const fetched = step("Fetching the source");
-            const contextTar = await ctx.buildContext();
+            const context = await ctx.buildContext();
             fetched();
             const built = step("Building the image");
             await ctx.ports.build(
                 {
                     tag: imageTag,
                     dockerfile: plan.build.dockerfilePath,
-                    contextTar,
-                    root: plan.build.rootDirectory,
+                    contextTar: context.tar,
+                    // Detection may have moved the build up to the repository root -
+                    // a workspace cannot install from inside one of its members.
+                    root: context.root ?? plan.build.rootDirectory,
                     builder: plan.build.method === "nixpacks" ? "nixpacks" : "docker"
                 },
                 sink
@@ -130,8 +132,7 @@ export class ComposeRuntime implements RuntimeDriver {
         if (exposed.length > 1) {
             ctx.log(
                 Buffer.from(
-                    `Image exposes multiple ports (${exposed.join(", ")}); publishing container port ${plan.expose.container}. ` +
-                        "Set the container port explicitly if the app serves on a different one.\n"
+                    `Image exposes multiple ports (${exposed.join(", ")}); publishing container port ${plan.expose.container}. Set the container port explicitly if the app serves on a different one.\n`
                 )
             );
             return plan;

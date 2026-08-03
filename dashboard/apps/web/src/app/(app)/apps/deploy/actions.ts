@@ -398,12 +398,18 @@ export async function setAppSourcePathsAction(input: {
     applicationId: string;
     rootDirectory?: string;
     dockerfilePath?: string;
+    installCommand?: string;
+    buildCommand?: string;
+    startCommand?: string;
 }): Promise<{ error?: string }> {
     const user = await requirePermission("deploy.manage");
     try {
         await deployService.setApplicationSourcePaths(input.applicationId, user.id, {
             rootDirectory: input.rootDirectory,
-            dockerfilePath: input.dockerfilePath
+            dockerfilePath: input.dockerfilePath,
+            installCommand: input.installCommand,
+            buildCommand: input.buildCommand,
+            startCommand: input.startCommand
         });
         revalidatePath(DEPLOY_PATH);
         return {};

@@ -7,6 +7,7 @@
  */
 
 import type { BuildInput } from "../builders/types.js";
+import type { BuildContext } from "../build-context.js";
 import type { RuntimePorts, OutputSink } from "../ports.js";
 import type { TraefikDomain, TraefikWaf } from "../traefik.js";
 
@@ -26,10 +27,14 @@ export interface RuntimeContext {
     readonly target: DeployTargetInfo;
     /** Append a line to the deployment's streamed log. */
     readonly log: OutputSink;
-    /** Produce the build context (a tar stream) for a build-from-source deploy.
-     *  Injected by the pipeline (which clones the repo), so the runtime and this
-     *  package stay free of git/filesystem concerns. Absent for image sources. */
-    readonly buildContext?: () => Promise<NodeJS.ReadableStream>;
+    /** Produce the build context for a build-from-source deploy. Injected by the
+     *  pipeline (which clones the repo), so the runtime and this package stay free
+     *  of git/filesystem concerns. Absent for image sources.
+     *
+     *  It answers with more than the tar because one question can only be settled
+     *  once the source is on disk: a workspace has to be built from the repository
+     *  root, whatever the service's own root directory says. */
+    readonly buildContext?: () => Promise<BuildContext>;
 }
 
 export interface ServiceRef {
