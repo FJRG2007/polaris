@@ -41,7 +41,7 @@ import { setLocalHostId } from "@/lib/local-server";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { enrollmentCommand } from "@/lib/enrollment-script";
 import { generateToken, hashToken } from "@polaris/core/tokens";
-import { decryptSecret, encryptSecret } from "@polaris/storage";
+import { decryptSecret, encryptCredentials, encryptSecret } from "@polaris/storage";
 import { generateSshKeyPair, publicKeyBlob, testAndCaptureHostKey } from "@polaris/ssh";
 import {
     ENROLLMENT_REFUSAL_MESSAGES,
@@ -53,7 +53,8 @@ import {
     type CreateEnrollmentInput,
     type EnrollmentKind,
     type EnrollmentRefusalReason,
-    type EnrollmentState
+    type EnrollmentState,
+    type HostCredentials
 } from "@polaris/core";
 
 /** Claims allowed from one address per window. A claim is cheap for the caller
@@ -128,7 +129,7 @@ export async function openEnrollment(
     const base = await appBaseUrl();
     return {
         id: row.id,
-        command: enrollmentCommand(base, token, input.grantDocker, input.grantRoot),
+        command: enrollmentCommand(base, token),
         expiresAt: expiresAt.toISOString(),
         insecureTransport: base.startsWith("http://")
     };
@@ -306,7 +307,14 @@ export async function claimEnrollment(
     if ("error" in reached) return await failClaim(row.id, reached.error);
     const { address, hostKey } = reached;
 
-    const credentials = encryptSecret(privateKey, loadEnv().POLARIS_MASTER_KEY);
+    // Stored in the shape every reader expects - `getHostConnection` decrypts a
+    // host credential as JSON. Writing the bare key here instead left every
+    // enrolled server unusable: the parse threw on the PEM's leading dash, which
+    // Drive surfaced as an error and the terminal swallowed into "invalid ticket".
+    const credentials = encryptCredentials(
+        { method: "key", privateKey } satisfies HostCredentials,
+        loadEnv().POLARIS_MASTER_KEY
+    );
     const host = await prisma.host.create({
         data: {
             ownerId: row.createdById,

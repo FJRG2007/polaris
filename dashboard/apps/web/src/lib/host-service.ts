@@ -11,8 +11,8 @@ import { prisma } from "@polaris/db";
 import { loadEnv } from "@polaris/config";
 import { testAndCaptureHostKey, type SshAuth } from "@polaris/ssh";
 import { isBaseDomain, normalizeBaseDomain } from "@polaris/deploy";
-import { decryptCredentials, encryptCredentials } from "@polaris/storage";
-import type { CreateHostInput, HostCredentials, ServerEnvironment } from "@polaris/core";
+import { decryptSecret, encryptCredentials, type EncryptedBlob } from "@polaris/storage";
+import { hostCredentialsSchema, type CreateHostInput, type HostCredentials, type ServerEnvironment } from "@polaris/core";
 
 /** Non-secret fields safe to show in listings. */
 export async function listHosts(ownerId: string) {
@@ -26,6 +26,7 @@ export async function listHosts(ownerId: string) {
             username: true,
             authMethod: true,
             sudo: true,
+            os: true,
             environment: true,
             wildcardDomain: true,
             status: true,
@@ -67,7 +68,7 @@ function connectionFor(row: HostRow): HostConnection {
     if (!row.encryptedCredential || !row.credentialNonce) {
         throw new Error("Host has no stored credentials");
     }
-    const creds = decryptCredentials<HostCredentials>(
+    const creds = readCredentials(
         {
             ciphertext: Buffer.from(row.encryptedCredential),
             nonce: Buffer.from(row.credentialNonce),
@@ -157,6 +158,28 @@ export async function setHostWildcardDomain(ownerId: string, hostId: string, dom
 
 export async function deleteHost(ownerId: string, hostId: string): Promise<void> {
     await prisma.host.deleteMany({ where: { id: hostId, ownerId } });
+}
+
+/**
+ * Decrypt a host credential into its parsed form.
+ *
+ * A credential is stored as a JSON `HostCredentials`, but enrollment used to store
+ * the bare private key instead, which left every server added by the enrollment
+ * command unusable: the parse threw on the PEM's leading dash, Drive surfaced that
+ * as an error and the terminal swallowed it into "invalid ticket". Those rows are
+ * still out there, so plaintext that is not a credential object is read as the key
+ * it actually is rather than failing.
+ */
+export function readCredentials(blob: EncryptedBlob, masterKey: string): HostCredentials {
+    const secret = decryptSecret(blob, masterKey);
+    let parsed: unknown;
+    try {
+        parsed = JSON.parse(secret);
+    } catch {
+        return { method: "key", privateKey: secret };
+    }
+    const credentials = hostCredentialsSchema.safeParse(parsed);
+    return credentials.success ? credentials.data : { method: "key", privateKey: secret };
 }
 
 function toSshAuth(creds: HostCredentials): SshAuth {
