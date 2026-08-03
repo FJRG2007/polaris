@@ -22,8 +22,9 @@
 
 import { prisma } from "@polaris/db";
 import { listReposForOwner } from "@/lib/github-service";
+import { githubTokenForUser } from "@/lib/github-access";
 import { parseStoredScope, targetKey } from "./runner-scope";
-import { githubLoginsForGroup, githubLoginsForUsers } from "@/lib/github-identity";
+import { connectionsForGroup, connectionsForUsers } from "@/lib/connections/store";
 import { MAX_RUNNER_TARGETS, type RunnerScopeInput, type RunnerTargetKind } from "@polaris/core";
 
 export { parseStoredScope, targetKey };
@@ -48,9 +49,13 @@ export interface TargetResolution {
     readonly note: string | null;
 }
 
-/** Every repository of an account, as one target each. */
-async function reposOf(owner: string): Promise<ResolvedTarget[]> {
-    const repos = await listReposForOwner(owner);
+/** Every repository of an account, as one target each. When the account belongs
+ *  to somebody on this Polaris, it is asked for as them: their own credentials
+ *  are the accurate answer to "their repositories", and the installation's are a
+ *  fallback for the rest. */
+async function reposOf(owner: string, asUserId?: string): Promise<ResolvedTarget[]> {
+    const asToken = asUserId ? await githubTokenForUser(asUserId, owner).catch(() => null) : null;
+    const repos = await listReposForOwner(owner, 100, asToken);
     return repos.map((repo) => {
         const [login, name] = repo.fullName.split("/");
         return { key: repo.fullName, kind: "repo" as const, owner: login ?? owner, repo: name ?? "" };
@@ -88,12 +93,12 @@ async function gather(scope: RunnerScopeInput): Promise<ResolvedTarget[]> {
         case "account":
             return reposOf(scope.owner);
         case "users": {
-            const linked = await githubLoginsForUsers(scope.userIds);
-            return (await Promise.all(linked.map((account) => reposOf(account.login)))).flat();
+            const linked = await connectionsForUsers("github", scope.userIds);
+            return (await Promise.all(linked.map((account) => reposOf(account.label, account.userId)))).flat();
         }
         case "group": {
-            const linked = await githubLoginsForGroup(scope.groupId);
-            return (await Promise.all(linked.map((account) => reposOf(account.login)))).flat();
+            const linked = await connectionsForGroup("github", scope.groupId);
+            return (await Promise.all(linked.map((account) => reposOf(account.label, account.userId)))).flat();
         }
     }
 }

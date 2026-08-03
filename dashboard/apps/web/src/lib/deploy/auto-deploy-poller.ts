@@ -8,6 +8,7 @@
 
 import { prisma } from "@polaris/db";
 import { getLatestCommit } from "../github-service";
+import { githubTokenForOwner } from "../github-access";
 import { commitPassesFilter, deployApplication } from "../deploy-service";
 
 const INTERVAL_MS = Number(process.env.POLARIS_AUTODEPLOY_POLL_MS) || 60_000;
@@ -40,10 +41,15 @@ export async function pollAutoDeploys(): Promise<void> {
         const branch = (app.deployBranch?.trim() || (typeof source.branch === "string" ? source.branch : "")).trim();
         if (!branch) continue;
 
-        const key = `${parsed.owner}/${parsed.repo}@${branch}`.toLowerCase();
+        // Keyed by who is asking as well as what is asked: a repository one
+        // project owner reaches and another does not must not answer from a cache
+        // filled on the first owner's behalf.
+        const ownerId = app.environment.project.ownerId;
+        const key = `${ownerId}:${parsed.owner}/${parsed.repo}@${branch}`.toLowerCase();
         let latest = commitCache.get(key);
         if (latest === undefined) {
-            latest = await getLatestCommit(parsed.owner, parsed.repo, branch);
+            const token = await githubTokenForOwner(ownerId, parsed.owner);
+            latest = await getLatestCommit(parsed.owner, parsed.repo, branch, token);
             commitCache.set(key, latest);
         }
         if (!latest || latest.sha === app.lastDeployedSha) continue;
@@ -56,7 +62,6 @@ export async function pollAutoDeploys(): Promise<void> {
         }
         if (!commitPassesFilter(latest.message, app.commitFilter)) continue;
 
-        const ownerId = app.environment.project.ownerId;
         try {
             await deployApplication(app.id, ownerId, ownerId, {
                 commitMessage: latest.message,

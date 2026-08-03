@@ -13,16 +13,11 @@ import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/session";
 import { parseGithubRepo } from "@/lib/repo-reference";
 import { resolveScope } from "@/lib/runners/runner-targets";
-import { listLinkedGithubAccounts } from "@/lib/github-identity";
+import { listConnectedAccounts } from "@/lib/connections/store";
 import { reconcileRunnerPools } from "@/lib/runners/runner-reconciler";
+import { resolveGithubRepo, searchGithubRepos, type GithubRepo } from "@/lib/github-service";
+import { githubCredentialsForUser, githubTokenForUser, listReposForUser } from "@/lib/github-access";
 import { createRunnerPoolSchema, runnerScopeSchema, serverIdSchema, updateRunnerPoolSchema } from "@polaris/core";
-import {
-    getGithubStatus,
-    listGithubRepos,
-    resolveGithubRepo,
-    searchGithubRepos,
-    type GithubRepo
-} from "@/lib/github-service";
 import {
     createRunnerPool,
     deleteRunnerPool,
@@ -133,16 +128,19 @@ export async function previewScopeAction(
     }
 }
 
-/** The connected GitHub account (if any) and the repositories it can register
- *  runners on, for the pool's repository picker. */
+/** The operator's own GitHub accounts and the repositories they can register
+ *  runners on, for the pool's repository picker. Their accounts rather than the
+ *  instance's, so the picker offers what this person can actually reach. */
 export async function githubReposAction(): Promise<{ connected: boolean; login: string | null; repos: GithubRepo[] }> {
-    await requirePermission("system.manage");
-    const status = await getGithubStatus();
-    if (!status.connected) return { connected: false, login: null, repos: [] };
+    const user = await requirePermission("system.manage");
+    const accounts = await githubCredentialsForUser(user.id);
+    if (accounts.length === 0) return { connected: false, login: null, repos: [] };
+    // Named only when there is one: two accounts have no single login to show.
+    const login = accounts.length === 1 ? (accounts[0]?.login ?? null) : null;
     try {
-        return { connected: true, login: status.login, repos: await listGithubRepos() };
+        return { connected: true, login, repos: await listReposForUser(user.id) };
     } catch {
-        return { connected: true, login: status.login, repos: [] };
+        return { connected: true, login, repos: [] };
     }
 }
 
@@ -154,16 +152,17 @@ const repoQuerySchema = z.string().trim().min(2).max(200);
  * rate limited, no such repository - is an empty list rather than an error.
  */
 export async function searchGithubReposAction(query: string): Promise<{ repos: GithubRepo[] }> {
-    await requirePermission("system.manage");
+    const user = await requirePermission("system.manage");
     const parsed = repoQuerySchema.safeParse(query);
     if (!parsed.success) return { repos: [] };
     try {
         const reference = parseGithubRepo(parsed.data);
         if (reference) {
-            const repo = await resolveGithubRepo(reference.owner, reference.repo);
+            const token = await githubTokenForUser(user.id, reference.owner);
+            const repo = await resolveGithubRepo(reference.owner, reference.repo, token);
             if (repo) return { repos: [repo] };
         }
-        return { repos: await searchGithubRepos(parsed.data) };
+        return { repos: await searchGithubRepos(parsed.data, await githubTokenForUser(user.id)) };
     } catch {
         return { repos: [] };
     }
@@ -183,18 +182,20 @@ export async function runnerPrincipalsAction(): Promise<{
 }> {
     await requirePermission("system.manage");
     const [linked, groups] = await Promise.all([
-        listLinkedGithubAccounts(),
+        listConnectedAccounts("github"),
         prisma.group.findMany({
             select: {
                 id: true,
                 name: true,
-                _count: { select: { members: { where: { user: { githubIdentity: { isNot: null } } } } } }
+                _count: {
+                    select: { members: { where: { user: { linkedAccounts: { some: { provider: "github" } } } } } }
+                }
             },
             orderBy: { name: "asc" }
         })
     ]);
     return {
-        people: linked.map((account) => ({ userId: account.userId, name: account.name, login: account.login })),
+        people: linked.map((account) => ({ userId: account.userId, name: account.name, login: account.label })),
         groups: groups.map((group) => ({ id: group.id, name: group.name, linked: group._count.members }))
     };
 }

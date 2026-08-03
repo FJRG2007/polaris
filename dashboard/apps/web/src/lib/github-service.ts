@@ -78,25 +78,12 @@ function optionalAuthHeaders(token: string | null): HeadersInit {
 }
 
 // --- Personal Access Token method ------------------------------------------
-
-/** Validate a token and return the login it authenticates as, or throw. */
-export async function verifyGithubToken(token: string): Promise<{ login: string }> {
-    const res = await fetch(`${API}/user`, { headers: apiHeaders(token), cache: "no-store" });
-    if (res.status === 401) throw new Error("GitHub rejected the token (unauthorized)");
-    if (!res.ok) throw new Error(`GitHub returned ${res.status} validating the token`);
-    const body = (await res.json()) as { login?: string };
-    if (!body.login) throw new Error("GitHub did not return an account for this token");
-    return { login: body.login };
-}
-
-/** Connect (or replace) GitHub with a Personal Access Token, validating it first. */
-export async function connectGithubPat(token: string, installedById?: string): Promise<{ login: string }> {
-    const trimmed = token.trim();
-    if (!trimmed) throw new Error("A GitHub token is required");
-    const { login } = await verifyGithubToken(trimmed);
-    await upsertIntegration(PROVIDER, { enabled: true, config: { method: "pat", login }, secret: trimmed, installedById });
-    return { login };
-}
+//
+// No longer something an administrator can connect: a personal token speaks for
+// one person, and connecting one instance-wide let everybody here list and clone
+// that person's repositories. People connect their own under Connected accounts.
+// What remains is the reader, so a token connected before that stays usable
+// until it has been handed back to its owner (see adopt-github-pat).
 
 /** The stored PAT (pat method only), or null. */
 async function getPatToken(): Promise<string | null> {
@@ -300,37 +287,91 @@ export interface GithubAccount {
     avatarUrl: string | null;
 }
 
+/** A user-to-server token, as GitHub issues it. The refresh token and expiry are
+ *  present only when the app was set to expire user tokens; without them the
+ *  access token simply keeps working. */
+export interface GithubUserToken {
+    accessToken: string;
+    refreshToken?: string;
+    /** Epoch milliseconds the access token stops being accepted at. */
+    expiresAt?: number;
+    scope: string;
+}
+
 /**
- * Turn the code GitHub handed back into the account that authorized it.
+ * Turn the code GitHub handed back into the account that authorized it, and the
+ * token that speaks for them.
  *
- * The access token is used once, here, and never stored: Polaris needs to know who
- * somebody is, not to act as them afterwards. Everything a pool does with their
- * repositories it does with the installation's own credentials.
+ * The token is kept, unlike before: it is what lists the repositories that
+ * person - and nobody else on this Polaris - can reach. Acting on those
+ * repositories is still done with the installation's own credentials, so a
+ * build keeps working after somebody's token expires.
  */
-export async function identifyGithubUser(code: string, redirectUri: string): Promise<GithubAccount> {
+export async function authorizeGithubUser(
+    code: string,
+    redirectUri: string
+): Promise<{ account: GithubAccount; token: GithubUserToken }> {
     const auth = await getGithubUserAuth();
     if (!auth) throw new Error("This GitHub connection cannot verify accounts");
 
-    const exchange = await fetch("https://github.com/login/oauth/access_token", {
-        method: "POST",
-        headers: { Accept: "application/json", "content-type": "application/json", "User-Agent": "polaris" },
-        body: JSON.stringify({
-            client_id: auth.clientId,
-            client_secret: auth.clientSecret,
-            code,
-            redirect_uri: redirectUri
-        }),
-        cache: "no-store"
+    const token = await exchangeUserToken(auth, {
+        code,
+        redirect_uri: redirectUri,
+        grant_type: "authorization_code"
     });
-    if (!exchange.ok) throw new Error(`GitHub returned ${exchange.status} verifying the account`);
-    const granted = (await exchange.json()) as { access_token?: string; error_description?: string; error?: string };
-    if (!granted.access_token) throw new Error(granted.error_description ?? granted.error ?? "GitHub declined the authorization");
+    return { account: await readGithubAccount(token.accessToken), token };
+}
 
-    const res = await fetch(`${API}/user`, { headers: apiHeaders(granted.access_token), cache: "no-store" });
+/**
+ * Trade a refresh token for a fresh access token. Only apps set to expire user
+ * tokens ever reach this; the rest hold one that keeps working.
+ */
+export async function refreshGithubUserToken(refreshToken: string): Promise<GithubUserToken> {
+    const auth = await getGithubUserAuth();
+    if (!auth) throw new Error("This GitHub connection cannot refresh accounts");
+    return exchangeUserToken(auth, { refresh_token: refreshToken, grant_type: "refresh_token" });
+}
+
+/** The account a user token speaks for. */
+export async function readGithubAccount(token: string): Promise<GithubAccount> {
+    const res = await fetch(`${API}/user`, { headers: apiHeaders(token), cache: "no-store" });
+    if (res.status === 401) throw new Error("GitHub rejected the token (unauthorized)");
     if (!res.ok) throw new Error(`GitHub returned ${res.status} reading the account`);
     const body = (await res.json()) as { id?: number; login?: string; avatar_url?: string };
     if (typeof body.id !== "number" || !body.login) throw new Error("GitHub did not return an account");
     return { id: body.id, login: body.login, avatarUrl: body.avatar_url ?? null };
+}
+
+async function exchangeUserToken(
+    auth: { clientId: string; clientSecret: string },
+    fields: Record<string, string>
+): Promise<GithubUserToken> {
+    const exchange = await fetch("https://github.com/login/oauth/access_token", {
+        method: "POST",
+        headers: { Accept: "application/json", "content-type": "application/json", "User-Agent": "polaris" },
+        body: JSON.stringify({ ...fields, client_id: auth.clientId, client_secret: auth.clientSecret }),
+        cache: "no-store"
+    });
+    if (!exchange.ok) throw new Error(`GitHub returned ${exchange.status} verifying the account`);
+    const granted = (await exchange.json()) as {
+        access_token?: string;
+        refresh_token?: string;
+        expires_in?: number;
+        scope?: string;
+        error_description?: string;
+        error?: string;
+    };
+    if (!granted.access_token) {
+        throw new Error(granted.error_description ?? granted.error ?? "GitHub declined the authorization");
+    }
+    return {
+        accessToken: granted.access_token,
+        refreshToken: granted.refresh_token,
+        // A minute of headroom, so a token is never spent on the request that
+        // discovers it has just expired.
+        ...(granted.expires_in ? { expiresAt: Date.now() + granted.expires_in * 1000 - 60_000 } : {}),
+        scope: granted.scope ?? ""
+    };
 }
 
 /** Refresh the stored installation list (call after the user installs the app). */
@@ -403,52 +444,54 @@ function dedupeRepos(repos: GithubRepo[]): GithubRepo[] {
     return unique;
 }
 
+function toRepo(row: { full_name: string; default_branch: string; private: boolean }): GithubRepo {
+    return { fullName: row.full_name, defaultBranch: row.default_branch || "main", private: row.private };
+}
+
 /**
- * Repositories the connection can deploy, most-recently-pushed first. PAT lists the
- * user's repos; App lists each installation's repos. Capped per source to keep the
- * picker snappy; the deploy UI also accepts a manual URL for anything past that.
+ * Repositories a personal access token reaches, most-recently-pushed first.
+ * Capped by GitHub's page size to keep the picker snappy; the deploy UI also
+ * accepts a manual URL for anything past that.
  */
-export async function listGithubRepos(): Promise<GithubRepo[]> {
-    const state = await getIntegrationState(PROVIDER);
-    if (!state?.hasSecret) throw new Error("GitHub is not connected");
-
-    if (state.config.method === "app") {
-        const secrets = await getAppSecrets();
-        if (!secrets) throw new Error("The GitHub App is not fully configured");
-        const installs = Array.isArray(state.config.installations) ? (state.config.installations as Installation[]) : [];
-        const repos: GithubRepo[] = [];
-        for (const inst of installs) {
-            const token = await installationToken(inst.id, secrets.appId, secrets.pem);
-            const res = await fetch(`${API}/installation/repositories?per_page=100`, {
-                headers: apiHeaders(token),
-                cache: "no-store"
-            });
-            if (!res.ok) continue;
-            const body = (await res.json()) as {
-                repositories: Array<{ full_name: string; default_branch: string; private: boolean }>;
-            };
-            repos.push(
-                ...body.repositories.map((repo) => ({
-                    fullName: repo.full_name,
-                    defaultBranch: repo.default_branch || "main",
-                    private: repo.private
-                }))
-            );
-        }
-        return dedupeRepos(repos);
-    }
-
-    const token = await getPatToken();
-    if (!token) throw new Error("GitHub is not connected");
+export async function listReposForPat(token: string): Promise<GithubRepo[]> {
     const url = `${API}/user/repos?per_page=100&sort=pushed&affiliation=owner,collaborator,organization_member`;
     const res = await fetch(url, { headers: apiHeaders(token), cache: "no-store" });
     if (!res.ok) throw new Error(`GitHub returned ${res.status} listing repositories`);
     const body = (await res.json()) as Array<{ full_name: string; default_branch: string; private: boolean }>;
-    return body.map((repo) => ({
-        fullName: repo.full_name,
-        defaultBranch: repo.default_branch || "main",
-        private: repo.private
-    }));
+    return body.map(toRepo);
+}
+
+/**
+ * Repositories a person reaches through this app, asked as them.
+ *
+ * This is the answer that differs per account and the reason user tokens are
+ * kept at all: GitHub intersects what the app was installed on with what that
+ * person can see, so somebody who is not on an organization never learns its
+ * repositories exist - which listing them with the app's own credentials would
+ * have told them.
+ */
+export async function listReposForUserToken(token: string): Promise<GithubRepo[]> {
+    const res = await fetch(`${API}/user/installations?per_page=100`, {
+        headers: apiHeaders(token),
+        cache: "no-store"
+    });
+    if (res.status === 401) throw new Error("GitHub rejected the token (unauthorized)");
+    if (!res.ok) throw new Error(`GitHub returned ${res.status} listing installations`);
+    const body = (await res.json()) as { installations?: Array<{ id: number }> };
+
+    const repos: GithubRepo[] = [];
+    for (const install of body.installations ?? []) {
+        const page = await fetch(`${API}/user/installations/${install.id}/repositories?per_page=100`, {
+            headers: apiHeaders(token),
+            cache: "no-store"
+        });
+        if (!page.ok) continue;
+        const listed = (await page.json()) as {
+            repositories?: Array<{ full_name: string; default_branch: string; private: boolean }>;
+        };
+        repos.push(...(listed.repositories ?? []).map(toRepo));
+    }
+    return dedupeRepos(repos);
 }
 
 /**
@@ -461,10 +504,23 @@ export async function listGithubRepos(): Promise<GithubRepo[]> {
  *
  * Ordered most recently pushed first and capped, so a scope pointed at an account
  * with hundreds of repositories takes the ones anybody is actually working in.
+ *
+ * `asToken` is the credential of whoever the scope names, when they have linked
+ * one: their own account is the most accurate answer for "their repositories",
+ * and it is used before the installation's.
  */
-export async function listReposForOwner(login: string, limit = 100): Promise<GithubRepo[]> {
+export async function listReposForOwner(login: string, limit = 100, asToken?: string | null): Promise<GithubRepo[]> {
     const owner = login.trim();
     if (!owner) return [];
+
+    if (asToken) {
+        const mine = await listReposForUserToken(asToken).catch(() => null);
+        if (mine) {
+            const theirs = mine.filter((repo) => repo.fullName.split("/")[0]?.toLowerCase() === owner.toLowerCase());
+            if (theirs.length > 0) return theirs.slice(0, limit);
+        }
+    }
+
     const state = await getIntegrationState(PROVIDER);
 
     if (state?.config.method === "app") {
@@ -515,13 +571,15 @@ export async function listReposForOwner(login: string, limit = 100): Promise<Git
 }
 
 /**
- * One repository by name, or null when GitHub does not serve it to this Polaris -
- * which is the same answer for "no such repository" and "private, and not one of
- * ours", exactly as GitHub reports it. Stored credentials are used when there are
- * any, so a private repository the connection can reach resolves like a public one.
+ * One repository by name, or null when GitHub does not serve it to whoever is
+ * asking - which is the same answer for "no such repository" and "private, and
+ * not one of yours", exactly as GitHub reports it.
+ *
+ * The token is the caller's, never the instance's: resolving a name with shared
+ * credentials would confirm the existence of a private repository to somebody who
+ * cannot reach it, and then let them deploy it.
  */
-export async function resolveGithubRepo(owner: string, repo: string): Promise<GithubRepo | null> {
-    const token = await apiToken(owner);
+export async function resolveGithubRepo(owner: string, repo: string, token: string | null): Promise<GithubRepo | null> {
     const url = `${API}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`;
     const res = await fetch(url, { headers: optionalAuthHeaders(token), cache: "no-store" });
     if (!res.ok) return null;
@@ -536,13 +594,12 @@ export async function resolveGithubRepo(owner: string, repo: string): Promise<Gi
 /**
  * Public repositories matching a phrase, best match first. GitHub's search index
  * only covers public repositories however the call is authenticated, so private
- * ones are reached through the connected account's own list instead; the token is
- * still passed because it triples the searches allowed per minute.
+ * ones are reached through the caller's own list instead; a token is still passed
+ * because it triples the searches allowed per minute.
  */
-export async function searchGithubRepos(query: string, limit = 8): Promise<GithubRepo[]> {
+export async function searchGithubRepos(query: string, token: string | null, limit = 8): Promise<GithubRepo[]> {
     const term = query.trim();
     if (term.length < 2) return [];
-    const token = await apiToken();
     const url = `${API}/search/repositories?q=${encodeURIComponent(term)}&per_page=${limit}`;
     const res = await fetch(url, { headers: optionalAuthHeaders(token), cache: "no-store" });
     if (!res.ok) return [];
@@ -564,17 +621,30 @@ export async function githubApiToken(owner?: string): Promise<string | null> {
     return apiToken(owner);
 }
 
+/**
+ * An installation token for `owner`, or null when this instance is not connected
+ * through a GitHub App.
+ *
+ * This is the only instance-wide credential anything acts on somebody else's
+ * behalf with. An installation is a grant an administrator deliberately put on a
+ * set of repositories, which a personal token connected to the same row is not -
+ * so work with nobody watching uses this and never the token.
+ */
+export async function githubAppInstallationToken(owner?: string): Promise<string | null> {
+    const state = await getIntegrationState(PROVIDER);
+    if (!state?.hasSecret || state.config.method !== "app") return null;
+    const secrets = await getAppSecrets();
+    if (!secrets) return null;
+    const installs = Array.isArray(state.config.installations) ? (state.config.installations as Installation[]) : [];
+    const inst = (owner && installs.find((row) => row.login.toLowerCase() === owner.toLowerCase())) || installs[0];
+    if (!inst) return null;
+    return installationToken(inst.id, secrets.appId, secrets.pem);
+}
+
 async function apiToken(owner?: string): Promise<string | null> {
     const state = await getIntegrationState(PROVIDER);
     if (!state?.hasSecret) return null;
-    if (state.config.method === "app") {
-        const secrets = await getAppSecrets();
-        if (!secrets) return null;
-        const installs = Array.isArray(state.config.installations) ? (state.config.installations as Installation[]) : [];
-        const inst = (owner && installs.find((row) => row.login.toLowerCase() === owner.toLowerCase())) || installs[0];
-        if (!inst) return null;
-        return installationToken(inst.id, secrets.appId, secrets.pem);
-    }
+    if (state.config.method === "app") return githubAppInstallationToken(owner);
     return getPatToken();
 }
 
@@ -606,9 +676,17 @@ const JS_FRAMEWORKS: Array<[string, string]> = [
  * Inspect a repo to auto-configure a deploy: find a Dockerfile and detect the
  * framework (like Vercel/Railway) so the build needs no Dockerfile. Best-effort -
  * returns nulls on any API hiccup and defaults to a nixpacks (auto) build.
+ *
+ * Reads the tree as whoever asked, for the same reason resolving a name does: the
+ * file list of a private repository is its contents by another route.
  */
-export async function inspectGithubRepo(owner: string, repo: string, branch: string): Promise<RepoInspection> {
-    const headers = optionalAuthHeaders(await apiToken(owner));
+export async function inspectGithubRepo(
+    owner: string,
+    repo: string,
+    branch: string,
+    token: string | null
+): Promise<RepoInspection> {
+    const headers = optionalAuthHeaders(token);
 
     let paths: string[] = [];
     try {
@@ -661,32 +739,14 @@ export async function inspectGithubRepo(owner: string, repo: string, branch: str
 }
 
 /**
- * A git basic-auth header value that authenticates a clone with the stored
- * credentials, or null if GitHub is not connected. Used as `http.extraHeader` so
- * the token never appears in the clone URL or the deployment log. For the App
- * method, `owner` selects the installation that owns the repo (falling back to the
- * first). GitHub reads the token from the password field regardless of the username.
+ * A git basic-auth header value that authenticates a clone with `token`, or null
+ * when there is none and the clone is a public one. Used as `http.extraHeader` so
+ * the token never appears in the clone URL or the deployment log. GitHub reads the
+ * token from the password field regardless of the username.
  */
-export async function githubCloneAuthHeader(owner?: string): Promise<string | null> {
-    const token = await resolveGithubToken(owner);
+export function cloneAuthHeader(token: string | null): string | null {
     if (!token) return null;
     return `Authorization: Basic ${Buffer.from(`x-access-token:${token}`).toString("base64")}`;
-}
-
-/** Resolve a GitHub API token, scoped to the owner's installation for the App
- *  method (falling back to the first) or the PAT otherwise. Null if not connected. */
-async function resolveGithubToken(owner?: string): Promise<string | null> {
-    const state = await getIntegrationState(PROVIDER);
-    if (!state?.hasSecret) return null;
-    if (state.config.method === "app") {
-        const secrets = await getAppSecrets();
-        if (!secrets) return null;
-        const installs = Array.isArray(state.config.installations) ? (state.config.installations as Installation[]) : [];
-        const inst = (owner && installs.find((row) => row.login.toLowerCase() === owner.toLowerCase())) || installs[0];
-        if (!inst) return null;
-        return installationToken(inst.id, secrets.appId, secrets.pem);
-    }
-    return getPatToken();
 }
 
 /**
@@ -704,11 +764,13 @@ export interface CommitInfo {
     authorAvatarUrl: string | null;
 }
 
-export async function getLatestCommit(owner: string, repo: string, ref: string): Promise<CommitInfo | null> {
-    const token = await resolveGithubToken(owner).catch(() => null);
-    const headers: HeadersInit = token
-        ? apiHeaders(token)
-        : { Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28", "User-Agent": "polaris" };
+export async function getLatestCommit(
+    owner: string,
+    repo: string,
+    ref: string,
+    token: string | null
+): Promise<CommitInfo | null> {
+    const headers = optionalAuthHeaders(token);
     try {
         const res = await fetch(`${API}/repos/${owner}/${repo}/commits/${encodeURIComponent(ref)}`, {
             headers,

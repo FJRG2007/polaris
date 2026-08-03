@@ -101,7 +101,7 @@ model User {
     notifyDeliveries    NotificationDelivery[]
     enrollments         Enrollment[]
     runnerPools         RunnerPool[]
-    githubIdentity      GithubIdentity?
+    linkedAccounts      UserConnection[]
     taskSpaces          TaskSpace[]
     taskSpaceMemberships TaskSpaceMember[]
     taskFolderMemberships TaskFolderMember[]
@@ -1282,24 +1282,53 @@ model RunnerPoolTarget {
     @@index([poolId])
 }
 
-// A Polaris account's GitHub identity, established by the person themselves
-// through GitHub's own authorization screen - never typed in on their behalf.
+// An outside account one Polaris account has linked: a GitHub account, a Google
+// account, whatever a later provider adds.
 //
-// It exists so a pool can serve "these people's repositories" without an
-// administrator being able to point somebody else's machine at a stranger's code
-// by guessing a login. The numeric id is the identity that matters: GitHub logins
-// can be renamed and re-registered by somebody else, so the login here is a label.
-model GithubIdentity {
-    id        String   @id @default(uuid(7)) @db.Uuid
-    userId    String   @unique @db.Uuid
-    // GitHub's own id for the account. Unique, so one GitHub account cannot be
-    // claimed by two Polaris users.
-    githubId  Int      @unique
-    login     String
-    avatarUrl String?
-    linkedAt  DateTime @default(now())
+// Two layers of credential, and they belong to different people. The operator
+// connects the application once (an Integration row holding the OAuth client),
+// and each person authorizes their own account on top of it. Polaris therefore
+// never holds one credential that reaches everybody's repositories or calendars,
+// and an account that unlinks takes its access with it.
+//
+// Nothing here is written from a form an administrator fills in on somebody
+// else's behalf: a row exists because the provider itself said who authorized,
+// or because the owner of the account pasted their own token. That is what makes
+// it safe to point a runner pool at "these people's repositories".
+//
+// Several accounts per provider are allowed, capped by a per-provider limit the
+// operator sets (one by default).
+model UserConnection {
+    id             String   @id @default(uuid(7)) @db.Uuid
+    userId         String   @db.Uuid
+    // Which service this is: "github", "google".
+    provider       String
+    // The provider's own id for the account. It is the identity that survives a
+    // rename, so it is what uniqueness is enforced on rather than the label.
+    accountId      String
+    // What to show for it: the GitHub login, the Google address.
+    label          String
+    avatarUrl      String?
+    // How it was authorized: "oauth" (the provider's own screen) or "token" (a
+    // personal access token the owner pasted).
+    method         String   @default("oauth")
+    // Envelope-encrypted credential as a JSON payload (refresh token, access
+    // token and its expiry, or the pasted token). Null when the link states an
+    // identity and nothing more.
+    encryptedToken Bytes?
+    tokenNonce     Bytes?
+    tokenKeyId     String?
+    // What the provider actually granted, so a declined scope is visible rather
+    // than showing up as an empty list.
+    scope          String   @default("")
+    linkedAt       DateTime @default(now())
+    updatedAt      DateTime @updatedAt
 
     user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    // One outside account cannot be claimed by two Polaris users.
+    @@unique([provider, accountId])
+    @@index([userId, provider])
 }
 
 // One ephemeral runner: registered, started, given a single job, gone.

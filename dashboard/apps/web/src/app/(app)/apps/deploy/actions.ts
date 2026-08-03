@@ -21,6 +21,7 @@ import { getFlagsForEnvironment } from "@/lib/deploy-project-service";
 import { ensurePublicIp, getDomainConfig } from "@/lib/domain-service";
 import { provisionHostnameDns, type HostnameDnsResult } from "@/lib/domain-dns";
 import { getOrCreateLocalTarget, getOrCreateHostTarget } from "@/lib/deploy-target-service";
+import { githubCredentialsForUser, githubTokenForUser, listReposForUser } from "@/lib/github-access";
 import { listVolumes, createVolume, updateVolume, deleteVolume, type VolumeView } from "@/lib/deploy-volume-service";
 import {
     getCloudflareAccountStatus,
@@ -38,6 +39,13 @@ import {
     stopNgrokTunnel,
     type NgrokTunnelStatus
 } from "@/lib/deploy/ngrok-tunnel-service";
+import {
+    inspectGithubRepo,
+    resolveGithubRepo,
+    searchGithubRepos,
+    type GithubRepo,
+    type RepoInspection
+} from "@/lib/github-service";
 import {
     deleteRegistryCredential,
     listRegistryCredentials,
@@ -62,15 +70,6 @@ import {
     type EnvScope,
     type EnvVarView
 } from "@/lib/env-var-service";
-import {
-    getGithubStatus,
-    inspectGithubRepo,
-    listGithubRepos,
-    resolveGithubRepo,
-    searchGithubRepos,
-    type GithubRepo,
-    type RepoInspection
-} from "@/lib/github-service";
 import {
     getNamedTunnelStatus,
     provisionNamedTunnel,
@@ -872,9 +871,10 @@ export async function inspectRepoAction(input: {
     repo: string;
     branch: string;
 }): Promise<RepoInspection> {
-    await requirePermission("deploy.manage");
+    const user = await requirePermission("deploy.manage");
     try {
-        return await inspectGithubRepo(input.owner, input.repo, input.branch);
+        const token = await githubTokenForUser(user.id, input.owner);
+        return await inspectGithubRepo(input.owner, input.repo, input.branch, token);
     } catch {
         return { dockerfile: null, framework: null, builder: "nixpacks" };
     }
@@ -962,17 +962,25 @@ export async function deleteVolumeAction(input: { id: string; applicationId: str
     }
 }
 
-/** The connected GitHub account (if any) and the repositories it can deploy, for the
- *  Deploy "GitHub Repository" picker. Gated on deploy.manage. */
+/**
+ * The caller's own GitHub accounts and the repositories they reach, for the
+ * Deploy "GitHub Repository" picker.
+ *
+ * Their accounts, not the instance's: the picker used to list whatever the
+ * operator's token could see, which showed one person's private repositories to
+ * everybody with deploy.manage. Somebody who has linked nothing gets an empty
+ * list and the card sends them to their connections. Gated on deploy.manage.
+ */
 export async function githubReposAction(): Promise<{ connected: boolean; login: string | null; repos: GithubRepo[] }> {
-    await requirePermission("deploy.manage");
-    const status = await getGithubStatus();
-    if (!status.connected) return { connected: false, login: null, repos: [] };
+    const user = await requirePermission("deploy.manage");
+    const accounts = await githubCredentialsForUser(user.id);
+    if (accounts.length === 0) return { connected: false, login: null, repos: [] };
+    // Named only when there is one: two accounts have no single login to show.
+    const login = accounts.length === 1 ? (accounts[0]?.login ?? null) : null;
     try {
-        const repos = await listGithubRepos();
-        return { connected: true, login: status.login, repos };
+        return { connected: true, login, repos: await listReposForUser(user.id) };
     } catch {
-        return { connected: true, login: status.login, repos: [] };
+        return { connected: true, login, repos: [] };
     }
 }
 
@@ -989,16 +997,17 @@ const repoQuerySchema = z.string().trim().min(2).max(200);
  * deploy.manage.
  */
 export async function searchGithubReposAction(query: string): Promise<{ repos: GithubRepo[] }> {
-    await requirePermission("deploy.manage");
+    const user = await requirePermission("deploy.manage");
     const parsed = repoQuerySchema.safeParse(query);
     if (!parsed.success) return { repos: [] };
     try {
         const reference = parseGithubRepo(parsed.data);
         if (reference) {
-            const repo = await resolveGithubRepo(reference.owner, reference.repo);
+            const token = await githubTokenForUser(user.id, reference.owner);
+            const repo = await resolveGithubRepo(reference.owner, reference.repo, token);
             if (repo) return { repos: [repo] };
         }
-        return { repos: await searchGithubRepos(parsed.data) };
+        return { repos: await searchGithubRepos(parsed.data, await githubTokenForUser(user.id)) };
     } catch {
         return { repos: [] };
     }

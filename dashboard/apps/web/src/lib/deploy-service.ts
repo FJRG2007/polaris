@@ -15,6 +15,7 @@ import { commitUrl } from "./deploy/commit-url";
 import { decryptSecret } from "@polaris/storage";
 import { mkdir, readFile } from "node:fs/promises";
 import { ensureLocalCa } from "./local-ca-service";
+import { getLatestCommit } from "./github-service";
 import { wipeVolume } from "./deploy-volume-service";
 import { resolveAutoDomain } from "./network-service";
 import { resolveMountTarget } from "./storage-service";
@@ -25,7 +26,7 @@ import { resolveRegistryLogin } from "./registry-credential-service";
 import { notifyDeployFinished } from "./notifications/deploy-events";
 import { deployHostname, type ZoneMintFailure } from "./domain-zones";
 import { gitBuildContext, type GitSource } from "./git-build-service";
-import { getLatestCommit, githubCloneAuthHeader } from "./github-service";
+import { githubCloneAuthHeader, githubTokenForOwner } from "./github-access";
 import { applicationDefaultWafPresets, isTunnelHostname } from "@polaris/core";
 import { getDriver, getPorts, toTargetInfo, type TargetRow } from "./deploy/runtime";
 import { getOrCreateHostTarget, getOrCreateLocalTarget } from "./deploy-target-service";
@@ -1334,11 +1335,13 @@ async function buildAppPlan(
     let gitSource: GitSource | undefined;
     if (typeof source.repoUrl === "string" && source.repoUrl) {
         gitSource = { repoUrl: source.repoUrl, branch: typeof source.branch === "string" ? source.branch : undefined };
-        // GitHub-sourced repos clone with the connected account's token so private
-        // repositories build; the header is null (public clone) when not connected.
+        // GitHub-sourced repos clone with the project owner's own account so their
+        // private repositories build, falling back to the App installation an
+        // administrator put on them; the header is null (public clone) when there
+        // is neither.
         if (source.provider === "github") {
             const owner = gitSource.repoUrl.match(/github\.com[/:]([^/]+)\//i)?.[1];
-            const authHeader = await githubCloneAuthHeader(owner);
+            const authHeader = await githubCloneAuthHeader(ownerId, owner);
             if (authHeader) gitSource.authHeader = authHeader;
         }
     }
@@ -1428,9 +1431,13 @@ export async function deployApplication(
     if (gitSource && !authorAvatarUrl) {
         const parsed = parseGithubRepo(gitSource.repoUrl);
         if (parsed) {
-            const commit = await getLatestCommit(parsed.owner, parsed.repo, commitSha ?? gitSource.branch ?? "HEAD").catch(
-                () => null
-            );
+            const token = await githubTokenForOwner(ownerId, parsed.owner);
+            const commit = await getLatestCommit(
+                parsed.owner,
+                parsed.repo,
+                commitSha ?? gitSource.branch ?? "HEAD",
+                token
+            ).catch(() => null);
             if (commit) {
                 commitSha = commitSha ?? commit.sha;
                 commitMessage = commitMessage ?? (commit.message.split("\n")[0]?.trim() || null);

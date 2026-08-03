@@ -22,7 +22,6 @@ import { requireUser } from "@/lib/session";
 import { recordAudit } from "@/lib/audit-service";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { newDeviceRefusal } from "@/lib/device-grace";
-import { unlinkGithubIdentity } from "@/lib/github-identity";
 import { requestEmailVerification } from "@/lib/email-verification-service";
 import {
     addUserEmail,
@@ -148,19 +147,4 @@ export async function promoteEmailAction(emailId: unknown, currentPassword: stri
         revalidatePath("/account");
     }
     return result;
-}
-
-/** Forget the GitHub account this profile is linked to. Self-service only: the
- *  session is re-resolved here, so this can never unlink somebody else. */
-export async function unlinkGithubAction(): Promise<{ error?: string }> {
-    const user = await requireUser();
-    const blocked = await newDeviceRefusal(user);
-    if (blocked) return { error: blocked };
-    try {
-        await unlinkGithubIdentity(user.id);
-    } catch {
-        return { error: "Could not unlink the GitHub account." };
-    }
-    revalidatePath("/account");
-    return {};
 }

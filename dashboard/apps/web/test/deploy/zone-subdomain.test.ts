@@ -19,6 +19,14 @@ vi.mock("@polaris/db", () => ({
     }
 }));
 
+// Reaching the deploy service pulls in the modules that read linked accounts,
+// and those validate the runtime environment as they load. None of it is asked
+// anything here, so a stand-in is enough to let the import through.
+vi.mock("@polaris/config", () => ({
+    loadEnv: () => ({ POLARIS_MASTER_KEY: "test-key", POLARIS_DATA_DIR: "/tmp/polaris" }),
+    getCapabilities: () => ({})
+}));
+
 const { checkZoneSubdomain } = await import("../../src/lib/deploy-service");
 
 /** A configured, DNS-proven zone layout - the state a hostname can be minted in. */

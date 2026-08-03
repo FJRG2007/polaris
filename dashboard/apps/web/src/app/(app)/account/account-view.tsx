@@ -18,7 +18,6 @@ import { Card, CardBody, Button, Input } from "@polaris/ui";
 import { useState, type FormEvent, type ReactNode } from "react";
 import type { UserEmailView, UserPhoneView } from "@polaris/auth";
 import { MAX_COMPANY_LENGTH, normalizePersonName } from "@polaris/core";
-import { GithubCard, type GithubIdentityCardProps } from "./github-card";
 
 type Result = { ok?: string; error?: string } | null;
 
@@ -61,16 +60,12 @@ export function AccountView({
     emails,
     mailReady,
     phone,
-    canSendWhatsApp,
-    github
+    canSendWhatsApp
 }: {
     name: string;
     username: string;
     company: string;
     emails: UserEmailView[];
-    /** The GitHub account this profile is linked to, and whether linking is even
-     *  possible on this instance. */
-    github: GithubIdentityCardProps;
     /** Whether an email channel is configured, which decides whether an address
      *  can be verified at all. */
     mailReady: boolean;
@@ -171,8 +166,6 @@ export function AccountView({
             </Section>
 
             <PhoneCard phone={phone} canSend={canSendWhatsApp} />
-
-            <GithubCard {...github} />
         </div>
     );
 }

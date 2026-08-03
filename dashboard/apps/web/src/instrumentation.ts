@@ -55,6 +55,14 @@ export async function register(): Promise<void> {
     const { ensureLocalCa } = await import("./lib/local-ca-service");
     void ensureLocalCa().catch((error) => console.error("polaris: local CA setup failed:", error));
 
+    // Move a GitHub token connected instance-wide onto the account of whoever
+    // connected it, so it stops serving their private repositories to every other
+    // account here. Best-effort and idempotent: a failure leaves the old row in
+    // place and the next boot retries, rather than leaving deploys without a
+    // clone credential.
+    const { adoptInstanceGithubPat } = await import("./lib/connections/adopt-github-pat");
+    void adoptInstanceGithubPat().catch((error) => console.error("polaris: GitHub token adoption failed:", error));
+
     // Vercel-style auto-deploy: poll connected GitHub repos and redeploy on a new
     // commit. Works without a public webhook (LAN installs can't receive one).
     const { startAutoDeployPoller } = await import("./lib/deploy/auto-deploy-poller");

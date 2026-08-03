@@ -12,8 +12,8 @@
  */
 
 import { prisma } from "@polaris/db";
-import { githubApiToken } from "@/lib/github-service";
-import { getGithubIdentity } from "@/lib/github-identity";
+import { githubTokenForUser } from "@/lib/github-access";
+import { listConnections } from "@/lib/connections/store";
 // The same parser the repository field uses, so what counts as a GitHub
 // repository is decided in exactly one place.
 import { parseGithubCommit, type CommitReference } from "@/lib/repo-reference";
@@ -71,11 +71,13 @@ export async function listCommits(taskId: string): Promise<CommitLink[]> {
     return rows.map(view);
 }
 
-/** What GitHub says about one commit, or nothing when it cannot be asked. */
+/** What GitHub says about one commit, asked as the person linking it, or nothing
+ *  when their account cannot reach it. */
 async function describeCommit(
-    reference: CommitReference
+    reference: CommitReference,
+    userId: string
 ): Promise<{ message: string; authorName: string; committedAt: Date | null; sha: string } | null> {
-    const token = await githubApiToken(reference.owner);
+    const token = await githubTokenForUser(userId, reference.owner);
     if (!token) return null;
     try {
         const response = await fetch(
@@ -122,9 +124,9 @@ export class CommitLinkError extends Error {}
  * goes on, with whatever the URL itself carried.
  */
 export async function linkCommit(taskId: string, userId: string, raw: string): Promise<CommitLink> {
-    const identity = await getGithubIdentity(userId);
-    if (!identity) {
-        throw new CommitLinkError("Connect your GitHub account on your account page first");
+    const [linkedAccount] = await listConnections(userId, "github");
+    if (!linkedAccount) {
+        throw new CommitLinkError("Connect your GitHub account under Connected accounts first");
     }
 
     const reference = parseGithubCommit(raw);
@@ -132,7 +134,7 @@ export async function linkCommit(taskId: string, userId: string, raw: string): P
         throw new CommitLinkError("Paste a commit link, or write it as owner/repo@sha");
     }
 
-    const details = await describeCommit(reference);
+    const details = await describeCommit(reference, userId);
     const sha = details?.sha ?? reference.sha;
     const repository = `${reference.owner}/${reference.repo}`;
 
@@ -144,7 +146,7 @@ export async function linkCommit(taskId: string, userId: string, raw: string): P
             sha,
             message: details?.message ?? "",
             url: `https://github.com/${repository}/commit/${sha}`,
-            authorName: details?.authorName ?? identity.login,
+            authorName: details?.authorName ?? linkedAccount.label,
             committedAt: details?.committedAt ?? null,
             linkedById: userId
         },
