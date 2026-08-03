@@ -23,6 +23,10 @@ export interface ListSummary {
     readonly color: string | null;
     readonly openCount: number;
     readonly totalCount: number;
+    /** True when the list holds nothing at all - archived tasks and subtasks
+     *  included - so deleting it destroys no work. The counts above only cover
+     *  what the sidebar shows, which is not the same question. */
+    readonly empty: boolean;
 }
 
 /** Folders come back flat with their parent, and the sidebar nests them through
@@ -55,8 +59,8 @@ export interface SpaceTreeView {
 
 /**
  * Everything the left rail draws, for every space the actor can see, in one
- * round trip. Counts come from a single grouped query rather than a count per
- * list, so a workspace with forty lists still costs three statements.
+ * round trip. Counts come from grouped queries rather than a count per list, so
+ * a workspace with forty lists still costs four statements.
  *
  * A space the actor only reaches through a folder grant is pruned to that
  * branch: the folders outside it and the lists at the space root never leave the
@@ -69,7 +73,7 @@ export async function listSpaceTree(userId: string, scope: TaskScope, isAdmin: b
     const partialSpaces = new Set(scope.partialSpaceIds);
     const grantedListIds = new Set(scope.listIds);
 
-    const [spaces, lists, counts] = await Promise.all([
+    const [spaces, lists, counts, occupied] = await Promise.all([
         prisma.taskSpace.findMany({
             where: { id: { in: spaceIds } },
             orderBy: [{ order: "asc" }, { createdAt: "asc" }],
@@ -97,7 +101,11 @@ export async function listSpaceTree(userId: string, scope: TaskScope, isAdmin: b
             by: ["listId", "statusId"],
             where: { spaceId: { in: spaceIds }, archived: false, parentId: null },
             _count: { _all: true }
-        })
+        }),
+        // Which lists hold anything at all. The counts above leave out archived
+        // work and subtasks, which a delete still takes with it, so they cannot
+        // answer whether a list is safe to drop without reading the name back.
+        prisma.task.groupBy({ by: ["listId"], where: { spaceId: { in: spaceIds } }, _count: { _all: true } })
     ]);
 
     const finishedStatusIds = await finishedStatuses(spaceIds);
@@ -109,6 +117,8 @@ export async function listSpaceTree(userId: string, scope: TaskScope, isAdmin: b
         totals.set(row.listId, bucket);
     }
 
+    const holding = new Set(occupied.map((row) => row.listId));
+
     const summarize = (list: (typeof lists)[number]): ListSummary => {
         const bucket = totals.get(list.id);
         return {
@@ -117,7 +127,8 @@ export async function listSpaceTree(userId: string, scope: TaskScope, isAdmin: b
             folderId: list.folderId,
             color: list.color,
             openCount: bucket?.open ?? 0,
-            totalCount: bucket?.total ?? 0
+            totalCount: bucket?.total ?? 0,
+            empty: !holding.has(list.id)
         };
     };
 

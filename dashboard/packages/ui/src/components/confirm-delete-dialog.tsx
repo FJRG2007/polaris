@@ -18,6 +18,12 @@
  * wrong is unrecoverable and irreversible for everyone in it. On a single row
  * somebody deletes several times a day it stops being a safeguard and becomes a
  * tax on the common case, so `requireTyping={false}` asks plainly instead.
+ *
+ * The same follows for a container that is currently empty: the toll is on the
+ * work inside, so a list with no tasks or a folder with nothing in it is asked
+ * plainly too. Decide that from what the delete actually destroys, not from what
+ * the screen happens to show - a list whose tasks are all archived still looks
+ * empty and is not.
  */
 
 import { cn } from "../lib/cn";

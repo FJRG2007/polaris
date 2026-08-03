@@ -80,7 +80,10 @@ interface Draft {
     readonly parentId: string | null;
 }
 
-type Pending = { kind: "folder" | "list"; id: string; name: string } | null;
+/** A delete waiting to be confirmed. `empty` is what decides how hard the
+ *  confirmation is: typing the name back is a toll on losing work, and an empty
+ *  list or folder has none to lose. */
+type Pending = { kind: "folder" | "list"; id: string; name: string; empty: boolean } | null;
 
 /**
  * One thing a row can do. Declared once and rendered twice - as an icon button
@@ -576,10 +579,13 @@ export function SpaceTree({ spaces, canCreate }: { spaces: readonly SpaceTreeVie
                 onOpenChange={(open) => (open ? undefined : setConfirm(null))}
                 name={confirm?.name ?? ""}
                 kind={confirm?.kind ?? "folder"}
+                requireTyping={!confirm?.empty}
                 description={
-                    confirm?.kind === "folder"
-                        ? "What is inside moves up one level rather than being deleted with it."
-                        : "The tasks in this list, and their comments and tracked time, go with it."
+                    confirm?.empty
+                        ? "It is empty, so nothing goes with it."
+                        : confirm?.kind === "folder"
+                          ? "What is inside moves up one level rather than being deleted with it."
+                          : "The tasks in this list, and their comments and tracked time, go with it."
                 }
                 confirmLabel={confirm?.kind === "folder" ? "Delete folder" : "Delete list"}
                 onConfirm={async () => {
@@ -712,7 +718,13 @@ function SpaceSection({
                                         label: "Delete list",
                                         Icon: Trash2,
                                         danger: true,
-                                        onSelect: () => onConfirm({ kind: "list", id: list.id, name: list.name })
+                                        onSelect: () =>
+                                            onConfirm({
+                                                kind: "list",
+                                                id: list.id,
+                                                name: list.name,
+                                                empty: list.empty
+                                            })
                                     }
                                 ]
                               : [])
@@ -747,7 +759,13 @@ function SpaceSection({
                           label: "Delete folder",
                           Icon: Trash2,
                           danger: true,
-                          onSelect: () => onConfirm({ kind: "folder", id: folder.id, name: folder.name })
+                          onSelect: () =>
+                              onConfirm({
+                                  kind: "folder",
+                                  id: folder.id,
+                                  name: folder.name,
+                                  empty: node.children.length === 0 && folder.lists.length === 0
+                              })
                       }
                   ]
                 : [])
