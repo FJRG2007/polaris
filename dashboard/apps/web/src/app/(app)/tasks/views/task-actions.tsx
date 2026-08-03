@@ -14,14 +14,17 @@
  * in a table, and so adding one adds it everywhere at once.
  */
 
+import { useState } from "react";
 import * as core from "@polaris/core";
 import { useAppUrl } from "@/components/app-url";
 import type { TaskRow } from "@/lib/tasks/facts";
 import type { TaskEdit, ViewProps } from "./shared";
 import type { SpaceContext } from "@/lib/tasks/facts";
-import { Ban, Check, Copy, ExternalLink, Flag, Link2, Tag, Trash2, UserPlus } from "lucide-react";
+import { Ban, Check, Copy, ExternalLink, Flag, Link2, Plus, Tag, Trash2, UserPlus } from "lucide-react";
 import { AssigneePicker, DuePicker, PriorityPicker, StatusIcon, StatusMarker, TagPicker, tagColorFor } from "../pickers";
 import {
+    Button,
+    cn,
     ContextMenu,
     ContextMenuContent,
     ContextMenuItem,
@@ -29,7 +32,13 @@ import {
     ContextMenuSub,
     ContextMenuSubContent,
     ContextMenuSubTrigger,
-    ContextMenuTrigger
+    ContextMenuTrigger,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    Input
 } from "@polaris/ui";
 
 export interface TaskCommands {
@@ -42,6 +51,8 @@ export interface TaskCommands {
     readonly onDelete: () => void;
     /** Creating a tag from the picker, when the screen offers that. */
     readonly onCreateTag?: (name: string, color: string) => Promise<string | null>;
+    /** Creating a status, when the reader may change the space's own. */
+    readonly onCreateStatus?: (name: string, type: core.TaskStatusType, color: string) => Promise<string | null>;
 }
 
 /** Bind one task to what a view can do with it. Every view builds its commands
@@ -55,7 +66,8 @@ export function commandsFor(props: ViewProps, task: TaskRow): TaskCommands {
         onEdit: (change) => props.onEdit(task, change),
         onDuplicate: () => props.onDuplicate(task),
         onDelete: () => props.onDelete(task),
-        onCreateTag: props.onCreateTag
+        onCreateTag: props.onCreateTag,
+        onCreateStatus: props.onCreateStatus
     };
 }
 
@@ -139,167 +151,328 @@ export function TaskStatusMarker({ commands }: { commands: TaskCommands }) {
     );
 }
 
+/** What the menu is in the middle of making, or nothing. */
+type Draft = "tag" | "status";
+
+/**
+ * Making a tag or a status from the task that needs it.
+ *
+ * The alternative is leaving the menu, finding the space's settings, adding the
+ * thing, coming back and finding the task again - by which point the reason for
+ * the tag has usually been forgotten. A dialog rather than a field inside the
+ * menu because a status is not just a name: its kind is what decides whether
+ * work sitting in it counts as finished, and guessing that from the word
+ * somebody typed is how a board ends up reporting the wrong thing.
+ */
+function CreateDialog({
+    what,
+    onClose,
+    onCreate
+}: {
+    what: Draft;
+    onClose: () => void;
+    onCreate: (draft: { name: string; type: core.TaskStatusType; color: string }) => Promise<string | null>;
+}) {
+    const [name, setName] = useState("");
+    const [type, setType] = useState<core.TaskStatusType>("open");
+    const [picked, setPicked] = useState<string | null>(null);
+    const [busy, setBusy] = useState(false);
+
+    const trimmed = name.trim();
+    // Until somebody picks one, a tag takes the colour its name always gets, so
+    // the same tag made here and made from the picker comes out the same.
+    const color = picked ?? (what === "tag" ? tagColorFor(trimmed || "tag") : "#64748b");
+
+    const submit = async () => {
+        if (!trimmed || busy) return;
+        setBusy(true);
+        const id = await onCreate({ name: trimmed, type, color });
+        setBusy(false);
+        if (id) onClose();
+    };
+
+    return (
+        <Dialog open onOpenChange={(open) => (open ? undefined : onClose())}>
+            <DialogContent className="max-w-sm">
+                <DialogHeader>
+                    <DialogTitle>{what === "tag" ? "New tag" : "New status"}</DialogTitle>
+                    <DialogDescription>
+                        {what === "tag"
+                            ? "Added to this space and put on this task."
+                            : "Added to this space and set on this task."}
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="flex flex-col gap-3">
+                    <label className="flex flex-col gap-1 text-sm">
+                        Name
+                        <Input
+                            autoFocus
+                            value={name}
+                            placeholder={what === "tag" ? "backend" : "On hold"}
+                            onChange={(event) => setName(event.target.value)}
+                            onKeyDown={(event) => {
+                                if (event.key !== "Enter") return;
+                                event.preventDefault();
+                                void submit();
+                            }}
+                        />
+                    </label>
+
+                    {what === "status" && (
+                        <div className="flex flex-col gap-1 text-sm">
+                            Kind
+                            <div className="flex flex-wrap gap-1">
+                                {core.TASK_STATUS_TYPES.map((entry) => (
+                                    <button
+                                        key={entry}
+                                        type="button"
+                                        onClick={() => setType(entry)}
+                                        aria-pressed={type === entry}
+                                        className={cn(
+                                            "rounded-md border px-2 py-1 text-xs transition-colors",
+                                            type === entry
+                                                ? "border-primary bg-primary/10 text-foreground"
+                                                : "border-border text-muted-foreground hover:text-foreground"
+                                        )}
+                                    >
+                                        {core.TASK_STATUS_TYPE_LABELS[entry]}
+                                    </button>
+                                ))}
+                            </div>
+                            <p className="text-xs text-muted-foreground">{core.TASK_STATUS_TYPE_HINTS[type]}</p>
+                        </div>
+                    )}
+
+                    <label className="flex items-center gap-2 text-sm">
+                        Colour
+                        <input
+                            type="color"
+                            value={color}
+                            aria-label={what === "tag" ? "Tag colour" : "Status colour"}
+                            onChange={(event) => setPicked(event.target.value)}
+                            className="size-8 cursor-pointer rounded border border-border bg-transparent"
+                        />
+                    </label>
+
+                    <div className="flex justify-end gap-2">
+                        <Button variant="secondary" onClick={onClose}>
+                            Cancel
+                        </Button>
+                        <Button disabled={!trimmed || busy} onClick={() => void submit()}>
+                            {busy ? "Adding..." : "Add"}
+                        </Button>
+                    </div>
+                </div>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
 /** Right-click anywhere on a task. */
 export function TaskMenu({ commands, children }: { commands: TaskCommands; children: React.ReactNode }) {
     const { task, context, canEdit } = commands;
     const baseUrl = useAppUrl();
+    const [drafting, setDrafting] = useState<Draft | null>(null);
+
+    const create = async (draft: { name: string; type: core.TaskStatusType; color: string }) => {
+        if (drafting === "tag") {
+            const id = (await commands.onCreateTag?.(draft.name, draft.color)) ?? null;
+            if (id) commands.onEdit({ tagIds: [...task.tags.map((tag) => tag.id), id] });
+            return id;
+        }
+        const id = (await commands.onCreateStatus?.(draft.name, draft.type, draft.color)) ?? null;
+        if (id) commands.onEdit({ statusId: id });
+        return id;
+    };
 
     return (
-        <ContextMenu>
-            <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
-            <ContextMenuContent className="w-56">
-                <ContextMenuItem onSelect={commands.onOpen}>
-                    <ExternalLink className="size-3.5" />
-                    Open
-                </ContextMenuItem>
-                <ContextMenuItem onSelect={() => void copy(taskLink(baseUrl, task.id))}>
-                    <Link2 className="size-3.5" />
-                    Copy link
-                </ContextMenuItem>
-                <ContextMenuItem onSelect={() => void copy(task.reference)}>
-                    <Copy className="size-3.5" />
-                    Copy {task.reference}
-                </ContextMenuItem>
+        <>
+            {drafting && <CreateDialog what={drafting} onClose={() => setDrafting(null)} onCreate={create} />}
+            <ContextMenu>
+                <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
+                <ContextMenuContent className="w-56">
+                    <ContextMenuItem onSelect={commands.onOpen}>
+                        <ExternalLink className="size-3.5" />
+                        Open
+                    </ContextMenuItem>
+                    <ContextMenuItem onSelect={() => void copy(taskLink(baseUrl, task.id))}>
+                        <Link2 className="size-3.5" />
+                        Copy link
+                    </ContextMenuItem>
+                    <ContextMenuItem onSelect={() => void copy(task.reference)}>
+                        <Copy className="size-3.5" />
+                        Copy {task.reference}
+                    </ContextMenuItem>
 
-                {canEdit && (
-                    <>
-                        <ContextMenuSeparator />
-                        <ContextMenuSub>
-                            <ContextMenuSubTrigger>
-                                <Check className="size-3.5" />
-                                Status
-                            </ContextMenuSubTrigger>
-                            <ContextMenuSubContent className="w-52">
-                                {context.statuses.map((status) => (
-                                    <ContextMenuItem
-                                        key={status.id}
-                                        onSelect={() => commands.onEdit({ statusId: status.id })}
-                                        className="gap-2"
-                                    >
-                                        <StatusIcon color={status.color} type={status.type} size={16} />
-                                        <span className="flex-1 truncate">{status.name}</span>
-                                        {status.id === task.statusId && <Check className="size-3.5 text-primary" />}
-                                    </ContextMenuItem>
-                                ))}
-                            </ContextMenuSubContent>
-                        </ContextMenuSub>
-
-                        <ContextMenuSub>
-                            <ContextMenuSubTrigger>
-                                <Flag className="size-3.5" />
-                                Priority
-                            </ContextMenuSubTrigger>
-                            <ContextMenuSubContent className="w-44">
-                                {core.TASK_PRIORITIES.filter((priority) => priority !== "none").map((priority) => (
-                                    <ContextMenuItem
-                                        key={priority}
-                                        onSelect={() => commands.onEdit({ priority })}
-                                        className="gap-2"
-                                    >
-                                        <Flag
-                                            className="size-3.5"
-                                            fill={core.TASK_PRIORITY_COLORS[priority]}
-                                            style={{ color: core.TASK_PRIORITY_COLORS[priority] }}
-                                        />
-                                        <span className="flex-1">{core.TASK_PRIORITY_LABELS[priority]}</span>
-                                        {task.priority === priority && <Check className="size-3.5 text-primary" />}
-                                    </ContextMenuItem>
-                                ))}
-                                <ContextMenuItem
-                                    onSelect={() => commands.onEdit({ priority: "none" })}
-                                    className="gap-2 text-muted-foreground"
-                                >
-                                    <Ban className="size-3.5" />
-                                    Clear
-                                </ContextMenuItem>
-                            </ContextMenuSubContent>
-                        </ContextMenuSub>
-
-                        <ContextMenuSub>
-                            <ContextMenuSubTrigger>
-                                <UserPlus className="size-3.5" />
-                                Assign
-                            </ContextMenuSubTrigger>
-                            <ContextMenuSubContent className="max-h-64 w-56 overflow-y-auto">
-                                {context.people.length === 0 && (
-                                    <p className="px-2 py-3 text-center text-xs text-muted-foreground">
-                                        Nobody is on this space yet.
-                                    </p>
-                                )}
-                                {context.people.map((person) => {
-                                    const on = task.assignees.some((entry) => entry.id === person.id);
-                                    return (
-                                        <ContextMenuItem
-                                            key={person.id}
-                                            className="gap-2"
-                                            onSelect={() =>
-                                                commands.onEdit({
-                                                    assigneeIds: on
-                                                        ? task.assignees
-                                                              .filter((entry) => entry.id !== person.id)
-                                                              .map((entry) => entry.id)
-                                                        : [...task.assignees.map((entry) => entry.id), person.id]
-                                                })
-                                            }
-                                        >
-                                            <span className="flex-1 truncate">{person.name}</span>
-                                            {on && <Check className="size-3.5 text-primary" />}
-                                        </ContextMenuItem>
-                                    );
-                                })}
-                            </ContextMenuSubContent>
-                        </ContextMenuSub>
-
-                        {context.tags.length > 0 && (
+                    {canEdit && (
+                        <>
+                            <ContextMenuSeparator />
                             <ContextMenuSub>
                                 <ContextMenuSubTrigger>
-                                    <Tag className="size-3.5" />
-                                    Tags
+                                    <Check className="size-3.5" />
+                                    Status
+                                </ContextMenuSubTrigger>
+                                <ContextMenuSubContent className="w-52">
+                                    {context.statuses.map((status) => (
+                                        <ContextMenuItem
+                                            key={status.id}
+                                            onSelect={() => commands.onEdit({ statusId: status.id })}
+                                            className="gap-2"
+                                        >
+                                            <StatusIcon color={status.color} type={status.type} size={16} />
+                                            <span className="flex-1 truncate">{status.name}</span>
+                                            {status.id === task.statusId && (
+                                                <Check className="size-3.5 text-primary" />
+                                            )}
+                                        </ContextMenuItem>
+                                    ))}
+                                    {commands.onCreateStatus && (
+                                        <>
+                                            <ContextMenuSeparator />
+                                            <ContextMenuItem
+                                                className="gap-2"
+                                                onSelect={() => setDrafting("status")}
+                                            >
+                                                <Plus className="size-3.5" />
+                                                New status
+                                            </ContextMenuItem>
+                                        </>
+                                    )}
+                                </ContextMenuSubContent>
+                            </ContextMenuSub>
+
+                            <ContextMenuSub>
+                                <ContextMenuSubTrigger>
+                                    <Flag className="size-3.5" />
+                                    Priority
+                                </ContextMenuSubTrigger>
+                                <ContextMenuSubContent className="w-44">
+                                    {core.TASK_PRIORITIES.filter((priority) => priority !== "none").map((priority) => (
+                                        <ContextMenuItem
+                                            key={priority}
+                                            onSelect={() => commands.onEdit({ priority })}
+                                            className="gap-2"
+                                        >
+                                            <Flag
+                                                className="size-3.5"
+                                                fill={core.TASK_PRIORITY_COLORS[priority]}
+                                                style={{ color: core.TASK_PRIORITY_COLORS[priority] }}
+                                            />
+                                            <span className="flex-1">{core.TASK_PRIORITY_LABELS[priority]}</span>
+                                            {task.priority === priority && <Check className="size-3.5 text-primary" />}
+                                        </ContextMenuItem>
+                                    ))}
+                                    <ContextMenuItem
+                                        onSelect={() => commands.onEdit({ priority: "none" })}
+                                        className="gap-2 text-muted-foreground"
+                                    >
+                                        <Ban className="size-3.5" />
+                                        Clear
+                                    </ContextMenuItem>
+                                </ContextMenuSubContent>
+                            </ContextMenuSub>
+
+                            <ContextMenuSub>
+                                <ContextMenuSubTrigger>
+                                    <UserPlus className="size-3.5" />
+                                    Assign
                                 </ContextMenuSubTrigger>
                                 <ContextMenuSubContent className="max-h-64 w-56 overflow-y-auto">
-                                    {context.tags.map((tag) => {
-                                        const on = task.tags.some((entry) => entry.id === tag.id);
+                                    {context.people.length === 0 && (
+                                        <p className="px-2 py-3 text-center text-xs text-muted-foreground">
+                                            Nobody is on this space yet.
+                                        </p>
+                                    )}
+                                    {context.people.map((person) => {
+                                        const on = task.assignees.some((entry) => entry.id === person.id);
                                         return (
                                             <ContextMenuItem
-                                                key={tag.id}
+                                                key={person.id}
                                                 className="gap-2"
                                                 onSelect={() =>
                                                     commands.onEdit({
-                                                        tagIds: on
-                                                            ? task.tags
-                                                                  .filter((entry) => entry.id !== tag.id)
+                                                        assigneeIds: on
+                                                            ? task.assignees
+                                                                  .filter((entry) => entry.id !== person.id)
                                                                   .map((entry) => entry.id)
-                                                            : [...task.tags.map((entry) => entry.id), tag.id]
+                                                            : [...task.assignees.map((entry) => entry.id), person.id]
                                                     })
                                                 }
                                             >
-                                                <span
-                                                    aria-hidden
-                                                    className="inline-block size-2.5 shrink-0 rounded-full"
-                                                    style={{ backgroundColor: tag.color }}
-                                                />
-                                                <span className="flex-1 truncate">{tag.name}</span>
+                                                <span className="flex-1 truncate">{person.name}</span>
                                                 {on && <Check className="size-3.5 text-primary" />}
                                             </ContextMenuItem>
                                         );
                                     })}
                                 </ContextMenuSubContent>
                             </ContextMenuSub>
-                        )}
 
-                        <ContextMenuSeparator />
-                        <ContextMenuItem onSelect={commands.onDuplicate}>
-                            <Copy className="size-3.5" />
-                            Duplicate
-                        </ContextMenuItem>
-                        <ContextMenuSeparator />
-                        <ContextMenuItem variant="danger" onSelect={commands.onDelete}>
-                            <Trash2 className="size-3.5" />
-                            Delete
-                        </ContextMenuItem>
-                    </>
-                )}
-            </ContextMenuContent>
-        </ContextMenu>
+                            {/* Offered even with nothing to pick yet: an empty
+                                Tags submenu that only says "create one" is how
+                                somebody discovers tags exist at all. */}
+                            {(context.tags.length > 0 || commands.onCreateTag) && (
+                                <ContextMenuSub>
+                                    <ContextMenuSubTrigger>
+                                        <Tag className="size-3.5" />
+                                        Tags
+                                    </ContextMenuSubTrigger>
+                                    <ContextMenuSubContent className="max-h-64 w-56 overflow-y-auto">
+                                        {context.tags.map((tag) => {
+                                            const on = task.tags.some((entry) => entry.id === tag.id);
+                                            return (
+                                                <ContextMenuItem
+                                                    key={tag.id}
+                                                    className="gap-2"
+                                                    onSelect={() =>
+                                                        commands.onEdit({
+                                                            tagIds: on
+                                                                ? task.tags
+                                                                      .filter((entry) => entry.id !== tag.id)
+                                                                      .map((entry) => entry.id)
+                                                                : [...task.tags.map((entry) => entry.id), tag.id]
+                                                        })
+                                                    }
+                                                >
+                                                    <span
+                                                        aria-hidden
+                                                        className="inline-block size-2.5 shrink-0 rounded-full"
+                                                        style={{ backgroundColor: tag.color }}
+                                                    />
+                                                    <span className="flex-1 truncate">{tag.name}</span>
+                                                    {on && <Check className="size-3.5 text-primary" />}
+                                                </ContextMenuItem>
+                                            );
+                                        })}
+                                        {commands.onCreateTag && (
+                                            <>
+                                                {context.tags.length > 0 && <ContextMenuSeparator />}
+                                                <ContextMenuItem
+                                                    className="gap-2"
+                                                    onSelect={() => setDrafting("tag")}
+                                                >
+                                                    <Plus className="size-3.5" />
+                                                    New tag
+                                                </ContextMenuItem>
+                                            </>
+                                        )}
+                                    </ContextMenuSubContent>
+                                </ContextMenuSub>
+                            )}
+
+                            <ContextMenuSeparator />
+                            <ContextMenuItem onSelect={commands.onDuplicate}>
+                                <Copy className="size-3.5" />
+                                Duplicate
+                            </ContextMenuItem>
+                            <ContextMenuSeparator />
+                            <ContextMenuItem variant="danger" onSelect={commands.onDelete}>
+                                <Trash2 className="size-3.5" />
+                                Delete
+                            </ContextMenuItem>
+                        </>
+                    )}
+                </ContextMenuContent>
+            </ContextMenu>
+        </>
     );
 }
