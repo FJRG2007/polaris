@@ -121,12 +121,49 @@ describe("what the waiting dialog is told", () => {
 
     // A refusal that outlives its command stops being something to retry, which is
     // what turns the dialog's "still works" line off without it having to guess.
+    //
+    // The state has to move with it. `error` used to imply a claim, so reading it
+    // first was harmless; a refusal puts one on a live row, and leaving that row
+    // `failed` forever meant a dead command still showing what to fix as though
+    // fixing it would help.
     it("stops calling a refusal recoverable once the command has expired", async () => {
         row = enrollment({
             error: ENROLLMENT_REFUSAL_MESSAGES["remote-login-off"],
             expiresAt: new Date(Date.now() - 1000)
         });
-        expect((await getEnrollmentStatus("enr_1", "usr_1"))?.retryable).toBe(false);
+        const status = await getEnrollmentStatus("enr_1", "usr_1");
+        expect(status?.retryable).toBe(false);
+        expect(status?.state).toBe("expired");
+        // The reason survives the state change, so the dialog can still say what
+        // the machine refused over rather than pretending it never ran.
+        expect(status?.error).toBe(ENROLLMENT_REFUSAL_MESSAGES["remote-login-off"]);
+    });
+
+    // A claim spends the token, so what happened to it stays the answer no matter
+    // what the clock did afterwards - there is nothing left to come back to.
+    it("keeps a failed claim failed even after the clock runs out", async () => {
+        row = enrollment({
+            claimedAt: new Date(),
+            error: "Polaris could not reach the machine",
+            expiresAt: new Date(Date.now() - 1000)
+        });
+        expect((await getEnrollmentStatus("enr_1", "usr_1"))?.state).toBe("failed");
+    });
+});
+
+// Every one of these ends up on screen next to a command that may be alive or dead,
+// and only the renderer knows which. A stored sentence that picks one is wrong half
+// the time - and it was wrong in the direction of telling somebody to paste a token
+// that no longer exists.
+describe("ENROLLMENT_REFUSAL_MESSAGES", () => {
+    it("says what to fix without saying what to do with the command", async () => {
+        const { ENROLLMENT_REFUSAL_REASONS } = await import("@polaris/core");
+        for (const reason of ENROLLMENT_REFUSAL_REASONS) {
+            const message = ENROLLMENT_REFUSAL_MESSAGES[reason];
+            expect(message.length).toBeGreaterThan(0);
+            expect(message).not.toMatch(/run (it|the command) again/i);
+            expect(message).not.toMatch(/generate a new/i);
+        }
     });
 });
 

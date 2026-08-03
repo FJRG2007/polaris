@@ -87,7 +87,15 @@ export function QuickEnroll({ onDone, kind = "server" }: { onDone: () => void; k
             if (status.state === "expired") {
                 clearInterval(timer);
                 setStillUsable(false);
-                setWaitError("This command expired before the machine ran it");
+                // A machine that refused left its reason on the enrollment, and it
+                // is still the true account of what happened - the command only
+                // ran out afterwards. Saying it never ran would be the misreport
+                // the refusal was reported to avoid, one lifetime later.
+                setWaitError(
+                    status.error
+                        ? `${status.error} This command has since expired, so generate a new one.`
+                        : "This command expired before the machine ran it"
+                );
                 return;
             }
             // The re-run got as far as claiming, so the refusal it recovered from

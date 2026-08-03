@@ -117,6 +117,7 @@ export const ENROLLMENT_REFUSAL_REASONS = [
     "no-user-tooling",
     "unsupported-platform",
     "curl-missing",
+    "unknown-option",
     "not-root"
 ] as const;
 export type EnrollmentRefusalReason = (typeof ENROLLMENT_REFUSAL_REASONS)[number];
@@ -124,24 +125,33 @@ export type EnrollmentRefusalReason = (typeof ENROLLMENT_REFUSAL_REASONS)[number
 export const refuseEnrollmentSchema = z.object({ reason: z.enum(ENROLLMENT_REFUSAL_REASONS) });
 export type RefuseEnrollmentInput = z.infer<typeof refuseEnrollmentSchema>;
 
-/** Polaris's own words for each code. Written for the operator watching the
- *  dialog, so each one says what to go and do. */
+/**
+ * Polaris's own words for each code: what happened and what to go and fix.
+ *
+ * Where that leaves the command is deliberately not part of the sentence. A
+ * refusal spends nothing, so for most of its life the answer is "run this one
+ * again" - but the same stored sentence is still on screen after the command
+ * lapses, and by then that is an instruction to paste a dead token. Whether to
+ * re-run or to generate a new one follows from the enrollment's state, so it is
+ * said by whoever is rendering it and knows which of the two is true.
+ */
 export const ENROLLMENT_REFUSAL_MESSAGES: Record<EnrollmentRefusalReason, string> = {
     "ssh-not-listening":
-        "The machine stopped before registering: nothing Polaris could reach is listening on its SSH port. Start its SSH server, or bind it to something other than loopback, and run the command again.",
+        "The machine stopped before registering: nothing Polaris could reach is listening on its SSH port. Start its SSH server, or bind it to something other than loopback.",
     "remote-login-off":
-        "The machine stopped before registering: Remote Login is off, so nothing would answer Polaris. Turn it on under System Settings > General > Sharing and run the command again.",
+        "The machine stopped before registering: Remote Login is off, so nothing would answer Polaris. Turn it on under System Settings > General > Sharing.",
     "no-ssh-host-keys":
-        "The machine stopped before registering: it has no SSH host keys and none could be generated. Install an SSH server there and run the command again.",
+        "The machine stopped before registering: it has no SSH host keys and none could be generated. Install an SSH server there.",
     "no-home-directory":
-        `The machine stopped before registering: the '${ENROLLMENT_USERNAME}' login has no home directory, so the key could not be installed. Fix the account and run the command again.`,
+        `The machine stopped before registering: the '${ENROLLMENT_USERNAME}' login has no home directory, so the key could not be installed. Fix the account.`,
     "no-user-tooling":
-        `The machine stopped before registering: it has neither useradd nor adduser, so the login could not be created. Create a '${ENROLLMENT_USERNAME}' user there and run the command again.`,
+        `The machine stopped before registering: it has neither useradd nor adduser, so the login could not be created. Create a '${ENROLLMENT_USERNAME}' user there.`,
     "unsupported-platform":
         "The machine stopped before registering: its operating system is not one the command supports. Add this server by hand instead.",
-    "curl-missing":
-        "The machine stopped before registering: curl is not installed there. Install it and run the command again.",
-    "not-root": "The machine stopped before registering: the command was not run as root. Run it again with sudo."
+    "curl-missing": "The machine stopped before registering: curl is not installed there. Install it.",
+    "unknown-option":
+        "The machine stopped before registering: the command was run with an argument it does not know. Paste it exactly as Polaris printed it.",
+    "not-root": "The machine stopped before registering: the command was not run as root. Run it with sudo."
 };
 
 /** How an enrollment is doing, for the dialog that waits on it. */

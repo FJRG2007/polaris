@@ -218,11 +218,21 @@ export async function getEnrollmentStatus(id: string, userId: string): Promise<E
     };
 }
 
+/**
+ * `error` used to imply a claim, so reading it first was the same as reading it
+ * after the expiry check. A refusal breaks that: it puts an error on a row that is
+ * still live and still unclaimed, and once that row lapses the error is the older
+ * fact of the two. Expiry therefore wins over it, so a dead command is never
+ * presented as something the machine is still working through.
+ *
+ * A claim is the exception, because a claim spends the token: what happened to it
+ * stays the answer regardless of what the clock did afterwards.
+ */
 function resolveState(row: { claimedAt: Date | null; expiresAt: Date; hostId: string | null; error: string | null }): EnrollmentState {
     if (row.hostId) return "claimed";
-    if (row.error) return "failed";
-    if (row.claimedAt) return "pending";
-    return row.expiresAt < new Date() ? "expired" : "pending";
+    if (row.claimedAt) return row.error ? "failed" : "pending";
+    if (row.expiresAt < new Date()) return "expired";
+    return row.error ? "failed" : "pending";
 }
 
 /** Cancel a pending enrollment, so a command pasted somewhere it should not have

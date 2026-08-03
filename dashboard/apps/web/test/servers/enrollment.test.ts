@@ -261,14 +261,24 @@ describe("enrollmentScript", () => {
     // is the exact misdiagnosis this check exists to prevent.
     it("wants a bind Polaris could dial, not merely a listener", () => {
         const probe = script.slice(script.indexOf("reachable_listener() {"));
-        const matcher = probe.slice(0, probe.indexOf("listening_on() {"));
-        expect(matcher).toContain("/^127\\./");
+        const matcher = probe.slice(0, probe.indexOf("listeners() {"));
+        expect(matcher).toContain("/^\\[?127\\./");
         expect(matcher).toContain('addr == "::1"');
         expect(matcher).toContain('addr == "[::1]"');
         // The port alone is not the match any more; the address column decides.
         expect(script).not.toContain('grep -q ":$1 "');
-        expect(script).toContain('ss -ltn 2>/dev/null | reachable_listener "$1"');
-        expect(script).toContain('netstat -lnt 2>/dev/null | reachable_listener "$1"');
+        expect(script).toContain('[ -n "$(listeners plain | reachable_listener "$1" "")" ]');
+    });
+
+    // Neither tool takes -p on every vintage, and one that does not prints nothing
+    // at all with it - which must not read as a machine with nothing listening.
+    it("asks for the owning process without letting the answer be all it has", () => {
+        expect(script).toContain("ss -ltnp 2>/dev/null");
+        expect(script).toContain("ss -ltn 2>/dev/null");
+        expect(script).toContain("netstat -lntp 2>/dev/null");
+        expect(script).toContain("netstat -lnt 2>/dev/null");
+        // Called with no argument from listening_on, and 'set -u' is on.
+        expect(script).toContain('[ "${1:-}" = "owners" ]');
     });
 
     // A box with neither tool cannot answer the question, and a wrong "nothing is
@@ -289,6 +299,35 @@ describe("enrollmentScript", () => {
         // A relative Include is resolved the way sshd resolves it.
         expect(script).toContain('*) _pattern="/etc/ssh/$_pattern" ;;');
         expect(script).toContain("for port in $(ssh_configured_ports) 22; do");
+    });
+
+    // A port does not only come from a `Port` line. `ListenAddress 10.0.0.5:2222`
+    // sets one with no `Port` anywhere, and on Ubuntu 24.04+ the documented way to
+    // move SSH is `systemctl edit ssh.socket`, which never touches sshd_config at
+    // all. Reading only `Port` made both of those look like a machine on 22.
+    it("reads the port out of every place one can be declared", () => {
+        expect(script).toContain('tolower($1) == "listenaddress" && match($2, /:[0-9]+$/)');
+        expect(script).toContain('if (tolower(_key) != "listenstream") next');
+        // What `systemctl edit ssh.socket` actually writes.
+        expect(script).toContain("/etc/systemd/system/ssh.socket.d/*.conf");
+        expect(script).toContain("/lib/systemd/system/ssh.socket");
+        // A bare IPv6 literal is colons and no port; only the bracketed form or an
+        // address with no other colon in it carries one.
+        expect(script).toContain("_addr ~ /^\\[.*\\]$/ || _addr !~ /:/");
+        // A reading that is not a port number never becomes a candidate.
+        expect(script).toContain("''|*[!0-9]*) continue ;;");
+    });
+
+    // The parse is the fallback, not the answer. This runs as root, so the process
+    // holding a socket is readable, and sshd's own socket settles the port without
+    // caring where it was written down - which is what makes a config shape nobody
+    // anticipated stop being a machine that cannot enroll.
+    it("prefers the port sshd is observed on over anything the config says", () => {
+        const probe = script.slice(script.indexOf("SSH_PROBE=none"));
+        expect(probe).toContain('OBSERVED_PORT=$(listeners owners | reachable_listener "" sshd) || OBSERVED_PORT=""');
+        // The candidate sweep is the else, so it only runs when the owner was mute.
+        expect(probe.indexOf('if [ -n "$OBSERVED_PORT" ]')).toBeLessThan(probe.indexOf("for port in $SSH_PORTS; do"));
+        expect(probe).toContain("SSH_PORT=$OBSERVED_PORT");
     });
 
     // An observed listener beats a parse. This is also what makes the port Polaris
@@ -330,9 +369,45 @@ describe("enrollmentScript", () => {
                 "no-user-tooling",
                 "unsupported-platform",
                 "curl-missing",
+                "unknown-option",
                 "not-root"
             ])
         );
+    });
+
+    // Scanning for `die "` was how the argument parser's bare `exit 2` sat there
+    // being a silent pre-claim stop while a test claimed there were none. The
+    // property is about stopping, not about a spelling, so this looks for the act:
+    // every shell exit before the claim, and every word said to stderr on the way
+    // out, has to be `die`'s - which is also why `die` is defined above the parser.
+    it("routes every pre-claim stop through die, whatever it is spelled like", () => {
+        const preClaim = script.slice(0, script.indexOf('say "telling Polaris about this machine'));
+        const die = preClaim.slice(preClaim.indexOf("die() {"));
+        const body = die.slice(0, die.indexOf("\n}"));
+        // awk's own `exit` carries no status, so a numbered one is always the shell.
+        const stops = preClaim.split("\n").filter((line) => /\bexit [0-9]/.test(line) || />&2/.test(line));
+        expect(stops.length).toBeGreaterThan(0);
+        for (const stop of stops) expect(body).toContain(stop.trim());
+        expect(preClaim).not.toContain("exit 2");
+        expect(script).toContain('*) die unknown-option "unknown option $arg" ;;');
+        // Nothing can stop before the reporter exists.
+        expect(preClaim.indexOf("die() {")).toBeLessThan(preClaim.indexOf('for arg in "$@"'));
+    });
+
+    // `die curl-missing` reported itself with curl, so the one abort that fires
+    // because curl is not there was the one abort that could never be delivered -
+    // and the dialog went back to waiting the command out and blaming the clock.
+    it("can still deliver the refusal that fires because curl is missing", () => {
+        const die = script.slice(script.indexOf("die() {"));
+        const body = die.slice(0, die.indexOf("\n}"));
+        expect(body).toContain("elif command -v wget");
+        expect(body).toContain("--post-data=");
+        expect(body).toContain("--timeout=10");
+        // Still a code and never a sentence, whichever tool carries it.
+        expect(body.match(/printf '\{"reason":"%s"\}' "\$1"/g)).toHaveLength(2);
+        // Still best-effort: neither branch may change the exit or the message.
+        expect(body.match(/\|\| true/g)).toHaveLength(2);
+        expect(body.indexOf("/refuse")).toBeLessThan(body.indexOf('echo "polaris: $2"'));
     });
 
     // A refusal is a courtesy to the dialog, not a step of the enrollment. If it

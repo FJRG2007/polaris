@@ -105,34 +105,43 @@ POLARIS_RETRY_HINT=${shellQuote(ENROLLMENT_RETRY_HINT)}
 GRANT_DOCKER=0
 GRANT_ROOT=0
 
-for arg in "\$@"; do
-    case "\$arg" in
-        --docker) GRANT_DOCKER=1 ;;
-        --root) GRANT_ROOT=1 ;;
-        *) echo "polaris: unknown option \$arg" >&2; exit 2 ;;
-    esac
-done
-
 say() { echo "polaris: \$1"; }
 
 # Every abort in this script happens before the claim, so every one of them tells
 # Polaris why on the way out - otherwise the dialog somebody is watching waits the
 # command out and then blames the clock for a machine that ran it and refused.
 # Reporting is folded into 'die' rather than left as a call to remember, so a stop
-# added later cannot be a silent one.
+# added later cannot be a silent one - which is also why this is defined before
+# anything that could stop, the argument parser included.
 #
 # It carries a fixed code and never a message - Polaris holds the wording - and it
 # spends nothing, so the same command still works. Best-effort in every direction:
-# no answer, no Polaris, no network, no curl, and this changes neither what the
-# script prints nor what it exits with.
+# no answer, no Polaris, no network, and this changes neither what the script
+# prints nor what it exits with. wget covers the one abort curl cannot carry its
+# own report for, since 'curl is missing' is a thing this has to be able to say.
 die() {
-    printf '{"reason":"%s"}' "\$1" | curl -sS -o /dev/null --max-time 10 -X POST \\
-        -H 'content-type: application/json' \\
-        --data-binary @- \\
-        "\$POLARIS_URL/api/servers/enroll/\$POLARIS_TOKEN/refuse" >/dev/null 2>&1 || true
+    if command -v curl >/dev/null 2>&1; then
+        printf '{"reason":"%s"}' "\$1" | curl -sS -o /dev/null --max-time 10 -X POST \\
+            -H 'content-type: application/json' \\
+            --data-binary @- \\
+            "\$POLARIS_URL/api/servers/enroll/\$POLARIS_TOKEN/refuse" >/dev/null 2>&1 || true
+    elif command -v wget >/dev/null 2>&1; then
+        wget -q -O /dev/null --timeout=10 \\
+            --header='content-type: application/json' \\
+            --post-data="\$(printf '{"reason":"%s"}' "\$1")" \\
+            "\$POLARIS_URL/api/servers/enroll/\$POLARIS_TOKEN/refuse" >/dev/null 2>&1 || true
+    fi
     echo "polaris: \$2" >&2
     exit 1
 }
+
+for arg in "\$@"; do
+    case "\$arg" in
+        --docker) GRANT_DOCKER=1 ;;
+        --root) GRANT_ROOT=1 ;;
+        *) die unknown-option "unknown option \$arg" ;;
+    esac
+done
 
 [ "\$(id -u)" = "0" ] || die not-root "run this with sudo"
 command -v curl >/dev/null 2>&1 || die curl-missing "curl is required and was not found"
@@ -233,15 +242,22 @@ chown -R "\$POLARIS_USER" "\$HOME_DIR/.ssh"`;
  * firewall that was never the problem. Catching it here leaves the token unspent,
  * so the same command works again once the server is on.
  *
- * The port is where this could go wrong in the other direction, so nothing here
- * trusts a single reading of the config. `sshd_config` names a port, the files it
- * `Include`s name one too - that is the default layout on Debian 12 and Ubuntu
- * 22.10+, and a hardened port usually lives in the dropped-in file rather than the
- * main one - and under systemd socket activation the config does not decide at all
- * and `ssh.socket` does. So every port any of them names is a candidate, 22 is
- * always one, and the one holding a reachable listener is the answer. That is also
- * what gets reported: an observed listener beats a parse, which is what the port
- * Polaris dials should have been all along.
+ * The port is where this could go wrong in the other direction, and a config parse
+ * is the wrong instrument for it: a port can be declared by `Port`, by the
+ * `ListenAddress host:port` form, in a file `sshd_config` `Include`s - the default
+ * layout on Debian 12 and Ubuntu 22.10+, where a hardened port usually lives - or
+ * in a `ssh.socket` unit under socket activation, where sshd_config does not decide
+ * at all. Every one of those is somewhere a reader can be behind.
+ *
+ * So the machine is asked instead. This runs as root, which is what makes the
+ * process holding a listening socket readable, and sshd's own socket answers the
+ * question outright no matter where the port was written down. The parse stays as
+ * the fallback for when the owner cannot be read - an `ss` or `netstat` too old for
+ * it, or a socket unit whose port systemd is still holding on sshd's behalf - and
+ * it reads all four places rather than only the first `Port` line. 22 is always a
+ * candidate too, and whichever candidate holds a reachable listener is the answer.
+ * Either way an observed listener beats a parse, which is what the port Polaris
+ * dials should have been all along.
  *
  * Reachable is part of the question rather than a refinement of it. A listener on
  * 127.0.0.1 answers the machine itself and nobody else, so counting it would let
@@ -263,31 +279,69 @@ chown -R "\$POLARIS_USER" "\$HOME_DIR/.ssh"`;
  * enrollment on a Mac whose sshd was running the whole time.
  */
 function sshServiceSection(): string {
-    return `# Every port sshd could be on, not just the first one named.
+    return `# Every port sshd could be on, from every place one can be declared - not just
+# the first 'Port' line, which is the one place a hardened config tends not to
+# use. A trailing ':port' on a 'ListenAddress' sets the port with no 'Port' line
+# anywhere, and an address that merely contains colons (a bare IPv6 literal) is
+# not one of those, so the port form has to be told apart from it.
 ssh_configured_ports() {
     _main=/etc/ssh/sshd_config
-    [ -f "\$_main" ] || return 0
-    _files=\$_main
-    # Unquoted on purpose: each pattern is a glob, and a pattern matching nothing
-    # stays literal and is dropped by the -f test.
-    for _pattern in \$(awk 'tolower(\$1) == "include" { for (i = 2; i <= NF; i++) print \$i }' "\$_main" 2>/dev/null); do
-        case "\$_pattern" in
-            /*) ;;
-            *) _pattern="/etc/ssh/\$_pattern" ;;
-        esac
-        for _file in \$_pattern; do
-            if [ -f "\$_file" ]; then _files="\$_files \$_file"; fi
+    if [ -f "\$_main" ]; then
+        _files=\$_main
+        # Unquoted on purpose: each pattern is a glob, and a pattern matching nothing
+        # stays literal and is dropped by the -f test.
+        for _pattern in \$(awk 'tolower(\$1) == "include" { for (i = 2; i <= NF; i++) print \$i }' "\$_main" 2>/dev/null); do
+            case "\$_pattern" in
+                /*) ;;
+                *) _pattern="/etc/ssh/\$_pattern" ;;
+            esac
+            for _file in \$_pattern; do
+                if [ -f "\$_file" ]; then _files="\$_files \$_file"; fi
+            done
         done
-    done
-    for _file in \$_files; do
-        awk 'tolower(\$1) == "port" && \$2 ~ /^[0-9]+\$/ { print \$2 }' "\$_file" 2>/dev/null || true
+        for _file in \$_files; do
+            awk '
+                tolower(\$1) == "port" && \$2 ~ /^[0-9]+\$/ { print \$2 }
+                tolower(\$1) == "listenaddress" && match(\$2, /:[0-9]+\$/) {
+                    _addr = substr(\$2, 1, RSTART - 1)
+                    if (_addr ~ /^\\[.*\\]\$/ || _addr !~ /:/) print substr(\$2, RSTART + 1)
+                }
+            ' "\$_file" 2>/dev/null || true
+        done
+    fi
+    # Socket activation: the unit holds the port and sshd_config is ignored, which
+    # is how 'systemctl edit ssh.socket' moves SSH without touching a config file.
+    for _unit in /etc/systemd/system/ssh.socket /etc/systemd/system/sshd.socket \\
+        /etc/systemd/system/ssh.socket.d/*.conf /etc/systemd/system/sshd.socket.d/*.conf \\
+        /lib/systemd/system/ssh.socket /lib/systemd/system/sshd.socket \\
+        /usr/lib/systemd/system/ssh.socket /usr/lib/systemd/system/sshd.socket; do
+        [ -f "\$_unit" ] || continue
+        awk -F= '
+            {
+                _key = \$1
+                gsub(/[ \\t\\r]/, "", _key)
+                if (tolower(_key) != "listenstream") next
+                _value = \$2
+                gsub(/[ \\t\\r]/, "", _value)
+                if (_value ~ /^[0-9]+\$/) { print _value; next }
+                if (match(_value, /:[0-9]+\$/)) {
+                    _addr = substr(_value, 1, RSTART - 1)
+                    if (_addr ~ /^\\[.*\\]\$/ || _addr !~ /:/) print substr(_value, RSTART + 1)
+                }
+            }
+        ' "\$_unit" 2>/dev/null || true
     done
 }
 
-# 22 is always a candidate: it is the default, and it is what sshd answers on when
-# a socket unit rather than the config decides.
+# 22 is always a candidate: it is the default, and it is what a machine that
+# declares nothing anywhere answers on.
 SSH_PORTS=""
 for port in \$(ssh_configured_ports) 22; do
+    # Anything a reader got wrong enough to not be a port number is dropped here
+    # rather than becoming a candidate nothing can match.
+    case "\$port" in
+        ''|*[!0-9]*) continue ;;
+    esac
     case " \$SSH_PORTS " in
         *" \$port "*) ;;
         *) SSH_PORTS="\${SSH_PORTS:+\$SSH_PORTS }\$port" ;;
@@ -370,7 +424,13 @@ function darwinRemoteLoginSection(): string {
 /**
  * Ask the machine what it is listening on, and let the answer pick the port.
  *
- * "Something is on that port" is not the question. An sshd bound to 127.0.0.1
+ * Two questions, one reader. The first is "where is sshd", which root can answer
+ * outright because it can see which process holds a socket - and that beats every
+ * candidate list, because it does not care where the port was declared. The second
+ * is the fallback for when the owner cannot be read: "does any candidate port hold
+ * a listener".
+ *
+ * "Something is on that port" is not either question. An sshd bound to 127.0.0.1
  * answers this machine and nobody else, so accepting it would let the claim
  * through and land the operator on "could not reach the machine's SSH port from
  * here. Check the firewall between them" - the report this whole check exists to
@@ -387,24 +447,39 @@ function linuxListenerSection(): string {
 
     # Both tools put the local address in the fourth column, in every spelling of a
     # wildcard they use ('0.0.0.0', '*', '[::]', ':::'). Only loopback is dropped.
+    #
+    # 'port' pins the port and leaves the owner open; 'owner' pins the process
+    # holding the socket and leaves the port open. Whichever port it settles on is
+    # printed, so an empty answer is the same "nothing reachable" in both directions.
     reachable_listener() {
-        awk -v port="\$1" '
-            \$4 ~ (":" port "\$") {
-                addr = substr(\$4, 1, length(\$4) - length(port) - 1)
-                if (addr ~ /^127\\./ || addr == "::1" || addr == "[::1]") next
+        awk -v port="\$1" -v owner="\$2" '
+            owner != "" && index(\$0, owner) == 0 { next }
+            {
+                if (!match(\$4, /:[0-9]+\$/)) next
+                addr = substr(\$4, 1, RSTART - 1)
+                found = substr(\$4, RSTART + 1)
+                if (port != "" && found != port) next
+                if (addr ~ /^\\[?127\\./ || addr == "::1" || addr == "[::1]") next
                 if (addr ~ /^\\[?::ffff:127\\./) next
-                found = 1
+                print found
+                exit
             }
-            END { exit found ? 0 : 1 }
         '
     }
 
-    listening_on() {
+    # Asked with the owning process and without it. Only root can read the owner,
+    # which this is - but an ss or netstat too old for the flag prints nothing at
+    # all with it, and that must not read as a machine with nothing listening.
+    listeners() {
         case "\$SSH_PROBE" in
-            ss) ss -ltn 2>/dev/null | reachable_listener "\$1" ;;
-            netstat) netstat -lnt 2>/dev/null | reachable_listener "\$1" ;;
+            ss) if [ "\${1:-}" = "owners" ]; then ss -ltnp 2>/dev/null; else ss -ltn 2>/dev/null; fi ;;
+            netstat) if [ "\${1:-}" = "owners" ]; then netstat -lntp 2>/dev/null; else netstat -lnt 2>/dev/null; fi ;;
             *) return 1 ;;
         esac
+    }
+
+    listening_on() {
+        [ -n "\$(listeners plain | reachable_listener "\$1" "")" ]
     }
 
     if [ "\$SSH_PROBE" = "none" ]; then
@@ -413,13 +488,22 @@ function linuxListenerSection(): string {
         say "no ss or netstat here, so whether anything is listening could not be checked"
     else
         SSH_LISTENING=no
-        for port in \$SSH_PORTS; do
-            if listening_on "\$port"; then
-                SSH_PORT=\$port
-                SSH_LISTENING=yes
-                break
-            fi
-        done
+        # What sshd is bound to, whatever declared it. Under socket activation the
+        # socket belongs to systemd until the first connection, so this can come up
+        # empty on a perfectly healthy machine - which is what the candidates are for.
+        OBSERVED_PORT=\$(listeners owners | reachable_listener "" sshd) || OBSERVED_PORT=""
+        if [ -n "\$OBSERVED_PORT" ]; then
+            SSH_PORT=\$OBSERVED_PORT
+            SSH_LISTENING=yes
+        else
+            for port in \$SSH_PORTS; do
+                if listening_on "\$port"; then
+                    SSH_PORT=\$port
+                    SSH_LISTENING=yes
+                    break
+                fi
+            done
+        fi
         if [ "\$SSH_LISTENING" = "no" ]; then
             die ssh-not-listening "nothing Polaris could reach is listening on any port this machine's SSH server could be using (\$SSH_PORTS); start it, or bind it to something other than loopback, \$POLARIS_RETRY_HINT"
         fi
