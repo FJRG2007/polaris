@@ -254,12 +254,32 @@ const GRAVATAR_SIZE = 200;
  */
 const GRAVATAR_TTL_MS = 24 * 60 * 60 * 1000;
 
+/**
+ * How long a lookup that never got an answer stands.
+ *
+ * "Gravatar has nobody at this address" is an answer and keeps for a day. "We
+ * could not ask" is not one, and treating it as if it were is how a single slow
+ * moment takes everybody's face away for the rest of the day - a four-second
+ * timeout on a home connection is not evidence about anybody's account. A minute
+ * is long enough that a board full of faces does not retry a dead network once
+ * per person, and short enough that nobody notices the outage ended.
+ */
+const GRAVATAR_RETRY_MS = 60 * 1000;
+
 /** Never let a slow or blocked network hold an avatar request open. */
 const GRAVATAR_TIMEOUT_MS = 4000;
 
+interface GravatarMemo {
+    /** When this stops being believed. */
+    readonly until: number;
+    readonly image: AvatarImage | null;
+    /** Whether this is a remembered answer or a remembered failure to get one. */
+    readonly failed: boolean;
+}
+
 /** Remembered per address, misses included - "this address has no Gravatar" is
  *  the answer worth caching hardest, since it is the common one. */
-const gravatarCache = new Map<string, { at: number; image: AvatarImage | null }>();
+const gravatarCache = new Map<string, GravatarMemo>();
 
 /**
  * What Gravatar has for an address, or null.
@@ -271,13 +291,18 @@ const gravatarCache = new Map<string, { at: number; image: AvatarImage | null }>
 async function gravatarImage(email: string): Promise<AvatarImage | null> {
     const hash = gravatarHash(email);
     const cached = gravatarCache.get(hash);
-    if (cached && Date.now() - cached.at < GRAVATAR_TTL_MS) return cached.image;
+    if (cached && Date.now() < cached.until) return cached.image;
 
     let image: AvatarImage | null = null;
+    let answered = false;
     try {
         const response = await fetch(`https://gravatar.com/avatar/${hash}?d=404&s=${GRAVATAR_SIZE}`, {
             signal: AbortSignal.timeout(GRAVATAR_TIMEOUT_MS)
         });
+        // A picture and a 404 are both Gravatar telling us about the address.
+        // A 429 or a 502 is Gravatar telling us about Gravatar, so it is worth
+        // asking again shortly rather than standing in for an answer all day.
+        answered = response.ok || response.status === 404;
         if (response.ok) {
             const bytes = new Uint8Array(await response.arrayBuffer());
             // Gravatar is a third party like any other: what it serves is
@@ -291,12 +316,18 @@ async function gravatarImage(email: string): Promise<AvatarImage | null> {
             }
         }
     } catch (error) {
-        // Offline, blocked, or slow. Not worth a line per avatar on every page,
-        // and the cache below keeps it from being retried on the next one.
-        if (!gravatarCache.has(hash)) console.error("avatars: gravatar unreachable:", error);
+        // Offline, blocked, or slow. Said once rather than once per avatar on
+        // every page, and again only after the address has worked in between -
+        // an operator needs to know egress broke, not to have the log filled
+        // with it for as long as it stays broken.
+        if (!cached?.failed) console.error("avatars: gravatar unreachable:", error);
     }
 
-    gravatarCache.set(hash, { at: Date.now(), image });
+    gravatarCache.set(hash, {
+        until: Date.now() + (answered ? GRAVATAR_TTL_MS : GRAVATAR_RETRY_MS),
+        image,
+        failed: !answered
+    });
     return image;
 }
 
