@@ -130,6 +130,8 @@ Tasks (work management):
 - [x] Sprints with burndown, goals with targets (a `tasks` target counts itself)
 - [x] Docs/wiki as a Markdown tree; public intake forms that file tasks
 - [x] Reporting: status/priority mix, 30-day completion, workload, tracked time
+- [x] Sharing one task: send it to people (in Polaris, or by email), the private
+      link, and a read-only public link that is off until somebody turns it on
 - [ ] Attachments on a task (Drive file picker)
 - [ ] Whiteboards, mind maps, clips, AI, email-in, proofing, map and workload
       views, portfolios - out of scope for this pillar

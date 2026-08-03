@@ -93,6 +93,16 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         defaults: { inapp: true, email: false }
     },
     {
+        id: "tasks.shared",
+        group: "tasks",
+        label: "A task sent to you",
+        description: "Somebody sent you a task to look at.",
+        level: "info",
+        // Mail is on by default here alone among the task events: a person chose
+        // to send this to you, so it should reach you off the app as well.
+        defaults: { inapp: true, email: true }
+    },
+    {
         id: "tasks.comment",
         group: "tasks",
         label: "Comment on your work",

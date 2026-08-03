@@ -1,7 +1,7 @@
 import * as engine from "../src/tasks.js";
 import { describe, expect, it } from "vitest";
 import type { Recurrence, TaskFilter } from "../src/schemas/tasks.js";
-import { FOLDER_DEPTH_LIMIT, strongerRole } from "../src/schemas/tasks.js";
+import { FOLDER_DEPTH_LIMIT, strongerRole, taskShareEmailSchema, taskShareSchema } from "../src/schemas/tasks.js";
 
 /** Wednesday, so "this week" has days on both sides of it. */
 const NOW = new Date("2026-08-05T12:00:00.000Z");
@@ -579,5 +579,22 @@ describe("references", () => {
         expect(engine.deriveSpacePrefix("Product Design")).toBe("PD");
         expect(engine.deriveSpacePrefix("")).toBe("TASK");
         expect(engine.taskReference("PD", 42)).toBe("PD-42");
+    });
+});
+
+describe("sharing a task", () => {
+    const TASK_ID = "0197f3a0-0000-7000-8000-000000000001";
+
+    it("refuses a send with nobody on it", () => {
+        expect(taskShareEmailSchema.safeParse({ taskId: TASK_ID }).success).toBe(false);
+    });
+
+    it("normalizes addresses so the same person is not two recipients", () => {
+        const parsed = taskShareEmailSchema.parse({ taskId: TASK_ID, emails: [" Ana@Example.COM "] });
+        expect(parsed.emails).toEqual(["ana@example.com"]);
+    });
+
+    it("defaults the public link to hiding the discussion", () => {
+        expect(taskShareSchema.parse({ taskId: TASK_ID, enabled: true }).showComments).toBe(false);
     });
 });

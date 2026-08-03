@@ -24,6 +24,7 @@ import * as tasks from "@/lib/tasks/task-service";
 import * as views from "@/lib/tasks/view-service";
 import * as forms from "@/lib/tasks/form-service";
 import * as spaces from "@/lib/tasks/space-service";
+import * as shares from "@/lib/tasks/share-service";
 import * as commits from "@/lib/tasks/commit-service";
 import * as files from "@/lib/tasks/attachment-service";
 import * as planning from "@/lib/tasks/planning-service";
@@ -916,6 +917,75 @@ export async function addReminderAction(taskId: string, remindAt: string, note: 
         return {};
     } catch (caught) {
         return failure(caught, "Could not set the reminder");
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Sharing
+// ---------------------------------------------------------------------------
+
+/**
+ * What the share dialog opens with. Everyone who can read the task gets the
+ * private link; the public one is only described to somebody who could turn it
+ * on, so a guest is never handed a token to pass along.
+ */
+export async function getTaskShareAction(taskId: string): Promise<{
+    privateUrl?: string;
+    share?: shares.TaskShareView | null;
+    canShare?: boolean;
+    error?: string;
+}> {
+    const caller = await actor("tasks.read");
+    try {
+        const { role } = await access.requireTask(caller, taskId, "guest");
+        const canShare = role === "owner" || role === "admin" || role === "member";
+        return {
+            privateUrl: await shares.taskLink(taskId),
+            share: canShare ? await shares.getTaskShare(taskId) : null,
+            canShare
+        };
+    } catch (caught) {
+        return failure(caught, "Could not read the sharing settings");
+    }
+}
+
+export async function setTaskShareAction(input: unknown): Promise<{
+    share?: shares.TaskShareView | null;
+    error?: string;
+}> {
+    const caller = await actor();
+    const parsed = core.taskShareSchema.safeParse(input);
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    try {
+        await access.requireTask(caller, parsed.data.taskId, "member");
+        const share = await shares.setTaskShare(caller.id, parsed.data);
+        await recordAudit({
+            actorId: caller.id,
+            action: parsed.data.enabled ? "tasks.share.enable" : "tasks.share.disable",
+            targetType: "task",
+            targetId: parsed.data.taskId
+        });
+        return { share };
+    } catch (caught) {
+        return failure(caught, "Could not change the public link");
+    }
+}
+
+export async function sendTaskShareAction(input: unknown): Promise<{
+    sent?: string[];
+    failures?: { recipient: string; reason: string }[];
+    error?: string;
+}> {
+    const user = await requirePermission("tasks.manage");
+    const caller: access.TaskActor = { id: user.id, isAdmin: user.isAdmin };
+    const parsed = core.taskShareEmailSchema.safeParse(input);
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Choose who to send it to" };
+    try {
+        await access.requireTask(caller, parsed.data.taskId, "member");
+        const delivery = await shares.sendTaskByEmail({ id: user.id, name: user.name }, parsed.data);
+        return { sent: delivery.sent, failures: delivery.failures };
+    } catch (caught) {
+        return failure(caught, "Could not send the task");
     }
 }
 

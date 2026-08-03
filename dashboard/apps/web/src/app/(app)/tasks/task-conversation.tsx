@@ -1,45 +1,63 @@
 "use client";
 
 /**
- * The talking and the timing: comments, tracked time, and the history trail.
+ * The talking and the timing: one thread per task, and the time logged against it.
+ *
+ * Comments and history are one stream rather than two lists. Split apart, the
+ * question "what happened to this?" needs both read side by side and mentally
+ * interleaved by timestamp - and the answer is usually a status change followed
+ * by somebody explaining it. Oldest at the top, newest above the composer, which
+ * is where every chat client has trained people to look.
  *
  * Comments are threaded one level deep on purpose. A reply to a reply is how a
- * task turns into a forum, and the thing being discussed is right there at the
- * top of the panel.
+ * task turns into a forum, and the thing being discussed is right there in the
+ * other column.
  */
 
-import { useState } from "react";
 import { Avatar } from "./pickers";
 import * as actions from "./actions";
 import * as core from "@polaris/core";
 import { runAction } from "@/lib/run-action";
 import { cn, Input, Button, Textarea } from "@polaris/ui";
 import { RelativeTime } from "@/components/relative-time";
-import { CheckCircle2, CornerDownRight, Play, Square, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { CheckCircle2, Play, SendHorizontal, Square, Trash2 } from "lucide-react";
 import type { ActivityView, CommentView, TimeEntryView } from "@/lib/tasks/task-service";
+import { describeActivity, mergeConversation, type ConversationFilter } from "./conversation";
 
 // ---------------------------------------------------------------------------
-// Comments
+// The thread
 // ---------------------------------------------------------------------------
 
-function CommentComposer({
+function Composer({
     placeholder,
     busy,
+    compact,
     onSubmit,
     onCancel
 }: {
     placeholder: string;
     busy: boolean;
+    /** The reply box, which sits inside a bubble and has no send affordance of
+     *  its own beyond the two buttons. */
+    compact?: boolean;
     onSubmit: (body: string) => Promise<void>;
     onCancel?: () => void;
 }) {
     const [body, setBody] = useState("");
 
+    const submit = async () => {
+        const trimmed = body.trim();
+        if (!trimmed) return;
+        await onSubmit(trimmed);
+        setBody("");
+    };
+
     return (
         <div className="flex flex-col gap-2">
             <Textarea
                 value={body}
-                rows={3}
+                rows={compact ? 2 : 3}
                 placeholder={placeholder}
                 onChange={(event) => setBody(event.target.value)}
                 onKeyDown={(event) => {
@@ -47,36 +65,33 @@ function CommentComposer({
                     // already have in their fingers from every chat client.
                     if (event.key === "Enter" && !event.shiftKey && body.trim()) {
                         event.preventDefault();
-                        void onSubmit(body.trim()).then(() => setBody(""));
+                        void submit();
                     }
                 }}
                 className="w-full resize-y rounded-md border border-border bg-background px-3 py-2 text-sm outline-none placeholder:text-muted-foreground focus:border-primary"
             />
             <div className="flex items-center gap-2">
-                <Button
-                    size="sm"
-                    disabled={busy || !body.trim()}
-                    onClick={async () => {
-                        await onSubmit(body.trim());
-                        setBody("");
-                    }}
-                >
-                    Comment
+                <Button size="sm" disabled={busy || !body.trim()} onClick={() => void submit()}>
+                    <SendHorizontal className="size-3.5" />
+                    Send
                 </Button>
                 {onCancel && (
                     <Button size="sm" variant="ghost" onClick={onCancel}>
                         Cancel
                     </Button>
                 )}
-                <span className="text-[11px] text-muted-foreground">Enter sends, shift+enter for a new line</span>
+                {!compact && (
+                    <span className="text-[11px] text-muted-foreground">Enter sends, shift+enter for a new line</span>
+                )}
             </div>
         </div>
     );
 }
 
-export function CommentSection({
+export function ActivityStream({
     taskId,
     comments,
+    activity,
     currentUserId,
     canModerate,
     onChanged,
@@ -84,13 +99,23 @@ export function CommentSection({
 }: {
     taskId: string;
     comments: readonly CommentView[];
+    activity: readonly ActivityView[];
     currentUserId: string;
     canModerate: boolean;
     onChanged: () => void;
     onError: (message: string) => void;
 }) {
     const [busy, setBusy] = useState(false);
+    const [filter, setFilter] = useState<ConversationFilter>("all");
     const [replyTo, setReplyTo] = useState<string | null>(null);
+    const foot = useRef<HTMLDivElement>(null);
+
+    const stream = useMemo(() => mergeConversation(comments, activity, filter), [comments, activity, filter]);
+
+    // The newest line is the one worth reading, and it is at the bottom.
+    useEffect(() => {
+        foot.current?.scrollIntoView({ block: "end" });
+    }, [taskId, stream.length]);
 
     const post = async (body: string, parentId: string | null) => {
         setBusy(true);
@@ -102,7 +127,6 @@ export function CommentSection({
         onChanged();
     };
 
-    const roots = comments.filter((comment) => !comment.parentId);
     const repliesOf = (id: string) => comments.filter((comment) => comment.parentId === id);
 
     const bubble = (comment: CommentView, nested: boolean) => (
@@ -162,7 +186,8 @@ export function CommentSection({
 
                 {replyTo === comment.id && (
                     <div className="mt-2">
-                        <CommentComposer
+                        <Composer
+                            compact
                             placeholder="Write a reply"
                             busy={busy}
                             onSubmit={(body) => post(body, comment.id)}
@@ -175,20 +200,53 @@ export function CommentSection({
     );
 
     return (
-        <section className="flex flex-col gap-4">
-            <h3 className="text-sm font-medium">Comments</h3>
-            <CommentComposer placeholder="Add a comment" busy={busy} onSubmit={(body) => post(body, null)} />
+        <div className="flex min-h-0 flex-1 flex-col">
+            <header className="flex items-center justify-between gap-2 border-b border-border px-4 py-3">
+                <h2 className="text-sm font-semibold">Activity</h2>
+                <div className="flex items-center gap-1 rounded-md bg-muted p-0.5 text-[11px]">
+                    {(["all", "comments"] as const).map((option) => (
+                        <button
+                            key={option}
+                            type="button"
+                            onClick={() => setFilter(option)}
+                            className={cn(
+                                "rounded px-2 py-0.5 transition-colors",
+                                filter === option
+                                    ? "bg-background text-foreground shadow-sm"
+                                    : "text-muted-foreground hover:text-foreground"
+                            )}
+                        >
+                            {option === "all" ? "Everything" : "Comments"}
+                        </button>
+                    ))}
+                </div>
+            </header>
 
-            {roots.length === 0 && <p className="text-xs text-muted-foreground">Nothing said about this yet.</p>}
-            <div className="flex flex-col gap-4">
-                {roots.map((comment) => (
-                    <div key={comment.id} className="flex flex-col gap-3">
-                        {bubble(comment, false)}
-                        {repliesOf(comment.id).map((reply) => bubble(reply, true))}
-                    </div>
-                ))}
+            <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4">
+                {stream.length === 0 && (
+                    <p className="text-xs text-muted-foreground">Nothing has happened here yet.</p>
+                )}
+                {stream.map((item) =>
+                    item.kind === "comment" ? (
+                        <div key={item.comment.id} className="flex flex-col gap-3">
+                            {bubble(item.comment, false)}
+                            {repliesOf(item.comment.id).map((reply) => bubble(reply, true))}
+                        </div>
+                    ) : (
+                        <div key={item.line.id} className="flex items-start gap-2 text-xs text-muted-foreground">
+                            <span aria-hidden className="mt-1.5 size-1.5 shrink-0 rounded-full bg-border" />
+                            <span className="flex-1">{describeActivity(item.line)}</span>
+                            <RelativeTime iso={item.line.createdAt} />
+                        </div>
+                    )
+                )}
+                <div ref={foot} />
             </div>
-        </section>
+
+            <div className="border-t border-border p-4">
+                <Composer placeholder="Write a comment" busy={busy} onSubmit={(body) => post(body, null)} />
+            </div>
+        </div>
     );
 }
 
@@ -196,11 +254,49 @@ export function CommentSection({
 // Time
 // ---------------------------------------------------------------------------
 
+/** Start or stop the timer, with what has been logged so far. Lives in the
+ *  properties block, where somebody about to start work is already looking. */
+export function TimerControl({
+    taskId,
+    trackedSeconds,
+    running,
+    onChanged,
+    onError
+}: {
+    taskId: string;
+    trackedSeconds: number;
+    running: boolean;
+    onChanged: () => void;
+    onError: (message: string) => void;
+}) {
+    return (
+        <div className="flex items-center gap-2">
+            <Button
+                size="sm"
+                variant={running ? "danger" : "ghost"}
+                onClick={async () => {
+                    onError("");
+                    await runAction(
+                        () => (running ? actions.stopTimerAction() : actions.startTimerAction(taskId)),
+                        onError
+                    );
+                    onChanged();
+                }}
+            >
+                {running ? <Square className="size-3.5" /> : <Play className="size-3.5" />}
+                {running ? "Stop" : "Start"}
+            </Button>
+            {trackedSeconds > 0 && (
+                <span className="text-xs text-muted-foreground">{core.formatTrackedSeconds(trackedSeconds)} logged</span>
+            )}
+        </div>
+    );
+}
+
 export function TimeSection({
     taskId,
     entries,
     estimate,
-    timerRunningHere,
     currentUserId,
     canModerate,
     onChanged,
@@ -208,9 +304,8 @@ export function TimeSection({
 }: {
     taskId: string;
     entries: readonly TimeEntryView[];
-    /** Minutes, so the panel can say how much of it has gone. */
+    /** Minutes, so the section can say how much of it has gone. */
     estimate: number | null;
-    timerRunningHere: boolean;
     currentUserId: string;
     canModerate: boolean;
     onChanged: () => void;
@@ -230,29 +325,11 @@ export function TimeSection({
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                     <span>{core.formatTrackedSeconds(tracked)} tracked</span>
                     {estimate ? <span>of {core.formatDurationMinutes(estimate)}</span> : null}
-                    {used !== null && (
-                        <span className={cn(used > 100 && "text-amber-500")}>({used}%)</span>
-                    )}
+                    {used !== null && <span className={cn(used > 100 && "text-amber-500")}>({used}%)</span>}
                 </div>
             </header>
 
             <div className="flex flex-wrap items-center gap-2">
-                <Button
-                    size="sm"
-                    variant={timerRunningHere ? "danger" : "secondary"}
-                    onClick={async () => {
-                        onError("");
-                        await runAction(
-                            () => (timerRunningHere ? actions.stopTimerAction() : actions.startTimerAction(taskId)),
-                            onError
-                        );
-                        onChanged();
-                    }}
-                >
-                    {timerRunningHere ? <Square className="size-3.5" /> : <Play className="size-3.5" />}
-                    {timerRunningHere ? "Stop timer" : "Start timer"}
-                </Button>
-
                 <Input
                     value={manual}
                     placeholder="1h 30m"
@@ -323,60 +400,6 @@ export function TimeSection({
                     ))}
                 </ul>
             )}
-        </section>
-    );
-}
-
-// ---------------------------------------------------------------------------
-// History
-// ---------------------------------------------------------------------------
-
-/** One history line in plain language. The stored values are already resolved to
- *  names, so this is a sentence rather than a second lookup. */
-function describe(line: ActivityView): string {
-    const who = line.authorName ?? "A rule";
-    switch (line.action) {
-        case "created":
-            return `${who} created this task`;
-        case "status":
-            return line.fromValue
-                ? `${who} moved it from ${line.fromValue} to ${line.toValue ?? "another status"}`
-                : `${who} set the status to ${line.toValue ?? "another status"}`;
-        case "priority":
-            return `${who} changed the priority from ${line.fromValue} to ${line.toValue}`;
-        case "due":
-            return line.toValue ? `${who} set a due date` : `${who} cleared the due date`;
-        case "assignee":
-            return `${who} changed who is on it`;
-        case "moved":
-            return `${who} moved it to another list`;
-        case "archived":
-            return `${who} archived it`;
-        case "recurred":
-            return "It recurred and was rescheduled";
-        case "automation":
-            return `The rule "${line.toValue}" ran`;
-        case "bulk":
-            return `${who} changed it along with others`;
-        default:
-            return `${who} changed it`;
-    }
-}
-
-export function ActivitySection({ activity }: { activity: readonly ActivityView[] }) {
-    if (activity.length === 0) return null;
-    return (
-        <section className="flex flex-col gap-2">
-            <h3 className="text-sm font-medium">History</h3>
-            <ul className="flex flex-col gap-1.5">
-                {activity.map((line) => (
-                    <li key={line.id} className="flex items-start gap-2 text-xs text-muted-foreground">
-                        <CornerDownRight className="mt-0.5 size-3 shrink-0 opacity-50" />
-                        <span className="flex-1">{describe(line)}</span>
-                        <RelativeTime iso={line.createdAt} />
-                    </li>
-                ))}
-            </ul>
         </section>
     );
 }

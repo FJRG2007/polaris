@@ -15,6 +15,7 @@
  */
 
 import { z } from "zod";
+import { emailField } from "./auth.js";
 
 // ---------------------------------------------------------------------------
 // Shared field primitives
@@ -991,6 +992,36 @@ export const reminderSchema = z.object({
     remindAt: z.string().datetime({ offset: true }),
     note: z.string().trim().max(200).default("")
 });
+
+/**
+ * Turning a task's public link on or off. Off deletes the link rather than
+ * suspending it, so turning it back on mints a new token: a link that was pasted
+ * somewhere it should not have been stops working for good.
+ */
+export const taskShareSchema = z.object({
+    taskId: uuid,
+    enabled: z.boolean(),
+    /** Whether the public page carries the discussion as well as the work. */
+    showComments: z.boolean().default(false)
+});
+
+export type TaskShareInput = z.infer<typeof taskShareSchema>;
+
+/**
+ * Sending a task to people. Members get the private link, which only opens for
+ * somebody who can already see the space; addresses outside Polaris get the
+ * public one, which is why the caller has to have turned it on first.
+ */
+export const taskShareEmailSchema = z
+    .object({
+        taskId: uuid,
+        userIds: z.array(uuid).max(20, "Twenty people at a time").default([]),
+        emails: z.array(emailField.toLowerCase()).max(20, "Twenty addresses at a time").default([]),
+        note: z.string().trim().max(1000).default("")
+    })
+    .refine((input) => input.userIds.length + input.emails.length > 0, "Choose who to send it to");
+
+export type TaskShareEmailInput = z.infer<typeof taskShareEmailSchema>;
 
 export const docSchema = z.object({
     spaceId: uuid.nullable().default(null),

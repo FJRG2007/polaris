@@ -1,0 +1,278 @@
+"use client";
+
+/**
+ * What a task is, as a block of labelled rows at the top of the panel.
+ *
+ * The order is the one people read in: what state is it in, who has it, when is
+ * it due, how urgent, how big, how long has it taken, what is it about. Anything
+ * the space itself added comes underneath in its own block, because a workspace
+ * with fifteen custom fields must not push the description off the screen - and
+ * the empty ones fold away, since a column of dashes is not information.
+ */
+
+import { useState } from "react";
+import * as pickers from "./pickers";
+import * as core from "@polaris/core";
+import type { TaskRow } from "@/lib/tasks/facts";
+import { TimerControl } from "./task-conversation";
+import { CustomFieldEditor } from "./custom-fields";
+import type { SpaceContext } from "@/lib/tasks/facts";
+import {
+    CalendarDays,
+    ChevronDown,
+    ChevronRight,
+    CircleDot,
+    Flag,
+    Hourglass,
+    Tag,
+    Target,
+    Timer,
+    UserRound
+} from "lucide-react";
+
+/** A labelled row. The icon column is what makes eight rows scannable rather
+ *  than a wall of grey labels. */
+export function Property({
+    icon,
+    label,
+    children
+}: {
+    icon: React.ReactNode;
+    label: string;
+    children: React.ReactNode;
+}) {
+    return (
+        <div className="flex items-start gap-3 py-1">
+            <span className="flex w-32 shrink-0 items-center gap-2 pt-1.5 text-xs text-muted-foreground">
+                <span className="shrink-0 opacity-70">{icon}</span>
+                {label}
+            </span>
+            <div className="flex min-w-0 flex-1 items-center gap-2">{children}</div>
+        </div>
+    );
+}
+
+export function PropertyRows({
+    task,
+    context,
+    running,
+    patch,
+    onChanged,
+    onError,
+    onCreateTag
+}: {
+    task: TaskRow;
+    context: SpaceContext;
+    /** This account has a timer going on this task. */
+    running: boolean;
+    patch: (input: Record<string, unknown>) => void;
+    onChanged: () => void;
+    onError: (message: string) => void;
+    /** Makes a tag that does not exist yet and returns its id. */
+    onCreateTag: (name: string) => Promise<string | null>;
+}) {
+    const disabled = !context.canEdit;
+
+    return (
+        <div className="flex flex-col">
+            <Property icon={<CircleDot className="size-3.5" />} label="Status">
+                <pickers.StatusPicker
+                    statuses={context.statuses}
+                    value={task.statusId}
+                    disabled={disabled}
+                    spaceId={context.spaceId}
+                    onChange={(statusId) => patch({ statusId })}
+                />
+            </Property>
+
+            <Property icon={<UserRound className="size-3.5" />} label="Assignees">
+                <pickers.AvatarStack people={task.assignees} />
+                <pickers.AssigneePicker
+                    people={context.people}
+                    selected={task.assignees.map((person) => person.id)}
+                    disabled={disabled}
+                    onChange={(assigneeIds) => patch({ assigneeIds })}
+                />
+                {task.assignees.length === 0 && <span className="text-xs text-muted-foreground">Nobody yet</span>}
+            </Property>
+
+            <Property icon={<CalendarDays className="size-3.5" />} label="Dates">
+                <pickers.DateField
+                    label="Start date"
+                    value={task.startDate}
+                    timed={task.timed}
+                    disabled={disabled}
+                    onChange={(startDate) => patch({ startDate })}
+                />
+                <span aria-hidden className="text-xs text-muted-foreground">
+                    -
+                </span>
+                <pickers.DateField
+                    label="Due date"
+                    value={task.dueDate}
+                    timed={task.timed}
+                    disabled={disabled}
+                    onChange={(dueDate) => patch({ dueDate })}
+                />
+                <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                    <input
+                        type="checkbox"
+                        checked={task.timed}
+                        disabled={disabled}
+                        onChange={(event) => patch({ timed: event.target.checked })}
+                    />
+                    Time of day
+                </label>
+            </Property>
+
+            <Property icon={<Flag className="size-3.5" />} label="Priority">
+                {/* The flag and the word are one control: pointing at "Normal"
+                    and having nothing happen is the kind of small lie that makes
+                    a panel feel unfinished. */}
+                <pickers.PriorityPicker
+                    value={task.priority}
+                    disabled={disabled}
+                    onChange={(priority) => patch({ priority })}
+                    trigger={
+                        <button
+                            type="button"
+                            aria-label="Priority"
+                            className="inline-flex items-center gap-1.5 rounded-md px-1.5 py-1 text-xs transition-colors hover:bg-muted"
+                        >
+                            <pickers.PriorityFlag priority={task.priority} />
+                            {core.TASK_PRIORITY_LABELS[task.priority]}
+                        </button>
+                    }
+                />
+            </Property>
+
+            <Property icon={<Target className="size-3.5" />} label="Points">
+                <input
+                    type="number"
+                    min={0}
+                    max={1000}
+                    key={`${task.id}-points`}
+                    defaultValue={task.points ?? ""}
+                    disabled={disabled}
+                    aria-label="Story points"
+                    placeholder="Empty"
+                    onBlur={(event) => {
+                        const raw = event.target.value.trim();
+                        const points = raw === "" ? null : Number(raw);
+                        if (points !== task.points) patch({ points });
+                    }}
+                    className="w-20 rounded-md border border-border bg-background px-2 py-1 text-xs outline-none focus:border-primary"
+                />
+            </Property>
+
+            <Property icon={<Hourglass className="size-3.5" />} label="Estimate">
+                <pickers.DurationField
+                    minutes={task.timeEstimate}
+                    disabled={disabled}
+                    onChange={(timeEstimate) => patch({ timeEstimate })}
+                />
+            </Property>
+
+            <Property icon={<Timer className="size-3.5" />} label="Track time">
+                <TimerControl
+                    taskId={task.id}
+                    trackedSeconds={task.trackedSeconds}
+                    running={running}
+                    onChanged={onChanged}
+                    onError={onError}
+                />
+            </Property>
+
+            <Property icon={<Tag className="size-3.5" />} label="Tags">
+                <span className="flex flex-wrap items-center gap-1">
+                    {task.tags.map((tag) => (
+                        <pickers.TagChip
+                            key={tag.id}
+                            tag={tag}
+                            onRemove={
+                                disabled
+                                    ? undefined
+                                    : () =>
+                                          patch({
+                                              tagIds: task.tags
+                                                  .filter((entry) => entry.id !== tag.id)
+                                                  .map((entry) => entry.id)
+                                          })
+                            }
+                        />
+                    ))}
+                    <pickers.TagPicker
+                        tags={context.tags}
+                        selected={task.tags.map((tag) => tag.id)}
+                        disabled={disabled}
+                        onChange={(tagIds) => patch({ tagIds })}
+                        onCreate={onCreateTag}
+                    />
+                </span>
+            </Property>
+        </div>
+    );
+}
+
+/**
+ * The space's own fields. Collapsed empties: a field nobody filled in says
+ * nothing, and hiding it is what keeps this block from burying the work.
+ */
+export function FieldsSection({
+    task,
+    context,
+    onChange
+}: {
+    task: TaskRow;
+    context: SpaceContext;
+    onChange: (fieldId: string, value: string) => void;
+}) {
+    const [open, setOpen] = useState(true);
+    const [showEmpty, setShowEmpty] = useState(false);
+
+    if (context.fields.length === 0) return null;
+
+    const filled = context.fields.filter((field) => (task.customValues[field.id] ?? "") !== "");
+    const empty = context.fields.filter((field) => (task.customValues[field.id] ?? "") === "");
+    const shown = showEmpty ? [...filled, ...empty] : filled;
+
+    return (
+        <section className="flex flex-col gap-1">
+            <button
+                type="button"
+                onClick={() => setOpen((current) => !current)}
+                className="flex w-fit items-center gap-1 text-sm font-medium"
+            >
+                {open ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
+                Fields
+            </button>
+
+            {open && (
+                <div className="flex flex-col">
+                    {shown.map((field) => (
+                        <Property key={field.id} icon={<span className="inline-block size-3.5" />} label={field.name}>
+                            <CustomFieldEditor
+                                field={field}
+                                value={task.customValues[field.id] ?? ""}
+                                people={context.people}
+                                disabled={!context.canEdit}
+                                onChange={(value) => onChange(field.id, value)}
+                            />
+                        </Property>
+                    ))}
+                    {empty.length > 0 && (
+                        <button
+                            type="button"
+                            onClick={() => setShowEmpty((current) => !current)}
+                            className="w-fit py-1 text-xs text-muted-foreground hover:text-foreground"
+                        >
+                            {showEmpty
+                                ? `Hide ${empty.length} empty ${empty.length === 1 ? "field" : "fields"}`
+                                : `Show ${empty.length} empty ${empty.length === 1 ? "field" : "fields"}`}
+                        </button>
+                    )}
+                </div>
+            )}
+        </section>
+    );
+}

@@ -2540,6 +2540,7 @@ model Task {
     submissions TaskFormSubmission[]
     attachments TaskAttachment[]
     commits     TaskCommit[]
+    share       TaskShare?
 
     @@unique([spaceId, number])
     @@index([listId])
@@ -3007,6 +3008,29 @@ model TaskDoc {
     @@index([spaceId])
     @@index([folderId])
     @@index([parentId])
+}
+
+// A read-only link to one task for people outside Polaris. At most one per task:
+// two live links to the same work is two things to remember to revoke. Turning
+// the link off deletes the row, so switching it back on mints a new token and
+// whatever was pasted elsewhere stays dead.
+//
+// The token is stored as written, the way a form's is: it is the whole credential
+// and it has to be shown again every time somebody reopens the share dialog.
+model TaskShare {
+    id     String @id @default(uuid(7)) @db.Uuid
+    taskId String @unique @db.Uuid
+    token  String @unique
+    // Whether the page carries the discussion as well as the work itself.
+    showComments Boolean @default(false)
+    // How often the link has been opened, so the owner can tell a dead link from
+    // one that is being read.
+    views        Int      @default(0)
+    // No FK: the link outlives the account that created it.
+    createdById  String?  @db.Uuid
+    createdAt    DateTime @default(now())
+
+    task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
 }
 
 // ---------------------------------------------------------------------------

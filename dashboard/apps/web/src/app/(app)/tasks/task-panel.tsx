@@ -8,46 +8,45 @@
  * and its filters - opening a card should never cost you your place. Deep links
  * still work: /tasks/t/<id> renders the same panel over the task's own list.
  *
+ * Two columns, the way every work manager people arrive from lays this out. The
+ * left one is the task: what it is, then what it is made of. The right one is
+ * its thread, comments and history together, with the box to write in pinned at
+ * the bottom - a task is a conversation about a thing, and reading the last
+ * thing said should never mean scrolling past sixteen checklist items.
+ *
  * Edits are optimistic. A status change repaints the header immediately and
  * rolls back if the write is refused, because waiting a round trip to see a
  * dropdown close is what makes a task manager feel slow.
  */
 
 import * as actions from "./actions";
-import * as core from "@polaris/core";
+import { tagColorFor } from "./pickers";
+import { ShareDialog } from "./task-share";
 import { runAction } from "@/lib/run-action";
-import { CustomFieldEditor } from "./custom-fields";
 import type { SpaceContext } from "@/lib/tasks/facts";
 import { CopyButton } from "@/components/copy-button";
 import type { TaskDetail } from "@/lib/tasks/task-service";
 import { useDisplayFormat } from "@/components/display-format";
 import { AttachmentSection, CommitSection } from "./task-files";
+import { FieldsSection, PropertyRows } from "./task-properties";
+import { ActivityStream, TimeSection } from "./task-conversation";
 import { useCallback, useEffect, useState, useTransition } from "react";
-import { Bell, BellOff, Copy, Loader2, Repeat, Trash2 } from "lucide-react";
-import { ActivitySection, CommentSection, TimeSection } from "./task-conversation";
 import { ChecklistSection, DependencySection, SubtaskSection } from "./task-subwork";
-import { ConfirmDeleteDialog, Dialog, DialogContent, DialogTitle, Button, Textarea, cn } from "@polaris/ui";
+import { Bell, BellOff, Loader2, MoreHorizontal, Repeat, Share2 } from "lucide-react";
 import {
-    AssigneePicker,
-    AvatarStack,
-    DateField,
-    DurationField,
-    PriorityPicker,
-    StatusPicker,
-    TagChip,
-    TagPicker,
-    tagColorFor
-} from "./pickers";
-
-/** A labelled row in the properties block. */
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-    return (
-        <div className="flex items-start gap-3 py-1.5">
-            <span className="w-28 shrink-0 pt-1 text-xs text-muted-foreground">{label}</span>
-            <div className="min-w-0 flex-1">{children}</div>
-        </div>
-    );
-}
+    Button,
+    ConfirmDeleteDialog,
+    Dialog,
+    DialogContent,
+    DialogTitle,
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+    Textarea,
+    keepFocusOnClose
+} from "@polaris/ui";
 
 export function TaskPanel({
     taskId,
@@ -66,20 +65,18 @@ export function TaskPanel({
     const [error, setError] = useState("");
     const [openId, setOpenId] = useState<string | null>(taskId);
     const [confirmDelete, setConfirmDelete] = useState(false);
+    const [sharing, setSharing] = useState(false);
     const [loading, startLoading] = useTransition();
 
     useEffect(() => setOpenId(taskId), [taskId]);
 
-    const load = useCallback(
-        (id: string) => {
-            startLoading(async () => {
-                const result = await runAction(() => actions.getTaskDetailAction(id), setError);
-                if (result?.detail) setDetail(result.detail);
-                else if (result?.error) setError(result.error);
-            });
-        },
-        []
-    );
+    const load = useCallback((id: string) => {
+        startLoading(async () => {
+            const result = await runAction(() => actions.getTaskDetailAction(id), setError);
+            if (result?.detail) setDetail(result.detail);
+            else if (result?.error) setError(result.error);
+        });
+    }, []);
 
     useEffect(() => {
         if (!openId) {
@@ -110,9 +107,13 @@ export function TaskPanel({
                 caps the width otherwise, and the panel renders at half the size
                 its two columns were laid out for. The header keeps clear of the
                 dialog's close button rather than sliding under it. */}
-            <DialogContent className="flex max-h-[92vh] w-[min(64rem,96vw)] max-w-[min(64rem,96vw)] flex-col gap-0 overflow-hidden p-0">
+            <DialogContent className="flex max-h-[92vh] w-[min(72rem,96vw)] max-w-[min(72rem,96vw)] flex-col gap-0 overflow-hidden p-0">
                 {!task && (
                     <div className="flex h-64 items-center justify-center text-sm text-muted-foreground">
+                        {/* The dialog is announced before its content arrives, so
+                            it needs a name while it is still loading - otherwise a
+                            screen reader opens an unnamed window. */}
+                        <DialogTitle className="sr-only">Task</DialogTitle>
                         {loading ? <Loader2 className="size-5 animate-spin" /> : (error || "Loading the task")}
                     </div>
                 )}
@@ -135,11 +136,18 @@ export function TaskPanel({
                                 </button>
                             )}
                             <span className="flex-1" />
+                            <span className="hidden text-[11px] text-muted-foreground sm:inline">
+                                Created {format.date(task.createdAt)}
+                            </span>
                             {task.recurring && (
                                 <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground" title="This task repeats">
                                     <Repeat className="size-3.5" /> Repeats
                                 </span>
                             )}
+                            <Button size="sm" variant="ghost" onClick={() => setSharing(true)}>
+                                <Share2 className="size-4" />
+                                Share
+                            </Button>
                             <button
                                 type="button"
                                 aria-label={watching ? "Stop watching" : "Watch this task"}
@@ -153,54 +161,65 @@ export function TaskPanel({
                                 {watching ? <Bell className="size-4" /> : <BellOff className="size-4" />}
                             </button>
                             {context.canEdit && (
-                                <>
-                                    <button
-                                        type="button"
-                                        aria-label="Duplicate task"
-                                        title="Duplicate task"
-                                        onClick={async () => {
-                                            const result = await runAction(
-                                                () => actions.duplicateTaskAction(task.id),
-                                                setError
-                                            );
-                                            onChanged();
-                                            if (result?.id) setOpenId(result.id);
-                                        }}
-                                        className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                                    >
-                                        <Copy className="size-4" />
-                                    </button>
-                                    <button
-                                        type="button"
-                                        aria-label="Delete task"
-                                        title="Delete task"
-                                        onClick={() => setConfirmDelete(true)}
-                                        className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-destructive"
-                                    >
-                                        <Trash2 className="size-4" />
-                                    </button>
-                                </>
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <button
+                                            type="button"
+                                            aria-label="More actions"
+                                            title="More actions"
+                                            className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                        >
+                                            <MoreHorizontal className="size-4" />
+                                        </button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end" className="w-52" onCloseAutoFocus={keepFocusOnClose}>
+                                        <DropdownMenuItem
+                                            onSelect={async () => {
+                                                const result = await runAction(
+                                                    () => actions.duplicateTaskAction(task.id),
+                                                    setError
+                                                );
+                                                onChanged();
+                                                if (result?.id) setOpenId(result.id);
+                                            }}
+                                        >
+                                            Duplicate
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem onSelect={() => void patch({ milestone: !task.milestone })}>
+                                            {task.milestone ? "Not a milestone" : "Mark as a milestone"}
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem onSelect={() => void patch({ archived: !task.archived })}>
+                                            {task.archived ? "Unarchive" : "Archive"}
+                                        </DropdownMenuItem>
+                                        <DropdownMenuSeparator />
+                                        <DropdownMenuItem
+                                            className="text-destructive"
+                                            onSelect={() => setConfirmDelete(true)}
+                                        >
+                                            Delete
+                                        </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
                             )}
                         </header>
 
-                        {/* Each column scrolls on its own so a long comment
-                            thread cannot carry the properties off the screen. */}
-                        <div className="grid min-h-0 flex-1 grid-cols-1 overflow-y-auto md:grid-cols-[minmax(0,1fr)_21rem] md:overflow-hidden">
+                        {/* Each column scrolls on its own so a long thread cannot
+                            carry the properties off the screen. */}
+                        <div className="grid min-h-0 flex-1 grid-cols-1 overflow-y-auto md:grid-cols-[minmax(0,1fr)_24rem] md:overflow-hidden">
                             <div className="flex flex-col gap-6 p-5 md:overflow-y-auto">
-                                <div>
-                                    <DialogTitle asChild>
-                                        <input
-                                            defaultValue={task.name}
-                                            disabled={!context.canEdit}
-                                            aria-label="Task name"
-                                            onBlur={(event) => {
-                                                const next = event.target.value.trim();
-                                                if (next && next !== task.name) void patch({ name: next });
-                                            }}
-                                            className="w-full bg-transparent text-lg font-semibold outline-none"
-                                        />
-                                    </DialogTitle>
-                                </div>
+                                <DialogTitle asChild>
+                                    <input
+                                        defaultValue={task.name}
+                                        key={task.id}
+                                        disabled={!context.canEdit}
+                                        aria-label="Task name"
+                                        onBlur={(event) => {
+                                            const next = event.target.value.trim();
+                                            if (next && next !== task.name) void patch({ name: next });
+                                        }}
+                                        className="w-full bg-transparent text-xl font-semibold outline-none"
+                                    />
+                                </DialogTitle>
 
                                 {error && (
                                     <p role="alert" className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
@@ -208,7 +227,27 @@ export function TaskPanel({
                                     </p>
                                 )}
 
-                                <section className="flex flex-col gap-1">
+                                <PropertyRows
+                                    task={task}
+                                    context={context}
+                                    running={runningHere}
+                                    patch={(input) => void patch(input)}
+                                    onChanged={() => {
+                                        load(task.id);
+                                        onChanged();
+                                    }}
+                                    onError={setError}
+                                    onCreateTag={async (name) => {
+                                        const created = await runAction(
+                                            () => actions.createTagAction(context.spaceId, name, tagColorFor(name)),
+                                            setError
+                                        );
+                                        if (created?.id) onChanged();
+                                        return created?.id ?? null;
+                                    }}
+                                />
+
+                                <section className="flex flex-col gap-1 border-t border-border pt-4">
                                     <h3 className="text-sm font-medium">Description</h3>
                                     <Textarea
                                         key={task.id}
@@ -224,20 +263,17 @@ export function TaskPanel({
                                     />
                                 </section>
 
-                                <AttachmentSection
-                                    taskId={task.id}
-                                    attachments={detail?.attachments ?? []}
-                                    canEdit={context.canEdit}
-                                    onChanged={() => load(task.id)}
-                                    onError={setError}
-                                />
-
-                                <CommitSection
-                                    taskId={task.id}
-                                    links={detail?.commits ?? []}
-                                    canEdit={context.canEdit}
-                                    onChanged={() => load(task.id)}
-                                    onError={setError}
+                                <FieldsSection
+                                    task={task}
+                                    context={context}
+                                    onChange={async (fieldId, value) => {
+                                        await runAction(
+                                            () => actions.setCustomValueAction(task.id, fieldId, value),
+                                            setError
+                                        );
+                                        load(task.id);
+                                        onChanged();
+                                    }}
                                 />
 
                                 <SubtaskSection
@@ -272,11 +308,26 @@ export function TaskPanel({
                                     onError={setError}
                                 />
 
+                                <AttachmentSection
+                                    taskId={task.id}
+                                    attachments={detail?.attachments ?? []}
+                                    canEdit={context.canEdit}
+                                    onChanged={() => load(task.id)}
+                                    onError={setError}
+                                />
+
+                                <CommitSection
+                                    taskId={task.id}
+                                    links={detail?.commits ?? []}
+                                    canEdit={context.canEdit}
+                                    onChanged={() => load(task.id)}
+                                    onError={setError}
+                                />
+
                                 <TimeSection
                                     taskId={task.id}
                                     entries={detail?.timeEntries ?? []}
                                     estimate={task.timeEstimate}
-                                    timerRunningHere={runningHere}
                                     currentUserId={context.currentUserId}
                                     canModerate={context.canModerate}
                                     onChanged={() => {
@@ -285,188 +336,29 @@ export function TaskPanel({
                                     }}
                                     onError={setError}
                                 />
+                            </div>
 
-                                <CommentSection
+                            <aside className="flex min-h-0 flex-col border-t border-border md:border-l md:border-t-0">
+                                <ActivityStream
                                     taskId={task.id}
                                     comments={detail?.comments ?? []}
+                                    activity={detail?.activity ?? []}
                                     currentUserId={context.currentUserId}
                                     canModerate={context.canModerate}
                                     onChanged={() => load(task.id)}
                                     onError={setError}
                                 />
-
-                                <ActivitySection activity={detail?.activity ?? []} />
-                            </div>
-
-                            <aside className="flex flex-col gap-1 border-t border-border p-5 md:overflow-y-auto md:border-l md:border-t-0">
-                                <Field label="Status">
-                                    <StatusPicker
-                                        statuses={context.statuses}
-                                        value={task.statusId}
-                                        disabled={!context.canEdit}
-                                        spaceId={context.spaceId}
-                                        onChange={(statusId) => void patch({ statusId })}
-                                    />
-                                </Field>
-                                <Field label="Assignees">
-                                    <div className="flex items-center gap-2">
-                                        <AvatarStack people={task.assignees} />
-                                        <AssigneePicker
-                                            people={context.people}
-                                            selected={task.assignees.map((person) => person.id)}
-                                            disabled={!context.canEdit}
-                                            onChange={(assigneeIds) => void patch({ assigneeIds })}
-                                        />
-                                    </div>
-                                </Field>
-                                <Field label="Priority">
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-xs">{core.TASK_PRIORITY_LABELS[task.priority]}</span>
-                                        <PriorityPicker
-                                            value={task.priority}
-                                            disabled={!context.canEdit}
-                                            onChange={(priority) => void patch({ priority })}
-                                        />
-                                    </div>
-                                </Field>
-                                <Field label="Dates">
-                                    <div className="flex flex-col gap-1.5">
-                                        <DateField
-                                            label="Start date"
-                                            value={task.startDate}
-                                            timed={task.timed}
-                                            disabled={!context.canEdit}
-                                            onChange={(startDate) => void patch({ startDate })}
-                                        />
-                                        <DateField
-                                            label="Due date"
-                                            value={task.dueDate}
-                                            timed={task.timed}
-                                            disabled={!context.canEdit}
-                                            onChange={(dueDate) => void patch({ dueDate })}
-                                        />
-                                        <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                                            <input
-                                                type="checkbox"
-                                                checked={task.timed}
-                                                disabled={!context.canEdit}
-                                                onChange={(event) => void patch({ timed: event.target.checked })}
-                                            />
-                                            Include a time of day
-                                        </label>
-                                    </div>
-                                </Field>
-                                <Field label="Estimate">
-                                    <DurationField
-                                        minutes={task.timeEstimate}
-                                        disabled={!context.canEdit}
-                                        onChange={(timeEstimate) => void patch({ timeEstimate })}
-                                    />
-                                </Field>
-                                <Field label="Points">
-                                    <input
-                                        type="number"
-                                        min={0}
-                                        max={1000}
-                                        defaultValue={task.points ?? ""}
-                                        disabled={!context.canEdit}
-                                        aria-label="Story points"
-                                        onBlur={(event) => {
-                                            const raw = event.target.value.trim();
-                                            const points = raw === "" ? null : Number(raw);
-                                            if (points !== task.points) void patch({ points });
-                                        }}
-                                        className="w-20 rounded-md border border-border bg-background px-2 py-1 text-xs outline-none focus:border-primary"
-                                    />
-                                </Field>
-                                <Field label="Tags">
-                                    <div className="flex flex-wrap items-center gap-1">
-                                        {task.tags.map((tag) => (
-                                            <TagChip
-                                                key={tag.id}
-                                                tag={tag}
-                                                onRemove={
-                                                    context.canEdit
-                                                        ? () =>
-                                                              void patch({
-                                                                  tagIds: task.tags
-                                                                      .filter((entry) => entry.id !== tag.id)
-                                                                      .map((entry) => entry.id)
-                                                              })
-                                                        : undefined
-                                                }
-                                            />
-                                        ))}
-                                        <TagPicker
-                                            tags={context.tags}
-                                            selected={task.tags.map((tag) => tag.id)}
-                                            disabled={!context.canEdit}
-                                            onChange={(tagIds) => void patch({ tagIds })}
-                                            onCreate={async (name) => {
-                                                const created = await runAction(
-                                                    () =>
-                                                        actions.createTagAction(
-                                                            context.spaceId,
-                                                            name,
-                                                            tagColorFor(name)
-                                                        ),
-                                                    setError
-                                                );
-                                                if (created?.id) onChanged();
-                                                return created?.id ?? null;
-                                            }}
-                                        />
-                                    </div>
-                                </Field>
-                                <Field label="Milestone">
-                                    <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                                        <input
-                                            type="checkbox"
-                                            checked={task.milestone}
-                                            disabled={!context.canEdit}
-                                            onChange={(event) => void patch({ milestone: event.target.checked })}
-                                        />
-                                        Mark as a milestone on the timeline
-                                    </label>
-                                </Field>
-
-                                {context.fields.length > 0 && (
-                                    <div className="mt-2 border-t border-border pt-2">
-                                        {context.fields.map((field) => (
-                                            <Field key={field.id} label={field.name}>
-                                                <CustomFieldEditor
-                                                    field={field}
-                                                    value={task.customValues[field.id] ?? ""}
-                                                    people={context.people}
-                                                    disabled={!context.canEdit}
-                                                    onChange={async (value) => {
-                                                        await runAction(
-                                                            () => actions.setCustomValueAction(task.id, field.id, value),
-                                                            setError
-                                                        );
-                                                        load(task.id);
-                                                        onChanged();
-                                                    }}
-                                                />
-                                            </Field>
-                                        ))}
-                                    </div>
-                                )}
-
-                                <p className="mt-3 text-[11px] text-muted-foreground">
-                                    Created {format.dateTime(task.createdAt)}
-                                </p>
-                                <div className={cn("flex gap-2", !context.canEdit && "hidden")}>
-                                    <Button
-                                        size="sm"
-                                        variant="ghost"
-                                        onClick={() => void patch({ archived: !task.archived })}
-                                    >
-                                        {task.archived ? "Unarchive" : "Archive"}
-                                    </Button>
-                                </div>
                             </aside>
                         </div>
+
+                        <ShareDialog
+                            taskId={task.id}
+                            taskName={task.name}
+                            people={context.people}
+                            currentUserId={context.currentUserId}
+                            open={sharing}
+                            onOpenChange={setSharing}
+                        />
 
                         <ConfirmDeleteDialog
                             open={confirmDelete}
