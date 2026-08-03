@@ -44,6 +44,7 @@ import { generateToken, hashToken } from "@polaris/core/tokens";
 import { decryptSecret, encryptSecret } from "@polaris/storage";
 import { generateSshKeyPair, publicKeyBlob, testAndCaptureHostKey } from "@polaris/ssh";
 import {
+    ENROLLMENT_REFUSAL_MESSAGES,
     ENROLLMENT_TTL_MS,
     ENROLLMENT_USERNAME,
     enrollmentAddressCandidates,
@@ -51,6 +52,7 @@ import {
     type ClaimEnrollmentInput,
     type CreateEnrollmentInput,
     type EnrollmentKind,
+    type EnrollmentRefusalReason,
     type EnrollmentState
 } from "@polaris/core";
 
@@ -64,6 +66,12 @@ const CLAIM_WINDOW_MS = 10 * 60 * 1000;
  *  budget because fetching is idempotent and a flaky network retries. */
 const FETCH_LIMIT = 30;
 const FETCH_WINDOW_MS = 10 * 60 * 1000;
+
+/** Refusals allowed from one address per window. A refusal leaves the enrollment
+ *  usable, so the same machine can legitimately report one per attempt; the budget
+ *  is the claim's, since neither should be worth grinding at. */
+const REFUSE_LIMIT = 10;
+const REFUSE_WINDOW_MS = 10 * 60 * 1000;
 
 /** What the operator is shown after opening an enrollment. */
 export interface OpenedEnrollment {
@@ -147,6 +155,38 @@ export async function resolveEnrollment(token: string, ip: string | undefined): 
     });
     if (!row || row.claimedAt || row.expiresAt < new Date()) return null;
     return { id: row.id, kind: row.kind, username: row.username, publicKey: row.publicKey };
+}
+
+/**
+ * Record that a machine refused to go through with an enrollment, without
+ * spending it.
+ *
+ * The script checks that something will answer on the SSH port before it claims,
+ * and stopping there is the point: the token stays unspent so the same command
+ * works once the SSH server is on. But a refusal that only reaches the terminal
+ * leaves the operator watching a dialog that waits out the full lifetime and then
+ * says the command expired, which by then is a lie about what happened.
+ *
+ * So the row gets an `error` and nothing else - no `claimedAt`, no delete - which
+ * `resolveState` already reads as `failed` and the dialog already renders, and
+ * which `resolveEnrollment` ignores, so the command it describes still works.
+ *
+ * The caller is a machine holding a token and nothing more, so the reason is a
+ * code from a closed set and the sentence stored is Polaris's own. `updateMany`
+ * rather than `update` because a token that names no row must be the same
+ * non-event as one that does: this endpoint is not a way to ask which tokens are
+ * live.
+ */
+export async function refuseEnrollment(
+    token: string,
+    reason: EnrollmentRefusalReason,
+    sourceIp: string | undefined
+): Promise<void> {
+    if (!(await rateLimit(`enroll:refuse:${sourceIp ?? "unknown"}`, REFUSE_LIMIT, REFUSE_WINDOW_MS)).ok) return;
+    await prisma.enrollment.updateMany({
+        where: { tokenHash: hashToken(token), claimedAt: null, hostId: null, expiresAt: { gt: new Date() } },
+        data: { error: ENROLLMENT_REFUSAL_MESSAGES[reason] }
+    });
 }
 
 /** How a claim went, in the shape the waiting dialog polls for. */

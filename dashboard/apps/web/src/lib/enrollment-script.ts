@@ -15,6 +15,8 @@
  * buys one claim against this Polaris.
  */
 
+import { ENROLLMENT_RETRY_HINT } from "@polaris/core";
+
 /** Where a service account belongs on macOS: below the 501 the GUI hands out. */
 const DARWIN_UID_FLOOR = 300;
 
@@ -78,13 +80,20 @@ export function enrollmentScript(input: EnrollmentScriptInput): string {
 #   - the '${input.username}' user and its home directory
 #   - ~${input.username}/.ssh/authorized_keys
 #   - Remote Login, on macOS and only if it was off - nothing can connect until
-#     it is on, which is the whole point of running this
+#     it is on, which is the whole point of running this. Turning it on would
+#     otherwise expose every account on the machine, so when this script is the
+#     one that turns it on it also limits SSH to the '${input.username}' login.
+#     A Mac that already had Remote Login on keeps whoever could use it.
 #   - the docker group membership, only with --docker
 #   - /etc/sudoers.d/${input.username}, only with --root
 #
 # Undo it with:  sudo userdel -r ${input.username}   (Linux)
 #                sudo dscl . -delete /Users/${input.username}   (macOS)
 #                sudo rm -f /etc/sudoers.d/${input.username}    (drops root only)
+#                sudo systemsetup -setremotelogin off   (macOS, only if this
+#                    script turned it on)
+#                sudo dseditgroup -o delete com.apple.access_ssh   (macOS, puts
+#                    SSH back to every account, only if this script limited it)
 
 set -eu
 
@@ -105,6 +114,19 @@ done
 
 say() { echo "polaris: \$1"; }
 die() { echo "polaris: \$1" >&2; exit 1; }
+
+# Tell Polaris why this machine is stopping, so the dialog somebody is watching
+# says that instead of waiting the command out and blaming the clock. It carries
+# a fixed code and never a message - Polaris holds the wording - and it spends
+# nothing, so the same command still works. Best-effort in every direction: no
+# answer, no Polaris, no network, and this changes neither what the script prints
+# nor what it exits with.
+refuse() {
+    printf '{"reason":"%s"}' "\$1" | curl -sS -o /dev/null --max-time 10 -X POST \\
+        -H 'content-type: application/json' \\
+        --data-binary @- \\
+        "\$POLARIS_URL/api/servers/enroll/\$POLARIS_TOKEN/refuse" >/dev/null 2>&1 || true
+}
 
 [ "\$(id -u)" = "0" ] || die "run this with sudo"
 command -v curl >/dev/null 2>&1 || die "curl is required and was not found"
@@ -205,44 +227,151 @@ chown -R "\$POLARIS_USER" "\$HOME_DIR/.ssh"`;
  * firewall that was never the problem. Catching it here leaves the token unspent,
  * so the same command works again once the server is on.
  *
+ * The port is where this could go wrong in the other direction, so nothing here
+ * trusts a single reading of the config. `sshd_config` names a port, the files it
+ * `Include`s name one too - that is the default layout on Debian 12 and Ubuntu
+ * 22.10+, and a hardened port usually lives in the dropped-in file rather than the
+ * main one - and under systemd socket activation the config does not decide at all
+ * and `ssh.socket` does. So every port any of them names is a candidate, 22 is
+ * always one, and the one holding a listener is the answer. That is also what gets
+ * reported: an observed listener beats a parse, which is what the port Polaris
+ * dials should have been all along.
+ *
+ * Refusing is reserved for the case where the check ran and no candidate had
+ * anything on it. A machine with neither `ss` nor `netstat` cannot answer the
+ * question, and a wrong "nothing is listening" would strand an enrollment that was
+ * fine.
+ *
  * macOS is where this bites, because it ships with Remote Login off, so that one
  * is switched on rather than only reported. Stdin is closed for it because this
  * script IS stdin: anything that reads from it swallows the rest of the script.
  * The result is re-read rather than assumed - since Catalina the change is refused
  * unless the process running the command holds Full Disk Access, and `systemsetup`
- * reports that on stdout rather than in its exit code.
+ * reports that on stdout rather than in its exit code. That read has three answers,
+ * not two: "off" is a reason to act, but a command that is missing or that says
+ * something unrecognizable has told us nothing, and refusing on it would abort an
+ * enrollment on a Mac whose sshd was running the whole time.
  */
 function sshServiceSection(): string {
-    return `SSH_PORT=\$(awk '/^[[:space:]]*Port[[:space:]]+[0-9]+/ { print \$2; exit }' /etc/ssh/sshd_config 2>/dev/null || true)
-[ -n "\${SSH_PORT:-}" ] || SSH_PORT=22
+    return `# Every port sshd could be on, not just the first one named.
+ssh_configured_ports() {
+    _main=/etc/ssh/sshd_config
+    [ -f "\$_main" ] || return 0
+    _files=\$_main
+    # Unquoted on purpose: each pattern is a glob, and a pattern matching nothing
+    # stays literal and is dropped by the -f test.
+    for _pattern in \$(awk 'tolower(\$1) == "include" { for (i = 2; i <= NF; i++) print \$i }' "\$_main" 2>/dev/null); do
+        case "\$_pattern" in
+            /*) ;;
+            *) _pattern="/etc/ssh/\$_pattern" ;;
+        esac
+        for _file in \$_pattern; do
+            if [ -f "\$_file" ]; then _files="\$_files \$_file"; fi
+        done
+    done
+    for _file in \$_files; do
+        awk 'tolower(\$1) == "port" && \$2 ~ /^[0-9]+\$/ { print \$2 }' "\$_file" 2>/dev/null || true
+    done
+}
+
+# 22 is always a candidate: it is the default, and it is what sshd answers on when
+# a socket unit rather than the config decides.
+SSH_PORTS=""
+for port in \$(ssh_configured_ports) 22; do
+    case " \$SSH_PORTS " in
+        *" \$port "*) ;;
+        *) SSH_PORTS="\${SSH_PORTS:+\$SSH_PORTS }\$port" ;;
+    esac
+done
+# What gets reported if nothing better is learned below: the first port the config
+# names, or 22 when it names none.
+SSH_PORT=\${SSH_PORTS%% *}
 
 if [ "\$PLATFORM" = "darwin" ]; then
-    if ! systemsetup -getremotelogin 2>/dev/null | grep -qi "remote login: on"; then
-        systemsetup -setremotelogin on </dev/null >/dev/null 2>&1 || true
-        if systemsetup -getremotelogin 2>/dev/null | grep -qi "remote login: on"; then
-            say "turned Remote Login on so Polaris can reach this machine"
-        else
-            die "Remote Login is off, so nothing answers on port \$SSH_PORT. Turn it on in System Settings > General > Sharing, then run this command again"
-        fi
-    fi
-    # Only matters when Remote Login is limited to named users.
-    dseditgroup -o edit -a "\$POLARIS_USER" -t user com.apple.access_ssh >/dev/null 2>&1 || true
+    ${darwinRemoteLoginSection()}
 else
-    # Only a listener this machine can see for itself counts. A box with neither
-    # tool skips the check: a wrong "nothing is listening" would strand an
-    # enrollment that was fine.
-    SSH_LISTENING=unknown
-    if command -v ss >/dev/null 2>&1; then
-        SSH_LISTENING=no
-        ss -ltn 2>/dev/null | grep -q ":\$SSH_PORT " && SSH_LISTENING=yes
-    elif command -v netstat >/dev/null 2>&1; then
-        SSH_LISTENING=no
-        netstat -lnt 2>/dev/null | grep -q ":\$SSH_PORT " && SSH_LISTENING=yes
-    fi
-    if [ "\$SSH_LISTENING" = "no" ]; then
-        die "nothing is listening on port \$SSH_PORT; start this machine's SSH server, then run this command again"
-    fi
+    ${linuxListenerSection()}
 fi`;
+}
+
+/** Read Remote Login into yes/no/unknown. `systemsetup` puts the answer on stdout
+ *  and keeps its exit code at 0 either way, so the text is what decides - and text
+ *  that matches neither wording is an answer nobody got. */
+function darwinRemoteLoginSection(): string {
+    return `read_remote_login() {
+        REMOTE_LOGIN=unknown
+        case "\$(systemsetup -getremotelogin 2>/dev/null | tr '[:upper:]' '[:lower:]')" in
+            *"remote login: on"*) REMOTE_LOGIN=yes ;;
+            *"remote login: off"*) REMOTE_LOGIN=no ;;
+        esac
+    }
+
+    read_remote_login
+    if [ "\$REMOTE_LOGIN" = "no" ]; then
+        systemsetup -setremotelogin on </dev/null >/dev/null 2>&1 || true
+        read_remote_login
+        if [ "\$REMOTE_LOGIN" = "yes" ]; then
+            # Remote Login was off, so nobody had SSH access here to lose. Turning
+            # it on without this would hand the network every password-bearing
+            # account on the machine, which is wider than anything the arguments
+            # to this script can grant - so it is narrowed to the one login that
+            # needs it. A Mac that already had Remote Login on never reaches here,
+            # and its access list is left exactly as its operator set it.
+            dseditgroup -o create -q com.apple.access_ssh >/dev/null 2>&1 || true
+            dseditgroup -o edit -d everyone -t group com.apple.access_ssh >/dev/null 2>&1 || true
+            dseditgroup -o edit -a "\$POLARIS_USER" -t user com.apple.access_ssh >/dev/null 2>&1 || true
+            say "turned Remote Login on, limited to the '\$POLARIS_USER' login"
+        else
+            refuse remote-login-off
+            die "Remote Login is off, so nothing answers on port \$SSH_PORT. Turn it on in System Settings > General > Sharing, ${ENROLLMENT_RETRY_HINT}"
+        fi
+    else
+        if [ "\$REMOTE_LOGIN" = "unknown" ]; then
+            say "could not read whether Remote Login is on, so it was left alone"
+        fi
+        # Only matters when Remote Login is limited to named users. Adds, never
+        # removes: this list is the operator's, and somebody else's access is not
+        # this script's to withdraw.
+        dseditgroup -o edit -a "\$POLARIS_USER" -t user com.apple.access_ssh >/dev/null 2>&1 || true
+    fi`;
+}
+
+/** Ask the machine what it is listening on, and let the answer pick the port. */
+function linuxListenerSection(): string {
+    return `SSH_PROBE=none
+    if command -v ss >/dev/null 2>&1; then
+        SSH_PROBE=ss
+    elif command -v netstat >/dev/null 2>&1; then
+        SSH_PROBE=netstat
+    fi
+
+    listening_on() {
+        case "\$SSH_PROBE" in
+            ss) ss -ltn 2>/dev/null | grep -q ":\$1 " ;;
+            netstat) netstat -lnt 2>/dev/null | grep -q ":\$1 " ;;
+            *) return 1 ;;
+        esac
+    }
+
+    if [ "\$SSH_PROBE" = "none" ]; then
+        # Neither tool, so the question cannot be asked. Reporting the configured
+        # port and carrying on beats stranding an enrollment on a guess.
+        say "no ss or netstat here, so whether anything is listening could not be checked"
+    else
+        SSH_LISTENING=no
+        for port in \$SSH_PORTS; do
+            if listening_on "\$port"; then
+                SSH_PORT=\$port
+                SSH_LISTENING=yes
+                break
+            fi
+        done
+        if [ "\$SSH_LISTENING" = "no" ]; then
+            refuse ssh-not-listening
+            die "nothing is listening on any port this machine's SSH server could be using (\$SSH_PORTS); start it, ${ENROLLMENT_RETRY_HINT}"
+        fi
+        say "an SSH server is listening on port \$SSH_PORT"
+    fi`;
 }
 
 /** Container-engine access, only when it was asked for. */

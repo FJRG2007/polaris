@@ -5,8 +5,15 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { enrollmentAddressCandidates } from "@polaris/core";
 import { enrollmentCommand, enrollmentScript } from "../../src/lib/enrollment-script";
+import {
+    ENROLLMENT_REFUSAL_MESSAGES,
+    ENROLLMENT_REFUSAL_REASONS,
+    ENROLLMENT_RETRY_HINT,
+    ENROLLMENT_TTL_MS,
+    enrollmentAddressCandidates,
+    refuseEnrollmentSchema
+} from "@polaris/core";
 
 describe("enrollmentAddressCandidates", () => {
     it("leads with the address it observed over the ones it was told", () => {
@@ -55,6 +62,39 @@ describe("enrollmentAddressCandidates", () => {
     it("bounds how many addresses one claim can send Polaris knocking on", () => {
         const reported = Array.from({ length: 16 }, (_, index) => `10.0.0.${index + 1}`);
         expect(enrollmentAddressCandidates("203.0.113.8", reported)).toHaveLength(6);
+    });
+});
+
+// The endpoint that takes these is unauthenticated - a caller holds a token and
+// nothing else - so what it accepts is the whole boundary.
+describe("refuseEnrollmentSchema", () => {
+    it("takes a code from the closed set and nothing else", () => {
+        for (const reason of ENROLLMENT_REFUSAL_REASONS) {
+            expect(refuseEnrollmentSchema.safeParse({ reason }).success).toBe(true);
+        }
+        expect(refuseEnrollmentSchema.safeParse({ reason: "made-up" }).success).toBe(false);
+    });
+
+    // Free text here would be a stranger writing into an operator's dashboard, so
+    // the machine picks a code and Polaris owns every word that gets rendered.
+    it("never lets the machine supply the sentence Polaris shows", () => {
+        expect(refuseEnrollmentSchema.safeParse({ reason: "Your account is locked, call 555-0100" }).success).toBe(
+            false
+        );
+        const parsed = refuseEnrollmentSchema.parse({ reason: "ssh-not-listening" });
+        expect(Object.keys(parsed)).toEqual(["reason"]);
+        for (const reason of ENROLLMENT_REFUSAL_REASONS) {
+            expect(ENROLLMENT_REFUSAL_MESSAGES[reason].length).toBeGreaterThan(0);
+        }
+    });
+});
+
+// Wording the operator sees on two different screens, built from one number so it
+// cannot drift away from how long a command actually lives.
+describe("ENROLLMENT_RETRY_HINT", () => {
+    it("matches the lifetime a command really has", () => {
+        expect(ENROLLMENT_RETRY_HINT).toContain(`${ENROLLMENT_TTL_MS / 60_000} minutes`);
+        expect(ENROLLMENT_RETRY_HINT).toContain("or generate a new one");
     });
 });
 
@@ -147,13 +187,53 @@ describe("enrollmentScript", () => {
         expect(script).toContain("systemsetup -setremotelogin on </dev/null");
         // Read back rather than trusted - Full Disk Access can refuse the change,
         // and systemsetup says so on stdout rather than in its exit code.
-        expect(script).toContain('grep -qi "remote login: on"');
+        expect(script).toContain('*"remote login: on"*) REMOTE_LOGIN=yes');
+    });
+
+    // "systemsetup is missing", "it errored" and "it printed something new" all
+    // produce no match, and treating that as off aborted enrollments on Macs whose
+    // sshd was running the whole time. Only a positive "off" is an answer.
+    it("gives macOS the same yes/no/unknown the listener check has", () => {
+        expect(script).toContain("REMOTE_LOGIN=unknown");
+        expect(script).toContain('*"remote login: off"*) REMOTE_LOGIN=no');
+        // The enable attempt, and the refusal, both hang off a positive "off".
+        expect(script).toContain('if [ "$REMOTE_LOGIN" = "no" ]');
+        expect(script).toContain('if [ "$REMOTE_LOGIN" = "unknown" ]');
+        // An unknown reading says so and keeps going rather than dying.
+        const unknown = script.slice(script.indexOf('if [ "$REMOTE_LOGIN" = "unknown" ]'));
+        expect(unknown.slice(0, unknown.indexOf("fi"))).not.toContain("die ");
+    });
+
+    // Remote Login defaults to every local account, so switching it on unasked is
+    // wider than either of the arguments the script makes people opt into. It is
+    // only narrowed on the path where the script did the switching, though: an
+    // access list somebody else set up is not this script's to withdraw.
+    it("limits SSH to the Polaris login only when it turned Remote Login on", () => {
+        const enabled = script.slice(
+            script.indexOf("systemsetup -setremotelogin on"),
+            script.indexOf("turned Remote Login on")
+        );
+        expect(enabled).toContain("dseditgroup -o create -q com.apple.access_ssh");
+        expect(enabled).toContain("dseditgroup -o edit -d everyone -t group com.apple.access_ssh");
+        expect(enabled).toContain('dseditgroup -o edit -a "$POLARIS_USER" -t user com.apple.access_ssh');
+
+        // The already-on path adds and never removes.
+        const alreadyOn = script.slice(script.indexOf('if [ "$REMOTE_LOGIN" = "unknown" ]'));
+        const untilEnd = alreadyOn.slice(0, alreadyOn.indexOf("SSH_PROBE"));
+        expect(untilEnd).toContain('dseditgroup -o edit -a "$POLARIS_USER"');
+        expect(untilEnd).not.toContain("-d everyone");
+        expect(untilEnd).not.toContain("-o create");
+    });
+
+    it("says how to undo the Remote Login changes it can make", () => {
+        expect(script).toContain("sudo systemsetup -setremotelogin off");
+        expect(script).toContain("sudo dseditgroup -o delete com.apple.access_ssh");
     });
 
     // Stopping here leaves the token unspent, so the same command works again once
     // the SSH server is on. Claiming first would burn it for nothing.
     it("stops before the claim when nothing will answer on the SSH port", () => {
-        const preflight = script.indexOf("nothing is listening on port");
+        const preflight = script.indexOf("nothing is listening on any port");
         expect(preflight).toBeGreaterThan(-1);
         expect(preflight).toBeLessThan(script.indexOf("telling Polaris about this machine"));
         expect(script).toContain('die "Remote Login is off');
@@ -162,8 +242,67 @@ describe("enrollmentScript", () => {
     // A box with neither tool cannot answer the question, and a wrong "nothing is
     // listening" would strand an enrollment that was fine.
     it("only refuses on a listener check it could actually run", () => {
-        expect(script).toContain("SSH_LISTENING=unknown");
+        expect(script).toContain("SSH_PROBE=none");
+        expect(script).toContain('if [ "$SSH_PROBE" = "none" ]');
         expect(script).toContain('if [ "$SSH_LISTENING" = "no" ]');
+    });
+
+    // The old parse took the first `Port` in sshd_config and made it the only
+    // thing the abort was gated on. That misses the dropped-in file Debian 12 and
+    // Ubuntu 22.10+ put the port in, and means nothing at all under systemd socket
+    // activation, where ssh.socket decides and the config is ignored.
+    it("treats every configured port as a candidate, plus 22 always", () => {
+        expect(script).toContain('tolower($1) == "include"');
+        expect(script).toContain('tolower($1) == "port"');
+        // A relative Include is resolved the way sshd resolves it.
+        expect(script).toContain('*) _pattern="/etc/ssh/$_pattern" ;;');
+        expect(script).toContain("for port in $(ssh_configured_ports) 22; do");
+    });
+
+    // An observed listener beats a parse. This is also what makes the port Polaris
+    // dials right on a box where the parse was wrong but nothing was ever broken.
+    it("lets the port that actually has a listener win, and refuses only if none does", () => {
+        const probe = script.slice(script.indexOf("SSH_PROBE=none"));
+        expect(probe).toContain("for port in $SSH_PORTS; do");
+        expect(probe).toContain("SSH_PORT=$port");
+        expect(probe).toContain("SSH_LISTENING=yes");
+        // The refusal is outside the loop: it needs every candidate to have missed.
+        expect(probe.indexOf('if [ "$SSH_LISTENING" = "no" ]')).toBeGreaterThan(probe.indexOf("SSH_LISTENING=yes"));
+    });
+
+    // Before this, the pre-claim abort existed only in a terminal nobody was
+    // necessarily watching: the dialog span for the full lifetime and then said the
+    // command had expired, which by then was a lie about what happened.
+    it("tells Polaris why it stopped, before each pre-claim die", () => {
+        expect(script).toContain("/refuse");
+        for (const reason of ENROLLMENT_REFUSAL_REASONS) expect(script).toContain(`refuse ${reason}`);
+        // Reported first, so the dialog has the reason before the operator is told.
+        expect(script.indexOf("refuse ssh-not-listening")).toBeLessThan(
+            script.indexOf('die "nothing is listening on any port')
+        );
+        expect(script.indexOf("refuse remote-login-off")).toBeLessThan(script.indexOf('die "Remote Login is off'));
+    });
+
+    // A refusal is a courtesy to the dialog, not a step of the enrollment. If it
+    // cannot be delivered the script must still print what it printed and exit how
+    // it exits, so nothing about it is allowed to fail loudly.
+    it("reports the refusal best-effort, so a failure changes nothing", () => {
+        const helper = script.slice(script.indexOf("refuse() {"));
+        const body = helper.slice(0, helper.indexOf("\n}"));
+        expect(body).toContain("|| true");
+        expect(body).toContain("--max-time");
+        // A code, never a sentence: this endpoint is unauthenticated.
+        expect(body).toContain("printf '{\"reason\":\"%s\"}' \"$1\"");
+    });
+
+    // Both die messages used to say "then run this command again" flatly, and the
+    // command can be most of the way through its life by the time somebody has
+    // installed an SSH server - so the next thing they saw was "expired".
+    it("does not promise a re-run the command may be too old for", () => {
+        expect(script).not.toContain("then run this command again\"");
+        const dies = script.match(/die "(?:nothing is listening|Remote Login is off)[^"]*"/g) ?? [];
+        expect(dies).toHaveLength(2);
+        for (const message of dies) expect(message).toContain(ENROLLMENT_RETRY_HINT);
     });
 
     it("locks the login it creates out of password authentication", () => {

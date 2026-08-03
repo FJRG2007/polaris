@@ -30,6 +30,12 @@ export type EnrollmentPlatform = (typeof ENROLLMENT_PLATFORMS)[number];
  *  and paste it, short enough that a command left in a chat log is already dead. */
 export const ENROLLMENT_TTL_MS = 15 * 60 * 1000;
 
+/** What to tell an operator whose machine stopped before claiming. The command is
+ *  still unspent, but only for what is left of its lifetime, so the sentence is
+ *  built from that lifetime rather than repeating a number that can drift. */
+export const ENROLLMENT_RETRY_HINT =
+    `then run this command again within ${ENROLLMENT_TTL_MS / 60_000} minutes of generating it, or generate a new one`;
+
 /** The login the script provisions. A dedicated account, never the operator's. */
 export const ENROLLMENT_USERNAME = "polaris";
 
@@ -89,6 +95,33 @@ export const claimEnrollmentSchema = z.object({
 });
 
 export type ClaimEnrollmentInput = z.infer<typeof claimEnrollmentSchema>;
+
+/**
+ * Why a machine stopped before claiming.
+ *
+ * The script checks that something will answer on the SSH port before it spends
+ * the token, and a refusal that only ever reaches the terminal leaves the dialog
+ * waiting out the whole lifetime and then blaming the clock. So the machine says
+ * why - but it says it as one of these codes and nothing else.
+ *
+ * The endpoint that takes them is unauthenticated, so a free-text reason would be
+ * a stranger writing into an operator's dashboard. Polaris keeps its own copy of
+ * every sentence below and the machine only chooses between them.
+ */
+export const ENROLLMENT_REFUSAL_REASONS = ["ssh-not-listening", "remote-login-off"] as const;
+export type EnrollmentRefusalReason = (typeof ENROLLMENT_REFUSAL_REASONS)[number];
+
+export const refuseEnrollmentSchema = z.object({ reason: z.enum(ENROLLMENT_REFUSAL_REASONS) });
+export type RefuseEnrollmentInput = z.infer<typeof refuseEnrollmentSchema>;
+
+/** Polaris's own words for each code. Written for the operator watching the
+ *  dialog, so each one says what to go and do. */
+export const ENROLLMENT_REFUSAL_MESSAGES: Record<EnrollmentRefusalReason, string> = {
+    "ssh-not-listening":
+        "The machine stopped before registering: nothing is listening on its SSH port. Start its SSH server and run the command again.",
+    "remote-login-off":
+        "The machine stopped before registering: Remote Login is off, so nothing would answer Polaris. Turn it on under System Settings > General > Sharing and run the command again."
+};
 
 /** How an enrollment is doing, for the dialog that waits on it. */
 export const ENROLLMENT_STATES = ["pending", "claimed", "failed", "expired"] as const;
