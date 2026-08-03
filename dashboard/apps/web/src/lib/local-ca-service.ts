@@ -12,13 +12,14 @@
  * self-signed default, so the dashboard is never taken offline by this.
  */
 
-import { execFile } from "node:child_process";
-import { networkInterfaces } from "node:os";
-import { promisify } from "node:util";
 import { join } from "node:path";
-import { mkdir, readFile, writeFile, access } from "node:fs/promises";
 import { prisma } from "@polaris/db";
+import { promisify } from "node:util";
 import { loadEnv } from "@polaris/config";
+import { networkInterfaces } from "node:os";
+import { execFile } from "node:child_process";
+import { getHostLanIp } from "@/lib/host-address";
+import { mkdir, readFile, writeFile, access } from "node:fs/promises";
 
 const run = promisify(execFile);
 
@@ -51,11 +52,28 @@ async function exists(path: string): Promise<boolean> {
     }
 }
 
-/** The DNS + IP names the leaf should be valid for: the mDNS hostname and its
- *  `.local` form, an optional configured public domain, every LAN/internal hostname
- *  Polaris serves (so free sslip.io subdomains and *.plr.local app names are
- *  trusted-HTTPS too, like polaris.local), and every non-internal IPv4 the host has. */
-async function subjectAltNames(): Promise<string[]> {
+/**
+ * The DNS + IP names the leaf should be valid for: the mDNS hostname and its
+ * `.local` form, an optional configured public domain, every LAN/internal hostname
+ * Polaris serves (so free sslip.io subdomains and *.plr.local app names are
+ * trusted-HTTPS too, like polaris.local), and the addresses a browser can actually
+ * reach this server on.
+ *
+ * The set is sorted, and deliberately excludes the addresses of the container's own
+ * docker networks. Those change every time the container is recreated, and the leaf
+ * is re-issued whenever this set changes - so including them meant a brand new
+ * certificate on every single deploy. A trust decision the operator already made
+ * (installing the CA is fine, but an accepted browser exception is per certificate)
+ * died with it, and the first thing to break is the one connection with nowhere to
+ * show a warning: the terminal's WebSocket, which browsers refuse outright rather
+ * than offering to continue. The address a browser really uses is the host's, which
+ * the mDNS responder publishes and the edge is configured with.
+ *
+ * Exported for its test: what has to hold is a property of the list itself - stable
+ * across restarts, and free of addresses that exist only inside docker - which is
+ * worth pinning without generating a certificate to read it back out of.
+ */
+export async function subjectAltNames(): Promise<string[]> {
     const host = process.env.POLARIS_MDNS_HOSTNAME || process.env.POLARIS_LOCAL_HOSTNAME || "polaris";
     const dns = new Set<string>([host, `${host}.local`, "polaris", "polaris.local", "plr.local", "*.plr.local", "localhost"]);
     const publicDomain = process.env.POLARIS_PUBLIC_DOMAIN;
@@ -63,8 +81,14 @@ async function subjectAltNames(): Promise<string[]> {
 
     // Every internal-cert domain (free sslip.io LAN subdomains, .plr.local app names)
     // so Traefik's default cert actually matches them instead of throwing a warning.
+    // Ordered by the database rather than by insertion, so the same set of domains
+    // never reads as a changed one.
     try {
-        const internal = await prisma.domain.findMany({ where: { certResolver: "internal" }, select: { hostname: true } });
+        const internal = await prisma.domain.findMany({
+            where: { certResolver: "internal" },
+            select: { hostname: true },
+            orderBy: { hostname: "asc" }
+        });
         for (const domain of internal) {
             const hostname = domain.hostname.trim().toLowerCase();
             if (hostname && dns.size < 200) dns.add(hostname);
@@ -74,20 +98,29 @@ async function subjectAltNames(): Promise<string[]> {
     }
 
     const ips = new Set<string>(["127.0.0.1"]);
-    // The host's LAN IP, so access by IP:port is trusted too. Inside the container
-    // networkInterfaces() only sees the Docker-internal address, so take the
-    // operator-configured public IP (the same one the edge routes on) as well.
     const configuredIp = process.env.POLARIS_PUBLIC_IP;
     if (configuredIp && /^\d{1,3}(\.\d{1,3}){3}$/.test(configuredIp)) ips.add(configuredIp);
-    for (const list of Object.values(networkInterfaces())) {
-        for (const info of list ?? []) {
-            if (info.family === "IPv4" && !info.internal) ips.add(info.address);
+    const lanIp = await getHostLanIp();
+    if (lanIp) ips.add(lanIp);
+    // Only when Polaris runs on the machine directly: there its own interfaces are
+    // the ones a browser connects to. In a container they are docker bridges, whose
+    // addresses no client can use and which change on every recreate.
+    if (!(await inContainer())) {
+        for (const list of Object.values(networkInterfaces())) {
+            for (const info of list ?? []) {
+                if (info.family === "IPv4" && !info.internal) ips.add(info.address);
+            }
         }
     }
     return [
-        ...[...dns].map((name) => `DNS:${name}`),
-        ...[...ips].map((ip) => `IP:${ip}`)
+        ...[...dns].sort().map((name) => `DNS:${name}`),
+        ...[...ips].sort().map((ip) => `IP:${ip}`)
     ];
+}
+
+/** Whether this process runs inside a container (the marker Docker writes). */
+async function inContainer(): Promise<boolean> {
+    return exists("/.dockerenv");
 }
 
 /** Generate the CA (once) and a leaf for the current names, if not already present.
