@@ -215,6 +215,45 @@ export function ListScreen({
         refresh();
     };
 
+    /**
+     * Keep the order the screen was showing, with the dragged task where it was
+     * dropped, and hand the arrangement over to whoever made it.
+     *
+     * A view opens in the order the engine chose - most urgent first - and that
+     * order is not written down anywhere, so a card dropped between two others
+     * would be re-sorted away the moment it landed. Rather than refuse the drag,
+     * the arrangement on screen becomes the manual one: every row keeps the place
+     * it was in, the dragged task takes its new one, and the view says it is now
+     * in manual order. Nothing jumps, and the next drag is an ordinary one.
+     */
+    const adoptOrder = async (taskId: string, position: { beforeId: string | null; afterId: string | null }) => {
+        // The whole screen, not just what passes the filter: order is a property
+        // of the list, and re-spacing only the visible rows would interleave them
+        // with the ones a filter is hiding.
+        const arranged = core.sortTasks(rows.map(toFacts), sort, statusOrder).map((facts) => facts.id);
+        const taskIds = core.arrangeAround(arranged, taskId, position);
+
+        const result = await runAction(() => actions.arrangeTasksAction({ taskIds }), setError);
+        if (result?.error) {
+            setError(result.error);
+            return;
+        }
+
+        // The order keys the write just gave them, applied here as well. Without
+        // this the view flips to manual while the rows still carry the positions
+        // they were written down with months ago, and the whole board scrambles
+        // for the length of a round trip before the refresh puts it right.
+        const orders = core.rebalanceOrders(taskIds.length);
+        setPending((current) => {
+            const next = { ...current };
+            taskIds.forEach((id, index) => {
+                next[id] = { ...next[id], order: orders[index] };
+            });
+            return next;
+        });
+        setSort({ field: "manual", direction: "asc" });
+    };
+
     const move: ViewProps["onMove"] = async ({ taskId, groupKey, position }) => {
         // The column of tasks with no status is keyed by an empty string. Sent
         // as-is it fails validation and the drop silently does nothing, so it
@@ -240,6 +279,15 @@ export function ListScreen({
             setError
         );
         if (result?.error) setError(result.error);
+        // Dropped onto a card - the only drop that promised a place, since that
+        // is where the line appears. Dropping into the space below a column is
+        // "put it in this column" and leaves the order to the sort. Under a sort
+        // that decides the order, a promised place only survives if the screen's
+        // arrangement is written down with it, and only once the move itself
+        // went through.
+        else if (result && sort.field !== "manual" && position.afterId) {
+            await adoptOrder(taskId, position);
+        }
         refresh();
     };
 
@@ -287,9 +335,9 @@ export function ListScreen({
         groups,
         context,
         canEdit: context.canEdit,
-        // A search is ranked by how well each row matched, so its order is no
-        // more the manual one than a sorted screen's is.
-        manualOrder: sort.field === "manual" && search.trim() === "",
+        // A search is ranked by how well each row matched, so a position among
+        // those rows is not one anybody could keep.
+        orderable: search.trim() === "",
         selection,
         onOpen: setOpenTaskId,
         onSelect: toggleSelect,

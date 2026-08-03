@@ -59,6 +59,28 @@ describe("manual ordering", () => {
     });
 });
 
+describe("keeping the order a screen was showing", () => {
+    const screen = ["a", "b", "c", "d"];
+
+    it("puts the task above the row it was dropped on", () => {
+        expect(engine.arrangeAround(screen, "d", { beforeId: "a", afterId: "b" })).toEqual(["a", "d", "b", "c"]);
+    });
+
+    it("puts it at the end when the drop named only the row above", () => {
+        expect(engine.arrangeAround(screen, "a", { beforeId: "d", afterId: null })).toEqual(["b", "c", "d", "a"]);
+    });
+
+    it("leaves the rest of the screen exactly as it was", () => {
+        const arranged = engine.arrangeAround(screen, "c", { beforeId: null, afterId: "a" });
+        expect(arranged).toEqual(["c", "a", "b", "d"]);
+        expect(arranged.filter((id) => id !== "c")).toEqual(["a", "b", "d"]);
+    });
+
+    it("falls back to the end when the neighbour is not on screen any more", () => {
+        expect(engine.arrangeAround(screen, "b", { beforeId: null, afterId: "gone" })).toEqual(["a", "c", "d", "b"]);
+    });
+});
+
 describe("durations", () => {
     it("reads what a person types into an estimate box", () => {
         expect(engine.parseDurationMinutes("90")).toBe(90);

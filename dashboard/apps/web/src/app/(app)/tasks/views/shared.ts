@@ -38,15 +38,16 @@ export interface ViewProps {
     readonly context: SpaceContext;
     readonly canEdit: boolean;
     /**
-     * Whether what is on screen is in the order somebody dragged it into.
+     * Whether dropping a task between two others puts it there.
      *
-     * False under any other sort, and the views owe the difference to whoever is
-     * dragging: a card dropped between two others cannot stay there when the
-     * screen is ordered by priority, so they stop promising a position they
-     * would immediately re-sort away. The drag still moves the task to the group
-     * it was dropped on - that part is honoured either way.
+     * True on an ordinary view whatever it is sorted by: a screen opens in the
+     * order the engine chose, and the first time somebody drags a card the
+     * screen keeps what it was showing and hands the order to them. False while
+     * a search is on, where the rows are ranked by how well they matched and a
+     * position between two of them means nothing - the drag then only moves the
+     * task to the group it was dropped on.
      */
-    readonly manualOrder: boolean;
+    readonly orderable: boolean;
     readonly selection: ReadonlySet<string>;
     readonly onOpen: (taskId: string) => void;
     readonly onSelect: (taskId: string) => void;

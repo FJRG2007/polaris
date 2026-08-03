@@ -620,6 +620,22 @@ export async function moveTaskAction(input: unknown): Promise<{ error?: string }
     }
 }
 
+/** Keep the order a screen was showing, because somebody just dragged a task
+ *  into it. Only the tasks the caller can reach are written. */
+export async function arrangeTasksAction(input: unknown): Promise<{ error?: string }> {
+    const caller = await actor();
+    const parsed = core.taskArrangeSchema.safeParse(input);
+    if (!parsed.success) return { error: "Could not work out the order that was dropped into" };
+    try {
+        const scope = await access.visibleScope(caller);
+        await tasks.arrangeTasks({ spaceIds: scope.spaceIds, listIds: scope.listIds }, parsed.data.taskIds);
+        refresh();
+        return {};
+    } catch (caught) {
+        return failure(caught, "Could not keep that order");
+    }
+}
+
 export async function bulkUpdateAction(input: unknown): Promise<{ count?: number; error?: string }> {
     const caller = await actor();
     const parsed = core.taskBulkSchema.safeParse(input);

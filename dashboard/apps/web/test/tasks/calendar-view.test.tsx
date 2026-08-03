@@ -83,7 +83,7 @@ function props(rows: TaskRow[]): ViewProps {
         groups: [],
         context: CONTEXT,
         canEdit: true,
-        manualOrder: false,
+        orderable: true,
         selection: new Set<string>(),
         onOpen: () => {},
         onSelect: () => {},

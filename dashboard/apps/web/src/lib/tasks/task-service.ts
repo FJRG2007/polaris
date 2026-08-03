@@ -847,6 +847,40 @@ async function rebalanceList(listId: string): Promise<void> {
     );
 }
 
+/**
+ * Write down the order a screen was showing.
+ *
+ * Sent when somebody drags a task on a view that was still in the order the
+ * engine chose: the drag says where that one task belongs, and the rest of the
+ * screen has to keep the places it was in or the board would rearrange itself
+ * under the hand that just moved something. So the whole sequence is re-spaced
+ * in one go, which is also what leaves room for the next drop between any two
+ * of them.
+ */
+export async function arrangeTasks(
+    reach: { spaceIds: string[]; listIds: string[] },
+    taskIds: readonly string[]
+): Promise<number> {
+    // The ids arrive from the browser, so the arrangement is narrowed to the
+    // tasks the caller was cleared for before a single order is written.
+    const allowed = await prisma.task.findMany({
+        where: {
+            id: { in: [...taskIds] },
+            OR: [{ spaceId: { in: reach.spaceIds } }, { listId: { in: reach.listIds } }]
+        },
+        select: { id: true }
+    });
+    const reachable = new Set(allowed.map((task) => task.id));
+    const ordered = taskIds.filter((id) => reachable.has(id));
+    if (ordered.length === 0) return 0;
+
+    const orders = core.rebalanceOrders(ordered.length);
+    await prisma.$transaction(
+        ordered.map((id, index) => prisma.task.update({ where: { id }, data: { order: orders[index] } }))
+    );
+    return ordered.length;
+}
+
 /** Apply one change to a selection. Kept separate from updateTask so the fields
  *  a bulk edit may touch stay an explicit, reviewable list. */
 export async function bulkUpdate(

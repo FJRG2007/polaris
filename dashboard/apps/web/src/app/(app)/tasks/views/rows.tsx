@@ -44,8 +44,8 @@ function TaskLine({
     depth: number;
     selected: boolean;
     showLocation?: boolean;
-    /** Whether dropping here would actually put the row here. False under a sort
-     *  that decides the order itself. */
+    /** Whether dropping here would actually put the row here. False while a
+     *  search is on, where the rows are ranked by how well they matched. */
     positioned?: boolean;
     onSelect: () => void;
     onDragStart?: () => void;
@@ -127,7 +127,7 @@ function TaskLine({
 }
 
 export function ListView(props: ViewProps) {
-    const { groups, canEdit, selection, onSelect, onMove, onQuickCreate, manualOrder } = props;
+    const { groups, canEdit, selection, onSelect, onMove, onQuickCreate, orderable } = props;
     const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set());
     const [dragging, setDragging] = useState<string | null>(null);
     const [addingTo, setAddingTo] = useState<string | null>(null);
@@ -207,16 +207,16 @@ export function ListView(props: ViewProps) {
                                             depth={node.depth}
                                             selected={selection.has(task.id)}
                                             showLocation={props.showLocation}
-                                            positioned={manualOrder}
+                                            positioned={orderable}
                                             onSelect={() => onSelect(task.id)}
                                             onDragStart={() => setDragging(task.id)}
                                             onDropBefore={() => {
                                                 if (!dragging) return;
                                                 const without = group.tasks.filter((entry) => entry.id !== dragging);
-                                                // Only the group is honoured when the
-                                                // sort owns the order; the row landed on
-                                                // says which one, not where in it.
-                                                const index = manualOrder
+                                                // Only the group is honoured while a
+                                                // search is on: the row landed on says
+                                                // which one, not where in it.
+                                                const index = orderable
                                                     ? without.findIndex((entry) => entry.id === task.id)
                                                     : without.length;
                                                 onMove({
@@ -224,7 +224,7 @@ export function ListView(props: ViewProps) {
                                                     groupKey: group.key,
                                                     position: {
                                                         beforeId: without[index - 1]?.id ?? null,
-                                                        afterId: manualOrder ? task.id : null
+                                                        afterId: orderable ? task.id : null
                                                     }
                                                 });
                                                 setDragging(null);

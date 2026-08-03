@@ -219,7 +219,7 @@ export function TaskCard({
 }
 
 export function BoardView(props: ViewProps) {
-    const { groups, selection, onSelect, onMove, onQuickCreate, canEdit, manualOrder } = props;
+    const { groups, selection, onSelect, onMove, onQuickCreate, canEdit, orderable } = props;
     const [dragging, setDragging] = useState<string | null>(null);
     const [addingTo, setAddingTo] = useState<string | null>(null);
     const [draft, setDraft] = useState("");
@@ -233,11 +233,10 @@ export function BoardView(props: ViewProps) {
 
     const drop = (groupKey: string, tasks: readonly TaskRow[], targetId: string | null) => {
         if (!dragging) return;
-        // Under a sort that decides the order, the card the drop landed on says
-        // which column was meant and nothing more - the position goes to the end,
-        // where the sort will move it from anyway. Recording the drop point
-        // instead would write a manual order nobody asked for and nobody sees.
-        const target = manualOrder ? targetId : null;
+        // While a search is on, the card the drop landed on says which column was
+        // meant and nothing more: the rows are ranked by how well they matched,
+        // so a position among them is not one anybody could keep.
+        const target = orderable ? targetId : null;
         onMove({ taskId: dragging, groupKey, position: neighbours(tasks, target, dragging) });
         setDragging(null);
     };
@@ -303,7 +302,7 @@ export function BoardView(props: ViewProps) {
                                 commands={commandsFor(props, task)}
                                 selected={selection.has(task.id)}
                                 showLocation={props.showLocation}
-                                positioned={manualOrder}
+                                positioned={orderable}
                                 onSelect={() => onSelect(task.id)}
                                 onDragStart={() => setDragging(task.id)}
                                 onDropBefore={() => drop(group.key, group.tasks, task.id)}
