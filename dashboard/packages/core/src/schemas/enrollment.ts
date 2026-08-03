@@ -99,16 +99,26 @@ export type ClaimEnrollmentInput = z.infer<typeof claimEnrollmentSchema>;
 /**
  * Why a machine stopped before claiming.
  *
- * The script checks that something will answer on the SSH port before it spends
- * the token, and a refusal that only ever reaches the terminal leaves the dialog
- * waiting out the whole lifetime and then blaming the clock. So the machine says
- * why - but it says it as one of these codes and nothing else.
+ * Every abort in the enrollment script happens before the token is spent, and one
+ * that only ever reaches the terminal leaves the dialog waiting out the whole
+ * lifetime and then blaming the clock. So the machine says why - but it says it as
+ * one of these codes and nothing else, and there is one for every way the script
+ * can stop rather than only for the SSH checks.
  *
  * The endpoint that takes them is unauthenticated, so a free-text reason would be
  * a stranger writing into an operator's dashboard. Polaris keeps its own copy of
  * every sentence below and the machine only chooses between them.
  */
-export const ENROLLMENT_REFUSAL_REASONS = ["ssh-not-listening", "remote-login-off"] as const;
+export const ENROLLMENT_REFUSAL_REASONS = [
+    "ssh-not-listening",
+    "remote-login-off",
+    "no-ssh-host-keys",
+    "no-home-directory",
+    "no-user-tooling",
+    "unsupported-platform",
+    "curl-missing",
+    "not-root"
+] as const;
 export type EnrollmentRefusalReason = (typeof ENROLLMENT_REFUSAL_REASONS)[number];
 
 export const refuseEnrollmentSchema = z.object({ reason: z.enum(ENROLLMENT_REFUSAL_REASONS) });
@@ -118,9 +128,20 @@ export type RefuseEnrollmentInput = z.infer<typeof refuseEnrollmentSchema>;
  *  dialog, so each one says what to go and do. */
 export const ENROLLMENT_REFUSAL_MESSAGES: Record<EnrollmentRefusalReason, string> = {
     "ssh-not-listening":
-        "The machine stopped before registering: nothing is listening on its SSH port. Start its SSH server and run the command again.",
+        "The machine stopped before registering: nothing Polaris could reach is listening on its SSH port. Start its SSH server, or bind it to something other than loopback, and run the command again.",
     "remote-login-off":
-        "The machine stopped before registering: Remote Login is off, so nothing would answer Polaris. Turn it on under System Settings > General > Sharing and run the command again."
+        "The machine stopped before registering: Remote Login is off, so nothing would answer Polaris. Turn it on under System Settings > General > Sharing and run the command again.",
+    "no-ssh-host-keys":
+        "The machine stopped before registering: it has no SSH host keys and none could be generated. Install an SSH server there and run the command again.",
+    "no-home-directory":
+        `The machine stopped before registering: the '${ENROLLMENT_USERNAME}' login has no home directory, so the key could not be installed. Fix the account and run the command again.`,
+    "no-user-tooling":
+        `The machine stopped before registering: it has neither useradd nor adduser, so the login could not be created. Create a '${ENROLLMENT_USERNAME}' user there and run the command again.`,
+    "unsupported-platform":
+        "The machine stopped before registering: its operating system is not one the command supports. Add this server by hand instead.",
+    "curl-missing":
+        "The machine stopped before registering: curl is not installed there. Install it and run the command again.",
+    "not-root": "The machine stopped before registering: the command was not run as root. Run it again with sudo."
 };
 
 /** How an enrollment is doing, for the dialog that waits on it. */

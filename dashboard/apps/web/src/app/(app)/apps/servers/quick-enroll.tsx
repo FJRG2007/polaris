@@ -55,6 +55,10 @@ export function QuickEnroll({ onDone, kind = "server" }: { onDone: () => void; k
     const [copied, setCopied] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [waitError, setWaitError] = useState<string | null>(null);
+    // Whether the command the panel is still showing works. A machine that stops
+    // before claiming - no SSH server running, Remote Login off - reports why and
+    // spends nothing, so this is a state to recover from rather than the end of it.
+    const [stillUsable, setStillUsable] = useState(false);
 
     // Watch the enrollment until the machine claims it. The dialog closing
     // unmounts this, which is what stops the poll.
@@ -71,14 +75,25 @@ export function QuickEnroll({ onDone, kind = "server" }: { onDone: () => void; k
                 return;
             }
             if (status.state === "failed") {
-                clearInterval(timer);
                 setWaitError(status.error ?? "The machine could not be registered");
+                setStillUsable(status.retryable);
+                // Only a spent command is the end of the road. While the token is
+                // still good the poll stays alive, so the operator who fixes the
+                // machine and re-runs the same command watches this finish on its
+                // own instead of being left in front of a stale error.
+                if (!status.retryable) clearInterval(timer);
                 return;
             }
             if (status.state === "expired") {
                 clearInterval(timer);
+                setStillUsable(false);
                 setWaitError("This command expired before the machine ran it");
+                return;
             }
+            // The re-run got as far as claiming, so the refusal it recovered from
+            // stops being the thing on screen.
+            setWaitError(null);
+            setStillUsable(false);
         }, POLL_MS);
         return () => {
             live = false;
@@ -110,6 +125,7 @@ export function QuickEnroll({ onDone, kind = "server" }: { onDone: () => void; k
         if (opened) await cancelEnrollmentAction(opened.id);
         setOpened(null);
         setWaitError(null);
+        setStillUsable(false);
     }
 
     if (opened) {
@@ -148,14 +164,22 @@ export function QuickEnroll({ onDone, kind = "server" }: { onDone: () => void; k
                 ) : null}
 
                 {waitError ? (
-                    <p className="text-sm text-danger">{waitError}</p>
+                    <div className="flex flex-col gap-1">
+                        <p className="text-sm text-danger">{waitError}</p>
+                        {stillUsable ? (
+                            <p className="text-sm text-muted-foreground">
+                                It was not used, so the command above still works. Fix that and run it
+                                again before it expires - this picks it up on its own.
+                            </p>
+                        ) : null}
+                    </div>
                 ) : (
                     <p className="text-sm text-muted-foreground">Waiting for the server to check in...</p>
                 )}
 
                 <div className="mt-1 flex justify-end gap-2">
                     <Button variant="ghost" onClick={() => void discard()}>
-                        {waitError ? "Start over" : "Cancel this command"}
+                        {waitError && !stillUsable ? "Start over" : "Cancel this command"}
                     </Button>
                 </div>
             </div>

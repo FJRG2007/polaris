@@ -195,6 +195,12 @@ export interface EnrollmentStatus {
     hostId: string | null;
     name: string;
     error: string | null;
+    /** Whether the command this describes still works. `failed` used to mean the
+     *  token was gone with it, but a machine that refuses before claiming leaves it
+     *  unspent on purpose - so the dialog needs to tell "run it again once the SSH
+     *  server is on" apart from "generate a new one", and needs to keep watching
+     *  for the re-run rather than treating the error as the end. */
+    retryable: boolean;
 }
 
 export async function getEnrollmentStatus(id: string, userId: string): Promise<EnrollmentStatus | null> {
@@ -207,7 +213,8 @@ export async function getEnrollmentStatus(id: string, userId: string): Promise<E
         state: resolveState(row),
         hostId: row.hostId,
         name: row.name,
-        error: row.error
+        error: row.error,
+        retryable: !row.hostId && !row.claimedAt && row.expiresAt > new Date()
     };
 }
 
@@ -254,10 +261,16 @@ export async function claimEnrollment(
 
     // Burn first. Everything below can fail, and none of it should be retryable
     // by whoever holds the token.
+    //
+    // `error` is cleared here rather than only on success: a refusal leaves one on
+    // a row that is still claimable, so a machine re-running the same command after
+    // fixing its SSH server would otherwise spend the whole outbound probe being
+    // reported as the failure it already recovered from.
     await prisma.enrollment.update({
         where: { id: row.id },
         data: {
             claimedAt: new Date(),
+            error: null,
             hostKeys: payload.hostKeys.join("\n"),
             port: payload.port,
             username: payload.username

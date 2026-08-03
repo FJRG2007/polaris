@@ -101,6 +101,7 @@ POLARIS_URL=${shellQuote(input.baseUrl)}
 POLARIS_TOKEN=${shellQuote(input.token)}
 POLARIS_USER=${shellQuote(input.username)}
 POLARIS_KEY=${shellQuote(input.publicKey)}
+POLARIS_RETRY_HINT=${shellQuote(ENROLLMENT_RETRY_HINT)}
 GRANT_DOCKER=0
 GRANT_ROOT=0
 
@@ -113,29 +114,34 @@ for arg in "\$@"; do
 done
 
 say() { echo "polaris: \$1"; }
-die() { echo "polaris: \$1" >&2; exit 1; }
 
-# Tell Polaris why this machine is stopping, so the dialog somebody is watching
-# says that instead of waiting the command out and blaming the clock. It carries
-# a fixed code and never a message - Polaris holds the wording - and it spends
-# nothing, so the same command still works. Best-effort in every direction: no
-# answer, no Polaris, no network, and this changes neither what the script prints
-# nor what it exits with.
-refuse() {
+# Every abort in this script happens before the claim, so every one of them tells
+# Polaris why on the way out - otherwise the dialog somebody is watching waits the
+# command out and then blames the clock for a machine that ran it and refused.
+# Reporting is folded into 'die' rather than left as a call to remember, so a stop
+# added later cannot be a silent one.
+#
+# It carries a fixed code and never a message - Polaris holds the wording - and it
+# spends nothing, so the same command still works. Best-effort in every direction:
+# no answer, no Polaris, no network, no curl, and this changes neither what the
+# script prints nor what it exits with.
+die() {
     printf '{"reason":"%s"}' "\$1" | curl -sS -o /dev/null --max-time 10 -X POST \\
         -H 'content-type: application/json' \\
         --data-binary @- \\
         "\$POLARIS_URL/api/servers/enroll/\$POLARIS_TOKEN/refuse" >/dev/null 2>&1 || true
+    echo "polaris: \$2" >&2
+    exit 1
 }
 
-[ "\$(id -u)" = "0" ] || die "run this with sudo"
-command -v curl >/dev/null 2>&1 || die "curl is required and was not found"
+[ "\$(id -u)" = "0" ] || die not-root "run this with sudo"
+command -v curl >/dev/null 2>&1 || die curl-missing "curl is required and was not found"
 
 PLATFORM=\$(uname -s | tr '[:upper:]' '[:lower:]')
 ARCH=\$(uname -m)
 case "\$PLATFORM" in
     linux|darwin) ;;
-    *) die "\$PLATFORM is not supported yet - add this server by hand from the Servers app" ;;
+    *) die unsupported-platform "\$PLATFORM is not supported yet - add this server by hand from the Servers app" ;;
 esac
 
 ${createUserSection()}
@@ -182,7 +188,7 @@ elif command -v adduser >/dev/null 2>&1; then
     adduser -D -s /bin/sh "\$POLARIS_USER"
     say "created the '\$POLARIS_USER' login"
 else
-    die "this machine has no useradd or adduser; create a '\$POLARIS_USER' user and re-run"
+    die no-user-tooling "this machine has no useradd or adduser; create a '\$POLARIS_USER' user and re-run"
 fi
 
 # Belt and braces: no password should ever authenticate this account.
@@ -195,7 +201,7 @@ if [ "\$PLATFORM" = "darwin" ]; then
 else
     HOME_DIR=\$(getent passwd "\$POLARIS_USER" 2>/dev/null | cut -d: -f6)
 fi
-[ -n "\${HOME_DIR:-}" ] || die "could not find the home directory of '\$POLARIS_USER'"`;
+[ -n "\${HOME_DIR:-}" ] || die no-home-directory "could not find the home directory of '\$POLARIS_USER'"`;
 }
 
 /** Install the key, without disturbing anything already authorized. */
@@ -233,14 +239,18 @@ chown -R "\$POLARIS_USER" "\$HOME_DIR/.ssh"`;
  * 22.10+, and a hardened port usually lives in the dropped-in file rather than the
  * main one - and under systemd socket activation the config does not decide at all
  * and `ssh.socket` does. So every port any of them names is a candidate, 22 is
- * always one, and the one holding a listener is the answer. That is also what gets
- * reported: an observed listener beats a parse, which is what the port Polaris
- * dials should have been all along.
+ * always one, and the one holding a reachable listener is the answer. That is also
+ * what gets reported: an observed listener beats a parse, which is what the port
+ * Polaris dials should have been all along.
+ *
+ * Reachable is part of the question rather than a refinement of it. A listener on
+ * 127.0.0.1 answers the machine itself and nobody else, so counting it would let
+ * the claim through and produce the firewall report this check exists to prevent.
  *
  * Refusing is reserved for the case where the check ran and no candidate had
- * anything on it. A machine with neither `ss` nor `netstat` cannot answer the
- * question, and a wrong "nothing is listening" would strand an enrollment that was
- * fine.
+ * anything reachable on it. A machine with neither `ss` nor `netstat` cannot answer
+ * the question, and a wrong "nothing is listening" would strand an enrollment that
+ * was fine.
  *
  * macOS is where this bites, because it ships with Remote Login off, so that one
  * is switched on rather than only reported. Stdin is closed for it because this
@@ -296,13 +306,26 @@ fi`;
 
 /** Read Remote Login into yes/no/unknown. `systemsetup` puts the answer on stdout
  *  and keeps its exit code at 0 either way, so the text is what decides - and text
- *  that matches neither wording is an answer nobody got. */
+ *  that matches neither wording is an answer nobody got. The access list is read
+ *  the same way and for the same reason: the three `dseditgroup` calls that narrow
+ *  it can each fail on a managed Mac, and announcing a restriction that did not
+ *  happen is worse than not restricting at all, because nobody goes to look. */
 function darwinRemoteLoginSection(): string {
     return `read_remote_login() {
         REMOTE_LOGIN=unknown
         case "\$(systemsetup -getremotelogin 2>/dev/null | tr '[:upper:]' '[:lower:]')" in
             *"remote login: on"*) REMOTE_LOGIN=yes ;;
             *"remote login: off"*) REMOTE_LOGIN=no ;;
+        esac
+    }
+
+    # yes/no/unknown again: dseditgroup reports membership on stdout, and a record
+    # it cannot resolve or a tool that is not there says nothing either way.
+    access_ssh_member() {
+        case "\$(dseditgroup -o checkmember -m "\$1" -t "\$2" com.apple.access_ssh 2>/dev/null | tr '[:upper:]' '[:lower:]')" in
+            yes*) echo yes ;;
+            no*) echo no ;;
+            *) echo unknown ;;
         esac
     }
 
@@ -320,10 +343,18 @@ function darwinRemoteLoginSection(): string {
             dseditgroup -o create -q com.apple.access_ssh >/dev/null 2>&1 || true
             dseditgroup -o edit -d everyone -t group com.apple.access_ssh >/dev/null 2>&1 || true
             dseditgroup -o edit -a "\$POLARIS_USER" -t user com.apple.access_ssh >/dev/null 2>&1 || true
-            say "turned Remote Login on, limited to the '\$POLARIS_USER' login"
+            # Claimed only on proof: the login is in the group macOS gates SSH on,
+            # and nothing says 'everyone' still is. Anything less and Remote Login
+            # has just been switched on for the whole machine, which is the one
+            # thing the operator has to be told rather than reassured about.
+            if [ "\$(access_ssh_member "\$POLARIS_USER" user)" = "yes" ] \\
+                && [ "\$(access_ssh_member everyone group)" != "yes" ]; then
+                say "turned Remote Login on, limited to the '\$POLARIS_USER' login"
+            else
+                say "WARNING: turned Remote Login on, but SSH could not be limited to the '\$POLARIS_USER' login - every account on this machine can now be reached over SSH. Restrict it under System Settings > General > Sharing > Remote Login"
+            fi
         else
-            refuse remote-login-off
-            die "Remote Login is off, so nothing answers on port \$SSH_PORT. Turn it on in System Settings > General > Sharing, ${ENROLLMENT_RETRY_HINT}"
+            die remote-login-off "Remote Login is off, so nothing answers on port \$SSH_PORT. Turn it on in System Settings > General > Sharing, \$POLARIS_RETRY_HINT"
         fi
     else
         if [ "\$REMOTE_LOGIN" = "unknown" ]; then
@@ -336,7 +367,16 @@ function darwinRemoteLoginSection(): string {
     fi`;
 }
 
-/** Ask the machine what it is listening on, and let the answer pick the port. */
+/**
+ * Ask the machine what it is listening on, and let the answer pick the port.
+ *
+ * "Something is on that port" is not the question. An sshd bound to 127.0.0.1
+ * answers this machine and nobody else, so accepting it would let the claim
+ * through and land the operator on "could not reach the machine's SSH port from
+ * here. Check the firewall between them" - the report this whole check exists to
+ * stop producing. So the bind address has to be one Polaris could dial: a wildcard
+ * or a real address, never loopback.
+ */
 function linuxListenerSection(): string {
     return `SSH_PROBE=none
     if command -v ss >/dev/null 2>&1; then
@@ -345,10 +385,24 @@ function linuxListenerSection(): string {
         SSH_PROBE=netstat
     fi
 
+    # Both tools put the local address in the fourth column, in every spelling of a
+    # wildcard they use ('0.0.0.0', '*', '[::]', ':::'). Only loopback is dropped.
+    reachable_listener() {
+        awk -v port="\$1" '
+            \$4 ~ (":" port "\$") {
+                addr = substr(\$4, 1, length(\$4) - length(port) - 1)
+                if (addr ~ /^127\\./ || addr == "::1" || addr == "[::1]") next
+                if (addr ~ /^\\[?::ffff:127\\./) next
+                found = 1
+            }
+            END { exit found ? 0 : 1 }
+        '
+    }
+
     listening_on() {
         case "\$SSH_PROBE" in
-            ss) ss -ltn 2>/dev/null | grep -q ":\$1 " ;;
-            netstat) netstat -lnt 2>/dev/null | grep -q ":\$1 " ;;
+            ss) ss -ltn 2>/dev/null | reachable_listener "\$1" ;;
+            netstat) netstat -lnt 2>/dev/null | reachable_listener "\$1" ;;
             *) return 1 ;;
         esac
     }
@@ -367,8 +421,7 @@ function linuxListenerSection(): string {
             fi
         done
         if [ "\$SSH_LISTENING" = "no" ]; then
-            refuse ssh-not-listening
-            die "nothing is listening on any port this machine's SSH server could be using (\$SSH_PORTS); start it, ${ENROLLMENT_RETRY_HINT}"
+            die ssh-not-listening "nothing Polaris could reach is listening on any port this machine's SSH server could be using (\$SSH_PORTS); start it, or bind it to something other than loopback, \$POLARIS_RETRY_HINT"
         fi
         say "an SSH server is listening on port \$SSH_PORT"
     fi`;
@@ -479,10 +532,10 @@ if [ -z "\$HOST_KEYS" ]; then
     # the machine commit to the keys it will still be answering with later:
     # 'ssh-keygen -A' only fills in what is missing and never replaces a key.
     command -v ssh-keygen >/dev/null 2>&1 \\
-        || die "this machine has no SSH host keys and no ssh-keygen to make them; is an SSH server installed?"
+        || die no-ssh-host-keys "this machine has no SSH host keys and no ssh-keygen to make them; is an SSH server installed?"
     ssh-keygen -A >/dev/null 2>&1 || true
     collect_host_keys
-    [ -n "\$HOST_KEYS" ] || die "this machine has no SSH host keys and they could not be generated; is an SSH server installed?"
+    [ -n "\$HOST_KEYS" ] || die no-ssh-host-keys "this machine has no SSH host keys and they could not be generated; is an SSH server installed?"
     say "this machine had no SSH host keys yet; generated them"
 fi
 

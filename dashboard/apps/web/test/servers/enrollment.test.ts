@@ -163,7 +163,7 @@ describe("enrollmentScript", () => {
     });
 
     it("refuses to run unprivileged rather than failing halfway through", () => {
-        expect(script).toContain('[ "$(id -u)" = "0" ] || die "run this with sudo"');
+        expect(script).toContain('[ "$(id -u)" = "0" ] || die not-root "run this with sudo"');
     });
 
     it("makes the machine commit to its host keys", () => {
@@ -225,6 +225,22 @@ describe("enrollmentScript", () => {
         expect(untilEnd).not.toContain("-o create");
     });
 
+    // Each dseditgroup call can fail quietly on a managed Mac, and by then Remote
+    // Login is already on. Announcing a restriction that did not happen is the one
+    // outcome nobody goes back to check, so the group is re-read the same way the
+    // Remote Login state is and the claim is made only on what it says.
+    it("only claims the SSH narrowing it can read back", () => {
+        expect(script).toContain("dseditgroup -o checkmember");
+        const enabled = script.slice(script.indexOf("dseditgroup -o create -q"));
+        const decided = enabled.slice(0, enabled.indexOf('say "turned Remote Login on'));
+        expect(decided).toContain('[ "$(access_ssh_member "$POLARIS_USER" user)" = "yes" ]');
+        expect(decided).toContain('[ "$(access_ssh_member everyone group)" != "yes" ]');
+        // An unreadable answer is not a yes, so the honest warning is what is left.
+        expect(script).toContain("WARNING: turned Remote Login on, but SSH could not be limited");
+        const reader = script.slice(script.indexOf("access_ssh_member() {"));
+        expect(reader.slice(0, reader.indexOf("\n    }"))).toContain("*) echo unknown ;;");
+    });
+
     it("says how to undo the Remote Login changes it can make", () => {
         expect(script).toContain("sudo systemsetup -setremotelogin off");
         expect(script).toContain("sudo dseditgroup -o delete com.apple.access_ssh");
@@ -233,10 +249,26 @@ describe("enrollmentScript", () => {
     // Stopping here leaves the token unspent, so the same command works again once
     // the SSH server is on. Claiming first would burn it for nothing.
     it("stops before the claim when nothing will answer on the SSH port", () => {
-        const preflight = script.indexOf("nothing is listening on any port");
+        const preflight = script.indexOf("nothing Polaris could reach is listening on any port");
         expect(preflight).toBeGreaterThan(-1);
         expect(preflight).toBeLessThan(script.indexOf("telling Polaris about this machine"));
-        expect(script).toContain('die "Remote Login is off');
+        expect(script).toContain('die remote-login-off "Remote Login is off');
+    });
+
+    // "Something holds the port" was never the question. An sshd on 127.0.0.1
+    // answers this machine and nobody else, so letting it through registers a
+    // server Polaris then cannot reach - and reports as a firewall problem, which
+    // is the exact misdiagnosis this check exists to prevent.
+    it("wants a bind Polaris could dial, not merely a listener", () => {
+        const probe = script.slice(script.indexOf("reachable_listener() {"));
+        const matcher = probe.slice(0, probe.indexOf("listening_on() {"));
+        expect(matcher).toContain("/^127\\./");
+        expect(matcher).toContain('addr == "::1"');
+        expect(matcher).toContain('addr == "[::1]"');
+        // The port alone is not the match any more; the address column decides.
+        expect(script).not.toContain('grep -q ":$1 "');
+        expect(script).toContain('ss -ltn 2>/dev/null | reachable_listener "$1"');
+        expect(script).toContain('netstat -lnt 2>/dev/null | reachable_listener "$1"');
     });
 
     // A box with neither tool cannot answer the question, and a wrong "nothing is
@@ -273,26 +305,49 @@ describe("enrollmentScript", () => {
     // Before this, the pre-claim abort existed only in a terminal nobody was
     // necessarily watching: the dialog span for the full lifetime and then said the
     // command had expired, which by then was a lie about what happened.
-    it("tells Polaris why it stopped, before each pre-claim die", () => {
+    //
+    // Every abort in this script is a pre-claim one, so reporting lives inside
+    // `die` rather than being a call to remember at each of them - which is what
+    // makes "no silent stop" a property of the script instead of a habit.
+    it("cannot stop without telling Polaris why", () => {
         expect(script).toContain("/refuse");
-        for (const reason of ENROLLMENT_REFUSAL_REASONS) expect(script).toContain(`refuse ${reason}`);
-        // Reported first, so the dialog has the reason before the operator is told.
-        expect(script.indexOf("refuse ssh-not-listening")).toBeLessThan(
-            script.indexOf('die "nothing is listening on any port')
+        // No bare `die "message"` anywhere: a code is not optional.
+        expect(script).not.toMatch(/die "/);
+        const codes = [...script.matchAll(/(?:^|[|;&\s])die ([a-z-]+) "/gm)].map((match) => match[1]);
+        expect(codes.length).toBeGreaterThan(0);
+        for (const code of codes) expect(ENROLLMENT_REFUSAL_REASONS).toContain(code);
+        // Nothing the script can refuse over is missing a sentence Polaris owns.
+        for (const reason of ENROLLMENT_REFUSAL_REASONS) {
+            expect(ENROLLMENT_REFUSAL_MESSAGES[reason].length).toBeGreaterThan(0);
+        }
+        // The ones this change was built for, plus the aborts that used to be mute.
+        expect(codes).toEqual(
+            expect.arrayContaining([
+                "ssh-not-listening",
+                "remote-login-off",
+                "no-ssh-host-keys",
+                "no-home-directory",
+                "no-user-tooling",
+                "unsupported-platform",
+                "curl-missing",
+                "not-root"
+            ])
         );
-        expect(script.indexOf("refuse remote-login-off")).toBeLessThan(script.indexOf('die "Remote Login is off'));
     });
 
     // A refusal is a courtesy to the dialog, not a step of the enrollment. If it
     // cannot be delivered the script must still print what it printed and exit how
     // it exits, so nothing about it is allowed to fail loudly.
     it("reports the refusal best-effort, so a failure changes nothing", () => {
-        const helper = script.slice(script.indexOf("refuse() {"));
+        const helper = script.slice(script.indexOf("die() {"));
         const body = helper.slice(0, helper.indexOf("\n}"));
         expect(body).toContain("|| true");
         expect(body).toContain("--max-time");
         // A code, never a sentence: this endpoint is unauthenticated.
         expect(body).toContain("printf '{\"reason\":\"%s\"}' \"$1\"");
+        // Reported before the operator is told, and the exit code is still 1.
+        expect(body.indexOf("/refuse")).toBeLessThan(body.indexOf('echo "polaris: $2"'));
+        expect(body).toContain("exit 1");
     });
 
     // Both die messages used to say "then run this command again" flatly, and the
@@ -300,9 +355,21 @@ describe("enrollmentScript", () => {
     // installed an SSH server - so the next thing they saw was "expired".
     it("does not promise a re-run the command may be too old for", () => {
         expect(script).not.toContain("then run this command again\"");
-        const dies = script.match(/die "(?:nothing is listening|Remote Login is off)[^"]*"/g) ?? [];
+        const dies =
+            script.match(/die (?:ssh-not-listening|remote-login-off) "[^"]*"/g) ?? [];
         expect(dies).toHaveLength(2);
-        for (const message of dies) expect(message).toContain(ENROLLMENT_RETRY_HINT);
+        for (const message of dies) expect(message).toContain("$POLARIS_RETRY_HINT");
+    });
+
+    // The hint is prose from @polaris/core spliced into a script that gets piped
+    // into a root shell. Every other value the script carries is single-quoted on
+    // the way in, and a later edit adding a quote, a `$` or a backtick to it must
+    // not be the thing that decides whether the script parses.
+    it("quotes the retry hint on the way in like every other value", () => {
+        expect(script).toContain(`POLARIS_RETRY_HINT='${ENROLLMENT_RETRY_HINT}'`);
+        // Once, in that quoted assignment, and nowhere else: every message reaches
+        // it through the variable rather than carrying a copy of the prose.
+        expect(script.split(ENROLLMENT_RETRY_HINT)).toHaveLength(2);
     });
 
     it("locks the login it creates out of password authentication", () => {
