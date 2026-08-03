@@ -97,6 +97,13 @@ describe("board card", () => {
         expect(markup).toContain('aria-label="Assignees"');
     });
 
+    it("keeps an empty control on screen while its own menu is open", () => {
+        // The menu takes the pointer off the card, so a control revealed by
+        // hover alone would vanish the moment it was used.
+        const markup = card(taskRow());
+        expect(markup).toContain("has-[[data-state=open]]:opacity-100");
+    });
+
     it("offers no controls to somebody who cannot edit", () => {
         const markup = card(taskRow(), false);
         expect(markup).not.toContain('aria-label="Priority"');

@@ -2,9 +2,10 @@
 
 /** Dropdown menu built on Radix. Used by the app switcher and row actions. */
 
+import { cn } from "../lib/cn";
+import { ignoreOpeningPress } from "../lib/menu-press";
 import * as RadixMenu from "@radix-ui/react-dropdown-menu";
 import { forwardRef, type ComponentPropsWithoutRef, type ElementRef } from "react";
-import { cn } from "../lib/cn";
 
 export const DropdownMenu = RadixMenu.Root;
 export const DropdownMenuTrigger = RadixMenu.Trigger;
@@ -24,6 +25,9 @@ export const DropdownMenuContent = forwardRef<
                 className
             )}
             {...props}
+            // After the spread: the menu must never commit an option on the
+            // release of the press that opened it.
+            onPointerUpCapture={ignoreOpeningPress}
         />
     </RadixMenu.Portal>
 ));

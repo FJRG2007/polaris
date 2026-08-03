@@ -45,8 +45,13 @@ function neighbours(tasks: readonly TaskRow[], targetId: string | null, dragged:
 function CornerControl({ set, canEdit, children }: { set: boolean; canEdit: boolean; children: React.ReactNode }) {
     if (set) return <>{children}</>;
     if (!canEdit) return null;
+    // An open menu takes the pointer off the card, so hover alone would hide the
+    // control being used and leave the menu floating beside a card with nothing
+    // on it. It stays while its menu is open.
     return (
-        <span className="opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">{children}</span>
+        <span className="opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100 has-[[data-state=open]]:opacity-100">
+            {children}
+        </span>
     );
 }
 

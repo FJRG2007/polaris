@@ -6,10 +6,11 @@
  * The file browser uses it for per-entry actions (open, rename, share, delete).
  */
 
-import * as RadixMenu from "@radix-ui/react-context-menu";
-import { ChevronRight } from "lucide-react";
-import { forwardRef, type ComponentPropsWithoutRef, type ElementRef } from "react";
 import { cn } from "../lib/cn";
+import { ChevronRight } from "lucide-react";
+import { ignoreOpeningPress } from "../lib/menu-press";
+import * as RadixMenu from "@radix-ui/react-context-menu";
+import { forwardRef, type ComponentPropsWithoutRef, type ElementRef } from "react";
 
 export const ContextMenu = RadixMenu.Root;
 export const ContextMenuTrigger = RadixMenu.Trigger;
@@ -28,6 +29,9 @@ export const ContextMenuContent = forwardRef<
                 className
             )}
             {...props}
+            // After the spread: the menu must never commit an option on the
+            // release of the press that opened it.
+            onPointerUpCapture={ignoreOpeningPress}
         />
     </RadixMenu.Portal>
 ));
@@ -79,6 +83,9 @@ export const ContextMenuSubContent = forwardRef<
                 className
             )}
             {...props}
+            // After the spread: the menu must never commit an option on the
+            // release of the press that opened it.
+            onPointerUpCapture={ignoreOpeningPress}
         />
     </RadixMenu.Portal>
 ));
