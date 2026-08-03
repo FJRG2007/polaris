@@ -155,7 +155,10 @@ export function PasskeysCard({ passkeys, lock }: { passkeys: PasskeyView[]; lock
                                 a breakpoint earlier. A column that comes early does not
                                 wrap - it puts the whole table on a horizontal scrollbar. */}
                             <tr>
-                                <th className="px-3 py-2 font-medium">Name</th>
+                                {/* w-full max-w-0: the line folded under the name is nowrap
+                                    text, and uncapped it sets a floor under this column
+                                    that no truncating gets below. */}
+                                <th className="w-full max-w-0 px-3 py-2 font-medium">Name</th>
                                 <th className="hidden px-3 py-2 font-medium lg:table-cell">Added from</th>
                                 <th className="hidden px-3 py-2 font-medium 2xl:table-cell">Address</th>
                                 <th className="hidden px-3 py-2 font-medium xl:table-cell">Works on</th>
@@ -174,7 +177,7 @@ export function PasskeysCard({ passkeys, lock }: { passkeys: PasskeyView[]; lock
                             ) : (
                                 passkeys.map((passkey) => (
                                     <tr key={passkey.id} className="border-t border-border">
-                                        <td className="px-3 py-2">
+                                        <td className="w-full max-w-0 px-3 py-2">
                                             <div className="flex items-center gap-3">
                                                 <KeyRound className="size-4 shrink-0 text-muted-foreground" />
                                                 <div className="min-w-0">

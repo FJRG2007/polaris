@@ -114,7 +114,10 @@ export function TrustedDevicesCard({ devices }: { devices: TrustedDeviceRow[] })
                                 the content area is narrower there than a breakpoint
                                 earlier. An early column scrolls the table sideways. */}
                             <tr>
-                                <th className="px-3 py-2 font-medium">Device</th>
+                                {/* w-full max-w-0: the folded origin line under the name is
+                                    nowrap, and without the cap it sets a floor under this
+                                    column that spills the table sideways. */}
+                                <th className="w-full max-w-0 px-3 py-2 font-medium">Device</th>
                                 <th className="hidden px-3 py-2 font-medium lg:table-cell">Address</th>
                                 <th className="hidden px-3 py-2 font-medium xl:table-cell">Domain</th>
                                 <th className="hidden px-3 py-2 font-medium 2xl:table-cell">Remembered</th>
@@ -140,7 +143,7 @@ export function TrustedDevicesCard({ devices }: { devices: TrustedDeviceRow[] })
                                                 busyId === device.id && "opacity-60"
                                             )}
                                         >
-                                            <td className="px-3 py-2">
+                                            <td className="w-full max-w-0 px-3 py-2">
                                                 <div className="flex items-center gap-3">
                                                     {named ? (
                                                         <Smartphone className="size-4 shrink-0 text-muted-foreground" />
@@ -151,7 +154,7 @@ export function TrustedDevicesCard({ devices }: { devices: TrustedDeviceRow[] })
                                                         <p className="flex flex-wrap items-center gap-1.5">
                                                             <button
                                                                 type="button"
-                                                                className="truncate text-left hover:underline"
+                                                                className="min-w-0 truncate text-left hover:underline"
                                                                 onClick={() => setOpened(device)}
                                                             >
                                                                 {named ? device.device : "Remembered earlier"}

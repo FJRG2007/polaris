@@ -229,6 +229,7 @@ export function DeviceDialog({
                                             </p>
                                         </div>
                                         <SessionsTable
+                                            compact
                                             sessions={detail.sessions}
                                             busyId={busy ? "all" : null}
                                             emptyLabel="Not signed in anywhere right now."

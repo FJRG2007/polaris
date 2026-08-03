@@ -229,6 +229,7 @@ export function UserDetailDialog({
                         </div>
                         {sessions ? (
                             <SessionsTable
+                                compact
                                 sessions={sessions}
                                 busyId={busy ? "all" : null}
                                 emptyLabel="Nothing is signed in."
