@@ -59,7 +59,7 @@ export default async function SecurityPage() {
     const lock = standing.settled ? undefined : { reason: newDeviceWaitMessage(standing) };
 
     return (
-        <div className="mx-auto flex max-w-2xl flex-col gap-4">
+        <div className="mx-auto flex w-full max-w-7xl flex-col gap-4">
             <div>
                 <h1 className="text-lg font-semibold">Security</h1>
                 <p className="text-sm text-muted-foreground">
@@ -68,6 +68,7 @@ export default async function SecurityPage() {
             </div>
             <SecurityView
                 lock={lock}
+                account={user.email}
                 newDeviceGraceDays={settings.newDeviceGraceDays}
                 hasPin={settings.hasPin}
                 idleLockMinutes={settings.idleLockMinutes}

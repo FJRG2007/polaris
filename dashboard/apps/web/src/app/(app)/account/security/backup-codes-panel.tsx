@@ -29,8 +29,8 @@ import {
 } from "@polaris/ui";
 
 /** Hand a generated file to the browser as a download. */
-function download(codes: readonly string[], format: BackupCodeFormat): void {
-    const file = backupCodesFile(codes, format);
+function download(codes: readonly string[], format: BackupCodeFormat, account: string): void {
+    const file = backupCodesFile(codes, format, account);
     const url = URL.createObjectURL(new Blob([file.body], { type: file.type }));
     const link = document.createElement("a");
     link.href = url;
@@ -44,11 +44,11 @@ function download(codes: readonly string[], format: BackupCodeFormat): void {
  * because a popup blocker would swallow the window and the codes are only shown
  * once - there is no second chance to get them onto paper.
  */
-function printCodes(codes: readonly string[]): void {
+function printCodes(codes: readonly string[], account: string): void {
     const frame = document.createElement("iframe");
     frame.setAttribute("aria-hidden", "true");
     frame.style.cssText = "position:fixed;width:0;height:0;border:0;visibility:hidden";
-    frame.srcdoc = backupCodesHtml(codes);
+    frame.srcdoc = backupCodesHtml(codes, account);
     frame.onload = () => {
         frame.contentWindow?.print();
         // Outlives the print dialog, which is modal on the frame's window.
@@ -57,7 +57,17 @@ function printCodes(codes: readonly string[]): void {
     document.body.append(frame);
 }
 
-export function BackupCodesPanel({ codes, label }: { codes: readonly string[]; label?: string }) {
+export function BackupCodesPanel({
+    codes,
+    account,
+    label
+}: {
+    codes: readonly string[];
+    /** The account these open, carried into the file name and onto the printed
+     *  page so one set of codes can be told from another. */
+    account: string;
+    label?: string;
+}) {
     return (
         <div className="flex flex-col gap-1">
             <span className="text-xs text-muted-foreground">
@@ -88,13 +98,16 @@ export function BackupCodesPanel({ codes, label }: { codes: readonly string[]; l
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="start">
                         {BACKUP_CODE_FORMATS.map((entry) => (
-                            <DropdownMenuItem key={entry.format} onSelect={() => download(codes, entry.format)}>
+                            <DropdownMenuItem
+                                key={entry.format}
+                                onSelect={() => download(codes, entry.format, account)}
+                            >
                                 {entry.label}
                             </DropdownMenuItem>
                         ))}
                     </DropdownMenuContent>
                 </DropdownMenu>
-                <Button type="button" variant="ghost" size="sm" onClick={() => printCodes(codes)}>
+                <Button type="button" variant="ghost" size="sm" onClick={() => printCodes(codes, account)}>
                     <Printer className="size-4" />
                     Print
                 </Button>

@@ -46,10 +46,13 @@ export function SessionsTable({
         <div className="overflow-x-auto rounded-lg border border-border">
             <table className="w-full text-sm">
                 <thead className="bg-surface/60 text-left text-xs text-muted-foreground">
+                    {/* Nothing arrives at md: the navigation rail appears there, so the
+                        content area is narrower than it was a breakpoint earlier and a
+                        column added then only scrolls the table sideways. */}
                     <tr>
                         <th className="px-3 py-2 font-medium">Device</th>
-                        <th className="hidden px-3 py-2 font-medium sm:table-cell">Address</th>
-                        <th className="hidden px-3 py-2 font-medium md:table-cell">Domain</th>
+                        <th className="hidden px-3 py-2 font-medium lg:table-cell">Address</th>
+                        <th className="hidden px-3 py-2 font-medium xl:table-cell">Domain</th>
                         <th className="hidden px-3 py-2 font-medium lg:table-cell">Last active</th>
                         <th className="px-3 py-2" />
                     </tr>
@@ -77,16 +80,16 @@ export function SessionsTable({
                                                 {session.locked ? <Badge>Locked</Badge> : null}
                                             </p>
                                             {/* The columns the narrow layouts drop, folded back in. */}
-                                            <p className="truncate text-xs text-muted-foreground sm:hidden">
+                                            <p className="truncate text-xs text-muted-foreground lg:hidden">
                                                 {sessionOrigin(session)}
                                             </p>
                                         </div>
                                     </div>
                                 </td>
-                                <td className="hidden whitespace-nowrap px-3 py-2 text-xs text-muted-foreground sm:table-cell">
+                                <td className="hidden whitespace-nowrap px-3 py-2 text-xs text-muted-foreground lg:table-cell">
                                     <DeviceAddress address={session} />
                                 </td>
-                                <td className="hidden max-w-[14rem] px-3 py-2 text-xs text-muted-foreground md:table-cell">
+                                <td className="hidden max-w-[12rem] px-3 py-2 text-xs text-muted-foreground xl:table-cell">
                                     <span className="block truncate">{session.host ?? "Not recorded"}</span>
                                 </td>
                                 <td className="hidden whitespace-nowrap px-3 py-2 text-xs text-muted-foreground lg:table-cell">

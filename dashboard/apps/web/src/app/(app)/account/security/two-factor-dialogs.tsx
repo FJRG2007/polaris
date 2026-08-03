@@ -52,11 +52,14 @@ function groupSecret(secret: string): string {
 export function EnableTwoFactorDialog({
     open,
     onOpenChange,
-    onDone
+    onDone,
+    account
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     onDone: () => void;
+    /** Who the backup codes minted here belong to, for the file they are saved to. */
+    account: string;
 }) {
     const [step, setStep] = useState<"password" | "verify">("password");
     const [totpUri, setTotpUri] = useState("");
@@ -175,7 +178,7 @@ export function EnableTwoFactorDialog({
                             </a>
                         </div>
 
-                        <BackupCodesPanel codes={backupCodes} />
+                        <BackupCodesPanel codes={backupCodes} account={account} />
 
                         <label className="flex flex-col gap-1 text-sm">
                             Code from your app

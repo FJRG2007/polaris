@@ -24,9 +24,10 @@ export default async function SessionsPage() {
     ]);
 
     // Wider than the rest of the account pages: this one is a table, and the
-    // address and domain columns are the point of it.
+    // address and domain columns are the point of it. Held to the same width as
+    // the security page so the two read as one place.
     return (
-        <div className="mx-auto flex max-w-4xl flex-col gap-4">
+        <div className="mx-auto flex w-full max-w-7xl flex-col gap-4">
             <div>
                 <h1 className="text-lg font-semibold">Sessions</h1>
                 <p className="text-sm text-muted-foreground">

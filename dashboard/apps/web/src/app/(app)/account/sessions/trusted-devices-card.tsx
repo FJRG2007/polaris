@@ -109,12 +109,16 @@ export function TrustedDevicesCard({ devices }: { devices: TrustedDeviceRow[] })
                 <div className="overflow-x-auto rounded-lg border border-border">
                     <table className="w-full text-sm">
                         <thead className="bg-surface/60 text-left text-xs text-muted-foreground">
+                            {/* Each column waits for the width that holds it, and nothing
+                                arrives at md: that is where the navigation rail appears, so
+                                the content area is narrower there than a breakpoint
+                                earlier. An early column scrolls the table sideways. */}
                             <tr>
                                 <th className="px-3 py-2 font-medium">Device</th>
-                                <th className="hidden px-3 py-2 font-medium sm:table-cell">Address</th>
-                                <th className="hidden px-3 py-2 font-medium md:table-cell">Domain</th>
-                                <th className="hidden px-3 py-2 font-medium lg:table-cell">Remembered</th>
-                                <th className="hidden px-3 py-2 font-medium lg:table-cell">Until</th>
+                                <th className="hidden px-3 py-2 font-medium lg:table-cell">Address</th>
+                                <th className="hidden px-3 py-2 font-medium xl:table-cell">Domain</th>
+                                <th className="hidden px-3 py-2 font-medium 2xl:table-cell">Remembered</th>
+                                <th className="hidden px-3 py-2 font-medium 2xl:table-cell">Until</th>
                                 <th className="px-3 py-2" />
                             </tr>
                         </thead>
@@ -156,26 +160,26 @@ export function TrustedDevicesCard({ devices }: { devices: TrustedDeviceRow[] })
                                                                 <Badge variant="primary">This device</Badge>
                                                             ) : null}
                                                         </p>
-                                                        <p className="truncate text-xs text-muted-foreground sm:hidden">
+                                                        <p className="truncate text-xs text-muted-foreground lg:hidden">
                                                             {origin(device)}
                                                         </p>
                                                     </div>
                                                 </div>
                                             </td>
-                                            <td className="hidden whitespace-nowrap px-3 py-2 text-xs text-muted-foreground sm:table-cell">
+                                            <td className="hidden whitespace-nowrap px-3 py-2 text-xs text-muted-foreground lg:table-cell">
                                                 <DeviceAddress address={device} />
                                             </td>
-                                            <td className="hidden max-w-[14rem] px-3 py-2 text-xs text-muted-foreground md:table-cell">
+                                            <td className="hidden max-w-[12rem] px-3 py-2 text-xs text-muted-foreground xl:table-cell">
                                                 <span className="block truncate">{device.host ?? "Not recorded"}</span>
                                             </td>
-                                            <td className="hidden whitespace-nowrap px-3 py-2 text-xs text-muted-foreground lg:table-cell">
+                                            <td className="hidden whitespace-nowrap px-3 py-2 text-xs text-muted-foreground 2xl:table-cell">
                                                 {device.rememberedAt ? (
                                                     <RelativeTime iso={device.rememberedAt} />
                                                 ) : (
                                                     "Not recorded"
                                                 )}
                                             </td>
-                                            <td className="hidden whitespace-nowrap px-3 py-2 text-xs text-muted-foreground lg:table-cell">
+                                            <td className="hidden whitespace-nowrap px-3 py-2 text-xs text-muted-foreground 2xl:table-cell">
                                                 <RelativeTime iso={device.expiresAt} tense="future" />
                                             </td>
                                             <td className="px-3 py-2">

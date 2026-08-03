@@ -55,11 +55,14 @@ function describe(remaining: number | null): { status: string; description: stri
 
 export function BackupCodesCard({
     lock,
+    account,
     twoFactorEnabled,
     remaining
 }: {
     /** Set while this browser is too new on the account to change any of it. */
     lock?: SettingLock;
+    /** Who the codes belong to, so a saved set says which account it opens. */
+    account: string;
     twoFactorEnabled: boolean;
     /** Codes still unspent, or null when no readable set exists. */
     remaining: number | null;
@@ -96,7 +99,7 @@ export function BackupCodesCard({
                     New codes
                 </Button>
             </SettingCard>
-            <RegenerateDialog open={open} onOpenChange={setOpen} />
+            <RegenerateDialog open={open} onOpenChange={setOpen} account={account} />
         </>
     );
 }
@@ -111,10 +114,12 @@ export function BackupCodesCard({
  */
 function RegenerateDialog({
     open,
-    onOpenChange
+    onOpenChange,
+    account
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
+    account: string;
 }) {
     const router = useRouter();
     const [codes, setCodes] = useState<string[] | null>(null);
@@ -162,6 +167,7 @@ function RegenerateDialog({
                     <div className="flex flex-col gap-3">
                         <BackupCodesPanel
                             codes={codes}
+                            account={account}
                             label="Each code works once. Keep them somewhere you can reach without your phone."
                         />
                         <div className="flex justify-end">

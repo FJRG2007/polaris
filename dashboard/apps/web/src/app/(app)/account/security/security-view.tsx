@@ -5,6 +5,12 @@
  * dialog. Only the two session limits are edited inline - they are a pair of
  * dropdowns, and burying them in a dialog would cost a click for nothing.
  *
+ * The cards sit in two columns once the viewport can carry them, split by what
+ * they answer: the left column is how a sign-in is proved, the right is what
+ * happens to a session afterwards and how the account is recovered. Passkeys run
+ * the full width underneath, because that card is a table with a row per device
+ * and a column that had nowhere to go inside a half-width card.
+ *
  * Nothing here decides anything; the server actions re-verify every change.
  */
 
@@ -51,6 +57,7 @@ function describeDays(days: number): string {
 
 export function SecurityView({
     lock,
+    account,
     newDeviceGraceDays,
     hasPin,
     idleLockMinutes,
@@ -68,6 +75,9 @@ export function SecurityView({
     /** Set while this browser is too new on the account to change any of this.
      *  Every control below reads it; the server refuses them regardless. */
     lock?: SettingLock;
+    /** Who these codes belong to, so a downloaded or printed set says which
+     *  account it opens. */
+    account: string;
     /** Days the account makes a device newly seen on it wait. 0 is no wait. */
     newDeviceGraceDays: number;
     hasPin: boolean;
@@ -141,182 +151,189 @@ export function SecurityView({
                 </Card>
             ) : null}
 
-            <SettingCard
-                title="Password"
-                description="Changing it signs out every other session."
-            >
-                <Button variant="ghost" disabled={locked} onClick={() => setDialog("recover")}>
-                    I forgot it
-                </Button>
-                <Button disabled={locked} onClick={() => setDialog("password")}>
-                    Change
-                </Button>
-            </SettingCard>
+            <div className="grid gap-4 xl:grid-cols-2 xl:items-start">
+                <div className="flex flex-col gap-4">
+                    <SettingCard
+                        title="Password"
+                        description="Changing it signs out every other session."
+                    >
+                        <Button variant="ghost" disabled={locked} onClick={() => setDialog("recover")}>
+                            I forgot it
+                        </Button>
+                        <Button disabled={locked} onClick={() => setDialog("password")}>
+                            Change
+                        </Button>
+                    </SettingCard>
 
-            <SettingCard
-                title="Authenticator app"
-                description="A time-based code from your phone, asked for after your password."
-                status={twoFactorEnabled ? "On" : "Off"}
-                statusTone={twoFactorEnabled ? "on" : "off"}
-            >
-                {twoFactorEnabled ? (
-                    <Button variant="outline" disabled={locked} onClick={() => setDialog("2fa-off")}>
-                        Turn off
-                    </Button>
-                ) : (
-                    <Button disabled={locked} onClick={() => setDialog("2fa-on")}>
-                        Set up
-                    </Button>
-                )}
-            </SettingCard>
+                    <SettingCard
+                        title="Authenticator app"
+                        description="A time-based code from your phone, asked for after your password."
+                        status={twoFactorEnabled ? "On" : "Off"}
+                        statusTone={twoFactorEnabled ? "on" : "off"}
+                    >
+                        {twoFactorEnabled ? (
+                            <Button variant="outline" disabled={locked} onClick={() => setDialog("2fa-off")}>
+                                Turn off
+                            </Button>
+                        ) : (
+                            <Button disabled={locked} onClick={() => setDialog("2fa-on")}>
+                                Set up
+                            </Button>
+                        )}
+                    </SettingCard>
 
-            <BackupCodesCard
-                lock={lock}
-                twoFactorEnabled={twoFactorEnabled}
-                remaining={backupCodesRemaining}
-            />
+                    <BackupCodesCard
+                        lock={lock}
+                        account={account}
+                        twoFactorEnabled={twoFactorEnabled}
+                        remaining={backupCodesRemaining}
+                    />
 
-            <TwoFactorMethodsCard
-                lock={lock}
-                statuses={twoFactorMethods}
-                preferred={twoFactorPreferred}
-                twoFactorEnabled={twoFactorEnabled}
-                trustedDevices={trustedDevices}
-                approval={{ enabled: requireLoginApproval, hasPin, otherSessions }}
-            />
+                    <TwoFactorMethodsCard
+                        lock={lock}
+                        statuses={twoFactorMethods}
+                        preferred={twoFactorPreferred}
+                        twoFactorEnabled={twoFactorEnabled}
+                        trustedDevices={trustedDevices}
+                        approval={{ enabled: requireLoginApproval, hasPin, otherSessions }}
+                    />
+                </div>
+
+                <div className="flex flex-col gap-4">
+                    <SettingCard
+                        title="Quick unlock PIN"
+                        // Not conditional on the approval gate any more: the PIN also
+                        // confirms a sign-in allowed by scanning the code on the sign-in
+                        // screen, which every account can do whether or not that gate is on.
+                        description="Reopens a locked dashboard, and confirms a sign-in you allow from here."
+                        status={hasPin ? "Set" : "Not set"}
+                        statusTone={hasPin ? "on" : "off"}
+                    >
+                        {hasPin ? (
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                aria-label="Remove quick unlock PIN"
+                                disabled={locked}
+                                onClick={() => setDialog("pin-off")}
+                            >
+                                <Trash2 className="size-4" />
+                            </Button>
+                        ) : null}
+                        <Button disabled={locked} onClick={() => setDialog("pin")}>
+                            {hasPin ? "Change" : "Set PIN"}
+                        </Button>
+                    </SettingCard>
+
+                    <SettingCard
+                        title="Security questions"
+                        description="Used to set a new password when you have forgotten the current one."
+                        status={hasQuestions ? "Set" : "Not set"}
+                        statusTone={hasQuestions ? "on" : "off"}
+                    >
+                        {hasQuestions ? (
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                aria-label="Remove security questions"
+                                disabled={locked}
+                                onClick={() => setDialog("questions-off")}
+                            >
+                                <Trash2 className="size-4" />
+                            </Button>
+                        ) : null}
+                        <Button disabled={locked} onClick={() => setDialog("questions")}>
+                            {hasQuestions ? "Update" : "Set up"}
+                        </Button>
+                    </SettingCard>
+
+                    <Card>
+                        <CardBody className="flex flex-col gap-3">
+                            <div>
+                                <h2 className="text-sm font-medium">New devices</h2>
+                                <p className="text-xs text-muted-foreground">
+                                    Make a browser you have not signed in from before wait before it
+                                    can change anything on this page. It buys you time to notice if
+                                    someone else signs in with your password.
+                                </p>
+                            </div>
+                            <label className="flex flex-col gap-1 text-sm sm:max-w-xs">
+                                Wait before a new device can change security
+                                <Select
+                                    value={String(grace)}
+                                    disabled={locked || graceBusy}
+                                    onValueChange={(value) => void saveGrace(Number(value))}
+                                    options={NEW_DEVICE_GRACE_CHOICES.map((days) => ({
+                                        value: String(days),
+                                        label: describeDays(days)
+                                    }))}
+                                />
+                            </label>
+                            <p className="text-xs text-muted-foreground">
+                                A waiting device can still read this page and sign itself out.
+                                Devices you already use are not affected.
+                            </p>
+                            <Feedback error={graceResult?.error} ok={graceResult?.ok} />
+                        </CardBody>
+                    </Card>
+
+                    <Card>
+                        <CardBody className="flex flex-col gap-3">
+                            <div>
+                                <h2 className="text-sm font-medium">Session limits</h2>
+                                <p className="text-xs text-muted-foreground">
+                                    When to lock the dashboard, and when to end the session outright.
+                                </p>
+                            </div>
+                            <div className="grid gap-3 sm:grid-cols-2">
+                                <label className="flex flex-col gap-1 text-sm">
+                                    Lock after inactivity
+                                    <Select
+                                        value={String(limits.idleLockMinutes)}
+                                        disabled={locked}
+                                        onValueChange={(value) =>
+                                            setLimits((prev) => ({ ...prev, idleLockMinutes: Number(value) }))
+                                        }
+                                        options={IDLE_LOCK_CHOICES.map((minutes) => ({
+                                            value: String(minutes),
+                                            label: describeMinutes(minutes, "Never")
+                                        }))}
+                                    />
+                                </label>
+                                <label className="flex flex-col gap-1 text-sm">
+                                    Sign out after
+                                    <Select
+                                        value={String(limits.sessionMaxMinutes)}
+                                        disabled={locked}
+                                        onValueChange={(value) =>
+                                            setLimits((prev) => ({ ...prev, sessionMaxMinutes: Number(value) }))
+                                        }
+                                        options={SESSION_MAX_CHOICES.map((minutes) => ({
+                                            value: String(minutes),
+                                            label: describeMinutes(minutes, "Instance default (7 days)")
+                                        }))}
+                                    />
+                                </label>
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                                Unlocking asks for your PIN, or your password when no PIN is set.
+                            </p>
+                            <div className="flex items-center justify-between gap-2">
+                                <Feedback error={limitsResult?.error} ok={limitsResult?.ok} />
+                                <Button
+                                    onClick={() => void saveLimits()}
+                                    disabled={locked || limitsBusy || !limitsChanged}
+                                    className="ml-auto"
+                                >
+                                    {limitsBusy ? "Saving..." : "Save"}
+                                </Button>
+                            </div>
+                        </CardBody>
+                    </Card>
+                </div>
+            </div>
 
             <PasskeysCard passkeys={passkeys} lock={lock} />
-
-            <SettingCard
-                title="Quick unlock PIN"
-                // Not conditional on the approval gate any more: the PIN also
-                // confirms a sign-in allowed by scanning the code on the sign-in
-                // screen, which every account can do whether or not that gate is on.
-                description="Reopens a locked dashboard, and confirms a sign-in you allow from here."
-                status={hasPin ? "Set" : "Not set"}
-                statusTone={hasPin ? "on" : "off"}
-            >
-                {hasPin ? (
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        aria-label="Remove quick unlock PIN"
-                        disabled={locked}
-                        onClick={() => setDialog("pin-off")}
-                    >
-                        <Trash2 className="size-4" />
-                    </Button>
-                ) : null}
-                <Button disabled={locked} onClick={() => setDialog("pin")}>
-                    {hasPin ? "Change" : "Set PIN"}
-                </Button>
-            </SettingCard>
-
-            <SettingCard
-                title="Security questions"
-                description="Used to set a new password when you have forgotten the current one."
-                status={hasQuestions ? "Set" : "Not set"}
-                statusTone={hasQuestions ? "on" : "off"}
-            >
-                {hasQuestions ? (
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        aria-label="Remove security questions"
-                        disabled={locked}
-                        onClick={() => setDialog("questions-off")}
-                    >
-                        <Trash2 className="size-4" />
-                    </Button>
-                ) : null}
-                <Button disabled={locked} onClick={() => setDialog("questions")}>
-                    {hasQuestions ? "Update" : "Set up"}
-                </Button>
-            </SettingCard>
-
-            <Card>
-                <CardBody className="flex flex-col gap-3">
-                    <div>
-                        <h2 className="text-sm font-medium">New devices</h2>
-                        <p className="text-xs text-muted-foreground">
-                            Make a browser you have not signed in from before wait before it can
-                            change anything on this page. It buys you time to notice if someone
-                            else signs in with your password.
-                        </p>
-                    </div>
-                    <label className="flex flex-col gap-1 text-sm sm:max-w-xs">
-                        Wait before a new device can change security
-                        <Select
-                            value={String(grace)}
-                            disabled={locked || graceBusy}
-                            onValueChange={(value) => void saveGrace(Number(value))}
-                            options={NEW_DEVICE_GRACE_CHOICES.map((days) => ({
-                                value: String(days),
-                                label: describeDays(days)
-                            }))}
-                        />
-                    </label>
-                    <p className="text-xs text-muted-foreground">
-                        A waiting device can still read this page and sign itself out. Devices you
-                        already use are not affected.
-                    </p>
-                    <Feedback error={graceResult?.error} ok={graceResult?.ok} />
-                </CardBody>
-            </Card>
-
-            <Card>
-                <CardBody className="flex flex-col gap-3">
-                    <div>
-                        <h2 className="text-sm font-medium">Session limits</h2>
-                        <p className="text-xs text-muted-foreground">
-                            When to lock the dashboard, and when to end the session outright.
-                        </p>
-                    </div>
-                    <div className="grid gap-3 sm:grid-cols-2">
-                        <label className="flex flex-col gap-1 text-sm">
-                            Lock after inactivity
-                            <Select
-                                value={String(limits.idleLockMinutes)}
-                                disabled={locked}
-                                onValueChange={(value) =>
-                                    setLimits((prev) => ({ ...prev, idleLockMinutes: Number(value) }))
-                                }
-                                options={IDLE_LOCK_CHOICES.map((minutes) => ({
-                                    value: String(minutes),
-                                    label: describeMinutes(minutes, "Never")
-                                }))}
-                            />
-                        </label>
-                        <label className="flex flex-col gap-1 text-sm">
-                            Sign out after
-                            <Select
-                                value={String(limits.sessionMaxMinutes)}
-                                disabled={locked}
-                                onValueChange={(value) =>
-                                    setLimits((prev) => ({ ...prev, sessionMaxMinutes: Number(value) }))
-                                }
-                                options={SESSION_MAX_CHOICES.map((minutes) => ({
-                                    value: String(minutes),
-                                    label: describeMinutes(minutes, "Instance default (7 days)")
-                                }))}
-                            />
-                        </label>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                        Unlocking asks for your PIN, or your password when no PIN is set.
-                    </p>
-                    <div className="flex items-center justify-between gap-2">
-                        <Feedback error={limitsResult?.error} ok={limitsResult?.ok} />
-                        <Button
-                            onClick={() => void saveLimits()}
-                            disabled={locked || limitsBusy || !limitsChanged}
-                            className="ml-auto"
-                        >
-                            {limitsBusy ? "Saving..." : "Save"}
-                        </Button>
-                    </div>
-                </CardBody>
-            </Card>
 
             <ChangePasswordDialog open={dialog === "password"} onOpenChange={(open) => !open && close()} />
             <RecoverPasswordDialog
@@ -327,6 +344,7 @@ export function SecurityView({
             />
             <EnableTwoFactorDialog
                 open={dialog === "2fa-on"}
+                account={account}
                 onOpenChange={(open) => !open && close()}
                 onDone={() => router.refresh()}
             />

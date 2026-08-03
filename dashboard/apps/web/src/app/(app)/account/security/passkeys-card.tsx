@@ -149,13 +149,18 @@ export function PasskeysCard({ passkeys, lock }: { passkeys: PasskeyView[]; lock
                 <div className="overflow-x-auto rounded-lg border border-border">
                     <table className="w-full text-sm">
                         <thead className="bg-surface/60 text-left text-xs text-muted-foreground">
+                            {/* Each column waits for the width that actually holds it, and
+                                nothing arrives at md: that is where the navigation rail
+                                appears, so the content area is narrower there than it was
+                                a breakpoint earlier. A column that comes early does not
+                                wrap - it puts the whole table on a horizontal scrollbar. */}
                             <tr>
                                 <th className="px-3 py-2 font-medium">Name</th>
-                                <th className="hidden px-3 py-2 font-medium sm:table-cell">Added from</th>
-                                <th className="hidden px-3 py-2 font-medium lg:table-cell">Address</th>
-                                <th className="hidden px-3 py-2 font-medium md:table-cell">Works on</th>
-                                <th className="hidden px-3 py-2 font-medium lg:table-cell">Added</th>
-                                <th className="hidden px-3 py-2 font-medium md:table-cell">Last used</th>
+                                <th className="hidden px-3 py-2 font-medium lg:table-cell">Added from</th>
+                                <th className="hidden px-3 py-2 font-medium 2xl:table-cell">Address</th>
+                                <th className="hidden px-3 py-2 font-medium xl:table-cell">Works on</th>
+                                <th className="hidden px-3 py-2 font-medium 2xl:table-cell">Added</th>
+                                <th className="hidden px-3 py-2 font-medium lg:table-cell">Last used</th>
                                 <th className="px-3 py-2" />
                             </tr>
                         </thead>
@@ -174,32 +179,32 @@ export function PasskeysCard({ passkeys, lock }: { passkeys: PasskeyView[]; lock
                                                 <KeyRound className="size-4 shrink-0 text-muted-foreground" />
                                                 <div className="min-w-0">
                                                     <p className="truncate">{passkey.name}</p>
-                                                    <p className="truncate text-xs text-muted-foreground sm:hidden">
+                                                    <p className="truncate text-xs text-muted-foreground lg:hidden">
                                                         {passkey.browser} on {passkey.os}
                                                     </p>
                                                 </div>
                                             </div>
                                         </td>
-                                        <td className="hidden whitespace-nowrap px-3 py-2 text-xs text-muted-foreground sm:table-cell">
+                                        <td className="hidden whitespace-nowrap px-3 py-2 text-xs text-muted-foreground lg:table-cell">
                                             <span className="flex items-center gap-1.5">
                                                 <Laptop className="size-3.5 shrink-0" />
                                                 {passkey.browser} on {passkey.os}
                                             </span>
                                         </td>
-                                        <td className="hidden whitespace-nowrap px-3 py-2 text-xs text-muted-foreground lg:table-cell">
+                                        <td className="hidden whitespace-nowrap px-3 py-2 text-xs text-muted-foreground 2xl:table-cell">
                                             {passkey.ip ? (
                                                 <span className="font-mono">{passkey.ip}</span>
                                             ) : (
                                                 "Not recorded"
                                             )}
                                         </td>
-                                        <td className="hidden max-w-[14rem] px-3 py-2 text-xs text-muted-foreground md:table-cell">
+                                        <td className="hidden max-w-[12rem] px-3 py-2 text-xs text-muted-foreground xl:table-cell">
                                             <span className="block truncate font-mono">{passkey.host}</span>
                                         </td>
-                                        <td className="hidden whitespace-nowrap px-3 py-2 text-xs text-muted-foreground lg:table-cell">
+                                        <td className="hidden whitespace-nowrap px-3 py-2 text-xs text-muted-foreground 2xl:table-cell">
                                             <RelativeTime iso={passkey.addedAt} />
                                         </td>
-                                        <td className="hidden whitespace-nowrap px-3 py-2 text-xs text-muted-foreground md:table-cell">
+                                        <td className="hidden whitespace-nowrap px-3 py-2 text-xs text-muted-foreground lg:table-cell">
                                             {passkey.lastUsedAt ? (
                                                 <RelativeTime iso={passkey.lastUsedAt} />
                                             ) : (
@@ -246,7 +251,9 @@ export function PasskeysCard({ passkeys, lock }: { passkeys: PasskeyView[]; lock
                 )}
 
                 <div className="flex items-start gap-2">
-                    <div className="flex-1">
+                    {/* A name field is a few words wide whatever the page is; letting it
+                        run the full width of a wide table only makes it harder to read. */}
+                    <div className="flex-1 sm:max-w-sm">
                         <Input
                             value={name}
                             maxLength={PASSKEY_NAME_MAX}
