@@ -73,7 +73,12 @@ export function ListScreen({
     const format = useDisplayFormat();
     const [, startRefresh] = useTransition();
 
-    const initial = savedViews[0];
+    // A private view is one person's own way of looking at this list, so it is
+    // the one they open on; a shared view is the list's, and is what everybody
+    // else gets. That is also where anything this screen saves for them goes -
+    // reshaping what the rest of the team sees is not a thing a drag should do.
+    const ownView = savedViews.find((view) => view.ownerId === context.currentUserId && !view.shared);
+    const initial = ownView ?? savedViews[0];
     const [viewType, setViewType] = useState<core.TaskViewType>(initial?.type ?? "board");
     const [groupBy, setGroupBy] = useState<core.TaskGroupField>(initial?.groupBy ?? "status");
     const [sort, setSort] = useState<core.TaskSort>(initial?.sort ?? { field: "priority", direction: "asc" });
@@ -216,6 +221,41 @@ export function ListScreen({
     };
 
     /**
+     * Remember that this screen is in manual order, so a reload opens on the
+     * arrangement instead of sorting it away again.
+     *
+     * It is saved as the reader's own view, since the order they dragged into
+     * place is theirs and a view somebody shared with the list belongs to whoever
+     * made it. A screen spanning spaces has no list or space of its own to hang a
+     * view on, so there the arrangement holds until the tab is closed.
+     */
+    const keepManualOrder = async () => {
+        const owner = listId
+            ? { listId, spaceId: null }
+            : context.spaceId
+              ? { listId: null, spaceId: context.spaceId }
+              : null;
+        if (!owner) return;
+
+        const view = {
+            ...owner,
+            name: ownView?.name ?? "My order",
+            type: viewType,
+            groupBy,
+            sort: { field: "manual", direction: "asc" },
+            filter,
+            columns: ownView?.columns ?? [],
+            showSubtasks: ownView?.showSubtasks ?? true,
+            showClosed,
+            shared: false
+        };
+        const result = ownView
+            ? await runAction(() => actions.updateViewAction(ownView.id, view), setError)
+            : await runAction(() => actions.createViewAction(view), setError);
+        if (result?.error) setError(result.error);
+    };
+
+    /**
      * Keep the order the screen was showing, with the dragged task where it was
      * dropped, and hand the arrangement over to whoever made it.
      *
@@ -226,12 +266,16 @@ export function ListScreen({
      * it was in, the dragged task takes its new one, and the view says it is now
      * in manual order. Nothing jumps, and the next drag is an ordinary one.
      */
-    const adoptOrder = async (taskId: string, position: { beforeId: string | null; afterId: string | null }) => {
-        // The whole screen, not just what passes the filter: order is a property
-        // of the list, and re-spacing only the visible rows would interleave them
-        // with the ones a filter is hiding.
-        const arranged = core.sortTasks(rows.map(toFacts), sort, statusOrder).map((facts) => facts.id);
-        const taskIds = core.arrangeAround(arranged, taskId, position);
+    const adoptOrder = async (task: TaskRow, position: { beforeId: string | null; afterId: string | null }) => {
+        // Order runs per list. A screen spanning several - Everything, a sprint -
+        // is looking at that many separate sequences, so only the dragged task's
+        // own list is written down and every other list keeps the order somebody
+        // arranged there.
+        const inList = rows.filter((row) => row.listId === task.listId);
+        // The whole list, not just what passes the filter: re-spacing only the
+        // visible rows would interleave them with the ones a filter is hiding.
+        const arranged = core.sortTasks(inList.map(toFacts), sort, statusOrder).map((facts) => facts.id);
+        const taskIds = core.arrangeAround(arranged, task.id, position);
 
         const result = await runAction(() => actions.arrangeTasksAction({ taskIds }), setError);
         if (result?.error) {
@@ -251,7 +295,15 @@ export function ListScreen({
             });
             return next;
         });
-        setSort({ field: "manual", direction: "asc" });
+
+        // The screen only goes into manual order when the arrangement that was
+        // just written down is the whole of it. Ordering a screen that spans
+        // lists by a key that only means something inside one would scramble
+        // every list on it except the one somebody just dragged in.
+        if (rows.every((row) => row.listId === task.listId)) {
+            setSort({ field: "manual", direction: "asc" });
+            await keepManualOrder();
+        }
     };
 
     const move: ViewProps["onMove"] = async ({ taskId, groupKey, position }) => {
@@ -286,7 +338,14 @@ export function ListScreen({
         // arrangement is written down with it, and only once the move itself
         // went through.
         else if (result && sort.field !== "manual" && position.afterId) {
-            await adoptOrder(taskId, position);
+            const dragged = rowById.get(taskId);
+            const landedOn = rowById.get(position.afterId);
+            // A card dropped on itself promised nothing, and a card from another
+            // list is not a place either: the two are ordered against their own
+            // lists, so there is no gap between them to be put in.
+            if (dragged && landedOn && landedOn.id !== dragged.id && landedOn.listId === dragged.listId) {
+                await adoptOrder(dragged, position);
+            }
         }
         refresh();
     };

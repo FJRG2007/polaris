@@ -108,6 +108,14 @@ async function grantedFolders(actor: TaskActor, spaceId: string): Promise<Map<st
     return reachable;
 }
 
+/** How a grant on the chain above something combines with what the space itself
+ *  gives: the stronger of the two, since a grant is there to reach somebody into
+ *  a branch and never to narrow them out of one. */
+function withGrant(spaceRole: SpaceAccess | null, granted: core.SpaceRole | null): SpaceAccess | null {
+    if (spaceRole === "owner" || !granted) return spaceRole;
+    return spaceRole ? core.strongerRole(spaceRole, granted) : granted;
+}
+
 /** What this actor may do inside one folder, counting the space role and any
  *  grant on the chain above it. Null when neither reaches. */
 async function resolveFolderRole(
@@ -120,9 +128,7 @@ async function resolveFolderRole(
     // A list at the space root sits under no folder, so only a space role
     // reaches it - a grant on a client folder must not open the whole space.
     if (!folderId) return spaceRole;
-    const granted = (await grantedFolders(actor, spaceId)).get(folderId) ?? null;
-    if (!granted) return spaceRole;
-    return spaceRole ? core.strongerRole(spaceRole, granted) : granted;
+    return withGrant(spaceRole, (await grantedFolders(actor, spaceId)).get(folderId) ?? null);
 }
 
 /** The space a folder belongs to, once the actor has been cleared for it. */
@@ -179,6 +185,59 @@ export async function requireTask(
     if (!task) throw new TaskAccessError("That task no longer exists");
     const { spaceId, role } = await requireList(actor, task.listId, minimum);
     return { taskId, listId: task.listId, spaceId, role };
+}
+
+/**
+ * The tasks in a set this actor may change, and nothing beside them.
+ *
+ * A screen that spans spaces hands a write whatever ids it was showing - a
+ * selection, or the arrangement behind a drag - so it cannot ask "may I" one row
+ * at a time the way a single-task action does. This answers for the whole set
+ * through each task's list, which is the rule requireTask applies to one, so
+ * being able to see work is never enough to change it: reaching a space because
+ * it is internal makes a guest, and a guest reorders and bulk-edits nothing.
+ *
+ * Ids that do not clear it are left out rather than refused, because the set is
+ * whatever a screen happened to be showing: one row that moved out of reach
+ * since it loaded must not fail everything sent with it.
+ *
+ * Roles are resolved once per space, so a screen spanning several costs a handful
+ * of queries rather than one set per row.
+ */
+export async function writableTasks(
+    actor: TaskActor,
+    taskIds: readonly string[],
+    minimum: core.SpaceRole
+): Promise<{ id: string; spaceId: string }[]> {
+    if (taskIds.length === 0) return [];
+    const tasks = await prisma.task.findMany({
+        where: { id: { in: [...taskIds] } },
+        select: { id: true, listId: true, spaceId: true }
+    });
+    if (tasks.length === 0) return [];
+
+    const lists = await prisma.taskList.findMany({
+        where: { id: { in: [...new Set(tasks.map((task) => task.listId))] } },
+        select: { id: true, spaceId: true, folderId: true }
+    });
+    const spaceRoles = new Map<string, SpaceAccess | null>();
+    const grants = new Map<string, Map<string, core.SpaceRole>>();
+    const writableLists = new Set<string>();
+    for (const list of lists) {
+        if (!spaceRoles.has(list.spaceId)) {
+            spaceRoles.set(list.spaceId, await resolveSpaceRole(actor, list.spaceId));
+        }
+        let role = spaceRoles.get(list.spaceId) ?? null;
+        if (role !== "owner" && list.folderId) {
+            if (!grants.has(list.spaceId)) grants.set(list.spaceId, await grantedFolders(actor, list.spaceId));
+            role = withGrant(role, grants.get(list.spaceId)?.get(list.folderId) ?? null);
+        }
+        if (role && atLeast(role, minimum)) writableLists.add(list.id);
+    }
+
+    return tasks
+        .filter((task) => writableLists.has(task.listId))
+        .map((task) => ({ id: task.id, spaceId: task.spaceId }));
 }
 
 // ---------------------------------------------------------------------------

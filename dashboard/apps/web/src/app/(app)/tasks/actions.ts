@@ -621,14 +621,17 @@ export async function moveTaskAction(input: unknown): Promise<{ error?: string }
 }
 
 /** Keep the order a screen was showing, because somebody just dragged a task
- *  into it. Only the tasks the caller can reach are written. */
+ *  into it. Ordering work is changing it, so it takes the same membership as
+ *  every other task write, and an id the caller may not write drops out of the
+ *  arrangement rather than failing the drag. */
 export async function arrangeTasksAction(input: unknown): Promise<{ error?: string }> {
     const caller = await actor();
     const parsed = core.taskArrangeSchema.safeParse(input);
     if (!parsed.success) return { error: "Could not work out the order that was dropped into" };
     try {
-        const scope = await access.visibleScope(caller);
-        await tasks.arrangeTasks({ spaceIds: scope.spaceIds, listIds: scope.listIds }, parsed.data.taskIds);
+        const cleared = await access.writableTasks(caller, parsed.data.taskIds, "member");
+        const writable = new Set(cleared.map((task) => task.id));
+        await tasks.arrangeTasks(parsed.data.taskIds.filter((id) => writable.has(id)));
         refresh();
         return {};
     } catch (caught) {
@@ -641,8 +644,11 @@ export async function bulkUpdateAction(input: unknown): Promise<{ count?: number
     const parsed = core.taskBulkSchema.safeParse(input);
     if (!parsed.success) return { error: "Check the selection and try again" };
     try {
-        const scope = await access.visibleScope(caller);
-        const count = await tasks.bulkUpdate(caller.id, { spaceIds: scope.spaceIds, listIds: scope.listIds }, parsed.data);
+        const writable = await access.writableTasks(caller, parsed.data.taskIds, "member");
+        // Moving a selection into a list is a write on that list too, and the
+        // destination arrives from the browser like the rest of it.
+        if (parsed.data.listId) await access.requireList(caller, parsed.data.listId, "member");
+        const count = await tasks.bulkUpdate(caller.id, writable, parsed.data);
         refresh();
         return { count };
     } catch (caught) {

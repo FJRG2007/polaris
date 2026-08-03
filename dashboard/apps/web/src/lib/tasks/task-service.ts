@@ -856,47 +856,44 @@ async function rebalanceList(listId: string): Promise<void> {
  * under the hand that just moved something. So the whole sequence is re-spaced
  * in one go, which is also what leaves room for the next drop between any two
  * of them.
+ *
+ * The ids arrive already narrowed to the tasks the caller may write, and in the
+ * order they are to end up in.
  */
-export async function arrangeTasks(
-    reach: { spaceIds: string[]; listIds: string[] },
-    taskIds: readonly string[]
-): Promise<number> {
-    // The ids arrive from the browser, so the arrangement is narrowed to the
-    // tasks the caller was cleared for before a single order is written.
-    const allowed = await prisma.task.findMany({
-        where: {
-            id: { in: [...taskIds] },
-            OR: [{ spaceId: { in: reach.spaceIds } }, { listId: { in: reach.listIds } }]
-        },
-        select: { id: true }
-    });
-    const reachable = new Set(allowed.map((task) => task.id));
-    const ordered = taskIds.filter((id) => reachable.has(id));
-    if (ordered.length === 0) return 0;
+export async function arrangeTasks(taskIds: readonly string[]): Promise<number> {
+    if (taskIds.length === 0) return 0;
 
-    const orders = core.rebalanceOrders(ordered.length);
+    const current = await prisma.task.findMany({
+        where: { id: { in: [...taskIds] } },
+        select: { id: true, order: true }
+    });
+    const held = new Map(current.map((task) => [task.id, task.order]));
+    const orders = core.rebalanceOrders(taskIds.length);
+    // A drop moves one card past a few others, so most of a screen is usually
+    // sitting where it is being told to sit already. Only the rows whose key
+    // would actually change are written, and a task that has been deleted since
+    // the screen loaded is nothing to write to at all.
+    const changed = taskIds
+        .map((id, index) => ({ id, order: orders[index] }))
+        .filter((row) => held.has(row.id) && held.get(row.id) !== row.order);
+    if (changed.length === 0) return 0;
+
     await prisma.$transaction(
-        ordered.map((id, index) => prisma.task.update({ where: { id }, data: { order: orders[index] } }))
+        changed.map((row) => prisma.task.update({ where: { id: row.id }, data: { order: row.order } }))
     );
-    return ordered.length;
+    return changed.length;
 }
 
 /** Apply one change to a selection. Kept separate from updateTask so the fields
  *  a bulk edit may touch stay an explicit, reviewable list. */
 export async function bulkUpdate(
     actorId: string,
-    reach: { spaceIds: string[]; listIds: string[] },
+    allowed: readonly { id: string; spaceId: string }[],
     input: core.TaskBulkInput
 ): Promise<number> {
-    // Never let a selection reach outside what the caller was cleared for - the
-    // ids arrive from the browser and a selection is easy to forge.
-    const allowed = await prisma.task.findMany({
-        where: {
-            id: { in: input.taskIds },
-            OR: [{ spaceId: { in: reach.spaceIds } }, { listId: { in: reach.listIds } }]
-        },
-        select: { id: true, spaceId: true }
-    });
+    // The selection arrives from the browser and is easy to forge, so what gets
+    // here is the part of it the caller was cleared to change, resolved by the
+    // access layer the way a single write is.
     const ids = allowed.map((task) => task.id);
     if (ids.length === 0) return 0;
     const spacesTouched = new Set(allowed.map((task) => task.spaceId));
@@ -905,18 +902,15 @@ export async function bulkUpdate(
     if (input.priority !== undefined) data.priority = input.priority;
     if (input.dueDate !== undefined) data.dueDate = input.dueDate ? new Date(input.dueDate) : null;
     if (input.listId !== undefined) {
-        // The destination is as forgeable as the selection. It also has to sit in
-        // the same space as everything being moved: Task.spaceId is not being
-        // rewritten here, and a task whose list and space disagree drops out of
-        // every space-scoped view at once.
-        const target = await prisma.taskList.findFirst({
-            where: {
-                id: input.listId,
-                OR: [{ spaceId: { in: reach.spaceIds } }, { id: { in: reach.listIds } }]
-            },
+        // The destination was cleared with the caller's role on it, and it also
+        // has to sit in the same space as everything being moved: Task.spaceId is
+        // not being rewritten here, and a task whose list and space disagree drops
+        // out of every space-scoped view at once.
+        const target = await prisma.taskList.findUnique({
+            where: { id: input.listId },
             select: { spaceId: true }
         });
-        if (!target) throw new Error("You do not have access to that list");
+        if (!target) throw new Error("That list no longer exists");
         if (spacesTouched.size > 1 || !spacesTouched.has(target.spaceId)) {
             throw new Error("Tasks can only be moved between lists in their own space");
         }
