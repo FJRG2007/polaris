@@ -225,6 +225,45 @@ describe("enrollmentScript", () => {
         expect(untilEnd).not.toContain("-o create");
     });
 
+    // "Remote Login was off" was never the same question as "this access list is
+    // mine to shape": a Mac can have the toggle off and still carry the list its
+    // operator built before switching it off, and narrowing that one withdraws
+    // access somebody else granted. So what the narrowing hangs off is whether the
+    // group existed, read before anything touches it.
+    it("narrows only the access list it created itself, never one already here", () => {
+        expect(script).toContain("access_ssh_exists() {");
+        expect(script).toContain("dseditgroup -o read com.apple.access_ssh");
+        expect(script).toContain("ACCESS_LIST=$(access_ssh_exists)");
+        // Read before the toggle is changed, so it is the state this script found.
+        const darwin = script.slice(script.indexOf("read_remote_login\n"));
+        expect(darwin.indexOf("ACCESS_LIST=$(access_ssh_exists)")).toBeLessThan(
+            darwin.indexOf("systemsetup -setremotelogin on")
+        );
+        // Every narrowing call sits inside the "there was no list" branch, and the
+        // branch for a list that was already here - or one nothing could read - adds
+        // to it and leaves it otherwise alone, exactly like the already-on path.
+        const branch = script.slice(script.indexOf('if [ "$ACCESS_LIST" = "no" ]'));
+        const split = branch.indexOf("\n            else");
+        const narrowing = branch.slice(0, split);
+        const kept = branch.slice(split, branch.indexOf("\n            fi"));
+        expect(narrowing).toContain("-o create");
+        expect(narrowing).toContain("-d everyone");
+        expect(kept).toContain('dseditgroup -o edit -a "$POLARIS_USER"');
+        expect(kept).not.toContain("-d everyone");
+        expect(kept).not.toContain("-o create");
+    });
+
+    // Remote Login is on by the time this is decided either way, so what it says
+    // has to be what happened: a list left open is the operator's to go and fix,
+    // and being told nothing about it is how it stays open.
+    it("says which of the two access lists it ended up with", () => {
+        expect(script).toContain("turned Remote Login on, limited to the '$POLARIS_USER' login");
+        expect(script).toContain("added '$POLARIS_USER' to the SSH access list this machine already had");
+        expect(script).toContain("WARNING: turned Remote Login on, and left the SSH access list alone");
+        // The calm sentence is only reachable on a positive "everyone is not in it".
+        expect(script).toContain('[ "$(access_ssh_member everyone group)" = "no" ]');
+    });
+
     // Each dseditgroup call can fail quietly on a managed Mac, and by then Remote
     // Login is already on. Announcing a restriction that did not happen is the one
     // outcome nobody goes back to check, so the group is re-read the same way the
@@ -286,7 +325,50 @@ describe("enrollmentScript", () => {
     it("only refuses on a listener check it could actually run", () => {
         expect(script).toContain("SSH_PROBE=none");
         expect(script).toContain('if [ "$SSH_PROBE" = "none" ]');
-        expect(script).toContain('if [ "$SSH_LISTENING" = "no" ]');
+        // Three states, and only the flat "no" reaches the refusal.
+        expect(script).toContain("SSH_LISTENING=unknown");
+        expect(script).toContain('case "$SSH_LISTENING" in');
+        const decision = script.slice(script.indexOf('case "$SSH_LISTENING" in'));
+        const arms = decision.slice(0, decision.indexOf("esac"));
+        expect(arms).toMatch(/unknown\)[^\n]*say/);
+        expect(arms).toMatch(/\*\)[^\n]*die ssh-not-listening/);
+        expect(arms.slice(0, arms.indexOf("*)"))).not.toContain("die ");
+    });
+
+    // A listener whose owner nothing could read is not sshd - it is the question
+    // going unanswered. Letting it pick the port put the machine's own check behind
+    // "could not reach the machine's SSH port from here. Check the firewall", which
+    // is the report this check exists to stop producing; letting it refuse would
+    // strand an enrollment on an ss too old for -p. So it does neither.
+    it("does not let an unidentified listener stand in for the SSH server", () => {
+        const probe = script.slice(script.indexOf("SSH_PROBE=none"));
+        // The bare-listener sweep runs after the owned ones and only sets the state.
+        const bare = probe.slice(probe.indexOf('if [ "$SSH_LISTENING" != "yes" ]'));
+        const untilDecision = bare.slice(0, bare.indexOf('case "$SSH_LISTENING" in'));
+        expect(untilDecision).toContain('if listening_on "$port"');
+        expect(untilDecision).toContain("SSH_LISTENING=unknown");
+        expect(untilDecision).not.toContain("SSH_PORT=");
+        expect(untilDecision).not.toContain("SSH_LISTENING=yes");
+    });
+
+    // Socket activation is the one case a candidate port still settles: sshd owns
+    // nothing until the first connection, systemd holds the socket, and the port
+    // says which of systemd's many sockets is the SSH one.
+    it("takes a systemd-held socket only on a port this machine declares", () => {
+        expect(script).toContain('if owned_by "$port" systemd');
+        const probe = script.slice(script.indexOf("SSH_PROBE=none"));
+        expect(probe.indexOf('owned_by "$port" systemd')).toBeLessThan(probe.indexOf('listening_on "$port"'));
+    });
+
+    // `index($0, "sshd")` matched anywhere on the line, so a process merely named
+    // like sshd was taken for it. ss writes the name as ("sshd",...) and netstat as
+    // 812/sshd, which with the quotes dropped is the name behind a '(' or a '/'.
+    it("matches the owner as a process name rather than anywhere in the line", () => {
+        const probe = script.slice(script.indexOf("reachable_listener() {"));
+        const matcher = probe.slice(0, probe.indexOf("listeners() {"));
+        expect(matcher).not.toContain("index($0, owner)");
+        expect(matcher).toContain('gsub(/"/, "", named)');
+        expect(matcher).toContain('named !~ "[(/]" owner "([^A-Za-z0-9_-]|$)"');
     });
 
     // The old parse took the first `Port` in sshd_config and made it the only
@@ -332,13 +414,13 @@ describe("enrollmentScript", () => {
 
     // An observed listener beats a parse. This is also what makes the port Polaris
     // dials right on a box where the parse was wrong but nothing was ever broken.
-    it("lets the port that actually has a listener win, and refuses only if none does", () => {
+    it("lets the port sshd is actually on win, and refuses only if nothing is there", () => {
         const probe = script.slice(script.indexOf("SSH_PROBE=none"));
         expect(probe).toContain("for port in $SSH_PORTS; do");
         expect(probe).toContain("SSH_PORT=$port");
         expect(probe).toContain("SSH_LISTENING=yes");
-        // The refusal is outside the loop: it needs every candidate to have missed.
-        expect(probe.indexOf('if [ "$SSH_LISTENING" = "no" ]')).toBeGreaterThan(probe.indexOf("SSH_LISTENING=yes"));
+        // The refusal is outside the loops: it needs every candidate to have missed.
+        expect(probe.indexOf("die ssh-not-listening")).toBeGreaterThan(probe.lastIndexOf("SSH_LISTENING=yes"));
     });
 
     // Before this, the pre-claim abort existed only in a terminal nobody was

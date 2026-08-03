@@ -81,9 +81,11 @@ export function enrollmentScript(input: EnrollmentScriptInput): string {
 #   - ~${input.username}/.ssh/authorized_keys
 #   - Remote Login, on macOS and only if it was off - nothing can connect until
 #     it is on, which is the whole point of running this. Turning it on would
-#     otherwise expose every account on the machine, so when this script is the
-#     one that turns it on it also limits SSH to the '${input.username}' login.
-#     A Mac that already had Remote Login on keeps whoever could use it.
+#     otherwise expose every account on the machine, so when this script is also
+#     the one that creates the SSH access list, it limits that list to the
+#     '${input.username}' login. An access list this machine already had is added
+#     to and never narrowed, and so is a Mac that already had Remote Login on -
+#     the script says which of the two it did.
 #   - the docker group membership, only with --docker
 #   - /etc/sudoers.d/${input.username}, only with --root
 #
@@ -93,7 +95,9 @@ export function enrollmentScript(input: EnrollmentScriptInput): string {
 #                sudo systemsetup -setremotelogin off   (macOS, only if this
 #                    script turned it on)
 #                sudo dseditgroup -o delete com.apple.access_ssh   (macOS, puts
-#                    SSH back to every account, only if this script limited it)
+#                    SSH back to every account, and only if this script said it
+#                    limited SSH to that login - it never deletes a list that was
+#                    already here, so neither should this)
 
 set -eu
 
@@ -251,22 +255,25 @@ chown -R "\$POLARIS_USER" "\$HOME_DIR/.ssh"`;
  *
  * So the machine is asked instead. This runs as root, which is what makes the
  * process holding a listening socket readable, and sshd's own socket answers the
- * question outright no matter where the port was written down. The parse stays as
- * the fallback for when the owner cannot be read - an `ss` or `netstat` too old for
- * it, or a socket unit whose port systemd is still holding on sshd's behalf - and
- * it reads all four places rather than only the first `Port` line. 22 is always a
- * candidate too, and whichever candidate holds a reachable listener is the answer.
- * Either way an observed listener beats a parse, which is what the port Polaris
- * dials should have been all along.
+ * question outright no matter where the port was written down. An observed listener
+ * beats a parse, which is what the port Polaris dials should have been all along.
+ *
+ * The parse is what is left when the owner does not settle it - a socket unit whose
+ * port systemd is still holding on sshd's behalf, where the candidate says which of
+ * systemd's sockets is the SSH one - so it reads all four places rather than only
+ * the first `Port` line, and 22 is always a candidate too. What a candidate cannot
+ * do is carry the answer on its own: a port a config names and an unidentified
+ * process happens to hold is not an SSH server, and it stays the port that gets
+ * reported only because nothing better was learned.
  *
  * Reachable is part of the question rather than a refinement of it. A listener on
  * 127.0.0.1 answers the machine itself and nobody else, so counting it would let
  * the claim through and produce the firewall report this check exists to prevent.
  *
- * Refusing is reserved for the case where the check ran and no candidate had
- * anything reachable on it. A machine with neither `ss` nor `netstat` cannot answer
- * the question, and a wrong "nothing is listening" would strand an enrollment that
- * was fine.
+ * Refusing is reserved for the case where the check ran and found nothing reachable
+ * at all. A machine with neither `ss` nor `netstat`, and one whose listeners have no
+ * readable owner, have both failed to answer rather than answered no - and a wrong
+ * "nothing is listening" would strand an enrollment that was fine.
  *
  * macOS is where this bites, because it ships with Remote Login off, so that one
  * is switched on rather than only reported. Stdin is closed for it because this
@@ -358,12 +365,21 @@ else
 fi`;
 }
 
-/** Read Remote Login into yes/no/unknown. `systemsetup` puts the answer on stdout
- *  and keeps its exit code at 0 either way, so the text is what decides - and text
- *  that matches neither wording is an answer nobody got. The access list is read
- *  the same way and for the same reason: the three `dseditgroup` calls that narrow
- *  it can each fail on a managed Mac, and announcing a restriction that did not
- *  happen is worse than not restricting at all, because nobody goes to look. */
+/**
+ * Read Remote Login into yes/no/unknown. `systemsetup` puts the answer on stdout
+ * and keeps its exit code at 0 either way, so the text is what decides - and text
+ * that matches neither wording is an answer nobody got. The access list is read
+ * the same way and for the same reason: the three `dseditgroup` calls that narrow
+ * it can each fail on a managed Mac, and announcing a restriction that did not
+ * happen is worse than not restricting at all, because nobody goes to look.
+ *
+ * Whether to narrow at all is a third reading, and it is about the list rather
+ * than about the toggle. A Mac can have Remote Login off and still carry the
+ * access list its operator built before switching it off - so "Remote Login was
+ * off" does not mean the list is this script's to shape. Only a list that was not
+ * there until this script created it gets narrowed; one that was already here is
+ * added to and left otherwise alone, exactly like the already-on path.
+ */
 function darwinRemoteLoginSection(): string {
     return `read_remote_login() {
         REMOTE_LOGIN=unknown
@@ -383,29 +399,57 @@ function darwinRemoteLoginSection(): string {
         esac
     }
 
+    # Whether this machine already has an SSH access list, asked before anything
+    # here changes one. yes/no/unknown for the same reason as the rest: a group
+    # nobody could read is not a group known to be absent, and only a positive "it
+    # was not there" makes the list this script's own.
+    access_ssh_exists() {
+        command -v dseditgroup >/dev/null 2>&1 || { echo unknown; return; }
+        if dseditgroup -o read com.apple.access_ssh 2>/dev/null | grep -qi com.apple.access_ssh; then
+            echo yes
+        else
+            echo no
+        fi
+    }
+
     read_remote_login
     if [ "\$REMOTE_LOGIN" = "no" ]; then
+        ACCESS_LIST=\$(access_ssh_exists)
         systemsetup -setremotelogin on </dev/null >/dev/null 2>&1 || true
         read_remote_login
         if [ "\$REMOTE_LOGIN" = "yes" ]; then
-            # Remote Login was off, so nobody had SSH access here to lose. Turning
-            # it on without this would hand the network every password-bearing
-            # account on the machine, which is wider than anything the arguments
-            # to this script can grant - so it is narrowed to the one login that
-            # needs it. A Mac that already had Remote Login on never reaches here,
-            # and its access list is left exactly as its operator set it.
-            dseditgroup -o create -q com.apple.access_ssh >/dev/null 2>&1 || true
-            dseditgroup -o edit -d everyone -t group com.apple.access_ssh >/dev/null 2>&1 || true
-            dseditgroup -o edit -a "\$POLARIS_USER" -t user com.apple.access_ssh >/dev/null 2>&1 || true
-            # Claimed only on proof: the login is in the group macOS gates SSH on,
-            # and nothing says 'everyone' still is. Anything less and Remote Login
-            # has just been switched on for the whole machine, which is the one
-            # thing the operator has to be told rather than reassured about.
-            if [ "\$(access_ssh_member "\$POLARIS_USER" user)" = "yes" ] \\
-                && [ "\$(access_ssh_member everyone group)" != "yes" ]; then
-                say "turned Remote Login on, limited to the '\$POLARIS_USER' login"
+            if [ "\$ACCESS_LIST" = "no" ]; then
+                # Remote Login was off and there was no access list, so nobody had
+                # SSH access here to lose and the list about to exist is this
+                # script's own. Turning Remote Login on without it would hand the
+                # network every password-bearing account on the machine, which is
+                # wider than anything the arguments to this script can grant.
+                dseditgroup -o create -q com.apple.access_ssh >/dev/null 2>&1 || true
+                dseditgroup -o edit -d everyone -t group com.apple.access_ssh >/dev/null 2>&1 || true
+                dseditgroup -o edit -a "\$POLARIS_USER" -t user com.apple.access_ssh >/dev/null 2>&1 || true
+                # Claimed only on proof: the login is in the group macOS gates SSH
+                # on, and nothing says 'everyone' still is. Anything less and Remote
+                # Login has just been switched on for the whole machine, which is
+                # the one thing the operator has to be told rather than reassured
+                # about.
+                if [ "\$(access_ssh_member "\$POLARIS_USER" user)" = "yes" ] \\
+                    && [ "\$(access_ssh_member everyone group)" != "yes" ]; then
+                    say "turned Remote Login on, limited to the '\$POLARIS_USER' login"
+                else
+                    say "WARNING: turned Remote Login on, but SSH could not be limited to the '\$POLARIS_USER' login - every account on this machine can now be reached over SSH. Restrict it under System Settings > General > Sharing > Remote Login"
+                fi
             else
-                say "WARNING: turned Remote Login on, but SSH could not be limited to the '\$POLARIS_USER' login - every account on this machine can now be reached over SSH. Restrict it under System Settings > General > Sharing > Remote Login"
+                # The list was here first, so it is added to and never narrowed:
+                # withdrawing access somebody else granted is not this script's
+                # call, and that holds whether Remote Login was on or off when this
+                # started. Remote Login is on now either way, so who it lets in is
+                # said out loud rather than left to be discovered.
+                dseditgroup -o edit -a "\$POLARIS_USER" -t user com.apple.access_ssh >/dev/null 2>&1 || true
+                if [ "\$(access_ssh_member everyone group)" = "no" ]; then
+                    say "turned Remote Login on and added '\$POLARIS_USER' to the SSH access list this machine already had, which is otherwise left as it was"
+                else
+                    say "WARNING: turned Remote Login on, and left the SSH access list alone because it was not this script's to narrow - whoever it already allowed, which may be every account here, can now be reached over SSH. Check it under System Settings > General > Sharing > Remote Login"
+                fi
             fi
         else
             die remote-login-off "Remote Login is off, so nothing answers on port \$SSH_PORT. Turn it on in System Settings > General > Sharing, \$POLARIS_RETRY_HINT"
@@ -424,18 +468,28 @@ function darwinRemoteLoginSection(): string {
 /**
  * Ask the machine what it is listening on, and let the answer pick the port.
  *
- * Two questions, one reader. The first is "where is sshd", which root can answer
- * outright because it can see which process holds a socket - and that beats every
- * candidate list, because it does not care where the port was declared. The second
- * is the fallback for when the owner cannot be read: "does any candidate port hold
- * a listener".
+ * "Where is sshd", which root can answer outright because it can see which process
+ * holds a socket - and that beats every candidate list, because it does not care
+ * where the port was declared. Under socket activation the answer is systemd
+ * rather than sshd, since the unit holds the socket until the first connection
+ * arrives; that one is taken too, but only on a port this machine declares, which
+ * is what keeps it from adopting any of the other sockets systemd holds.
  *
- * "Something is on that port" is not either question. An sshd bound to 127.0.0.1
- * answers this machine and nobody else, so accepting it would let the claim
- * through and land the operator on "could not reach the machine's SSH port from
- * here. Check the firewall between them" - the report this whole check exists to
- * stop producing. So the bind address has to be one Polaris could dial: a wildcard
- * or a real address, never loopback.
+ * "Something is on that port" is not that question, and it is not evidence of an
+ * SSH server: a stale `Port` line and an unrelated service on it would make the
+ * check announce a port Polaris then cannot get SSH out of. So a listener nobody
+ * could attribute never picks the port and never counts as sshd having been found.
+ * What it does decide is which way the check failed - "nothing is listening here"
+ * is an answer and may refuse, while "something is, and this machine would not say
+ * what" is the question going unanswered, and that has never been allowed to
+ * strand an enrollment.
+ *
+ * Reachable is part of the question rather than a refinement of it. An sshd bound
+ * to 127.0.0.1 answers this machine and nobody else, so accepting it would let the
+ * claim through and land the operator on "could not reach the machine's SSH port
+ * from here. Check the firewall between them" - the report this whole check exists
+ * to stop producing. So the bind address has to be one Polaris could dial: a
+ * wildcard or a real address, never loopback.
  */
 function linuxListenerSection(): string {
     return `SSH_PROBE=none
@@ -451,9 +505,15 @@ function linuxListenerSection(): string {
     # 'port' pins the port and leaves the owner open; 'owner' pins the process
     # holding the socket and leaves the port open. Whichever port it settles on is
     # printed, so an empty answer is the same "nothing reachable" in both directions.
+    #
+    # The owner is matched as a process name and not as a substring of the line:
+    # ss writes it as ("sshd",pid=...) and netstat as 812/sshd, so with the quotes
+    # dropped both are the name behind a '(' or a '/'. Looking anywhere in the line
+    # would take any process whose name merely ends in sshd for sshd itself.
     reachable_listener() {
         awk -v port="\$1" -v owner="\$2" '
-            owner != "" && index(\$0, owner) == 0 { next }
+            { named = \$0; gsub(/"/, "", named) }
+            owner != "" && named !~ "[(/]" owner "([^A-Za-z0-9_-]|\$)" { next }
             {
                 if (!match(\$4, /:[0-9]+\$/)) next
                 addr = substr(\$4, 1, RSTART - 1)
@@ -478,6 +538,13 @@ function linuxListenerSection(): string {
         esac
     }
 
+    # "Is this port held by that process" and "is this port held at all". The second
+    # answers a narrower thing than it looks like it does, so it never picks the
+    # port and never stands in for having found sshd - see the call below.
+    owned_by() {
+        [ -n "\$(listeners owners | reachable_listener "\$1" "\$2")" ]
+    }
+
     listening_on() {
         [ -n "\$(listeners plain | reachable_listener "\$1" "")" ]
     }
@@ -487,27 +554,47 @@ function linuxListenerSection(): string {
         # port and carrying on beats stranding an enrollment on a guess.
         say "no ss or netstat here, so whether anything is listening could not be checked"
     else
-        SSH_LISTENING=no
-        # What sshd is bound to, whatever declared it. Under socket activation the
-        # socket belongs to systemd until the first connection, so this can come up
-        # empty on a perfectly healthy machine - which is what the candidates are for.
+        SSH_LISTENING=unknown
+        # What sshd is bound to, whatever declared it.
         OBSERVED_PORT=\$(listeners owners | reachable_listener "" sshd) || OBSERVED_PORT=""
         if [ -n "\$OBSERVED_PORT" ]; then
             SSH_PORT=\$OBSERVED_PORT
             SSH_LISTENING=yes
         else
+            # Socket activation: the unit holds the socket until the first
+            # connection, so sshd owns nothing and systemd owns a port this machine
+            # declares. Candidates in the order they were declared with 22 last, so
+            # which one wins is the config's order and never the file system's.
             for port in \$SSH_PORTS; do
-                if listening_on "\$port"; then
+                if owned_by "\$port" systemd; then
                     SSH_PORT=\$port
                     SSH_LISTENING=yes
                     break
                 fi
             done
         fi
-        if [ "\$SSH_LISTENING" = "no" ]; then
-            die ssh-not-listening "nothing Polaris could reach is listening on any port this machine's SSH server could be using (\$SSH_PORTS); start it, or bind it to something other than loopback, \$POLARIS_RETRY_HINT"
+
+        if [ "\$SSH_LISTENING" != "yes" ]; then
+            # No SSH server was identified, which is not yet the same as there being
+            # none: an ss or netstat too old for -p, or a socket that could not be
+            # attributed, leaves a listener with no owner on it. So a bare listener
+            # on a candidate port is read as the question going unanswered - it does
+            # not become SSH_PORT, and it does not pass for sshd - while nothing
+            # reachable anywhere is the answer that may refuse.
+            SSH_LISTENING=no
+            for port in \$SSH_PORTS; do
+                if listening_on "\$port"; then
+                    SSH_LISTENING=unknown
+                    break
+                fi
+            done
         fi
-        say "an SSH server is listening on port \$SSH_PORT"
+
+        case "\$SSH_LISTENING" in
+            yes) say "an SSH server is listening on port \$SSH_PORT" ;;
+            unknown) say "something is listening on a port this machine's SSH server could use, but this machine would not say which process, so port \$SSH_PORT is what gets reported" ;;
+            *) die ssh-not-listening "nothing Polaris could reach is listening on any port this machine's SSH server could be using (\$SSH_PORTS); start it, or bind it to something other than loopback, \$POLARIS_RETRY_HINT" ;;
+        esac
     fi`;
 }
 
