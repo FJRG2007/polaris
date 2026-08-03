@@ -89,6 +89,7 @@ model User {
     apiKeys             ApiKey[]
     twoFactors          TwoFactor[]
     sessionStates       SessionState[]
+    deviceCodes         DeviceCode[]
     emails              UserEmail[]
     phone               UserPhone?
     avatar              UserAvatar?
@@ -562,6 +563,46 @@ model SessionState {
     user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
     @@index([userId])
+}
+
+// A sign-in waiting to be let in from a phone: the QR code on the sign-in screen.
+// The screen holds the device code, the person scanning holds the short user code,
+// and the row is what carries a decision between the two.
+//
+// Every column down to `scope` is better-auth's device-authorization plugin's to
+// write (RFC 8628); Polaris only stores them. The three `request*` columns are
+// Polaris additions, recorded when the code is issued, so the person approving is
+// shown what they are letting in rather than approving something unnamed. Like
+// every user-agent they are client-supplied - a label, never an input to a
+// decision.
+//
+// Rows are short-lived by design (the code expires in minutes) and are consumed
+// on the exchange that issues the session, so this table stays near-empty.
+model DeviceCode {
+    id              String    @id @default(uuid(7)) @db.Uuid
+    // The secret the waiting screen polls with. Never leaves that browser.
+    deviceCode      String    @unique
+    // The short code printed under the QR, and carried in the link it encodes.
+    userCode        String    @unique
+    // Set once somebody signed in has claimed the code; only they may answer it.
+    userId          String?   @db.Uuid
+    expiresAt       DateTime
+    // pending | approved | denied.
+    status          String
+    lastPolledAt    DateTime?
+    // Milliseconds the waiting screen must leave between polls.
+    pollingInterval Int?
+    clientId        String?
+    scope           String?
+    requestIp        String?
+    requestUserAgent String?
+    requestHost      String?
+    createdAt       DateTime  @default(now())
+
+    user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@index([userId])
+    @@index([expiresAt])
 }
 
 // A named bundle of users. Policies attach to a group so a grant applies to

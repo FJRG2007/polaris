@@ -101,6 +101,47 @@ export const sessionLimitsSchema = z.object({
 });
 
 // ---------------------------------------------------------------------------
+// Signing in by QR code
+// ---------------------------------------------------------------------------
+
+/**
+ * The only client allowed to open a QR sign-in. The device flow is not a public
+ * API here - Polaris is both the screen showing the code and the app approving
+ * it - so anything else asking for a code is refused.
+ */
+export const QR_SIGN_IN_CLIENT_ID = "polaris-dashboard";
+
+/** Where a scanned code is answered. Also the path the QR itself encodes. */
+export const QR_SIGN_IN_PATH = "/account/scan";
+
+/** How long a code on the sign-in screen stays good. Short: it is on display in
+ *  whatever room the screen is in, and the person is signing in right now. */
+export const QR_SIGN_IN_TTL_SECONDS = 120;
+
+/** How often the waiting screen may ask whether the code has been answered. */
+export const QR_SIGN_IN_POLL_SECONDS = 3;
+
+/**
+ * The code as it is shown and typed. The generator emits uppercase letters and
+ * digits without the characters that read as each other, and a code is only ever
+ * compared after the display grouping is stripped.
+ */
+export const qrUserCodeField = z
+    .string()
+    .trim()
+    .toUpperCase()
+    .transform((value) => value.replace(/[\s-]/g, ""))
+    .pipe(z.string().regex(/^[A-Z0-9]{6,12}$/, "That code is not a Polaris sign-in code"));
+
+/** Answering a scanned code. Approving needs the PIN; refusing only closes a
+ *  door, so the field is optional and ignored on a refusal. */
+export const qrSignInDecisionSchema = z.object({
+    userCode: qrUserCodeField,
+    approve: z.boolean(),
+    pin: z.string().trim().default("")
+});
+
+// ---------------------------------------------------------------------------
 // Recovery questions
 // ---------------------------------------------------------------------------
 

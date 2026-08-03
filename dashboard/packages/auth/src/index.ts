@@ -58,6 +58,15 @@ export {
     type UserSecuritySettings
 } from "./security.js";
 export {
+    openDeviceCode,
+    claimDeviceCode,
+    decideDeviceCode,
+    exchangeDeviceCode,
+    type DeviceCodeIssued,
+    type DeviceExchange,
+    type IssuedCookie
+} from "./device-login.js";
+export {
     verifyTotpForSession,
     twoFactorEnabled,
     countTrustedDevices,

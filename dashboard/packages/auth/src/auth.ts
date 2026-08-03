@@ -18,11 +18,16 @@ import { prisma } from "@polaris/db";
 import { randomUUID } from "node:crypto";
 import { loadEnv } from "@polaris/config";
 import { passkey } from "@better-auth/passkey";
-import { magicLink, twoFactor } from "better-auth/plugins";
+import { setSessionCookie } from "better-auth/cookies";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { betterAuth, type BetterAuthPlugin } from "better-auth";
+import { APIError, createAuthMiddleware } from "better-auth/api";
+import { deviceAuthorization, magicLink, twoFactor } from "better-auth/plugins";
 import {
     passkeyRelyingPartyId,
+    QR_SIGN_IN_CLIENT_ID,
+    QR_SIGN_IN_POLL_SECONDS,
+    QR_SIGN_IN_TTL_SECONDS,
     TWO_FACTOR_CODE_ATTEMPTS,
     TWO_FACTOR_CODE_TTL_MINUTES,
     TWO_FACTOR_METHOD_HEADER
@@ -98,6 +103,87 @@ function twoFactorPlugin(options: AuthOptions): BetterAuthPlugin {
     );
 }
 
+/**
+ * Signing in by scanning the QR code on the sign-in screen, on better-auth's
+ * device-authorization plugin (RFC 8628). The waiting screen holds a device code
+ * and polls with it; the phone that scans holds the short user code and answers.
+ *
+ * Every one of its endpoints is sealed off from the network (see sealDeviceFlow):
+ * this is not a public device flow, it is one screen of Polaris talking to
+ * another, and the rules that make it safe - who may open a code, how often, and
+ * the quick-unlock PIN that has to be typed to allow one - live in Polaris's own
+ * actions. An endpoint reachable over HTTP would be a way around all three.
+ */
+function deviceAuthorizationPlugin(): BetterAuthPlugin {
+    return sealDeviceFlow(
+        deviceAuthorization({
+            expiresIn: `${QR_SIGN_IN_TTL_SECONDS}s`,
+            interval: `${QR_SIGN_IN_POLL_SECONDS}s`,
+            validateClient: (clientId) => clientId === QR_SIGN_IN_CLIENT_ID
+        }) as BetterAuthPlugin
+    );
+}
+
+/** The paths the device flow answers on, all of them Polaris-internal. */
+const DEVICE_PATHS: ReadonlySet<string> = new Set([
+    "/device/code",
+    "/device",
+    "/device/approve",
+    "/device/deny",
+    "/device/token"
+]);
+
+/** Where the approved exchange hands back a session for the waiting browser. */
+const DEVICE_TOKEN_PATH = "/device/token";
+
+/**
+ * Close the device flow to the network, and make the exchange that ends it issue
+ * a session cookie.
+ *
+ * Both hooks exist because the plugin is built for a different shape of client
+ * than this one. It expects a TV or a CLI: anybody may ask for a code, approving
+ * needs nothing but a session, and the exchange hands back a bearer token. Here
+ * the same three steps are Polaris's own screens, so a code is opened by the
+ * sign-in page under a rate limit, an approval costs the quick-unlock PIN, and
+ * what the browser needs at the end is the cookie every other sign-in leaves.
+ *
+ * `ctx.request` is set only when a request arrived over HTTP; a server-side
+ * `auth.api` call leaves it undefined, which is what separates Polaris's actions
+ * from anything else. The plugin uses the same distinction itself for its
+ * client-request switch, so it is the library's own line rather than one drawn
+ * here.
+ */
+function sealDeviceFlow(plugin: BetterAuthPlugin): BetterAuthPlugin {
+    return {
+        ...plugin,
+        hooks: {
+            ...plugin.hooks,
+            before: [
+                ...(plugin.hooks?.before ?? []),
+                {
+                    matcher: (context) => DEVICE_PATHS.has(context.path ?? ""),
+                    handler: createAuthMiddleware(async (ctx) => {
+                        if (!ctx.request) return;
+                        throw new APIError("NOT_FOUND", { message: "Not found" });
+                    })
+                }
+            ],
+            after: [
+                ...(plugin.hooks?.after ?? []),
+                {
+                    matcher: (context) => context.path === DEVICE_TOKEN_PATH,
+                    handler: createAuthMiddleware(async (ctx) => {
+                        // Only set on the one exchange that found an approved
+                        // code; every other outcome throws before reaching here.
+                        const issued = ctx.context.newSession;
+                        if (issued) await setSessionCookie(ctx, issued);
+                    })
+                }
+            ]
+        }
+    };
+}
+
 /** Where an emailed sign-in link is redeemed. */
 export const MAGIC_LINK_VERIFY_PATH = "/magic-link/verify";
 
@@ -143,9 +229,10 @@ function gateEmailedLink(plugin: BetterAuthPlugin): BetterAuthPlugin {
 
 /**
  * The sign-in methods beyond a password: a TOTP second factor with single-use
- * backup codes, passkeys, and - on a deployment that has a mail sender - sign-in
- * by emailed link. Verification is required before the authenticator is armed,
- * so a user who mis-scans the QR cannot lock themselves out.
+ * backup codes, passkeys, scanning the sign-in screen's QR code from a device
+ * that is already signed in, and - on a deployment that has a mail sender -
+ * sign-in by emailed link. Verification is required before the authenticator is
+ * armed, so a user who mis-scans the QR cannot lock themselves out.
  *
  * Typed as the plugin base rather than left inferred: the plugin's endpoint
  * types embed better-auth's own nested zod, which this package cannot name in
@@ -154,7 +241,7 @@ function gateEmailedLink(plugin: BetterAuthPlugin): BetterAuthPlugin {
  * auth client, not through auth.api here.
  */
 function buildPlugins(options: AuthOptions, address: string): BetterAuthPlugin[] {
-    const plugins: BetterAuthPlugin[] = [twoFactorPlugin(options)];
+    const plugins: BetterAuthPlugin[] = [twoFactorPlugin(options), deviceAuthorizationPlugin()];
     const webauthn = passkeyPlugin(address);
     if (webauthn) plugins.push(webauthn);
     // Registered only when the app can send at all. Whether a channel is
