@@ -2,9 +2,11 @@
 
 import Link from "next/link";
 import { KeyRound } from "lucide-react";
+import { QrSignInPanel } from "./qr-panel";
 import { useRouter } from "next/navigation";
 import { loginSchema } from "@polaris/core";
 import { useZodForm } from "@/lib/use-zod-form";
+import { postLoginTarget } from "./post-login-target";
 import { authClient, signIn } from "@/lib/auth-client";
 import { useEffect, useState, type FormEvent } from "react";
 import { accountHasPasskey, magicLinkAvailable, resolveIdentifier } from "./actions";
@@ -13,14 +15,6 @@ import { Button, Card, CardBody, CardHeader, CardTitle, Input, PolarisMark } fro
 /** Where the last-used identifier is remembered so the field is prefilled. */
 const LAST_IDENTIFIER_KEY = "polaris:last-identifier";
 const GENERIC_ERROR = "Invalid email/username or password";
-
-/** Post-login destination: a same-origin `redirect` param (used by the edge login
- *  handoff at /edge/authorize) if it is a safe relative path, else the drive. Read
- *  from window.location to avoid a Suspense boundary for useSearchParams. */
-function postLoginTarget(): string {
-    const redirect = new URLSearchParams(window.location.search).get("redirect");
-    return redirect && redirect.startsWith("/") && !redirect.startsWith("//") ? redirect : "/drive";
-}
 
 /** Why the previous session ended, when it ended for a reason worth explaining.
  *  Deliberately vague about network rules: the page is public, so it says the
@@ -158,12 +152,15 @@ export function LoginForm({ awaitingSetup }: { awaitingSetup: boolean }) {
 
     return (
         <main className="grid min-h-screen place-items-center p-4">
-            <Card className="w-full max-w-sm">
+            <Card className="w-full max-w-sm sm:max-w-2xl">
                 <CardHeader className="items-center">
                     <PolarisMark className="mb-1" />
                     <CardTitle>Sign in to Polaris</CardTitle>
                 </CardHeader>
-                <CardBody>
+                {/* The QR sits beside the form from the `sm` breakpoint up, and is
+                    left out below it - a phone cannot scan its own screen. */}
+                <CardBody className="grid gap-6 sm:grid-cols-2">
+                    <div>
                     {notice ? (
                         <p className="mb-3 rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
                             {notice}
@@ -242,6 +239,8 @@ export function LoginForm({ awaitingSetup }: { awaitingSetup: boolean }) {
                             setup link.
                         </p>
                     ) : null}
+                    </div>
+                    <QrSignInPanel />
                 </CardBody>
             </Card>
         </main>

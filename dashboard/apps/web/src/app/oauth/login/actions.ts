@@ -1,18 +1,27 @@
 "use server";
 
 /**
- * Resolve a sign-in identifier (email or username) to the account email, so the
- * client can complete sign-in through better-auth's email flow. Returns null when
- * no account matches; the caller shows a generic error either way, so this never
- * confirms whether a given username exists.
+ * What the sign-in screen needs before anybody has proved who they are: resolving
+ * an identifier to the account email so the client can finish through better-auth's
+ * email flow, the two hints that decide which alternatives are worth offering, and
+ * the QR code a device that is already signed in can answer.
+ *
+ * Nothing here confirms whether an account exists: an identifier that matches
+ * nothing returns null and the caller shows the same generic error either way.
  */
 
+import { prisma } from "@polaris/db";
 import { headers } from "next/headers";
 import { loadEnv } from "@polaris/config";
-import { prisma } from "@polaris/db";
-import { passkeyRelyingPartyId } from "@polaris/core";
 import { getAuthMailStatus } from "@/lib/auth-mail";
 import { rateLimit } from "@/lib/rate-limit-service";
+import { passkeyRelyingPartyId } from "@polaris/core";
+import {
+    openSignInCode,
+    redeemSignInCode,
+    type QrSignInCode,
+    type QrSignInStatus
+} from "@/lib/qr-sign-in-service";
 
 /** Caps how fast one address can be probed for a passkey. Generous enough for a
  *  person retyping their email, useless for enumerating a list. */
@@ -72,6 +81,25 @@ export async function accountHasPasskey(identifier: string): Promise<boolean> {
 async function currentRelyingPartyId(): Promise<string | null> {
     const store = await headers();
     return passkeyRelyingPartyId(store.get("x-forwarded-host") ?? store.get("host"));
+}
+
+/**
+ * Open a code for the QR on the sign-in screen. Unauthenticated by nature -
+ * nobody has said who they are yet - so it is throttled per address and the code
+ * it hands back is useless until somebody already signed in allows it.
+ */
+export async function startQrSignIn(): Promise<{ code?: QrSignInCode; error?: string }> {
+    return openSignInCode();
+}
+
+/**
+ * Ask whether the code has been answered. Comes back "approved" only once the
+ * session cookies are on this response, so the caller navigates straight into the
+ * dashboard rather than reloading its way there.
+ */
+export async function pollQrSignIn(deviceCode: unknown): Promise<QrSignInStatus> {
+    if (typeof deviceCode !== "string" || deviceCode.length === 0) return "expired";
+    return redeemSignInCode(deviceCode);
 }
 
 /** Matches the passkeys that sign in on an address, including the ones registered

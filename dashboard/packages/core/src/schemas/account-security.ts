@@ -141,6 +141,8 @@ export const qrSignInDecisionSchema = z.object({
     pin: z.string().trim().default("")
 });
 
+export type QrSignInDecision = z.infer<typeof qrSignInDecisionSchema>;
+
 // ---------------------------------------------------------------------------
 // Recovery questions
 // ---------------------------------------------------------------------------

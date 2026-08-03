@@ -11,11 +11,12 @@
  * from it before deciding whether to sign it out.
  */
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { signOut } from "@/lib/auth-client";
-import { Check, LogOut, X } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { useConfirm } from "@/components/confirm-dialog";
+import { Check, LogOut, ScanLine, X } from "lucide-react";
 import { RelativeTime } from "@/components/relative-time";
 import type { SessionView } from "@/lib/session-directory";
 import { SessionActivityDialog } from "./session-activity-dialog";
@@ -152,17 +153,28 @@ export function SessionsView({ sessions }: { sessions: SessionView[] }) {
                 <CardBody className="flex flex-col gap-3">
                     <div className="flex items-center justify-between gap-2">
                         <h2 className="text-sm font-medium">Active sessions</h2>
-                        {others.length > 0 ? (
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                disabled={busyId === "all"}
-                                onClick={() => void revokeOthers()}
-                            >
-                                <LogOut className="size-4" />
-                                Sign out everywhere else
-                            </Button>
-                        ) : null}
+                        <div className="flex gap-2">
+                            {/* The other way a sign-in gets let in: the code on the
+                                sign-in screen, answered here instead of waiting for
+                                somebody to find this page. */}
+                            <Link href="/account/scan">
+                                <Button variant="outline" size="sm">
+                                    <ScanLine className="size-4" />
+                                    Scan a code
+                                </Button>
+                            </Link>
+                            {others.length > 0 ? (
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={busyId === "all"}
+                                    onClick={() => void revokeOthers()}
+                                >
+                                    <LogOut className="size-4" />
+                                    Sign out everywhere else
+                                </Button>
+                            ) : null}
+                        </div>
                     </div>
 
                     <SessionsTable

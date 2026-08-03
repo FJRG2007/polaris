@@ -125,11 +125,10 @@ export function SecurityView({
 
             <SettingCard
                 title="Quick unlock PIN"
-                description={
-                    requireLoginApproval
-                        ? "Reopens a locked dashboard, and confirms a new sign-in you allow."
-                        : "Reopens a locked dashboard without retyping your password."
-                }
+                // Not conditional on the approval gate any more: the PIN also
+                // confirms a sign-in allowed by scanning the code on the sign-in
+                // screen, which every account can do whether or not that gate is on.
+                description="Reopens a locked dashboard, and confirms a sign-in you allow from here."
                 status={hasPin ? "Set" : "Not set"}
                 statusTone={hasPin ? "on" : "off"}
             >
