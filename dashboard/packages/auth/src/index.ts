@@ -93,7 +93,6 @@ export {
     rememberAccountDevice,
     newDeviceWaitMessage,
     setNewDeviceGrace,
-    NEW_DEVICE_GRACE_CHOICES,
     type DeviceStanding
 } from "./devices.js";
 export {

@@ -27,14 +27,11 @@
 
 import { prisma } from "@polaris/db";
 import type { DeviceOrigin } from "./two-factor.js";
+import { NEW_DEVICE_GRACE_CHOICES } from "@polaris/core";
 
 /** How much of a user-agent is kept. It is a header, so its length is the
  *  caller's to choose, and this one is an index key. A real one is far shorter. */
 const MAX_USER_AGENT = 512;
-
-/** The waits an account can choose between, in days. Offered as a list rather
- *  than a free number so the screen can name each one. */
-export const NEW_DEVICE_GRACE_CHOICES = [0, 1, 3, 7, 14, 30] as const;
 
 export interface DeviceStanding {
     /** Whether this device may change the account's protection. True whenever

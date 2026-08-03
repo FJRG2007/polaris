@@ -320,6 +320,11 @@ export async function createProjectToken(
         allowedCidrs: [],
         allowedCountries: [],
         allowedContinents: [],
+        // Unrestricted on both counts: a deploy token is presented by whatever CI
+        // runs the deploy, from wherever it happens to run, and neither is known
+        // when the token is minted.
+        allowedUserAgents: [],
+        deniedUserAgents: [],
         groupIds: [],
         expiresInDays: days ?? 0
     });

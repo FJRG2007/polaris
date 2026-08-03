@@ -10,7 +10,10 @@
  * their keys' reach with it - no stale grant survives in a token.
  */
 
+import { prisma } from "@polaris/db";
 import { randomBytes } from "node:crypto";
+import { getUserPermissions } from "./roles.js";
+import { generateToken, hashToken, tokenMatchesHash } from "@polaris/core/tokens";
 import {
     ALL_PERMISSIONS,
     API_KEY_PREFIX,
@@ -21,11 +24,9 @@ import {
     unionRules,
     type CreateApiKeyInput,
     type EffectiveAccessRules,
-    type Permission
+    type Permission,
+    type UserAgentRules
 } from "@polaris/core";
-import { generateToken, hashToken, tokenMatchesHash } from "@polaris/core/tokens";
-import { prisma } from "@polaris/db";
-import { getUserPermissions } from "./roles.js";
 
 /** One key as the management UI shows it. The secret is never part of this. */
 export interface ApiKeyView {
@@ -36,10 +37,14 @@ export interface ApiKeyView {
     allowedCidrs: string[];
     allowedCountries: string[];
     allowedContinents: string[];
+    /** Client patterns the key answers to, and the ones it always refuses. */
+    allowedUserAgents: string[];
+    deniedUserAgents: string[];
     groupIds: string[];
     expiresAt: string | null;
     lastUsedAt: string | null;
     lastUsedIp: string | null;
+    lastUsedUserAgent: string | null;
     revokedAt: string | null;
     createdAt: string;
 }
@@ -51,6 +56,9 @@ export interface VerifiedApiKey {
     /** Scopes intersected with the owner's live permissions. */
     scopes: Permission[];
     rules: EffectiveAccessRules;
+    /** Which clients may present it. Returned unevaluated for the same reason
+     *  the network rules are: the request is the caller's to read. */
+    clients: UserAgentRules;
 }
 
 /** The public half of a key: "plk_" plus 8 URL-safe characters. */
@@ -59,6 +67,10 @@ function generatePrefix(): string {
 }
 
 const MINUTES_PER_DAY = 24 * 60;
+
+/** How much of a presented user-agent is kept. It is a header, so its length is
+ *  the caller's to choose. */
+const MAX_USER_AGENT = 512;
 
 /** When a key stops working: a hand-picked date if there is one, otherwise the
  *  chosen span, and null for a key that never expires. */
@@ -94,6 +106,8 @@ export async function createApiKey(
             allowedCidrs: stringifyList(input.allowedCidrs),
             allowedCountries: stringifyList(input.allowedCountries),
             allowedContinents: stringifyList(input.allowedContinents),
+            allowedUserAgents: stringifyList(input.allowedUserAgents),
+            deniedUserAgents: stringifyList(input.deniedUserAgents),
             expiresAt: expiryFor(input),
             groups: { createMany: { data: owned.map((group) => ({ groupId: group.id })) } }
         },
@@ -117,10 +131,13 @@ export async function listApiKeys(userId: string): Promise<ApiKeyView[]> {
         allowedCidrs: parseStringList(row.allowedCidrs),
         allowedCountries: parseStringList(row.allowedCountries),
         allowedContinents: parseStringList(row.allowedContinents),
+        allowedUserAgents: parseStringList(row.allowedUserAgents),
+        deniedUserAgents: parseStringList(row.deniedUserAgents),
         groupIds: row.groups.map((group) => group.groupId),
         expiresAt: row.expiresAt?.toISOString() ?? null,
         lastUsedAt: row.lastUsedAt?.toISOString() ?? null,
         lastUsedIp: row.lastUsedIp,
+        lastUsedUserAgent: row.lastUsedUserAgent,
         revokedAt: row.revokedAt?.toISOString() ?? null,
         createdAt: row.createdAt.toISOString()
     }));
@@ -174,7 +191,11 @@ export async function verifyApiKey(presented: string): Promise<VerifiedApiKey | 
         id: row.id,
         userId: row.userId,
         scopes,
-        rules: unionRules([row, ...row.groups.map((binding) => binding.group)])
+        rules: unionRules([row, ...row.groups.map((binding) => binding.group)]),
+        clients: {
+            allowedUserAgents: parseStringList(row.allowedUserAgents),
+            deniedUserAgents: parseStringList(row.deniedUserAgents)
+        }
     };
 }
 
@@ -190,12 +211,21 @@ export async function scopesAvailableTo(userId: string, isAdmin = false): Promis
     return PERMISSIONS.filter((permission) => granted.has(permission));
 }
 
-/** Record that a key was just used. Best-effort: never fails the request. */
-export async function touchApiKey(id: string, ip: string | undefined): Promise<void> {
+/** Record that a key was just used, and by what. Best-effort: never fails the
+ *  request. */
+export async function touchApiKey(
+    id: string,
+    ip: string | undefined,
+    userAgent?: string
+): Promise<void> {
     try {
         await prisma.apiKey.update({
             where: { id },
-            data: { lastUsedAt: new Date(), lastUsedIp: ip ?? null }
+            data: {
+                lastUsedAt: new Date(),
+                lastUsedIp: ip ?? null,
+                lastUsedUserAgent: userAgent?.slice(0, MAX_USER_AGENT) ?? null
+            }
         });
     } catch {
         // A usage stamp is not worth failing an authorized call over.

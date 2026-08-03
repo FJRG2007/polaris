@@ -13,6 +13,7 @@
 import { z } from "zod";
 import { isCidr, isIpAddress } from "../cidr.js";
 import { CONTINENTS, COUNTRY_CODES } from "../geo.js";
+import { USER_AGENT_PATTERN_MAX } from "../user-agent.js";
 import { expandPermissions, PERMISSIONS } from "../permissions.js";
 
 /** A single IP address or CIDR range in a network allowlist. */
@@ -99,6 +100,24 @@ export const sessionLimitsSchema = z.object({
             message: "Unsupported session lifetime"
         })
 });
+
+/**
+ * How long a device newly seen on an account waits before it may change what
+ * protects that account. 0 asks for no wait, which is the default.
+ *
+ * Offered as a list rather than a free number so the screen can name each one,
+ * and so a value nobody chose cannot be stored through the endpoint. An
+ * unrecognised one is refused rather than rounded: every direction it could be
+ * rounded in is a different promise about the account.
+ */
+export const NEW_DEVICE_GRACE_CHOICES = [0, 1, 3, 7, 14, 30] as const;
+
+export const newDeviceGraceSchema = z
+    .number()
+    .int()
+    .refine((value) => (NEW_DEVICE_GRACE_CHOICES as readonly number[]).includes(value), {
+        message: "Unsupported wait"
+    });
 
 // ---------------------------------------------------------------------------
 // Signing in by QR code
@@ -237,7 +256,31 @@ export const API_KEY_EXPIRY_CHOICES = [0, 7, 30, 90, 180, 365] as const;
 /** How far ahead a hand-picked expiry date may sit. */
 export const API_KEY_MAX_EXPIRY_YEARS = 10;
 
+/** How many client patterns one key may carry per list. A handful describes any
+ *  real client; a long list is a sign the rule is not doing what was meant. */
+const USER_AGENT_LIST_MAX = 20;
+
+/** One client pattern, normalized before it is checked so a value that only
+ *  differs by surrounding space is the same rule. */
+const userAgentPattern = z.string().trim().min(1, "Enter a pattern").max(USER_AGENT_PATTERN_MAX);
+
+/** The client lists a key may carry, on top of the addresses it may be used
+ *  from. Duplicates are dropped: two copies of a pattern decide nothing twice. */
+export const userAgentRulesSchema = z.object({
+    allowedUserAgents: z
+        .array(userAgentPattern)
+        .max(USER_AGENT_LIST_MAX)
+        .default([])
+        .transform((values) => [...new Set(values)]),
+    deniedUserAgents: z
+        .array(userAgentPattern)
+        .max(USER_AGENT_LIST_MAX)
+        .default([])
+        .transform((values) => [...new Set(values)])
+});
+
 export const createApiKeySchema = accessRulesSchema.extend({
+    ...userAgentRulesSchema.shape,
     name: z.string().trim().min(1, "Name is required").max(60),
     /** Permissions the key may exercise; it can only ever narrow its owner's own. */
     scopes: z

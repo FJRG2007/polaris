@@ -620,9 +620,17 @@ model ApiKey {
     allowedCidrs      String    @default("[]")
     allowedCountries  String    @default("[]")
     allowedContinents String    @default("[]")
+    // Which clients may present the key, beside where from. JSON string arrays
+    // of patterns, matched against the request's user-agent; empty allow means
+    // any client, and a deny match refuses whatever the allow list says.
+    allowedUserAgents String    @default("[]")
+    deniedUserAgents  String    @default("[]")
     expiresAt         DateTime?
     lastUsedAt        DateTime?
     lastUsedIp        String?
+    // What last presented it, so a key that is being used from somewhere
+    // unexpected can be recognised as such rather than only dated.
+    lastUsedUserAgent String?
     revokedAt         DateTime?
     // Set on a token minted from a project's settings: the key still carries its
     // owner's permissions, but may only act on this project. Null is an ordinary

@@ -25,7 +25,7 @@
  */
 
 import Link from "next/link";
-import { Feedback } from "./setting-card";
+import { Feedback, type SettingLock } from "./setting-card";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { setLoginApprovalAction } from "./actions";
@@ -61,12 +61,15 @@ export interface LoginApprovalStatus {
 }
 
 export function TwoFactorMethodsCard({
+    lock,
     statuses,
     preferred,
     twoFactorEnabled,
     trustedDevices,
     approval
 }: {
+    /** Set while this browser is too new on the account to change any of it. */
+    lock?: SettingLock;
     statuses: TwoFactorMethodStatus[];
     preferred: TwoFactorMethod;
     twoFactorEnabled: boolean;
@@ -83,6 +86,7 @@ export function TwoFactorMethodsCard({
     const [choice, setChoice] = useState<TwoFactorMethod>(preferred);
     const [approve, setApprove] = useState(approval.enabled);
     const [confirming, setConfirming] = useState(false);
+    const locked = Boolean(lock);
 
     const savedMethods = TWO_FACTOR_DELIVERY_METHODS.filter(
         (method) => statuses.find((status) => status.method === method)?.enabled === true
@@ -133,7 +137,7 @@ export function TwoFactorMethodsCard({
                                 ) : (
                                     <Switch
                                         checked={on}
-                                        disabled={!twoFactorEnabled || (!status.available && !on)}
+                                        disabled={locked || !twoFactorEnabled || (!status.available && !on)}
                                         aria-label={`Use ${info.label}`}
                                         onChange={(next) =>
                                             toggle(status.method as TwoFactorDeliveryMethod, next)
@@ -173,7 +177,7 @@ export function TwoFactorMethodsCard({
                         </div>
                         <Switch
                             checked={approve}
-                            disabled={(twoFactorEnabled || !approval.hasPin) && !approve}
+                            disabled={locked || ((twoFactorEnabled || !approval.hasPin) && !approve)}
                             aria-label="Require approval for new sign-ins"
                             onChange={setApprove}
                         />
@@ -188,6 +192,7 @@ export function TwoFactorMethodsCard({
                             it means is that nothing else has been turned on yet. */}
                         <Select
                             value={choice}
+                            disabled={locked}
                             onValueChange={(value) => setChoice(value as TwoFactorMethod)}
                             options={TWO_FACTOR_METHODS.map((method) => {
                                 const off =
@@ -232,7 +237,7 @@ export function TwoFactorMethodsCard({
                 </p>
 
                 <div className="flex justify-end">
-                    <Button disabled={!changed} onClick={() => setConfirming(true)}>
+                    <Button disabled={locked || !changed} onClick={() => setConfirming(true)}>
                         Save
                     </Button>
                 </div>

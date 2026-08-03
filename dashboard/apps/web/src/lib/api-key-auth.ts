@@ -11,9 +11,9 @@
  */
 
 import { touchApiKey, verifyApiKey } from "@polaris/auth";
-import type { Permission } from "@polaris/core";
 import { evaluateAccountAccess } from "@/lib/network-rules";
-import { clientIp } from "@/lib/request-context";
+import { userAgentAllowed, type Permission } from "@polaris/core";
+import { clientIp, clientUserAgent } from "@/lib/request-context";
 
 export interface ApiKeyPrincipal {
     keyId: string;
@@ -42,13 +42,18 @@ export async function authenticateApiKey(request: Request): Promise<ApiKeyPrinci
     const verified = await verifyApiKey(token);
     if (!verified) return null;
 
-    const ip = await clientIp();
+    const [ip, userAgent] = await Promise.all([clientIp(), clientUserAgent()]);
     // The key's own allowlist, and whatever an administrator imposed on the
     // account behind it: a key must not be a way around a limit set on its owner.
     const decision = await evaluateAccountAccess(verified.userId, ip, verified.rules);
     if (!decision.allowed) return null;
 
-    await touchApiKey(verified.id, ip);
+    // And what is presenting it, which the key may also have been narrowed to.
+    // A user-agent is written by whoever makes the request, so this narrows a
+    // credential that has already been proven; it never stands in for proving one.
+    if (!userAgentAllowed(verified.clients, userAgent)) return null;
+
+    await touchApiKey(verified.id, ip, userAgent);
     return { keyId: verified.id, userId: verified.userId, scopes: verified.scopes };
 }
 

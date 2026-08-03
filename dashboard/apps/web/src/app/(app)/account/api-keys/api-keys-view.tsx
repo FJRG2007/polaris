@@ -9,9 +9,25 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { ScopePicker } from "./scope-picker";
 import { Copy, KeyRound, Plus } from "lucide-react";
+import { useConfirm } from "@/components/confirm-dialog";
+import { RelativeTime } from "@/components/relative-time";
 import type { AccessGroupView, ApiKeyView } from "@polaris/auth";
-import { API_KEY_EXPIRY_CHOICES, expandPermissions, type Permission } from "@polaris/core";
+import { createApiKeyAction, deleteApiKeyAction, revokeApiKeyAction } from "./actions";
+import { ClientRulesEditor, EMPTY_CLIENT_RULES } from "@/components/client-rules-editor";
+import {
+    AccessRulesEditor,
+    EMPTY_ACCESS_RULES,
+    type AccessRulesValue
+} from "@/components/access-rules-editor";
+import {
+    API_KEY_EXPIRY_CHOICES,
+    describeDevice,
+    expandPermissions,
+    type Permission,
+    type UserAgentRules
+} from "@polaris/core";
 import {
     Badge,
     Button,
@@ -25,15 +41,6 @@ import {
     Input,
     Select
 } from "@polaris/ui";
-import {
-    AccessRulesEditor,
-    EMPTY_ACCESS_RULES,
-    type AccessRulesValue
-} from "@/components/access-rules-editor";
-import { useConfirm } from "@/components/confirm-dialog";
-import { RelativeTime } from "@/components/relative-time";
-import { createApiKeyAction, deleteApiKeyAction, revokeApiKeyAction } from "./actions";
-import { ScopePicker } from "./scope-picker";
 
 /** The Select value that swaps the fixed spans for a date of the user's choosing. */
 const CUSTOM_EXPIRY = "custom";
@@ -55,6 +62,25 @@ function earliestExpiryDate(): string {
     const month = String(now.getMonth() + 1).padStart(2, "0");
     const day = String(now.getDate()).padStart(2, "0");
     return `${now.getFullYear()}-${month}-${day}`;
+}
+
+/**
+ * The one line that says a key is narrower than it looks, or nothing when it is
+ * not. A key restricted to an address or a client and showing no sign of it is a
+ * key somebody will spend an afternoon debugging.
+ */
+function describeLimits(key: ApiKeyView): string | null {
+    const parts: string[] = [];
+    const addresses =
+        key.allowedCidrs.length + key.allowedCountries.length + key.allowedContinents.length;
+    if (addresses > 0) parts.push(`${addresses} address rule${addresses === 1 ? "" : "s"}`);
+    if (key.allowedUserAgents.length > 0) {
+        parts.push(`${key.allowedUserAgents.length} allowed client${key.allowedUserAgents.length === 1 ? "" : "s"}`);
+    }
+    if (key.deniedUserAgents.length > 0) {
+        parts.push(`${key.deniedUserAgents.length} blocked client${key.deniedUserAgents.length === 1 ? "" : "s"}`);
+    }
+    return parts.length > 0 ? `Limited to ${parts.join(", ")}` : null;
 }
 
 /** What a key's state should read as in the list. */
@@ -117,8 +143,8 @@ export function ApiKeysView({
                         <div>
                             <h2 className="text-sm font-medium">Your keys</h2>
                             <p className="text-xs text-muted-foreground">
-                                Each key carries a subset of your own permissions, and can be limited to an address
-                                or a location.
+                                Each key carries a subset of your own permissions, and can be limited
+                                to an address, a location, or the clients that may present it.
                             </p>
                         </div>
                         <Button size="sm" onClick={() => setCreateOpen(true)}>
@@ -160,6 +186,20 @@ export function ApiKeysView({
                                                     </>
                                                 ) : " - never used"}
                                             </p>
+                                            {describeLimits(key) ? (
+                                                <p className="text-xs text-muted-foreground">
+                                                    {describeLimits(key)}
+                                                </p>
+                                            ) : null}
+                                            {key.lastUsedUserAgent ? (
+                                                <p
+                                                    className="truncate text-xs text-muted-foreground"
+                                                    title={key.lastUsedUserAgent}
+                                                >
+                                                    Last used by {describeDevice(key.lastUsedUserAgent)}
+                                                    {key.lastUsedIp ? ` from ${key.lastUsedIp}` : null}
+                                                </p>
+                                            ) : null}
                                         </div>
                                     </div>
                                     <div className="flex shrink-0 gap-1">
@@ -214,6 +254,7 @@ function CreateKeyDialog({
     const [expiry, setExpiry] = useState<string>("90");
     const [expiryDate, setExpiryDate] = useState("");
     const [rules, setRules] = useState<AccessRulesValue>(EMPTY_ACCESS_RULES);
+    const [clients, setClients] = useState<UserAgentRules>(EMPTY_CLIENT_RULES);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -227,6 +268,7 @@ function CreateKeyDialog({
         setExpiry("90");
         setExpiryDate("");
         setRules(EMPTY_ACCESS_RULES);
+        setClients(EMPTY_CLIENT_RULES);
         setError(null);
     }
 
@@ -238,7 +280,8 @@ function CreateKeyDialog({
             scopes: expandPermissions(scopes),
             expiresInDays: custom ? 0 : Number(expiry),
             expiresAt: chosenDate?.toISOString(),
-            ...rules
+            ...rules,
+            ...clients
         });
         setBusy(false);
         if (result.error || !result.secret) {
@@ -314,6 +357,11 @@ function CreateKeyDialog({
                     <div className="flex flex-col gap-1">
                         <span className="text-xs font-medium">Where the key may be used</span>
                         <AccessRulesEditor value={rules} groups={groups} onChange={setRules} />
+                    </div>
+
+                    <div className="flex flex-col gap-1">
+                        <span className="text-xs font-medium">What may use it</span>
+                        <ClientRulesEditor value={clients} onChange={setClients} />
                     </div>
 
                     {error ? <p className="text-sm text-danger">{error}</p> : null}

@@ -25,10 +25,17 @@ import { recordAudit } from "@/lib/audit-service";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { newDeviceRefusal } from "@/lib/device-grace";
 import { revokeOtherSessions } from "@/lib/session-directory";
-import { recoverPasswordSchema, securityQuestionsSchema, sessionLimitsSchema, setPinSchema } from "@polaris/core";
+import {
+    newDeviceGraceSchema,
+    recoverPasswordSchema,
+    securityQuestionsSchema,
+    sessionLimitsSchema,
+    setPinSchema
+} from "@polaris/core";
 import {
     beginSessionRotation,
     changeUserPassword,
+    setNewDeviceGrace,
     clearQuickPin,
     clearSecurityQuestions,
     getUserSecurity,
@@ -44,6 +51,7 @@ import {
 } from "@polaris/auth";
 
 type ActionResult = { error?: string };
+
 
 /** Guess-throttling for the identity proofs that stand in for the password. */
 const RECOVERY_LIMIT = 5;
@@ -140,6 +148,31 @@ export async function clearPinAction(password: string): Promise<ActionResult> {
         revalidatePath("/account/security");
     }
     return result;
+}
+
+/**
+ * Set how long a device newly seen on this account waits before it may change
+ * anything here.
+ *
+ * Gated like everything else on the page, which is what stops the wait being the
+ * first thing a device inside one turns off. Raising it, lowering it and turning
+ * it off are all the same decision and all need a device the account already
+ * knows.
+ */
+export async function setNewDeviceGraceAction(days: unknown): Promise<ActionResult> {
+    const user = await requireUser();
+    const blocked = await newDeviceRefusal(user);
+    if (blocked) return { error: blocked };
+    const parsed = newDeviceGraceSchema.safeParse(days);
+    if (!parsed.success) return { error: "Pick one of the offered waits." };
+    await setNewDeviceGrace(user.id, parsed.data);
+    await recordAudit({
+        actorId: user.id,
+        action: "account.new-device-grace.updated",
+        metadata: { days: parsed.data }
+    });
+    revalidatePath("/account/security");
+    return {};
 }
 
 export async function updateSessionLimitsAction(input: unknown): Promise<ActionResult> {

@@ -12,7 +12,6 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { PasskeysCard } from "./passkeys-card";
 import { ShieldAlert, Trash2 } from "lucide-react";
-import { NEW_DEVICE_GRACE_CHOICES } from "@polaris/auth";
 import type { PasskeyView } from "@/lib/passkey-directory";
 import { Button, Card, CardBody, Select } from "@polaris/ui";
 import { RemovePinDialog, SetPinDialog } from "./pin-dialogs";
@@ -25,6 +24,7 @@ import { ClearQuestionsDialog, SecurityQuestionsDialog } from "./questions-dialo
 import { DisableTwoFactorDialog, EnableTwoFactorDialog } from "./two-factor-dialogs";
 import {
     IDLE_LOCK_CHOICES,
+    NEW_DEVICE_GRACE_CHOICES,
     SECURITY_QUESTION_COUNT,
     SESSION_MAX_CHOICES,
     type TwoFactorMethod
@@ -63,6 +63,11 @@ export function SecurityView({
     trustedDevices,
     otherSessions
 }: {
+    /** Set while this browser is too new on the account to change any of this.
+     *  Every control below reads it; the server refuses them regardless. */
+    lock?: SettingLock;
+    /** Days the account makes a device newly seen on it wait. 0 is no wait. */
+    newDeviceGraceDays: number;
     hasPin: boolean;
     idleLockMinutes: number;
     sessionMaxMinutes: number;
@@ -96,18 +101,52 @@ export function SecurityView({
         if (!result.error) router.refresh();
     }
 
+    const [grace, setGrace] = useState(newDeviceGraceDays);
+    const [graceBusy, setGraceBusy] = useState(false);
+    const [graceResult, setGraceResult] = useState<{ error?: string; ok?: string } | null>(null);
+
+    async function saveGrace(days: number) {
+        setGrace(days);
+        setGraceBusy(true);
+        setGraceResult(null);
+        const result = await setNewDeviceGraceAction(days);
+        setGraceBusy(false);
+        setGraceResult(result.error ? result : { ok: "Saved." });
+        if (result.error) setGrace(newDeviceGraceDays);
+        else router.refresh();
+    }
+
     const hasQuestions = questions.length === SECURITY_QUESTION_COUNT;
+    const locked = Boolean(lock);
 
     return (
         <div className="flex flex-col gap-4">
+            {lock ? (
+                <Card>
+                    <CardBody className="flex items-start gap-3">
+                        <ShieldAlert className="mt-0.5 size-4 shrink-0 text-warning" />
+                        <div>
+                            <h2 className="text-sm font-medium">This device is still new here</h2>
+                            <p className="text-xs text-muted-foreground">{lock.reason}</p>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                                Use a device you have signed in from before, or wait it out. Signing
+                                out from here still works.
+                            </p>
+                        </div>
+                    </CardBody>
+                </Card>
+            ) : null}
+
             <SettingCard
                 title="Password"
                 description="Changing it signs out every other session."
             >
-                <Button variant="ghost" onClick={() => setDialog("recover")}>
+                <Button variant="ghost" disabled={locked} onClick={() => setDialog("recover")}>
                     I forgot it
                 </Button>
-                <Button onClick={() => setDialog("password")}>Change</Button>
+                <Button disabled={locked} onClick={() => setDialog("password")}>
+                    Change
+                </Button>
             </SettingCard>
 
             <SettingCard
@@ -117,15 +156,18 @@ export function SecurityView({
                 statusTone={twoFactorEnabled ? "on" : "off"}
             >
                 {twoFactorEnabled ? (
-                    <Button variant="outline" onClick={() => setDialog("2fa-off")}>
+                    <Button variant="outline" disabled={locked} onClick={() => setDialog("2fa-off")}>
                         Turn off
                     </Button>
                 ) : (
-                    <Button onClick={() => setDialog("2fa-on")}>Set up</Button>
+                    <Button disabled={locked} onClick={() => setDialog("2fa-on")}>
+                        Set up
+                    </Button>
                 )}
             </SettingCard>
 
             <TwoFactorMethodsCard
+                lock={lock}
                 statuses={twoFactorMethods}
                 preferred={twoFactorPreferred}
                 twoFactorEnabled={twoFactorEnabled}
@@ -133,7 +175,7 @@ export function SecurityView({
                 approval={{ enabled: requireLoginApproval, hasPin, otherSessions }}
             />
 
-            <PasskeysCard passkeys={passkeys} />
+            <PasskeysCard passkeys={passkeys} lock={lock} />
 
             <SettingCard
                 title="Quick unlock PIN"
@@ -149,12 +191,15 @@ export function SecurityView({
                         variant="ghost"
                         size="icon"
                         aria-label="Remove quick unlock PIN"
+                        disabled={locked}
                         onClick={() => setDialog("pin-off")}
                     >
                         <Trash2 className="size-4" />
                     </Button>
                 ) : null}
-                <Button onClick={() => setDialog("pin")}>{hasPin ? "Change" : "Set PIN"}</Button>
+                <Button disabled={locked} onClick={() => setDialog("pin")}>
+                    {hasPin ? "Change" : "Set PIN"}
+                </Button>
             </SettingCard>
 
             <SettingCard
@@ -168,13 +213,46 @@ export function SecurityView({
                         variant="ghost"
                         size="icon"
                         aria-label="Remove security questions"
+                        disabled={locked}
                         onClick={() => setDialog("questions-off")}
                     >
                         <Trash2 className="size-4" />
                     </Button>
                 ) : null}
-                <Button onClick={() => setDialog("questions")}>{hasQuestions ? "Update" : "Set up"}</Button>
+                <Button disabled={locked} onClick={() => setDialog("questions")}>
+                    {hasQuestions ? "Update" : "Set up"}
+                </Button>
             </SettingCard>
+
+            <Card>
+                <CardBody className="flex flex-col gap-3">
+                    <div>
+                        <h2 className="text-sm font-medium">New devices</h2>
+                        <p className="text-xs text-muted-foreground">
+                            Make a browser you have not signed in from before wait before it can
+                            change anything on this page. It buys you time to notice if someone
+                            else signs in with your password.
+                        </p>
+                    </div>
+                    <label className="flex flex-col gap-1 text-sm sm:max-w-xs">
+                        Wait before a new device can change security
+                        <Select
+                            value={String(grace)}
+                            disabled={locked || graceBusy}
+                            onValueChange={(value) => void saveGrace(Number(value))}
+                            options={NEW_DEVICE_GRACE_CHOICES.map((days) => ({
+                                value: String(days),
+                                label: describeDays(days)
+                            }))}
+                        />
+                    </label>
+                    <p className="text-xs text-muted-foreground">
+                        A waiting device can still read this page and sign itself out. Devices you
+                        already use are not affected.
+                    </p>
+                    <Feedback error={graceResult?.error} ok={graceResult?.ok} />
+                </CardBody>
+            </Card>
 
             <Card>
                 <CardBody className="flex flex-col gap-3">
@@ -189,6 +267,7 @@ export function SecurityView({
                             Lock after inactivity
                             <Select
                                 value={String(limits.idleLockMinutes)}
+                                disabled={locked}
                                 onValueChange={(value) =>
                                     setLimits((prev) => ({ ...prev, idleLockMinutes: Number(value) }))
                                 }
@@ -202,6 +281,7 @@ export function SecurityView({
                             Sign out after
                             <Select
                                 value={String(limits.sessionMaxMinutes)}
+                                disabled={locked}
                                 onValueChange={(value) =>
                                     setLimits((prev) => ({ ...prev, sessionMaxMinutes: Number(value) }))
                                 }
@@ -219,7 +299,7 @@ export function SecurityView({
                         <Feedback error={limitsResult?.error} ok={limitsResult?.ok} />
                         <Button
                             onClick={() => void saveLimits()}
-                            disabled={limitsBusy || !limitsChanged}
+                            disabled={locked || limitsBusy || !limitsChanged}
                             className="ml-auto"
                         >
                             {limitsBusy ? "Saving..." : "Save"}

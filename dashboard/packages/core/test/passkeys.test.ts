@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { passkeyRelyingPartyId } from "../src/passkeys.js";
+import { passkeyNameKey, passkeyRelyingPartyId } from "../src/passkeys.js";
 
 describe("passkeyRelyingPartyId", () => {
     it("keeps a domain, a LAN name, and a bare label", () => {
@@ -22,5 +22,19 @@ describe("passkeyRelyingPartyId", () => {
         expect(passkeyRelyingPartyId("pola ris.local")).toBeNull();
         expect(passkeyRelyingPartyId("")).toBeNull();
         expect(passkeyRelyingPartyId(null)).toBeNull();
+    });
+});
+
+describe("passkeyNameKey", () => {
+    it("treats names a person could not tell apart as the same name", () => {
+        // The field on the screen and the ceremony on the server both compare
+        // through this, so they cannot disagree about what a duplicate is.
+        expect(passkeyNameKey("  iPhone ")).toBe(passkeyNameKey("iphone"));
+        expect(passkeyNameKey("Work  Laptop")).toBe(passkeyNameKey("work laptop"));
+    });
+
+    it("keeps genuinely different names apart", () => {
+        expect(passkeyNameKey("iPhone")).not.toBe(passkeyNameKey("iPad"));
+        expect(passkeyNameKey("Laptop 1")).not.toBe(passkeyNameKey("Laptop 2"));
     });
 });
