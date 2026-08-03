@@ -10,7 +10,16 @@ import { cn } from "../lib/cn";
 import { ChevronRight } from "lucide-react";
 import { ignoreOpeningPress } from "../lib/menu-press";
 import * as RadixMenu from "@radix-ui/react-context-menu";
-import { forwardRef, useEffect, useRef, type ComponentPropsWithoutRef, type ElementRef } from "react";
+import {
+    createContext,
+    forwardRef,
+    useContext,
+    useEffect,
+    useRef,
+    useState,
+    type ComponentPropsWithoutRef,
+    type ElementRef
+} from "react";
 
 /**
  * How long to wait before a submenu that should have opened is asked again.
@@ -27,7 +36,40 @@ const SETTLED_MS = 350;
 export const ContextMenu = RadixMenu.Root;
 export const ContextMenuTrigger = RadixMenu.Trigger;
 export const ContextMenuGroup = RadixMenu.Group;
-export const ContextMenuSub = RadixMenu.Sub;
+
+/** Whether this submenu has been open before, and so is being kept rather than
+ *  rebuilt. Read by its content; nothing outside this file needs it. */
+const SubmenuKept = createContext(false);
+
+/**
+ * A submenu that is built once and then kept.
+ *
+ * A menu drops a submenu's contents the instant the pointer leaves it, so
+ * stepping along a row of them - status, then priority, then people - builds
+ * each list from scratch every single time, including on the way back to one
+ * that was open a second ago. On a list of any size that reads as the menu
+ * stopping to load something, when there was nothing to load.
+ *
+ * So the first time one opens it stays mounted and is hidden while closed:
+ * coming back to it is a class change rather than a rebuild. It lasts as long as
+ * the menu is open, which is the span somebody is moving between the options.
+ */
+export function ContextMenuSub({ onOpenChange, ...props }: ComponentPropsWithoutRef<typeof RadixMenu.Sub>) {
+    const [kept, setKept] = useState(false);
+    return (
+        <SubmenuKept.Provider value={kept}>
+            <RadixMenu.Sub
+                {...props}
+                onOpenChange={(open) => {
+                    // Only once it has actually been opened, so a menu nobody
+                    // steps into still costs nothing to put on screen.
+                    if (open) setKept(true);
+                    onOpenChange?.(open);
+                }}
+            />
+        </SubmenuKept.Provider>
+    );
+}
 
 export const ContextMenuContent = forwardRef<
     ElementRef<typeof RadixMenu.Content>,
@@ -117,21 +159,29 @@ ContextMenuSubTrigger.displayName = "ContextMenuSubTrigger";
 export const ContextMenuSubContent = forwardRef<
     ElementRef<typeof RadixMenu.SubContent>,
     ComponentPropsWithoutRef<typeof RadixMenu.SubContent>
->(({ className, ...props }, ref) => (
-    <RadixMenu.Portal>
-        <RadixMenu.SubContent
-            ref={ref}
-            className={cn(
-                "z-50 min-w-[11rem] overflow-hidden rounded-md border border-border bg-card p-1 text-foreground shadow-lg data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
-                className
-            )}
-            {...props}
-            // After the spread: the menu must never commit an option on the
-            // release of the press that opened it.
-            onPointerUpCapture={ignoreOpeningPress}
-        />
-    </RadixMenu.Portal>
-));
+>(({ className, ...props }, ref) => {
+    // Kept mounted once it has been opened - see ContextMenuSub. Hidden rather
+    // than faded while closed, since there is nothing to animate out of a
+    // submenu that is only being stepped past.
+    const kept = useContext(SubmenuKept);
+    return (
+        <RadixMenu.Portal forceMount={kept || undefined}>
+            <RadixMenu.SubContent
+                ref={ref}
+                forceMount={kept || undefined}
+                className={cn(
+                    "z-50 min-w-[11rem] overflow-hidden rounded-md border border-border bg-card p-1 text-foreground shadow-lg data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+                    className,
+                    kept && "data-[state=closed]:hidden"
+                )}
+                {...props}
+                // After the spread: the menu must never commit an option on the
+                // release of the press that opened it.
+                onPointerUpCapture={ignoreOpeningPress}
+            />
+        </RadixMenu.Portal>
+    );
+});
 ContextMenuSubContent.displayName = "ContextMenuSubContent";
 
 export function ContextMenuSeparator({ className }: { className?: string }) {
