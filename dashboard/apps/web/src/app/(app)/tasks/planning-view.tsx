@@ -343,7 +343,7 @@ export function GoalsView({
                                 <div className="flex items-start gap-3">
                                     <Target className="mt-0.5 size-4" style={{ color: goal.color }} />
                                     <div className="min-w-0 flex-1">
-                                        <p className={cn("truncate font-medium", goal.completedAt && "line-through")}>
+                                        <p className={cn("truncate font-medium", goal.completedAt && "text-muted-foreground")}>
                                             {goal.name}
                                         </p>
                                         <p className="text-xs text-muted-foreground">

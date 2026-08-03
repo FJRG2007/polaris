@@ -166,7 +166,7 @@ export function TaskCard({
                     </span>
                 </div>
 
-                <p className={cn("text-sm leading-snug", core.isFinishedStatus(task.statusType) && "text-muted-foreground line-through")}>
+                <p className={cn("text-sm leading-snug", core.isFinishedStatus(task.statusType) && "text-muted-foreground")}>
                     {task.name}
                 </p>
 

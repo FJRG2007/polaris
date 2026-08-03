@@ -87,7 +87,7 @@ function TaskLine({
                     className="flex min-w-0 items-center gap-2 text-left"
                 >
                     <span className="hidden font-mono text-[11px] text-muted-foreground sm:inline">{task.reference}</span>
-                    <span className={cn("truncate text-sm", core.isFinishedStatus(task.statusType) && "text-muted-foreground line-through")}>
+                    <span className={cn("truncate text-sm", core.isFinishedStatus(task.statusType) && "text-muted-foreground")}>
                         {task.name}
                     </span>
                     {task.blocked && <Ban className="size-3.5 shrink-0 text-amber-500" aria-label="Blocked" />}

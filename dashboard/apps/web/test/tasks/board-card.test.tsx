@@ -104,6 +104,11 @@ describe("board card", () => {
         expect(markup).toContain("has-[[data-state=open]]:opacity-100");
     });
 
+    it("dims a finished task instead of striking its name out", () => {
+        const markup = card(taskRow({ statusType: "done" }));
+        expect(markup).not.toContain("line-through");
+    });
+
     it("offers no controls to somebody who cannot edit", () => {
         const markup = card(taskRow(), false);
         expect(markup).not.toContain('aria-label="Priority"');

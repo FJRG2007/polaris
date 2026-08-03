@@ -94,7 +94,7 @@ export default async function PublicTaskPage({ params }: { params: Promise<{ tok
                                     className="size-2.5 rounded-full"
                                     style={{ backgroundColor: task.statusColor }}
                                 />
-                                <span className={task.finished ? "text-muted-foreground line-through" : undefined}>
+                                <span className={task.finished ? "text-muted-foreground" : undefined}>
                                     {task.statusName}
                                 </span>
                             </span>
@@ -152,7 +152,7 @@ export default async function PublicTaskPage({ params }: { params: Promise<{ tok
                                         />
                                         <span
                                             className={
-                                                subtask.finished ? "flex-1 text-muted-foreground line-through" : "flex-1"
+                                                subtask.finished ? "flex-1 text-muted-foreground" : "flex-1"
                                             }
                                         >
                                             {subtask.name}
@@ -171,7 +171,7 @@ export default async function PublicTaskPage({ params }: { params: Promise<{ tok
                                 {checklist.items.map((item, itemIndex) => (
                                     <li
                                         key={itemIndex}
-                                        className={item.done ? "text-muted-foreground line-through" : undefined}
+                                        className={item.done ? "text-muted-foreground" : undefined}
                                     >
                                         {item.done ? "[x]" : "[ ]"} {item.name}
                                     </li>

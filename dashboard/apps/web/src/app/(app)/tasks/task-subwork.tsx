@@ -221,7 +221,7 @@ export function SubtaskSection({
                             className="flex-1 truncate text-left text-sm hover:underline"
                         >
                             <span className="mr-2 font-mono text-[11px] text-muted-foreground">{subtask.reference}</span>
-                            <span className={cn(core.isFinishedStatus(subtask.statusType) && "text-muted-foreground line-through")}>
+                            <span className={cn(core.isFinishedStatus(subtask.statusType) && "text-muted-foreground")}>
                                 {subtask.name}
                             </span>
                         </button>
@@ -412,7 +412,7 @@ export function ChecklistSection({
                                                 onChanged();
                                             }}
                                         />
-                                        <span className={cn("flex-1 text-sm", item.done && "text-muted-foreground line-through")}>
+                                        <span className={cn("flex-1 text-sm", item.done && "text-muted-foreground")}>
                                             {item.name}
                                         </span>
                                         {canEdit && (
