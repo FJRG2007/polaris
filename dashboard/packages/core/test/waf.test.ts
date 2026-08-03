@@ -20,6 +20,7 @@ describe("guard rule codec", () => {
             deny: ["10.0.0.0/8", "203.0.113.5"],
             requireLogin: true,
             browserIntegrity: false,
+            injectionProtection: true,
             emailObfuscation: false,
             presets: [],
             rules: [CUSTOM_RULE]
@@ -32,17 +33,19 @@ describe("guard rule codec", () => {
             deny: [],
             requireLogin: false,
             browserIntegrity: false,
+            injectionProtection: false,
             emailObfuscation: false,
             presets: [],
             rules: []
         });
     });
 
-    it("fails closed on a malformed header (requires login)", () => {
+    it("fails closed on a malformed header (requires login and inspects payloads)", () => {
         expect(decodeGuardRule("###not-valid###")).toEqual({
             deny: [],
             requireLogin: true,
             browserIntegrity: false,
+            injectionProtection: true,
             emailObfuscation: false,
             presets: [],
             rules: []
@@ -55,6 +58,7 @@ describe("guard rule codec", () => {
             deny: ["10.0.0.1"],
             requireLogin: false,
             browserIntegrity: false,
+            injectionProtection: false,
             emailObfuscation: false,
             presets: [],
             rules: []
@@ -112,13 +116,14 @@ describe("edge token", () => {
 describe("wafRuleInputSchema", () => {
     it("accepts a valid rule and applies defaults", () => {
         const parsed = wafRuleInputSchema.parse({ ipAllowlist: ["10.0.0.0/8"] });
-        // Email obfuscation defaults ON, which is what "on everywhere" means at the
-        // schema level rather than at the UI's.
+        // Injection protection and email obfuscation default ON, which is what "on
+        // everywhere" means at the schema level rather than at the UI's.
         expect(parsed).toEqual({
             ipAllowlist: ["10.0.0.0/8"],
             ipDenylist: [],
             requireLogin: false,
             browserIntegrity: false,
+            injectionProtection: true,
             emailObfuscation: true,
             presets: [],
             rules: []

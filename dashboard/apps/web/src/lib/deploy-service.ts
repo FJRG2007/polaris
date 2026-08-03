@@ -713,6 +713,7 @@ export async function syncAppRoutes(): Promise<void> {
             deny: [],
             requireLogin: false,
             browserIntegrity: false,
+            injectionProtection: true,
             emailObfuscation: true,
             presets: [],
             rules: []
@@ -731,6 +732,7 @@ export async function syncAppRoutes(): Promise<void> {
                 rules: rule.rules,
                 requireLogin: rule.requireLogin,
                 browserIntegrity: rule.browserIntegrity,
+                injectionProtection: rule.injectionProtection,
                 emailObfuscation: rule.emailObfuscation
             });
         }
@@ -748,6 +750,7 @@ export async function syncAppRoutes(): Promise<void> {
                 rules: rule.rules,
                 requireLogin: rule.requireLogin,
                 browserIntegrity: rule.browserIntegrity,
+                injectionProtection: rule.injectionProtection,
                 emailObfuscation: rule.emailObfuscation
             });
         }
@@ -1256,13 +1259,19 @@ async function buildAppPlan(
     // default: it would be true for every service, so including it would put the guard
     // in front of every route on the instance to deliver a control the forwardAuth
     // path cannot apply anyway. It rides on the proxy wiring instead.
+    //
+    // Injection protection IS in it, for the opposite reason: forwardAuth is exactly
+    // where it applies, so a service that has nothing else set still needs the guard to
+    // get it. It costs no extra hop in practice - the instance-wide packs already put
+    // the guard in front of every route on a default instance.
     const waf =
         resolvedWaf.allowLists.length > 0 ||
         resolvedWaf.deny.length > 0 ||
         resolvedWaf.presets.length > 0 ||
         resolvedWaf.rules.length > 0 ||
         resolvedWaf.requireLogin ||
-        resolvedWaf.browserIntegrity
+        resolvedWaf.browserIntegrity ||
+        resolvedWaf.injectionProtection
             ? resolvedWaf
             : undefined;
 

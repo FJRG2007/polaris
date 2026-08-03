@@ -323,3 +323,81 @@ describe("browser integrity", () => {
         expect(decision.status).toBe(200);
     });
 });
+
+/**
+ * Injection protection is the one control here that is armed by default, so what it
+ * lets through matters as much as what it stops - and it sits after the custom rules
+ * for the same reason the integrity check does.
+ */
+describe("injection protection", () => {
+    function armed(rules: WafCustomRule[] = []) {
+        return encodeGuardRule({ deny: [], requireLogin: false, injectionProtection: true, rules });
+    }
+
+    it("does nothing until it is armed", () => {
+        const wafHeader = encodeGuardRule({ deny: [], requireLogin: false, rules: [] });
+        const decision = evaluate(
+            { wafHeader, forwardedHost: HOST, forwardedUri: "/p?id=1' or 1=1--" },
+            cfg
+        );
+
+        expect(decision.status).toBe(200);
+    });
+
+    it("blocks a payload in the query and says which signature fired", () => {
+        const decision = evaluate(
+            { wafHeader: armed(), forwardedHost: HOST, forwardedUri: "/p?id=1' or 1=1--" },
+            cfg
+        );
+
+        expect(decision).toEqual({
+            status: 403,
+            reason: "injection: sql always-true condition in the query"
+        });
+    });
+
+    it("blocks a payload in the path and an encoded one", () => {
+        expect(
+            evaluate({ wafHeader: armed(), forwardedHost: HOST, forwardedUri: "/p/<script>" }, cfg).status
+        ).toBe(403);
+        expect(
+            evaluate(
+                { wafHeader: armed(), forwardedHost: HOST, forwardedUri: "/p?q=%3Cscript%3E" },
+                cfg
+            ).status
+        ).toBe(403);
+    });
+
+    it("admits ordinary traffic", () => {
+        expect(
+            evaluate(
+                {
+                    wafHeader: armed(),
+                    forwardedHost: HOST,
+                    forwardedUri: "/blog/why-we-moved?page=2&q=black+and+white",
+                    userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Safari/605.1.15"
+                },
+                cfg
+            )
+        ).toEqual({ status: 200 });
+    });
+
+    it("lets a custom allow rule carve out an exception above it", () => {
+        const allow: WafCustomRule = {
+            name: "the reporting endpoint really does take sql",
+            enabled: true,
+            action: "allow",
+            conditions: [{ field: "path", operator: "starts_with", values: ["/admin/query"] }]
+        };
+        const decision = evaluate(
+            {
+                wafHeader: armed([allow]),
+                forwardedHost: HOST,
+                forwardedUri: "/admin/query?sql=select+name+from+users"
+            },
+            cfg
+        );
+
+        expect(decision.status).toBe(200);
+    });
+});

@@ -99,6 +99,7 @@ export function renderDashboardConfig(hosts: readonly string[], waf?: DashboardW
     const rules = waf?.rules ?? [];
     const presets = waf?.presets ?? [];
     const browserIntegrity = waf?.browserIntegrity === true;
+    const injectionProtection = waf?.injectionProtection === true;
 
     const middlewares: string[] = [];
     const definitions: string[] = [
@@ -111,13 +112,13 @@ export function renderDashboardConfig(hosts: readonly string[], waf?: DashboardW
         middlewares.push(mw);
         definitions.push(`    ${mw}:`, "      ipAllowList:", `        sourceRange: [${allow.map((entry) => `"${entry}"`).join(", ")}]`);
     }
-    if (deny.length > 0 || presets.length > 0 || rules.length > 0 || browserIntegrity) {
+    if (deny.length > 0 || presets.length > 0 || rules.length > 0 || browserIntegrity || injectionProtection) {
         middlewares.push(WAF_CTX, WAF_GUARD);
         definitions.push(
             `    ${WAF_CTX}:`,
             "      headers:",
             "        customRequestHeaders:",
-            `          X-Polaris-Waf: "${encodeGuardRule({ deny, presets, rules, requireLogin: false, browserIntegrity })}"`,
+            `          X-Polaris-Waf: "${encodeGuardRule({ deny, presets, rules, requireLogin: false, browserIntegrity, injectionProtection })}"`,
             `    ${WAF_GUARD}:`,
             "      forwardAuth:",
             `        address: "${guardUrl()}/authz"`
@@ -167,6 +168,8 @@ export interface DashboardWaf {
     readonly rules?: readonly WafCustomRule[];
     /** Refuse requests whose headers do not hold together as a browser's. */
     readonly browserIntegrity?: boolean;
+    /** Refuse requests whose URL carries a SQL injection or XSS payload. */
+    readonly injectionProtection?: boolean;
 }
 
 /**
@@ -224,7 +227,8 @@ export async function syncDashboardRoute(): Promise<void> {
             deny: waf.deny,
             presets: waf.presets,
             rules: waf.rules,
-            browserIntegrity: waf.browserIntegrity
+            browserIntegrity: waf.browserIntegrity,
+            injectionProtection: waf.injectionProtection
         };
         await writeFile(join(dynamicDir(), FILE), renderDashboardConfig(hosts, rule), "utf8");
     } catch (error) {

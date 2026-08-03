@@ -5,9 +5,9 @@
  * intentionally I/O-free and deterministic so it can be unit-tested exhaustively -
  * the HTTP wrapper in server.ts only marshals headers in and a status out.
  *
- * The per-route rule (denylist, custom rules, require-login) arrives in the
- * `X-Polaris-Waf` header, which a Traefik `headers` middleware stamps on the request,
- * so a client cannot forge it. Deny is checked first: a denied IP is blocked even if
+ * The per-route rule (denylist, custom rules, injection protection, require-login)
+ * arrives in the `X-Polaris-Waf` header, which a Traefik `headers` middleware stamps
+ * on the request, so a client cannot forge it. Deny is checked first: a denied IP is blocked even if
  * logged in. The custom rules run next, in order, and the first one to match decides
  * - which is what lets a narrow `allow` sit above a broad `block` without the two
  * contradicting each other.
@@ -24,7 +24,13 @@
  */
 
 import { decodeGuardRule, verifyEdgeToken } from "@polaris/core/waf";
-import { browserIntegrityFailure, evaluateWafRules, ipAllowed, type WafIntelIndex } from "@polaris/core";
+import {
+    browserIntegrityFailure,
+    evaluateWafRules,
+    injectionFailure,
+    ipAllowed,
+    type WafIntelIndex
+} from "@polaris/core";
 
 /** Path (on the app's own domain) the login handoff returns to. */
 const CALLBACK_PATH = "/edge/callback";
@@ -162,6 +168,25 @@ export function evaluate(req: GuardRequest, cfg: GuardConfig): GuardDecision {
         });
         if (verdict?.action === "block") return { status: 403, reason: `rule: ${verdict.rule.name}` };
         if (verdict?.action === "allow") return { status: 200 };
+    }
+
+    // After the custom rules too, and before the integrity check because it is the more
+    // precise of the two: when a request would fail both, "sql union select in the
+    // query" tells an operator what happened and "no user agent" does not.
+    //
+    // The URI is split rather than parsed. `new URL` would allocate and re-encode on a
+    // check that runs for every request on every route, and the raw request line is
+    // what should be scanned anyway - the signatures are matched against the bytes the
+    // client actually sent, after this check's own decoding.
+    if (rule.injectionProtection === true) {
+        const uri = req.forwardedUri ?? "";
+        const split = uri.indexOf("?");
+        const failure = injectionFailure({
+            path: split < 0 ? uri : uri.slice(0, split),
+            query: split < 0 ? null : uri.slice(split + 1),
+            userAgent: req.userAgent
+        });
+        if (failure) return { status: 403, reason: `injection: ${failure}` };
     }
 
     // After the custom rules, deliberately. This is a heuristic and every heuristic is

@@ -20,6 +20,9 @@ export interface GuardRule {
     /** Refuse requests whose headers do not hold together as a browser's. Optional on
      *  the way in (an older edge config predates it), always present on the way out. */
     readonly browserIntegrity?: boolean;
+    /** Refuse requests whose URL carries a SQL injection or XSS payload. Optional on
+     *  the way in (an older edge config predates it), always present on the way out. */
+    readonly injectionProtection?: boolean;
     /** Rewrite email addresses in served HTML. Carried here rather than in a config of
      *  its own so one header describes everything the guard does to a route - but note
      *  it is the only entry the forwardAuth path ignores, because it changes the
@@ -35,14 +38,15 @@ export interface GuardRule {
 }
 
 /** Encode a guard rule for the X-Polaris-Waf header (base64 of compact JSON:
- *  `d` = denylist, `l` = require-login, `b` = browser integrity, `e` = email
- *  obfuscation, `p` = pack ids, `r` = custom rules). */
+ *  `d` = denylist, `l` = require-login, `b` = browser integrity, `i` = injection
+ *  protection, `e` = email obfuscation, `p` = pack ids, `r` = custom rules). */
 export function encodeGuardRule(rule: GuardRule): string {
     return Buffer.from(
         JSON.stringify({
             d: rule.deny,
             l: rule.requireLogin,
             b: rule.browserIntegrity === true,
+            i: rule.injectionProtection === true,
             e: rule.emailObfuscation === true,
             p: rule.presets ?? [],
             r: rule.rules
@@ -54,14 +58,19 @@ const EMPTY_RULE: GuardRule = {
     deny: [],
     requireLogin: false,
     browserIntegrity: false,
+    injectionProtection: false,
     emailObfuscation: false,
     presets: [],
     rules: []
 };
+/** Everything a rule can refuse with, for a header that arrived unreadable. Injection
+ *  protection is on here even though the empty rule leaves it off: the empty rule is
+ *  "no rule was attached", this one is "a rule was attached and we cannot read it". */
 const FAIL_CLOSED: GuardRule = {
     deny: [],
     requireLogin: true,
     browserIntegrity: false,
+    injectionProtection: true,
     emailObfuscation: false,
     presets: [],
     rules: []
@@ -114,13 +123,22 @@ function decodeUncached(header: string): GuardRule {
     try {
         const raw: unknown = JSON.parse(Buffer.from(header, "base64").toString("utf8"));
         if (raw && typeof raw === "object") {
-            const obj = raw as { d?: unknown; l?: unknown; b?: unknown; e?: unknown; p?: unknown; r?: unknown };
+            const obj = raw as {
+                d?: unknown;
+                l?: unknown;
+                b?: unknown;
+                i?: unknown;
+                e?: unknown;
+                p?: unknown;
+                r?: unknown;
+            };
             const deny = Array.isArray(obj.d) ? obj.d.filter((v): v is string => typeof v === "string") : [];
             const presets = Array.isArray(obj.p) ? obj.p.filter((v): v is string => typeof v === "string") : [];
             return {
                 deny,
                 requireLogin: obj.l === true,
                 browserIntegrity: obj.b === true,
+                injectionProtection: obj.i === true,
                 emailObfuscation: obj.e === true,
                 presets,
                 rules: [...parseRules(obj.r), ...expandWafPresets(presets)]

@@ -91,6 +91,7 @@ export interface WafScopeRule {
     ipDenylist: string[];
     requireLogin: boolean;
     browserIntegrity: boolean;
+    injectionProtection: boolean;
     emailObfuscation: boolean;
     presets: string[];
     rules: WafCustomRule[];

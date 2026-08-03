@@ -34,13 +34,15 @@ import { getWafRuleAction, setWafRuleAction, type WafScopeRule } from "./actions
 import { Ban, Loader2, Mail, ScanFace, ShieldCheck, TriangleAlert } from "lucide-react";
 import { WAF_PRESETS, WAF_RULES_MAX, type WafCustomRule, type WafPreset, type WafScopeType } from "@polaris/core";
 
-/** The scope as nothing has ever been written to it. Obfuscation is on here for the
- *  same reason it is on in the schema: that is the state of an unconfigured Polaris. */
+/** The scope as nothing has ever been written to it. Injection protection and
+ *  obfuscation are on here for the same reason they are on in the schema: that is the
+ *  state of an unconfigured Polaris. */
 const BLANK: WafScopeRule = {
     ipAllowlist: [],
     ipDenylist: [],
     requireLogin: false,
     browserIntegrity: false,
+    injectionProtection: true,
     emailObfuscation: true,
     presets: [],
     rules: []
@@ -248,9 +250,16 @@ export function WafEditor({
 
             <Section
                 title="Managed rules"
-                hint="Lists Polaris keeps up to date. A pack enabled on a broader scope also applies here; write an allow rule above it to carve out an exception."
+                hint="Signatures and lists Polaris keeps up to date. A pack enabled on a broader scope also applies here; write an allow rule above it to carve out an exception."
             >
                 <div className="-mx-4 -mb-4 flex flex-col divide-y divide-border border-t border-border">
+                    <ToggleRow
+                        title="Block SQL injection and cross-site scripting"
+                        description="Checks the URL of every request against injection signatures and refuses the ones carrying a payload: quoted conditions, UNION SELECT, script tags, event handlers. Encoded payloads are decoded first. It reads the request line, so a payload in a POST body is not visible to it."
+                        checked={saved.injectionProtection}
+                        disabled={busy}
+                        onChange={(on) => persist({ injectionProtection: on })}
+                    />
                     {WAF_PRESETS.map((preset) => (
                         <PresetRow
                             key={preset.id}

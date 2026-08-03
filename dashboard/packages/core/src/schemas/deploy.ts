@@ -234,6 +234,16 @@ export const wafRuleInputSchema = z
          */
         browserIntegrity: z.boolean().default(false),
         /**
+         * Refuse a request whose own URL carries a SQL injection or XSS payload.
+         *
+         * On by default, unlike the integrity check above, because it is not a
+         * heuristic about the client: every signature it matches is a string that
+         * cannot occur in an honest request line (see waf-injection.ts). It combines
+         * across scopes the way email obfuscation does rather than the way the other
+         * refusals do - see `injectionProtection` in ResolvedWaf.
+         */
+        injectionProtection: z.boolean().default(true),
+        /**
          * Rewrite email addresses in served HTML so a harvester reading the source
          * finds an encoded token instead. On everywhere unless something switches it
          * off (see `emailObfuscation` in ResolvedWaf for how the scopes combine).
@@ -273,6 +283,19 @@ export interface ResolvedWaf {
      *  it refuses traffic, so a narrower scope must not be able to switch off a
      *  broader one's decision to refuse it. */
     readonly browserIntegrity: boolean;
+    /**
+     * True only if EVERY scope leaves injection protection on.
+     *
+     * It refuses traffic, so unioning is the shape the rest of this file argues for -
+     * and it is on by default, which is what changes the answer. A default that unions
+     * is a default nothing can ever get out of: an operator whose one legacy service
+     * really does put SQL in a query string would have no way to say so, because the
+     * instance-wide scope they inherit it from covers every other service too. So any
+     * scope can switch it off for what that scope covers, and a narrower one cannot
+     * switch it back on. Exempting a single URL rather than a whole scope is what the
+     * custom `allow` rules above it are for.
+     */
+    readonly injectionProtection: boolean;
     /**
      * True only if EVERY scope leaves email obfuscation on.
      *

@@ -110,6 +110,15 @@ describe("guarding the dashboard itself", () => {
         expect(config).not.toContain("X-Polaris-Waf");
     });
 
+    it("carries injection protection on its own", () => {
+        // On by default, so this is the dashboard's normal state rather than a
+        // configured one, and it is the only thing putting the guard in front of it.
+        const config = renderDashboardConfig(["polaris.fjrg2007.com"], { injectionProtection: true });
+
+        expect(config).toContain("X-Polaris-Waf");
+        expect(config).toContain("polaris-dashboard-waf-guard");
+    });
+
     it("narrows the route to an allowlist natively", () => {
         // Traefik enforces this one itself, so it keeps working with the guard down.
         const config = renderDashboardConfig(["polaris.fjrg2007.com"], { allow: ["192.168.1.0/24"] });

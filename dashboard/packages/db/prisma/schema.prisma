@@ -2408,6 +2408,11 @@ model WafRule {
     // across scopes like requireLogin - it refuses traffic, so a narrower scope
     // cannot switch off a broader one's decision to refuse it.
     browserIntegrity Boolean @default(false)
+    // Refuse requests whose URL carries a SQL injection or XSS payload. Intersects
+    // across scopes like emailObfuscation rather than unioning like the refusals
+    // above: it is on by default, and a default that unions is one no scope can ever
+    // get out of. Default true is what makes it on everywhere.
+    injectionProtection Boolean @default(true)
     // Rewrite email addresses in served HTML. Intersects across scopes instead of
     // unioning: it rewrites the page rather than refusing it, so any scope can turn
     // it off for what it covers. Default true is what makes it on everywhere.

@@ -47,6 +47,10 @@ export interface AppRoute {
     /** Refuse requests whose headers do not hold together as a browser's. Needs the
      *  guard, like the denylist and the custom rules. */
     readonly browserIntegrity?: boolean;
+    /** Refuse requests whose URL carries a SQL injection or XSS payload. Needs the
+     *  guard too, and is on by default - so in practice this is what puts the guard in
+     *  front of a route that has no other rule on it. */
+    readonly injectionProtection?: boolean;
     /** Rewrite email addresses in served HTML. Carried to the guard for completeness
      *  but does NOT on its own put the guard in front of the route: forwardAuth never
      *  sees a response, so this one is applied by the guard's proxy mode instead. */
@@ -72,7 +76,8 @@ function needsGuard(route: AppRoute): boolean {
         (route.presets?.length ?? 0) > 0 ||
         (route.rules?.length ?? 0) > 0 ||
         route.requireLogin === true ||
-        route.browserIntegrity === true
+        route.browserIntegrity === true ||
+        route.injectionProtection === true
     );
 }
 
@@ -116,6 +121,7 @@ function routeMiddlewares(route: AppRoute, name: string, defs: Map<string, strin
             deny: route.deny ?? [],
             requireLogin: route.requireLogin === true,
             browserIntegrity: route.browserIntegrity === true,
+            injectionProtection: route.injectionProtection === true,
             emailObfuscation: route.emailObfuscation === true,
             presets: route.presets ?? [],
             rules: route.rules ?? []

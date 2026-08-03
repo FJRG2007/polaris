@@ -33,6 +33,10 @@ export interface TraefikWaf {
     /** Refuse requests whose headers do not hold together as a browser's. Needs the
      *  guard, like the denylist and the custom rules. */
     readonly browserIntegrity?: boolean;
+    /** Refuse requests whose URL carries a SQL injection or XSS payload. Needs the
+     *  guard too, and is on by default - so in practice this is what puts the guard in
+     *  front of a service that has no other rule on it. */
+    readonly injectionProtection?: boolean;
     /**
      * Rewrite email addresses in served HTML.
      *
@@ -81,7 +85,8 @@ function wafNeedsGuard(waf: TraefikWaf): boolean {
         (waf.presets?.length ?? 0) > 0 ||
         (waf.rules?.length ?? 0) > 0 ||
         waf.requireLogin === true ||
-        waf.browserIntegrity === true
+        waf.browserIntegrity === true ||
+        waf.injectionProtection === true
     );
 }
 
@@ -113,6 +118,7 @@ function wafMiddlewares(
             rules: waf.rules ?? [],
             requireLogin: waf.requireLogin === true,
             browserIntegrity: waf.browserIntegrity === true,
+            injectionProtection: waf.injectionProtection === true,
             emailObfuscation: waf.emailObfuscation === true
         });
         labels["traefik.http.middlewares.polaris-waf-guard.forwardauth.address"] = `${guardUrl()}/authz`;

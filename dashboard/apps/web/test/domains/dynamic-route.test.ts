@@ -117,3 +117,17 @@ describe("a route that only needs the guard's verdict", () => {
         expect(config).not.toContain("forwardAuth");
     });
 });
+
+describe("a route with injection protection", () => {
+    it("gets the guard even with nothing else switched on", () => {
+        // It is on by default, so this is the state most routes are actually in: no
+        // denylist, no packs, no custom rules, and still inspected.
+        const config = renderDynamicConfig([route({ injectionProtection: true })]);
+
+        expect(config).toContain("polaris-waf-guard");
+        expect(config).toContain("X-Polaris-Waf");
+        // Beside the path, not in it: the app is still dialled directly.
+        expect(config).toContain('url: "http://10.0.0.7:8123"');
+        expect(config).not.toContain("X-Polaris-Origin");
+    });
+});

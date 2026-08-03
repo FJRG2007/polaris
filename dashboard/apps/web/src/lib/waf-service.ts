@@ -88,6 +88,7 @@ interface RuleRow {
     readonly ipDenylist: string;
     readonly requireLogin: boolean;
     readonly browserIntegrity: boolean;
+    readonly injectionProtection: boolean;
     readonly emailObfuscation: boolean;
     readonly presets: string;
     readonly rules: string;
@@ -100,6 +101,7 @@ const RULE_SELECT = {
     ipDenylist: true,
     requireLogin: true,
     browserIntegrity: true,
+    injectionProtection: true,
     emailObfuscation: true,
     presets: true,
     rules: true
@@ -115,9 +117,10 @@ function mergeRules(rows: readonly RuleRow[]): ResolvedWaf {
     const rules: WafCustomRule[] = [];
     let requireLogin = false;
     let browserIntegrity = false;
-    // Intersected, so it starts true and any scope can clear it. Every other control
-    // here unions; this is the one that changes the page instead of refusing it, and
-    // the asymmetry is what keeps "on by default" from meaning "impossible to escape".
+    // The two that start true and are intersected, so any scope can clear one for what
+    // it covers. Both are on before anyone configures anything, and that is exactly why
+    // they cannot union: a default that unions is a default no scope can escape.
+    let injectionProtection = true;
     let emailObfuscation = true;
     for (const row of ordered) {
         const allow = parseList(row.ipAllowlist);
@@ -130,26 +133,38 @@ function mergeRules(rows: readonly RuleRow[]): ResolvedWaf {
         for (const id of parseList(row.presets)) presets.add(id);
         if (row.requireLogin) requireLogin = true;
         if (row.browserIntegrity) browserIntegrity = true;
+        if (!row.injectionProtection) injectionProtection = false;
         if (!row.emailObfuscation) emailObfuscation = false;
         // Concatenated, not merged: a rule set is ordered and first-match-wins, so a
         // broader scope's rules have to be offered the request first - otherwise a
         // project could write an `allow` that overrides an instance-wide block.
         rules.push(...parseCustomRules(row.rules));
     }
-    return { allowLists, deny: [...deny], requireLogin, browserIntegrity, emailObfuscation, presets: [...presets], rules };
+    return {
+        allowLists,
+        deny: [...deny],
+        requireLogin,
+        browserIntegrity,
+        injectionProtection,
+        emailObfuscation,
+        presets: [...presets],
+        rules
+    };
 }
 
 /**
  * An empty decision: allow all, deny none, no login required, no packs, no rules.
  *
- * `emailObfuscation` is true here for the same reason it is true in the schema - it is
- * the state of an instance nobody has configured, and that state is "on".
+ * `injectionProtection` and `emailObfuscation` are true here for the same reason they
+ * are true in the schema - it is the state of an instance nobody has configured, and
+ * that state is "on".
  */
 const EMPTY_WAF: ResolvedWaf = {
     allowLists: [],
     deny: [],
     requireLogin: false,
     browserIntegrity: false,
+    injectionProtection: true,
     emailObfuscation: true,
     presets: [],
     rules: []
@@ -162,6 +177,7 @@ const DEFAULT_GLOBAL_ROW: RuleRow = {
     ipDenylist: "[]",
     requireLogin: false,
     browserIntegrity: false,
+    injectionProtection: true,
     emailObfuscation: true,
     presets: JSON.stringify(defaultPresets("global")),
     rules: "[]"
@@ -322,6 +338,7 @@ export interface WafRuleView {
     readonly ipDenylist: string[];
     readonly requireLogin: boolean;
     readonly browserIntegrity: boolean;
+    readonly injectionProtection: boolean;
     readonly emailObfuscation: boolean;
     /** Managed rule packs enabled on this scope alone - not the union it inherits. */
     readonly presets: string[];
@@ -380,6 +397,7 @@ export async function getWafRule(
             ipDenylist: true,
             requireLogin: true,
             browserIntegrity: true,
+            injectionProtection: true,
             emailObfuscation: true,
             presets: true,
             rules: true
@@ -388,13 +406,14 @@ export async function getWafRule(
     if (!row) {
         // An unwritten instance scope must show the packs it is actually enforcing,
         // or the page would offer to "enable" protection that is already on and the
-        // first save would look like it changed nothing. The same applies to email
-        // obfuscation, which is on before anyone has been here.
+        // first save would look like it changed nothing. The same applies to injection
+        // protection and email obfuscation, which are on before anyone has been here.
         return {
             ipAllowlist: [],
             ipDenylist: [],
             requireLogin: false,
             browserIntegrity: false,
+            injectionProtection: true,
             emailObfuscation: true,
             presets: defaultPresets(scopeType),
             rules: []
@@ -405,6 +424,7 @@ export async function getWafRule(
         ipDenylist: parseList(row.ipDenylist),
         requireLogin: row.requireLogin,
         browserIntegrity: row.browserIntegrity,
+        injectionProtection: row.injectionProtection,
         emailObfuscation: row.emailObfuscation,
         presets: parseList(row.presets),
         rules: parseCustomRules(row.rules)
@@ -466,8 +486,8 @@ export async function setWafRule(
     await assertScopeOwner(ownerId, scopeType, scopeId);
     const parsed = wafRuleInputSchema.parse(input);
     // "Empty" is the state a never-configured scope is in, not merely a falsy one:
-    // email obfuscation is ON when nothing has been saved, so a scope that switches it
-    // OFF is carrying a decision and its row has to survive.
+    // injection protection and email obfuscation are ON when nothing has been saved, so
+    // a scope that switches either OFF is carrying a decision and its row has to survive.
     const empty =
         parsed.ipAllowlist.length === 0 &&
         parsed.ipDenylist.length === 0 &&
@@ -475,6 +495,7 @@ export async function setWafRule(
         parsed.presets.length === 0 &&
         !parsed.requireLogin &&
         !parsed.browserIntegrity &&
+        parsed.injectionProtection &&
         parsed.emailObfuscation;
     // An instance scope keeps its row even when empty: absence there means "never
     // configured" and re-applies the default packs, so deleting it would silently
@@ -488,6 +509,7 @@ export async function setWafRule(
         ipDenylist: JSON.stringify(parsed.ipDenylist),
         requireLogin: parsed.requireLogin,
         browserIntegrity: parsed.browserIntegrity,
+        injectionProtection: parsed.injectionProtection,
         emailObfuscation: parsed.emailObfuscation,
         presets: JSON.stringify(parsed.presets),
         rules: JSON.stringify(parsed.rules)

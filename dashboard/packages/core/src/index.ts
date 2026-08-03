@@ -29,6 +29,7 @@ export * from "./runner-placement.js";
 export * from "./waf-rules.js";
 export * from "./waf-email.js";
 export * from "./waf-integrity.js";
+export * from "./waf-injection.js";
 export * from "./waf-jails.js";
 export * from "./waf-auth-log.js";
 export * from "./waf-anomalies.js";
