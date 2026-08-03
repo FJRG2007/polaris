@@ -18,6 +18,7 @@ import * as core from "@polaris/core";
 import { Filter, Plus, X } from "lucide-react";
 import { Button, Select, cn } from "@polaris/ui";
 import type { PersonRef } from "@/lib/tasks/facts";
+import { Avatar, preloadAvatars } from "@/components/avatar";
 import type { CustomFieldView, StatusView, TagView } from "@/lib/tasks/space-service";
 
 /** Which operators make sense for a field. */
@@ -51,7 +52,7 @@ function choicesFor(
         fields: readonly CustomFieldView[];
         lists: readonly { id: string; name: string }[];
     }
-): { value: string; label: string }[] | null {
+): { value: string; label: string; person?: PersonRef }[] | null {
     switch (condition.field) {
         case "status":
             return context.statuses.map((status) => ({ value: status.id, label: status.name }));
@@ -70,7 +71,9 @@ function choicesFor(
         case "assignee":
         case "watcher":
         case "createdBy":
-            return context.people.map((person) => ({ value: person.id, label: person.name }));
+            // Carried whole, so the chip can draw the face beside the name the
+            // way every other people picker does.
+            return context.people.map((person) => ({ value: person.id, label: person.name, person }));
         case "list":
             return context.lists.map((list) => ({ value: list.id, label: list.name }));
         case "archived":
@@ -127,7 +130,12 @@ export function FilterBar({
         <div className={cn("flex flex-col gap-2", className)}>
             <button
                 type="button"
-                onClick={() => setOpen(!open)}
+                onClick={() => {
+                    // The faces a person condition offers, fetched as the panel
+                    // opens rather than as the chips draw.
+                    if (!open) preloadAvatars(context.people);
+                    setOpen(!open);
+                }}
                 className={cn(
                     "inline-flex items-center gap-1.5 rounded-md border border-border px-2 py-1 text-xs transition-colors hover:bg-muted",
                     count > 0 && "border-primary/50 text-primary"
@@ -229,12 +237,13 @@ export function FilterBar({
                                                             })
                                                         }
                                                         className={cn(
-                                                            "rounded-md border px-2 py-0.5 text-[11px] transition-colors",
+                                                            "inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] transition-colors",
                                                             on
                                                                 ? "border-primary bg-primary/10 text-primary"
                                                                 : "border-border text-muted-foreground hover:bg-muted"
                                                         )}
                                                     >
+                                                        {choice.person && <Avatar person={choice.person} size={16} />}
                                                         {choice.label}
                                                     </button>
                                                 );

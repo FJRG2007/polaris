@@ -35,6 +35,34 @@ export function initials(name: string): string {
     return (parts.length === 1 ? parts[0]!.slice(0, 2) : `${parts[0]![0]}${parts[1]![0]}`).toUpperCase();
 }
 
+/**
+ * The faces this browser has already been asked for, so asking again costs
+ * nothing. Module level rather than component state: a menu that unmounts every
+ * time it closes would forget it otherwise, and the point is to remember across
+ * the open and close of whatever is showing the people.
+ */
+const requested = new Set<string>();
+
+/**
+ * Fetch a set of faces before anything draws them.
+ *
+ * A picker that mounts thirty avatars fires thirty requests as it appears, which
+ * is the pause people see between opening a menu and being able to read it. Done
+ * ahead of time - when the menu that will show them opens, not when its submenu
+ * does - the pictures are already in the browser's cache by the time an <img>
+ * asks for one, and the response carries a max-age so later screens reuse them.
+ */
+export function preloadAvatars(people: readonly AvatarPerson[]): void {
+    if (typeof window === "undefined") return;
+    for (const person of people) {
+        const source = person.image ?? avatarUrl(person.id);
+        if (requested.has(source)) continue;
+        requested.add(source);
+        const picture = new window.Image();
+        picture.src = source;
+    }
+}
+
 export function Avatar({
     person,
     size = 24,

@@ -11,9 +11,9 @@
 
 import { useState } from "react";
 import * as core from "@polaris/core";
-import { Input, Select, Textarea } from "@polaris/ui";
 import { Avatar, StatusDot } from "./pickers";
 import type { PersonRef } from "@/lib/tasks/facts";
+import { Input, Select, Textarea } from "@polaris/ui";
 import { useDisplayFormat } from "@/components/display-format";
 import type { CustomFieldView } from "@/lib/tasks/space-service";
 
@@ -182,9 +182,9 @@ export function CustomFieldEditor({
             );
         case "labels":
         case "people": {
-            const entries =
+            const entries: { id: string; label: string; person?: PersonRef }[] =
                 field.type === "people"
-                    ? people.map((person) => ({ id: person.id, label: person.name }))
+                    ? people.map((person) => ({ id: person.id, label: person.name, person }))
                     : options.map((option) => ({ id: option.id, label: option.label }));
             return (
                 <div className="flex flex-wrap gap-1">
@@ -210,7 +210,10 @@ export function CustomFieldEditor({
                                         : "border-border text-muted-foreground hover:bg-muted"
                                 }`}
                             >
-                                {entry.label}
+                                <span className="inline-flex items-center gap-1">
+                                    {entry.person && <Avatar person={entry.person} size={16} />}
+                                    {entry.label}
+                                </span>
                             </button>
                         );
                     })}

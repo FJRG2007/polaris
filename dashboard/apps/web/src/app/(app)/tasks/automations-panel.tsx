@@ -14,6 +14,7 @@ import * as actions from "./actions";
 import * as core from "@polaris/core";
 import { FilterBar } from "./filter-bar";
 import { runAction } from "@/lib/run-action";
+import { Avatar } from "@/components/avatar";
 import { Plus, Trash2, Zap } from "lucide-react";
 import type { PersonRef } from "@/lib/tasks/facts";
 import { CopyButton } from "@/components/copy-button";
@@ -32,7 +33,10 @@ interface RuleContext {
 }
 
 /** The ids an action can point at, per action type. */
-function targetsFor(type: core.AutomationActionType, context: RuleContext): { value: string; label: string }[] | null {
+function targetsFor(
+    type: core.AutomationActionType,
+    context: RuleContext
+): { value: string; label: string; icon?: React.ReactNode }[] | null {
     switch (type) {
         case "setStatus":
             return context.statuses.map((status) => ({ value: status.id, label: status.name }));
@@ -44,7 +48,11 @@ function targetsFor(type: core.AutomationActionType, context: RuleContext): { va
         case "addAssignee":
         case "removeAssignee":
         case "addWatcher":
-            return context.people.map((person) => ({ value: person.id, label: person.name }));
+            return context.people.map((person) => ({
+                value: person.id,
+                label: person.name,
+                icon: <Avatar person={person} size={16} />
+            }));
         case "addTag":
         case "removeTag":
             return context.tags.map((tag) => ({ value: tag.id, label: tag.name }));

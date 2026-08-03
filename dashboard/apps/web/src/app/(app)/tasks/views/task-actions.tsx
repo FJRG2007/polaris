@@ -14,14 +14,24 @@
  * in a table, and so adding one adds it everywhere at once.
  */
 
-import { useState } from "react";
 import * as core from "@polaris/core";
+import { useMemo, useState } from "react";
 import { useAppUrl } from "@/components/app-url";
 import type { TaskRow } from "@/lib/tasks/facts";
 import type { TaskEdit, ViewProps } from "./shared";
 import type { SpaceContext } from "@/lib/tasks/facts";
 import { Ban, Check, Copy, ExternalLink, Flag, Link2, Plus, Tag, Trash2, UserPlus } from "lucide-react";
-import { AssigneePicker, DuePicker, PriorityPicker, StatusIcon, StatusMarker, TagPicker, tagColorFor } from "../pickers";
+import {
+    AssigneePicker,
+    Avatar,
+    DuePicker,
+    PriorityPicker,
+    preloadAvatars,
+    StatusIcon,
+    StatusMarker,
+    TagPicker,
+    tagColorFor
+} from "../pickers";
 import {
     Button,
     cn,
@@ -274,6 +284,19 @@ export function TaskMenu({ commands, children }: { commands: TaskCommands; child
     const baseUrl = useAppUrl();
     const [drafting, setDrafting] = useState<Draft | null>(null);
 
+    /**
+     * What the submenus are about to show, worked out once instead of on every
+     * move between options.
+     *
+     * A menu unmounts its submenu the moment the pointer leaves it, so hovering
+     * back and forth rebuilds the same lists over and over; these are held by the
+     * row, which stays put, so they survive the menu itself opening and closing.
+     * The faces are warmed the same way one level up - see the open handler.
+     */
+    const assigned = useMemo(() => new Set(task.assignees.map((entry) => entry.id)), [task.assignees]);
+    const tagged = useMemo(() => new Set(task.tags.map((entry) => entry.id)), [task.tags]);
+    const priorities = useMemo(() => core.TASK_PRIORITIES.filter((priority) => priority !== "none"), []);
+
     const create = async (draft: { name: string; type: core.TaskStatusType; color: string }) => {
         if (drafting === "tag") {
             const id = (await commands.onCreateTag?.(draft.name, draft.color)) ?? null;
@@ -288,7 +311,10 @@ export function TaskMenu({ commands, children }: { commands: TaskCommands; child
     return (
         <>
             {drafting && <CreateDialog what={drafting} onClose={() => setDrafting(null)} onCreate={create} />}
-            <ContextMenu>
+            {/* The people this space can assign are fetched the moment the menu
+                opens rather than when the Assign submenu does, so their faces are
+                already in the browser by the time anybody reaches them. */}
+            <ContextMenu onOpenChange={(open) => (open ? preloadAvatars(context.people) : undefined)}>
                 <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
                 <ContextMenuContent className="w-56">
                     <ContextMenuItem onSelect={commands.onOpen}>
@@ -347,7 +373,7 @@ export function TaskMenu({ commands, children }: { commands: TaskCommands; child
                                     Priority
                                 </ContextMenuSubTrigger>
                                 <ContextMenuSubContent className="w-44">
-                                    {core.TASK_PRIORITIES.filter((priority) => priority !== "none").map((priority) => (
+                                    {priorities.map((priority) => (
                                         <ContextMenuItem
                                             key={priority}
                                             onSelect={() => commands.onEdit({ priority })}
@@ -384,7 +410,7 @@ export function TaskMenu({ commands, children }: { commands: TaskCommands; child
                                         </p>
                                     )}
                                     {context.people.map((person) => {
-                                        const on = task.assignees.some((entry) => entry.id === person.id);
+                                        const on = assigned.has(person.id);
                                         return (
                                             <ContextMenuItem
                                                 key={person.id}
@@ -399,6 +425,11 @@ export function TaskMenu({ commands, children }: { commands: TaskCommands; child
                                                     })
                                                 }
                                             >
+                                                {/* The same face the row and the
+                                                    directory draw: a list of names
+                                                    is slower to pick from than a
+                                                    list of people. */}
+                                                <Avatar person={person} size={20} />
                                                 <span className="flex-1 truncate">{person.name}</span>
                                                 {on && <Check className="size-3.5 text-primary" />}
                                             </ContextMenuItem>
@@ -418,7 +449,7 @@ export function TaskMenu({ commands, children }: { commands: TaskCommands; child
                                     </ContextMenuSubTrigger>
                                     <ContextMenuSubContent className="max-h-64 w-56 overflow-y-auto">
                                         {context.tags.map((tag) => {
-                                            const on = task.tags.some((entry) => entry.id === tag.id);
+                                            const on = tagged.has(tag.id);
                                             return (
                                                 <ContextMenuItem
                                                     key={tag.id}
