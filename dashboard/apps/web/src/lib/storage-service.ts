@@ -14,11 +14,11 @@ import { getCapabilities, loadEnv } from "@polaris/config";
 import { canHostMount, requiresHostd } from "@polaris/core";
 import { grantedConnectionIds } from "@/lib/drive-acl-service";
 import { ContainerDriver } from "@/lib/deploy/container-driver";
-import { getHostConnection, listHosts } from "@/lib/host-service";
 import { fetchUnasMetrics, type UnasMetrics } from "@/lib/unifi-unas";
 import { deleteMetricsForSubject } from "@/lib/metrics-history-service";
 import type { StorageConfig, StorageCredentials, StorageProviderKind } from "@polaris/core";
 import { resolveContainerName, resolveLocalContainer } from "@/lib/container-files-service";
+import { getHostConnection, getHostConnectionUnscoped, listHosts, type HostConnection } from "@/lib/host-service";
 import {
     createDriver,
     decryptCredentials,
@@ -58,7 +58,16 @@ async function buildContainerDriverUnscoped(applicationId: string): Promise<Stor
 
 /** SFTP driver for a global Host. Browses from the SSH root, host-key pinned. */
 async function buildHostSftpDriver(hostId: string, ownerId: string): Promise<StorageDriver> {
-    const conn = await getHostConnection(hostId, ownerId);
+    return sftpDriverFor(await getHostConnection(hostId, ownerId));
+}
+
+/** Same, without the owner check - for routes that have already authorized the
+ *  server through `authorizeDrive`. */
+async function buildHostSftpDriverUnscoped(hostId: string): Promise<StorageDriver> {
+    return sftpDriverFor(await getHostConnectionUnscoped(hostId));
+}
+
+async function sftpDriverFor(conn: HostConnection): Promise<StorageDriver> {
     const driver = new SftpDriver({
         id: `${HOST_CONNECTION_PREFIX}${conn.id}`,
         host: conn.address,
@@ -295,6 +304,9 @@ export async function getDriver(connectionId: string, ownerId: string): Promise<
  * the caller with getDriver().
  */
 export async function getDriverForConnection(connectionId: string): Promise<StorageDriver> {
+    if (connectionId.startsWith(HOST_CONNECTION_PREFIX)) {
+        return buildHostSftpDriverUnscoped(connectionId.slice(HOST_CONNECTION_PREFIX.length));
+    }
     if (connectionId.startsWith(CONTAINER_CONNECTION_PREFIX)) {
         return buildContainerDriverUnscoped(connectionId.slice(CONTAINER_CONNECTION_PREFIX.length));
     }

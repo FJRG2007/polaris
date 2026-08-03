@@ -1,9 +1,9 @@
-import type { StorageProviderKind } from "@polaris/core";
 import { PageHeader } from "@polaris/ui";
 import { requireUser } from "@/lib/session";
-import { connectionWebUrl, getContainerConnection, listAccessibleConnections } from "@/lib/storage-service";
 import { DriveExplorer } from "./drive-explorer";
-import type { ConnectionSummary } from "./types";
+import type { StorageProviderKind } from "@polaris/core";
+import { isSavedConnection, type ConnectionSummary } from "./types";
+import { connectionWebUrl, getContainerConnection, listAccessibleConnections } from "@/lib/storage-service";
 
 export const dynamic = "force-dynamic";
 
@@ -40,8 +40,9 @@ export default async function DrivePage({
         webUrl: connectionWebUrl(row.kind, row.config),
         shared: row.shared,
         // Only the owner (or an admin) manages a connection's ACLs and locks; a
-        // shared connection is browse-only from the grantee's side.
-        canManageAccess: !row.shared || user.isAdmin,
+        // shared connection is browse-only from the grantee's side, and a server
+        // borrowed from the Servers app is managed there, not here.
+        canManageAccess: isSavedConnection(row.id) && (!row.shared || user.isAdmin),
         // Non-secret config for the edit form; parsed defensively.
         config: parseConfig(row.config),
         // Flag connections whose credentials predate the current master key so the

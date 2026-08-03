@@ -2,6 +2,18 @@
 
 import type { StorageProviderKind } from "@polaris/core";
 
+/**
+ * Whether a source is a saved storage connection, as opposed to one Drive borrows
+ * from another app: a registered server browsed over SFTP (`host:<id>`) or a
+ * running container (`container:<id>`). Both are browsed like any other location,
+ * but everything that hangs off a connection row - shares, file requests, access
+ * rules, editing or removing the connection itself - has nothing to attach to, so
+ * it is not offered rather than offered and then failing.
+ */
+export function isSavedConnection(connectionId: string): boolean {
+    return !connectionId.includes(":");
+}
+
 export interface ConnectionSummary {
     id: string;
     name: string;

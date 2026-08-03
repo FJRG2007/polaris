@@ -15,20 +15,20 @@
  *      never shut out of removing their own lock.
  */
 
+import { prisma } from "@polaris/db";
 import { cookies } from "next/headers";
 import { loadEnv } from "@polaris/config";
-import type { DriveAction, Permission } from "@polaris/core";
 import { userHasPermission } from "@polaris/auth";
-import { prisma } from "@polaris/db";
-import { CONTAINER_CONNECTION_PREFIX, getDriverForConnection } from "@/lib/storage-service";
+import type { StorageDriver } from "@polaris/storage";
 import { canAccessDrive } from "@/lib/drive-acl-service";
+import type { DriveAction, Permission } from "@polaris/core";
+import { CONTAINER_CONNECTION_PREFIX, getDriverForConnection, HOST_CONNECTION_PREFIX } from "@/lib/storage-service";
 import {
     findLockForPath,
     lockUnlockCookie,
     verifyLockUnlock,
     type LockInfo
 } from "@/lib/access-lock-service";
-import type { StorageDriver } from "@polaris/storage";
 
 /** The global capability an owner must hold to perform each Drive verb. */
 const OWNER_CAPABILITY: Record<DriveAction, Permission> = {
@@ -96,6 +96,24 @@ export async function authorizeDrive(
         if (!app) throw new DriveAccessError();
         if (!user?.isAdmin) {
             if (app.environment.project.ownerId !== userId) throw new DriveAccessError();
+            if (!(await userHasPermission(userId, OWNER_CAPABILITY[action]))) throw new DriveAccessError();
+        }
+        return;
+    }
+
+    // A registered server browsed over SFTP. Like a container source it has no
+    // StorageConnection row - its id is `host:<uuid>`, which is not even a value
+    // that column can hold - so ownership of the Host plus the global Drive
+    // capability is the whole gate, and there are no ACLs or locks to consult.
+    if (connectionId.startsWith(HOST_CONNECTION_PREFIX)) {
+        const hostId = connectionId.slice(HOST_CONNECTION_PREFIX.length);
+        const [user, host] = await Promise.all([
+            prisma.user.findUnique({ where: { id: userId }, select: { isAdmin: true } }),
+            prisma.host.findUnique({ where: { id: hostId }, select: { ownerId: true } })
+        ]);
+        if (!host) throw new DriveAccessError();
+        if (!user?.isAdmin) {
+            if (host.ownerId !== userId) throw new DriveAccessError();
             if (!(await userHasPermission(userId, OWNER_CAPABILITY[action]))) throw new DriveAccessError();
         }
         return;

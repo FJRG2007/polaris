@@ -47,7 +47,22 @@ export interface HostConnection {
 
 /** Decrypt a host's credentials into connection parameters for a connector. */
 export async function getHostConnection(hostId: string, ownerId: string): Promise<HostConnection> {
-    const row = await prisma.host.findFirst({ where: { id: hostId, ownerId } });
+    return connectionFor(await prisma.host.findFirst({ where: { id: hostId, ownerId } }));
+}
+
+/**
+ * The same, without the owner check. Only for callers that have already
+ * authorized the server some other way - Drive's `authorizeDrive` choke point,
+ * which resolves a `host:` source before it ever asks for a driver. Never call
+ * this from something a user reaches directly.
+ */
+export async function getHostConnectionUnscoped(hostId: string): Promise<HostConnection> {
+    return connectionFor(await prisma.host.findUnique({ where: { id: hostId } }));
+}
+
+type HostRow = Awaited<ReturnType<typeof prisma.host.findUnique>>;
+
+function connectionFor(row: HostRow): HostConnection {
     if (!row) throw new Error("Host not found");
     if (!row.encryptedCredential || !row.credentialNonce) {
         throw new Error("Host has no stored credentials");

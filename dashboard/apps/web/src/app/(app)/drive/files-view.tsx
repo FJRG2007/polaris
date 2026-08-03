@@ -247,8 +247,11 @@ export function FilesView({
     onUpload: (items: { file: File; relPath: string }[]) => void;
     onDelete: (entries: DriveEntry[]) => void;
     onRename: (entry: DriveEntry, nextName: string) => void;
-    onShare: (entry: DriveEntry) => void;
-    onRequestFiles: (path: string, name: string) => void;
+    /** Share a link to an item. Absent on a source with no saved connection behind
+     *  it - a server or a running container - where a link has nothing to hang off. */
+    onShare?: (entry: DriveEntry) => void;
+    /** Ask somebody to drop files into a folder. Absent for the same reason. */
+    onRequestFiles?: (path: string, name: string) => void;
     onToggleHidden: (entry: DriveEntry) => void;
     onSetFavorite: (entry: DriveEntry, favorite: boolean) => void;
     onSetIcon: (entry: DriveEntry, icon: string | null, color: string | null) => void;
@@ -446,7 +449,7 @@ export function FilesView({
     /** Share the file the preview is showing. */
     function shareViewerTarget() {
         const entry = entries.find((item) => item.path === viewerTarget?.path);
-        if (entry) onShare(entry);
+        if (entry) onShare?.(entry);
     }
 
     // Keep the open viewer's properties honest after a refresh: saving from one of
@@ -621,7 +624,7 @@ export function FilesView({
                 return;
             }
             if (shortcut === "request-files") {
-                if (pending) return;
+                if (pending || !onRequestFiles) return;
                 event.preventDefault();
                 onRequestFiles(path, path.split("/").pop() ?? "");
                 return;
@@ -897,10 +900,12 @@ export function FilesView({
                             <Download className="size-4" />
                             Download as ZIP
                         </ContextMenuItem>
-                        <ContextMenuItem onSelect={() => onRequestFiles(entry.path, entry.name)}>
-                            <Inbox className="size-4" />
-                            Request files here
-                        </ContextMenuItem>
+                        {onRequestFiles ? (
+                            <ContextMenuItem onSelect={() => onRequestFiles(entry.path, entry.name)}>
+                                <Inbox className="size-4" />
+                                Request files here
+                            </ContextMenuItem>
+                        ) : null}
                         {clipboard ? (
                             <ContextMenuItem
                                 onSelect={() => {
@@ -980,10 +985,12 @@ export function FilesView({
                     <ClipboardCopy className="size-4" />
                     Copy path
                 </ContextMenuItem>
-                <ContextMenuItem onSelect={() => onShare(entry)}>
-                    <Share2 className="size-4" />
-                    Share
-                </ContextMenuItem>
+                {onShare ? (
+                    <ContextMenuItem onSelect={() => onShare(entry)}>
+                        <Share2 className="size-4" />
+                        Share
+                    </ContextMenuItem>
+                ) : null}
                 <ContextMenuSeparator />
                 <ContextMenuItem onSelect={() => onSetFavorite(entry, !entry.favorite)}>
                     <Star
@@ -1326,10 +1333,12 @@ export function FilesView({
                             </span>
                         </div>
                         <div className="flex shrink-0 items-center gap-2">
-                            <Button size="sm" variant="ghost" onClick={shareViewerTarget}>
-                                <Share2 className="size-4" />
-                                Share
-                            </Button>
+                            {onShare ? (
+                                <Button size="sm" variant="ghost" onClick={shareViewerTarget}>
+                                    <Share2 className="size-4" />
+                                    Share
+                                </Button>
+                            ) : null}
                             <Button asChild size="sm" variant="secondary">
                                 <a
                                     href={downloadUrl(connectionId, viewerTarget.path)}
@@ -1405,19 +1414,21 @@ export function FilesView({
                                 </span>
                             </Button>
                         ) : null}
-                        <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() =>
-                                onRequestFiles(path, segments[segments.length - 1] ?? "")
-                            }
-                            disabled={pending}
-                            title={`Request files (${SHORTCUT_HINTS["request-files"]})`}
-                            aria-label="Request files"
-                        >
-                            <Inbox className="size-4" />
-                            <span className="hidden sm:inline">Request files</span>
-                        </Button>
+                        {onRequestFiles ? (
+                            <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() =>
+                                    onRequestFiles(path, segments[segments.length - 1] ?? "")
+                                }
+                                disabled={pending}
+                                title={`Request files (${SHORTCUT_HINTS["request-files"]})`}
+                                aria-label="Request files"
+                            >
+                                <Inbox className="size-4" />
+                                <span className="hidden sm:inline">Request files</span>
+                            </Button>
+                        ) : null}
                         <Button
                             size="sm"
                             variant="ghost"
@@ -2230,16 +2241,18 @@ export function FilesView({
                                                                             {sizeLabel(entry)}
                                                                         </div>
                                                                         <div className="flex w-12 shrink-0 justify-end px-2">
-                                                                            <Button
-                                                                                size="icon"
-                                                                                variant="ghost"
-                                                                                onClick={() =>
-                                                                                    onShare(entry)
-                                                                                }
-                                                                                aria-label={`Share ${entry.name}`}
-                                                                            >
-                                                                                <Share2 className="size-4" />
-                                                                            </Button>
+                                                                            {onShare ? (
+                                                                                <Button
+                                                                                    size="icon"
+                                                                                    variant="ghost"
+                                                                                    onClick={() =>
+                                                                                        onShare(entry)
+                                                                                    }
+                                                                                    aria-label={`Share ${entry.name}`}
+                                                                                >
+                                                                                    <Share2 className="size-4" />
+                                                                                </Button>
+                                                                            ) : null}
                                                                         </div>
                                                                     </div>
                                                                 </ContextMenuTrigger>
@@ -2289,15 +2302,17 @@ export function FilesView({
                                 {SHORTCUT_HINTS["upload-folder"]}
                             </span>
                         </ContextMenuItem>
-                        <ContextMenuItem
-                            onSelect={() => onRequestFiles(path, path.split("/").pop() ?? "")}
-                        >
-                            <Inbox className="size-4" />
-                            Request files here
-                            <span className="ml-auto pl-6 text-xs text-muted-foreground">
-                                {SHORTCUT_HINTS["request-files"]}
-                            </span>
-                        </ContextMenuItem>
+                        {onRequestFiles ? (
+                            <ContextMenuItem
+                                onSelect={() => onRequestFiles(path, path.split("/").pop() ?? "")}
+                            >
+                                <Inbox className="size-4" />
+                                Request files here
+                                <span className="ml-auto pl-6 text-xs text-muted-foreground">
+                                    {SHORTCUT_HINTS["request-files"]}
+                                </span>
+                            </ContextMenuItem>
+                        ) : null}
                         {clipboard ? (
                             <ContextMenuItem onSelect={paste}>
                                 <ClipboardPaste className="size-4" />
