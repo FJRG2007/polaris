@@ -56,7 +56,15 @@ export interface DetectedBuild {
      *  which is where a workspace has to build from, whatever the service's own
      *  root directory says. */
     readonly buildRoot: string;
-    readonly install: string | null;
+    /**
+     * Always null. Nixpacks installs dependencies correctly on its own - and its
+     * install phase is also where it bootstraps the package manager, so replacing
+     * that phase takes the bootstrap with it and the build dies on
+     * "pnpm: command not found". Kept as a field because a service may still set
+     * one by hand, which is a deliberate choice rather than a restatement of what
+     * would have happened anyway.
+     */
+    readonly install: null;
     readonly build: string | null;
     readonly start: string | null;
     /** Nix packages the start command needs. A built site needs something to serve
@@ -146,22 +154,6 @@ function workspaceRoot(levels: readonly DirectorySnapshot[]): DirectorySnapshot 
         if (level && declaresWorkspace(level)) return level;
     }
     return null;
-}
-
-/** The install command, which is always run from wherever the build is rooted. */
-function installCommand(manager: PackageManager, files: readonly string[]): string {
-    switch (manager) {
-        case "pnpm":
-            return "pnpm install --frozen-lockfile";
-        case "yarn":
-            return "yarn install --frozen-lockfile";
-        case "bun":
-            return "bun install";
-        case "npm":
-            // `npm ci` needs a lockfile and refuses without one, which would turn a
-            // missing file into a failed build for no reason.
-            return files.includes("package-lock.json") ? "npm ci" : "npm install";
-    }
 }
 
 /** Run one of the app's own scripts, from the build root. `workspace` is the
@@ -277,7 +269,7 @@ export function detectBuild(snapshot: RepoSnapshot): DetectedBuild | null {
     return {
         framework: label,
         buildRoot,
-        install: installCommand(manager, (enclosing ?? app).files),
+        install: null,
         build,
         start,
         packages,

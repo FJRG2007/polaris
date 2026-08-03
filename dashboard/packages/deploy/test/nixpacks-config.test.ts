@@ -36,7 +36,13 @@ describe("nixpacksConfig", () => {
         );
         expect(order).toEqual([...order].sort((a, b) => a - b));
         expect(order.every((at) => at >= 0)).toBe(true);
-        expect(rendered).toContain('nixPkgs = ["caddy"]');
+    });
+
+    it("adds to the setup packages instead of replacing them", () => {
+        // A bare list here replaces the provider's, which for this phase means
+        // throwing away the language runtime and shipping an image that holds a
+        // static file server and no Node at all.
+        expect(nixpacksConfig({ packages: ["caddy"] })).toContain('nixPkgs = ["...", "caddy"]');
     });
 
     it("escapes a command that would otherwise end the string", () => {

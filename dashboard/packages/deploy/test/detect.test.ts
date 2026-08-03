@@ -61,7 +61,7 @@ describe("a framework that never wrote a start script", () => {
         expect(plan?.framework).toBe("Next.js");
         expect(plan?.start).toBe("next start");
         expect(plan?.build).toBe("npm run build");
-        expect(plan?.install).toBe("npm ci");
+        expect(plan?.install).toBeNull();
     });
 
     it("prefers the project's own start script over the framework default", () => {
@@ -117,7 +117,7 @@ describe("a monorepo builds from the workspace root", () => {
 
     it("scopes every script to the one workspace", () => {
         const plan = detectBuild(snapshot);
-        expect(plan?.install).toBe("pnpm install --frozen-lockfile");
+        expect(plan?.install).toBeNull();
         expect(plan?.build).toBe("pnpm --filter @polaris/web run build");
         expect(plan?.start).toBe("pnpm --filter @polaris/web run start");
     });
@@ -213,9 +213,10 @@ describe("the workspace root is not always the repository root", () => {
         expect(detectBuild(nested)?.buildRoot).toBe("dashboard");
     });
 
-    it("reads the package manager from where the install will actually run", () => {
-        // The repository root has no lockfile at all; npm would be the wrong answer.
-        expect(detectBuild(nested)?.install).toBe("pnpm install --frozen-lockfile");
+    it("reads the package manager from where the build will actually run", () => {
+        // The repository root has no lockfile at all; npm would be the wrong answer,
+        // and it is the package manager that decides how a script is addressed.
+        expect(detectBuild(nested)?.build).toBe("pnpm --filter @polaris/web run build");
     });
 
     it("still scopes the scripts to the member", () => {
@@ -247,25 +248,20 @@ describe("the workspace root is not always the repository root", () => {
         };
         const plan = detectBuild(twice);
         expect(plan?.buildRoot).toBe("inner");
-        expect(plan?.install).toBe("yarn install --frozen-lockfile");
+        // yarn.lock is the inner one's, which is the workspace that owns this app.
+        expect(plan?.build).toBe("yarn workspace app build");
     });
 });
 
 describe("the package manager comes from the lockfile", () => {
     const manifest = { scripts: { build: "vite build", start: "node ." }, dependencies: { next: "15" } };
 
-    it("reads pnpm, yarn, bun and npm", () => {
+    it("reads pnpm, yarn, bun and npm to know how to run a script", () => {
         const at = (lock: string) => detectBuild(alone({ files: ["package.json", lock], manifest }));
-        expect(at("pnpm-lock.yaml")?.install).toBe("pnpm install --frozen-lockfile");
-        expect(at("yarn.lock")?.install).toBe("yarn install --frozen-lockfile");
-        expect(at("bun.lockb")?.install).toBe("bun install");
-        expect(at("package-lock.json")?.install).toBe("npm ci");
-    });
-
-    it("installs rather than ci when npm has no lockfile to go on", () => {
-        // `npm ci` refuses without one, which would turn a missing file into a
-        // failed build for no reason.
-        expect(detectBuild(alone({ files: ["package.json"], manifest }))?.install).toBe("npm install");
+        expect(at("pnpm-lock.yaml")?.build).toBe("pnpm run build");
+        expect(at("yarn.lock")?.build).toBe("yarn build");
+        expect(at("bun.lockb")?.build).toBe("bun run build");
+        expect(at("package-lock.json")?.build).toBe("npm run build");
     });
 
     it("uses each manager's own way of addressing a workspace", () => {
@@ -275,5 +271,28 @@ describe("the package manager comes from the lockfile", () => {
         expect(at("yarn.lock")?.build).toBe("yarn workspace web build");
         expect(at("bun.lockb")?.build).toBe("bun run --filter web build");
         expect(at("package-lock.json")?.build).toBe("npm run build -w web");
+    });
+});
+
+describe("installing is left alone", () => {
+    /**
+     * A regression, and an expensive one: detection used to emit the install
+     * command too. Writing a phase into nixpacks.toml REPLACES the provider's, and
+     * the install phase is where nixpacks bootstraps the package manager itself -
+     * so an install command that only restated what nixpacks would have run anyway
+     * took the bootstrap out with it, and the build died on "pnpm: command not
+     * found" before installing anything.
+     *
+     * The rule this pins: never override a phase to say what would have happened
+     * regardless. A service can still set an install command by hand, which is a
+     * deliberate act rather than a restatement.
+     */
+    it("never emits an install command, whatever it detected", () => {
+        const cases = [
+            alone({ manifest: { scripts: { build: "next build" }, dependencies: { next: "15" } } }),
+            alone({ files: ["package.json", "pnpm-lock.yaml"], manifest: { dependencies: { astro: "5" } } }),
+            workspace({ name: "web", scripts: { build: "next build", start: "next start" }, dependencies: { next: "15" } })
+        ];
+        for (const snapshot of cases) expect(detectBuild(snapshot)?.install ?? null).toBeNull();
     });
 });
