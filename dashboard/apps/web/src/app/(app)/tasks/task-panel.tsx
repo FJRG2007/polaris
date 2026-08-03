@@ -86,6 +86,26 @@ export function TaskPanel({
         load(openId);
     }, [openId, load]);
 
+    /**
+     * Commit whatever is typed but not yet blurred.
+     *
+     * The free-text fields here - the name, the description, a text custom field -
+     * save when they lose focus, and a field that still has focus when the panel
+     * goes away is torn off the page without ever blurring: no blur event, no save,
+     * and the edit is gone. Blurring it first runs exactly the save the reader would
+     * have got by clicking somewhere else, whichever field it was.
+     */
+    const flushEdits = () => {
+        const active = document.activeElement;
+        if (active instanceof HTMLElement && active.closest("[role='dialog']")) active.blur();
+    };
+
+    /** Open another task in this same panel, saving what the current one has open. */
+    const openTask = (id: string) => {
+        flushEdits();
+        setOpenId(id);
+    };
+
     /** Apply a change locally, then persist it. A refused write reloads the task
      *  rather than leaving the screen showing something that did not happen. */
     const patch = async (input: Record<string, unknown>) => {
@@ -102,7 +122,16 @@ export function TaskPanel({
     const runningHere = detail?.timeEntries.some((entry) => entry.running && entry.userId === context.currentUserId) ?? false;
 
     return (
-        <Dialog open={openId !== null} onOpenChange={(open) => (open ? undefined : onClose())}>
+        <Dialog
+            open={openId !== null}
+            onOpenChange={(open) => {
+                if (open) return;
+                // Escape and a click outside close the panel with the caret still
+                // in a field, so the edit is saved on the way out.
+                flushEdits();
+                onClose();
+            }}
+        >
             {/* max-w has to be set as well as w: DialogContent's own max-w-lg
                 caps the width otherwise, and the panel renders at half the size
                 its two columns were laid out for. The header keeps clear of the
@@ -129,7 +158,7 @@ export function TaskPanel({
                             {detail?.parent && (
                                 <button
                                     type="button"
-                                    onClick={() => setOpenId(detail.parent!.id)}
+                                    onClick={() => openTask(detail.parent!.id)}
                                     className="truncate text-xs text-muted-foreground hover:text-foreground hover:underline"
                                 >
                                     in {detail.parent.name}
@@ -180,7 +209,7 @@ export function TaskPanel({
                                                     setError
                                                 );
                                                 onChanged();
-                                                if (result?.id) setOpenId(result.id);
+                                                if (result?.id) openTask(result.id);
                                             }}
                                         >
                                             Duplicate
@@ -282,7 +311,7 @@ export function TaskPanel({
                                     subtasks={detail?.subtasks ?? []}
                                     statuses={context.statuses}
                                     canEdit={context.canEdit}
-                                    onOpen={setOpenId}
+                                    onOpen={openTask}
                                     onChanged={() => {
                                         load(task.id);
                                         onChanged();
@@ -303,7 +332,7 @@ export function TaskPanel({
                                     dependencies={detail?.dependencies ?? []}
                                     candidates={context.siblings}
                                     canEdit={context.canEdit}
-                                    onOpen={setOpenId}
+                                    onOpen={openTask}
                                     onChanged={() => load(task.id)}
                                     onError={setError}
                                 />
