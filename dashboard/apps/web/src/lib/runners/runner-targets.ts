@@ -138,6 +138,10 @@ export interface SyncedTargets {
         queuedAt: Date | null;
         lastServedAt: Date | null;
         blocked: string | null;
+        /** What GitHub last said the repository is, which decides whether it may
+         *  be served at all and what the guard on the machine refuses. */
+        visibility: string | null;
+        checkedAt: Date | null;
     }>;
     /** Targets that were being served and are not any more, so whatever they have
      *  running can be stood down. */
@@ -215,6 +219,8 @@ function asView(row: {
     queuedAt: Date | null;
     lastServedAt: Date | null;
     blocked: string | null;
+    visibility: string | null;
+    checkedAt: Date | null;
 }): SyncedTargets["targets"][number] {
     return {
         id: row.id,
@@ -225,7 +231,9 @@ function asView(row: {
         queued: row.queued,
         queuedAt: row.queuedAt,
         lastServedAt: row.lastServedAt,
-        blocked: row.blocked
+        blocked: row.blocked,
+        visibility: row.visibility,
+        checkedAt: row.checkedAt
     };
 }
 

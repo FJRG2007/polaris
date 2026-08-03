@@ -23,11 +23,18 @@
 
 import type { Client } from "ssh2";
 import { quoteArg } from "@polaris/deploy";
-import type { RunnerIsolation } from "@polaris/core";
 import type { RunnerRelease } from "./runner-release";
 import { execCommand, openSshClient } from "@polaris/ssh";
 import { getHostConnection, type HostConnection } from "@/lib/host-service";
-import type { RunnerHandle, RunnerMachine, RunnerProbe } from "./runner-machine";
+import { factsFromLog, JOB_FACTS_FILE, parseJobFacts, type RunnerIsolation } from "@polaris/core";
+import {
+    CONTAINER_RUNNER_ROOT,
+    type RunnerHandle,
+    type RunnerMachine,
+    type RunnerProbe,
+    type RunnerRemains,
+    type RunnerStart
+} from "./runner-machine";
 
 /** Everything Polaris puts on a machine lives under one directory, so removing a
  *  server from Polaris leaves one thing to delete. */
@@ -195,16 +202,9 @@ mv "$FILE".part "$FILE"`;
      * Start one ephemeral runner. `jitConfig` authenticates as that runner until it
      * is used, so it goes in on stdin and never onto a command line.
      */
-    public async start(input: {
-        name: string;
-        isolation: RunnerIsolation;
-        release: RunnerRelease;
-        jitConfig: string;
-    }): Promise<RunnerHandle> {
+    public async start(input: RunnerStart): Promise<RunnerHandle> {
         const result =
-            input.isolation === "container"
-                ? await this.startContainer(input.name, input.release, input.jitConfig)
-                : await this.startOnMachine(input.name, input.release, input.jitConfig);
+            input.isolation === "container" ? await this.startContainer(input) : await this.startOnMachine(input);
 
         if (result.code !== 0 || !result.stdout) {
             throw new Error(result.stderr || result.stdout || "The machine did not start the runner");
@@ -223,19 +223,43 @@ mv "$FILE".part "$FILE"`;
      * with it, and the log of a runner that exited without ever taking a job is the
      * only account of why; Polaris removes it when it reaps it instead.
      *
-     * The configuration is exported into this shell and handed over with a bare
-     * `-e NAME`, so the engine reads it from the environment. Spelling it `-e
-     * NAME=value` would put it back on a command line.
+     * Nothing sensitive touches a command line. The configuration, the guard and
+     * the secrets all arrive on stdin: the configuration and the guard become
+     * environment values of this shell and are handed over with a bare `-e NAME`,
+     * and the secrets become a file passed as `--env-file`. Spelling any of them
+     * `-e NAME=value` would put them in `ps`, which every user on the box reads.
+     *
+     * The guard is base64 on the way in and is written *inside* the container by
+     * the command that starts the runner - it is a multi-line script, and this
+     * machine's filesystem is not the container's.
      */
-    private async startContainer(name: string, release: RunnerRelease, jitConfig: string): Promise<RunResult> {
+    private async startContainer(input: RunnerStart): Promise<RunResult> {
+        const guardPath = `${CONTAINER_RUNNER_ROOT}/polaris-guard.sh`;
+        // Written, made executable and pointed at; then the runner replaces this
+        // shell, so nothing of the bootstrap survives into the job.
+        const boot = [
+            `printf '%s' "$POLARIS_JOB_GUARD" | base64 -d > ${guardPath}`,
+            `chmod 700 ${guardPath}`,
+            "unset POLARIS_JOB_GUARD",
+            `export ACTIONS_RUNNER_HOOK_JOB_STARTED=${guardPath}`,
+            "exec ./run.sh"
+        ].join("; ");
+
         const script = `set -eu
-IFS= read -r JIT
-[ -n "$JIT" ] || { echo "no runner configuration was passed" >&2; exit 1; }
-export ACTIONS_RUNNER_INPUT_JITCONFIG="$JIT"
-docker rm -f ${quoteArg(name)} >/dev/null 2>&1 || true
-docker run -d --name ${quoteArg(name)} --label ${quoteArg(RUNNER_LABEL)} -e ACTIONS_RUNNER_INPUT_JITCONFIG ${quoteArg(release.image)} ./run.sh >/dev/null
-printf '%s' ${quoteArg(name)}`;
-        return this.run(script, `${jitConfig}\n`);
+${READ_PAYLOAD}
+ENVF=${ROOT}/live/${quoteArg(`${input.name}.env`)}
+mkdir -p ${ROOT}/live
+# The engine reads this file as it starts the container and never again, so it is
+# removed immediately afterwards - it holds every secret the job may read, on a
+# machine other people can usually log in to.
+(umask 077 && printf '%s' "$POLARIS_JOB_ENV" | base64 $B64 > "$ENVF")
+docker rm -f ${quoteArg(input.name)} >/dev/null 2>&1 || true
+docker run -d --name ${quoteArg(input.name)} --label ${quoteArg(RUNNER_LABEL)} \\
+    -e ACTIONS_RUNNER_INPUT_JITCONFIG -e POLARIS_JOB_GUARD --env-file "$ENVF" \\
+    ${quoteArg(input.release.image)} sh -c ${quoteArg(boot)} >/dev/null 2>&1 || { rm -f "$ENVF"; echo "the container engine would not start the runner" >&2; exit 1; }
+rm -f "$ENVF"
+printf '%s' ${quoteArg(input.name)}`;
+        return this.run(script, payload(input.jitConfig, input.guard, envFile(input.secrets)));
     }
 
     /**
@@ -243,24 +267,33 @@ printf '%s' ${quoteArg(name)}`;
      * cannot share one directory - the runner writes its registration and its
      * diagnostics into it - and a per-job copy is also what makes this a clean
      * slate rather than a directory the last job left something in.
+     *
+     * The secrets go into the runner's own `.env`, which is the documented way to
+     * put a value in reach of a job's steps, and it is written before the runner
+     * starts because the runner only reads it once.
      */
-    private async startOnMachine(name: string, release: RunnerRelease, jitConfig: string): Promise<RunResult> {
+    private async startOnMachine(input: RunnerStart): Promise<RunResult> {
         const script = `set -eu
-DIR=${ROOT}/live/${quoteArg(name)}
+DIR=${ROOT}/live/${quoteArg(input.name)}
 rm -rf "$DIR"
 mkdir -p "$DIR"
-tar xzf ${ROOT}/cache/${quoteArg(release.assetName)} -C "$DIR"
+tar xzf ${ROOT}/cache/${quoteArg(input.release.assetName)} -C "$DIR"
 
-IFS= read -r JIT
-[ -n "$JIT" ] || { echo "no runner configuration was passed" >&2; exit 1; }
-export ACTIONS_RUNNER_INPUT_JITCONFIG="$JIT"
+${READ_PAYLOAD}
+# The runner reads .env once, at startup, so both of these are in place before it
+# is started. The hook is pointed at by absolute path, which only the machine can
+# spell - .env is a plain list of names and values and expands nothing.
+(umask 077 && printf 'ACTIONS_RUNNER_HOOK_JOB_STARTED=%s\\n' "$DIR/polaris-guard.sh" > "$DIR"/.env)
+printf '%s' "$POLARIS_JOB_ENV" | base64 $B64 >> "$DIR"/.env
+printf '%s' "$POLARIS_JOB_GUARD" | base64 $B64 > "$DIR"/polaris-guard.sh
+chmod 700 "$DIR"/polaris-guard.sh
 
 cd "$DIR"
 # nohup, not a service: the runner takes one job and exits, so it has to outlive
 # this SSH channel without ever being something the machine restarts.
 nohup ./run.sh >"$DIR"/polaris.log 2>&1 </dev/null &
 printf '%s' "$!"`;
-        return this.run(script, `${jitConfig}\n`);
+        return this.run(script, payload(input.jitConfig, input.guard, envFile(input.secrets)));
     }
 
     /** Whether a runner Polaris started is still there. Probed, because the answer
@@ -278,22 +311,40 @@ printf '%s' "$!"`;
     }
 
     /**
-     * Take a finished runner off the machine and report what it said on its way
-     * out. The log matters: a runner that exits without ever registering did so for
-     * a reason the operator has no other way to see.
+     * Take a finished runner off the machine and report what it left behind.
+     *
+     * Two things are wanted and both are gone a moment later. The log is why a
+     * runner that never registered gave up, which nothing else records. The job
+     * record is what the runner actually ran, which GitHub cannot be asked for
+     * afterwards - an ephemeral runner de-registers itself as its job ends.
+     *
+     * They are collected in the same round trip as the removal, because the
+     * removal is what destroys them.
      */
-    public async reap(name: string, runner: RunnerHandle): Promise<string> {
+    public async reap(name: string, runner: RunnerHandle): Promise<RunnerRemains> {
         if (runner.isolation === "container") {
+            // The record is fished out of the container's own log: the guard prints
+            // it to process 1's output for exactly this, since a stopped container
+            // is not somewhere a file can be read from without more privilege than
+            // this needs.
             const result = await this.run(
-                `docker logs --tail 20 ${quoteArg(runner.handle)} 2>&1 | tail -c 2000 || true; docker rm -f ${quoteArg(runner.handle)} >/dev/null 2>&1 || true`
+                `docker logs --tail 200 ${quoteArg(runner.handle)} 2>&1 | tail -c 8000 || true
+docker rm -f ${quoteArg(runner.handle)} >/dev/null 2>&1 || true`
             );
-            return result.stdout;
+            return { log: tailLines(result.stdout), facts: factsFromLog(result.stdout) };
         }
+
         const script = `DIR=${ROOT}/live/${quoteArg(name)}
 ${/^\d+$/.test(runner.handle) ? `kill ${runner.handle} 2>/dev/null || true` : "true"}
+if [ -f "$DIR"/${quoteArg(JOB_FACTS_FILE)} ]; then
+    printf '%s\\n' ${quoteArg(FACTS_BOUNDARY)}
+    cat "$DIR"/${quoteArg(JOB_FACTS_FILE)}
+    printf '%s\\n' ${quoteArg(FACTS_BOUNDARY)}
+fi
 [ -f "$DIR"/polaris.log ] && tail -c 2000 "$DIR"/polaris.log || true
 rm -rf "$DIR"`;
-        return (await this.run(script)).stdout;
+        const result = await this.run(script);
+        return splitRemains(result.stdout);
     }
 
     /**
@@ -340,6 +391,57 @@ rm -rf ${dirs}`);
             if (timer) clearTimeout(timer);
         }
     }
+}
+
+/**
+ * The preamble every start script begins with: read what came in on stdin.
+ *
+ * Everything sensitive arrives this way rather than on a command line, because
+ * sshd runs what it is given through a shell and that command is readable in
+ * `ps` by every user on the box. Three lines, in order: the registration, the
+ * guard, and the environment file - the last two base64 so a multi-line script
+ * and a list of values stay one line each on the way in.
+ *
+ * `base64 -d` is GNU's spelling and `-D` is the BSD one that macOS ships. Which
+ * one this machine has is settled once, by trying it, rather than guessed from
+ * the platform.
+ */
+const READ_PAYLOAD = `IFS= read -r JIT
+IFS= read -r POLARIS_JOB_GUARD
+IFS= read -r POLARIS_JOB_ENV
+[ -n "$JIT" ] || { echo "no runner configuration was passed" >&2; exit 1; }
+export ACTIONS_RUNNER_INPUT_JITCONFIG="$JIT"
+export POLARIS_JOB_GUARD
+if printf 'cG9sYXJpcw==' | base64 -d >/dev/null 2>&1; then B64="-d"; else B64="-D"; fi`;
+
+/** What is fed to that preamble, in the order it reads them. */
+function payload(jitConfig: string, guard: string, env: string): string {
+    const encode = (value: string): string => Buffer.from(value, "utf8").toString("base64");
+    return `${jitConfig}\n${encode(guard)}\n${encode(env)}\n`;
+}
+
+/** The secrets as the runner and the container engine both read them: one name
+ *  and value per line, no quoting and no expansion. Values are single-line by
+ *  the time they get here, which is what makes that format sufficient. */
+function envFile(secrets: Readonly<Record<string, string>>): string {
+    const lines = Object.entries(secrets).map(([name, value]) => `${name}=${value}`);
+    return lines.length > 0 ? `${lines.join("\n")}\n` : "";
+}
+
+/** Marks the job record inside the reap script's output, so one round trip can
+ *  carry both it and the log without either being mistaken for the other. */
+const FACTS_BOUNDARY = "--polaris-facts--";
+
+/** Split a reap's output back into the record and the log. */
+function splitRemains(output: string): RunnerRemains {
+    const parts = output.split(FACTS_BOUNDARY);
+    if (parts.length < 3) return { log: tailLines(output), facts: null };
+    return { log: tailLines(`${parts[0] ?? ""}${parts.slice(2).join(FACTS_BOUNDARY)}`), facts: parseJobFacts(parts[1] ?? "") };
+}
+
+/** The last of a log, which is the part that says why. */
+function tailLines(output: string): string {
+    return output.trim().slice(-2000);
 }
 
 /** Turn a failed preparation into something that names what to fix. */

@@ -21,6 +21,8 @@ export * from "./format.js";
 export * from "./permissions.js";
 export * from "./authz.js";
 export * from "./runners.js";
+export * from "./runner-policy.js";
+export * from "./runner-runs.js";
 export * from "./runner-placement.js";
 export * from "./waf-rules.js";
 export * from "./waf-jails.js";

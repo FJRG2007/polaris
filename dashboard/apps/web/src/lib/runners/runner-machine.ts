@@ -12,7 +12,7 @@
 import { RunnerHost } from "./runner-host";
 import type { RunnerRelease } from "./runner-release";
 import { LocalRunnerHost } from "./local-runner-host";
-import { LOCAL_SERVER_ID, type MachineResources, type RunnerIsolation } from "@polaris/core";
+import { LOCAL_SERVER_ID, type JobFacts, type MachineResources, type RunnerIsolation } from "@polaris/core";
 
 /** Where one ephemeral runner can be found again on the machine. */
 export interface RunnerHandle {
@@ -31,26 +31,54 @@ export interface RunnerProbe {
     readonly resources: MachineResources;
 }
 
+/** What one runner is started with, beyond the runner itself. */
+export interface RunnerStart {
+    readonly name: string;
+    readonly isolation: RunnerIsolation;
+    readonly release: RunnerRelease;
+    readonly jitConfig: string;
+    /**
+     * The script GitHub runs once a job has been assigned to this runner and
+     * before any step of it runs. It is what decides whether the job is allowed
+     * at all, so it is attached at start rather than configured on the machine:
+     * a runner without it is a runner that would take anything.
+     */
+    readonly guard: string;
+    /** The secrets this runner's jobs may read, as environment variables. Every
+     *  value is a single line, which is what both ways of carrying them can
+     *  actually represent. */
+    readonly secrets: Readonly<Record<string, string>>;
+}
+
+/** What was left of a runner once it was taken off the machine. */
+export interface RunnerRemains {
+    /** The tail of its log - the only account of why one that never registered
+     *  gave up. */
+    readonly log: string;
+    /** What the job turned out to be, as the guard recorded it, or null when the
+     *  runner was stood down before it was ever given one. */
+    readonly facts: JobFacts | null;
+}
+
 export interface RunnerMachine {
     /** How Polaris drives it, which decides what isolation it can offer. */
     readonly reach: "login" | "engine";
     probe(): Promise<RunnerProbe>;
     /** Put what a job will need in place, before any registration is minted. */
     prepare(release: RunnerRelease, isolation: RunnerIsolation): Promise<void>;
-    start(input: {
-        name: string;
-        isolation: RunnerIsolation;
-        release: RunnerRelease;
-        jitConfig: string;
-    }): Promise<RunnerHandle>;
+    start(input: RunnerStart): Promise<RunnerHandle>;
     isAlive(runner: RunnerHandle): Promise<boolean>;
-    /** Take a finished runner off the machine and return what it said on its way
-     *  out - the only account of why one that never registered gave up. */
-    reap(name: string, runner: RunnerHandle): Promise<string>;
+    /** Take a finished runner off the machine and report what it left behind. */
+    reap(name: string, runner: RunnerHandle): Promise<RunnerRemains>;
     /** Remove whatever no live runner accounts for. */
     sweep(live: readonly string[]): Promise<void>;
     close(): void;
 }
+
+/** Where the guard and its record live inside a job container. The image runs as
+ *  the `runner` user out of its home directory, which is the one place a job is
+ *  certain to be able to write. */
+export const CONTAINER_RUNNER_ROOT = "/home/runner";
 
 /** Open the machine a pool runs on. `serverId` is a Host id, or "local" for the
  *  box Polaris runs on. */

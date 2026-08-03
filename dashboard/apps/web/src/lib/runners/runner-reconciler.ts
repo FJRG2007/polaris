@@ -36,10 +36,12 @@ import { targetKey } from "./runner-scope";
 import { parseLabels } from "./runner-labels";
 import { liveRunnerNames } from "./runner-service";
 import { syncPoolTargets } from "./runner-targets";
+import { secretsForTarget } from "./runner-secrets";
 import { poolUsage, usageFor } from "./runner-usage";
 import { resolveRunnerRelease, runnerPlatform } from "./runner-release";
 import { describeDropped, markServed, refreshDemand } from "./runner-demand";
 import { openRunnerMachine, poolServerId, type RunnerMachine } from "./runner-machine";
+import { policiesForPool, policyFor, refreshRepoSafety, visibilityOf } from "./runner-repo-config";
 import {
     createRunnerJitConfig,
     deleteGithubRunner,
@@ -49,10 +51,14 @@ import {
 } from "@/lib/github-runners";
 import {
     budgetVerdict,
+    DEFAULT_RUNNER_REPO_POLICY,
     placeRunners,
+    renderJobGuard,
+    repoServingRefusal,
     runnerName,
     runnerNamePrefix,
     RUNNER_JOB_LIVE_STATES,
+    type JobFacts,
     type RunnerIsolation,
     type RunnerJobState,
     type RunnerWindow,
@@ -147,6 +153,10 @@ async function reconcilePool(pool: PoolRow): Promise<string | null> {
             if (still) alive.push(job);
         }
 
+        // Asked before the budgets, because what a repository is decides whether it
+        // may be served at all. A repository made public since the last pass has to
+        // stop being served on this one, not on the one after it.
+        await refreshRepoSafety(targets);
         const blocked = await applyBudgets(pool, targets);
 
         // Only worth asking who is waiting when the pool has to choose. With a slot
@@ -249,16 +259,22 @@ async function settleJob(
         return true;
     }
 
-    const log = handle ? await machine.reap(job.name, handle).catch(() => "") : "";
+    const remains = handle
+        ? await machine.reap(job.name, handle).catch(() => ({ log: "", facts: null }))
+        : { log: "", facts: null };
     // "starting" means it never showed up in a GitHub listing, so it never
-    // connected: this one did not run a job, it fell over.
-    const failed = job.state === "starting";
+    // connected: this one did not run a job, it fell over. A runner the guard
+    // refused is the exception - it was given a job and turned it down, which is
+    // a finished runner with something to say rather than a broken one.
+    const refused = remains.facts?.refused ?? null;
+    const failed = job.state === "starting" && !refused;
     await prisma.runnerJob.update({
         where: { id: job.id },
         data: {
             state: failed ? "failed" : "finished",
-            error: failed ? exitReason(log) : null,
-            finishedAt: new Date()
+            error: failed ? exitReason(remains.log) : null,
+            finishedAt: new Date(),
+            ...factsColumns(remains.facts)
         }
     });
 
@@ -290,11 +306,24 @@ async function standDown(machine: RunnerMachine, job: JobRow, reason: string | n
 }
 
 /**
- * Work out what each repository has spent and record why it is not being served.
+ * Work out why each repository is not being served, if it is not.
  *
- * The reason is stored on the target rather than only used here, because "why is
- * nothing running for this repository" is a question asked on the pool card long
- * after the pass that answered it.
+ * Two different refusals land in the same place. One is a spent budget, which is
+ * about fairness between repositories sharing a machine. The other is the
+ * policy: a repository that is public and was never signed off, or one with
+ * every event turned off, should not have a runner sitting on it in the first
+ * place.
+ *
+ * The policy refusal is checked here as well as on the machine, and that is not
+ * redundant. The guard refuses a job after GitHub has already handed it over,
+ * which is the last line and the one that has to hold; this one means the runner
+ * is never offered, so there is nothing to hand a job to. Skipping it would leave
+ * a machine advertising itself to a public repository and relying entirely on the
+ * script to turn every stranger away.
+ *
+ * Either way the reason is stored on the target rather than only used here,
+ * because "why is nothing running for this repository" is asked on the pool card
+ * long after the pass that answered it.
  */
 async function applyBudgets(pool: PoolRow, targets: readonly StoredTarget[]): Promise<Map<string, string | null>> {
     const limits = {
@@ -305,14 +334,20 @@ async function applyBudgets(pool: PoolRow, targets: readonly StoredTarget[]): Pr
         onExhausted: pool.onExhausted === "warn" ? ("warn" as const) : ("pause" as const)
     };
     const usage = await poolUsage(pool.id, limits.minutesWindow);
+    const policies = await policiesForPool(pool.id);
     const verdicts = new Map<string, string | null>();
 
     for (const target of targets) {
+        const policy = policies.get(target.key) ?? DEFAULT_RUNNER_REPO_POLICY;
+        // The policy comes first: a repository nobody may run anything on is not
+        // worth reporting a budget for, and its refusal is the more useful thing
+        // to read.
+        const refusal = repoServingRefusal(policy, visibilityOf(target.visibility));
         const verdict = budgetVerdict(usageFor(usage, target.key), limits);
         // `warn` reports the overage without withholding the runner, so what is
         // stored is the sentence and what gates placement is `allowed`.
-        const blocked = verdict.allowed ? null : verdict.exceeded;
-        verdicts.set(target.key, verdict.exceeded);
+        const blocked = refusal ?? (verdict.allowed ? null : verdict.exceeded);
+        verdicts.set(target.key, refusal ?? verdict.exceeded);
         if (target.blocked !== blocked) {
             await prisma.runnerPoolTarget.update({ where: { id: target.id }, data: { blocked } });
             target.blocked = blocked;
@@ -377,7 +412,15 @@ async function prepareMachine(
     return { release, isolation };
 }
 
-/** Start one runner for one target, on a machine already prepared for it. */
+/**
+ * Start one runner for one target, on a machine already prepared for it.
+ *
+ * The guard and the secrets are settled here, per target, rather than per pool:
+ * one pool serves many repositories and they do not agree about who may run
+ * things or what may be read while they do. Both are read fresh on every start,
+ * so a policy tightened a minute ago applies to the next runner rather than to
+ * the next pool that happens to be recreated.
+ */
 async function startRunner(
     machine: RunnerMachine,
     pool: PoolRow,
@@ -385,6 +428,9 @@ async function startRunner(
     ready: { release: Awaited<ReturnType<typeof resolveRunnerRelease>>; isolation: RunnerIsolation }
 ): Promise<void> {
     const { release, isolation } = ready;
+    const policy = await policyFor(pool.id, target.key);
+    const guard = renderJobGuard({ policy, visibility: visibilityOf(target.visibility) });
+    const secrets = await secretsForTarget(pool.id, target.key, { allowed: policy.secrets });
 
     // The name is settled before the row exists, so a crash between the two can
     // never leave a nameless runner holding a slot nothing can reconcile.
@@ -405,7 +451,14 @@ async function startRunner(
     await prisma.runnerJob.update({ where: { id: job.id }, data: { githubRunnerId: jit.runnerId } });
 
     try {
-        const handle = await machine.start({ name, isolation, release, jitConfig: jit.encodedConfig });
+        const handle = await machine.start({
+            name,
+            isolation,
+            release,
+            jitConfig: jit.encodedConfig,
+            guard,
+            secrets
+        });
         await prisma.runnerJob.update({ where: { id: job.id }, data: { handle: handle.handle } });
         await markServed(target.id);
     } catch (caught) {
@@ -466,6 +519,22 @@ async function dropOrphans(
             await deleteGithubRunner(storedTarget(target), runner.id).catch(() => undefined);
         }
     }
+}
+
+/** What the guard recorded, as columns on the job. Absent facts leave the row
+ *  alone rather than writing nulls over what a previous pass already learned. */
+function factsColumns(facts: JobFacts | null): Record<string, string | null> {
+    if (!facts) return {};
+    return {
+        workflow: facts.workflow,
+        jobName: facts.job,
+        runId: facts.runId,
+        event: facts.event,
+        actor: facts.actor,
+        ref: facts.ref,
+        sha: facts.sha,
+        refusedReason: facts.refused
+    };
 }
 
 /** The line of a dead runner's log worth showing. The runner is verbose and most

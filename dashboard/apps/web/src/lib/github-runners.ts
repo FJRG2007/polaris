@@ -189,6 +189,97 @@ export async function countQueuedRuns(target: RunnerTarget): Promise<number> {
 }
 
 /**
+ * GitHub's own approval policy for pull requests from forks, which decides
+ * whether a stranger's workflow starts by itself or waits for somebody to press
+ * approve.
+ *
+ * Polaris does not enforce this - GitHub does, before a job is ever queued - and
+ * that is precisely why it is worth reading. It is the layer in front of the
+ * guard on the machine, and an operator serving a public repository with it set
+ * to the loosest option has a gap the runner cannot close for them.
+ */
+export const FORK_APPROVAL_POLICIES = [
+    "first_time_contributors_new_to_github",
+    "first_time_contributors",
+    "all_external_contributors"
+] as const;
+export type ForkApprovalPolicy = (typeof FORK_APPROVAL_POLICIES)[number];
+
+/** What GitHub says about a repository, as far as running somebody else's code
+ *  on your hardware is concerned. */
+export interface RepoSafety {
+    visibility: "public" | "private" | null;
+    /** Null when the connection may not read it, which is not the same as none. */
+    forkApproval: ForkApprovalPolicy | null;
+}
+
+/**
+ * Read a repository's visibility and fork approval policy.
+ *
+ * Never throws: this runs on the reconcile pass, and a repository GitHub would
+ * not answer about this minute must cost that repository a turn rather than the
+ * whole pass. An unreadable answer is null, which every caller treats as "not
+ * known" - and "not known" is never treated as "safe".
+ */
+export async function readRepoSafety(owner: string, repo: string): Promise<RepoSafety> {
+    const empty: RepoSafety = { visibility: null, forkApproval: null };
+    let token: string;
+    try {
+        token = await tokenFor({ scope: "repo", owner, repo });
+    } catch {
+        return empty;
+    }
+    const path = `${API}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`;
+
+    const [repoRes, approvalRes] = await Promise.all([
+        fetch(path, { headers: apiHeaders(token), cache: "no-store" }).catch(() => null),
+        // Needs Administration on the repository - the same permission repository
+        // runner registration needs, so a pool that works at all usually has it.
+        fetch(`${path}/actions/permissions/fork-pr-contributor-approval`, {
+            headers: apiHeaders(token),
+            cache: "no-store"
+        }).catch(() => null)
+    ]);
+
+    let visibility: RepoSafety["visibility"] = null;
+    if (repoRes?.ok) {
+        const body = (await repoRes.json().catch(() => null)) as { private?: boolean } | null;
+        if (typeof body?.private === "boolean") visibility = body.private ? "private" : "public";
+    }
+
+    let forkApproval: ForkApprovalPolicy | null = null;
+    if (approvalRes?.ok) {
+        const body = (await approvalRes.json().catch(() => null)) as { approval_policy?: string } | null;
+        const policy = FORK_APPROVAL_POLICIES.find((entry) => entry === body?.approval_policy);
+        if (policy) forkApproval = policy;
+    }
+
+    return { visibility, forkApproval };
+}
+
+/**
+ * Ask GitHub to require approval before anybody outside the repository can run a
+ * workflow on it. Offered where the repository page says the setting is loose,
+ * because it is the half of the protection Polaris cannot provide from the
+ * machine: the guard refuses a fork after GitHub has already queued it, and this
+ * stops it being queued.
+ */
+export async function setForkApproval(owner: string, repo: string, policy: ForkApprovalPolicy): Promise<void> {
+    const target: RunnerTarget = { scope: "repo", owner, repo };
+    const token = await tokenFor(target);
+    const res = await fetch(
+        `${API}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/actions/permissions/fork-pr-contributor-approval`,
+        {
+            method: "PUT",
+            headers: { ...apiHeaders(token), "content-type": "application/json" },
+            body: JSON.stringify({ approval_policy: policy }),
+            cache: "no-store"
+        }
+    );
+    if (!res.ok) throw accessError(res.status, target);
+}
+
+/**
  * Remove a runner. An ephemeral runner de-registers itself after its job, so this
  * is for the ones that never got that far: a machine that died mid-job would
  * otherwise leave a row GitHub keeps queueing work onto.

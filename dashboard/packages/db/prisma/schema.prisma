@@ -1075,9 +1075,84 @@ model RunnerPool {
     host    Host?              @relation(fields: [hostId], references: [id], onDelete: Cascade)
     jobs    RunnerJob[]
     targets RunnerPoolTarget[]
+    secrets RunnerSecret[]
+    repos   RunnerRepoConfig[]
 
     @@index([ownerId])
     @@index([hostId])
+}
+
+// What one repository is allowed to make this pool's machine do.
+//
+// Deliberately NOT stored on RunnerPoolTarget, which is derived: a scope that
+// momentarily resolves smaller (GitHub answering 502, an installation being
+// repaired) deletes target rows and would take the operator's decisions with
+// them. Losing "this public repository was reviewed and allowed" to a transient
+// API failure, and silently restoring the permissive-looking default when the
+// row comes back, is the one data loss here that has a security consequence.
+//
+// A missing row means the defaults in @polaris/core/runner-policy, which are the
+// cautious ones: no public repository served, nothing from a fork.
+model RunnerRepoConfig {
+    id          String   @id @default(uuid(7)) @db.Uuid
+    poolId      String   @db.Uuid
+    // "owner/repo", matching RunnerPoolTarget.key. An organization-level pool
+    // registers one runner for every repository at once, so its key is the owner
+    // and its policy necessarily covers all of them.
+    key         String
+    // Which events may run here, as a stringified JSON array of the names in
+    // RUNNER_EVENTS. Re-read through parseRunnerEvents, which drops anything this
+    // version does not know rather than trusting a row a newer Polaris wrote.
+    events      String
+    // Whether a pull request whose code lives in a fork may run at all.
+    allowForks  Boolean  @default(false)
+    // Whether this repository being public was reviewed and accepted.
+    allowPublic Boolean  @default(false)
+    // Whether the secrets set for this repository are put within its jobs' reach.
+    secrets     Boolean  @default(true)
+    createdAt   DateTime @default(now())
+    updatedAt   DateTime @updatedAt
+
+    pool RunnerPool @relation(fields: [poolId], references: [id], onDelete: Cascade)
+
+    @@unique([poolId, key])
+    @@index([poolId])
+}
+
+// A value a workflow reads out of its environment, held by Polaris rather than
+// by GitHub.
+//
+// GitHub's own secrets are handed to a job by GitHub. These are the other half:
+// what the operator wants their own machines to carry - a registry login, an
+// internal endpoint, a signing key that should never be uploaded to GitHub at
+// all. They are put in the runner's environment when it starts, which is why the
+// scope below is exactly the registration: a runner is registered against one
+// repository, so a secret scoped to that repository reaches its jobs and no
+// others.
+//
+// The value is envelope-encrypted at rest with the master key, the same way a
+// deploy secret and a stored credential are, and is never returned to the client
+// once written.
+model RunnerSecret {
+    id             String   @id @default(uuid(7)) @db.Uuid
+    poolId         String   @db.Uuid
+    // The environment variable name a workflow step reads.
+    key            String
+    // "" for every repository the pool serves, else the "owner/repo" it is for.
+    // An empty string rather than null so the unique index below actually holds:
+    // in SQL, two nulls are not equal, and a pool could end up with two of the
+    // same pool-wide secret.
+    scopeKey       String   @default("")
+    encryptedValue Bytes
+    valueNonce     Bytes
+    valueKeyId     String
+    createdAt      DateTime @default(now())
+    updatedAt      DateTime @updatedAt
+
+    pool RunnerPool @relation(fields: [poolId], references: [id], onDelete: Cascade)
+
+    @@unique([poolId, scopeKey, key])
+    @@index([poolId])
 }
 
 // One place a pool registers runners: a repository, or an organization as a whole.
@@ -1106,8 +1181,20 @@ model RunnerPoolTarget {
     // When this pool last started a runner here. Oldest first is what stops one
     // repository from holding every slot on a shared machine.
     lastServedAt DateTime?
-    // Why this target is not being served right now (a spent budget), or null.
+    // Why this target is not being served right now (a spent budget, or a policy
+    // that will not have it), or null.
     blocked      String?
+    // public | private, as GitHub last reported it, or null when it has not been
+    // asked yet. Derived and re-read on an interval, because a repository can be
+    // made public long after a pool was pointed at it and that changes who is
+    // able to run something on the machine.
+    visibility   String?
+    // GitHub's own fork pull request approval policy for this repository, as last
+    // read. Polaris does not enforce it - GitHub does - but it decides whether the
+    // repository page has anything to warn about.
+    forkApproval String?
+    // When visibility and forkApproval were last read.
+    checkedAt    DateTime?
     createdAt    DateTime @default(now())
     updatedAt    DateTime @updatedAt
 
@@ -1169,6 +1256,25 @@ model RunnerJob {
     // of the detached process. Advisory - liveness is probed, never assumed.
     handle         String?
     error          String?
+    // What the job turned out to be, recorded on the machine by the guard hook and
+    // read back when the runner is reaped. It cannot be asked for afterwards: an
+    // ephemeral runner de-registers itself the moment its job ends, and GitHub
+    // stops being able to say which job it took. Null on a runner that was stood
+    // down before anything was ever assigned to it.
+    workflow       String?
+    jobName        String?
+    // GitHub's id for the workflow run, so a row can link to it. Text rather than
+    // a number: it is transcribed by a shell script and only ever used as a path
+    // segment after being checked against /^\d+$/.
+    runId          String?
+    event          String?
+    actor          String?
+    ref            String?
+    sha            String?
+    // Why the guard refused to let the job run, or null when it ran. A refusal is
+    // a run worth showing: somebody's pull request did not build and this is the
+    // only place that says why.
+    refusedReason  String?
     startedAt      DateTime  @default(now())
     finishedAt     DateTime?
 
