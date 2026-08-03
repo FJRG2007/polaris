@@ -361,9 +361,18 @@ main() {
         # shellcheck disable=SC2086 # deliberate word splitting: a service list
         $compose pull $others || err "some supporting images could not be pulled; continuing with what is here"
 
+        # On a source build the checkout IS the update, so the sidecars have to be
+        # rebuilt from it as well. Without this, compose keeps whatever image it built
+        # once and the sidecars silently fall behind the dashboard - which is how an
+        # edge guard older than the routes the dashboard writes for it ends up serving
+        # 502s for a healthy app. Published deployments need none of this: the pull
+        # above already advanced them.
+        build_flag=""
+        [ "$source" = "build" ] && build_flag="--build"
+
         log "updating the supporting services"
         # shellcheck disable=SC2086 # deliberate word splitting: a service list
-        $compose up -d --no-deps $others || err "some supporting services did not come up; the dashboard is updated below"
+        $compose up -d --no-deps $build_flag $others || err "some supporting services did not come up; the dashboard is updated below"
     else
         err "could not list the stack's services; only the dashboard is being updated"
     fi

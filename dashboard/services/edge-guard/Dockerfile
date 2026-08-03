@@ -35,5 +35,8 @@ ENV NODE_ENV=production
 # The bundle is self-contained; nothing else from the workspace is needed.
 COPY --from=builder /build/services/edge-guard/dist/index.js ./index.js
 USER node
-EXPOSE 8080
+# 8080 answers Traefik's forwardAuth question; 8081 IS the upstream for a route whose
+# response gets rewritten. Both are declared so `docker ps` shows what the container
+# actually serves - a guard listed as 8080-only reads as one that has no proxy.
+EXPOSE 8080 8081
 CMD ["node", "index.js"]

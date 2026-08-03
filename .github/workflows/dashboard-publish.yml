@@ -8,7 +8,7 @@ name: Publish dashboard image
 # Each image is its own job, gated on whether its sources actually changed, so a
 # web-only push does not rebuild the multi-arch Rust host daemon (the slowest
 # step by far). Jobs also run in parallel, so wall-clock is the slowest single
-# image, not the sum of all four.
+# image, not the sum of them all.
 #
 # An image is also gated on its suite passing. `latest` is what every deployment
 # pulls, and the update card offers whatever commit that tag was built from - so
@@ -28,6 +28,7 @@ on:
       - "dashboard/docker/**"
       - "dashboard/mdns/**"
       - "dashboard/services/messaging-bridge/**"
+      - "dashboard/services/edge-guard/**"
       - "dashboard/package.json"
       - "dashboard/package-lock.json"
       - "crates/polaris-hostd/**"
@@ -51,6 +52,7 @@ jobs:
       hostd: ${{ steps.filter.outputs.hostd }}
       updater: ${{ steps.filter.outputs.updater }}
       bridge: ${{ steps.filter.outputs.bridge }}
+      guard: ${{ steps.filter.outputs.guard }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -63,7 +65,7 @@ jobs:
         run: |
           set -euo pipefail
           out() { echo "$1=$2" >> "$GITHUB_OUTPUT"; }
-          all() { out web true; out mdns true; out hostd true; out updater true; out bridge true; }
+          all() { out web true; out mdns true; out hostd true; out updater true; out bridge true; out guard true; }
           if [ "$EVENT" = "workflow_dispatch" ] || [ -z "${BEFORE:-}" ] \
              || [ "$BEFORE" = "0000000000000000000000000000000000000000" ] \
              || ! git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
@@ -78,13 +80,15 @@ jobs:
           has '^crates/polaris-hostd/|^Cargo\.(toml|lock)$' && out hostd true || out hostd false
           has '^dashboard/docker/updater/' && out updater true || out updater false
           has '^dashboard/services/messaging-bridge/|^dashboard/packages/messaging/|^dashboard/package(-lock)?\.json$' && out bridge true || out bridge false
+          # The guard bundles @polaris/core, so a change there is a change to the guard.
+          has '^dashboard/services/edge-guard/|^dashboard/packages/core/|^dashboard/package(-lock)?\.json$' && out guard true || out guard false
 
   # The gates. Skipped when nothing they cover is being rebuilt, which also skips
   # the image jobs that need them - they would have been skipped by their own
   # filter anyway.
   dashboard-ci:
     needs: changes
-    if: ${{ needs.changes.outputs.web == 'true' || needs.changes.outputs.bridge == 'true' || github.event_name == 'workflow_dispatch' }}
+    if: ${{ needs.changes.outputs.web == 'true' || needs.changes.outputs.bridge == 'true' || needs.changes.outputs.guard == 'true' || github.event_name == 'workflow_dispatch' }}
     uses: ./.github/workflows/dashboard-ci.yml
 
   rust-ci:
@@ -252,3 +256,28 @@ jobs:
           tags: ghcr.io/fjrg2007/polaris-messaging-bridge:latest
           cache-from: type=gha,scope=bridge
           cache-to: type=gha,mode=max,scope=bridge
+
+  # WAF sidecar that sits at each server's edge. Published for the same reason the
+  # bridge is: it was build-only, so an update pulled a newer dashboard and left the
+  # guard at whatever was built on install day. The two have to move together - the
+  # dashboard writes edge routes that name the guard's listeners.
+  guard:
+    needs: [changes, dashboard-ci]
+    if: ${{ needs.changes.outputs.guard == 'true' || github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: dashboard
+          file: dashboard/services/edge-guard/Dockerfile
+          push: true
+          tags: ghcr.io/fjrg2007/polaris-edge-guard:latest
+          cache-from: type=gha,scope=guard
+          cache-to: type=gha,mode=max,scope=guard

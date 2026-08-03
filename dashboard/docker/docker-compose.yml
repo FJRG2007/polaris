@@ -300,6 +300,12 @@ services:
   # from-source path. It is built once on first `up`; a later release that changes it
   # will ship a published image so updates pull it (see the WAF follow-up notes).
   edge-guard:
+    # Published like every other sidecar, and pinned to the same tag as the dashboard.
+    # It was build-only, which meant `update.sh` never replaced it: compose reuses an
+    # image it already built, so the guard stayed frozen at install time while the
+    # dashboard advanced past it - and a route the newer dashboard pointed at the
+    # guard's proxy port reached a container that had no such listener (502).
+    image: ghcr.io/fjrg2007/polaris-edge-guard:${POLARIS_IMAGE_TAG:-latest}
     build:
       context: ..
       dockerfile: services/edge-guard/Dockerfile

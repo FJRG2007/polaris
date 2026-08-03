@@ -90,22 +90,74 @@ function guardProxyUrl(): string {
     return process.env.POLARIS_EDGE_PROXY_URL ?? "http://polaris-edge-guard:8081";
 }
 
+/** How long a reachability answer is reused for. A sync runs on every deploy, domain
+ *  change and firewall edit, and the answer only changes when the sidecar restarts. */
+const PROXY_PROBE_TTL_MS = 30_000;
+const PROXY_PROBE_TIMEOUT_MS = 2000;
+
+let proxyProbe: { at: number; reachable: boolean } | null = null;
+
+/**
+ * Whether the guard's proxy listener is actually answering.
+ *
+ * Asked before a route is pointed at it, because the guard is a separate container on
+ * its own release cadence: one older than the control plane has the forwardAuth server
+ * and not the proxy, and writing an upstream nothing listens on turns every obfuscated
+ * route into a 502 with a healthy app behind it. The alternative - assume it is there -
+ * is what took `orphion.plr.fjrg2007.com` down while its container served fine on the
+ * host port.
+ *
+ * `/health` is the proxy's own endpoint and needs no signed origin, so a 200 means the
+ * listener is up AND is this proxy rather than something else that grabbed the port.
+ */
+export async function guardProxyReachable(now: number = Date.now()): Promise<boolean> {
+    if (proxyProbe && now - proxyProbe.at < PROXY_PROBE_TTL_MS) return proxyProbe.reachable;
+    let reachable = false;
+    try {
+        const response = await fetch(`${guardProxyUrl()}/health`, {
+            signal: AbortSignal.timeout(PROXY_PROBE_TIMEOUT_MS)
+        });
+        reachable = response.ok;
+    } catch {
+        reachable = false;
+    }
+    proxyProbe = { at: now, reachable };
+    return reachable;
+}
+
+/** Options a render needs that it cannot work out on its own (they take IO). */
+export interface RenderOptions {
+    /** Whether the guard's proxy listener is answering. False routes every obfuscated
+     *  route direct instead, unobfuscated but serving. */
+    readonly proxyAvailable?: boolean;
+}
+
 /**
  * Whether this route's response is served through the guard rather than straight from
  * the app.
  *
  * Only email obfuscation needs it, and only when there is a secret to sign the upstream
- * with. No secret means the proxy could not verify where to forward even if we pointed
- * at it, so the route goes direct and simply does not get obfuscated - losing a
- * cosmetic rewrite is the right failure here, taking the route down is not.
+ * with and a proxy listening to receive it. Either missing means the guard could not
+ * serve the request even if we pointed at it, so the route goes direct and simply does
+ * not get obfuscated - losing a cosmetic rewrite is the right failure here, taking the
+ * route down is not.
  */
-function proxied(route: AppRoute): boolean {
-    return route.emailObfuscation === true && (process.env.POLARIS_AUTH_SECRET ?? "") !== "";
+function proxied(route: AppRoute, options: RenderOptions): boolean {
+    return (
+        route.emailObfuscation === true &&
+        (process.env.POLARIS_AUTH_SECRET ?? "") !== "" &&
+        options.proxyAvailable !== false
+    );
 }
 
 /** The middleware names to attach to a route's primary (app-serving) router, adding
  *  any middleware definitions they introduce to `defs`. */
-function routeMiddlewares(route: AppRoute, name: string, defs: Map<string, string>): string[] {
+function routeMiddlewares(
+    route: AppRoute,
+    name: string,
+    defs: Map<string, string>,
+    options: RenderOptions
+): string[] {
     const names: string[] = [];
     (route.allowLists ?? []).forEach((allow, index) => {
         if (allow.length === 0) return;
@@ -117,7 +169,7 @@ function routeMiddlewares(route: AppRoute, name: string, defs: Map<string, strin
     // The rule header is stamped whenever the guard will read it - either because
     // forwardAuth is about to ask it a question, or because the guard IS the upstream
     // and needs to know what to do to the response.
-    const isProxied = proxied(route);
+    const isProxied = proxied(route, options);
     if (needsGuard(route) || isProxied) {
         const ctx = `${name}-waf-ctx`;
         const rule = encodeGuardRule({
@@ -165,7 +217,7 @@ function routeMiddlewares(route: AppRoute, name: string, defs: Map<string, strin
 
 /** Render Traefik dynamic config for a set of app routes. Shared by every Router
  *  implementation so local and remote edges serve byte-identical config. */
-export function renderDynamicConfig(routes: readonly AppRoute[]): string {
+export function renderDynamicConfig(routes: readonly AppRoute[], options: RenderOptions = {}): string {
     const routers: string[] = [];
     const services: string[] = [];
     const defs = new Map<string, string>([
@@ -174,7 +226,7 @@ export function renderDynamicConfig(routes: readonly AppRoute[]): string {
     for (const route of routes) {
         const name = `polaris-app-${route.id}`;
         const dial = `${route.dialHost}:${route.dialPort}`;
-        const appMw = routeMiddlewares(route, name, defs);
+        const appMw = routeMiddlewares(route, name, defs, options);
         const appMwLine = appMw.length > 0 ? `\n      middlewares: [${appMw.join(", ")}]` : "";
         if (route.certResolver === "none") {
             routers.push(
@@ -198,7 +250,7 @@ export function renderDynamicConfig(routes: readonly AppRoute[]): string {
         // A proxied route dials the guard instead of the app; the app's own address
         // travels in the signed header above, so the guard is the only thing that
         // learns it.
-        const upstream = proxied(route) ? guardProxyUrl() : `http://${dial}`;
+        const upstream = proxied(route, options) ? guardProxyUrl() : `http://${dial}`;
         services.push(`    ${name}:\n      loadBalancer:\n        servers:\n          - url: "${upstream}"`);
     }
     if (routers.length === 0) return "http: {}\n";
@@ -212,6 +264,15 @@ export class LocalRouter implements Router {
         `${process.env.POLARIS_TRAEFIK_DYNAMIC_DIR ?? "/dynamic"}/polaris-apps.yml`;
 
     public async sync(routes: readonly AppRoute[]): Promise<void> {
-        await writeFile(this.file, renderDynamicConfig(routes), "utf8");
+        // Only worth asking when something would actually be pointed at the proxy.
+        const wantsProxy = routes.some((route) => route.emailObfuscation === true);
+        const proxyAvailable = wantsProxy ? await guardProxyReachable() : true;
+        if (wantsProxy && !proxyAvailable) {
+            const affected = routes.filter((route) => route.emailObfuscation === true).length;
+            console.warn(
+                `polaris: the edge guard's proxy is not answering on ${guardProxyUrl()}; routing ${affected} domain(s) direct, without email obfuscation. Update the polaris-edge-guard container to restore it.`
+            );
+        }
+        await writeFile(this.file, renderDynamicConfig(routes, { proxyAvailable }), "utf8");
     }
 }
