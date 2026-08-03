@@ -78,7 +78,8 @@ export function ListScreen({
     const [showClosed, setShowClosed] = useState(initial?.showClosed ?? false);
     const [search, setSearch] = useState("");
     const [openTaskId, setOpenTaskId] = useState<string | null>(initialTaskId);
-    const [creating, setCreating] = useState(false);
+    // The create dialog, and what was already known when it was asked for.
+    const [creating, setCreating] = useState<{ name: string; dueDate: string | null } | null>(null);
     const [deleting, setDeleting] = useState<TaskRow | null>(null);
     const [selection, setSelection] = useState<ReadonlySet<string>>(new Set());
     const [error, setError] = useState("");
@@ -234,17 +235,23 @@ export function ListScreen({
     };
 
     const quickCreate = async (groupKey: string, name: string) => {
-        const target = listId ?? defaultListId;
-        if (!target) {
-            setError("Pick a list to add this to.");
-            return;
-        }
         // The key says what it is rather than being read off the current view: a
         // calendar hands back "date:<iso>", every other view hands back the group
         // it was added to. Guessing from the view type puts a status id in the
         // due date the moment somebody uses the header button on a calendar.
         const dueDate = groupKey.startsWith("date:") ? groupKey.slice(5) : null;
         const statusId = !dueDate && groupBy === "status" && groupKey ? groupKey : null;
+
+        const target = listId ?? defaultListId;
+        if (!target) {
+            // A screen spanning several lists has nowhere to put a typed-in name,
+            // and the column it was typed into is a status belonging to whichever
+            // space defined it first. So the dialog opens carrying what is known -
+            // the name, and the day if that is what was clicked - and asks for the
+            // list, rather than refusing what was just typed.
+            setCreating({ name, dueDate });
+            return;
+        }
 
         const result = await runAction(
             () => actions.createTaskAction({ listId: target, name, statusId, dueDate }),
@@ -253,6 +260,11 @@ export function ListScreen({
         if (result?.error) setError(result.error);
         refresh();
     };
+
+    // What "New task" opens on. A screen with no list of its own still has to be
+    // able to make one - Everything is where a lot of people live - so it falls
+    // back to the first list in reach and the dialog asks which one it goes in.
+    const createTarget = listId ?? defaultListId ?? lists[0]?.id ?? null;
 
     const toggleSelect = (taskId: string) => {
         const next = new Set(selection);
@@ -318,8 +330,8 @@ export function ListScreen({
                     {subtitle && <p className="truncate text-sm text-muted-foreground">{subtitle}</p>}
                 </div>
                 <span className="flex-1" />
-                {context.canEdit && (listId ?? defaultListId) && (
-                    <Button size="sm" onClick={() => setCreating(true)}>
+                {context.canEdit && createTarget && (
+                    <Button size="sm" onClick={() => setCreating({ name: "", dueDate: null })}>
                         <Plus className="size-4" /> New task
                     </Button>
                 )}
@@ -490,16 +502,23 @@ export function ListScreen({
                 Ctrl-click (or Cmd-click) a task to select it without opening it.
             </p>
 
-            {(listId ?? defaultListId) && (
+            {createTarget && (
                 <TaskCreateDialog
-                    open={creating}
+                    open={creating !== null}
                     spaceId={context.spaceId}
                     statuses={context.statuses}
                     tags={context.tags}
                     people={context.people}
-                    lists={lists.length > 0 ? lists : [{ id: (listId ?? defaultListId) as string, name: title }]}
-                    defaultListId={(listId ?? defaultListId) as string}
-                    onClose={() => setCreating(false)}
+                    lists={lists.length > 0 ? lists : [{ id: createTarget, name: title }]}
+                    defaultListId={createTarget}
+                    defaultName={creating?.name ?? ""}
+                    defaultDueDate={creating?.dueDate ?? null}
+                    // The statuses on a screen that spans spaces are every
+                    // space's, so starting on one of them would be starting on
+                    // another space's word. Left unset, the list it goes into
+                    // decides.
+                    defaultStatusId={(listId ?? defaultListId) ? undefined : null}
+                    onClose={() => setCreating(null)}
                     onCreated={(id) => {
                         refresh();
                         // Straight into the new task: whoever just described it

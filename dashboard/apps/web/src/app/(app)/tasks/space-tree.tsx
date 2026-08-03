@@ -25,8 +25,8 @@ import * as actions from "./actions";
 import * as core from "@polaris/core";
 import { runAction } from "@/lib/run-action";
 import { usePathname } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
 import { FolderAccessDialog } from "./folder-access-dialog";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { FolderSummary, ListSummary, SpaceTreeView } from "@/lib/tasks/space-service";
 import { createOptionsFor, TreeCreate, type CreateAt, type CreateKind } from "./tree-create";
 import {
@@ -450,6 +450,11 @@ export function SpaceTree({ spaces, canCreate }: { spaces: readonly SpaceTreeVie
         if (result?.error) setError(result.error);
     };
 
+    // Stable, because it is a dependency of the fetch that opens a create dialog:
+    // a fresh arrow every render sends that effect round again on every keystroke
+    // anywhere in the tree.
+    const closeCreate = useCallback(() => setCreate(null), []);
+
     /**
      * What "create a <kind> here" means.
      *
@@ -555,12 +560,7 @@ export function SpaceTree({ spaces, canCreate }: { spaces: readonly SpaceTreeVie
                 />
             ))}
 
-            <TreeCreate
-                request={create}
-                onClose={() => setCreate(null)}
-                onDone={() => setCreate(null)}
-                onError={setError}
-            />
+            <TreeCreate request={create} onClose={closeCreate} onDone={closeCreate} onError={setError} />
 
             <FolderAccessDialog
                 folderId={accessFolderId}

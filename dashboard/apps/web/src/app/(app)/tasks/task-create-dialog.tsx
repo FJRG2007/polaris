@@ -58,9 +58,9 @@ interface Fields {
     points: number | null;
 }
 
-function blank(listId: string, statusId: string | null): Fields {
+function blank(listId: string, statusId: string | null, known: { name: string; dueDate: string | null }): Fields {
     return {
-        name: "",
+        name: known.name,
         description: "",
         listId,
         statusId,
@@ -68,7 +68,7 @@ function blank(listId: string, statusId: string | null): Fields {
         assigneeIds: [],
         tagIds: [],
         startDate: null,
-        dueDate: null,
+        dueDate: known.dueDate,
         timed: false,
         timeEstimate: null,
         points: null
@@ -95,6 +95,8 @@ export function TaskCreateDialog({
     lists,
     defaultListId,
     defaultStatusId,
+    defaultName = "",
+    defaultDueDate = null,
     onClose,
     onCreated
 }: {
@@ -106,13 +108,21 @@ export function TaskCreateDialog({
     people: readonly PersonRef[];
     lists: readonly { id: string; name: string }[];
     defaultListId: string;
-    /** Pre-selected when the dialog was opened from a particular board column. */
+    /** Pre-selected when the dialog was opened from a particular board column.
+     *  Null leaves it unset on purpose, which is what a screen spanning several
+     *  spaces has to do: the list decides, once it is chosen. */
     defaultStatusId?: string | null;
+    /** What was already typed or clicked elsewhere, so opening this does not
+     *  lose it - a name typed into a column, the day picked on a calendar. */
+    defaultName?: string;
+    defaultDueDate?: string | null;
     onClose: () => void;
     onCreated: (taskId: string) => void;
 }) {
-    const firstStatus = defaultStatusId ?? statuses[0]?.id ?? null;
-    const [fields, setFields] = useState<Fields>(() => blank(defaultListId, firstStatus));
+    const firstStatus = defaultStatusId === undefined ? (statuses[0]?.id ?? null) : defaultStatusId;
+    const [fields, setFields] = useState<Fields>(() =>
+        blank(defaultListId, firstStatus, { name: defaultName, dueDate: defaultDueDate })
+    );
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState("");
 
@@ -120,10 +130,10 @@ export function TaskCreateDialog({
     // creates the same task twice.
     useEffect(() => {
         if (open) {
-            setFields(blank(defaultListId, firstStatus));
+            setFields(blank(defaultListId, firstStatus, { name: defaultName, dueDate: defaultDueDate }));
             setError("");
         }
-    }, [open, defaultListId, firstStatus]);
+    }, [open, defaultListId, firstStatus, defaultName, defaultDueDate]);
 
     const set = <Key extends keyof Fields>(key: Key, value: Fields[Key]) =>
         setFields((current) => ({ ...current, [key]: value }));
@@ -296,14 +306,20 @@ export function TaskCreateDialog({
                                 onChange={(tagIds) => set("tagIds", tagIds)}
                                 // A tag that does not exist yet is created here
                                 // rather than sending somebody to the settings
-                                // and back with the form half filled in.
-                                onCreate={async (name) => {
-                                    const created = await runAction(
-                                        () => actions.createTagAction(spaceId, name, tagColorFor(name)),
-                                        setError
-                                    );
-                                    return created?.id ?? null;
-                                }}
+                                // and back with the form half filled in. A tag
+                                // belongs to a space, so a screen that spans them
+                                // all offers finding rather than creating.
+                                onCreate={
+                                    spaceId
+                                        ? async (name) => {
+                                              const created = await runAction(
+                                                  () => actions.createTagAction(spaceId, name, tagColorFor(name)),
+                                                  setError
+                                              );
+                                              return created?.id ?? null;
+                                          }
+                                        : undefined
+                                }
                             />
                         </div>
                     </Field>
