@@ -219,7 +219,7 @@ export function BoardView(props: ViewProps) {
     // A column can only be added when the board's columns ARE the space's
     // statuses. Grouped by assignee or by tag, "add a column" would mean
     // inventing a person or a label, which is not what the button says.
-    const canAddColumn = props.onCreateGroup !== undefined && (props.groupBy ?? "status") === "status";
+    const canAddColumn = props.onCreateStatus !== undefined && (props.groupBy ?? "status") === "status";
 
     const drop = (groupKey: string, tasks: readonly TaskRow[], targetId: string | null) => {
         if (!dragging) return;
@@ -347,9 +347,9 @@ export function BoardView(props: ViewProps) {
                                 type="button"
                                 disabled={!newColumn.name.trim() || savingColumn}
                                 onClick={async () => {
-                                    if (!props.onCreateGroup) return;
+                                    if (!props.onCreateStatus) return;
                                     setSavingColumn(true);
-                                    await props.onCreateGroup(newColumn.name.trim(), newColumn.type, newColumn.color);
+                                    await props.onCreateStatus(newColumn.name.trim(), newColumn.type, newColumn.color);
                                     setSavingColumn(false);
                                     setNewColumn(null);
                                 }}

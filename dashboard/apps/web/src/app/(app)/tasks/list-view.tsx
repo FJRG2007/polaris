@@ -94,10 +94,10 @@ export function ListScreen({
             router.refresh();
         });
 
-    const statusOrder = useMemo(
-        () => new Map(context.statuses.map((status, index) => [status.id, index])),
-        [context.statuses]
-    );
+    // By column, not by row: on a screen spanning several spaces the same status
+    // exists once per space, and sorting by its own position would interleave
+    // "Done" from one space with "In progress" from another.
+    const statusOrder = useMemo(() => core.statusColumnOrder(context.statuses), [context.statuses]);
 
     // The engine reasons in facts (real Dates); the screen renders rows (ISO
     // strings). Rather than convert back and forth, the facts are derived once
@@ -291,20 +291,23 @@ export function ListScreen({
               }
             : undefined,
         groupBy,
-        // A new board column is a new status for the whole space, so it is
-        // offered only to whoever may change the space's statuses. The action
-        // enforces the same thing; this is what keeps the button from appearing
-        // for somebody who would only be refused.
-        onCreateGroup: context.canModerate
-            ? async (name, type, color) => {
-                  const result = await runAction(
-                      () => actions.createStatusAction(context.spaceId, { name, type, color }),
-                      setError
-                  );
-                  if (result?.error) setError(result.error);
-                  refresh();
-              }
-            : undefined
+        // A new status belongs to a space, so a screen that spans them all has
+        // nowhere to put one - the same reason a tag cannot be created there.
+        // The rest is offered only to whoever may change a space's statuses; the
+        // action enforces that too, this is what keeps the affordance from
+        // appearing for somebody who would only be refused.
+        onCreateStatus:
+            context.canModerate && context.spaceId
+                ? async (name, type, color) => {
+                      const created = await runAction(
+                          () => actions.createStatusAction(context.spaceId, { name, type, color }),
+                          setError
+                      );
+                      if (created?.error) setError(created.error);
+                      refresh();
+                      return created?.id ?? null;
+                  }
+                : undefined
     };
 
     return (

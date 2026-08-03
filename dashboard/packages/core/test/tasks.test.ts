@@ -287,6 +287,59 @@ describe("grouping", () => {
         const groups = engine.groupTasks([orphan], "status", { statuses }, NOW);
         expect(groups.flatMap((group) => group.tasks)).toContain(orphan);
     });
+
+    // Everything and a cross-space sprint hand over one status row per space. Drawn
+    // literally that is the same board repeated once per space, which is what this
+    // stops: a column is what the status is called, not which space defined it.
+    describe("across several spaces", () => {
+        const shared = [
+            { id: "a-todo", name: "To do", color: "#64748b" },
+            { id: "a-doing", name: "In progress", color: "#3b82f6" },
+            { id: "b-todo", name: "To Do", color: "#94a3b8" },
+            { id: "b-doing", name: " in progress ", color: "#60a5fa" },
+            { id: "b-blocked", name: "Blocked", color: "#ef4444" }
+        ];
+
+        it("draws one column per status name, keeping what only one space has", () => {
+            expect(engine.statusColumns(shared).map((column) => column.name)).toEqual([
+                "To do",
+                "In progress",
+                "Blocked"
+            ]);
+        });
+
+        it("puts every space's row for a name into that one column", () => {
+            const groups = engine.groupTasks(
+                [task({ id: "one", statusId: "a-todo" }), task({ id: "two", statusId: "b-todo" })],
+                "status",
+                { statuses: shared },
+                NOW
+            );
+            expect(groups[0]?.label).toBe("To do");
+            expect(groups[0]?.tasks.map((entry) => entry.id)).toEqual(["one", "two"]);
+        });
+
+        it("keeps the order the tasks arrived in inside a merged column", () => {
+            const groups = engine.groupTasks(
+                [
+                    task({ id: "first", statusId: "b-todo" }),
+                    task({ id: "second", statusId: "a-todo" }),
+                    task({ id: "third", statusId: "b-todo" })
+                ],
+                "status",
+                { statuses: shared },
+                NOW
+            );
+            expect(groups[0]?.tasks.map((entry) => entry.id)).toEqual(["first", "second", "third"]);
+        });
+
+        it("sorts every row for a name to the same place", () => {
+            const order = engine.statusColumnOrder(shared);
+            expect(order.get("a-todo")).toBe(order.get("b-todo"));
+            expect(order.get("a-doing")).toBe(order.get("b-doing"));
+            expect(order.get("b-blocked")).toBe(2);
+        });
+    });
 });
 
 describe("rollups", () => {

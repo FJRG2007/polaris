@@ -402,15 +402,15 @@ export async function deleteListAction(listId: string): Promise<{ error?: string
 export async function createStatusAction(
     spaceId: string,
     input: { name: string; type: core.TaskStatusType; color: string }
-): Promise<{ error?: string }> {
+): Promise<{ id?: string; error?: string }> {
     const caller = await actor();
     const parsed = core.statusSchema.safeParse({ spaceId, ...input });
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the status and try again" };
     try {
         await access.requireSpace(caller, spaceId, "admin");
-        await spaces.createStatus(spaceId, parsed.data.name, parsed.data.type, parsed.data.color);
+        const id = await spaces.createStatus(spaceId, parsed.data.name, parsed.data.type, parsed.data.color);
         refresh();
-        return {};
+        return { id };
     } catch (caught) {
         return failure(caught, "Could not add the status");
     }

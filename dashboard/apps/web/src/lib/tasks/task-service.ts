@@ -479,6 +479,37 @@ async function defaultStatusId(spaceId: string): Promise<string | null> {
     return status?.id ?? null;
 }
 
+/**
+ * The status row a task in this space may actually hold.
+ *
+ * A status belongs to one space, but a board that spans several shows one column
+ * per status *name* - three spaces that all call it "Done" share the one Done
+ * column (see `statusColumns`). So what arrives from such a screen is whichever
+ * space's row happened to key the column, and moving a task there means "put it
+ * on what this task's own space calls that". Anything else would either refuse
+ * an ordinary drag or file the task under another space's status.
+ *
+ * Throws when the space has nothing by that name: silently leaving the status
+ * unchanged after a drop looks exactly like the board rejecting the drag.
+ */
+async function statusInSpace(spaceId: string, statusId: string): Promise<{ id: string; type: string }> {
+    const given = await prisma.taskStatus.findUnique({
+        where: { id: statusId },
+        select: { id: true, name: true, type: true, spaceId: true }
+    });
+    if (!given) throw new Error("That status no longer exists");
+    if (given.spaceId === spaceId) return { id: given.id, type: given.type };
+
+    // Matched in memory rather than in the query: a space holds a handful of
+    // statuses, and Prisma's case-insensitive filter is Postgres-only while this
+    // schema has to keep working on SQLite.
+    const owned = await prisma.taskStatus.findMany({ where: { spaceId }, select: { id: true, name: true, type: true } });
+    const needle = given.name.trim().toLowerCase();
+    const sameName = owned.find((status) => status.name.trim().toLowerCase() === needle);
+    if (!sameName) throw new Error(`This task's space has no status called "${given.name}"`);
+    return { id: sameName.id, type: sameName.type };
+}
+
 async function nextOrderInList(listId: string): Promise<number> {
     const last = await prisma.task.findFirst({
         where: { listId },
@@ -497,7 +528,9 @@ export async function createTask(
     spaceId: string,
     input: core.TaskCreateInput
 ): Promise<{ id: string; reference: string }> {
-    const statusId = input.statusId ?? (await defaultStatusId(spaceId));
+    const statusId = input.statusId
+        ? (await statusInSpace(spaceId, input.statusId)).id
+        : await defaultStatusId(spaceId);
     const order = await nextOrderInList(input.listId);
 
     const created = await prisma.$transaction(async (tx) => {
@@ -604,14 +637,14 @@ export async function updateTask(actorId: string, input: core.TaskUpdateInput): 
     }
 
     let finished = false;
+    // What the space itself calls the status asked for, which on a screen that
+    // spans several spaces is not the row that was handed over.
+    let movedTo: string | null = null;
     if (input.statusId !== undefined && input.statusId !== before.statusId) {
-        const status = await prisma.taskStatus.findUnique({
-            where: { id: input.statusId },
-            select: { name: true, type: true, spaceId: true }
-        });
-        if (!status || status.spaceId !== before.spaceId) throw new Error("That status is not in this space");
+        const status = await statusInSpace(before.spaceId, input.statusId);
         finished = core.isFinishedStatus(status.type as core.TaskStatusType);
-        data.statusId = input.statusId;
+        movedTo = status.id;
+        data.statusId = status.id;
         data.completedAt = finished ? (before.completedAt ?? new Date()) : null;
     }
 
@@ -629,14 +662,8 @@ export async function updateTask(actorId: string, input: core.TaskUpdateInput): 
 
     // History, then rules: a rule that changes the task should read a task that
     // already reflects what the person did.
-    if (input.statusId !== undefined && input.statusId !== before.statusId) {
-        await logActivity(
-            input.taskId,
-            actorId,
-            "status",
-            await statusName(before.statusId),
-            await statusName(input.statusId)
-        );
+    if (movedTo !== null && movedTo !== before.statusId) {
+        await logActivity(input.taskId, actorId, "status", await statusName(before.statusId), await statusName(movedTo));
     }
     if (input.priority !== undefined && input.priority !== before.priority) {
         await logActivity(
@@ -658,7 +685,7 @@ export async function updateTask(actorId: string, input: core.TaskUpdateInput): 
     }
     if (input.archived === true) await logActivity(input.taskId, actorId, "archived");
 
-    if (input.statusId !== undefined && input.statusId !== before.statusId) {
+    if (movedTo !== null && movedTo !== before.statusId) {
         await runAutomations({ trigger: "task.statusChanged", taskId: input.taskId, actorId });
         if (finished) {
             await runAutomations({ trigger: "task.completed", taskId: input.taskId, actorId });
@@ -780,12 +807,8 @@ export async function moveTask(actorId: string, input: core.TaskMoveInput): Prom
             data.statusId = null;
             data.completedAt = null;
         } else {
-            const status = await prisma.taskStatus.findUnique({
-                where: { id: input.statusId },
-                select: { type: true, spaceId: true }
-            });
-            if (!status || status.spaceId !== current.spaceId) throw new Error("That status is not in this space");
-            data.statusId = input.statusId;
+            const status = await statusInSpace(current.spaceId, input.statusId);
+            data.statusId = status.id;
             data.completedAt = core.isFinishedStatus(status.type as core.TaskStatusType) ? new Date() : null;
         }
     }
@@ -867,16 +890,34 @@ export async function bulkUpdate(
     }
     if (input.sprintId !== undefined) data.sprintId = input.sprintId;
     if (input.archived !== undefined) data.archived = input.archived;
+
+    // A status belongs to one space and a selection can span several, so the one
+    // that was picked is resolved space by space to whatever that space calls it.
+    // Resolved for every space before anything is written: a space with nothing
+    // by that name refuses the whole change rather than applying it to half the
+    // selection. Everything else in `data` is space-agnostic and goes to all.
+    const statusPerSpace = new Map<string, { id: string; completedAt: Date | null }>();
     if (input.statusId !== undefined) {
-        const status = await prisma.taskStatus.findUnique({
-            where: { id: input.statusId },
-            select: { type: true }
-        });
-        data.statusId = input.statusId;
-        data.completedAt =
-            status && core.isFinishedStatus(status.type as core.TaskStatusType) ? new Date() : null;
+        for (const spaceId of spacesTouched) {
+            const status = await statusInSpace(spaceId, input.statusId);
+            statusPerSpace.set(spaceId, {
+                id: status.id,
+                completedAt: core.isFinishedStatus(status.type as core.TaskStatusType) ? new Date() : null
+            });
+        }
     }
-    if (Object.keys(data).length > 0) await prisma.task.updateMany({ where: { id: { in: ids } }, data });
+
+    if (statusPerSpace.size > 0) {
+        for (const [spaceId, status] of statusPerSpace) {
+            const scoped = allowed.filter((task) => task.spaceId === spaceId).map((task) => task.id);
+            await prisma.task.updateMany({
+                where: { id: { in: scoped } },
+                data: { ...data, statusId: status.id, completedAt: status.completedAt }
+            });
+        }
+    } else if (Object.keys(data).length > 0) {
+        await prisma.task.updateMany({ where: { id: { in: ids } }, data });
+    }
 
     // createMany's skipDuplicates is Postgres-only and the schema has to stay
     // SQLite-portable, so whatever would collide is removed first. Same result,

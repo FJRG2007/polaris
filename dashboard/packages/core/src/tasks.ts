@@ -611,6 +611,63 @@ export interface GroupContext {
     readonly lists?: readonly { id: string; name: string }[];
 }
 
+/** One column of a board grouped by status, and every status row it stands for. */
+export interface StatusColumn {
+    /** The status the column is keyed by: the first one that carries this name. */
+    readonly id: string;
+    readonly name: string;
+    readonly color: string;
+    /** Every status id that lands in this column, the key included. */
+    readonly ids: string[];
+}
+
+/**
+ * The columns a board draws for a set of statuses.
+ *
+ * Statuses belong to a space, so a screen that spans several - Everything, a
+ * sprint drawing on two spaces - is handed one "In progress" per space. Drawn
+ * literally that is the same board repeated once per space, which is not a view
+ * of anything. Columns are therefore keyed by what the status is called: three
+ * spaces that all call it "Done" share one Done column, and a space that calls
+ * it something else keeps its own.
+ *
+ * Case and surrounding space do not make a new column - "In Progress" and "in
+ * progress" are the same column to everyone reading the board.
+ */
+export function statusColumns(
+    statuses: readonly { id: string; name: string; color: string }[]
+): StatusColumn[] {
+    const columns: StatusColumn[] = [];
+    const byName = new Map<string, StatusColumn>();
+    for (const status of statuses) {
+        const key = status.name.trim().toLowerCase();
+        const existing = byName.get(key);
+        if (existing) {
+            existing.ids.push(status.id);
+            continue;
+        }
+        const column: StatusColumn = { id: status.id, name: status.name, color: status.color, ids: [status.id] };
+        byName.set(key, column);
+        columns.push(column);
+    }
+    return columns;
+}
+
+/**
+ * Where each status sorts, by the column it belongs to rather than by its own
+ * position. Two spaces that both end in "Done" must not interleave their rows
+ * just because one of them defined it fourth and the other fifth.
+ */
+export function statusColumnOrder(
+    statuses: readonly { id: string; name: string; color: string }[]
+): Map<string, number> {
+    const order = new Map<string, number>();
+    statusColumns(statuses).forEach((column, index) => {
+        for (const id of column.ids) order.set(id, index);
+    });
+    return order;
+}
+
 /** The pile something unset lands in. Always last, always present when it has
  *  members, so a board never hides a task by having no column for it. */
 const UNSET_LABELS: Partial<Record<work.TaskGroupField, string>> = {
@@ -640,10 +697,17 @@ export function groupTasks<T extends TaskFacts>(
         else buckets.set(key, [task]);
     };
 
+    // Statuses are collapsed to columns before anything is bucketed rather than
+    // afterwards, so a column that several spaces feed keeps the one order the
+    // tasks arrived in instead of one space's tasks followed by the next's.
+    const columns = groupBy === "status" ? statusColumns(context.statuses ?? []) : [];
+    const columnOf = new Map<string, string>();
+    for (const column of columns) for (const id of column.ids) columnOf.set(id, column.id);
+
     for (const task of tasks) {
         switch (groupBy) {
             case "status":
-                push(task.statusId ?? "", task);
+                push(task.statusId ? (columnOf.get(task.statusId) ?? task.statusId) : "", task);
                 break;
             case "priority":
                 push(task.priority, task);
@@ -676,8 +740,8 @@ export function groupTasks<T extends TaskFacts>(
     };
 
     if (groupBy === "status") {
-        for (const status of context.statuses ?? []) {
-            groups.push({ key: status.id, label: status.name, color: status.color, tasks: consume(status.id) });
+        for (const column of columns) {
+            groups.push({ key: column.id, label: column.name, color: column.color, tasks: consume(column.id) });
         }
     } else if (groupBy === "priority") {
         for (const priority of ["urgent", "high", "normal", "low", "none"] as const) {

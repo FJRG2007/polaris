@@ -56,8 +56,10 @@ export interface ViewProps {
     /** What the board is grouped by, so it knows whether a new column is a
      *  status somebody can add or a slice of data it cannot invent. */
     readonly groupBy?: TaskGroupField;
-    /** Add a status to the space from the end of the board. Only supplied when
-     *  the reader may change the space's statuses, which is what decides whether
-     *  the affordance exists at all. */
-    readonly onCreateGroup?: (name: string, type: TaskStatusType, color: string) => Promise<void>;
+    /** Add a status to the space, from the end of the board or from a task's own
+     *  menu, and say which one was made so the caller can put a task on it.
+     *  Only supplied when the reader may change the space's statuses and the
+     *  screen belongs to one space, which is what decides whether the affordance
+     *  exists at all. */
+    readonly onCreateStatus?: (name: string, type: TaskStatusType, color: string) => Promise<string | null>;
 }

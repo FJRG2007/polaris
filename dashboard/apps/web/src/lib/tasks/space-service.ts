@@ -785,15 +785,24 @@ export async function listStatuses(spaceId: string): Promise<StatusView[]> {
     }));
 }
 
-export async function createStatus(spaceId: string, name: string, type: core.TaskStatusType, color: string): Promise<void> {
+/** Add a status to a space, and say which one it is: a status created from a
+ *  task's own menu is meant to be put on that task straight away. */
+export async function createStatus(
+    spaceId: string,
+    name: string,
+    type: core.TaskStatusType,
+    color: string
+): Promise<string> {
     const last = await prisma.taskStatus.findFirst({
         where: { spaceId },
         orderBy: { order: "desc" },
         select: { order: true }
     });
-    await prisma.taskStatus.create({
-        data: { spaceId, name, type, color, order: (last?.order ?? 0) + core.ORDER_STEP }
+    const status = await prisma.taskStatus.create({
+        data: { spaceId, name, type, color, order: (last?.order ?? 0) + core.ORDER_STEP },
+        select: { id: true }
     });
+    return status.id;
 }
 
 export async function updateStatus(
