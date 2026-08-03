@@ -20,10 +20,17 @@ const findMany = vi.fn();
 const findUnique = vi.fn();
 const upsert = vi.fn();
 const create = vi.fn();
+/**
+ * The row an alert reads the account's notification rules off. Without it the
+ * dispatch falls back to its "could not read the rules" default, which happens to
+ * match this event's - so the tests still passed while covering nothing about how
+ * the alert is routed, and every run printed the failure.
+ */
+const userRules = vi.fn(async () => ({ notifyPrefs: null }));
 
 vi.mock("@polaris/db", () => ({
     prisma: {
-        user: { findMany },
+        user: { findMany, findUnique: userRules },
         notification: { create },
         setting: { findUnique, upsert, deleteMany: vi.fn() }
     }
