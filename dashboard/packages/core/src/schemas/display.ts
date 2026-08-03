@@ -20,6 +20,11 @@ export const DATE_ORDERS = ["dmy", "mdy"] as const;
 export const YEAR_FORMATS = ["yyyy", "yy"] as const;
 export const CLOCK_FORMATS = ["24h", "12h"] as const;
 
+/** Which day a calendar week is drawn from. The three in real use: most of the
+ *  world reads a week as Monday to Sunday, the Americas as Sunday first, and
+ *  parts of the Middle East as Saturday first. */
+export const WEEK_STARTS = ["sun", "mon", "sat"] as const;
+
 /** The languages the interface is translated into. English is the only one so
  *  far; the setting exists so an account keeps its choice when more arrive. */
 export const LANGUAGES = ["en"] as const;
@@ -54,6 +59,7 @@ export type TemperatureUnit = (typeof TEMPERATURE_UNITS)[number];
 export type DateOrder = (typeof DATE_ORDERS)[number];
 export type YearFormat = (typeof YEAR_FORMATS)[number];
 export type ClockFormat = (typeof CLOCK_FORMATS)[number];
+export type WeekStart = (typeof WEEK_STARTS)[number];
 export type Language = (typeof LANGUAGES)[number];
 
 /** A complete set of choices - what every screen ends up formatting against. */
@@ -62,6 +68,7 @@ export const displayPreferencesSchema = z.object({
     dateOrder: z.enum(DATE_ORDERS),
     yearFormat: z.enum(YEAR_FORMATS),
     clock: z.enum(CLOCK_FORMATS),
+    weekStart: z.enum(WEEK_STARTS),
     currency: z.enum(CURRENCY_CODES),
     language: z.enum(LANGUAGES)
 });
@@ -80,6 +87,7 @@ export const DISPLAY_DEFAULTS: DisplayPreferences = {
     dateOrder: "mdy",
     yearFormat: "yyyy",
     clock: "24h",
+    weekStart: "sun",
     currency: "EUR",
     language: "en"
 };
@@ -120,6 +128,24 @@ export function stringifyDisplayPreferences(preferences: UserDisplayPreferences)
     return JSON.stringify(chosen(preferences));
 }
 
+/** Weekday names, indexed the way `Date.getDay()` numbers them. */
+export const WEEKDAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] as const;
+export const WEEKDAY_SHORT_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
+
+/** The `Date.getDay()` index a week begins on, which is what every calendar
+ *  header, week grid and "this week" window counts from. */
+export function weekStartIndex(weekStart: WeekStart): number {
+    if (weekStart === "mon") return 1;
+    return weekStart === "sat" ? 6 : 0;
+}
+
+/** The seven `getDay()` indexes in the order this week runs, so a header and the
+ *  cells under it can never disagree about which column is which day. */
+export function weekdayOrder(weekStart: WeekStart): number[] {
+    const first = weekStartIndex(weekStart);
+    return Array.from({ length: 7 }, (_, offset) => (first + offset) % 7);
+}
+
 /** The BCP 47 tag Intl formats with. */
 export function localeFor(language: Language): string {
     return language;
@@ -151,6 +177,8 @@ function pad(value: number): string {
 /** The formatters every screen uses. Bound to one set of preferences. */
 export interface DisplayFormat {
     readonly preferences: DisplayPreferences;
+    /** The `getDay()` index the week starts on, for the views that draw one. */
+    readonly weekStartsOn: number;
     /** "31/07/2026", "07/31/26", ... */
     date(value: Formattable): string;
     /** "14:05", "2:05 PM". Seconds are opt-in. */
@@ -189,6 +217,7 @@ export function createDisplayFormat(preferences: DisplayPreferences): DisplayFor
 
     return {
         preferences,
+        weekStartsOn: weekStartIndex(preferences.weekStart),
         date,
         time,
         dateTime(value, options) {

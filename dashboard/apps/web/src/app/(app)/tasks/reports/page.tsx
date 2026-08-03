@@ -6,13 +6,14 @@
  */
 
 import { requirePermission } from "@/lib/session";
-import { addDays, startOfWeek } from "@polaris/core";
 import { timeByPerson } from "@/lib/tasks/time-service";
 import { SpaceTree } from "@/app/(app)/tasks/space-tree";
 import { buildReport } from "@/lib/tasks/report-service";
 import { listSpaceTree } from "@/lib/tasks/space-service";
 import { ReportsView } from "@/app/(app)/tasks/reports-view";
 import { visibleScope, type TaskActor } from "@/lib/tasks/access";
+import { addDays, startOfWeek, weekStartIndex } from "@polaris/core";
+import { resolveDisplayPreferencesFor } from "@/lib/display-prefs-service";
 
 export const dynamic = "force-dynamic";
 
@@ -22,11 +23,12 @@ export default async function ReportsPage() {
     const scope = await visibleScope(actor);
 
     const now = new Date();
-    const weekStart = startOfWeek(now);
+    const weekStartsOn = weekStartIndex((await resolveDisplayPreferencesFor(user.id)).weekStart);
+    const weekStart = startOfWeek(now, weekStartsOn);
 
     const [tree, report, byPerson] = await Promise.all([
         listSpaceTree(user.id, scope, user.isAdmin),
-        buildReport(scope, now),
+        buildReport(scope, now, weekStartsOn),
         timeByPerson(scope, weekStart, addDays(weekStart, 7))
     ]);
 

@@ -18,7 +18,13 @@ import { useDisplayFormat } from "@/components/display-format";
 import { ChevronLeft, ChevronRight, Square } from "lucide-react";
 import type { RunningTimer, Timesheet } from "@/lib/tasks/time-service";
 
-const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+/** The seven columns, named off the week the sheet actually covers rather than
+ *  from a fixed list - the week starts on whichever day the account chose, and a
+ *  header that disagrees with the columns under it is worse than none. */
+function weekdayHeadings(from: string): string[] {
+    const first = new Date(from);
+    return Array.from({ length: 7 }, (_, offset) => core.WEEKDAY_SHORT_NAMES[core.addDays(first, offset).getDay()] as string);
+}
 
 export function TimesheetView({
     sheet,
@@ -125,8 +131,8 @@ export function TimesheetView({
                     <thead>
                         <tr className="border-b border-border bg-muted/40 text-left text-xs text-muted-foreground">
                             <th className="px-3 py-2 font-medium">Task</th>
-                            {WEEKDAYS.map((day) => (
-                                <th key={day} className="px-2 py-2 text-center font-medium">
+                            {weekdayHeadings(sheet.from).map((day, index) => (
+                                <th key={`${day}-${index}`} className="px-2 py-2 text-center font-medium">
                                     {day}
                                 </th>
                             ))}

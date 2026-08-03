@@ -11,14 +11,17 @@
  */
 
 import { useMemo, useState, type FormEvent } from "react";
+import { Button, Card, CardBody, Select, type SelectOption } from "@polaris/ui";
 import {
     CURRENCIES,
+    weekdayOrder,
     createDisplayFormat,
+    WEEKDAY_SHORT_NAMES,
     resolveDisplayPreferences,
+    type WeekStart,
     type DisplayPreferences,
     type UserDisplayPreferences
 } from "@polaris/core";
-import { Button, Card, CardBody, Select, type SelectOption } from "@polaris/ui";
 
 /** The "leave it to the layer below" choice. Radix forbids an empty value. */
 const INHERIT = "inherit";
@@ -67,6 +70,16 @@ const FIELDS: FieldSpec[] = [
         options: [
             { value: "24h", label: "24-hour (14:05)", short: "24-hour" },
             { value: "12h", label: "12-hour (2:05 PM)", short: "12-hour" }
+        ]
+    },
+    {
+        key: "weekStart",
+        label: "Week starts on",
+        hint: "Where every calendar and week view begins.",
+        options: [
+            { value: "sun", label: "Sunday", short: "Sunday" },
+            { value: "mon", label: "Monday", short: "Monday" },
+            { value: "sat", label: "Saturday", short: "Saturday" }
         ]
     },
     {
@@ -191,6 +204,7 @@ export function DisplayPreferencesForm({
                     <dl className="grid grid-cols-2 gap-x-4 gap-y-1 rounded-md border border-border bg-muted/30 p-3 text-sm sm:grid-cols-4">
                         <Sample label="Date" value={format.date(SAMPLE)} />
                         <Sample label="Time" value={format.time(SAMPLE)} />
+                        <Sample label="Week" value={weekSample(effective.weekStart)} />
                         <Sample label="Temperature" value={format.temperature(21.4)} />
                         <Sample label="Amount" value={format.currency(1234.5)} />
                     </dl>
@@ -206,6 +220,12 @@ export function DisplayPreferencesForm({
             </CardBody>
         </Card>
     );
+}
+
+/** The week as the chosen start draws it: the first day, then the last. */
+function weekSample(weekStart: WeekStart): string {
+    const order = weekdayOrder(weekStart);
+    return `${WEEKDAY_SHORT_NAMES[order[0] as number]} to ${WEEKDAY_SHORT_NAMES[order[6] as number]}`;
 }
 
 /** The short name of a value, so "Platform default" can say what it resolves to. */

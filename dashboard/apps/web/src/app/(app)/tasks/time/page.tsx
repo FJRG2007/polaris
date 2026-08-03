@@ -7,12 +7,13 @@
  */
 
 import { requirePermission } from "@/lib/session";
-import { addDays, startOfWeek } from "@polaris/core";
 import { SpaceTree } from "@/app/(app)/tasks/space-tree";
 import { listSpaceTree } from "@/lib/tasks/space-service";
 import { TimesheetView } from "@/app/(app)/tasks/timesheet-view";
 import { visibleScope, type TaskActor } from "@/lib/tasks/access";
+import { addDays, startOfWeek, weekStartIndex } from "@polaris/core";
 import { runningTimer, weeklyTimesheet } from "@/lib/tasks/time-service";
+import { resolveDisplayPreferencesFor } from "@/lib/display-prefs-service";
 
 export const dynamic = "force-dynamic";
 
@@ -22,12 +23,13 @@ export default async function TimesheetPage({ searchParams }: { searchParams: Pr
     const actor: TaskActor = { id: user.id, isAdmin: user.isAdmin };
     const scope = await visibleScope(actor);
 
+    const weekStartsOn = weekStartIndex((await resolveDisplayPreferencesFor(user.id)).weekStart);
     const offset = Number(week ?? "0");
-    const anchor = addDays(startOfWeek(new Date()), Number.isFinite(offset) ? offset * 7 : 0);
+    const anchor = addDays(startOfWeek(new Date(), weekStartsOn), Number.isFinite(offset) ? offset * 7 : 0);
 
     const [tree, sheet, timer] = await Promise.all([
         listSpaceTree(user.id, scope, user.isAdmin),
-        weeklyTimesheet(user.id, anchor, scope),
+        weeklyTimesheet(user.id, anchor, scope, weekStartsOn),
         runningTimer(user.id)
     ]);
 

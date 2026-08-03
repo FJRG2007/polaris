@@ -101,7 +101,7 @@ export interface TimesheetEntry {
     readonly listName: string;
     readonly spaceName: string;
     readonly billable: boolean;
-    /** Seconds per day of the week, Monday first. */
+    /** Seconds per day, from the sheet's first day onwards. */
     readonly days: number[];
     readonly total: number;
 }
@@ -120,8 +120,13 @@ export interface Timesheet {
  * task with both billable and unbillable time shows the split instead of hiding
  * it in a single number an invoice cannot use.
  */
-export async function weeklyTimesheet(userId: string, anchor: Date, scope: TaskScope): Promise<Timesheet> {
-    const from = core.startOfWeek(anchor);
+export async function weeklyTimesheet(
+    userId: string,
+    anchor: Date,
+    scope: TaskScope,
+    weekStartsOn = 1
+): Promise<Timesheet> {
+    const from = core.startOfWeek(anchor, weekStartsOn);
     const to = core.endOfDay(core.addDays(from, 6));
 
     const entries = await prisma.taskTimeEntry.findMany({

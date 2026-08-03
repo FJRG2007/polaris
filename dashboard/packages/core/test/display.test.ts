@@ -6,7 +6,8 @@ import {
     resolveDisplayPreferences,
     stringifyDisplayPreferences,
     toDisplayTemperature,
-    userDisplayPreferencesSchema
+    userDisplayPreferencesSchema,
+    weekdayOrder
 } from "../src/schemas/display.js";
 
 /** A day past the 12th and an afternoon hour, so every choice reads differently. */
@@ -33,6 +34,19 @@ describe("preference layering", () => {
         expect(parseDisplayPreferences('{"clock":"37h"}')).toEqual({});
         expect(parseDisplayPreferences(null)).toEqual({});
         expect(parseDisplayPreferences('{"clock":"12h"}')).toEqual({ clock: "12h" });
+    });
+
+    it("starts the week on Sunday until somebody chooses otherwise", () => {
+        expect(DISPLAY_DEFAULTS.weekStart).toBe("sun");
+        expect(createDisplayFormat(DISPLAY_DEFAULTS).weekStartsOn).toBe(0);
+        expect(createDisplayFormat({ ...DISPLAY_DEFAULTS, weekStart: "mon" }).weekStartsOn).toBe(1);
+        expect(createDisplayFormat({ ...DISPLAY_DEFAULTS, weekStart: "sat" }).weekStartsOn).toBe(6);
+    });
+
+    it("orders the weekday columns from the chosen first day", () => {
+        expect(weekdayOrder("sun")).toEqual([0, 1, 2, 3, 4, 5, 6]);
+        expect(weekdayOrder("mon")).toEqual([1, 2, 3, 4, 5, 6, 0]);
+        expect(weekdayOrder("sat")).toEqual([6, 0, 1, 2, 3, 4, 5]);
     });
 
     it("rejects a unit nothing knows how to render", () => {

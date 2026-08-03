@@ -50,7 +50,7 @@ export interface TaskReport {
 }
 
 /** The whole reporting page for everything the reader can reach, in one pass. */
-export async function buildReport(scope: TaskScope, now = new Date()): Promise<TaskReport> {
+export async function buildReport(scope: TaskScope, now = new Date(), weekStartsOn = 1): Promise<TaskReport> {
     const spaceIds = scopeSpaceIds(scope);
     if (spaceIds.length === 0) {
         return {
@@ -70,7 +70,7 @@ export async function buildReport(scope: TaskScope, now = new Date()): Promise<T
         };
     }
 
-    const weekStart = core.startOfWeek(now);
+    const weekStart = core.startOfWeek(now, weekStartsOn);
     const weekEnd = core.endOfDay(core.addDays(weekStart, 6));
     // The reach clause is itself an OR, so anything else that needs one is
     // nested under AND rather than spread beside it, where it would overwrite it

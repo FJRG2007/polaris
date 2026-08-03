@@ -132,6 +132,31 @@ describe("relative dates", () => {
         expect(engine.daysBetween(week.from, week.to)).toBe(6);
     });
 
+    it("begins the week where the reader's preference says, not where the engine assumes", () => {
+        for (const [weekStartsOn, expected] of [
+            [0, 0],
+            [1, 1],
+            [6, 6]
+        ] as const) {
+            const week = engine.resolveRelativeDate("thisWeek", NOW, weekStartsOn);
+            expect(week.from.getDay()).toBe(expected);
+            expect(engine.daysBetween(week.from, week.to)).toBe(6);
+            // The week the reader is in, never the one before or after it.
+            expect(week.from.getTime()).toBeLessThanOrEqual(NOW.getTime());
+            expect(week.to.getTime()).toBeGreaterThanOrEqual(NOW.getTime());
+        }
+    });
+
+    it("moves the boundary of 'this week' with the chosen first day", () => {
+        // NOW is a Wednesday. The Sunday two days before it belongs to this week
+        // for a Sunday-first reader and to the last one for a Monday-first reader.
+        const sunday = new Date("2026-08-02T10:00:00.000Z");
+        expect(engine.startOfWeek(NOW, 0).getTime()).toBe(engine.startOfDay(sunday).getTime());
+        expect(engine.startOfWeek(NOW, 1).getTime()).toBeGreaterThan(engine.startOfDay(sunday).getTime());
+        expect(engine.dueBucket(task({ dueDate: new Date("2026-08-09T10:00:00.000Z") }), NOW, 1)).toBe("thisWeek");
+        expect(engine.dueBucket(task({ dueDate: new Date("2026-08-09T10:00:00.000Z") }), NOW, 0)).toBe("later");
+    });
+
     it("treats overdue as everything up to now", () => {
         const overdue = engine.resolveRelativeDate("overdue", NOW);
         expect(overdue.to.getTime()).toBe(NOW.getTime());

@@ -74,7 +74,7 @@ export function HomeView({
         for (const facts of core.sortTasks(tasks.map(toFacts), { field: "dueDate", direction: "asc" })) {
             const task = byId.get(facts.id);
             if (!task) continue;
-            const bucket = core.dueBucket(facts, now);
+            const bucket = core.dueBucket(facts, now, format.weekStartsOn);
             const existing = buckets.get(bucket);
             if (existing) existing.push(task);
             else buckets.set(bucket, [task]);
@@ -82,7 +82,7 @@ export function HomeView({
         return core.DUE_BUCKETS.map((bucket) => ({ bucket, tasks: buckets.get(bucket) ?? [] })).filter(
             (group) => group.tasks.length > 0
         );
-    }, [tasks]);
+    }, [tasks, format.weekStartsOn]);
 
     // The panel belongs to the space of whatever task is open.
     const openSpaceId = tasks.find((task) => task.id === openTaskId)?.spaceId;

@@ -197,12 +197,21 @@ export function addDays(date: Date, days: number): Date {
     return copy;
 }
 
-/** The Monday of the week a date falls in. Weeks start on Monday because the
- *  sprint, the timesheet and the calendar header all have to agree, and a
- *  Sunday-first week puts two working days in different weeks. */
-export function startOfWeek(date: Date): Date {
+/**
+ * The first day of the week a date falls in.
+ *
+ * Which day that is belongs to the reader, not to the engine: half the world
+ * reads a week as Monday to Sunday and half as Sunday to Saturday, and a
+ * calendar drawn the other way round is one nobody can plan against. Every
+ * screen passes the account's choice (`weekStartIndex` off the display
+ * preferences); the default is Monday, which is what the sprint and the
+ * timesheet count from when nobody has said otherwise.
+ *
+ * @param weekStartsOn - A `Date.getDay()` index: 0 Sunday, 1 Monday, 6 Saturday.
+ */
+export function startOfWeek(date: Date, weekStartsOn = 1): Date {
     const copy = startOfDay(date);
-    const weekday = (copy.getDay() + 6) % 7;
+    const weekday = (copy.getDay() - weekStartsOn + 7) % 7;
     return addDays(copy, -weekday);
 }
 
@@ -223,7 +232,11 @@ export function isSameDay(left: Date, right: Date): boolean {
 
 /** The window a relative-date token covers right now. Stored as a token rather
  *  than a date so a view saved as "due this week" stays true next week. */
-export function resolveRelativeDate(token: work.RelativeDate, now: Date): { from: Date; to: Date } {
+export function resolveRelativeDate(
+    token: work.RelativeDate,
+    now: Date,
+    weekStartsOn = 1
+): { from: Date; to: Date } {
     const today = startOfDay(now);
     switch (token) {
         case "today":
@@ -233,15 +246,15 @@ export function resolveRelativeDate(token: work.RelativeDate, now: Date): { from
         case "yesterday":
             return { from: addDays(today, -1), to: endOfDay(addDays(today, -1)) };
         case "thisWeek": {
-            const from = startOfWeek(now);
+            const from = startOfWeek(now, weekStartsOn);
             return { from, to: endOfDay(addDays(from, 6)) };
         }
         case "nextWeek": {
-            const from = addDays(startOfWeek(now), 7);
+            const from = addDays(startOfWeek(now, weekStartsOn), 7);
             return { from, to: endOfDay(addDays(from, 6)) };
         }
         case "lastWeek": {
-            const from = addDays(startOfWeek(now), -7);
+            const from = addDays(startOfWeek(now, weekStartsOn), -7);
             return { from, to: endOfDay(addDays(from, 6)) };
         }
         case "thisMonth": {
@@ -289,14 +302,18 @@ function deadlineOf(task: Pick<TaskFacts, "dueDate" | "timed">): Date | null {
  * overdue: the date has stopped mattering once the work is done, and colouring
  * it red is how a done list ends up looking like a crisis.
  */
-export function dueBucket(task: Pick<TaskFacts, "dueDate" | "statusType" | "timed">, now: Date): DueBucket {
+export function dueBucket(
+    task: Pick<TaskFacts, "dueDate" | "statusType" | "timed">,
+    now: Date,
+    weekStartsOn = 1
+): DueBucket {
     const { dueDate } = task;
     if (!dueDate) return "none";
     const deadline = deadlineOf(task) as Date;
     if (!work.isFinishedStatus(task.statusType) && deadline.getTime() < now.getTime()) return "overdue";
     if (isSameDay(dueDate, now)) return "today";
     if (isSameDay(dueDate, addDays(now, 1))) return "tomorrow";
-    const weekEnd = endOfDay(addDays(startOfWeek(now), 6));
+    const weekEnd = endOfDay(addDays(startOfWeek(now, weekStartsOn), 6));
     return dueDate >= startOfDay(now) && dueDate <= weekEnd ? "thisWeek" : "later";
 }
 
@@ -376,15 +393,25 @@ function asRelative(value: string): work.RelativeDate | null {
 }
 
 /** Resolve a condition value to an instant, honouring relative tokens. */
-function conditionDate(value: string | undefined, now: Date, edge: "from" | "to"): Date | null {
+function conditionDate(
+    value: string | undefined,
+    now: Date,
+    edge: "from" | "to",
+    weekStartsOn: number
+): Date | null {
     if (!value) return null;
     const relative = asRelative(value);
-    if (relative) return resolveRelativeDate(relative, now)[edge];
+    if (relative) return resolveRelativeDate(relative, now, weekStartsOn)[edge];
     const parsed = new Date(value);
     return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
-function matchesDateCondition(date: Date | null, condition: work.TaskFilterCondition, now: Date): boolean {
+function matchesDateCondition(
+    date: Date | null,
+    condition: work.TaskFilterCondition,
+    now: Date,
+    weekStartsOn: number
+): boolean {
     switch (condition.operator) {
         case "isSet":
             return date !== null;
@@ -397,23 +424,23 @@ function matchesDateCondition(date: Date | null, condition: work.TaskFilterCondi
 
     const first = condition.values[0];
     if (condition.operator === "between") {
-        const from = conditionDate(first, now, "from");
-        const to = conditionDate(condition.values[1] ?? first, now, "to");
+        const from = conditionDate(first, now, "from", weekStartsOn);
+        const to = conditionDate(condition.values[1] ?? first, now, "to", weekStartsOn);
         if (!from || !to) return false;
         return date >= from && date <= to;
     }
     if (condition.operator === "before" || condition.operator === "lt") {
-        const to = conditionDate(first, now, "from");
+        const to = conditionDate(first, now, "from", weekStartsOn);
         return to !== null && date < to;
     }
     if (condition.operator === "after" || condition.operator === "gt") {
-        const from = conditionDate(first, now, "to");
+        const from = conditionDate(first, now, "to", weekStartsOn);
         return from !== null && date > from;
     }
     // "is" on a date means "falls within that window", which is the only reading
     // that makes "due is today" behave the way a person expects.
-    const from = conditionDate(first, now, "from");
-    const to = conditionDate(first, now, "to");
+    const from = conditionDate(first, now, "from", weekStartsOn);
+    const to = conditionDate(first, now, "to", weekStartsOn);
     if (!from || !to) return false;
     const inside = date >= from && date <= to;
     return condition.operator === "isNot" ? !inside : inside;
@@ -444,14 +471,19 @@ function matchesNumberCondition(value: number | null, condition: work.TaskFilter
 }
 
 /** Whether one task satisfies one condition. */
-export function matchesCondition(task: TaskFacts, condition: work.TaskFilterCondition, now: Date): boolean {
+export function matchesCondition(
+    task: TaskFacts,
+    condition: work.TaskFilterCondition,
+    now: Date,
+    weekStartsOn = 1
+): boolean {
     if (DATE_FIELDS.has(condition.field)) {
         // "due date is overdue" is a question about the status too, so it routes
         // through the same bucket logic the home screen uses.
         if (condition.values.includes("overdue") && condition.operator === "is") {
             return isOverdue(task, now);
         }
-        return matchesDateCondition(factDate(task, condition.field), condition, now);
+        return matchesDateCondition(factDate(task, condition.field), condition, now, weekStartsOn);
     }
     if (NUMBER_FIELDS.has(condition.field)) {
         return matchesNumberCondition(
@@ -486,15 +518,25 @@ export function matchesCondition(task: TaskFacts, condition: work.TaskFilterCond
 
 /** Whether a task satisfies a whole filter. An empty filter matches everything,
  *  which is what an unfiltered view is. */
-export function matchesFilter(task: TaskFacts, filter: work.TaskFilter, now: Date): boolean {
+export function matchesFilter(
+    task: TaskFacts,
+    filter: work.TaskFilter,
+    now: Date,
+    weekStartsOn = 1
+): boolean {
     if (filter.conditions.length === 0) return true;
     return filter.match === "all"
-        ? filter.conditions.every((condition) => matchesCondition(task, condition, now))
-        : filter.conditions.some((condition) => matchesCondition(task, condition, now));
+        ? filter.conditions.every((condition) => matchesCondition(task, condition, now, weekStartsOn))
+        : filter.conditions.some((condition) => matchesCondition(task, condition, now, weekStartsOn));
 }
 
-export function applyFilter<T extends TaskFacts>(tasks: readonly T[], filter: work.TaskFilter, now: Date): T[] {
-    return tasks.filter((task) => matchesFilter(task, filter, now));
+export function applyFilter<T extends TaskFacts>(
+    tasks: readonly T[],
+    filter: work.TaskFilter,
+    now: Date,
+    weekStartsOn = 1
+): T[] {
+    return tasks.filter((task) => matchesFilter(task, filter, now, weekStartsOn));
 }
 
 /** Free-text search over the fields a person types into a search box. */
@@ -715,7 +757,8 @@ export function groupTasks<T extends TaskFacts>(
     tasks: readonly T[],
     groupBy: work.TaskGroupField,
     context: GroupContext = {},
-    now: Date = new Date()
+    now: Date = new Date(),
+    weekStartsOn = 1
 ): TaskGroup<T>[] {
     if (groupBy === "none") return [{ key: "", label: "All tasks", tasks: [...tasks] }];
 
@@ -742,7 +785,7 @@ export function groupTasks<T extends TaskFacts>(
                 push(task.priority, task);
                 break;
             case "dueDate":
-                push(dueBucket(task, now), task);
+                push(dueBucket(task, now, weekStartsOn), task);
                 break;
             case "list":
                 push(task.listId, task);
@@ -1214,7 +1257,8 @@ export interface GanttBar {
  */
 export function ganttRange(
     tasks: readonly Pick<TaskFacts, "startDate" | "dueDate">[],
-    now: Date
+    now: Date,
+    weekStartsOn = 1
 ): { from: Date; to: Date } {
     let from: Date | null = null;
     let to: Date | null = null;
@@ -1224,7 +1268,7 @@ export function ganttRange(
         if (start && (!from || start < from)) from = start;
         if (end && (!to || end > to)) to = end;
     }
-    const anchor = startOfWeek(from ?? now);
+    const anchor = startOfWeek(from ?? now, weekStartsOn);
     const finish = endOfDay(to ?? addDays(anchor, 13));
     const padded = addDays(anchor, -2);
     const minimumEnd = addDays(padded, 14);
