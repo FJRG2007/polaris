@@ -49,6 +49,9 @@ Drive (storage):
 Drive explorer (interaction):
 - [x] Non-reflowing selection: the action bar is a reserved fixed-height row, so
       selecting items never shifts the file list
+- [x] Drag to move onto a folder row or a breadcrumb segment, carrying the whole
+      selection when the dragged item belongs to it, with a count in place of the
+      single-row ghost the browser would otherwise draw
 - [x] Empty a folder (delete its contents, keep the folder) as a distinct action
       from delete, behind an explicit in-app confirm
 - [x] Zip a selection to the NAS, optionally AES-256 encrypted with a password on
@@ -109,6 +112,9 @@ Tasks (work management):
 - [x] Folders nest as deep as the work does (a client, its projects, their
       lists), rearranged by dragging in the sidebar and renamed in place (F2,
       double click, or the right-click menu)
+- [x] Deleting a list or folder asks for its name back only when there is work to
+      lose; an empty one is confirmed plainly, with archived tasks and subtasks
+      counting as work even though the sidebar counts leave them out
 - [x] Access granted on one folder: a client or a contractor is invited to a
       branch and sees that branch only, with the space beside it pruned out of
       the sidebar and every cross-space screen
