@@ -15,13 +15,14 @@
  */
 
 import Link from "next/link";
+import { useAppUrl } from "@/components/app-url";
 import { HeaderPortal } from "@/components/header-portal";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useDisplayFormat } from "@/components/display-format";
 import { useCallback, useEffect, useState, useTransition } from "react";
 import { ANALYTICS_SCOPES, scopeNeedsTarget, type AnalyticsScope, type SiteOption } from "./site-catalog";
-import { countryFlag, countryName, VISIT_RANGE_SPEC, type VisitDimension, type VisitRange, type VisitRow } from "@polaris/core";
 import { Activity, Check, Copy, Globe, MonitorSmartphone, RefreshCw, ShieldCheck, TrendingUp } from "lucide-react";
+import { countryFlag, countryName, VISIT_RANGE_SPEC, type VisitDimension, type VisitRange, type VisitRow } from "@polaris/core";
 import { Badge, Button, Card, CardBody, CardHeader, CardTitle, Input, Select, Skeleton, Switch, TimeSeriesChart, cn } from "@polaris/ui";
 import {
     getAnalyticsOverviewAction,
@@ -588,8 +589,10 @@ function TrackerPanel({
 }) {
     const [copied, setCopied] = useState(false);
     const [rotating, startRotate] = useTransition();
-    const origin = typeof window === "undefined" ? "" : window.location.origin;
-    const snippet = `<script defer src="${origin}/analytics.js" data-key="${data.site.publicKey}"></script>`;
+    // The snippet is pasted into somebody else's site, so it has to name the address
+    // Polaris answers on publicly - a LAN hostname would load nothing out there.
+    const baseUrl = useAppUrl();
+    const snippet = `<script defer src="${baseUrl}/analytics.js" data-key="${data.site.publicKey}"></script>`;
 
     return (
         <Card>

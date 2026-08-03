@@ -42,7 +42,7 @@ export interface SpaceScreenProps {
     readonly forms: readonly FormView[];
     readonly people: readonly PersonRef[];
     readonly canManage: boolean;
-    readonly origin: string;
+    readonly baseUrl: string;
     /** Which tab to open on, from the URL. Anything unrecognised opens the
      *  overview rather than a blank screen. */
     readonly initialTab?: string;
@@ -127,7 +127,7 @@ export function SpaceScreen(props: SpaceScreenProps) {
             )}
             {tab === "Automations" && <AutomationsPanel automations={props.automations} context={ruleContext} />}
             {tab === "Forms" && (
-                <FormsPanel forms={props.forms} spaceId={props.spaceId} lists={listRefs} origin={props.origin} />
+                <FormsPanel forms={props.forms} spaceId={props.spaceId} lists={listRefs} baseUrl={props.baseUrl} />
             )}
         </div>
     );

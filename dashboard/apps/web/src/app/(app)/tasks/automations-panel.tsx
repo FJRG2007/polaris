@@ -394,13 +394,13 @@ export function FormsPanel({
     forms,
     spaceId,
     lists,
-    origin
+    baseUrl
 }: {
     forms: readonly FormView[];
     spaceId: string;
     lists: readonly { id: string; name: string }[];
-    /** Where the instance answers, so the link shown is the one to send. */
-    origin: string;
+    /** The address Polaris hands out, so the link shown is the one to send. */
+    baseUrl: string;
 }) {
     const [creating, setCreating] = useState(false);
     const [name, setName] = useState("");
@@ -501,7 +501,7 @@ export function FormsPanel({
 
             <ul className="flex flex-col gap-2">
                 {forms.map((form) => {
-                    const url = `${origin}/forms/${form.token}`;
+                    const url = `${baseUrl}/forms/${form.token}`;
                     return (
                         <li key={form.id}>
                             <Card>

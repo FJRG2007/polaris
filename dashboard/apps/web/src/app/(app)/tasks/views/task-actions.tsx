@@ -15,6 +15,7 @@
  */
 
 import * as core from "@polaris/core";
+import { useAppUrl } from "@/components/app-url";
 import type { TaskRow } from "@/lib/tasks/facts";
 import type { TaskEdit, ViewProps } from "./shared";
 import type { SpaceContext } from "@/lib/tasks/facts";
@@ -58,10 +59,11 @@ export function commandsFor(props: ViewProps, task: TaskRow): TaskCommands {
     };
 }
 
-/** The link to a task, absolute, so what lands in somebody's clipboard is what
- *  they can paste into a chat. */
-function taskLink(taskId: string): string {
-    return typeof window === "undefined" ? `/tasks/t/${taskId}` : `${window.location.origin}/tasks/t/${taskId}`;
+/** The link to a task, absolute and on the address Polaris hands out, so what
+ *  lands in somebody's clipboard is what they can paste into a chat - the tab's
+ *  own hostname may be the LAN name, which resolves nowhere else. */
+function taskLink(baseUrl: string, taskId: string): string {
+    return `${baseUrl}/tasks/t/${taskId}`;
 }
 
 async function copy(value: string): Promise<void> {
@@ -140,6 +142,7 @@ export function TaskStatusMarker({ commands }: { commands: TaskCommands }) {
 /** Right-click anywhere on a task. */
 export function TaskMenu({ commands, children }: { commands: TaskCommands; children: React.ReactNode }) {
     const { task, context, canEdit } = commands;
+    const baseUrl = useAppUrl();
 
     return (
         <ContextMenu>
@@ -149,7 +152,7 @@ export function TaskMenu({ commands, children }: { commands: TaskCommands; child
                     <ExternalLink className="size-3.5" />
                     Open
                 </ContextMenuItem>
-                <ContextMenuItem onSelect={() => void copy(taskLink(task.id))}>
+                <ContextMenuItem onSelect={() => void copy(taskLink(baseUrl, task.id))}>
                     <Link2 className="size-3.5" />
                     Copy link
                 </ContextMenuItem>
