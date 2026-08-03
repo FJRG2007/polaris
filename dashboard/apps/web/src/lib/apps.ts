@@ -145,6 +145,10 @@ export interface AppSection {
     /** Reachable, but not one of the app's primary sections: kept out of the left
      *  rail while still being findable from search. */
     hidden?: boolean;
+    /** The heading this sits under in the rail. Sections with none stay under the
+     *  app's own heading, so a flat rail needs no groups at all; once one screen
+     *  names a group, everything sharing that name is drawn together under it. */
+    group?: string;
 }
 
 /**
@@ -207,13 +211,45 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
     ],
     account: [
         { label: "Profile", href: "/account", icon: UserCog, keywords: ["name", "email", "avatar"] },
-        { label: "Preferences", href: "/account/preferences", icon: SlidersHorizontal, keywords: ["units", "language", "timezone"] },
+        { label: "Preferences", href: "/account/preferences", icon: SlidersHorizontal, keywords: ["units", "language", "timezone", "week start", "calendar"] },
         { label: "Notifications", href: "/account/notifications", icon: Bell, keywords: ["alerts", "email"] },
-        { label: "Security", href: "/account/security", icon: ShieldCheck, keywords: ["password", "2fa", "two-factor", "passkey"] },
-        { label: "Sessions", href: "/account/sessions", icon: MonitorSmartphone, keywords: ["devices", "sign out", "remembered devices", "trusted devices"] },
-        { label: "Scan a code", href: "/account/scan", icon: ScanLine, keywords: ["qr", "sign in", "approve", "camera"] },
-        { label: "Access rules", href: "/account/access", icon: Network, keywords: ["ip", "country", "geo"] },
-        { label: "API keys", href: "/account/api-keys", icon: KeyRound, keywords: ["tokens"] }
+        {
+            label: "Connected accounts",
+            href: "/account/connections",
+            icon: Link2,
+            keywords: ["github", "google", "link", "oauth", "repositories", "calendar"]
+        },
+        // Everything that decides who reaches this account is one subject, and it
+        // is half the rail: five screens people go looking for together.
+        {
+            label: "Password & 2FA",
+            href: "/account/security",
+            icon: ShieldCheck,
+            keywords: ["password", "2fa", "two-factor", "passkey", "security"],
+            group: "Security"
+        },
+        {
+            label: "Sessions",
+            href: "/account/sessions",
+            icon: MonitorSmartphone,
+            keywords: ["devices", "sign out", "remembered devices", "trusted devices"],
+            group: "Security"
+        },
+        {
+            label: "Scan a code",
+            href: "/account/scan",
+            icon: ScanLine,
+            keywords: ["qr", "sign in", "approve", "camera"],
+            group: "Security"
+        },
+        {
+            label: "Access rules",
+            href: "/account/access",
+            icon: Network,
+            keywords: ["ip", "country", "geo"],
+            group: "Security"
+        },
+        { label: "API keys", href: "/account/api-keys", icon: KeyRound, keywords: ["tokens"], group: "Security" }
     ],
     admin: [
         { label: "Overview", href: "/admin", icon: LayoutDashboard },

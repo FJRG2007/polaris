@@ -11,6 +11,10 @@
  * pools, repositories, runs and secrets. Inside one of those the rail shows that
  * subject instead of the app's list, with a way back at the top: a rail that
  * changes what it contains and offers no way out is a place people get stuck.
+ *
+ * Within one list, screens that belong to the same subject sit under a heading of
+ * their own (Account's five security screens). A list where nothing names a group
+ * is drawn flat, exactly as before.
  */
 
 import Link from "next/link";
@@ -30,6 +34,16 @@ export function AppSidebar() {
     const items = sections.filter((section) => !section.hidden);
     if (items.length === 0) return null;
 
+    // The ungrouped screens keep the list's own heading; each named group follows
+    // in the order it first appears, so the rail reads in the order it is declared.
+    const groups: { label: string; items: AppSection[] }[] = [];
+    for (const item of items) {
+        const label = item.group ?? (subapp ? subapp.label : app.label);
+        const existing = groups.find((group) => group.label === label);
+        if (existing) existing.items.push(item);
+        else groups.push({ label, items: [item] });
+    }
+
     return (
         <nav className="flex flex-col gap-1">
             {subapp ? (
@@ -41,11 +55,15 @@ export function AppSidebar() {
                     {subapp.parent.label}
                 </Link>
             ) : null}
-            <p className="px-2 pb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                {subapp ? subapp.label : app.label}
-            </p>
-            {items.map((item) => (
-                <RailLink key={item.href} item={item} pathname={pathname} sections={sections} />
+            {groups.map((group, index) => (
+                <div key={group.label} className={cn("flex flex-col gap-1", index > 0 && "mt-3")}>
+                    <p className="px-2 pb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                        {group.label}
+                    </p>
+                    {group.items.map((item) => (
+                        <RailLink key={item.href} item={item} pathname={pathname} sections={sections} />
+                    ))}
+                </div>
             ))}
         </nav>
     );
