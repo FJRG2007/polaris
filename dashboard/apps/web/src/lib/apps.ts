@@ -207,7 +207,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
         { label: "Preferences", href: "/account/preferences", icon: SlidersHorizontal, keywords: ["units", "language", "timezone"] },
         { label: "Notifications", href: "/account/notifications", icon: Bell, keywords: ["alerts", "email"] },
         { label: "Security", href: "/account/security", icon: ShieldCheck, keywords: ["password", "2fa", "two-factor", "passkey"] },
-        { label: "Sessions", href: "/account/sessions", icon: MonitorSmartphone, keywords: ["devices", "sign out"] },
+        { label: "Sessions", href: "/account/sessions", icon: MonitorSmartphone, keywords: ["devices", "sign out", "remembered devices", "trusted devices"] },
         { label: "Scan a code", href: "/account/scan", icon: ScanLine, keywords: ["qr", "sign in", "approve", "camera"] },
         { label: "Access rules", href: "/account/access", icon: Network, keywords: ["ip", "country", "geo"] },
         { label: "API keys", href: "/account/api-keys", icon: KeyRound, keywords: ["tokens"] }

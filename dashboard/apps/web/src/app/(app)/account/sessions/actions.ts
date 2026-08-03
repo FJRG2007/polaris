@@ -6,14 +6,21 @@
  * belonging to another account simply matches nothing.
  */
 
-import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { listSessionActivity, type SessionActivityEntry } from "@/lib/audit-service";
-import { rateLimit } from "@/lib/rate-limit-service";
+import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/session";
+import { recordAudit } from "@/lib/audit-service";
+import { rateLimit } from "@/lib/rate-limit-service";
+import { revokeTrustedDevice, revokeTrustedDevices } from "@polaris/auth";
+import { listSessionActivity, type SessionActivityEntry } from "@/lib/audit-service";
 import { decideLoginApproval, revokeOtherSessions, revokeUserSession } from "@/lib/session-directory";
 
 const sessionIdSchema = z.string().uuid();
+
+/** The handle a remembered browser is named by: better-auth's own identifier for
+ *  the pass. Shaped rather than free text, so a malformed one is refused here
+ *  instead of turning into a query nobody meant to run. */
+const trustedDeviceIdSchema = z.string().regex(/^trust-device-[A-Za-z0-9_-]{1,64}$/);
 
 /** Guess-throttling for the PIN that stands between a waiting sign-in and access. */
 const APPROVAL_LIMIT = 5;
@@ -30,6 +37,45 @@ export async function revokeSessionAction(sessionId: string): Promise<{ error?: 
 export async function revokeOtherSessionsAction(): Promise<{ count: number }> {
     const user = await requireUser();
     const count = await revokeOtherSessions(user.id, user.sessionId);
+    revalidatePath("/account/sessions");
+    return { count };
+}
+
+/**
+ * Stop remembering one browser, so its next sign-in answers the challenge again.
+ *
+ * Scoped to the caller's own account inside revokeTrustedDevice, so a handle
+ * lifted from somewhere else matches nothing rather than reaching another
+ * account's device.
+ *
+ * No password is asked for, here or below: this only ever narrows the ways in,
+ * and the moment somebody reaches for it is the moment a remembered device is
+ * somewhere it should not be. A control that asks for more before it can take
+ * access away is a control that arrives too late.
+ */
+export async function forgetTrustedDeviceAction(id: unknown): Promise<{ error?: string }> {
+    const user = await requireUser();
+    const parsed = trustedDeviceIdSchema.safeParse(id);
+    if (!parsed.success) return { error: "That device is no longer remembered." };
+    if (!(await revokeTrustedDevice(user.id, parsed.data))) {
+        return { error: "That device is no longer remembered." };
+    }
+    await recordAudit({ actorId: user.id, action: "account.2fa.trusted-device-revoked" });
+    revalidatePath("/account/sessions");
+    return {};
+}
+
+/** Stop remembering every browser at once. */
+export async function forgetTrustedDevicesAction(): Promise<{ count: number }> {
+    const user = await requireUser();
+    const count = await revokeTrustedDevices(user.id);
+    if (count > 0) {
+        await recordAudit({
+            actorId: user.id,
+            action: "account.2fa.trusted-devices-revoked",
+            metadata: { count }
+        });
+    }
     revalidatePath("/account/sessions");
     return { count };
 }

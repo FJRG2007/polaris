@@ -34,8 +34,7 @@ import {
     verifyAccountPassword,
     verifySecurityAnswers,
     verifyTotpForSession,
-    twoFactorEnabled,
-    revokeTrustedDevices
+    twoFactorEnabled
 } from "@polaris/auth";
 
 type ActionResult = { error?: string };
@@ -192,24 +191,4 @@ export async function clearSecurityQuestionsAction(password: string): Promise<Ac
         revalidatePath("/account/security");
     }
     return result;
-}
-
-/**
- * Stop remembering the browsers that asked to skip the challenge for 30 days.
- *
- * No password: this only narrows the ways in, and the moment somebody reaches
- * for it is the moment a remembered device is somewhere it should not be - a
- * control that asks for more before it can take access away is a control that
- * arrives too late.
- */
-export async function revokeTrustedDevicesAction(): Promise<ActionResult> {
-    const user = await requireUser();
-    const revoked = await revokeTrustedDevices(user.id);
-    await recordAudit({
-        actorId: user.id,
-        action: "account.2fa.trusted-devices-revoked",
-        metadata: { revoked }
-    });
-    revalidatePath("/account/security");
-    return {};
 }

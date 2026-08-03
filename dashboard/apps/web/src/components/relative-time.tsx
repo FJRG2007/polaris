@@ -8,10 +8,18 @@
  * absolute date is shown as the fallback, so there is never a blank cell.
  */
 
-import { createElement, useEffect, type ReactElement } from "react";
 import { useDisplayFormat } from "./display-format";
+import { createElement, useEffect, type ReactElement } from "react";
 
-export function RelativeTime({ iso }: { iso: string }): ReactElement {
+export function RelativeTime({
+    iso,
+    tense = "past"
+}: {
+    iso: string;
+    /** "future" for a moment that has not happened yet ("in 26 days"), which the
+     *  element will not phrase correctly if it is told to expect a past one. */
+    tense?: "past" | "future";
+}): ReactElement {
     const format = useDisplayFormat();
     useEffect(() => {
         void import("@github/relative-time-element");
@@ -20,7 +28,7 @@ export function RelativeTime({ iso }: { iso: string }): ReactElement {
     const absolute = format.dateTime(iso);
     return createElement(
         "relative-time",
-        { datetime: iso, tense: "past", title: absolute },
+        { datetime: iso, tense, title: absolute },
         absolute
     );
 }

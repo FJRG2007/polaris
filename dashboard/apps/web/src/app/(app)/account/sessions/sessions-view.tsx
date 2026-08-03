@@ -18,9 +18,10 @@ import { useState, type FormEvent } from "react";
 import { useConfirm } from "@/components/confirm-dialog";
 import { Check, LogOut, ScanLine, X } from "lucide-react";
 import { RelativeTime } from "@/components/relative-time";
-import type { SessionView } from "@/lib/session-directory";
+import { TrustedDevicesCard } from "./trusted-devices-card";
 import { SessionActivityDialog } from "./session-activity-dialog";
 import { SessionsTable, sessionOrigin } from "@/components/sessions-table";
+import type { SessionView, TrustedDeviceRow } from "@/lib/session-directory";
 import { decideLoginApprovalAction, revokeOtherSessionsAction, revokeSessionAction } from "./actions";
 import {
     Button,
@@ -42,7 +43,15 @@ function Origin({ session }: { session: SessionView }) {
     );
 }
 
-export function SessionsView({ sessions }: { sessions: SessionView[] }) {
+export function SessionsView({
+    sessions,
+    trusted
+}: {
+    sessions: SessionView[];
+    /** Browsers allowed to skip the second-factor challenge. Empty on an account
+     *  that has never armed one, which is when the card stays away. */
+    trusted: TrustedDeviceRow[];
+}) {
     const router = useRouter();
     const [confirm, confirmElement] = useConfirm();
     const [busyId, setBusyId] = useState<string | null>(null);
@@ -186,6 +195,8 @@ export function SessionsView({ sessions }: { sessions: SessionView[] }) {
                     />
                 </CardBody>
             </Card>
+
+            {trusted.length > 0 ? <TrustedDevicesCard devices={trusted} /> : null}
 
             <SessionActivityDialog
                 session={activityFor}

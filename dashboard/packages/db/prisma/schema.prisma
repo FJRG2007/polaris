@@ -89,6 +89,7 @@ model User {
     apiKeys             ApiKey[]
     twoFactors          TwoFactor[]
     sessionStates       SessionState[]
+    trustedDevices      TrustedDevice[]
     deviceCodes         DeviceCode[]
     emails              UserEmail[]
     phone               UserPhone?
@@ -190,6 +191,41 @@ model UserAvatar {
     updatedAt    DateTime @updatedAt
 
     user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// A browser allowed to sign in without answering the second-factor challenge,
+// because somebody ticked "remember this device".
+//
+// The pass itself is a Verification row: better-auth writes one keyed by a random
+// identifier, hands the browser a signed cookie naming it, and rotates the pair
+// on every sign-in it lets through. That row carries nothing but the user id and
+// an expiry, which is why an account could previously only be told how many of
+// these existed and offered to drop the lot.
+//
+// This is the half Polaris keeps: what the device looked like when it was
+// remembered, so the owner can recognise one in the list and end that one. It is
+// a label, never the pass - deleting a row here forgets a device, and the
+// Verification row is what actually decides whether the challenge is skipped.
+model TrustedDevice {
+    id String @id @default(uuid(7)) @db.Uuid
+    // The Verification row this describes. Follows better-auth's rotation, so
+    // one long-lived device stays one row rather than accumulating a new one per
+    // sign-in.
+    identifier String @unique
+    userId     String @db.Uuid
+    // Client-supplied, exactly like a session's: shown so a person can tell
+    // their phone from their laptop, never an input to a decision.
+    userAgent String?
+    ip        String?
+    host      String?
+    createdAt DateTime @default(now())
+    // Bumped whenever the pass is used, so a device nobody has touched in weeks
+    // is visible as one worth forgetting.
+    lastSeenAt DateTime @default(now())
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@index([userId])
 }
 
 model Session {

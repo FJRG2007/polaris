@@ -28,9 +28,9 @@ import Link from "next/link";
 import { Feedback } from "./setting-card";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
+import { setLoginApprovalAction } from "./actions";
 import { saveTwoFactorPreferencesAction } from "./two-factor-actions";
 import type { TwoFactorMethodStatus } from "@/lib/two-factor-delivery";
-import { revokeTrustedDevicesAction, setLoginApprovalAction } from "./actions";
 import {
     TWO_FACTOR_DELIVERY_METHODS,
     TWO_FACTOR_METHOD_INFO,
@@ -75,7 +75,6 @@ export function TwoFactorMethodsCard({
     approval: LoginApprovalStatus;
 }) {
     const router = useRouter();
-    const [forgetting, setForgetting] = useState(false);
     const [methods, setMethods] = useState<TwoFactorDeliveryMethod[]>(
         TWO_FACTOR_DELIVERY_METHODS.filter(
             (method) => statuses.find((status) => status.method === method)?.enabled === true
@@ -206,8 +205,8 @@ export function TwoFactorMethodsCard({
 
                 {/* Only worth a row while there is something to forget. A remembered
                     browser is the one way a sign-in skips the challenge without any
-                    setting on this page saying so, so it says how many and offers to
-                    end them - nothing about the device itself is recorded. */}
+                    setting on this page saying so, so it is named here and listed
+                    with the sessions, where the devices are. */}
                 {twoFactorEnabled && trustedDevices > 0 ? (
                     <div className="flex items-start justify-between gap-3 rounded-md border border-border px-3 py-2">
                         <div className="min-w-0">
@@ -218,19 +217,11 @@ export function TwoFactorMethodsCard({
                                     : `${trustedDevices} devices sign in without a code until their 30 days run out.`}
                             </p>
                         </div>
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            disabled={forgetting}
-                            onClick={async () => {
-                                setForgetting(true);
-                                await revokeTrustedDevicesAction();
-                                setForgetting(false);
-                                router.refresh();
-                            }}
-                        >
-                            {forgetting ? "Forgetting..." : "Forget them"}
-                        </Button>
+                        <Link href="/account/sessions">
+                            <Button variant="outline" size="sm">
+                                Review
+                            </Button>
+                        </Link>
                     </div>
                 ) : null}
 

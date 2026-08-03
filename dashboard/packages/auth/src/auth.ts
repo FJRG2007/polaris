@@ -22,8 +22,12 @@ import { setSessionCookie } from "better-auth/cookies";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { betterAuth, type BetterAuthPlugin } from "better-auth";
 import { APIError, createAuthMiddleware } from "better-auth/api";
+import { followTrustedDevice, recordTrustedDevice } from "./two-factor.js";
 import { deviceAuthorization, magicLink, twoFactor } from "better-auth/plugins";
 import {
+    originHost,
+    originIp,
+    originUserAgent,
     passkeyRelyingPartyId,
     QR_SIGN_IN_CLIENT_ID,
     QR_SIGN_IN_POLL_SECONDS,
@@ -78,29 +82,132 @@ function passkeyPlugin(address: string): BetterAuthPlugin | null {
  */
 function twoFactorPlugin(options: AuthOptions): BetterAuthPlugin {
     const send = options.sendTwoFactorCode;
-    if (!send) return gateEmailedLink(twoFactor({ issuer: "Polaris" }));
-    return gateEmailedLink(
-        twoFactor({
-            issuer: "Polaris",
-            otpOptions: {
-                period: TWO_FACTOR_CODE_TTL_MINUTES,
-                allowedAttempts: TWO_FACTOR_CODE_ATTEMPTS,
-                // The code is a short-lived, low-entropy secret; store it the way
-                // any other one is rather than in the clear next to the account it
-                // opens.
-                storeOTP: "hashed",
-                sendOTP: async ({ user, otp }, ctx) => {
-                    const requested = ctx?.headers?.get(TWO_FACTOR_METHOD_HEADER) ?? null;
-                    const result = await send({ userId: user.id, requested, code: otp });
-                    // better-auth answers send-otp the same way whether or not this
-                    // callback managed anything, so a failure is only ever recorded
-                    // here. Telling the caller would say which methods an account
-                    // has, to somebody who has not finished proving who they are.
-                    if (result.error) console.error("two-factor code not sent:", result.error);
+    if (!send) return describeTrustedDevices(gateEmailedLink(twoFactor({ issuer: "Polaris" })));
+    return describeTrustedDevices(
+        gateEmailedLink(
+            twoFactor({
+                issuer: "Polaris",
+                otpOptions: {
+                    period: TWO_FACTOR_CODE_TTL_MINUTES,
+                    allowedAttempts: TWO_FACTOR_CODE_ATTEMPTS,
+                    // The code is a short-lived, low-entropy secret; store it the
+                    // way any other one is rather than in the clear next to the
+                    // account it opens.
+                    storeOTP: "hashed",
+                    sendOTP: async ({ user, otp }, ctx) => {
+                        const requested = ctx?.headers?.get(TWO_FACTOR_METHOD_HEADER) ?? null;
+                        const result = await send({ userId: user.id, requested, code: otp });
+                        // better-auth answers send-otp the same way whether or not
+                        // this callback managed anything, so a failure is only ever
+                        // recorded here. Telling the caller would say which methods
+                        // an account has, to somebody who has not finished proving
+                        // who they are.
+                        if (result.error) console.error("two-factor code not sent:", result.error);
+                    }
                 }
-            }
-        })
+            })
+        )
     );
+}
+
+/** What every Polaris cookie is named under. Also the value handed to better-auth
+ *  as its cookiePrefix; the two must not drift, so there is one of them. */
+const COOKIE_PREFIX = "polaris";
+
+/** better-auth's own name for the cookie naming a remembered browser's pass. */
+const TRUST_DEVICE_COOKIE = "trust_device";
+
+/**
+ * That cookie as it appears in a jar, both ways it can be named: a deployment
+ * with secure cookies on gets the `__Secure-` prefix, and better-auth reads
+ * either. Exported because the account page resolves which pass the browser
+ * holds from the request's own cookies, outside better-auth's request handling.
+ */
+export const TRUST_DEVICE_COOKIE_NAMES = [
+    `${COOKIE_PREFIX}.${TRUST_DEVICE_COOKIE}`,
+    `__Secure-${COOKIE_PREFIX}.${TRUST_DEVICE_COOKIE}`
+] as const;
+
+/** The paths that can hand a browser a pass, by answering the challenge. */
+const TWO_FACTOR_VERIFY_PATHS: ReadonlySet<string> = new Set([
+    "/two-factor/verify-totp",
+    "/two-factor/verify-otp",
+    "/two-factor/verify-backup-code"
+]);
+
+/** The paths a pass is spent on, which is where better-auth rotates it. Built on
+ *  demand because the emailed-link path is declared further down, next to the
+ *  hook that widened the challenge to cover it. */
+function spendsTrust(path: string): boolean {
+    return path === "/sign-in/email" || path === MAGIC_LINK_VERIFY_PATH;
+}
+
+/**
+ * Record what a remembered browser was, so the account can list its devices
+ * rather than being told a number.
+ *
+ * A pass is a verification row holding a random identifier, the user id and an
+ * expiry - nothing that would let anybody tell one device from another. So
+ * Account > Security could offer only "you have three, forget all three", which
+ * is the wrong control for the case it exists for: a phone that was lost is one
+ * device, and ending the pass on it should not end it on the laptop as well.
+ *
+ * Two moments to catch. Answering the challenge with "remember this device"
+ * mints a pass, and every later sign-in that the pass admits rotates it - old
+ * identifier deleted, new one written - so a description that did not follow the
+ * rotation would come off the first time the device was used.
+ *
+ * Both run after better-auth's own handling, and read the pass out of the
+ * request cookie, which better-auth does not modify. Neither can fail the
+ * request: a sign-in that worked must not be undone because a label could not be
+ * written.
+ */
+function describeTrustedDevices(plugin: BetterAuthPlugin): BetterAuthPlugin {
+    return {
+        ...plugin,
+        hooks: {
+            ...plugin.hooks,
+            after: [
+                ...(plugin.hooks?.after ?? []),
+                {
+                    matcher: (context) =>
+                        TWO_FACTOR_VERIFY_PATHS.has(context.path ?? "") || spendsTrust(context.path ?? ""),
+                    handler: createAuthMiddleware(async (ctx) => {
+                        // Null while a challenge is still in flight: the sign-in
+                        // handler creates a session and the two-factor hook takes
+                        // it back again, which is the case with no device yet.
+                        const user = ctx.context.newSession?.user;
+                        if (!user) return;
+                        const origin = {
+                            userAgent: originUserAgent(ctx.headers ?? new Headers()),
+                            ip: originIp(ctx.headers ?? new Headers()),
+                            host: originHost(ctx.headers ?? new Headers())
+                        };
+
+                        if (TWO_FACTOR_VERIFY_PATHS.has(ctx.path)) {
+                            // The only thing that mints a pass. Anything else on
+                            // these paths is somebody proving themselves without
+                            // asking to be remembered.
+                            if ((ctx.body as { trustDevice?: unknown } | undefined)?.trustDevice !== true) return;
+                            await recordTrustedDevice(user.id, origin);
+                            return;
+                        }
+
+                        // A rotation only happens for an account that has the
+                        // challenge armed; for any other, a cookie left over from
+                        // before is not a pass and better-auth ignored it.
+                        if ((user as { twoFactorEnabled?: unknown }).twoFactorEnabled !== true) return;
+                        const cookie = ctx.context.createAuthCookie(TRUST_DEVICE_COOKIE);
+                        // False is a cookie whose signature did not check out,
+                        // which better-auth treats as no cookie at all.
+                        const held = await ctx.getSignedCookie(cookie.name, ctx.context.secret);
+                        const previous = typeof held === "string" ? held.split("!")[1] : undefined;
+                        if (previous) await followTrustedDevice(user.id, previous, origin);
+                    })
+                }
+            ]
+        }
+    };
 }
 
 /**
@@ -396,7 +503,7 @@ export function createAuth(options: AuthOptions = {}, address?: string) {
             }
         },
         advanced: {
-            cookiePrefix: "polaris",
+            cookiePrefix: COOKIE_PREFIX,
             // Off by default so sign-in works over plain HTTP (polaris.local on the
             // LAN); set POLARIS_SECURE_COOKIES=true for an HTTPS deployment.
             useSecureCookies: env.POLARIS_SECURE_COOKIES,

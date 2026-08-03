@@ -5,7 +5,13 @@
  * because they need its concrete auth instance and request headers.
  */
 
-export { createAuth, createRequestAuth, type Auth, type RequestAuth } from "./auth.js";
+export {
+    createAuth,
+    createRequestAuth,
+    TRUST_DEVICE_COOKIE_NAMES,
+    type Auth,
+    type RequestAuth
+} from "./auth.js";
 export {
     seedDefaultRoles,
     getUserPermissions,
@@ -70,7 +76,11 @@ export {
     verifyTotpForSession,
     twoFactorEnabled,
     countTrustedDevices,
-    revokeTrustedDevices
+    currentTrustedDevice,
+    listTrustedDevices,
+    revokeTrustedDevice,
+    revokeTrustedDevices,
+    type TrustedDeviceView
 } from "./two-factor.js";
 export {
     getUserPhone,

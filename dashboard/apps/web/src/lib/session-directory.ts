@@ -10,8 +10,14 @@
 
 import { auth } from "@/lib/auth";
 import { prisma } from "@polaris/db";
-import { verifyQuickPin } from "@polaris/auth";
+import { cookies } from "next/headers";
 import { recordAudit } from "@/lib/audit-service";
+import {
+    currentTrustedDevice,
+    listTrustedDevices,
+    TRUST_DEVICE_COOKIE_NAMES,
+    verifyQuickPin
+} from "@polaris/auth";
 
 export interface SessionView {
     id: string;
@@ -102,6 +108,51 @@ export async function listUserSessions(userId: string, currentSessionId: string)
             expiresAt: row.expiresAt.toISOString()
         };
     });
+}
+
+/**
+ * A browser allowed to skip the second-factor challenge for thirty days, as the
+ * account page shows it.
+ *
+ * Deliberately the same shape a session is described in - the same label from
+ * the same user-agent, the same address and domain - because to the person
+ * reading the page these are the same devices in two lists, and two vocabularies
+ * for one laptop is how a security screen stops being read.
+ */
+export interface TrustedDeviceRow {
+    id: string;
+    current: boolean;
+    device: string;
+    ip: string | null;
+    host: string | null;
+    /** Null for a pass granted before Polaris recorded what the device was. */
+    rememberedAt: string | null;
+    lastSeenAt: string | null;
+    expiresAt: string;
+}
+
+/**
+ * Every pass this account holds, newest first, with the one this browser is
+ * using flagged.
+ *
+ * The flag is read from the request's own cookie, so it only ever means "the
+ * screen you are looking at" - an administrator reading another account's page
+ * would match nothing, which is right.
+ */
+export async function listTrustedDeviceRows(userId: string): Promise<TrustedDeviceRow[]> {
+    const jar = await cookies();
+    const held = TRUST_DEVICE_COOKIE_NAMES.map((name) => jar.get(name)?.value).find(Boolean);
+    const devices = await listTrustedDevices(userId, currentTrustedDevice(held, userId));
+    return devices.map((device) => ({
+        id: device.id,
+        current: device.current,
+        device: describeDevice(device.userAgent),
+        ip: device.ip,
+        host: device.host,
+        rememberedAt: device.rememberedAt,
+        lastSeenAt: device.lastSeenAt,
+        expiresAt: device.expiresAt
+    }));
 }
 
 /** End one of the caller's own sessions. */
