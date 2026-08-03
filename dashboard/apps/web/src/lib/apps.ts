@@ -223,7 +223,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             label: "Uploads",
             href: "/admin/uploads",
             icon: HardDrive,
-            keywords: ["attachments", "files", "storage", "nas", "size limit"]
+            keywords: ["attachments", "files", "storage", "nas", "size limit", "avatars", "profile photos", "gravatar"]
         },
         { label: "Integrations", href: "/integrations", icon: Blocks, keywords: ["github", "cloudflare", "connect"] },
         { label: "Updates & settings", href: "/settings", icon: Settings, keywords: ["version", "upgrade"] }

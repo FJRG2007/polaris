@@ -14,7 +14,7 @@
  * other column.
  */
 
-import { Avatar } from "./pickers";
+import { Avatar } from "@/components/avatar";
 import * as actions from "./actions";
 import * as core from "@polaris/core";
 import { runAction } from "@/lib/run-action";

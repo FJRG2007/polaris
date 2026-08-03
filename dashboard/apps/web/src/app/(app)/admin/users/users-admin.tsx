@@ -12,6 +12,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Avatar } from "@/components/avatar";
 import { InviteDialog } from "./invite-dialog";
 import { revokeInviteAction } from "./actions";
 import { RecoveryRequests } from "./recovery-requests";
@@ -48,20 +49,6 @@ function hasLimits(user: DirectoryUser): boolean {
         enforced.allowedCidrs.length > 0 ||
         enforced.allowedCountries.length > 0 ||
         enforced.allowedContinents.length > 0
-    );
-}
-
-/** The circle of initials that stands in for a photo nobody uploaded. */
-function Avatar({ name }: { name: string }) {
-    const initials = name
-        .split(/\s+/)
-        .slice(0, 2)
-        .map((part) => part.charAt(0).toUpperCase())
-        .join("");
-    return (
-        <span className="grid size-9 shrink-0 place-items-center rounded-full bg-primary/10 text-xs font-medium text-primary">
-            {initials || "?"}
-        </span>
     );
 }
 
@@ -169,7 +156,7 @@ export function UsersAdmin({
                                 >
                                     <td className="px-3 py-2">
                                         <div className="flex items-center gap-3">
-                                            <Avatar name={user.name} />
+                                            <Avatar person={user} size={36} />
                                             <div className="min-w-0">
                                                 <p className="flex items-center gap-1.5 truncate font-medium">
                                                     {user.name}

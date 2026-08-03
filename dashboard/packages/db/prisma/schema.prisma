@@ -91,6 +91,7 @@ model User {
     sessionStates       SessionState[]
     emails              UserEmail[]
     phone               UserPhone?
+    avatar              UserAvatar?
     emailVerifications  EmailVerification[]
     passkeys            Passkey[]
     notifyDestinations  NotificationDestination[]
@@ -167,6 +168,25 @@ model UserPhone {
     attempts      Int       @default(0)
     createdAt     DateTime  @default(now())
     updatedAt     DateTime  @updatedAt
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// A profile photo somebody uploaded. The bytes are not here: they go to whatever
+// storage the instance keeps uploads on (a NAS if it has one), and this records
+// which storage and where, so a photo written before a NAS was connected stays
+// readable on the disk it was written to. One row per account - a new photo
+// replaces the old one rather than piling up versions nobody asked for.
+model UserAvatar {
+    userId       String   @id @db.Uuid
+    // Null when the bytes are on the disk Polaris runs on.
+    connectionId String?
+    // Where the bytes are under that storage, relative to its root.
+    path         String
+    mime         String
+    // Bytes. Capped at upload, so an Int is enough and stays JSON-safe.
+    size         Int      @default(0)
+    updatedAt    DateTime @updatedAt
 
     user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

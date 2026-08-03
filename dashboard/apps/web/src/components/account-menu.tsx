@@ -1,7 +1,9 @@
 "use client";
 
-import { Bell, Link2, LogOut, UserCog } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { signOut } from "@/lib/auth-client";
+import { Avatar } from "@/components/avatar";
+import { Bell, Link2, LogOut, UserCog } from "lucide-react";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -10,16 +12,14 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger
 } from "@polaris/ui";
-import { signOut } from "@/lib/auth-client";
 
 /**
  * The personal account dropdown. Only per-user items live here; administration
  * (users, policies, domains, integrations, updates, ...) moved to the dedicated
  * Management app in the switcher, so this menu stays about "you", not the system.
  */
-export function AccountMenu({ name, email }: { name: string; email: string }) {
+export function AccountMenu({ id, name, email }: { id: string; name: string; email: string }) {
     const router = useRouter();
-    const initial = name.trim().charAt(0).toUpperCase() || "?";
 
     async function onSignOut() {
         await signOut();
@@ -29,8 +29,11 @@ export function AccountMenu({ name, email }: { name: string; email: string }) {
 
     return (
         <DropdownMenu>
-            <DropdownMenuTrigger className="grid size-8 place-items-center rounded-full bg-primary/15 text-sm font-medium text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                {initial}
+            <DropdownMenuTrigger
+                aria-label="Your account"
+                className="rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+                <Avatar person={{ id, name }} size={32} />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
                 <DropdownMenuLabel>

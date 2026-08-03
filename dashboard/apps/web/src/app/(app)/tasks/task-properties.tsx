@@ -14,6 +14,7 @@ import { useState } from "react";
 import * as pickers from "./pickers";
 import * as core from "@polaris/core";
 import type { TaskRow } from "@/lib/tasks/facts";
+import { AvatarStack } from "@/components/avatar";
 import { TimerControl } from "./task-conversation";
 import { CustomFieldEditor } from "./custom-fields";
 import type { SpaceContext } from "@/lib/tasks/facts";
@@ -86,7 +87,7 @@ export function PropertyRows({
             </Property>
 
             <Property icon={<UserRound className="size-3.5" />} label="Assignees">
-                <pickers.AvatarStack people={task.assignees} />
+                <AvatarStack people={task.assignees} />
                 <pickers.AssigneePicker
                     people={context.people}
                     selected={task.assignees.map((person) => person.id)}

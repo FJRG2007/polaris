@@ -55,7 +55,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
                                     <span className="hidden lg:inline-flex">
                                         <EditionBadge />
                                     </span>
-                                    <AccountMenu name={user.name} email={user.email} />
+                                    <AccountMenu id={user.id} name={user.name} email={user.email} />
                                 </>
                             }
                         >

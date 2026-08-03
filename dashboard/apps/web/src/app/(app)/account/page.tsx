@@ -7,6 +7,7 @@
  */
 
 import { prisma } from "@polaris/db";
+import { AvatarCard } from "./avatar-card";
 import { requireUser } from "@/lib/session";
 import { AccountView } from "./account-view";
 import { getAuthMailStatus } from "@/lib/auth-mail";
@@ -18,11 +19,14 @@ export const dynamic = "force-dynamic";
 
 export default async function AccountPage() {
     const session = await requireUser();
-    const [user, emails, mail, phone, whatsappChannel, identity, userAuth] = await Promise.all([
+    const [user, photo, emails, mail, phone, whatsappChannel, identity, userAuth] = await Promise.all([
         prisma.user.findUnique({
             where: { id: session.id },
             select: { name: true, username: true, company: true }
         }),
+        // Only whether there is one to replace or remove; the picture itself is
+        // fetched by the browser like every other face on the page.
+        prisma.userAvatar.findUnique({ where: { userId: session.id }, select: { userId: true } }),
         listUserEmails(session.id),
         getAuthMailStatus(),
         getUserPhone(session.id),
@@ -44,6 +48,7 @@ export default async function AccountPage() {
                 <h1 className="text-lg font-semibold">Profile</h1>
                 <p className="text-sm text-muted-foreground">How you appear in Polaris, and how you sign in.</p>
             </div>
+            <AvatarCard userId={session.id} name={user?.name ?? session.name} hasPhoto={photo !== null} />
             <AccountView
                 name={user?.name ?? session.name}
                 username={user?.username ?? ""}

@@ -13,6 +13,7 @@
 
 import Link from "next/link";
 import * as core from "@polaris/core";
+import { Avatar } from "@/components/avatar";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { PersonRef, TagRef, TaskRow } from "@/lib/tasks/facts";
 import type { StatusView, TagView } from "@/lib/tasks/space-service";
@@ -32,50 +33,14 @@ import {
 // People
 // ---------------------------------------------------------------------------
 
-/** Initials from a display name, for an account with no picture. */
-function initials(name: string): string {
-    const parts = name.trim().split(/\s+/).filter(Boolean);
-    if (parts.length === 0) return "?";
-    return (parts.length === 1 ? parts[0]!.slice(0, 2) : `${parts[0]![0]}${parts[1]![0]}`).toUpperCase();
-}
-
-export function Avatar({ person, size = 24 }: { person: PersonRef; size?: number }) {
-    return (
-        <span
-            title={person.name}
-            className="inline-flex shrink-0 items-center justify-center rounded-full bg-muted text-[10px] font-medium text-muted-foreground ring-1 ring-border"
-            style={{ width: size, height: size }}
-        >
-            {person.image ? (
-                // eslint-disable-next-line @next/next/no-img-element -- avatars come from arbitrary external URLs.
-                <img src={person.image} alt="" className="size-full rounded-full object-cover" />
-            ) : (
-                initials(person.name)
-            )}
-        </span>
-    );
-}
-
-/** Up to three faces and a "+n", which is as many as a row can carry legibly. */
-export function AvatarStack({ people, size = 24 }: { people: readonly PersonRef[]; size?: number }) {
-    if (people.length === 0) return null;
-    const shown = people.slice(0, 3);
-    return (
-        <span className="flex items-center -space-x-1.5">
-            {shown.map((person) => (
-                <Avatar key={person.id} person={person} size={size} />
-            ))}
-            {people.length > shown.length && (
-                <span
-                    className="inline-flex items-center justify-center rounded-full bg-muted text-[10px] font-medium text-muted-foreground ring-1 ring-border"
-                    style={{ width: size, height: size }}
-                >
-                    +{people.length - shown.length}
-                </span>
-            )}
-        </span>
-    );
-}
+/**
+ * A face is no longer a task control: the same circle is drawn in the people
+ * directory, in the account menu and on a profile, and it now has a picture to
+ * resolve rather than only initials. It lives in `components/avatar` and is
+ * re-exported here so the screens that have always taken their controls from
+ * this module keep doing so.
+ */
+export { Avatar, AvatarStack } from "@/components/avatar";
 
 /** A menu that filters as you type once the list stops being scannable. */
 function MenuSearch({
