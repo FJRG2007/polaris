@@ -10,21 +10,16 @@
  */
 
 import { RefreshCw } from "lucide-react";
-import { ActivityDetails } from "./activity-details";
+import { Button, PageHeader } from "@polaris/ui";
 import type { ActivityEntry } from "@/lib/audit-service";
-import { useDisplayFormat } from "@/components/display-format";
 import { useLiveResource } from "@/components/use-live-resource";
-import { Badge, Button, PageHeader, Skeleton } from "@polaris/ui";
+import { ActivityTable, type ActivityRow } from "@/components/activity-table";
 
 /** How often the feed re-reads. An audit trail is appended to, not edited, so
  *  this is gentle - the refresh control covers wanting it now. */
 const POLL_MS = 30_000;
 
-/** Rows sketched while the first answer is in flight; about a screenful. */
-const SKELETON_ROWS = 12;
-
 export function ActivityView() {
-    const format = useDisplayFormat();
     const { data, loading, error, stale, refreshing, refresh } = useLiveResource<ActivityEntry[]>({
         url: "/api/admin/activity",
         cacheKey: "admin.activity",
@@ -34,6 +29,15 @@ export function ActivityView() {
             return Array.isArray(items) ? (items as ActivityEntry[]) : [];
         }
     });
+
+    const rows: ActivityRow[] | null =
+        data?.map((event) => ({
+            id: event.id,
+            at: event.at,
+            context: event.actor,
+            action: event.action,
+            metadata: event.metadata
+        })) ?? null;
 
     return (
         <>
@@ -54,74 +58,13 @@ export function ActivityView() {
                 }
             />
             {stale ? <p className="mb-3 text-sm text-warning">{stale}</p> : null}
-            <div className="overflow-hidden rounded-lg border border-border">
-                <table className="w-full text-sm">
-                    <thead className="bg-surface/60 text-left text-xs text-muted-foreground">
-                        <tr>
-                            <th className="px-3 py-2 font-medium">When</th>
-                            <th className="px-3 py-2 font-medium">Who</th>
-                            <th className="px-3 py-2 font-medium">Action</th>
-                            <th className="hidden px-3 py-2 font-medium md:table-cell">Details</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {loading ? (
-                            <ActivityRowsSkeleton />
-                        ) : error ? (
-                            <tr>
-                                <td colSpan={4} className="px-3 py-8 text-center text-danger">
-                                    {error}
-                                </td>
-                            </tr>
-                        ) : (data?.length ?? 0) === 0 ? (
-                            <tr>
-                                <td colSpan={4} className="px-3 py-8 text-center text-muted-foreground">
-                                    No activity recorded yet.
-                                </td>
-                            </tr>
-                        ) : (
-                            data?.map((event) => (
-                                <tr key={event.id} className="border-t border-border hover:bg-card-hover">
-                                    <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">
-                                        {format.dateTime(event.at)}
-                                    </td>
-                                    <td className="px-3 py-2">{event.actor}</td>
-                                    <td className="px-3 py-2">
-                                        <Badge variant="neutral">{event.action}</Badge>
-                                    </td>
-                                    <td className="hidden px-3 py-2 align-top text-xs text-muted-foreground md:table-cell">
-                                        <ActivityDetails metadata={event.metadata} />
-                                    </td>
-                                </tr>
-                            ))
-                        )}
-                    </tbody>
-                </table>
-            </div>
-        </>
-    );
-}
-
-/** The rows' own shape, so the table does not jump when they arrive. */
-function ActivityRowsSkeleton() {
-    return (
-        <>
-            {Array.from({ length: SKELETON_ROWS }).map((_, index) => (
-                <tr key={index} className="border-t border-border">
-                    <td className="px-3 py-2">
-                        <Skeleton className="h-4 w-32" />
-                    </td>
-                    <td className="px-3 py-2">
-                        <Skeleton className="h-4 w-28" />
-                    </td>
-                    <td className="px-3 py-2">
-                        <Skeleton className="h-5 w-24 rounded-full" />
-                    </td>
-                    <td className="hidden px-3 py-2 md:table-cell">
-                        <Skeleton className="h-4 w-full max-w-md" />
-                    </td>
-                </tr>
-            ))}
+            <ActivityTable
+                rows={rows}
+                loading={loading}
+                error={error}
+                contextLabel="Who"
+                emptyLabel="No activity recorded yet."
+            />
         </>
     );
 }

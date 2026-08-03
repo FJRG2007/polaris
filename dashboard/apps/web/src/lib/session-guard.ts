@@ -19,8 +19,8 @@ import { recordAudit } from "@/lib/audit-service";
 import { notify } from "@/lib/notifications/dispatch";
 import { describeOrigin } from "@/lib/session-directory";
 import { evaluateAccountAccess } from "@/lib/network-rules";
-import { consumeSessionRotation, rememberAccountDevice, resolveSignInRules } from "@polaris/auth";
 import { clientHost, clientIp, clientUserAgent, clientUserAgentBrands } from "@/lib/request-context";
+import { consumeSessionRotation, rememberAccountDevice, resolveSignInRules, takeSignInRecord } from "@polaris/auth";
 
 /** Where a refused session is sent, or null when the session may proceed. */
 export type SessionVerdict = { ok: true } | { ok: false; redirect: string };
@@ -170,6 +170,11 @@ export async function guardSession({
  * same person on the same device. The session being replaced leaves a
  * single-use, address-bound pass behind for it (see beginSessionRotation).
  *
+ * This is also where the sign-in that opened the session is collected. The sign-in
+ * itself happened in an earlier request - two earlier requests when a second
+ * factor was answered - so what each of them proved was left on the account and
+ * is picked up here, once, and written against the session it belongs to.
+ *
  * A single navigation resolves the session more than once (the layout and the
  * page render concurrently), so two callers can reach this at the same moment for
  * the same brand-new session. The loser of that race adopts the row the winner
@@ -196,10 +201,11 @@ async function createSessionState(input: {
         if (approver) approval = "pending";
     }
 
-    const [userAgent, userAgentBrands, host] = await Promise.all([
+    const [userAgent, userAgentBrands, host, signIn] = await Promise.all([
         clientUserAgent(),
         clientUserAgentBrands(),
-        clientHost()
+        clientHost(),
+        takeSignInRecord(input.userId)
     ]);
     try {
         await prisma.sessionState.create({
@@ -211,7 +217,9 @@ async function createSessionState(input: {
                 country: input.country,
                 userAgent: userAgent ?? null,
                 userAgentBrands: userAgentBrands ?? null,
-                host: host ?? null
+                host: host ?? null,
+                signInMethod: signIn.method,
+                secondFactor: signIn.secondFactor
             }
         });
     } catch {
@@ -228,6 +236,17 @@ async function createSessionState(input: {
     // which is what dates a device for the new-device wait. Written here because
     // this runs exactly once per session, at the sign-in that opened it.
     await rememberAccountDevice(input.userId, { userAgent, userAgentBrands, ip: input.ip, host });
+
+    // The session carries this too, but a session ends and this does not: it is
+    // what lets somebody read back how their account was signed into last month.
+    await recordAudit({
+        actorId: input.userId,
+        action: "account.signin",
+        targetType: "session",
+        targetId: input.sessionId,
+        sessionId: input.sessionId,
+        metadata: { method: signIn.method, secondFactor: signIn.secondFactor }
+    });
 
     if (approval === "pending") {
         await recordAudit({

@@ -220,7 +220,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             keywords: ["github", "google", "link", "oauth", "repositories", "calendar"]
         },
         // Everything that decides who reaches this account is one subject, and it
-        // is half the rail: five screens people go looking for together.
+        // is half the rail: six screens people go looking for together.
         {
             label: "Password & 2FA",
             href: "/account/security",
@@ -233,6 +233,13 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             href: "/account/sessions",
             icon: MonitorSmartphone,
             keywords: ["devices", "sign out", "remembered devices", "trusted devices"],
+            group: "Security"
+        },
+        {
+            label: "Activity",
+            href: "/account/activity",
+            icon: History,
+            keywords: ["audit", "logs", "history", "what happened"],
             group: "Security"
         },
         {

@@ -24,7 +24,7 @@ import { clientIp } from "@/lib/request-context";
 import { recordAudit } from "@/lib/audit-service";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { newDeviceRefusal } from "@/lib/device-grace";
-import { revokeOtherSessions } from "@/lib/session-directory";
+import { revokeOtherSessions, sessionSignInRecord } from "@/lib/session-directory";
 import {
     newDeviceGraceSchema,
     recoverPasswordSchema,
@@ -34,6 +34,7 @@ import {
 } from "@polaris/core";
 import {
     beginSessionRotation,
+    carrySignInRecord,
     changeUserPassword,
     setNewDeviceGrace,
     clearQuickPin,
@@ -51,7 +52,6 @@ import {
 } from "@polaris/auth";
 
 type ActionResult = { error?: string };
-
 
 /** Guess-throttling for the identity proofs that stand in for the password. */
 const RECOVERY_LIMIT = 5;
@@ -113,10 +113,15 @@ export async function recoverPasswordAction(input: unknown): Promise<ActionResul
  * told to allow it from another session, which is exactly the session that had
  * just been ended. Called by the authenticator dialogs immediately before the
  * step that replaces the session.
+ *
+ * The replacement inherits how this session signed in, for the same reason: it is
+ * the same sign-in continuing, and a session list that suddenly could not say how
+ * the reader's own device got in would be reporting the rotation as a mystery.
  */
 export async function beginSessionRotationAction(): Promise<void> {
     const user = await requireUser();
     await beginSessionRotation(user.id, (await clientIp()) ?? null);
+    await carrySignInRecord(user.id, await sessionSignInRecord(user.id, user.sessionId));
 }
 
 export async function setPinAction(input: unknown): Promise<ActionResult> {

@@ -25,9 +25,11 @@ function session(overrides: Partial<SessionView> = {}): SessionView {
         publicIp: null,
         country: "ES",
         host: "polaris.local",
+        signIn: { method: "password", secondFactor: null },
         lastSeenAt: "2026-08-03T10:00:00.000Z",
         createdAt: "2026-08-01T10:00:00.000Z",
         expiresAt: "2026-08-08T10:00:00.000Z",
+        signIn: { method: "password", secondFactor: "totp" },
         ...overrides
     };
 }
@@ -69,8 +71,49 @@ describe("the session table", () => {
         expect(render([session({ current: true })])).toContain("This device");
     });
 
+    it("says how each session got in, which is the fact the list exists to check", () => {
+        expect(render([session()])).toContain("Password + Authenticator app");
+    });
+
+    // The one worth noticing at a glance: the account has a second step armed and
+    // this sign-in was let past it because the browser had been remembered.
+    it("shows a skipped second step rather than a session that merely lacks one", () => {
+        const markup = render([session({ signIn: { method: "password", secondFactor: "trusted-device" } })]);
+        expect(markup).toContain("Password + Remembered device");
+    });
+
+    it("shows a scanned code and a passkey as the ways in they are", () => {
+        expect(render([session({ signIn: { method: "qr-code", secondFactor: null } })])).toContain("QR code");
+        expect(render([session({ signIn: { method: "passkey", secondFactor: null } })])).toContain("Passkey");
+    });
+
+    // Silence would read as "a password and nothing else", which is a claim
+    // nobody made about a session that predates the record.
+    it("admits it does not know rather than implying nothing was asked for", () => {
+        const markup = render([session({ signIn: { method: null, secondFactor: null } })]);
+        expect(markup).toContain("Sign-in not recorded");
+    });
+
     it("labels its row actions, which carry no text of their own", () => {
         expect(render([session()])).toContain('aria-label="Sign Chrome on Windows out"');
+    });
+
+    it("links a row to that session's own history rather than to the whole log", () => {
+        const markup = renderToStaticMarkup(
+            <SessionsTable
+                sessions={[session({ id: "session-1" })]}
+                busyId={null}
+                emptyLabel="Nothing is signed in."
+                activityHref={(entry) => `/account/activity?session=${entry.id}`}
+                onRevoke={() => {}}
+            />
+        );
+        expect(markup).toContain('href="/account/activity?session=session-1"');
+        expect(markup).toContain('aria-label="Activity from Chrome on Windows"');
+    });
+
+    it("leaves the history out where the reader has no business reading it", () => {
+        expect(render([session()])).not.toContain("Activity from");
     });
 
     it("explains an empty table instead of showing an empty frame", () => {

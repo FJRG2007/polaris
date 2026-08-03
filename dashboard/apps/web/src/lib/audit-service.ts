@@ -6,7 +6,7 @@
  * payload never includes secrets.
  *
  * Each entry also remembers the session it came from, which is what lets a user
- * read their own history one device at a time from the session list.
+ * read their own history on its own screen and narrow it to one device.
  */
 
 import { cache } from "react";
@@ -114,33 +114,71 @@ export async function listActivityFeed(limit = 200): Promise<ActivityEntry[]> {
     }));
 }
 
-export interface SessionActivityEntry {
+/** One row of a user's own history, ready to render. */
+export interface UserActivityEntry {
     id: string;
-    action: string;
-    target: string | null;
+    /** ISO 8601; the screen formats it with the reader's own preferences. */
     at: string;
+    action: string;
+    /** What the action was aimed at, as one line, or "" when it named nothing. */
+    target: string;
+    /** The raw metadata document, or "" when the entry carried none. */
+    metadata: string;
+    /** The session it came from, null for anything a browser did not drive. */
+    sessionId: string | null;
+}
+
+/** A session that appears in a user's history, for the filter to offer. */
+export interface ActivitySessionGroup {
+    /** Null groups everything that reached Polaris outside a browser session. */
+    id: string | null;
+    /** When that session was last heard from, so the list can be ordered. */
+    lastAt: string;
 }
 
 /**
- * One session's own history, newest first. Always scoped by the owning user as
- * well as the session, so a session id belonging to another account reads back
- * as empty rather than as somebody else's activity.
+ * A user's own history, newest first, optionally narrowed to one session.
+ *
+ * Always scoped by the owning user, so a session id belonging to another account
+ * reads back as empty rather than as somebody else's activity. `sessionId: null`
+ * asks for the entries that came from no session at all - an API key, a
+ * background job - which is exactly what a reader auditing their account wants to
+ * be able to isolate.
  */
-export async function listSessionActivity(
+export async function listUserActivity(
     userId: string,
-    sessionId: string,
-    limit = 100
-): Promise<SessionActivityEntry[]> {
+    { sessionId, limit = 200 }: { sessionId?: string | null; limit?: number } = {}
+): Promise<UserActivityEntry[]> {
     const rows = await prisma.auditLog.findMany({
-        where: { actorId: userId, sessionId },
+        where: { actorId: userId, ...(sessionId === undefined ? {} : { sessionId }) },
         orderBy: { at: "desc" },
         take: limit,
-        select: { id: true, action: true, targetType: true, targetId: true, at: true }
+        select: { id: true, action: true, targetType: true, targetId: true, metadata: true, sessionId: true, at: true }
     });
     return rows.map((row) => ({
         id: row.id,
+        at: row.at.toISOString(),
         action: row.action,
-        target: row.targetType ? [row.targetType, row.targetId].filter(Boolean).join(" ") : null,
-        at: row.at.toISOString()
+        target: row.targetType ? [row.targetType, row.targetId].filter(Boolean).join(" ") : "",
+        metadata: row.metadata ?? "",
+        sessionId: row.sessionId
     }));
+}
+
+/**
+ * The sessions a user's history was written from, newest first.
+ *
+ * Grouped in the database rather than derived from the entries on screen: the
+ * feed is capped, so a session whose activity has scrolled past the cap would
+ * otherwise vanish from the filter that exists to bring it back.
+ */
+export async function listUserActivitySessions(userId: string): Promise<ActivitySessionGroup[]> {
+    const groups = await prisma.auditLog.groupBy({
+        by: ["sessionId"],
+        where: { actorId: userId },
+        _max: { at: true }
+    });
+    return groups
+        .map((group) => ({ id: group.sessionId, lastAt: (group._max.at ?? new Date(0)).toISOString() }))
+        .sort((a, b) => b.lastAt.localeCompare(a.lastAt));
 }

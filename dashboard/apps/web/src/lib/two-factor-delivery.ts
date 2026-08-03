@@ -13,22 +13,23 @@
  * which is exactly why it stays the method that cannot be turned off.
  */
 
+import { prisma } from "@polaris/db";
+import { recordAudit } from "@/lib/audit-service";
+import { rateLimit } from "@/lib/rate-limit-service";
+import { normalizePeerId } from "@/lib/messaging-service";
+import { bridgeSend } from "@/lib/messaging/bridge-client";
+import { getAuthMailStatus, sendAuthEmail } from "@/lib/auth-mail";
+import { getUserPhone, getUserSecurity, noteSecondFactor, twoFactorEnabled } from "@polaris/auth";
 import {
     maskEmail,
     maskPhone,
+    SECOND_FACTOR_BY_DELIVERY,
     TWO_FACTOR_CODE_TTL_MINUTES,
     TWO_FACTOR_DELIVERY_METHODS,
     TWO_FACTOR_METHODS,
     type TwoFactorDeliveryMethod,
     type TwoFactorMethod
 } from "@polaris/core";
-import { getUserPhone, getUserSecurity, twoFactorEnabled } from "@polaris/auth";
-import { prisma } from "@polaris/db";
-import { recordAudit } from "@/lib/audit-service";
-import { getAuthMailStatus, sendAuthEmail } from "@/lib/auth-mail";
-import { bridgeSend } from "@/lib/messaging/bridge-client";
-import { normalizePeerId } from "@/lib/messaging-service";
-import { rateLimit } from "@/lib/rate-limit-service";
 
 /** How many codes one account may ask for, and over what span. Loose enough for
  *  a message that never arrived, tight enough that the mailbox is not a target. */
@@ -238,6 +239,11 @@ export async function sendTwoFactorCode(input: {
         chosen === "email"
             ? await sendCodeByEmail(destination.address, code)
             : await sendCodeByWhatsApp(destination, code);
+
+    // Which channel carried the code is only known here - the request that checks
+    // it carries nothing about where it came from - so a code that actually went
+    // out leaves its channel against the sign-in in progress.
+    if (!result.error) await noteSecondFactor(userId, SECOND_FACTOR_BY_DELIVERY[chosen] ?? "code");
 
     await recordAudit({
         actorId: userId,

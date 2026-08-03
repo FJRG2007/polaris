@@ -16,9 +16,16 @@ import { prisma } from "@polaris/db";
 import { cookies } from "next/headers";
 import { recordAudit } from "@/lib/audit-service";
 import { networkPublicIp } from "@/lib/network-service";
-import { describeDevice, isIpv4, isPrivateIp } from "@polaris/core";
 import { listUserPasskeys, type PasskeyView } from "@/lib/passkey-directory";
 import { clientHost, clientIp, clientUserAgent, clientUserAgentBrands } from "@/lib/request-context";
+import {
+    describeDevice,
+    isIpv4,
+    isPrivateIp,
+    parseSecondFactor,
+    parseSignInMethod,
+    type SignInRecord
+} from "@polaris/core";
 import {
     adoptTrustedDevice,
     currentTrustedDevice,
@@ -44,6 +51,10 @@ export interface SessionView {
     /** Which of this deployment's names the session was opened on, when it was
      *  recorded. Null for sessions older than the column. */
     host: string | null;
+    /** How this session proved who it was. Both halves are null on a session
+     *  opened before Polaris recorded it, which reads as unknown rather than as
+     *  a sign-in that skipped everything. */
+    signIn: SignInRecord;
     lastSeenAt: string;
     createdAt: string;
     expiresAt: string;
@@ -125,6 +136,10 @@ function toSessionView(row: SessionRow, currentSessionId: string, publicIp: stri
         publicIp: ip && isLocalAddress(ip) ? publicIp : null,
         country: row.state?.country ?? null,
         host: row.state?.host ?? null,
+        signIn: {
+            method: parseSignInMethod(row.state?.signInMethod),
+            secondFactor: parseSecondFactor(row.state?.secondFactor)
+        },
         lastSeenAt: (row.state?.lastSeenAt ?? row.createdAt).toISOString(),
         createdAt: row.createdAt.toISOString(),
         expiresAt: row.expiresAt.toISOString()
@@ -146,6 +161,39 @@ export async function listUserSessions(userId: string, currentSessionId: string)
     const rows = await liveSessionRows(userId);
     const publicIp = await pairedPublicIp(rows.map((row) => row.state?.ip ?? row.ipAddress));
     return rows.map((row) => toSessionView(row, currentSessionId, publicIp));
+}
+
+/**
+ * What each of a user's live sessions is called, by session id.
+ *
+ * The label only, for the screens that name a session beside something else -
+ * the activity log says which device an entry came from. Kept apart from the
+ * list above so naming a session costs one query and never the address lookup a
+ * full row pays for. A session that has since ended is simply absent, which is
+ * how the caller knows to say so.
+ */
+export async function sessionDeviceLabels(userId: string): Promise<Map<string, string>> {
+    const rows = await liveSessionRows(userId);
+    return new Map(rows.map((row) => [row.id, describeDevice(sessionUserAgent(row), row.state?.userAgentBrands)]));
+}
+
+/**
+ * How one session proved who it was, for the code that has to hand that on.
+ *
+ * Arming or dropping an authenticator replaces the session it was done from, and
+ * the replacement is the same person, still signed in the way they signed in - so
+ * the record has to travel with them or the screen that says where sessions came
+ * from would lose the one the reader is sitting at.
+ */
+export async function sessionSignInRecord(userId: string, sessionId: string): Promise<SignInRecord> {
+    const state = await prisma.sessionState.findFirst({
+        where: { sessionId, userId },
+        select: { signInMethod: true, secondFactor: true }
+    });
+    return {
+        method: parseSignInMethod(state?.signInMethod),
+        secondFactor: parseSecondFactor(state?.secondFactor)
+    };
 }
 
 /**

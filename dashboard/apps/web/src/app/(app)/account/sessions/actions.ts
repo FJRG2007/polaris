@@ -20,7 +20,6 @@ import { recordAudit } from "@/lib/audit-service";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { newDeviceRefusal } from "@/lib/device-grace";
 import { revokeTrustedDevice, revokeTrustedDevices } from "@polaris/auth";
-import { listSessionActivity, type SessionActivityEntry } from "@/lib/audit-service";
 import {
     decideLoginApproval,
     revokeDeviceSessions,
@@ -41,12 +40,14 @@ const trustedDeviceIdSchema = z.string().regex(/^trust-device-[A-Za-z0-9_-]{1,64
 const APPROVAL_LIMIT = 5;
 const APPROVAL_WINDOW_MS = 15 * 60 * 1000;
 
-export async function revokeSessionAction(sessionId: string): Promise<{ error?: string }> {
+export async function revokeSessionAction(sessionId: unknown): Promise<{ error?: string }> {
     const user = await requireUser();
     const blocked = await newDeviceRefusal(user);
     if (blocked) return { error: blocked };
-    if (sessionId === user.sessionId) return { error: "Use Sign out to end this session." };
-    await revokeUserSession(user.id, String(sessionId));
+    const parsed = sessionIdSchema.safeParse(sessionId);
+    if (!parsed.success) return { error: "Unknown session." };
+    if (parsed.data === user.sessionId) return { error: "Use Sign out to end this session." };
+    await revokeUserSession(user.id, parsed.data);
     revalidatePath("/account/sessions");
     return {};
 }
@@ -142,26 +143,18 @@ export async function forgetTrustedDevicesAction(): Promise<{ count: number; err
     return { count };
 }
 
-/** What was done from one of the caller's sessions, newest first. */
-export async function sessionActivityAction(
-    sessionId: unknown
-): Promise<{ entries?: SessionActivityEntry[]; error?: string }> {
-    const user = await requireUser();
-    const parsed = sessionIdSchema.safeParse(sessionId);
-    if (!parsed.success) return { error: "Unknown session." };
-    return { entries: await listSessionActivity(user.id, parsed.data) };
-}
-
 /**
  * Decide a waiting sign-in. Approving asks for the quick-unlock PIN, so the
  * attempts are throttled the way any short secret has to be; refusing is free.
  */
 export async function decideLoginApprovalAction(
-    sessionId: string,
+    sessionId: unknown,
     approve: boolean,
     pin?: string
 ): Promise<{ error?: string }> {
     const user = await requireUser();
+    const parsed = sessionIdSchema.safeParse(sessionId);
+    if (!parsed.success) return { error: "Unknown session." };
     if (approve === true) {
         // Letting somebody else in is the one direction that needs the wait;
         // refusing a sign-in is always allowed, from any device.
@@ -172,7 +165,7 @@ export async function decideLoginApprovalAction(
             return { error: `Too many attempts. Try again in ${Math.ceil(throttle.retryAfterMs / 60000)} minutes.` };
         }
     }
-    const result = await decideLoginApproval(user.id, String(sessionId), approve === true, String(pin ?? ""));
+    const result = await decideLoginApproval(user.id, parsed.data, approve === true, String(pin ?? ""));
     if (!result.error) revalidatePath("/account/sessions");
     return result;
 }

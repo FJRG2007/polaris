@@ -7,8 +7,8 @@
  *
  * Device labels come from the client-supplied user-agent, so they are treated as
  * hints - the address and the timestamps are what a user should judge by. When
- * those are not enough to place a session, Activity opens what was actually done
- * from it before deciding whether to sign it out.
+ * those are not enough to place a session, Activity leads to the log narrowed to
+ * that session, which is what was actually done from it.
  */
 
 import Link from "next/link";
@@ -19,7 +19,7 @@ import { useConfirm } from "@/components/confirm-dialog";
 import { Check, LogOut, ScanLine, X } from "lucide-react";
 import { RelativeTime } from "@/components/relative-time";
 import { TrustedDevicesCard } from "./trusted-devices-card";
-import { SessionActivityDialog } from "./session-activity-dialog";
+import { describeSignIn, signInSummary } from "@polaris/core";
 import { SessionsTable, sessionOrigin } from "@/components/sessions-table";
 import type { SessionView, TrustedDeviceRow } from "@/lib/session-directory";
 import { decideLoginApprovalAction, revokeOtherSessionsAction, revokeSessionAction } from "./actions";
@@ -37,9 +37,17 @@ import {
 
 function Origin({ session }: { session: SessionView }) {
     return (
-        <p className="text-xs text-muted-foreground">
-            {sessionOrigin(session)} - last active <RelativeTime iso={session.lastSeenAt} />
-        </p>
+        <>
+            <p className="text-xs text-muted-foreground">
+                {sessionOrigin(session)} - last active <RelativeTime iso={session.lastSeenAt} />
+            </p>
+            {/* Most of what this decision rests on, next to where it came from:
+                a sign-in that already answered a code is a different thing to
+                allow than one that only had the password. */}
+            {describeSignIn(session.signIn).length > 0 ? (
+                <p className="text-xs text-muted-foreground">Signed in with {signInSummary(session.signIn)}</p>
+            ) : null}
+        </>
     );
 }
 
@@ -56,7 +64,6 @@ export function SessionsView({
     const [confirm, confirmElement] = useConfirm();
     const [busyId, setBusyId] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
-    const [activityFor, setActivityFor] = useState<SessionView | null>(null);
     const [approving, setApproving] = useState<SessionView | null>(null);
 
     const pending = sessions.filter((session) => session.approval === "pending");
@@ -160,9 +167,9 @@ export function SessionsView({
 
             <Card>
                 <CardBody className="flex flex-col gap-3">
-                    <div className="flex items-center justify-between gap-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
                         <h2 className="text-sm font-medium">Active sessions</h2>
-                        <div className="flex gap-2">
+                        <div className="flex flex-wrap gap-2">
                             {/* The other way a sign-in gets let in: the code on the
                                 sign-in screen, answered here instead of waiting for
                                 somebody to find this page. */}
@@ -190,20 +197,13 @@ export function SessionsView({
                         sessions={active}
                         busyId={busyId}
                         emptyLabel="Nothing is signed in."
-                        onActivity={setActivityFor}
+                        activityHref={(session) => `/account/activity?session=${session.id}`}
                         onRevoke={(session) => void (session.current ? signOutHere() : revoke(session))}
                     />
                 </CardBody>
             </Card>
 
             {trusted.length > 0 ? <TrustedDevicesCard devices={trusted} /> : null}
-
-            <SessionActivityDialog
-                session={activityFor}
-                onOpenChange={(open) => {
-                    if (!open) setActivityFor(null);
-                }}
-            />
 
             <ApproveSignInDialog
                 session={approving}

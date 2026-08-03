@@ -6,10 +6,10 @@
  * dropdowns, and burying them in a dialog would cost a click for nothing.
  *
  * The cards sit in two columns once the viewport can carry them, split by what
- * they answer: the left column is how a sign-in is proved, the right is what
- * happens to a session afterwards and how the account is recovered. Passkeys run
+ * they answer: the left column is how a sign-in is proved, the right is the ways
+ * back in when that fails and what a session is allowed afterwards. Passkeys run
  * the full width underneath, because that card is a table with a row per device
- * and a column that had nowhere to go inside a half-width card.
+ * and columns that had nowhere to go inside a half-width card.
  *
  * Nothing here decides anything; the server actions re-verify every change.
  */
@@ -182,13 +182,6 @@ export function SecurityView({
                         )}
                     </SettingCard>
 
-                    <BackupCodesCard
-                        lock={lock}
-                        account={account}
-                        twoFactorEnabled={twoFactorEnabled}
-                        remaining={backupCodesRemaining}
-                    />
-
                     <TwoFactorMethodsCard
                         lock={lock}
                         statuses={twoFactorMethods}
@@ -200,6 +193,13 @@ export function SecurityView({
                 </div>
 
                 <div className="flex flex-col gap-4">
+                    <BackupCodesCard
+                        lock={lock}
+                        account={account}
+                        twoFactorEnabled={twoFactorEnabled}
+                        remaining={backupCodesRemaining}
+                    />
+
                     <SettingCard
                         title="Quick unlock PIN"
                         // Not conditional on the approval gate any more: the PIN also

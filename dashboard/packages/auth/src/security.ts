@@ -115,8 +115,11 @@ export async function getUserSecurity(userId: string): Promise<UserSecuritySetti
     };
 }
 
-/** Create-or-update the settings row for a user with a partial change. */
-async function upsertSecurity(
+/** Create-or-update the settings row for a user with a partial change. Exported
+ *  for this package only - the row holds the transient sign-in note as well as
+ *  the settings, and both are written the same way; it is deliberately not part
+ *  of the package's public surface. */
+export async function upsertSecurity(
     userId: string,
     data: Parameters<typeof prisma.userSecurity.update>[0]["data"]
 ): Promise<void> {

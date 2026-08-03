@@ -475,6 +475,21 @@ model UserSecurity {
     // Bound to the address that asked for it and consumed on first use.
     rotationGraceUntil   DateTime?
     rotationGraceIp      String?
+    // The sign-in in progress, waiting for the session it belongs to.
+    //
+    // A sign-in and the session row Polaris keeps beside it are written by two
+    // different requests: better-auth creates the session while answering the
+    // sign-in, and the guard writes SessionState on that session's first request.
+    // A second factor makes it three - the password, the code that follows, and
+    // the navigation after it - so what each step learned is left here and
+    // collected when the session state is finally written.
+    //
+    // Transient by design: overwritten at the start of every sign-in, consumed by
+    // the session it produced, and ignored once stale, so a sign-in nobody
+    // finished can never label somebody else's session.
+    pendingSignInMethod  String?
+    pendingSignInFactor  String?
+    pendingSignInAt      DateTime?
     // A recent password confirmation, so an action that has just asked for the
     // password does not ask again for the ceremony it starts. Bound to the
     // session that proved it, because it is that browser's proof and nobody
@@ -671,6 +686,15 @@ model SessionState {
     // are otherwise indistinguishable. Client-supplied, like the user-agent: a
     // label to tell them apart, never an input to a decision.
     host       String?
+    // How this session proved who it was. `signInMethod` is what identified the
+    // account (password, passkey, email-link, qr-code); `secondFactor` is what
+    // was asked for on top of it (totp, email-code, whatsapp-code, code,
+    // backup-code) - including trusted-device, which is the challenge that was
+    // skipped because the browser had been remembered. Both null on a session
+    // opened before Polaris recorded any of this, and the screens say so rather
+    // than reading an absent second factor as "no second step".
+    signInMethod String?
+    secondFactor String?
     createdAt  DateTime  @default(now())
 
     session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)

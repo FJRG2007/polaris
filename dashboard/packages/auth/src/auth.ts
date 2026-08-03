@@ -25,6 +25,7 @@ import { betterAuth, type BetterAuthPlugin } from "better-auth";
 import { APIError, createAuthMiddleware } from "better-auth/api";
 import { newDeviceWaitMessage, sessionDeviceStanding } from "./devices.js";
 import { deviceAuthorization, magicLink, twoFactor } from "better-auth/plugins";
+import { noteSecondFactor, noteSentCodeAnswered, noteSignIn } from "./sign-in-record.js";
 import { followTrustedDevice, recordTrustedDevice, type DeviceOrigin } from "./two-factor.js";
 import {
     originHost,
@@ -39,7 +40,9 @@ import {
     QR_SIGN_IN_TTL_SECONDS,
     TWO_FACTOR_CODE_ATTEMPTS,
     TWO_FACTOR_CODE_TTL_MINUTES,
-    TWO_FACTOR_METHOD_HEADER
+    TWO_FACTOR_METHOD_HEADER,
+    type SecondFactor,
+    type SignInMethod
 } from "@polaris/core";
 
 /** What a request said about the browser making it, in the shape every device
@@ -206,11 +209,21 @@ export const TRUST_DEVICE_COOKIE_NAMES = [
     `__Secure-${COOKIE_PREFIX}.${TRUST_DEVICE_COOKIE}`
 ] as const;
 
+/** The two challenge answers that name themselves. The third - a code Polaris
+ *  sent - is named by the channel it went out on, which is settled where it is
+ *  sent rather than here. */
+const SECOND_FACTOR_BY_PATH: ReadonlyMap<string, SecondFactor> = new Map([
+    ["/two-factor/verify-totp", "totp"],
+    ["/two-factor/verify-backup-code", "backup-code"]
+] as const);
+
+/** Where a sent code is checked. */
+const VERIFY_OTP_PATH = "/two-factor/verify-otp";
+
 /** The paths that can hand a browser a pass, by answering the challenge. */
 const TWO_FACTOR_VERIFY_PATHS: ReadonlySet<string> = new Set([
-    "/two-factor/verify-totp",
-    "/two-factor/verify-otp",
-    "/two-factor/verify-backup-code"
+    ...SECOND_FACTOR_BY_PATH.keys(),
+    VERIFY_OTP_PATH
 ]);
 
 /** The paths a pass is spent on, which is where better-auth rotates it. Built on
@@ -408,6 +421,60 @@ function gateEmailedLink(plugin: BetterAuthPlugin): BetterAuthPlugin {
     };
 }
 
+/** The paths that end a sign-in by issuing a session, and what each one proves
+ *  about the person who reached it. */
+const SIGN_IN_METHOD_BY_PATH: ReadonlyMap<string, SignInMethod> = new Map([
+    ["/sign-in/email", "password"],
+    [MAGIC_LINK_VERIFY_PATH, "email-link"],
+    ["/passkey/verify-authentication", "passkey"],
+    [DEVICE_TOKEN_PATH, "qr-code"]
+] as const);
+
+/**
+ * Record how each sign-in proved itself, for the account's own session list.
+ *
+ * Registered as the instance's own after-hook rather than on a plugin, because
+ * the methods it covers belong to four different ones - and because running
+ * before every plugin hook is exactly what it needs: on a credential sign-in the
+ * two-factor plugin takes the session back again when a challenge is due, and
+ * this has to see the session while it is still there to know whose sign-in it
+ * was. A better-auth that stopped running it first would cost the first factor on
+ * a challenged sign-in - "authenticator app" with nothing in front of it - rather
+ * than describe one wrongly, which is the direction to fail in.
+ *
+ * That is also why a password sign-in on an account with the challenge armed is
+ * noted here as having skipped it on a remembered browser. At this point nobody
+ * knows yet whether the challenge will be raised; if it is, answering it
+ * overwrites this note, and if it is abandoned the note expires uncollected. The
+ * only sign-in this description survives to is the one it describes.
+ */
+const recordSignInMethod = createAuthMiddleware(async (ctx) => {
+    // Null on a wrong password, a refused code, and while a challenge is in
+    // flight - all of them sign-ins that issued nothing to describe.
+    const user = ctx.context.newSession?.user;
+    if (!user) return;
+
+    const method = SIGN_IN_METHOD_BY_PATH.get(ctx.path);
+    if (method) {
+        const armed = (user as { twoFactorEnabled?: unknown }).twoFactorEnabled === true;
+        // A passkey and a scanned code are never challenged, so an armed factor
+        // says nothing about how they got in.
+        const challengeable = method === "password" || method === "email-link";
+        await noteSignIn(user.id, {
+            method,
+            secondFactor: challengeable && armed ? "trusted-device" : null
+        });
+        return;
+    }
+
+    const answered = SECOND_FACTOR_BY_PATH.get(ctx.path);
+    if (answered) {
+        await noteSecondFactor(user.id, answered);
+        return;
+    }
+    if (ctx.path === VERIFY_OTP_PATH) await noteSentCodeAnswered(user.id);
+});
+
 /**
  * The sign-in methods beyond a password: a TOTP second factor with single-use
  * backup codes, passkeys, scanning the sign-in screen's QR code from a device
@@ -567,6 +634,7 @@ export function createAuth(options: AuthOptions = {}, address?: string) {
             expiresIn: SESSION_MAX_AGE,
             updateAge: SESSION_UPDATE_AGE
         },
+        hooks: { after: recordSignInMethod },
         plugins: buildPlugins(options, address ?? new URL(env.POLARIS_APP_URL).host),
         user: {
             additionalFields: {
