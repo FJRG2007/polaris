@@ -53,6 +53,9 @@ export {
     clearQuickPin,
     verifyQuickPin,
     verifyAccountPassword,
+    confirmAccountPassword,
+    passwordConfirmed,
+    clearPasswordConfirmation,
     listSecurityQuestions,
     setSecurityQuestions,
     clearSecurityQuestions,
@@ -75,13 +78,24 @@ export {
 export {
     verifyTotpForSession,
     twoFactorEnabled,
+    adoptTrustedDevice,
     countTrustedDevices,
     currentTrustedDevice,
     listTrustedDevices,
     revokeTrustedDevice,
     revokeTrustedDevices,
+    type DeviceOrigin,
     type TrustedDeviceView
 } from "./two-factor.js";
+export {
+    accountDeviceStanding,
+    sessionDeviceStanding,
+    rememberAccountDevice,
+    newDeviceWaitMessage,
+    setNewDeviceGrace,
+    NEW_DEVICE_GRACE_CHOICES,
+    type DeviceStanding
+} from "./devices.js";
 export {
     getUserPhone,
     setUserPhone,

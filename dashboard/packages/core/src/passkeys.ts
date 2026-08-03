@@ -9,6 +9,20 @@
  * can exist there at all and which of the account's passkeys will work.
  */
 
+/** How long a passkey's name may be. It is the handle somebody removes a
+ *  credential by, so it has to fit a table cell and be worth reading. */
+export const PASSKEY_NAME_MAX = 60;
+
+/**
+ * The form two passkey names are compared in, so the same device typed twice is
+ * caught however it was capitalised or spaced. Used by the field as it is typed
+ * and by the ceremony that accepts the credential, so the two never disagree
+ * about what counts as a duplicate.
+ */
+export function passkeyNameKey(name: string): string {
+    return name.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
 /** An address that is only a number is not a domain, and no browser accepts one
  *  as a relying party. */
 const IPV4 = /^\d{1,3}(\.\d{1,3}){3}$/;

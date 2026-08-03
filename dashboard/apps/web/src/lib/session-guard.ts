@@ -19,8 +19,8 @@ import { recordAudit } from "@/lib/audit-service";
 import { notify } from "@/lib/notifications/dispatch";
 import { describeOrigin } from "@/lib/session-directory";
 import { evaluateAccountAccess } from "@/lib/network-rules";
-import { consumeSessionRotation, resolveSignInRules } from "@polaris/auth";
-import { clientHost, clientIp, clientUserAgent } from "@/lib/request-context";
+import { consumeSessionRotation, rememberAccountDevice, resolveSignInRules } from "@polaris/auth";
+import { clientHost, clientIp, clientUserAgent, clientUserAgentBrands } from "@/lib/request-context";
 
 /** Where a refused session is sent, or null when the session may proceed. */
 export type SessionVerdict = { ok: true } | { ok: false; redirect: string };
@@ -196,7 +196,11 @@ async function createSessionState(input: {
         if (approver) approval = "pending";
     }
 
-    const [userAgent, host] = await Promise.all([clientUserAgent(), clientHost()]);
+    const [userAgent, userAgentBrands, host] = await Promise.all([
+        clientUserAgent(),
+        clientUserAgentBrands(),
+        clientHost()
+    ]);
     try {
         await prisma.sessionState.create({
             data: {
@@ -206,6 +210,7 @@ async function createSessionState(input: {
                 ip: input.ip ?? null,
                 country: input.country,
                 userAgent: userAgent ?? null,
+                userAgentBrands: userAgentBrands ?? null,
                 host: host ?? null
             }
         });
@@ -219,6 +224,11 @@ async function createSessionState(input: {
         return { approval: existing?.approval ?? "denied" };
     }
 
+    // The account's register of the browsers it has ever been signed in from,
+    // which is what dates a device for the new-device wait. Written here because
+    // this runs exactly once per session, at the sign-in that opened it.
+    await rememberAccountDevice(input.userId, { userAgent, userAgentBrands, ip: input.ip, host });
+
     if (approval === "pending") {
         await recordAudit({
             actorId: input.userId,
@@ -230,7 +240,7 @@ async function createSessionState(input: {
             userId: input.userId,
             event: "account.signin",
             title: "A new sign-in is waiting for your approval",
-            body: describeOrigin(input.ip, input.country, userAgent),
+            body: describeOrigin(input.ip, input.country, userAgent, userAgentBrands),
             href: "/account/sessions",
             actionRequired: true
         });

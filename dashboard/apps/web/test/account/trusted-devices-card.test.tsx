@@ -22,8 +22,13 @@ vi.mock("@/components/relative-time", () => ({
 }));
 vi.mock("../../src/app/(app)/account/sessions/actions", () => ({
     forgetTrustedDeviceAction: async () => ({}),
-    forgetTrustedDevicesAction: async () => ({ count: 0 })
+    forgetTrustedDevicesAction: async () => ({ count: 0 }),
+    revokeSessionAction: async () => ({}),
+    signOutTrustedDeviceAction: async () => ({ count: 0, endedCurrent: false }),
+    trustedDeviceAction: async () => ({ detail: undefined })
 }));
+vi.mock("@/lib/auth-client", () => ({ signOut: async () => {} }));
+vi.mock("@/components/display-format", () => ({ useDisplayFormat: () => ({ date: (iso: string) => iso }) }));
 
 const { TrustedDevicesCard } = await import("../../src/app/(app)/account/sessions/trusted-devices-card");
 
@@ -33,6 +38,7 @@ function device(overrides: Partial<TrustedDeviceRow> = {}): TrustedDeviceRow {
         current: false,
         device: "Chrome on Android",
         ip: "192.168.1.131",
+        publicIp: null,
         host: "polaris.local",
         rememberedAt: "2026-07-20T10:00:00.000Z",
         lastSeenAt: "2026-08-01T10:00:00.000Z",
@@ -77,6 +83,20 @@ describe("the remembered-devices card", () => {
         const markup = render([device({ rememberedAt: null, device: "Unknown device", ip: null, host: null })]);
         expect(markup).toContain("Remembered earlier");
         expect(markup).toContain('aria-label="Stop remembering this device"');
+    });
+
+    // Ending the pass is not the only thing somebody wants to do about a device
+    // they have just recognised - what it can still reach is the other half.
+    it("opens each device, named so it can be told apart", () => {
+        const markup = render([device(), device({ id: "trust-device-bbbbbbbb", device: "Safari on iOS" })]);
+        expect(markup).toContain('aria-label="Open Chrome on Android"');
+        expect(markup).toContain('aria-label="Open Safari on iOS"');
+    });
+
+    it("pairs a local address with the one its network is seen at", () => {
+        const markup = render([device({ ip: "192.168.1.131", publicIp: "85.87.156.88" })]);
+        expect(markup).toContain("192.168.1.131");
+        expect(markup).toContain("85.87.156.88");
     });
 
     it("only offers the blunt control when there is more than one to end", () => {

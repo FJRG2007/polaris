@@ -36,8 +36,10 @@ beforeAll(async () => {
 });
 
 describe("createAuth", () => {
+    // The binding is what these assert; the plugin's other options are its own
+    // business and adding one must not read as a change of address.
     it("binds passkeys to the published address by default", () => {
-        expect(relyingParty(authModule.createAuth())).toEqual({
+        expect(relyingParty(authModule.createAuth())).toMatchObject({
             rpID: "polaris.example.com",
             rpName: "Polaris",
             origin: ["https://polaris.example.com", "http://polaris.example.com"]
@@ -45,7 +47,7 @@ describe("createAuth", () => {
     });
 
     it("binds them to the address it is given, port and all", () => {
-        expect(relyingParty(authModule.createAuth({}, "polaris.local:3000"))).toEqual({
+        expect(relyingParty(authModule.createAuth({}, "polaris.local:3000"))).toMatchObject({
             rpID: "polaris.local",
             rpName: "Polaris",
             origin: ["https://polaris.local:3000", "http://polaris.local:3000"]

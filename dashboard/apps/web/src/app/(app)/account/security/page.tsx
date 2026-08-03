@@ -5,17 +5,24 @@
  *
  * The page only reports state; every change goes through a server action that
  * re-verifies the password or another proof of identity.
+ *
+ * It also resolves whether this browser is old enough on the account to change
+ * any of it. The actions refuse a device that is not either way; this is so the
+ * page says so up front instead of letting somebody fill in a dialog that was
+ * never going to be accepted.
  */
 
 import { requireUser } from "@/lib/session";
 import { SecurityView } from "./security-view";
 import { listPasskeys } from "./passkey-actions";
+import { currentDeviceStanding } from "@/lib/device-grace";
 import { listUserSessions } from "@/lib/session-directory";
 import { describeTwoFactorMethods } from "@/lib/two-factor-delivery";
 import {
     countTrustedDevices,
     getUserSecurity,
     listSecurityQuestions,
+    newDeviceWaitMessage,
     twoFactorEnabled
 } from "@polaris/auth";
 
@@ -23,7 +30,7 @@ export const dynamic = "force-dynamic";
 
 export default async function SecurityPage() {
     const user = await requireUser();
-    const [settings, questions, hasTwoFactor, passkeys, methods, sessions, trustedDevices] =
+    const [settings, questions, hasTwoFactor, passkeys, methods, sessions, trustedDevices, standing] =
         await Promise.all([
             getUserSecurity(user.id),
             listSecurityQuestions(user.id),
@@ -33,8 +40,10 @@ export default async function SecurityPage() {
             // Approving a sign-in is done from another open session, so the card says
             // how many there are rather than offering a gate with nothing behind it.
             listUserSessions(user.id, user.sessionId),
-            countTrustedDevices(user.id)
+            countTrustedDevices(user.id),
+            currentDeviceStanding(user)
         ]);
+    const lock = standing.settled ? undefined : { reason: newDeviceWaitMessage(standing) };
 
     return (
         <div className="mx-auto flex max-w-2xl flex-col gap-4">
@@ -45,6 +54,8 @@ export default async function SecurityPage() {
                 </p>
             </div>
             <SecurityView
+                lock={lock}
+                newDeviceGraceDays={settings.newDeviceGraceDays}
                 hasPin={settings.hasPin}
                 idleLockMinutes={settings.idleLockMinutes}
                 sessionMaxMinutes={settings.sessionMaxMinutes}

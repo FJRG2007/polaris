@@ -31,6 +31,7 @@ import { recordAudit } from "@/lib/audit-service";
 import { evaluateNetworkRules } from "@/lib/network-rules";
 import { clientIp } from "@/lib/request-context";
 import { requireUser } from "@/lib/session";
+import { newDeviceRefusal } from "@/lib/device-grace";
 
 type ActionResult = { error?: string };
 
@@ -58,6 +59,8 @@ const LOCKOUT_MESSAGE =
 
 export async function saveSignInRulesAction(input: unknown): Promise<ActionResult> {
     const user = await requireUser();
+    const blocked = await newDeviceRefusal(user);
+    if (blocked) return { error: blocked };
     const parsed = accessRulesSchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the rules." };
 
@@ -102,6 +105,8 @@ async function projectWithGroupChange(
 
 export async function createAccessGroupAction(input: unknown): Promise<ActionResult> {
     const user = await requireUser();
+    const blocked = await newDeviceRefusal(user);
+    if (blocked) return { error: blocked };
     const parsed = accessGroupSchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the group." };
     // A new group is not attached to anything yet, so it cannot lock anyone out.
@@ -114,6 +119,8 @@ export async function createAccessGroupAction(input: unknown): Promise<ActionRes
 
 export async function updateAccessGroupAction(id: string, input: unknown): Promise<ActionResult> {
     const user = await requireUser();
+    const blocked = await newDeviceRefusal(user);
+    if (blocked) return { error: blocked };
     const parsed = accessGroupSchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the group." };
 
@@ -129,6 +136,8 @@ export async function updateAccessGroupAction(id: string, input: unknown): Promi
 
 export async function deleteAccessGroupAction(id: string): Promise<ActionResult> {
     const user = await requireUser();
+    const blocked = await newDeviceRefusal(user);
+    if (blocked) return { error: blocked };
     const projected = await projectWithGroupChange(user.id, String(id), null);
     if (await wouldLockOut(projected)) return { error: LOCKOUT_MESSAGE };
 

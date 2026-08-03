@@ -34,6 +34,7 @@ vi.mock("@polaris/db", () => ({
 vi.mock("@polaris/auth", () => ({ verifyQuickPin: async () => false }));
 vi.mock("@/lib/auth", () => ({ auth: {} }));
 vi.mock("@/lib/audit-service", () => ({ recordAudit: async () => undefined }));
+vi.mock("@/lib/network-service", () => ({ networkPublicIp: async () => "85.87.156.88" }));
 
 const { clientHost } = await import("../../src/lib/request-context");
 const { listUserSessions } = await import("../../src/lib/session-directory");

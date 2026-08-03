@@ -4,6 +4,13 @@
  * Session-management actions. Each re-resolves the session, so the ids a client
  * sends are only ever matched against the caller's own sessions - a forged id
  * belonging to another account simply matches nothing.
+ *
+ * Everything that reaches another device passes the new-device gate first, when
+ * the account has asked for one. Signing the account's other devices out is the
+ * move that removes the witnesses, and it is worth the most to somebody who has
+ * just arrived with a password they should not have. Reading the lists, and
+ * signing out the browser in hand, are never gated: the first changes nothing and
+ * the second only ever closes a door on itself.
  */
 
 import { z } from "zod";
@@ -11,9 +18,17 @@ import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/session";
 import { recordAudit } from "@/lib/audit-service";
 import { rateLimit } from "@/lib/rate-limit-service";
+import { newDeviceRefusal } from "@/lib/device-grace";
 import { revokeTrustedDevice, revokeTrustedDevices } from "@polaris/auth";
 import { listSessionActivity, type SessionActivityEntry } from "@/lib/audit-service";
-import { decideLoginApproval, revokeOtherSessions, revokeUserSession } from "@/lib/session-directory";
+import {
+    decideLoginApproval,
+    revokeDeviceSessions,
+    revokeOtherSessions,
+    revokeUserSession,
+    trustedDeviceDetail,
+    type TrustedDeviceDetail
+} from "@/lib/session-directory";
 
 const sessionIdSchema = z.string().uuid();
 
@@ -28,14 +43,18 @@ const APPROVAL_WINDOW_MS = 15 * 60 * 1000;
 
 export async function revokeSessionAction(sessionId: string): Promise<{ error?: string }> {
     const user = await requireUser();
+    const blocked = await newDeviceRefusal(user);
+    if (blocked) return { error: blocked };
     if (sessionId === user.sessionId) return { error: "Use Sign out to end this session." };
     await revokeUserSession(user.id, String(sessionId));
     revalidatePath("/account/sessions");
     return {};
 }
 
-export async function revokeOtherSessionsAction(): Promise<{ count: number }> {
+export async function revokeOtherSessionsAction(): Promise<{ count: number; error?: string }> {
     const user = await requireUser();
+    const blocked = await newDeviceRefusal(user);
+    if (blocked) return { count: 0, error: blocked };
     const count = await revokeOtherSessions(user.id, user.sessionId);
     revalidatePath("/account/sessions");
     return { count };
@@ -55,6 +74,8 @@ export async function revokeOtherSessionsAction(): Promise<{ count: number }> {
  */
 export async function forgetTrustedDeviceAction(id: unknown): Promise<{ error?: string }> {
     const user = await requireUser();
+    const blocked = await newDeviceRefusal(user);
+    if (blocked) return { error: blocked };
     const parsed = trustedDeviceIdSchema.safeParse(id);
     if (!parsed.success) return { error: "That device is no longer remembered." };
     if (!(await revokeTrustedDevice(user.id, parsed.data))) {
@@ -65,9 +86,50 @@ export async function forgetTrustedDeviceAction(id: unknown): Promise<{ error?: 
     return {};
 }
 
-/** Stop remembering every browser at once. */
-export async function forgetTrustedDevicesAction(): Promise<{ count: number }> {
+/**
+ * Everything the account holds on one remembered device: the pass, the sessions
+ * open on it wherever they were opened, and the passkeys it registered.
+ *
+ * Read on demand rather than with the page, because it is a handful of extra
+ * queries for a panel most visits never open.
+ */
+export async function trustedDeviceAction(
+    id: unknown
+): Promise<{ detail?: TrustedDeviceDetail; error?: string }> {
     const user = await requireUser();
+    const parsed = trustedDeviceIdSchema.safeParse(id);
+    if (!parsed.success) return { error: "That device is no longer remembered." };
+    const detail = await trustedDeviceDetail(user.id, user.sessionId, parsed.data);
+    if (!detail) return { error: "That device is no longer remembered." };
+    return { detail };
+}
+
+/**
+ * Sign one device out of this account everywhere: every session it has open, on
+ * every name Polaris answers on.
+ *
+ * The pass is left alone. Ending the sessions and forgetting the device are two
+ * different decisions - a laptop that was borrowed for an afternoon needs the
+ * first, one that was stolen needs both - and the panel offers them separately.
+ */
+export async function signOutTrustedDeviceAction(
+    id: unknown
+): Promise<{ count?: number; endedCurrent?: boolean; error?: string }> {
+    const user = await requireUser();
+    const blocked = await newDeviceRefusal(user);
+    if (blocked) return { error: blocked };
+    const parsed = trustedDeviceIdSchema.safeParse(id);
+    if (!parsed.success) return { error: "That device is no longer remembered." };
+    const result = await revokeDeviceSessions(user.id, user.sessionId, parsed.data);
+    revalidatePath("/account/sessions");
+    return result;
+}
+
+/** Stop remembering every browser at once. */
+export async function forgetTrustedDevicesAction(): Promise<{ count: number; error?: string }> {
+    const user = await requireUser();
+    const blocked = await newDeviceRefusal(user);
+    if (blocked) return { count: 0, error: blocked };
     const count = await revokeTrustedDevices(user.id);
     if (count > 0) {
         await recordAudit({
@@ -101,6 +163,10 @@ export async function decideLoginApprovalAction(
 ): Promise<{ error?: string }> {
     const user = await requireUser();
     if (approve === true) {
+        // Letting somebody else in is the one direction that needs the wait;
+        // refusing a sign-in is always allowed, from any device.
+        const blocked = await newDeviceRefusal(user);
+        if (blocked) return { error: blocked };
         const throttle = await rateLimit(`signin-approval:${user.id}`, APPROVAL_LIMIT, APPROVAL_WINDOW_MS);
         if (!throttle.ok) {
             return { error: `Too many attempts. Try again in ${Math.ceil(throttle.retryAfterMs / 60000)} minutes.` };

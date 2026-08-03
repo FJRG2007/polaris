@@ -10,7 +10,10 @@
  * in the Setting table (no schema change).
  */
 
+import { getSetting, setSetting } from "./setting-store";
+import { deployZoneBase, zoneDnsVerified } from "./domain-zones";
 import { DEFAULT_SUBDOMAIN_BASE, magicDomain } from "@polaris/deploy";
+import { deployBase, duckdnsConfigured, getPublicIp } from "./domain-service";
 import {
     isCarrierGradeNat,
     isIpv4,
@@ -20,9 +23,6 @@ import {
     serverEnvironmentGroup,
     type ServerEnvironment
 } from "@polaris/core";
-import { deployBase, duckdnsConfigured, getPublicIp } from "./domain-service";
-import { deployZoneBase, zoneDnsVerified } from "./domain-zones";
-import { getSetting, setSetting } from "./setting-store";
 
 /**
  * - `auto`     : classify from detection (public IP -> public, else LAN-only).
@@ -181,7 +181,6 @@ export async function detectPlacement(force = false): Promise<ServerPlacement> {
 /** Re-detect the public IP if the cached value is older than this. */
 const DETECT_TTL_MS = 6 * 60 * 60 * 1000;
 
-
 /** Fetch the box's external public IP from an echo service, cached with a TTL. */
 export async function detectPublicIp(force = false): Promise<string | null> {
     if (!force) {
@@ -207,6 +206,34 @@ export async function detectPublicIp(force = false): Promise<string | null> {
         }
     }
     return getSetting(KEYS.detectedIp);
+}
+
+/**
+ * The address this network reaches the internet from, as last detected, without
+ * ever probing on the way.
+ *
+ * For the pages that pair it with a private address: a device seen at
+ * 192.168.1.131 reached Polaris over the local network, so it is on that
+ * network, and what the internet sees of it is what the internet sees of this
+ * box. Saying only "192.168.1.131" leaves a person unable to connect the phone
+ * on the sofa with the three sessions listed under a public address, which are
+ * the same phone.
+ *
+ * A split-tunnel VPN is the case this is wrong for - a client that is on the
+ * network but does not leave through it - which is why it is shown as the
+ * network's address rather than the device's, and why it never decides anything.
+ *
+ * `detectPublicIp` is the one that goes out to an echo service; this reads what
+ * that last found and refreshes it behind the render, because a session list
+ * must not wait on three HTTP timeouts to draw a table.
+ */
+export async function networkPublicIp(): Promise<string | null> {
+    const [cached, at] = await Promise.all([getSetting(KEYS.detectedIp), getSetting(KEYS.detectedAt)]);
+    const stamp = Number(at);
+    if (!Number.isFinite(stamp) || Date.now() - stamp >= DETECT_TTL_MS) {
+        void detectPublicIp().catch(() => undefined);
+    }
+    return cached || null;
 }
 
 export interface NetworkStatus {

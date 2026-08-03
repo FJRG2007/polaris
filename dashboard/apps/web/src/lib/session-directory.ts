@@ -1,22 +1,31 @@
 /**
  * The user's own session list: what is signed in, from where, and what to do
- * about it. Every read and write is scoped by the owning user, so one account can
- * never see or end another's sessions.
+ * about it - and, for a browser the account stopped asking for a code, what else
+ * that same browser holds. Every read and write is scoped by the owning user, so
+ * one account can never see or end another's sessions.
  *
  * Device names come from the stored user-agent. That string is client-supplied
  * and can say anything, so it is only ever used as a label - never as an input to
- * a decision - and is rendered as a short summary rather than echoed raw.
+ * a decision - and is rendered as a short summary rather than echoed raw. It is
+ * also what groups one device's things together, which is a comparison between
+ * two claims and is presented as one.
  */
 
 import { auth } from "@/lib/auth";
 import { prisma } from "@polaris/db";
 import { cookies } from "next/headers";
 import { recordAudit } from "@/lib/audit-service";
+import { networkPublicIp } from "@/lib/network-service";
+import { describeDevice, isIpv4, isPrivateIp } from "@polaris/core";
+import { listUserPasskeys, type PasskeyView } from "@/lib/passkey-directory";
+import { clientHost, clientIp, clientUserAgent, clientUserAgentBrands } from "@/lib/request-context";
 import {
+    adoptTrustedDevice,
     currentTrustedDevice,
     listTrustedDevices,
     TRUST_DEVICE_COOKIE_NAMES,
-    verifyQuickPin
+    verifyQuickPin,
+    type TrustedDeviceView
 } from "@polaris/auth";
 
 export interface SessionView {
@@ -27,6 +36,10 @@ export interface SessionView {
     locked: boolean;
     device: string;
     ip: string | null;
+    /** The address this network reaches the internet from, set only when `ip` is
+     *  a local one. A row that says 192.168.1.131 and nothing else cannot be
+     *  connected with the rows for the same device seen from outside. */
+    publicIp: string | null;
     country: string | null;
     /** Which of this deployment's names the session was opened on, when it was
      *  recorded. Null for sessions older than the column. */
@@ -36,37 +49,87 @@ export interface SessionView {
     expiresAt: string;
 }
 
-/** A readable device label from a user-agent string. */
-export function describeDevice(userAgent: string | null | undefined): string {
-    if (!userAgent) return "Unknown device";
-    const browser =
-        /\bEdg\//.test(userAgent) ? "Edge"
-        : /\bOPR\//.test(userAgent) ? "Opera"
-        : /\bFirefox\//.test(userAgent) ? "Firefox"
-        : /\bChrome\//.test(userAgent) ? "Chrome"
-        : /\bSafari\//.test(userAgent) ? "Safari"
-        : "Browser";
-    const platform =
-        /Windows/.test(userAgent) ? "Windows"
-        : /Android/.test(userAgent) ? "Android"
-        : /iPhone|iPad|iOS/.test(userAgent) ? "iOS"
-        : /Mac OS X|Macintosh/.test(userAgent) ? "macOS"
-        : /Linux/.test(userAgent) ? "Linux"
-        : "Unknown OS";
-    return `${browser} on ${platform}`;
-}
-
 /** One line describing where a sign-in came from, for a notification body. */
 export function describeOrigin(
     ip: string | undefined | null,
     country: string | null,
-    userAgent: string | undefined | null
+    userAgent: string | undefined | null,
+    brands?: string | null
 ): string {
+    const device = describeDevice(userAgent, brands);
     const where = [ip || null, country].filter(Boolean).join(" - ");
-    return where ? `${describeDevice(userAgent)} - ${where}` : describeDevice(userAgent);
+    return where ? `${device} - ${where}` : device;
 }
 
 const APPROVALS: ReadonlySet<string> = new Set(["approved", "pending", "denied"]);
+
+/** Every live session a user holds, newest first, as stored. */
+async function liveSessionRows(userId: string) {
+    return prisma.session.findMany({
+        where: { userId, expiresAt: { gt: new Date() } },
+        orderBy: { createdAt: "desc" },
+        select: {
+            id: true,
+            createdAt: true,
+            expiresAt: true,
+            ipAddress: true,
+            userAgent: true,
+            state: true
+        }
+    });
+}
+
+type SessionRow = Awaited<ReturnType<typeof liveSessionRows>>[number];
+
+/** The browser a session was opened with, preferring Polaris's own copy:
+ *  better-auth's column is written once and never followed. */
+function sessionUserAgent(row: SessionRow): string | null {
+    return row.state?.userAgent ?? row.userAgent ?? null;
+}
+
+/**
+ * The address this network is seen at from outside, but only when a list holds
+ * something it applies to.
+ *
+ * A local address is the whole truth about where a device is and says nothing
+ * about where it is on the internet, so it is paired with the public one - and
+ * a list with no local address in it never pays for the lookup.
+ *
+ * A failure costs the second address and nothing else. This is the page somebody
+ * opens when they think their account is being used by somebody else, and it
+ * refusing to draw because a detail could not be resolved would be the worst
+ * possible moment for it.
+ */
+async function pairedPublicIp(addresses: readonly (string | null)[]): Promise<string | null> {
+    if (!addresses.some((ip) => ip && isLocalAddress(ip))) return null;
+    return networkPublicIp().catch(() => null);
+}
+
+/** Whether an address is one only this network can reach. Deliberately narrow:
+ *  a value that is not an IPv4 literal at all gets no public address hung off
+ *  it, since an unparsed string is not evidence of anything. */
+function isLocalAddress(ip: string): boolean {
+    return isIpv4(ip) && isPrivateIp(ip);
+}
+
+function toSessionView(row: SessionRow, currentSessionId: string, publicIp: string | null): SessionView {
+    const approval = row.state?.approval ?? "approved";
+    const ip = row.state?.ip ?? row.ipAddress;
+    return {
+        id: row.id,
+        current: row.id === currentSessionId,
+        approval: (APPROVALS.has(approval) ? approval : "approved") as SessionView["approval"],
+        locked: row.state?.lockedAt != null,
+        device: describeDevice(sessionUserAgent(row), row.state?.userAgentBrands),
+        ip,
+        publicIp: ip && isLocalAddress(ip) ? publicIp : null,
+        country: row.state?.country ?? null,
+        host: row.state?.host ?? null,
+        lastSeenAt: (row.state?.lastSeenAt ?? row.createdAt).toISOString(),
+        createdAt: row.createdAt.toISOString(),
+        expiresAt: row.expiresAt.toISOString()
+    };
+}
 
 /**
  * Every live session for a user, newest first, with the current one flagged.
@@ -80,34 +143,9 @@ const APPROVALS: ReadonlySet<string> = new Set(["approved", "pending", "denied"]
  * exactly right - none of those sessions is the one they are reading from.
  */
 export async function listUserSessions(userId: string, currentSessionId: string): Promise<SessionView[]> {
-    const rows = await prisma.session.findMany({
-        where: { userId, expiresAt: { gt: new Date() } },
-        orderBy: { createdAt: "desc" },
-        select: {
-            id: true,
-            createdAt: true,
-            expiresAt: true,
-            ipAddress: true,
-            userAgent: true,
-            state: true
-        }
-    });
-    return rows.map((row) => {
-        const approval = row.state?.approval ?? "approved";
-        return {
-            id: row.id,
-            current: row.id === currentSessionId,
-            approval: (APPROVALS.has(approval) ? approval : "approved") as SessionView["approval"],
-            locked: row.state?.lockedAt != null,
-            device: describeDevice(row.state?.userAgent ?? row.userAgent),
-            ip: row.state?.ip ?? row.ipAddress,
-            country: row.state?.country ?? null,
-            host: row.state?.host ?? null,
-            lastSeenAt: (row.state?.lastSeenAt ?? row.createdAt).toISOString(),
-            createdAt: row.createdAt.toISOString(),
-            expiresAt: row.expiresAt.toISOString()
-        };
-    });
+    const rows = await liveSessionRows(userId);
+    const publicIp = await pairedPublicIp(rows.map((row) => row.state?.ip ?? row.ipAddress));
+    return rows.map((row) => toSessionView(row, currentSessionId, publicIp));
 }
 
 /**
@@ -124,6 +162,8 @@ export interface TrustedDeviceRow {
     current: boolean;
     device: string;
     ip: string | null;
+    /** The address this network reaches the internet from, when `ip` is local. */
+    publicIp: string | null;
     host: string | null;
     /** Null for a pass granted before Polaris recorded what the device was. */
     rememberedAt: string | null;
@@ -138,21 +178,132 @@ export interface TrustedDeviceRow {
  * The flag is read from the request's own cookie, so it only ever means "the
  * screen you are looking at" - an administrator reading another account's page
  * would match nothing, which is right.
+ *
+ * The same cookie is what lets a nameless pass be named: the browser holding it
+ * is the one asking for this page, so before the list is built it is offered the
+ * description its own request carries. Nothing else can name a pass granted
+ * before Polaris described them - the rest wait until they are next signed in
+ * with.
  */
 export async function listTrustedDeviceRows(userId: string): Promise<TrustedDeviceRow[]> {
+    const devices = await trustedDeviceViews(userId);
+    const publicIp = await pairedPublicIp(devices.map((device) => device.ip));
+    return devices.map((device) => toTrustedDeviceRow(device, publicIp));
+}
+
+/** The passes this account holds, with the one this browser is on resolved and
+ *  described. Kept apart from the mapping above because the raw user-agent goes
+ *  no further than this module, and matching a device needs it. */
+async function trustedDeviceViews(userId: string): Promise<TrustedDeviceView[]> {
     const jar = await cookies();
     const held = TRUST_DEVICE_COOKIE_NAMES.map((name) => jar.get(name)?.value).find(Boolean);
-    const devices = await listTrustedDevices(userId, currentTrustedDevice(held, userId));
-    return devices.map((device) => ({
+    const current = currentTrustedDevice(held, userId);
+    if (current) {
+        const [userAgent, userAgentBrands, ip, host] = await Promise.all([
+            clientUserAgent(),
+            clientUserAgentBrands(),
+            clientIp(),
+            clientHost()
+        ]);
+        await adoptTrustedDevice(userId, current, { userAgent, userAgentBrands, ip, host });
+    }
+    return listTrustedDevices(userId, current);
+}
+
+function toTrustedDeviceRow(device: TrustedDeviceView, publicIp: string | null): TrustedDeviceRow {
+    return {
         id: device.id,
         current: device.current,
-        device: describeDevice(device.userAgent),
+        device: describeDevice(device.userAgent, device.userAgentBrands),
         ip: device.ip,
+        publicIp: device.ip && isLocalAddress(device.ip) ? publicIp : null,
         host: device.host,
         rememberedAt: device.rememberedAt,
         lastSeenAt: device.lastSeenAt,
         expiresAt: device.expiresAt
-    }));
+    };
+}
+
+/**
+ * One remembered device and everything this account holds on it: the pass
+ * itself, the sessions open on it, and the passkeys it registered.
+ *
+ * The three are held together by the browser's own description of itself,
+ * because it is the only thing the same device presents on every one of this
+ * deployment's names. A session cookie is host-only and a passkey is bound to
+ * one address, so the laptop signed in on polaris.local and on the domain is two
+ * sessions and possibly two credentials, and a person deciding what to take away
+ * from a device they no longer have needs all of it in one place rather than
+ * spread across two screens by an accident of hostnames.
+ *
+ * The match is exact and it is a match on a claim: two machines running the same
+ * browser on the same operating-system version report themselves identically and
+ * are grouped as one device here. That is the direction worth erring in - this
+ * exists to take access away, and taking away one session too many costs a
+ * sign-in, while missing one leaves the device that was lost signed in. The
+ * screen says so rather than presenting the grouping as a fact.
+ */
+export interface TrustedDeviceDetail {
+    device: TrustedDeviceRow;
+    /** False when the pass carries no description, so nothing can be attributed
+     *  to it. The pass can still be ended, which is the point of listing it. */
+    identified: boolean;
+    /** Every live session opened by this browser, on every name Polaris answers
+     *  on - which is the whole reason this is not a filter of one host. */
+    sessions: SessionView[];
+    passkeys: PasskeyView[];
+}
+
+export async function trustedDeviceDetail(
+    userId: string,
+    currentSessionId: string,
+    identifier: string
+): Promise<TrustedDeviceDetail | null> {
+    const view = (await trustedDeviceViews(userId)).find((device) => device.id === identifier);
+    if (!view) return null;
+    const userAgent = view.userAgent;
+    if (!userAgent) {
+        const device = toTrustedDeviceRow(view, await pairedPublicIp([view.ip]));
+        return { device, identified: false, sessions: [], passkeys: [] };
+    }
+
+    const [rows, passkeys] = await Promise.all([liveSessionRows(userId), listUserPasskeys(userId, userAgent)]);
+    const matched = rows.filter((row) => sessionUserAgent(row) === userAgent);
+    const publicIp = await pairedPublicIp([view.ip, ...matched.map((row) => row.state?.ip ?? row.ipAddress)]);
+    return {
+        device: toTrustedDeviceRow(view, publicIp),
+        identified: true,
+        sessions: matched.map((row) => toSessionView(row, currentSessionId, publicIp)),
+        passkeys
+    };
+}
+
+/**
+ * End every session this browser has open, on every name it opened one on.
+ *
+ * The current session is not spared. Signing a device out is the thing somebody
+ * reaches for about the device in their hand as readily as about the one they
+ * lost, and refusing to include the session they are reading from would leave
+ * exactly the session they meant to end. The caller is told it happened so it
+ * can drop the cookie and send them to sign in again.
+ */
+export async function revokeDeviceSessions(
+    userId: string,
+    currentSessionId: string,
+    identifier: string
+): Promise<{ count: number; endedCurrent: boolean }> {
+    const detail = await trustedDeviceDetail(userId, currentSessionId, identifier);
+    if (!detail || detail.sessions.length === 0) return { count: 0, endedCurrent: false };
+    const ids = detail.sessions.map((session) => session.id);
+    const { count } = await prisma.session.deleteMany({ where: { userId, id: { in: ids } } });
+    if (count > 0) {
+        await recordAudit({
+            actorId: userId,
+            action: "account.session.revoked-device",
+            metadata: { count, device: detail.device.device }
+        });
+    }
+    return { count, endedCurrent: ids.includes(currentSessionId) };
 }
 
 /** End one of the caller's own sessions. */

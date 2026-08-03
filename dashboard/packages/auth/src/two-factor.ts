@@ -97,6 +97,32 @@ export function currentTrustedDevice(cookie: string | undefined, userId: string)
     return identifier;
 }
 
+/**
+ * What a request said about the browser making it, as recorded against a pass.
+ *
+ * Every field is the caller's to write and is kept as a label. The brands are
+ * carried beside the user-agent because a Chromium browser that rebadges Chrome
+ * names itself in one and not the other.
+ */
+export interface DeviceOrigin {
+    userAgent?: string;
+    userAgentBrands?: string;
+    ip?: string;
+    host?: string;
+}
+
+/** The stored columns for what a request said about itself. Absent is null
+ *  rather than left alone, so a re-description never keeps half of an older one
+ *  and reads as a device that was never really seen that way. */
+function describedBy(origin: DeviceOrigin) {
+    return {
+        userAgent: origin.userAgent ?? null,
+        userAgentBrands: origin.userAgentBrands ?? null,
+        ip: origin.ip ?? null,
+        host: origin.host ?? null
+    };
+}
+
 /** One remembered browser, as the account page shows it. */
 export interface TrustedDeviceView {
     /** The pass being described. What a revoke names, and what rotates - so it
@@ -108,6 +134,8 @@ export interface TrustedDeviceView {
     /** Raw, for the caller to label; the shapes it can take are a browser's
      *  business, so the parse lives with the rest of the device labelling. */
     userAgent: string | null;
+    /** The brands it announced, read together with the user-agent above. */
+    userAgentBrands: string | null;
     ip: string | null;
     host: string | null;
     /** Null on a pass granted before Polaris started describing them. */
@@ -149,6 +177,7 @@ export async function listTrustedDevices(
             id: pass.identifier,
             current: pass.identifier === currentIdentifier,
             userAgent: details?.userAgent ?? null,
+            userAgentBrands: details?.userAgentBrands ?? null,
             ip: details?.ip ?? null,
             host: details?.host ?? null,
             rememberedAt: details?.createdAt.toISOString() ?? null,
@@ -200,10 +229,7 @@ export async function revokeTrustedDevices(userId: string): Promise<number> {
  * in, and a description that could not be written must not be the reason a
  * correct sign-in fails. The pass is listed either way, just without a name.
  */
-export async function recordTrustedDevice(
-    userId: string,
-    origin: { userAgent?: string; ip?: string; host?: string }
-): Promise<void> {
+export async function recordTrustedDevice(userId: string, origin: DeviceOrigin): Promise<void> {
     try {
         const pass = await prisma.verification.findFirst({
             where: { ...trustFilter(userId), expiresAt: { gt: new Date() } },
@@ -213,17 +239,55 @@ export async function recordTrustedDevice(
         if (!pass) return;
         await prisma.trustedDevice.upsert({
             where: { identifier: pass.identifier },
-            create: {
-                identifier: pass.identifier,
-                userId,
-                userAgent: origin.userAgent ?? null,
-                ip: origin.ip ?? null,
-                host: origin.host ?? null
-            },
-            update: { userAgent: origin.userAgent ?? null, ip: origin.ip ?? null, host: origin.host ?? null }
+            create: { identifier: pass.identifier, userId, ...describedBy(origin) },
+            update: describedBy(origin)
         });
     } catch (error) {
         console.error("trusted device not recorded:", error);
+    }
+}
+
+/**
+ * Describe the pass the browser reading the page is holding, when nothing
+ * describes it yet.
+ *
+ * A pass is only ever described at the moment it is minted or spent, so every
+ * pass granted before Polaris recorded any of that stays nameless for the rest
+ * of its thirty days - a list of "Remembered earlier" rows with no address, no
+ * domain and nothing to open. For one of them that is avoidable: the browser
+ * holding it is the one asking for the page, and its own request says what it
+ * is.
+ *
+ * Only ever fills a gap. An existing description is left exactly as it was -
+ * what a device looked like when it was remembered is the fact worth keeping,
+ * not what it looks like now - and a pass that has expired or belongs to nobody
+ * gets nothing, so this can never invent a device.
+ */
+export async function adoptTrustedDevice(
+    userId: string,
+    identifier: string,
+    origin: DeviceOrigin
+): Promise<boolean> {
+    if (!identifier.startsWith(TRUST_PREFIX)) return false;
+    if (!origin.userAgent && !origin.ip && !origin.host) return false;
+    try {
+        const described = await prisma.trustedDevice.findUnique({
+            where: { identifier },
+            select: { identifier: true }
+        });
+        if (described) return false;
+        const pass = await prisma.verification.findFirst({
+            where: { ...trustFilter(userId), identifier, expiresAt: { gt: new Date() } },
+            select: { identifier: true }
+        });
+        if (!pass) return false;
+        await prisma.trustedDevice.create({ data: { identifier, userId, ...describedBy(origin) } });
+        return true;
+    } catch (error) {
+        // Two tabs rendering the page at once is the way this loses; the row the
+        // winner wrote is the same one, so there is nothing to repair.
+        console.error("trusted device not adopted:", error);
+        return false;
     }
 }
 
@@ -244,7 +308,7 @@ export async function recordTrustedDevice(
 export async function followTrustedDevice(
     userId: string,
     previousIdentifier: string,
-    origin: { userAgent?: string; ip?: string; host?: string }
+    origin: DeviceOrigin
 ): Promise<void> {
     try {
         const pass = await prisma.verification.findFirst({
@@ -267,6 +331,7 @@ export async function followTrustedDevice(
                     ip: origin.ip ?? existing.ip,
                     host: origin.host ?? existing.host,
                     userAgent: origin.userAgent ?? existing.userAgent,
+                    userAgentBrands: origin.userAgentBrands ?? existing.userAgentBrands,
                     lastSeenAt: new Date()
                 }
             });
@@ -274,13 +339,7 @@ export async function followTrustedDevice(
         }
         await prisma.trustedDevice.upsert({
             where: { identifier: pass.identifier },
-            create: {
-                identifier: pass.identifier,
-                userId,
-                userAgent: origin.userAgent ?? null,
-                ip: origin.ip ?? null,
-                host: origin.host ?? null
-            },
+            create: { identifier: pass.identifier, userId, ...describedBy(origin) },
             update: { lastSeenAt: new Date() }
         });
     } catch (error) {

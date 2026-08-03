@@ -3,27 +3,46 @@
 /**
  * Passkeys on the account: registering one, naming it, and removing it.
  *
- * Registration runs entirely in the browser through the passkey client - the
- * credential is created by the device and never passes through Polaris code, so
- * there is no server action here to add one. Removal does go through a server
- * action, because deleting a row is not the browser's business.
+ * Registration runs in the browser through the passkey client - the credential
+ * is created by the device and never passes through Polaris code, so there is no
+ * server action that adds one. What does go through the server is the step
+ * before it: the account password, proved once so the ceremony is allowed to
+ * start. Without it an open session on a borrowed screen is enough to attach a
+ * permanent way in, because WebAuthn only ever proves the device.
  *
  * WebAuthn ties a credential to one address. The server issues the challenge for
  * whichever of this deployment's names the browser is on, so a passkey can be
- * added anywhere it is reachable; the card names the address on each one and says
- * when the address in hand cannot hold a passkey at all.
+ * added anywhere it is reachable; the table names the address on each one and
+ * says when the address in hand cannot hold a passkey at all.
+ *
+ * A name is required, and required to be unlike the others. When somebody comes
+ * to remove a credential they do not recognise, the name is the only handle they
+ * have on it - three rows reading "Unnamed passkey" is a list nobody can act on.
+ * The field says so as it is typed; the server refuses the same thing, because
+ * the ceremony is reachable without this screen.
  */
 
-import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { KeyRound, Trash2 } from "lucide-react";
-import { passkeyRelyingPartyId } from "@polaris/core";
-import { Button, Card, CardBody, Input } from "@polaris/ui";
-import { useConfirm } from "@/components/confirm-dialog";
-import { useDisplayFormat } from "@/components/display-format";
 import { authClient } from "@/lib/auth-client";
-import { removePasskeyAction, type PasskeyView } from "./passkey-actions";
-import { Feedback } from "./setting-card";
+import { useConfirm } from "@/components/confirm-dialog";
+import { RelativeTime } from "@/components/relative-time";
+import type { PasskeyView } from "@/lib/passkey-directory";
+import { Feedback, type SettingLock } from "./setting-card";
+import { KeyRound, Trash2, Laptop, ShieldCheck } from "lucide-react";
+import { useEffect, useMemo, useState, useTransition, type FormEvent } from "react";
+import { PASSKEY_NAME_MAX, passkeyNameKey, passkeyRelyingPartyId } from "@polaris/core";
+import { confirmPasswordForPasskeyAction, removePasskeyAction } from "./passkey-actions";
+import {
+    Button,
+    Card,
+    CardBody,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    Input
+} from "@polaris/ui";
 
 /** The address this browser is on: the name a new passkey would be bound to, and
  *  whether the page is served securely enough for the browser to create one. Read
@@ -33,12 +52,25 @@ interface Here {
     secure: boolean;
 }
 
-export function PasskeysCard({ passkeys }: { passkeys: PasskeyView[] }) {
+/** Why this name cannot be used, or null when it can. Runs on every keystroke
+ *  against the passkeys already on screen, so the problem is named before the
+ *  device raises a prompt that would only fail. */
+function nameProblem(name: string, passkeys: PasskeyView[]): string | null {
+    const trimmed = name.trim();
+    if (!trimmed) return null;
+    if (trimmed.length > PASSKEY_NAME_MAX) return `Keep it under ${PASSKEY_NAME_MAX} characters.`;
+    const key = passkeyNameKey(trimmed);
+    return passkeys.some((passkey) => passkeyNameKey(passkey.name) === key)
+        ? "You already have a passkey with this name."
+        : null;
+}
+
+export function PasskeysCard({ passkeys, lock }: { passkeys: PasskeyView[]; lock?: SettingLock }) {
     const router = useRouter();
     const [confirm, confirmElement] = useConfirm();
-    const format = useDisplayFormat();
     const [here, setHere] = useState<Here | null>(null);
     const [name, setName] = useState("");
+    const [asking, setAsking] = useState(false);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [removing, startRemove] = useTransition();
@@ -50,21 +82,39 @@ export function PasskeysCard({ passkeys }: { passkeys: PasskeyView[] }) {
         });
     }, []);
 
-    const canAdd = Boolean(here?.host && here.secure);
-    const noneHere = canAdd && passkeys.length > 0 && !passkeys.some((key) => key.host === here?.host);
+    const problem = useMemo(() => nameProblem(name, passkeys), [name, passkeys]);
+    const supported = Boolean(here?.host && here.secure);
+    const canAdd = supported && !lock && name.trim().length > 0 && !problem;
+    const noneHere = supported && passkeys.length > 0 && !passkeys.some((key) => key.host === here?.host);
 
-    async function add() {
+    /** Register the credential, once the password has been proved. The prompt is
+     *  raised by the device; a cancelled one is a choice, not a failure. */
+    async function register() {
         setBusy(true);
         setError(null);
-        const result = await authClient.passkey.addPasskey({ name: name.trim() || undefined });
+        const result = await authClient.passkey.addPasskey({ name: name.trim() });
         setBusy(false);
         if (result?.error) {
-            // A cancelled prompt is a choice, not a failure worth shouting about.
             setError(result.error.message ?? "That did not complete. Try again.");
             return;
         }
         setName("");
+        setAsking(false);
         router.refresh();
+    }
+
+    async function confirmPassword(event: FormEvent<HTMLFormElement>) {
+        event.preventDefault();
+        const form = new FormData(event.currentTarget);
+        setBusy(true);
+        setError(null);
+        const result = await confirmPasswordForPasskeyAction(String(form.get("password") ?? ""));
+        if (result.error) {
+            setBusy(false);
+            setError(result.error);
+            return;
+        }
+        await register();
     }
 
     async function remove(passkey: PasskeyView) {
@@ -96,37 +146,86 @@ export function PasskeysCard({ passkeys }: { passkeys: PasskeyView[] }) {
                     </p>
                 </div>
 
-                {passkeys.length > 0 && (
-                    <div className="overflow-hidden rounded-md border border-border">
-                        {passkeys.map((passkey) => (
-                            <div
-                                key={passkey.id}
-                                className="flex items-center justify-between gap-3 border-t border-border px-3 py-2 first:border-t-0"
-                            >
-                                <div className="flex min-w-0 items-center gap-2">
-                                    <KeyRound className="size-4 shrink-0 text-muted-foreground" />
-                                    <span className="truncate text-sm">{passkey.name}</span>
-                                    <code className="shrink-0 rounded bg-muted px-1 text-xs text-muted-foreground">
-                                        {passkey.host}
-                                    </code>
-                                    <span className="shrink-0 text-xs text-muted-foreground">
-                                        added {format.date(passkey.addedAt)}
-                                    </span>
-                                </div>
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    aria-label={`Remove ${passkey.name}`}
-                                    title="Remove"
-                                    disabled={removing}
-                                    onClick={() => void remove(passkey)}
-                                >
-                                    <Trash2 className="size-4" />
-                                </Button>
-                            </div>
-                        ))}
-                    </div>
-                )}
+                <div className="overflow-x-auto rounded-lg border border-border">
+                    <table className="w-full text-sm">
+                        <thead className="bg-surface/60 text-left text-xs text-muted-foreground">
+                            <tr>
+                                <th className="px-3 py-2 font-medium">Name</th>
+                                <th className="hidden px-3 py-2 font-medium sm:table-cell">Added from</th>
+                                <th className="hidden px-3 py-2 font-medium lg:table-cell">Address</th>
+                                <th className="hidden px-3 py-2 font-medium md:table-cell">Works on</th>
+                                <th className="hidden px-3 py-2 font-medium lg:table-cell">Added</th>
+                                <th className="hidden px-3 py-2 font-medium md:table-cell">Last used</th>
+                                <th className="px-3 py-2" />
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {passkeys.length === 0 ? (
+                                <tr>
+                                    <td colSpan={7} className="px-3 py-8 text-center text-muted-foreground">
+                                        No passkeys yet. Add one to sign in with this device.
+                                    </td>
+                                </tr>
+                            ) : (
+                                passkeys.map((passkey) => (
+                                    <tr key={passkey.id} className="border-t border-border">
+                                        <td className="px-3 py-2">
+                                            <div className="flex items-center gap-3">
+                                                <KeyRound className="size-4 shrink-0 text-muted-foreground" />
+                                                <div className="min-w-0">
+                                                    <p className="truncate">{passkey.name}</p>
+                                                    <p className="truncate text-xs text-muted-foreground sm:hidden">
+                                                        {passkey.browser} on {passkey.os}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td className="hidden whitespace-nowrap px-3 py-2 text-xs text-muted-foreground sm:table-cell">
+                                            <span className="flex items-center gap-1.5">
+                                                <Laptop className="size-3.5 shrink-0" />
+                                                {passkey.browser} on {passkey.os}
+                                            </span>
+                                        </td>
+                                        <td className="hidden whitespace-nowrap px-3 py-2 text-xs text-muted-foreground lg:table-cell">
+                                            {passkey.ip ? (
+                                                <span className="font-mono">{passkey.ip}</span>
+                                            ) : (
+                                                "Not recorded"
+                                            )}
+                                        </td>
+                                        <td className="hidden max-w-[14rem] px-3 py-2 text-xs text-muted-foreground md:table-cell">
+                                            <span className="block truncate font-mono">{passkey.host}</span>
+                                        </td>
+                                        <td className="hidden whitespace-nowrap px-3 py-2 text-xs text-muted-foreground lg:table-cell">
+                                            <RelativeTime iso={passkey.addedAt} />
+                                        </td>
+                                        <td className="hidden whitespace-nowrap px-3 py-2 text-xs text-muted-foreground md:table-cell">
+                                            {passkey.lastUsedAt ? (
+                                                <RelativeTime iso={passkey.lastUsedAt} />
+                                            ) : (
+                                                "Never used"
+                                            )}
+                                        </td>
+                                        <td className="px-3 py-2">
+                                            <div className="flex justify-end">
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    aria-label={`Remove ${passkey.name}`}
+                                                    title="Remove"
+                                                    disabled={removing || Boolean(lock)}
+                                                    onClick={() => void remove(passkey)}
+                                                >
+                                                    <Trash2 className="size-4" />
+                                                </Button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))
+                            )}
+                        </tbody>
+                    </table>
+                </div>
 
                 {here && !here.host && (
                     <p className="text-xs text-warning">
@@ -147,18 +246,67 @@ export function PasskeysCard({ passkeys }: { passkeys: PasskeyView[] }) {
                 )}
 
                 <div className="flex items-start gap-2">
-                    <Input
-                        value={name}
-                        placeholder="Name this device (optional)"
-                        onChange={(event) => setName(event.target.value)}
-                    />
-                    <Button onClick={() => void add()} disabled={busy || !canAdd}>
-                        {busy ? "Waiting..." : "Add a passkey"}
+                    <div className="flex-1">
+                        <Input
+                            value={name}
+                            maxLength={PASSKEY_NAME_MAX}
+                            placeholder="Name this device"
+                            aria-label="Passkey name"
+                            aria-invalid={problem ? true : undefined}
+                            onChange={(event) => setName(event.target.value)}
+                        />
+                        {problem ? <p className="mt-1 text-xs text-danger">{problem}</p> : null}
+                    </div>
+                    <Button onClick={() => setAsking(true)} disabled={!canAdd}>
+                        Add a passkey
                     </Button>
                 </div>
-                <Feedback error={error} />
+                <Feedback error={lock?.reason ?? error} />
                 {confirmElement}
             </CardBody>
+
+            <Dialog
+                open={asking}
+                onOpenChange={(open) => {
+                    if (busy) return;
+                    setAsking(open);
+                    if (!open) setError(null);
+                }}
+            >
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Confirm your password</DialogTitle>
+                        <DialogDescription>
+                            Adding a passkey adds a way into your account, so it asks for your
+                            password first. Your device will prompt you next.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={confirmPassword} className="flex flex-col gap-3">
+                        <label className="flex flex-col gap-1 text-sm">
+                            Current password
+                            <Input name="password" type="password" required autoComplete="current-password" />
+                        </label>
+                        <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                            <ShieldCheck className="size-3.5 shrink-0" />
+                            Naming it &quot;{name.trim()}&quot;.
+                        </p>
+                        <Feedback error={error} />
+                        <div className="flex justify-end gap-2">
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                disabled={busy}
+                                onClick={() => setAsking(false)}
+                            >
+                                Cancel
+                            </Button>
+                            <Button type="submit" disabled={busy}>
+                                {busy ? "Waiting..." : "Continue"}
+                            </Button>
+                        </div>
+                    </form>
+                </DialogContent>
+            </Dialog>
         </Card>
     );
 }

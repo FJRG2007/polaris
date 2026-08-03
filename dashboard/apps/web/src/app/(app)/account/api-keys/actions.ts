@@ -15,11 +15,14 @@ import { createApiKey, deleteApiKey, revokeApiKey, scopesAvailableTo } from "@po
 import { createApiKeySchema } from "@polaris/core";
 import { recordAudit } from "@/lib/audit-service";
 import { requireUser } from "@/lib/session";
+import { newDeviceRefusal } from "@/lib/device-grace";
 
 export async function createApiKeyAction(
     input: unknown
 ): Promise<{ secret?: string; prefix?: string; error?: string }> {
     const user = await requireUser();
+    const blocked = await newDeviceRefusal(user);
+    if (blocked) return { error: blocked };
     const parsed = createApiKeySchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the form." };
 
@@ -41,6 +44,8 @@ export async function createApiKeyAction(
 
 export async function revokeApiKeyAction(id: string): Promise<{ error?: string }> {
     const user = await requireUser();
+    const blocked = await newDeviceRefusal(user);
+    if (blocked) return { error: blocked };
     await revokeApiKey(user.id, String(id));
     await recordAudit({
         actorId: user.id,
@@ -54,6 +59,8 @@ export async function revokeApiKeyAction(id: string): Promise<{ error?: string }
 
 export async function deleteApiKeyAction(id: string): Promise<{ error?: string }> {
     const user = await requireUser();
+    const blocked = await newDeviceRefusal(user);
+    if (blocked) return { error: blocked };
     await deleteApiKey(user.id, String(id));
     await recordAudit({
         actorId: user.id,

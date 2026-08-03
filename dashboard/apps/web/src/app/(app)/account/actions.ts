@@ -5,15 +5,23 @@
  * ever change their own profile or addresses. The credential work (verify, hash)
  * lives in @polaris/auth so there is one source of truth for how passwords are
  * stored; password and security settings live under ./security.
+ *
+ * The addresses, the username and the linked GitHub account are identity rather
+ * than presentation - they are what a password reset is sent to and what the
+ * account is known by - so each passes the new-device gate when the account has
+ * asked for one. A display name or a company is left alone by it: those change
+ * nothing about who can get in.
  */
 
 import { z } from "zod";
 import { auth } from "@/lib/auth";
+import { prisma } from "@polaris/db";
 import { emailField } from "@polaris/core";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/session";
 import { recordAudit } from "@/lib/audit-service";
 import { rateLimit } from "@/lib/rate-limit-service";
+import { newDeviceRefusal } from "@/lib/device-grace";
 import { unlinkGithubIdentity } from "@/lib/github-identity";
 import { requestEmailVerification } from "@/lib/email-verification-service";
 import {
@@ -50,12 +58,30 @@ export async function verifyEmailAction(input: unknown): Promise<{ error?: strin
     return result;
 }
 
+/**
+ * Whether a profile save would actually take a different username.
+ *
+ * The form sends every field on every save, so gating on "a username was sent"
+ * would stop a new device fixing its display name for a week over a value it did
+ * not touch. Compared the way a username is matched - trimmed and caseless -
+ * since retyping the same name in different capitals is not a change.
+ */
+async function changesUsername(userId: string, username: string | null | undefined): Promise<boolean> {
+    if (username === undefined) return false;
+    const row = await prisma.user.findUnique({ where: { id: userId }, select: { username: true } });
+    return (username ?? "").trim().toLowerCase() !== (row?.username ?? "").trim().toLowerCase();
+}
+
 export async function updateProfileAction(input: {
     name?: string;
     username?: string | null;
     company?: string | null;
 }): Promise<{ error?: string }> {
     const user = await requireUser();
+    if (await changesUsername(user.id, input.username)) {
+        const blocked = await newDeviceRefusal(user);
+        if (blocked) return { error: blocked };
+    }
     const result = await updateUserProfile(user.id, {
         name: typeof input.name === "string" ? input.name : undefined,
         username: input.username === undefined ? undefined : (input.username ?? ""),
@@ -67,6 +93,8 @@ export async function updateProfileAction(input: {
 
 export async function addEmailAction(input: unknown): Promise<{ error?: string }> {
     const user = await requireUser();
+    const blocked = await newDeviceRefusal(user);
+    if (blocked) return { error: blocked };
     const parsed = emailField.safeParse(input);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Enter a valid email" };
     const result = await addUserEmail(user.id, parsed.data);
@@ -79,6 +107,8 @@ export async function addEmailAction(input: unknown): Promise<{ error?: string }
 
 export async function removeEmailAction(emailId: unknown): Promise<{ error?: string }> {
     const user = await requireUser();
+    const blocked = await newDeviceRefusal(user);
+    if (blocked) return { error: blocked };
     const parsed = emailIdSchema.safeParse(emailId);
     if (!parsed.success) return { error: "That address is no longer on your account." };
     const result = await removeUserEmail(user.id, parsed.data);
@@ -91,6 +121,8 @@ export async function removeEmailAction(emailId: unknown): Promise<{ error?: str
 
 export async function setEmailRecoveryAction(emailId: unknown, recovery: boolean): Promise<{ error?: string }> {
     const user = await requireUser();
+    const blocked = await newDeviceRefusal(user);
+    if (blocked) return { error: blocked };
     const parsed = emailIdSchema.safeParse(emailId);
     if (!parsed.success) return { error: "That address is no longer on your account." };
     const result = await setUserEmailRecovery(user.id, parsed.data, recovery === true);
@@ -106,6 +138,8 @@ export async function setEmailRecoveryAction(emailId: unknown, recovery: boolean
 
 export async function promoteEmailAction(emailId: unknown, currentPassword: string): Promise<{ error?: string }> {
     const user = await requireUser();
+    const blocked = await newDeviceRefusal(user);
+    if (blocked) return { error: blocked };
     const parsed = emailIdSchema.safeParse(emailId);
     if (!parsed.success) return { error: "That address is no longer on your account." };
     const result = await promoteUserEmail(auth, user.id, parsed.data, String(currentPassword));
@@ -120,6 +154,8 @@ export async function promoteEmailAction(emailId: unknown, currentPassword: stri
  *  session is re-resolved here, so this can never unlink somebody else. */
 export async function unlinkGithubAction(): Promise<{ error?: string }> {
     const user = await requireUser();
+    const blocked = await newDeviceRefusal(user);
+    if (blocked) return { error: blocked };
     try {
         await unlinkGithubIdentity(user.id);
     } catch {

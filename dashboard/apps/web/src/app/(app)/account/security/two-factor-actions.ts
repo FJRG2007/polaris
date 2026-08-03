@@ -10,8 +10,17 @@
  * code is throttled per account because six digits is a guessable secret.
  */
 
-import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { auth } from "@/lib/auth";
+import { prisma } from "@polaris/db";
+import { revalidatePath } from "next/cache";
+import { requireUser } from "@/lib/session";
+import { recordAudit } from "@/lib/audit-service";
+import { rateLimit } from "@/lib/rate-limit-service";
+import { newDeviceRefusal } from "@/lib/device-grace";
+import { normalizePeerId } from "@/lib/messaging-service";
+import { bridgeSend } from "@/lib/messaging/bridge-client";
+import { describeTwoFactorMethods } from "@/lib/two-factor-delivery";
 import {
     issuePhoneCode,
     removeUserPhone,
@@ -26,14 +35,6 @@ import {
     TWO_FACTOR_METHOD_INFO,
     twoFactorPreferencesSchema
 } from "@polaris/core";
-import { prisma } from "@polaris/db";
-import { auth } from "@/lib/auth";
-import { recordAudit } from "@/lib/audit-service";
-import { requireUser } from "@/lib/session";
-import { rateLimit } from "@/lib/rate-limit-service";
-import { bridgeSend } from "@/lib/messaging/bridge-client";
-import { normalizePeerId } from "@/lib/messaging-service";
-import { describeTwoFactorMethods } from "@/lib/two-factor-delivery";
 
 type ActionResult = { error?: string };
 
@@ -52,6 +53,8 @@ const setPhoneSchema = z.object({
 
 export async function setPhoneAction(input: unknown): Promise<ActionResult> {
     const user = await requireUser();
+    const blocked = await newDeviceRefusal(user);
+    if (blocked) return { error: blocked };
     const parsed = setPhoneSchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the form." };
     const result = await setUserPhone(auth, user.id, parsed.data.phone, parsed.data.password);
@@ -64,6 +67,8 @@ export async function setPhoneAction(input: unknown): Promise<ActionResult> {
 
 export async function removePhoneAction(password: unknown): Promise<ActionResult> {
     const user = await requireUser();
+    const blocked = await newDeviceRefusal(user);
+    if (blocked) return { error: blocked };
     const result = await removeUserPhone(auth, user.id, String(password ?? ""));
     if (!result.error) {
         await recordAudit({ actorId: user.id, action: "account.phone.removed" });
@@ -82,6 +87,8 @@ export async function removePhoneAction(password: unknown): Promise<ActionResult
  */
 export async function sendPhoneCodeAction(): Promise<ActionResult> {
     const user = await requireUser();
+    const blocked = await newDeviceRefusal(user);
+    if (blocked) return { error: blocked };
     const throttle = await rateLimit(`phone-code:${user.id}`, CODE_SEND_LIMIT, CODE_SEND_WINDOW_MS);
     if (!throttle.ok) {
         return { error: `Too many codes asked for. Try again in ${Math.ceil(throttle.retryAfterMs / 60000)} minutes.` };
@@ -111,6 +118,8 @@ export async function sendPhoneCodeAction(): Promise<ActionResult> {
 
 export async function verifyPhoneAction(code: unknown): Promise<ActionResult> {
     const user = await requireUser();
+    const blocked = await newDeviceRefusal(user);
+    if (blocked) return { error: blocked };
     const parsed = otpCodeField.safeParse(code);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Enter the 6-digit code." };
     const throttle = await rateLimit(`phone-check:${user.id}`, CODE_CHECK_LIMIT, CODE_CHECK_WINDOW_MS);
@@ -140,6 +149,8 @@ const savePreferencesSchema = z.object({
  */
 export async function saveTwoFactorPreferencesAction(input: unknown): Promise<ActionResult> {
     const user = await requireUser();
+    const blocked = await newDeviceRefusal(user);
+    if (blocked) return { error: blocked };
     const parsed = savePreferencesSchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the form." };
 

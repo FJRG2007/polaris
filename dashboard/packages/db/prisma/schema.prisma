@@ -90,6 +90,7 @@ model User {
     twoFactors          TwoFactor[]
     sessionStates       SessionState[]
     trustedDevices      TrustedDevice[]
+    accountDevices      AccountDevice[]
     deviceCodes         DeviceCode[]
     emails              UserEmail[]
     phone               UserPhone?
@@ -216,6 +217,8 @@ model TrustedDevice {
     // Client-supplied, exactly like a session's: shown so a person can tell
     // their phone from their laptop, never an input to a decision.
     userAgent String?
+    // The brands that browser announced, read the same way a session's are.
+    userAgentBrands String?
     ip        String?
     host      String?
     createdAt DateTime @default(now())
@@ -225,6 +228,43 @@ model TrustedDevice {
 
     user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+    @@index([userId])
+}
+
+// Every browser this account has ever signed in from, and when it first did.
+//
+// Distinct from TrustedDevice above, which is only the browsers that asked to
+// skip the second-factor challenge and which expires with the pass it describes.
+// This one never expires and covers every device, because what it exists to
+// answer is "how long has this machine been on the account" - and a device that
+// signed in yesterday must not be able to erase that fact by declining to be
+// remembered, or by waiting for a pass to lapse.
+//
+// A session would be the obvious place to read it from, except that sessions are
+// ended and expire, so the account's oldest laptop would look new again the
+// morning after it was signed out. The first sighting has to outlive them.
+//
+// Identity is the browser's own description of itself, which two identical
+// machines share and which anyone able to set a header can copy. That is the
+// safe direction: the worst it does is let a device that has already stolen the
+// password skip a wait, and the wait was never the thing keeping them out.
+model AccountDevice {
+    id     String @id @default(uuid(7)) @db.Uuid
+    userId String @db.Uuid
+    // Exactly what the browser said it was - matched, not read, so it is stored
+    // raw and the label is derived when it is shown.
+    userAgent String
+    // What it announced and where from when it was first seen. Kept as first
+    // seen rather than last: this row is about the device's age on the account.
+    userAgentBrands String?
+    ip              String?
+    host            String?
+    firstSeenAt DateTime @default(now())
+    lastSeenAt  DateTime @default(now())
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@unique([userId, userAgent])
     @@index([userId])
 }
 
@@ -276,8 +316,9 @@ model Verification {
 }
 
 // A WebAuthn credential: a passkey held by the user's device or password
-// manager, proved by the device rather than typed. Every column here is the
-// passkey plugin's to decide; Polaris only stores them.
+// manager, proved by the device rather than typed. Every column down to
+// `aaguid` is the passkey plugin's to decide; Polaris only stores them. The two
+// after it are Polaris's own, recorded as the registration goes past.
 model Passkey {
     id           String   @id @default(uuid(7)) @db.Uuid
     // What the user calls it, e.g. "iPhone". Set when it is registered.
@@ -298,7 +339,22 @@ model Passkey {
     // The address it was registered on, which is the only one it signs in on.
     // Null on rows that predate this: those were all issued under the app URL.
     rpId         String?
+    // The browser that registered it, as that browser described itself. It is
+    // what puts a passkey next to the sessions and the remembered pass of the
+    // same device; client-supplied, so a label and never a decision.
+    userAgent    String?
+    // The brands that browser announced, from the client-hints header. Brave,
+    // Vivaldi and Arc report themselves as Chrome in the user-agent on purpose,
+    // and this is the only place they say otherwise.
+    userAgentBrands String?
+    // Where the registration came from. Nothing decides on it; it is what
+    // answers "was this me?" about a credential the owner does not recognise.
+    ip           String?
     createdAt    DateTime @default(now())
+    // When this credential last proved a sign-in. Null until it has been used
+    // once, and on rows that predate the column - a passkey nobody can date is
+    // the one worth looking at, so it is shown as unused rather than hidden.
+    lastUsedAt   DateTime?
 
     user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -419,6 +475,17 @@ model UserSecurity {
     // Bound to the address that asked for it and consumed on first use.
     rotationGraceUntil   DateTime?
     rotationGraceIp      String?
+    // A recent password confirmation, so an action that has just asked for the
+    // password does not ask again for the ceremony it starts. Bound to the
+    // session that proved it, because it is that browser's proof and nobody
+    // else's, and short enough that a walked-away-from screen does not carry it.
+    reauthUntil          DateTime?
+    reauthSessionId      String?   @db.Uuid
+    // Days a device newly seen on this account waits before it may change
+    // anything under Security. 0 turns the wait off, which is the default: it
+    // protects an account whose password has just been taken, at the cost of
+    // making a genuine new laptop wait, and that is the owner's call to make.
+    newDeviceGraceDays   Int       @default(0)
     // Sign-in restrictions set directly on the account, on top of whatever the
     // attached access groups contribute. JSON string arrays for SQLite
     // portability; empty everywhere means no restriction.
@@ -587,6 +654,9 @@ model SessionState {
     ip         String?
     country    String?
     userAgent  String?
+    // The brands the browser announced, from the client-hints header, so a
+    // session names the same browser its passkeys and its remembered pass do.
+    userAgentBrands String?
     // The hostname the session was opened on. A deployment answers on several
     // names - polaris.local on the LAN, its domain from outside - and the cookie
     // is host-only, so the same person signed in twice holds two sessions that

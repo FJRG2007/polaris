@@ -18,17 +18,22 @@ import { prisma } from "@polaris/db";
 import { randomUUID } from "node:crypto";
 import { loadEnv } from "@polaris/config";
 import { passkey } from "@better-auth/passkey";
+import { passwordConfirmed } from "./security.js";
 import { setSessionCookie } from "better-auth/cookies";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { betterAuth, type BetterAuthPlugin } from "better-auth";
 import { APIError, createAuthMiddleware } from "better-auth/api";
-import { followTrustedDevice, recordTrustedDevice } from "./two-factor.js";
+import { newDeviceWaitMessage, sessionDeviceStanding } from "./devices.js";
 import { deviceAuthorization, magicLink, twoFactor } from "better-auth/plugins";
+import { followTrustedDevice, recordTrustedDevice, type DeviceOrigin } from "./two-factor.js";
 import {
     originHost,
     originIp,
     originUserAgent,
+    originUserAgentBrands,
+    passkeyNameKey,
     passkeyRelyingPartyId,
+    PASSKEY_NAME_MAX,
     QR_SIGN_IN_CLIENT_ID,
     QR_SIGN_IN_POLL_SECONDS,
     QR_SIGN_IN_TTL_SECONDS,
@@ -36,6 +41,18 @@ import {
     TWO_FACTOR_CODE_TTL_MINUTES,
     TWO_FACTOR_METHOD_HEADER
 } from "@polaris/core";
+
+/** What a request said about the browser making it, in the shape every device
+ *  record here is written from. */
+function requestOrigin(headers: Headers | undefined): DeviceOrigin {
+    const source = headers ?? new Headers();
+    return {
+        userAgent: originUserAgent(source),
+        userAgentBrands: originUserAgentBrands(source),
+        ip: originIp(source),
+        host: originHost(source)
+    };
+}
 
 /** Session lifetime: 7 days, refreshed at most once per day. */
 const SESSION_MAX_AGE = 60 * 60 * 24 * 7;
@@ -56,6 +73,13 @@ const MAGIC_LINK_TTL_SECONDS = 10 * 60;
  * The address is checked against the trusted list before it reaches here; an
  * address that cannot be a relying party at all - a bare IP - leaves the plugin
  * unregistered, so its endpoints are absent rather than failing halfway.
+ *
+ * Two things are decided inside the ceremony rather than after it. A credential
+ * must arrive named, and named something the account is not already using, since
+ * the name is the only handle a person has on it when they come to take one away
+ * - "Unnamed passkey" three times over is a list nobody can act on. And each
+ * assertion stamps the credential it used, so a passkey nobody recognises can be
+ * told apart from one that has simply been forgotten.
  */
 function passkeyPlugin(address: string): BetterAuthPlugin | null {
     const rpID = passkeyRelyingPartyId(address);
@@ -66,8 +90,62 @@ function passkeyPlugin(address: string): BetterAuthPlugin | null {
         // Pinned rather than left for the client to supply: an origin the caller
         // chooses is an origin an attacker chooses. The port rides along, since
         // it is part of the origin the browser reports.
-        origin: origins(address)
+        origin: origins(address),
+        registration: {
+            afterVerification: async ({ ctx, user }) => {
+                await assertPasskeyNameFree(user.id, (ctx.body as { name?: unknown })?.name);
+            }
+        },
+        authentication: {
+            afterVerification: async ({ clientData }) => {
+                await stampPasskeyUse(clientData.id);
+            }
+        }
     }) as BetterAuthPlugin;
+}
+
+/**
+ * Refuse a passkey that arrives unnamed, or named what another of the account's
+ * passkeys is already called.
+ *
+ * Runs before the row is written, so a refusal leaves nothing behind. The
+ * comparison ignores case and surrounding space, because two credentials called
+ * "iPhone" and "iphone " are two entries a person reading the list cannot tell
+ * apart, which is the only thing the rule is protecting.
+ *
+ * The screen checks the same thing as the field is typed. This is the check that
+ * counts: the ceremony is reachable without it.
+ */
+async function assertPasskeyNameFree(userId: string, supplied: unknown): Promise<void> {
+    const name = typeof supplied === "string" ? supplied.trim() : "";
+    if (!name) throw new APIError("BAD_REQUEST", { message: "Name this passkey before adding it." });
+    if (name.length > PASSKEY_NAME_MAX) {
+        throw new APIError("BAD_REQUEST", { message: `Keep the name under ${PASSKEY_NAME_MAX} characters.` });
+    }
+    // Compared in the application rather than by the database: an account holds a
+    // handful of these, and a case-insensitive match is one of the few things the
+    // two engines this schema targets do not spell the same way.
+    const existing = await prisma.passkey.findMany({ where: { userId }, select: { name: true } });
+    const key = passkeyNameKey(name);
+    if (existing.some((row) => row.name && passkeyNameKey(row.name) === key)) {
+        throw new APIError("BAD_REQUEST", { message: "One of your passkeys is already called that." });
+    }
+}
+
+/**
+ * Note that a credential has just proved a sign-in.
+ *
+ * Identified by the credential the browser presented, which better-auth has
+ * already matched against a stored row and verified the signature of by the time
+ * this runs - so it names exactly one passkey and only after that passkey worked.
+ *
+ * Never fails the sign-in. Somebody is being let in on a credential that
+ * verified; a date that could not be written is not a reason to refuse them.
+ */
+async function stampPasskeyUse(credentialId: string): Promise<void> {
+    await prisma.passkey
+        .updateMany({ where: { credentialID: credentialId }, data: { lastUsedAt: new Date() } })
+        .catch((error: unknown) => console.error("passkey use not recorded:", error));
 }
 
 /**
@@ -178,11 +256,7 @@ function describeTrustedDevices(plugin: BetterAuthPlugin): BetterAuthPlugin {
                         // it back again, which is the case with no device yet.
                         const user = ctx.context.newSession?.user;
                         if (!user) return;
-                        const origin = {
-                            userAgent: originUserAgent(ctx.headers ?? new Headers()),
-                            ip: originIp(ctx.headers ?? new Headers()),
-                            host: originHost(ctx.headers ?? new Headers())
-                        };
+                        const origin = requestOrigin(ctx.headers);
 
                         if (TWO_FACTOR_VERIFY_PATHS.has(ctx.path)) {
                             // The only thing that mints a pass. Anything else on
@@ -562,11 +636,81 @@ export function createRequestAuth(options: AuthOptions = {}): RequestAuth {
     return {
         auth: shared,
         handle: async (request) => {
+            const refusal = await refuseProtectedEndpoint(shared, request);
+            if (refusal) return refusal;
             const address = await resolvePasskeyAddress(request, options);
             const response = await instanceFor(address).handler(request);
-            return address ? recordRelyingParty(request, response, address) : response;
+            return address ? recordPasskeyOrigin(request, response, address) : response;
         }
     };
+}
+
+/**
+ * The better-auth endpoints that change what protects an account, rather than
+ * using it.
+ *
+ * These are the ones the account page's own actions have no say over: the
+ * ceremony that attaches a passkey, the ones that rename or remove one, and
+ * arming or dropping the authenticator. Everything equivalent that goes through
+ * a server action is guarded there; this is the same rule applied where the
+ * browser talks to better-auth directly.
+ */
+const PROTECTED_ENDPOINTS: ReadonlySet<string> = new Set([
+    "/passkey/generate-register-options",
+    "/passkey/verify-registration",
+    "/passkey/delete-passkey",
+    "/passkey/update-passkey",
+    "/two-factor/enable",
+    "/two-factor/disable"
+]);
+
+/** Registering a passkey is the one that also wants the password proved. The
+ *  others already ask for it, or only ever take something away. */
+const NEEDS_PASSWORD: ReadonlySet<string> = new Set([
+    "/passkey/generate-register-options",
+    "/passkey/verify-registration"
+]);
+
+/** A refusal in the shape a better-auth client reads an error from. */
+function refused(message: string, code: string): Response {
+    return new Response(JSON.stringify({ code, message }), {
+        status: 403,
+        headers: { "content-type": "application/json" }
+    });
+}
+
+/**
+ * Stop a request that would change the account's protection when this browser is
+ * not entitled to: it has not proved the password, or it is a device still
+ * serving the account's new-device wait.
+ *
+ * Adding a passkey is adding a way in, and better-auth's ceremony proves the
+ * device rather than the account - so an open session left on a borrowed screen
+ * was enough to attach a permanent credential to it. Asking for the password
+ * first is what makes that a deliberate act. It is proved through a server action
+ * beforehand and only checked here, because the ceremony's own request is the
+ * browser's to shape and there is nowhere in it to carry one.
+ *
+ * Returns null for everything else, including every unauthenticated request:
+ * better-auth refuses those itself, and answering them here would only invent a
+ * second opinion about who is signed in.
+ */
+export async function refuseProtectedEndpoint(auth: Auth, request: Request): Promise<Response | null> {
+    const path = new URL(request.url).pathname;
+    const endpoint = [...PROTECTED_ENDPOINTS].find((known) => path.endsWith(known));
+    if (!endpoint) return null;
+
+    const session = await auth.api.getSession({ headers: request.headers }).catch(() => null);
+    if (!session) return null;
+
+    const standing = await sessionDeviceStanding(session.user.id, session.session.id);
+    if (!standing.settled) {
+        return refused(newDeviceWaitMessage(standing), "NEW_DEVICE_WAITING");
+    }
+    if (NEEDS_PASSWORD.has(endpoint) && !(await passwordConfirmed(session.user.id, session.session.id))) {
+        return refused("Confirm your password before adding a passkey.", "PASSWORD_NOT_CONFIRMED");
+    }
+    return null;
 }
 
 /**
@@ -590,15 +734,28 @@ export async function resolvePasskeyAddress(
 }
 
 /**
- * Record which address a newly registered passkey is bound to. The plugin's own
- * row does not carry it, and without it the account page cannot say where a
- * passkey works and the sign-in page cannot tell whether offering one here would
- * do anything but raise a prompt that fails.
+ * Record where a newly registered passkey came from: the address it is bound to,
+ * and the browser that created it.
  *
- * Read from the response rather than reported by the browser afterwards, so the
- * binding is whatever the server actually issued the challenge for.
+ * The plugin's own row carries neither. Without the address the account page
+ * cannot say where a passkey works and the sign-in page cannot tell whether
+ * offering one here would do anything but raise a prompt that fails. Without the
+ * browser a passkey cannot be shown beside the sessions and the remembered pass
+ * of the device holding it, which is what somebody deciding what to take away
+ * from a device they no longer have is looking for.
+ *
+ * The address is read from the response rather than reported by the browser
+ * afterwards, so the binding is whatever the server actually issued the
+ * challenge for. The user-agent, the brands and the address the request came
+ * from can only ever be what the caller claimed, which is why they are labels
+ * here and nowhere near a decision.
+ *
+ * The name is settled here too. better-auth stores what the browser sent
+ * verbatim, and the ceremony that accepted it compared a trimmed form, so
+ * writing the trimmed form back is what keeps the stored name and the name the
+ * uniqueness rule was applied to the same string.
  */
-export async function recordRelyingParty(
+export async function recordPasskeyOrigin(
     request: Request,
     response: Response,
     address: string
@@ -608,10 +765,20 @@ export async function recordRelyingParty(
     const created: unknown = await response.clone().json().catch(() => null);
     const id = (created as { id?: unknown } | null)?.id;
     if (typeof id !== "string") return response;
+    const name = (created as { name?: unknown }).name;
     await prisma.passkey
-        .update({ where: { id }, data: { rpId: passkeyRelyingPartyId(address) } })
+        .update({
+            where: { id },
+            data: {
+                rpId: passkeyRelyingPartyId(address),
+                userAgent: originUserAgent(request.headers) ?? null,
+                userAgentBrands: originUserAgentBrands(request.headers) ?? null,
+                ip: originIp(request.headers) ?? null,
+                ...(typeof name === "string" && name.trim() ? { name: name.trim() } : {})
+            }
+        })
         // The passkey exists and works either way; only the label for it is lost,
         // so this must not turn a successful registration into a failed request.
-        .catch((error: unknown) => console.error("passkey address not recorded:", error));
+        .catch((error: unknown) => console.error("passkey origin not recorded:", error));
     return response;
 }

@@ -31,9 +31,8 @@ import { cookies, headers } from "next/headers";
 import { recordAudit } from "@/lib/audit-service";
 import { appBaseUrl } from "@/lib/domain-service";
 import { rateLimit } from "@/lib/rate-limit-service";
-import { describeDevice } from "@/lib/session-directory";
-import { QR_SIGN_IN_PATH, type QrSignInDecision } from "@polaris/core";
 import { clientHost, clientIp, clientUserAgent } from "@/lib/request-context";
+import { describeDevice, QR_SIGN_IN_PATH, type QrSignInDecision } from "@polaris/core";
 import {
     beginSessionRotation,
     claimDeviceCode,

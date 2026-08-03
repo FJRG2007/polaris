@@ -10,7 +10,7 @@
 
 import { headers } from "next/headers";
 import { createHash } from "node:crypto";
-import { originHost, originIp, originUserAgent } from "@polaris/core";
+import { originHost, originIp, originUserAgent, originUserAgentBrands } from "@polaris/core";
 
 /** Best-effort client IP from the forwarded headers, or undefined. */
 export async function clientIp(): Promise<string | undefined> {
@@ -20,6 +20,13 @@ export async function clientIp(): Promise<string | undefined> {
 /** The client user-agent string, or undefined. */
 export async function clientUserAgent(): Promise<string | undefined> {
     return originUserAgent(await headers());
+}
+
+/** The browser brands the client announced, or undefined. Recorded beside the
+ *  user-agent because it is where a Chromium browser that rebadges Chrome says
+ *  which one it really is. */
+export async function clientUserAgentBrands(): Promise<string | undefined> {
+    return originUserAgentBrands(await headers());
 }
 
 /**

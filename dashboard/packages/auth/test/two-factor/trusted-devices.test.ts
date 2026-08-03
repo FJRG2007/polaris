@@ -64,6 +64,14 @@ const prisma = {
             devices.filter((row) => row.userId === where.userId && where.identifier.in.includes(row.identifier)),
         findUnique: async ({ where }: { where: { identifier: string } }) =>
             devices.find((row) => row.identifier === where.identifier) ?? null,
+        create: async ({ data }: { data: DeviceRow }) => {
+            if (devices.some((row) => row.identifier === data.identifier)) {
+                throw new Error("identifier already described");
+            }
+            const created = { createdAt: new Date(), lastSeenAt: new Date(), ...data };
+            devices.push(created);
+            return created;
+        },
         update: async ({ where, data }: { where: { identifier: string }; data: Partial<DeviceRow> }) => {
             const row = devices.find((entry) => entry.identifier === where.identifier);
             if (!row) throw new Error("no such device");
@@ -217,6 +225,53 @@ describe("a pass better-auth rotated", () => {
         await twoFactor.recordTrustedDevice(USER, { userAgent: "Firefox/1" });
         verifications = [];
         await twoFactor.followTrustedDevice(USER, "trust-device-old", {});
+        expect(devices).toEqual([]);
+    });
+});
+
+describe("naming the pass the browser reading the page holds", () => {
+    it("describes a nameless pass from the request that is asking", async () => {
+        pass("trust-device-mine");
+        expect(
+            await twoFactor.adoptTrustedDevice(USER, "trust-device-mine", {
+                userAgent: "Chrome/1",
+                ip: "192.168.1.131",
+                host: "polaris.local"
+            })
+        ).toBe(true);
+
+        const listed = await twoFactor.listTrustedDevices(USER, null);
+        expect(listed[0]?.userAgent).toBe("Chrome/1");
+        expect(listed[0]?.ip).toBe("192.168.1.131");
+        expect(listed[0]?.host).toBe("polaris.local");
+    });
+
+    // What the device was when it was remembered is the fact worth keeping; what
+    // it looks like today is on the session list already.
+    it("never overwrites a description that already exists", async () => {
+        pass("trust-device-mine");
+        await twoFactor.recordTrustedDevice(USER, { userAgent: "Firefox/1", ip: "10.0.0.9" });
+        expect(await twoFactor.adoptTrustedDevice(USER, "trust-device-mine", { userAgent: "Chrome/1" })).toBe(false);
+        expect((await twoFactor.listTrustedDevices(USER, null))[0]?.userAgent).toBe("Firefox/1");
+    });
+
+    it("describes nothing when there is no pass behind the handle", async () => {
+        expect(await twoFactor.adoptTrustedDevice(USER, "trust-device-gone", { userAgent: "Chrome/1" })).toBe(false);
+        expect(devices).toEqual([]);
+    });
+
+    it("never reaches another account's pass, or anything that is not one", async () => {
+        pass("trust-device-theirs", OTHER);
+        expect(await twoFactor.adoptTrustedDevice(USER, "trust-device-theirs", { userAgent: "Chrome/1" })).toBe(false);
+        expect(await twoFactor.adoptTrustedDevice(USER, "2fa-attempts-something", { userAgent: "Chrome/1" })).toBe(
+            false
+        );
+        expect(devices).toEqual([]);
+    });
+
+    it("writes nothing when the request says nothing about the browser", async () => {
+        pass("trust-device-mine");
+        expect(await twoFactor.adoptTrustedDevice(USER, "trust-device-mine", {})).toBe(false);
         expect(devices).toEqual([]);
     });
 });

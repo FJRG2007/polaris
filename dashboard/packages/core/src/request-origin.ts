@@ -32,6 +32,22 @@ export function originUserAgent(headers: HeaderSource): string | undefined {
     return headers.get("user-agent")?.trim() || undefined;
 }
 
+/** How much of the brand list is worth keeping. It is a header, so it is as long
+ *  as the caller wants it to be; a real one is well under this. */
+const MAX_BRANDS = 256;
+
+/**
+ * The browser brands the request announced itself with, or undefined.
+ *
+ * Recorded alongside the user-agent because it is the only place a Chromium
+ * browser that rebadges Chrome - Brave, Vivaldi, Arc - names itself; the
+ * user-agent says Chrome on purpose. Browsers that send no hints at all leave
+ * this empty and are read from the user-agent as before.
+ */
+export function originUserAgentBrands(headers: HeaderSource): string | undefined {
+    return headers.get("sec-ch-ua")?.trim().slice(0, MAX_BRANDS) || undefined;
+}
+
 /** Hostnames are matched, stored and shown as this; anything else is dropped
  *  rather than kept, since a Host header is the caller's to write. */
 const HOSTNAME = /^[a-z0-9.-]+$/;

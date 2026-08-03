@@ -9,16 +9,17 @@
  */
 
 import { useState } from "react";
-import { Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { PasskeysCard } from "./passkeys-card";
-import type { PasskeyView } from "./passkey-actions";
-import { updateSessionLimitsAction } from "./actions";
-import { Feedback, SettingCard } from "./setting-card";
+import { ShieldAlert, Trash2 } from "lucide-react";
+import { NEW_DEVICE_GRACE_CHOICES } from "@polaris/auth";
+import type { PasskeyView } from "@/lib/passkey-directory";
 import { Button, Card, CardBody, Select } from "@polaris/ui";
 import { RemovePinDialog, SetPinDialog } from "./pin-dialogs";
 import { TwoFactorMethodsCard } from "./two-factor-methods-card";
 import type { TwoFactorMethodStatus } from "@/lib/two-factor-delivery";
+import { Feedback, SettingCard, type SettingLock } from "./setting-card";
+import { setNewDeviceGraceAction, updateSessionLimitsAction } from "./actions";
 import { ChangePasswordDialog, RecoverPasswordDialog } from "./password-dialogs";
 import { ClearQuestionsDialog, SecurityQuestionsDialog } from "./questions-dialog";
 import { DisableTwoFactorDialog, EnableTwoFactorDialog } from "./two-factor-dialogs";
@@ -38,7 +39,18 @@ function describeMinutes(minutes: number, zeroLabel: string): string {
     return `${days} day${days === 1 ? "" : "s"}`;
 }
 
+/** Human label for a wait measured in days. */
+function describeDays(days: number): string {
+    if (days === 0) return "No wait";
+    if (days === 1) return "1 day";
+    if (days === 7) return "1 week";
+    if (days === 14) return "2 weeks";
+    return `${days} days`;
+}
+
 export function SecurityView({
+    lock,
+    newDeviceGraceDays,
     hasPin,
     idleLockMinutes,
     sessionMaxMinutes,

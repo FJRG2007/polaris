@@ -9,6 +9,11 @@
  * Actions that weaken a control (setting a PIN, replacing the recovery questions,
  * changing the password) re-verify the current password inside @polaris/auth, so
  * a stolen session cannot quietly install its own way back in.
+ *
+ * Every one of them also passes the new-device gate first, when the account has
+ * asked for one. The password is not proof of much in the hours after it has been
+ * taken, which is exactly when these actions are worth the most to somebody who
+ * should not have it.
  */
 
 import { auth } from "@/lib/auth";
@@ -18,6 +23,7 @@ import { requireUser } from "@/lib/session";
 import { clientIp } from "@/lib/request-context";
 import { recordAudit } from "@/lib/audit-service";
 import { rateLimit } from "@/lib/rate-limit-service";
+import { newDeviceRefusal } from "@/lib/device-grace";
 import { revokeOtherSessions } from "@/lib/session-directory";
 import { recoverPasswordSchema, securityQuestionsSchema, sessionLimitsSchema, setPinSchema } from "@polaris/core";
 import {
@@ -45,6 +51,8 @@ const RECOVERY_WINDOW_MS = 15 * 60 * 1000;
 
 export async function changePasswordAction(currentPassword: string, newPassword: string): Promise<ActionResult> {
     const user = await requireUser();
+    const blocked = await newDeviceRefusal(user);
+    if (blocked) return { error: blocked };
     const result = await changeUserPassword(auth, user.id, String(currentPassword), String(newPassword));
     if (!result.error) {
         await revokeOtherSessions(user.id, user.sessionId);
@@ -61,6 +69,8 @@ export async function changePasswordAction(currentPassword: string, newPassword:
  */
 export async function recoverPasswordAction(input: unknown): Promise<ActionResult> {
     const user = await requireUser();
+    const blocked = await newDeviceRefusal(user);
+    if (blocked) return { error: blocked };
     const parsed = recoverPasswordSchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the form." };
 
@@ -103,6 +113,8 @@ export async function beginSessionRotationAction(): Promise<void> {
 
 export async function setPinAction(input: unknown): Promise<ActionResult> {
     const user = await requireUser();
+    const blocked = await newDeviceRefusal(user);
+    if (blocked) return { error: blocked };
     const parsed = setPinSchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the form." };
     const result = await setQuickPin(auth, user.id, parsed.data.pin, parsed.data.password);
@@ -115,6 +127,8 @@ export async function setPinAction(input: unknown): Promise<ActionResult> {
 
 export async function clearPinAction(password: string): Promise<ActionResult> {
     const user = await requireUser();
+    const blocked = await newDeviceRefusal(user);
+    if (blocked) return { error: blocked };
     // Approving a sign-in is what the PIN proves, so it cannot outlive the PIN.
     const security = await getUserSecurity(user.id);
     if (security.requireLoginApproval) {
@@ -130,6 +144,8 @@ export async function clearPinAction(password: string): Promise<ActionResult> {
 
 export async function updateSessionLimitsAction(input: unknown): Promise<ActionResult> {
     const user = await requireUser();
+    const blocked = await newDeviceRefusal(user);
+    if (blocked) return { error: blocked };
     const parsed = sessionLimitsSchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the form." };
     await updateSessionLimits(user.id, parsed.data);
@@ -153,6 +169,8 @@ export async function updateSessionLimitsAction(input: unknown): Promise<ActionR
  */
 export async function setLoginApprovalAction(required: boolean, password: string): Promise<ActionResult> {
     const user = await requireUser();
+    const blocked = await newDeviceRefusal(user);
+    if (blocked) return { error: blocked };
     if (!(await verifyAccountPassword(auth, user.id, String(password)))) {
         return { error: "Current password is incorrect." };
     }
@@ -173,6 +191,8 @@ export async function setLoginApprovalAction(required: boolean, password: string
 
 export async function setSecurityQuestionsAction(password: string, input: unknown): Promise<ActionResult> {
     const user = await requireUser();
+    const blocked = await newDeviceRefusal(user);
+    if (blocked) return { error: blocked };
     const parsed = securityQuestionsSchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the form." };
     const result = await setSecurityQuestions(auth, user.id, String(password), parsed.data.answers);
@@ -185,6 +205,8 @@ export async function setSecurityQuestionsAction(password: string, input: unknow
 
 export async function clearSecurityQuestionsAction(password: string): Promise<ActionResult> {
     const user = await requireUser();
+    const blocked = await newDeviceRefusal(user);
+    if (blocked) return { error: blocked };
     const result = await clearSecurityQuestions(auth, user.id, String(password));
     if (!result.error) {
         await recordAudit({ actorId: user.id, action: "account.security-questions.cleared" });

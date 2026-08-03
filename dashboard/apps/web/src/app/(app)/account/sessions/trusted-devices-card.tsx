@@ -18,21 +18,29 @@
  * A pass granted before Polaris recorded any of that still appears, unnamed. A
  * device nobody can put a name to is the first one worth ending, not the one to
  * leave off the list.
+ *
+ * Opening a row is the other half of it. Ending a pass is not the only thing
+ * somebody wants to do about a device they have recognised, and what else it can
+ * reach - what it has signed in, what it holds a passkey for - is not something
+ * a row has room for. The name opens that; the row keeps the one-click way to
+ * end the pass, since that is the case this list exists for.
  */
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { DeviceDialog } from "./device-dialog";
 import { useConfirm } from "@/components/confirm-dialog";
 import { RelativeTime } from "@/components/relative-time";
-import type { TrustedDeviceRow } from "@/lib/session-directory";
 import { Badge, Button, Card, CardBody, cn } from "@polaris/ui";
-import { ShieldOff, ShieldQuestion, Smartphone } from "lucide-react";
+import type { TrustedDeviceRow } from "@/lib/session-directory";
+import { addressLine, DeviceAddress } from "@/components/device-address";
 import { forgetTrustedDeviceAction, forgetTrustedDevicesAction } from "./actions";
+import { PanelRightOpen, ShieldOff, ShieldQuestion, Smartphone } from "lucide-react";
 
 /** Where a pass was granted, as one line, for the layouts too narrow to hold the
  *  columns. */
 function origin(device: TrustedDeviceRow): string {
-    return [device.ip, device.host].filter(Boolean).join(" - ") || "Not recorded";
+    return [addressLine(device), device.host].filter(Boolean).join(" - ") || "Not recorded";
 }
 
 export function TrustedDevicesCard({ devices }: { devices: TrustedDeviceRow[] }) {
@@ -40,6 +48,7 @@ export function TrustedDevicesCard({ devices }: { devices: TrustedDeviceRow[] })
     const [confirm, confirmElement] = useConfirm();
     const [busyId, setBusyId] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [opened, setOpened] = useState<TrustedDeviceRow | null>(null);
 
     async function forget(device: TrustedDeviceRow) {
         const ok = await confirm({
@@ -136,9 +145,13 @@ export function TrustedDevicesCard({ devices }: { devices: TrustedDeviceRow[] })
                                                     )}
                                                     <div className="min-w-0">
                                                         <p className="flex flex-wrap items-center gap-1.5">
-                                                            <span className="truncate">
+                                                            <button
+                                                                type="button"
+                                                                className="truncate text-left hover:underline"
+                                                                onClick={() => setOpened(device)}
+                                                            >
                                                                 {named ? device.device : "Remembered earlier"}
-                                                            </span>
+                                                            </button>
                                                             {device.current ? (
                                                                 <Badge variant="primary">This device</Badge>
                                                             ) : null}
@@ -150,7 +163,7 @@ export function TrustedDevicesCard({ devices }: { devices: TrustedDeviceRow[] })
                                                 </div>
                                             </td>
                                             <td className="hidden whitespace-nowrap px-3 py-2 text-xs text-muted-foreground sm:table-cell">
-                                                <span className="font-mono">{device.ip ?? "-"}</span>
+                                                <DeviceAddress address={device} />
                                             </td>
                                             <td className="hidden max-w-[14rem] px-3 py-2 text-xs text-muted-foreground md:table-cell">
                                                 <span className="block truncate">{device.host ?? "Not recorded"}</span>
@@ -166,7 +179,16 @@ export function TrustedDevicesCard({ devices }: { devices: TrustedDeviceRow[] })
                                                 <RelativeTime iso={device.expiresAt} tense="future" />
                                             </td>
                                             <td className="px-3 py-2">
-                                                <div className="flex justify-end">
+                                                <div className="flex justify-end gap-1">
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        title="What this device can reach"
+                                                        aria-label={`Open ${named ? device.device : "this device"}`}
+                                                        onClick={() => setOpened(device)}
+                                                    >
+                                                        <PanelRightOpen className="size-4" />
+                                                    </Button>
                                                     <Button
                                                         variant="ghost"
                                                         size="icon"
@@ -187,6 +209,15 @@ export function TrustedDevicesCard({ devices }: { devices: TrustedDeviceRow[] })
                     </table>
                 </div>
             </CardBody>
+
+            <DeviceDialog
+                device={opened}
+                onOpenChange={(open) => {
+                    if (!open) setOpened(null);
+                }}
+                onChanged={() => router.refresh()}
+            />
+
             {confirmElement}
         </Card>
     );

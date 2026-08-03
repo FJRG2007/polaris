@@ -19,11 +19,12 @@ import { Badge, Button, cn } from "@polaris/ui";
 import { RelativeTime } from "@/components/relative-time";
 import type { SessionView } from "@/lib/session-directory";
 import { History, LogOut, MonitorSmartphone } from "lucide-react";
+import { addressLine, DeviceAddress } from "@/components/device-address";
 
 /** Where a session came from, as one line, for the surfaces too narrow to hold
  *  the columns - and for the approval card, which is not a table at all. */
 export function sessionOrigin(session: SessionView): string {
-    return [session.ip, session.country, session.host].filter(Boolean).join(" - ") || "Unknown location";
+    return [addressLine(session), session.host].filter(Boolean).join(" - ") || "Unknown location";
 }
 
 export function SessionsTable({
@@ -83,8 +84,7 @@ export function SessionsTable({
                                     </div>
                                 </td>
                                 <td className="hidden whitespace-nowrap px-3 py-2 text-xs text-muted-foreground sm:table-cell">
-                                    <span className="font-mono">{session.ip ?? "-"}</span>
-                                    {session.country ? ` - ${session.country}` : ""}
+                                    <DeviceAddress address={session} />
                                 </td>
                                 <td className="hidden max-w-[14rem] px-3 py-2 text-xs text-muted-foreground md:table-cell">
                                     <span className="block truncate">{session.host ?? "Not recorded"}</span>

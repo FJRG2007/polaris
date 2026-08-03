@@ -40,6 +40,20 @@ export function SettingCard({
     );
 }
 
+/**
+ * A control the account has, held shut for a reason the person can read.
+ *
+ * Passed down rather than each card working it out, so one rule decides what is
+ * locked. Undefined is the ordinary case and reads as "not locked" everywhere it
+ * is checked, which keeps every call site to a single truthiness test.
+ *
+ * The server refuses these actions regardless; this exists so the screen says why
+ * before somebody fills in a dialog that was never going to be accepted.
+ */
+export interface SettingLock {
+    reason: string;
+}
+
 /** Inline feedback under a dialog's fields. */
 export function Feedback({ error, ok }: { error?: string | null; ok?: string | null }) {
     if (error) return <p className="text-sm text-danger">{error}</p>;

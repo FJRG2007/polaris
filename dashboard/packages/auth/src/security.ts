@@ -10,6 +10,8 @@
  * a hijacked session cannot quietly install its own way back in.
  */
 
+import { prisma } from "@polaris/db";
+import type { Auth } from "./auth.js";
 import {
     parseStringList,
     stringifyList,
@@ -20,8 +22,6 @@ import {
     type TwoFactorMethod,
     type TwoFactorPreferencesInput
 } from "@polaris/core";
-import { prisma } from "@polaris/db";
-import type { Auth } from "./auth.js";
 
 /** The effective settings for a user, with the defaults an absent row implies. */
 export interface UserSecuritySettings {
@@ -33,6 +33,9 @@ export interface UserSecuritySettings {
     twoFactorMethods: TwoFactorDeliveryMethod[];
     /** The method the challenge offers first. */
     twoFactorPreferred: TwoFactorMethod;
+    /** Days a device newly seen on the account waits before it may change any
+     *  of this. 0 when the account asks for no wait. */
+    newDeviceGraceDays: number;
     allowedCidrs: string[];
     allowedCountries: string[];
     allowedContinents: string[];
@@ -46,6 +49,7 @@ const DEFAULTS: UserSecuritySettings = {
     requireLoginApproval: false,
     twoFactorMethods: [],
     twoFactorPreferred: "totp",
+    newDeviceGraceDays: 0,
     allowedCidrs: [],
     allowedCountries: [],
     allowedContinents: [],
@@ -103,6 +107,7 @@ export async function getUserSecurity(userId: string): Promise<UserSecuritySetti
         requireLoginApproval: row.requireLoginApproval,
         twoFactorMethods: parseDeliveryMethods(row.twoFactorMethods),
         twoFactorPreferred: parsePreferredMethod(row.twoFactorPreferred),
+        newDeviceGraceDays: row.newDeviceGraceDays,
         allowedCidrs: parseStringList(row.allowedCidrs),
         allowedCountries: parseStringList(row.allowedCountries),
         allowedContinents: parseStringList(row.allowedContinents),
@@ -218,6 +223,53 @@ export async function consumeSessionRotation(userId: string, ip: string | null):
         data: { rotationGraceUntil: null, rotationGraceIp: null }
     });
     return row.rotationGraceUntil.getTime() > Date.now() && row.rotationGraceIp === ip;
+}
+
+/**
+ * How long a password confirmation stands. Long enough to finish the ceremony it
+ * was asked for, including a prompt the user dismissed and reopened; short enough
+ * that a screen somebody walked away from is not still carrying one.
+ */
+const REAUTH_MS = 5 * 60 * 1000;
+
+/**
+ * Prove the account password, so the step that asked for it may go ahead.
+ *
+ * Registering a passkey is adding a way in, and better-auth's ceremony asks the
+ * device rather than the account: an open session was enough to attach a new
+ * credential, which makes a borrowed screen a permanent one. This is the proof
+ * that ceremony is gated on.
+ *
+ * Bound to the session that gave it. A proof belongs to the browser that made it,
+ * and another session of the same account borrowing it would defeat the point.
+ */
+export async function confirmAccountPassword(
+    auth: Auth,
+    userId: string,
+    sessionId: string,
+    password: string
+): Promise<boolean> {
+    if (!(await verifyPassword(auth, userId, password))) return false;
+    await upsertSecurity(userId, {
+        reauthUntil: new Date(Date.now() + REAUTH_MS),
+        reauthSessionId: sessionId
+    });
+    return true;
+}
+
+/** Whether this session proved the password recently enough to still count. */
+export async function passwordConfirmed(userId: string, sessionId: string): Promise<boolean> {
+    const row = await prisma.userSecurity.findUnique({
+        where: { userId },
+        select: { reauthUntil: true, reauthSessionId: true }
+    });
+    if (!row?.reauthUntil || row.reauthSessionId !== sessionId) return false;
+    return row.reauthUntil.getTime() > Date.now();
+}
+
+/** Drop the confirmation, once whatever asked for it is over. */
+export async function clearPasswordConfirmation(userId: string): Promise<void> {
+    await upsertSecurity(userId, { reauthUntil: null, reauthSessionId: null });
 }
 
 /** Set the quick-unlock PIN after re-verifying the account password. */

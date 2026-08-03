@@ -22,6 +22,7 @@ function session(overrides: Partial<SessionView> = {}): SessionView {
         locked: false,
         device: "Chrome on Windows",
         ip: "192.168.1.131",
+        publicIp: null,
         country: "ES",
         host: "polaris.local",
         lastSeenAt: "2026-08-03T10:00:00.000Z",
@@ -75,11 +76,30 @@ describe("the session table", () => {
     it("explains an empty table instead of showing an empty frame", () => {
         expect(render([])).toContain("Nothing is signed in.");
     });
+
+    // A local address is not something a person can connect with the rows for the
+    // same device seen from outside, which is most of the list.
+    it("shows the address a local session leaves the network by, beside the local one", () => {
+        const markup = render([session({ ip: "192.168.1.131", publicIp: "85.87.156.88" })]);
+        expect(markup).toContain("192.168.1.131");
+        expect(markup).toContain("85.87.156.88");
+    });
+
+    it("leaves a public address alone rather than pairing it with itself", () => {
+        const markup = render([session({ ip: "85.87.156.88", publicIp: null })]);
+        expect(markup).not.toContain("via");
+    });
 });
 
 describe("the one-line origin", () => {
     it("reads address, country, then the name it was opened on", () => {
         expect(sessionOrigin(session())).toBe("192.168.1.131 - ES - polaris.local");
+    });
+
+    it("carries both addresses when the session came in over the local network", () => {
+        expect(sessionOrigin(session({ publicIp: "85.87.156.88" }))).toBe(
+            "192.168.1.131 via 85.87.156.88 - ES - polaris.local"
+        );
     });
 
     it("skips what was never recorded rather than printing gaps", () => {
