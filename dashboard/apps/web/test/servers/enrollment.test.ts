@@ -210,7 +210,7 @@ describe("enrollmentScript", () => {
     // access list somebody else set up is not this script's to withdraw.
     it("limits SSH to the Polaris login only when it turned Remote Login on", () => {
         const enabled = script.slice(
-            script.indexOf("systemsetup -setremotelogin on"),
+            script.indexOf('if [ "$REMOTE_LOGIN" = "no" ]'),
             script.indexOf("turned Remote Login on")
         );
         expect(enabled).toContain("dseditgroup -o create -q com.apple.access_ssh");
@@ -246,23 +246,24 @@ describe("enrollmentScript", () => {
         expect(darwin.indexOf("ACCESS_LIST=$(access_ssh_exists)")).toBeLessThan(
             darwin.indexOf("systemsetup -setremotelogin on")
         );
-        // Every narrowing call sits inside the "there was no list" branch, and the
-        // branch for a list that was already here adds to it and leaves it
-        // otherwise alone, exactly like the already-on path.
-        const branch = script.slice(script.indexOf('if [ "$ACCESS_LIST" = "no" ]'));
-        const split = branch.indexOf("\n        else");
-        const narrowing = branch.slice(0, split);
-        const kept = branch.slice(split, branch.indexOf("\n        fi"));
+        // Every narrowing call sits inside the "there was no list" branch, which
+        // builds one before the switch moves - and nowhere else on this platform
+        // does anything create or empty a group.
+        const body = darwin.slice(0, darwin.indexOf("SSH_PROBE"));
+        const narrowing = body.slice(
+            body.indexOf("dseditgroup -o create -q"),
+            body.indexOf("systemsetup -setremotelogin on")
+        );
         expect(narrowing).toContain("-o create");
         expect(narrowing).toContain("-d everyone");
+        expect(body.match(/-o create/g)).toHaveLength(1);
+        expect(body.match(/-d everyone/g)).toHaveLength(1);
+        // The branch for a list that was already here adds to it and leaves it
+        // otherwise alone, exactly like the already-on path.
+        const kept = body.slice(body.indexOf('if [ "$ACCESS_LIST" = "yes" ]'), body.indexOf("dseditgroup -o create -q"));
+        expect(kept).toContain("ADDED=$(add_to_access_list)");
         expect(kept).not.toContain("-d everyone");
         expect(kept).not.toContain("-o create");
-        // The list that was already here is only ever added to, and that happens
-        // before the switch moves rather than in this arm.
-        const decided = script.slice(script.indexOf('if [ "$ACCESS_LIST" = "yes" ]'));
-        expect(decided.slice(0, decided.indexOf("systemsetup -setremotelogin on"))).toContain(
-            "ADDED=$(add_to_access_list)"
-        );
     });
 
     // A group read that failed is not a group that is absent, and the two used to
@@ -300,8 +301,26 @@ describe("enrollmentScript", () => {
         // The decision is made while the machine is still as its operator left it.
         expect(gate).toBeLessThan(darwin.indexOf("systemsetup -setremotelogin on"));
         const stop = darwin.slice(gate, darwin.indexOf("systemsetup -setremotelogin on"));
-        expect(stop).toContain("die remote-login-off");
+        expect(stop).toContain("die ssh-access-list-unrestricted");
         expect(stop).toContain("would not say whether it has an SSH access list");
+    });
+
+    // Sharing a code with the stop that means "Remote Login is off, go and turn it
+    // on" told the operator to do the exact thing the machine just refused as
+    // unsafe - and the dashboard, which is where this gets read, said nothing about
+    // the access list that was the reason.
+    it("does not tell the dashboard to turn on what it refused to turn on", () => {
+        const message = ENROLLMENT_REFUSAL_MESSAGES["ssh-access-list-unrestricted"];
+        expect(message).toContain("access list");
+        expect(message).toContain("left off");
+        expect(message).not.toMatch(/turn it on under/i);
+        // The terminal and the dashboard say the same thing, which is the whole
+        // point of the code: only one of the two is guaranteed to be read.
+        for (const stop of script.match(/die ssh-access-list-unrestricted "[^"]*"/g) ?? []) {
+            expect(stop).toContain("was left off exactly as found");
+            expect(stop).toContain("Look at which logins that list admits");
+        }
+        expect(script.match(/die ssh-access-list-unrestricted/g)).toHaveLength(2);
     });
 
     // Remote Login is on by the time this is decided either way, so what it says
@@ -328,7 +347,7 @@ describe("enrollmentScript", () => {
         // Decided while the machine is still as its operator left it.
         expect(gate).toBeLessThan(darwin.indexOf("systemsetup -setremotelogin on"));
         expect(darwin.slice(gate, darwin.indexOf("systemsetup -setremotelogin on"))).toContain(
-            "die remote-login-off"
+            "die ssh-access-list-unrestricted"
         );
         // And the warning it used to carry on past is gone.
         expect(script).not.toContain("WARNING: turned Remote Login on, and left the SSH access list alone");
@@ -367,6 +386,38 @@ describe("enrollmentScript", () => {
         expect(decided).toContain('[ "$(access_ssh_member everyone group)" != "yes" ]');
         const reader = script.slice(script.indexOf("access_ssh_member() {"));
         expect(reader.slice(0, reader.indexOf("\n    }"))).toContain("*) echo unknown ;;");
+    });
+
+    // The switch is what puts sshd on the network, and what it lets in the instant
+    // it moves is whatever the access list says. Building the list afterwards left a
+    // window - the enable, its read-back, three dseditgroup calls - in which every
+    // password-bearing account on the machine was reachable over SSH, which is the
+    // thing this branch's own comment says it exists to prevent.
+    it("builds the access list before it turns Remote Login on, not after", () => {
+        const darwin = script.slice(script.indexOf("read_remote_login\n"));
+        const enable = darwin.indexOf("systemsetup -setremotelogin on");
+        expect(darwin.indexOf("dseditgroup -o create -q")).toBeLessThan(enable);
+        expect(darwin.indexOf("dseditgroup -o edit -d everyone")).toBeLessThan(enable);
+        expect(darwin.indexOf('dseditgroup -o edit -a "$POLARIS_USER"')).toBeLessThan(enable);
+        // And a narrowing that could not be read back stops the switch from ever
+        // moving, the way the paths either side of it do.
+        const built = darwin.slice(darwin.indexOf("dseditgroup -o create -q"), enable);
+        expect(built).toContain('[ "$(access_ssh_member "$POLARIS_USER" user)" != "yes" ]');
+        expect(built).toContain('[ "$(access_ssh_member everyone group)" = "yes" ]');
+        expect(built).toContain("die remote-login-unrestricted");
+        // The group made for a switch that never moved goes with it.
+        expect(built.indexOf("dseditgroup -o delete")).toBeLessThan(built.indexOf("die remote-login-unrestricted"));
+        expect(built).toContain("was left off, the way this found it");
+    });
+
+    // Only once the machine says the switch is off, though: a delete on an "on" or
+    // an unreadable answer would strip the one thing gating SSH to a single login.
+    it("keeps the list it built when the failed enable cannot be confirmed off", () => {
+        const darwin = script.slice(script.indexOf("read_remote_login\n"));
+        const stop = darwin.slice(darwin.indexOf('if [ "$REMOTE_LOGIN" != "yes" ]'));
+        const untilDie = stop.slice(0, stop.indexOf("die remote-login-off"));
+        expect(untilDie).toContain('[ "$ACCESS_LIST" = "no" ] && [ "$REMOTE_LOGIN" = "no" ]');
+        expect(untilDie).toContain("dseditgroup -o delete com.apple.access_ssh");
     });
 
     // A warning was all that stood between an unreadable narrowing and a machine
@@ -416,7 +467,12 @@ describe("enrollmentScript", () => {
         // And Polaris's own sentence for it does not send anybody to switch on what
         // is already on.
         expect(ENROLLMENT_REFUSAL_MESSAGES["remote-login-left-open"]).not.toMatch(/turn it on/i);
-        expect(ENROLLMENT_REFUSAL_MESSAGES["remote-login-unrestricted"]).toContain("put back off");
+        // One sentence for a machine this may never have opened at all - the
+        // narrowing is checked before the switch moves - and for one it put back:
+        // both end with Remote Login off the way the command found it, and neither
+        // is told a revert happened that may not have.
+        expect(ENROLLMENT_REFUSAL_MESSAGES["remote-login-unrestricted"]).toContain("left off");
+        expect(ENROLLMENT_REFUSAL_MESSAGES["remote-login-unrestricted"]).not.toContain("put back off");
     });
 
     it("says how to undo the Remote Login changes it can make", () => {
@@ -506,13 +562,27 @@ describe("enrollmentScript", () => {
     // strand an enrollment on an ss too old for -p. So it does neither.
     it("does not let an unidentified listener stand in for the SSH server", () => {
         const probe = script.slice(script.indexOf("SSH_PROBE=none"));
-        // The bare-listener sweep runs after the owned ones and only sets the state.
+        // The bare-listener sweep runs after the owned ones and never becomes a yes.
         const bare = probe.slice(probe.indexOf('if [ "$SSH_LISTENING" != "yes" ]'));
         const untilDecision = bare.slice(0, bare.indexOf('case "$SSH_LISTENING" in'));
         expect(untilDecision).toContain('if listening_on "$port"');
         expect(untilDecision).toContain("SSH_LISTENING=unknown");
-        expect(untilDecision).not.toContain("SSH_PORT=");
         expect(untilDecision).not.toContain("SSH_LISTENING=yes");
+    });
+
+    // Which port the unanswered question reports is still a choice, and it was being
+    // made in favour of the guess already known to be wrong: with a config naming
+    // 2222 first and an unattributable listener only on 22, the claim went out for
+    // 2222 - a port this very sweep had just found nothing on - while 22 was seen
+    // answering. Both are guesses; the reported one is now the observed one, which
+    // is also what makes the sentence printed alongside it true.
+    it("reports the port an unidentified listener was seen on", () => {
+        const probe = script.slice(script.indexOf("SSH_PROBE=none"));
+        const bare = probe.slice(probe.indexOf('if [ "$SSH_LISTENING" != "yes" ]'));
+        const sweep = bare.slice(0, bare.indexOf('case "$SSH_LISTENING" in'));
+        expect(sweep.indexOf("SSH_PORT=$port")).toBeGreaterThan(sweep.indexOf('if listening_on "$port"'));
+        expect(sweep.indexOf("SSH_PORT=$port")).toBeLessThan(sweep.indexOf("SSH_LISTENING=unknown"));
+        expect(script).toContain("so port $SSH_PORT is what gets reported");
     });
 
     // Socket activation is the one case a candidate port still settles: sshd owns
@@ -636,6 +706,7 @@ describe("enrollmentScript", () => {
             expect.arrayContaining([
                 "ssh-not-listening",
                 "remote-login-off",
+                "ssh-access-list-unrestricted",
                 "remote-login-unrestricted",
                 "remote-login-left-open",
                 "not-in-ssh-access-list",
@@ -707,9 +778,9 @@ describe("enrollmentScript", () => {
         expect(script).not.toContain("then run this command again\"");
         const dies =
             script.match(
-                /die (?:ssh-not-listening|remote-login-off|remote-login-unrestricted|remote-login-left-open|not-in-ssh-access-list) "[^"]*"/g
+                /die (?:ssh-not-listening|remote-login-off|ssh-access-list-unrestricted|remote-login-unrestricted|remote-login-left-open|not-in-ssh-access-list) "[^"]*"/g
             ) ?? [];
-        expect(dies).toHaveLength(8);
+        expect(dies).toHaveLength(9);
         for (const message of dies) expect(message).toContain("$POLARIS_RETRY_HINT");
     });
 

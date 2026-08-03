@@ -405,6 +405,16 @@ fi`;
  * a refusal, and a stock Mac - the machine this whole check was written for - is
  * never mistaken for a directory that would not answer.
  *
+ * A list that was not there is built before the switch moves, for the same reason
+ * the reading happens there: the switch is what puts sshd on the network, and what
+ * it lets in the instant it moves is whatever the list says. Building it afterwards
+ * leaves a window - short, but a window in which every password-bearing account on
+ * the machine is reachable - and the narrowing is read back before the switch is
+ * touched rather than after, so a machine whose list this could not shape is one
+ * the switch never moves on at all. The group made for a switch that then would not
+ * move goes again, on the same rule the revert below follows: only once the machine
+ * says Remote Login is off, because until it does that group is what gates SSH.
+ *
  * A list that was already here is read for two things before the switch moves, for
  * the same reason and in the same place. It gates SSH the instant Remote Login goes
  * on, so a list that admits `everyone` makes the switch the thing that hands the
@@ -488,7 +498,7 @@ function darwinRemoteLoginSection(): string {
         # list nobody could read is not a list known to be safe to open.
         ACCESS_LIST=\$(access_ssh_exists)
         if [ "\$ACCESS_LIST" = "unknown" ]; then
-            die remote-login-off "Remote Login is off, so nothing answers on port \$SSH_PORT, and this machine would not say whether it has an SSH access list - turning it on could open every account here. Turn it on yourself in System Settings > General > Sharing, \$POLARIS_RETRY_HINT"
+            die ssh-access-list-unrestricted "Remote Login is off, so nothing answers on port \$SSH_PORT, and this machine would not say whether it has an SSH access list - turning it on could open every account here, so it was left off exactly as found. Look at which logins that list admits under System Settings > General > Sharing > Remote Login; turning Remote Login on is yours to decide once you have, \$POLARIS_RETRY_HINT"
         fi
         ADDED=unknown
         if [ "\$ACCESS_LIST" = "yes" ]; then
@@ -500,7 +510,7 @@ function darwinRemoteLoginSection(): string {
             # it is not this script's list to narrow instead, so the choice goes back
             # to whoever built it.
             if [ "\$(access_ssh_member everyone group)" != "no" ]; then
-                die remote-login-off "Remote Login is off, so nothing answers on port \$SSH_PORT, and this machine's SSH access list either lets every account here in or would not say - turning it on is not this command's call to make. Turn it on yourself in System Settings > General > Sharing, \$POLARIS_RETRY_HINT"
+                die ssh-access-list-unrestricted "Remote Login is off, so nothing answers on port \$SSH_PORT, and this machine's SSH access list either lets every account here in or would not say - turning it on could open every account here, so it was left off exactly as found. Look at which logins that list admits under System Settings > General > Sharing > Remote Login; turning Remote Login on is yours to decide once you have, \$POLARIS_RETRY_HINT"
             fi
             # And the login has to be on that list before the switch moves too,
             # because the list is what macOS turns an unlisted login away with:
@@ -510,23 +520,47 @@ function darwinRemoteLoginSection(): string {
             if [ "\$ADDED" = "no" ]; then
                 die not-in-ssh-access-list "this machine limits SSH to a list of logins, '\$POLARIS_USER' could not be added to it, and Remote Login was left off rather than opened for a login it would turn away. Add '\$POLARIS_USER' under System Settings > General > Sharing > Remote Login, \$POLARIS_RETRY_HINT"
             fi
+        else
+            # Remote Login was off and there was no access list, so nobody had SSH
+            # access here to lose and the list about to exist is this script's own.
+            #
+            # Built before the switch moves, because the switch is what puts sshd on
+            # the network and this list is the whole of what keeps it to one login.
+            # Doing it the other way round leaves a window - the enable, the read
+            # back, the three calls below - in which every password-bearing account
+            # on the machine is reachable, which is wider than anything the arguments
+            # to this script can grant, however briefly.
+            dseditgroup -o create -q com.apple.access_ssh >/dev/null 2>&1 || true
+            dseditgroup -o edit -d everyone -t group com.apple.access_ssh >/dev/null 2>&1 || true
+            dseditgroup -o edit -a "\$POLARIS_USER" -t user com.apple.access_ssh >/dev/null 2>&1 || true
+            # Each of those can fail quietly on a managed Mac, so the switch is only
+            # moved on proof: the login is in the group macOS gates SSH on, and
+            # nothing says 'everyone' still is. Anything less and Remote Login stays
+            # off, exactly as the paths either side of this one leave it - the group
+            # goes with it, because it was not here a moment ago and half of one is
+            # worse than none the next time somebody enables Remote Login by hand.
+            if [ "\$(access_ssh_member "\$POLARIS_USER" user)" != "yes" ] \\
+                || [ "\$(access_ssh_member everyone group)" = "yes" ]; then
+                dseditgroup -o delete com.apple.access_ssh >/dev/null 2>&1 || true
+                die remote-login-unrestricted "SSH could not be limited to the '\$POLARIS_USER' login, so Remote Login was left off, the way this found it. Turn it on and restrict it to that login in System Settings > General > Sharing, \$POLARIS_RETRY_HINT"
+            fi
         fi
         systemsetup -setremotelogin on </dev/null >/dev/null 2>&1 || true
         read_remote_login
         if [ "\$REMOTE_LOGIN" != "yes" ]; then
+            # The list above was built for a switch that did not move, so it goes
+            # again - but only on a machine that says the switch is off, for the same
+            # reason the revert below deletes it last: while Remote Login may be on,
+            # that group is what holds SSH to the one login.
+            if [ "\$ACCESS_LIST" = "no" ] && [ "\$REMOTE_LOGIN" = "no" ]; then
+                dseditgroup -o delete com.apple.access_ssh >/dev/null 2>&1 || true
+            fi
             die remote-login-off "Remote Login is off, so nothing answers on port \$SSH_PORT. Turn it on in System Settings > General > Sharing, \$POLARIS_RETRY_HINT"
         fi
         if [ "\$ACCESS_LIST" = "no" ]; then
-            # Remote Login was off and there was no access list, so nobody had SSH
-            # access here to lose and the list about to exist is this script's own.
-            # Turning Remote Login on without it would hand the network every
-            # password-bearing account on the machine, which is wider than anything
-            # the arguments to this script can grant.
-            dseditgroup -o create -q com.apple.access_ssh >/dev/null 2>&1 || true
-            dseditgroup -o edit -d everyone -t group com.apple.access_ssh >/dev/null 2>&1 || true
-            dseditgroup -o edit -a "\$POLARIS_USER" -t user com.apple.access_ssh >/dev/null 2>&1 || true
-            # Claimed only on proof: the login is in the group macOS gates SSH on,
-            # and nothing says 'everyone' still is.
+            # Read again now the switch has moved, because that is the state the
+            # sentence below describes and what this says happened has to be what
+            # happened.
             if [ "\$(access_ssh_member "\$POLARIS_USER" user)" = "yes" ] \\
                 && [ "\$(access_ssh_member everyone group)" != "yes" ]; then
                 say "turned Remote Login on, limited to the '\$POLARIS_USER' login"
@@ -584,9 +618,16 @@ function darwinRemoteLoginSection(): string {
         # where a list exists it is what macOS turns an unlisted login away with,
         # and that refusal would arrive after the claim, on a spent token, reported
         # as a machine nothing could reach.
+        #
+        # Which is a question about a list that is there, so it is asked first and
+        # nothing is written unless the answer was yes. An add against a group that
+        # is not there rests on 'dseditgroup -o edit' being a no-op for a missing
+        # one, which Apple has never contracted to keep - and a release that created
+        # it instead would restrict SSH here to the Polaris login, locking the
+        # operator out of their own Mac on the one path that changes nothing.
         ACCESS_LIST=\$(access_ssh_exists)
-        ADDED=\$(add_to_access_list)
         if [ "\$ACCESS_LIST" = "yes" ]; then
+            ADDED=\$(add_to_access_list)
             if [ "\$ADDED" = "yes" ]; then
                 say "added '\$POLARIS_USER' to the SSH access list this machine already had, which is otherwise left as it was"
             elif [ "\$ADDED" = "no" ] && [ "\$(access_ssh_member everyone group)" != "yes" ]; then
@@ -600,6 +641,12 @@ function darwinRemoteLoginSection(): string {
             else
                 say "could not read back whether '\$POLARIS_USER' is on this machine's SSH access list; if SSH here is limited to named logins, add it under System Settings > General > Sharing > Remote Login"
             fi
+        elif [ "\$ACCESS_LIST" = "unknown" ]; then
+            # The reading that decided whether to write at all is the one that went
+            # unanswered, so nothing was written - and that is said rather than
+            # swallowed. It does not refuse: this path leaves the machine exactly as
+            # it found it, and an answer nobody got has never stranded an enrollment.
+            say "could not read whether this machine limits SSH to a list of logins, so nothing was added to one; if it does, add '\$POLARIS_USER' under System Settings > General > Sharing > Remote Login"
         fi
     fi`;
 }
@@ -617,11 +664,13 @@ function darwinRemoteLoginSection(): string {
  * "Something is on that port" is not that question, and it is not evidence of an
  * SSH server: a stale `Port` line and an unrelated service on it would make the
  * check announce a port Polaris then cannot get SSH out of. So a listener nobody
- * could attribute never picks the port and never counts as sshd having been found.
- * What it does decide is which way the check failed - "nothing is listening here"
- * is an answer and may refuse, while "something is, and this machine would not say
- * what" is the question going unanswered, and that has never been allowed to
- * strand an enrollment.
+ * could attribute never counts as sshd having been found. What it does decide is
+ * which way the check failed - "nothing is listening here" is an answer and may
+ * refuse, while "something is, and this machine would not say what" is the question
+ * going unanswered, and that has never been allowed to strand an enrollment. It
+ * also decides which port that unanswered question reports, because the only other
+ * candidate is the first port the config names and the same sweep has just found
+ * nothing on it.
  *
  * Reachable is part of the question rather than a refinement of it. An sshd bound
  * to 127.0.0.1 answers this machine and nobody else, so accepting it would let the
@@ -737,11 +786,17 @@ function linuxListenerSection(): string {
             # none: an ss or netstat too old for -p, or a socket that could not be
             # attributed, leaves a listener with no owner on it. So a bare listener
             # on a candidate port is read as the question going unanswered - it does
-            # not become SSH_PORT, and it does not pass for sshd - while nothing
-            # reachable anywhere is the answer that may refuse.
+            # not pass for sshd - while nothing reachable anywhere is the answer that
+            # may refuse.
+            #
+            # The port it was seen on is still what gets reported, because by then
+            # the alternative is the first port the config happens to name, and this
+            # sweep has just established there is nothing on it. Both are guesses;
+            # only one of them is already known to be empty.
             SSH_LISTENING=no
             for port in \$SSH_PORTS; do
                 if listening_on "\$port"; then
+                    SSH_PORT=\$port
                     SSH_LISTENING=unknown
                     break
                 fi

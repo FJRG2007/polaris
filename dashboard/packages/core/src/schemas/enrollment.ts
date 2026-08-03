@@ -118,6 +118,7 @@ export type ClaimEnrollmentInput = z.infer<typeof claimEnrollmentSchema>;
 export const ENROLLMENT_REFUSAL_REASONS = [
     "ssh-not-listening",
     "remote-login-off",
+    "ssh-access-list-unrestricted",
     "remote-login-unrestricted",
     "remote-login-left-open",
     "not-in-ssh-access-list",
@@ -149,8 +150,10 @@ export const ENROLLMENT_REFUSAL_MESSAGES: Record<EnrollmentRefusalReason, string
         "The machine stopped before registering: nothing Polaris could reach is listening on its SSH port. Start its SSH server, or bind it to something other than loopback.",
     "remote-login-off":
         "The machine stopped before registering: Remote Login is off, so nothing would answer Polaris. Turn it on under System Settings > General > Sharing, where you can also see which logins it lets in.",
+    "ssh-access-list-unrestricted":
+        "The machine stopped before registering: Remote Login is off there, and its SSH access list either lets every account on that machine in or would not say - turning Remote Login on would then have opened every account there, which is wider than this command grants, so it was left off exactly as found. Look at which logins that list admits under System Settings > General > Sharing > Remote Login; turning Remote Login on is yours to decide once you have.",
     "remote-login-unrestricted":
-        `The machine stopped before registering: Remote Login could not be limited to the '${ENROLLMENT_USERNAME}' login, and turning it on for every account there is wider than this command grants, so it was put back off the way the command found it. Turn it on and restrict it to that login under System Settings > General > Sharing.`,
+        `The machine stopped before registering: Remote Login could not be limited to the '${ENROLLMENT_USERNAME}' login, and turning it on for every account there is wider than this command grants, so it was left off the way the command found it. Turn it on and restrict it to that login under System Settings > General > Sharing.`,
     "remote-login-left-open":
         `The machine stopped before registering: Remote Login was turned on there, could not be limited to the '${ENROLLMENT_USERNAME}' login, and could not be confirmed back off - every account on that machine may be reachable over SSH right now. Turn Remote Login off, or restrict it to that login, under System Settings > General > Sharing.`,
     "not-in-ssh-access-list":
