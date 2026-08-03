@@ -126,8 +126,9 @@ export function TaskPanel({
             open={openId !== null}
             onOpenChange={(open) => {
                 if (open) return;
-                // Escape and a click outside close the panel with the caret still
-                // in a field, so the edit is saved on the way out.
+                // Escape, the close button and a click outside all pull the panel
+                // away with the caret still in a field, so the edit is committed on
+                // the way out rather than dropped.
                 flushEdits();
                 onClose();
             }}
