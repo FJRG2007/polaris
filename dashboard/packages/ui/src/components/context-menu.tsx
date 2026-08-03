@@ -10,7 +10,19 @@ import { cn } from "../lib/cn";
 import { ChevronRight } from "lucide-react";
 import { ignoreOpeningPress } from "../lib/menu-press";
 import * as RadixMenu from "@radix-ui/react-context-menu";
-import { forwardRef, type ComponentPropsWithoutRef, type ElementRef } from "react";
+import { forwardRef, useEffect, useRef, type ComponentPropsWithoutRef, type ElementRef } from "react";
+
+/**
+ * How long to wait before a submenu that should have opened is asked again.
+ *
+ * A menu ignores a hover that arrives while the pointer still looks like it is
+ * heading for the submenu it just left - the courtesy that lets somebody cut the
+ * corner into a submenu without it closing under them. It lasts 300ms, and only
+ * a pointer that MOVES afterwards opens anything. So a hand that runs down the
+ * options and stops on one inside that window gets nothing at all, and has to
+ * jiggle the mouse to be noticed, which is what makes a quick scan feel broken.
+ */
+const SETTLED_MS = 350;
 
 export const ContextMenu = RadixMenu.Root;
 export const ContextMenuTrigger = RadixMenu.Trigger;
@@ -56,19 +68,50 @@ ContextMenuItem.displayName = "ContextMenuItem";
 export const ContextMenuSubTrigger = forwardRef<
     ElementRef<typeof RadixMenu.SubTrigger>,
     ComponentPropsWithoutRef<typeof RadixMenu.SubTrigger>
->(({ className, children, ...props }, ref) => (
-    <RadixMenu.SubTrigger
-        ref={ref}
-        className={cn(
-            "relative flex cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none transition-colors focus:bg-muted data-[state=open]:bg-muted data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
-            className
-        )}
-        {...props}
-    >
-        {children}
-        <ChevronRight className="ml-auto size-4" />
-    </RadixMenu.SubTrigger>
-));
+>(({ className, children, onPointerMove, onPointerLeave, ...props }, ref) => {
+    const settled = useRef<number | undefined>(undefined);
+    const cancel = () => {
+        if (settled.current !== undefined) window.clearTimeout(settled.current);
+        settled.current = undefined;
+    };
+    useEffect(() => cancel, []);
+
+    return (
+        <RadixMenu.SubTrigger
+            ref={ref}
+            className={cn(
+                "relative flex cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none transition-colors focus:bg-muted data-[state=open]:bg-muted data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+                className
+            )}
+            {...props}
+            // After the spread, so nothing a caller passes loses the nudge.
+            onPointerMove={(event) => {
+                onPointerMove?.(event);
+                if (event.pointerType !== "mouse" || settled.current !== undefined) return;
+                const trigger = event.currentTarget;
+                const { clientX, clientY } = event;
+                // The pointer has arrived. If it is still here once the menu has
+                // stopped being courteous and this is still shut, move for it -
+                // the jiggle somebody would otherwise have to do themselves.
+                settled.current = window.setTimeout(() => {
+                    settled.current = undefined;
+                    if (!trigger.isConnected || trigger.dataset.state === "open") return;
+                    if (!trigger.matches(":hover")) return;
+                    trigger.dispatchEvent(
+                        new PointerEvent("pointermove", { bubbles: true, clientX, clientY, pointerType: "mouse" })
+                    );
+                }, SETTLED_MS);
+            }}
+            onPointerLeave={(event) => {
+                onPointerLeave?.(event);
+                cancel();
+            }}
+        >
+            {children}
+            <ChevronRight className="ml-auto size-4" />
+        </RadixMenu.SubTrigger>
+    );
+});
 ContextMenuSubTrigger.displayName = "ContextMenuSubTrigger";
 
 export const ContextMenuSubContent = forwardRef<
