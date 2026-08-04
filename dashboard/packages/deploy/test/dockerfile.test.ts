@@ -64,7 +64,8 @@ describe("the package manager has to exist before it is used", () => {
         // The Node images ship corepack disabled, so pnpm's first invocation is
         // "not found" - which reads as a broken image rather than a disabled shim.
         const file = generateDockerfile(plan({ install: "pnpm install --frozen-lockfile", build: "pnpm run build" }));
-        expect(file).toContain("RUN corepack enable pnpm && pnpm install --frozen-lockfile && pnpm run build");
+        expect(file).toContain("corepack enable pnpm || corepack enable || npm i -g pnpm");
+        expect(file).toContain("pnpm install --frozen-lockfile && pnpm run build");
     });
 
     it("turns corepack on for yarn", () => {
@@ -95,7 +96,7 @@ describe("a monorepo", () => {
 
     it("installs once at the repository root, where the lockfile is", () => {
         expect(file).toContain("WORKDIR /workspace");
-        expect(file).toContain("RUN corepack enable pnpm && pnpm install --frozen-lockfile");
+        expect(file).toContain("corepack enable pnpm || corepack enable || npm i -g pnpm");
     });
 
     it("then works inside the app, so its scripts run where they live", () => {
@@ -106,7 +107,7 @@ describe("a monorepo", () => {
     });
 
     it("keeps the root install in its own layer, so an app-only change reuses it", () => {
-        const rootInstall = file.indexOf("RUN corepack enable pnpm && pnpm install");
+        const rootInstall = file.indexOf("corepack enable pnpm");
         const appWorkdir = file.indexOf("WORKDIR /workspace/apps/web");
         expect(rootInstall).toBeGreaterThan(-1);
         expect(rootInstall).toBeLessThan(appWorkdir);

@@ -55,12 +55,19 @@ function sourceDir(appDirectory: string): string {
  * Make the package manager available before it is used. The Node images ship
  * corepack but leave it off, so a pnpm or yarn project fails on its first command
  * with "not found" - which reads as a broken image rather than a disabled shim.
+ *
+ * Every fallback is tried and the whole thing is swallowed, because this line must
+ * never be what fails a build: corepack can be absent on an old base, refused
+ * without permissions, or already satisfied. If none of it works the install that
+ * follows says so properly, which is a better error than this one.
+ *
+ * npm needs nothing (the image has it) and bun is its own image.
  */
 function ensurePackageManager(command: string | null): string | null {
     if (!command) return null;
-    if (/^pnpm\b/.test(command)) return "corepack enable pnpm";
-    if (/^yarn\b/.test(command)) return "corepack enable yarn";
-    return null;
+    const manager = /^(pnpm|yarn)\b/.exec(command)?.[1];
+    if (!manager) return null;
+    return `(corepack enable ${manager} || corepack enable || npm i -g ${manager}) >/dev/null 2>&1 || true`;
 }
 
 /** One RUN with the install and build chained, so the image does not commit a
