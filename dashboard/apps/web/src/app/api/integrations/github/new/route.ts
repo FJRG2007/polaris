@@ -4,18 +4,18 @@
  * account and redirects back to the callback with a temporary code. A CSRF state
  * is stored in an httpOnly cookie and echoed back for the callback to verify.
  *
- * The browser-facing URLs are taken from the incoming request origin, so this works
- * on a LAN hostname or a public domain alike (the redirect happens in the user's
- * browser, and that origin is where the state cookie was set). The webhook is not
- * one of those: GitHub calls it from its own network and validates it before it
- * creates anything, so it is resolved separately below.
+ * Every URL the app is registered with comes from the address Polaris hands out,
+ * never from the tab this was started in: an app created from `http://0.0.0.0:3000`
+ * gets a webhook GitHub refuses and a callback no browser will open. The flow is
+ * moved onto that address first, so the state cookie and the session are on the host
+ * GitHub returns to.
  */
 
 import { randomBytes } from "node:crypto";
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/session";
 import { publicHostname } from "@/lib/domain-edge";
-import { publicAppUrl } from "@/lib/domain-service";
+import { callbackOrigin } from "@/lib/domain-service";
 import { GITHUB_APP_NEW_URL, buildAppManifest } from "@/lib/github-service";
 
 export const runtime = "nodejs";
@@ -29,28 +29,33 @@ function escapeAttr(value: string): string {
         .replace(/"/g, "&quot;");
 }
 
-/**
- * The address GitHub's own servers can reach this instance at, or null when there is
- * none. The configured/reachable app address first, then the one the browser is on -
- * which is a public name when the dashboard was reached through it, and a LAN name,
- * `localhost` or the bind address `0.0.0.0` otherwise. Any of those last three in a
- * manifest is what GitHub rejects, so they resolve to null and the app is created
- * without a webhook instead of not being created at all.
- */
-async function reachableFromGithub(origin: string): Promise<string | null> {
-    const configured = await publicAppUrl();
-    if (configured) return configured;
-    return publicHostname(origin) ? origin : null;
-}
+/** Marks the pass that already ran on the address below, so the move happens once. */
+const MOVED = "moved";
 
 export async function GET(request: Request): Promise<Response> {
     await requireAdmin();
 
-    const origin = new URL(request.url).origin;
+    const requested = new URL(request.url);
+    const origin = await callbackOrigin(requested.origin);
+    // Start the flow over on that address when this one is not it. The state cookie
+    // set below and the session that authorized this both belong to a single host,
+    // and it has to be the host GitHub returns to. The marker is what stops a second
+    // move: behind a proxy that does not pass the browser's host through, this route
+    // keeps seeing the internal address however it was reached, and comparing the two
+    // again would loop.
+    if (origin !== requested.origin && requested.searchParams.get(MOVED) !== "1") {
+        const target = new URL(requested.pathname, origin);
+        target.searchParams.set(MOVED, "1");
+        return NextResponse.redirect(target);
+    }
+
     // App names are globally unique on GitHub; suffix with entropy to avoid clashes.
     const name = `Polaris ${randomBytes(4).toString("hex")}`;
     const state = randomBytes(16).toString("hex");
-    const manifest = JSON.stringify(buildAppManifest({ name, origin, publicUrl: await reachableFromGithub(origin) }));
+    // GitHub calls the webhook from its own network and validates it before it creates
+    // anything, so it is declared only when this address is one the internet can reach.
+    const publicUrl = publicHostname(origin) ? origin : null;
+    const manifest = JSON.stringify(buildAppManifest({ name, origin, publicUrl }));
 
     const html = `<!doctype html>
 <html>
@@ -69,7 +74,10 @@ export async function GET(request: Request): Promise<Response> {
     response.cookies.set("gh_manifest_state", state, {
         httpOnly: true,
         sameSite: "lax",
-        secure: origin.startsWith("https:"),
+        // The scheme this request arrived on, not the canonical one: a proxy that
+        // terminates TLS reaches here over http, and a Secure cookie the browser
+        // stores anyway is fine while one it drops loses the round trip.
+        secure: requested.protocol === "https:",
         path: "/",
         maxAge: 600
     });

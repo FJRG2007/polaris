@@ -9,6 +9,7 @@
 
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/session";
+import { callbackOrigin } from "@/lib/domain-service";
 import { exchangeManifestCode, refreshInstallations } from "@/lib/github-service";
 
 export const runtime = "nodejs";
@@ -21,7 +22,9 @@ export async function GET(request: Request): Promise<Response> {
     const code = url.searchParams.get("code");
     const state = url.searchParams.get("state");
     const installationId = url.searchParams.get("installation_id");
-    const integrations = new URL("/integrations", url.origin);
+    // Back to the dashboard on the address it is served at, which is the one the app
+    // was registered with - not necessarily the one this process sees the request on.
+    const integrations = new URL("/integrations", await callbackOrigin(url.origin));
 
     // Step 2: the app was installed. Capture its installations.
     if (installationId) {
