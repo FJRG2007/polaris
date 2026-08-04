@@ -206,7 +206,9 @@ describe("allowing a sign-in", () => {
     it("goes through on the right PIN", async () => {
         const result = await decideSignInCode(OWNER, PHONE, { userCode: "ABCD1234", approve: true, pin: "1234" });
         expect(result.error).toBeUndefined();
-        expect(calls).toEqual(["pin", "claim", "approve", "authorizer"]);
+        // The note comes before the answer: the browser holding the code is
+        // polling, so answering it can hand over a session on the very next poll.
+        expect(calls).toEqual(["pin", "claim", "authorizer", "approve"]);
     });
 
     // The session this opens is written on the other device's next request, which

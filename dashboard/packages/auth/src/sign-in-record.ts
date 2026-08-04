@@ -21,7 +21,13 @@
 
 import { prisma } from "@polaris/db";
 import { upsertSecurity } from "./security.js";
-import { parseSecondFactor, parseSignInMethod, type SecondFactor, type SignInRecord } from "@polaris/core";
+import {
+    parseSecondFactor,
+    parseSignInMethod,
+    type SecondFactor,
+    type SignInMethod,
+    type SignInRecord
+} from "@polaris/core";
 
 /**
  * How long a note stays collectable.
@@ -35,6 +41,10 @@ const NOTE_TTL_MS = 15 * 60 * 1000;
 
 /** The factors that mean "a code Polaris sent", whichever channel carried it. */
 const SENT_CODES: ReadonlySet<SecondFactor> = new Set(["email-code", "whatsapp-code", "code"]);
+
+/** The one way in that somebody else has to answer for before the session
+ *  exists, and so the only one an authorizer can belong to. */
+const SCANNED_CODE: SignInMethod = "qr-code";
 
 /** Whatever went wrong, the sign-in itself stands. */
 function swallow(what: string): (error: unknown) => void {
@@ -119,6 +129,15 @@ const NOTHING_COLLECTED: CollectedSignIn = { method: null, secondFactor: null, a
  * session: two browsers signing the same account in at the same moment is the
  * way this loses, and the cost of losing it is one session labelled the way the
  * other one signed in - never a session labelled as somebody else's.
+ *
+ * The two halves of a note are written by different requests, so the authorizer
+ * is only handed over when the method says a scanned code is what it belongs to.
+ * An approval whose browser never came back leaves its half behind, and the next
+ * sign-in - a password on some other machine, or an account being created - would
+ * otherwise collect it and read as having been let in by a device that answered
+ * for something else entirely. The unpaired half is dropped rather than shown,
+ * because a missing label costs a line on a screen and a wrong one sends somebody
+ * hunting a device that did nothing.
  */
 export async function takeSignInRecord(userId: string): Promise<CollectedSignIn> {
     const row = await prisma.userSecurity
@@ -149,11 +168,13 @@ export async function takeSignInRecord(userId: string): Promise<CollectedSignIn>
         .catch(swallow("sign-in note not cleared"));
 
     if (Date.now() - row.pendingSignInAt.getTime() > NOTE_TTL_MS) return NOTHING_COLLECTED;
+    const method = parseSignInMethod(row.pendingSignInMethod);
+    const authorizerId = method === SCANNED_CODE ? row.pendingAuthorizerId : null;
     return {
-        method: parseSignInMethod(row.pendingSignInMethod),
+        method,
         secondFactor: parseSecondFactor(row.pendingSignInFactor),
-        authorizedBy: row.pendingAuthorizerId
-            ? { sessionId: row.pendingAuthorizerId, device: row.pendingAuthorizerDevice ?? "Unknown device" }
+        authorizedBy: authorizerId
+            ? { sessionId: authorizerId, device: row.pendingAuthorizerDevice ?? "Unknown device" }
             : null
     };
 }

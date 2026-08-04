@@ -301,14 +301,17 @@ export async function decideSignInCode(
     if (!(await claimDeviceCode(auth, decision.userCode, store))) {
         return { error: "That code is no longer valid. Ask for a new one on the sign-in screen." };
     }
-    const result = await decideDeviceCode(auth, decision.userCode, decision.approve, store);
-    if (result.error) return result;
-
     // What this device is, from the request that is answering: the scan happens
     // here and the session it lets in is written on another device's next request,
-    // which has nothing of its own to say about who allowed it.
+    // which has nothing of its own to say about who allowed it. Left before the
+    // code is answered rather than after, because the browser waiting on that code
+    // is polling: the moment the answer lands it can be handed its session, and a
+    // note written after that arrives too late for the session it describes.
     const scanner = describeDevice(await clientUserAgent(), await clientUserAgentBrands());
     if (decision.approve) await noteSignInAuthorizer(userId, { sessionId: bySessionId, device: scanner });
+
+    const result = await decideDeviceCode(auth, decision.userCode, decision.approve, store);
+    if (result.error) return result;
 
     await recordAudit({
         actorId: userId,
