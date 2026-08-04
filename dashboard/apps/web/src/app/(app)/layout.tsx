@@ -18,6 +18,7 @@ import { RouteSkeletonCapture } from "@/components/route-skeleton";
 import { DisplayFormatProvider } from "@/components/display-format";
 import { AppShell, CapabilityProvider, EditionBadge } from "@polaris/ui";
 import { resolveDisplayPreferencesFor } from "@/lib/display-prefs-service";
+import { NotificationFavicon } from "@/components/notifications/notification-favicon";
 import { NotificationsProvider } from "@/components/notifications/notifications-provider";
 
 /**
@@ -45,6 +46,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
             <AppUrlProvider baseUrl={baseUrl}>
                 <DisplayFormatProvider preferences={display}>
                     <NotificationsProvider initial={notifications}>
+                        <NotificationFavicon />
                         <AppShell
                             switcher={<AppNav appIds={apps} />}
                             navButton={<AppNavDrawer />}

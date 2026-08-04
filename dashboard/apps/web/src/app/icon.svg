@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+    <!-- The Polaris mark. Kept identical to the geometry in src/lib/favicon.ts,
+         which redraws it to badge the tab with the unread count. -->
+    <rect width="32" height="32" rx="7" fill="#7632EC"/>
+    <path d="M16 3Q17.6 12.6 29 16Q17.6 19.4 16 29Q14.4 19.4 3 16Q14.4 12.6 16 3Z" fill="#FFFFFF"/>
+</svg>

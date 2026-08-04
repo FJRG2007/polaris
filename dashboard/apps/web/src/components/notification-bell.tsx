@@ -9,6 +9,10 @@
 
 import Link from "next/link";
 import { Bell } from "lucide-react";
+import { badgeLabel } from "@/lib/notification-badge";
+import { RelativeTime } from "@/components/relative-time";
+import { useNotificationFeed } from "@/components/notifications/notifications-provider";
+import { describeAudience, levelStyle } from "@/components/notifications/notification-visuals";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -18,15 +22,13 @@ import {
     DropdownMenuTrigger,
     cn
 } from "@polaris/ui";
-import { RelativeTime } from "@/components/relative-time";
-import { useNotificationFeed } from "@/components/notifications/notifications-provider";
-import { describeAudience, levelStyle } from "@/components/notifications/notification-visuals";
 
 /** How many alerts the dropdown previews before sending the user to the page. */
 const PREVIEW_COUNT = 8;
 
 export function NotificationBell() {
     const { items, unread, markAllRead, markRead } = useNotificationFeed();
+    const badge = badgeLabel(unread);
 
     return (
         <DropdownMenu>
@@ -35,9 +37,9 @@ export function NotificationBell() {
                 aria-label={unread > 0 ? `Notifications (${unread} unread)` : "Notifications"}
             >
                 <Bell className="size-4" />
-                {unread > 0 ? (
+                {badge ? (
                     <span className="absolute -right-0.5 -top-0.5 grid min-w-4 place-items-center rounded-full bg-danger px-1 text-[10px] font-medium leading-4 text-white">
-                        {unread > 9 ? "9+" : unread}
+                        {badge}
                     </span>
                 ) : null}
             </DropdownMenuTrigger>
