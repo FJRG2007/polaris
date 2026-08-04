@@ -17,15 +17,9 @@ import { cookies } from "next/headers";
 import { recordAudit } from "@/lib/audit-service";
 import { networkPublicIp } from "@/lib/network-service";
 import { listUserPasskeys, type PasskeyView } from "@/lib/passkey-directory";
+import { describeDevice, isIpv4, isPrivateIp, type SignInRecord } from "@polaris/core";
 import { clientHost, clientIp, clientUserAgent, clientUserAgentBrands } from "@/lib/request-context";
-import {
-    describeDevice,
-    isIpv4,
-    isPrivateIp,
-    parseSecondFactor,
-    parseSignInMethod,
-    type SignInRecord
-} from "@polaris/core";
+import { sessionApproval, sessionSignIn, sessionUserAgent, type SessionApproval } from "@/lib/session-row";
 import {
     adoptTrustedDevice,
     currentTrustedDevice,
@@ -39,7 +33,7 @@ export interface SessionView {
     id: string;
     /** Whether this is the session making the request. */
     current: boolean;
-    approval: "approved" | "pending" | "denied";
+    approval: SessionApproval;
     locked: boolean;
     device: string;
     ip: string | null;
@@ -72,8 +66,6 @@ export function describeOrigin(
     return where ? `${device} - ${where}` : device;
 }
 
-const APPROVALS: ReadonlySet<string> = new Set(["approved", "pending", "denied"]);
-
 /** Every live session a user holds, newest first, as stored. */
 async function liveSessionRows(userId: string) {
     return prisma.session.findMany({
@@ -91,12 +83,6 @@ async function liveSessionRows(userId: string) {
 }
 
 type SessionRow = Awaited<ReturnType<typeof liveSessionRows>>[number];
-
-/** The browser a session was opened with, preferring Polaris's own copy:
- *  better-auth's column is written once and never followed. */
-function sessionUserAgent(row: SessionRow): string | null {
-    return row.state?.userAgent ?? row.userAgent ?? null;
-}
 
 /**
  * The address this network is seen at from outside, but only when a list holds
@@ -124,22 +110,18 @@ function isLocalAddress(ip: string): boolean {
 }
 
 function toSessionView(row: SessionRow, currentSessionId: string, publicIp: string | null): SessionView {
-    const approval = row.state?.approval ?? "approved";
     const ip = row.state?.ip ?? row.ipAddress;
     return {
         id: row.id,
         current: row.id === currentSessionId,
-        approval: (APPROVALS.has(approval) ? approval : "approved") as SessionView["approval"],
+        approval: sessionApproval(row.state?.approval),
         locked: row.state?.lockedAt != null,
         device: describeDevice(sessionUserAgent(row), row.state?.userAgentBrands),
         ip,
         publicIp: ip && isLocalAddress(ip) ? publicIp : null,
         country: row.state?.country ?? null,
         host: row.state?.host ?? null,
-        signIn: {
-            method: parseSignInMethod(row.state?.signInMethod),
-            secondFactor: parseSecondFactor(row.state?.secondFactor)
-        },
+        signIn: sessionSignIn(row.state),
         lastSeenAt: (row.state?.lastSeenAt ?? row.createdAt).toISOString(),
         createdAt: row.createdAt.toISOString(),
         expiresAt: row.expiresAt.toISOString()
@@ -190,10 +172,7 @@ export async function sessionSignInRecord(userId: string, sessionId: string): Pr
         where: { sessionId, userId },
         select: { signInMethod: true, secondFactor: true }
     });
-    return {
-        method: parseSignInMethod(state?.signInMethod),
-        secondFactor: parseSecondFactor(state?.secondFactor)
-    };
+    return sessionSignIn(state);
 }
 
 /**

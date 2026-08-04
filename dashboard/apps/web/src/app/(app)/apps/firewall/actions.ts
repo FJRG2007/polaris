@@ -365,6 +365,11 @@ function countEntries(json: string | undefined): number {
  * accounts, which is the People screen's to give out and no operator's by default.
  * Absent rather than empty when the reader may not have it, so the screen can tell
  * "nobody has ever signed in from here" from "not yours to see".
+ *
+ * A failure to read them costs the names and nothing else. The requests are what
+ * the dialog was opened for and the evidence a ban is judged on; replacing them
+ * with an error because the second, optional question could not be answered would
+ * withhold the answer the reader came for.
  */
 export async function getWafAddressActivityAction(
     ip: string,
@@ -378,7 +383,7 @@ export async function getWafAddressActivityAction(
     try {
         const [activity, accounts] = await Promise.all([
             wafAddressActivity(address.data, window.data),
-            user.isAdmin ? accountsAtAddress(address.data) : undefined
+            user.isAdmin ? accountsAtAddress(address.data).catch(() => undefined) : undefined
         ]);
         return { activity, accounts };
     } catch (caught) {

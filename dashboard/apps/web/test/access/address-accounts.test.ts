@@ -33,6 +33,7 @@ let sessionRows: SessionRow[] = [];
 let auditGroups: AuditGroup[] = [];
 let sessionQuery: Record<string, unknown> | null = null;
 let auditQuery: Record<string, unknown> | null = null;
+let userQuery: { id: { in: string[] } } | null = null;
 
 const PEOPLE = [
     { id: "user-1", name: "Ada Lovelace", email: "ada@example.com", image: null, bannedAt: null },
@@ -58,8 +59,10 @@ vi.mock("@polaris/db", () => ({
             }
         },
         user: {
-            findMany: async ({ where }: { where: { id: { in: string[] } } }) =>
-                PEOPLE.filter((person) => where.id.in.includes(person.id))
+            findMany: async ({ where }: { where: { id: { in: string[] } } }) => {
+                userQuery = where;
+                return PEOPLE.filter((person) => where.id.in.includes(person.id));
+            }
         }
     }
 }));
@@ -104,6 +107,7 @@ beforeEach(() => {
     auditGroups = [];
     sessionQuery = null;
     auditQuery = null;
+    userQuery = null;
 });
 
 describe("accounts at an address", () => {
@@ -183,5 +187,28 @@ describe("accounts at an address", () => {
 
     it("has nothing to say about an address nobody has ever been seen on", async () => {
         expect(await accountsAtAddress("85.87.156.88", NOW)).toEqual([]);
+    });
+
+    // The log is asked about the gateway a whole company signs in through as
+    // readily as about one attacker, and it holds a group per account and
+    // outcome, so the question itself has to be bounded rather than the answer.
+    it("asks the log for the most recent sign-ins only, and a bounded number of them", async () => {
+        await accountsAtAddress("85.87.156.88", NOW);
+        expect(auditQuery?.orderBy).toEqual({ _max: { at: "desc" } });
+        expect(typeof auditQuery?.take).toBe("number");
+    });
+
+    // Every account named is carried to the browser whole, and the panel draws
+    // six of them. A shared address must not turn that into the directory.
+    it("looks up no more accounts than it is willing to carry back", async () => {
+        sessionRows = Array.from({ length: 400 }, (_, index) =>
+            session({ id: `session-${index}`, userId: `user-${index}` })
+        );
+        auditGroups = Array.from({ length: 400 }, (_, index) => group({ actorId: `other-${index}` }));
+        await accountsAtAddress("85.87.156.88", NOW);
+        const asked = userQuery?.id.in ?? [];
+        expect(asked.length).toBeLessThanOrEqual(50);
+        // Whoever a ban would actually cut off is who survives the cut.
+        expect(asked.every((id) => id.startsWith("user-"))).toBe(true);
     });
 });
