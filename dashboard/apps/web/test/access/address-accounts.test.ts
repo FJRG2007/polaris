@@ -38,7 +38,13 @@ let userQuery: { id: { in: string[] } } | null = null;
 
 const PEOPLE = [
     { id: "user-1", name: "Ada Lovelace", email: "ada@example.com", image: null, bannedAt: null },
-    { id: "user-2", name: "", email: "grace@example.com", image: null, bannedAt: new Date("2026-08-01T00:00:00Z") }
+    {
+        id: "user-2",
+        name: "",
+        email: "grace@example.com",
+        image: null,
+        bannedAt: new Date("2026-08-01T00:00:00Z")
+    }
 ];
 
 // The real hash reaches for node:crypto through a module that pulls in the whole
@@ -50,7 +56,9 @@ vi.mock("@polaris/db", () => ({
         session: {
             findMany: async (args: Record<string, unknown>) => {
                 sessionQueries.push(args);
-                return "ipAddress" in (args.where as Record<string, unknown>) ? sessionRows : movedRows;
+                return "ipAddress" in (args.where as Record<string, unknown>)
+                    ? sessionRows
+                    : movedRows;
             }
         },
         auditLog: {
@@ -126,7 +134,10 @@ describe("accounts at an address", () => {
 
     it("merges the two without listing a session that both found twice", async () => {
         sessionRows = [session()];
-        movedRows = [session(), session({ id: "session-2", createdAt: new Date("2026-08-04T11:00:00Z") })];
+        movedRows = [
+            session(),
+            session({ id: "session-2", createdAt: new Date("2026-08-04T11:00:00Z") })
+        ];
         const accounts = await accountsAtAddress("85.87.156.88", NOW);
         expect(accounts[0]?.sessions.map((entry) => entry.id)).toEqual(["session-2", "session-1"]);
     });
@@ -147,7 +158,10 @@ describe("accounts at an address", () => {
     it("gathers an account's sessions under it, and names it by its email when it has no name", async () => {
         sessionRows = [session(), session({ id: "session-2", userId: "user-2" })];
         const accounts = await accountsAtAddress("85.87.156.88", NOW);
-        expect(accounts.map((account) => account.name)).toEqual(["Ada Lovelace", "grace@example.com"]);
+        expect(accounts.map((account) => account.name)).toEqual([
+            "Ada Lovelace",
+            "grace@example.com"
+        ]);
         expect(accounts[0]?.sessions).toHaveLength(1);
         expect(accounts[0]?.sessions[0]?.device).toBe("Chrome on Windows");
         expect(accounts[1]?.banned).toBe(true);
@@ -168,7 +182,9 @@ describe("accounts at an address", () => {
     // The whole point of reading the log as well: an address that failed its way
     // through an account's network rules leaves no session behind at all.
     it("names an account that only ever had sign-ins refused here", async () => {
-        auditGroups = [group({ actorId: "user-2", action: "account.signin.blocked", _count: { _all: 12 } })];
+        auditGroups = [
+            group({ actorId: "user-2", action: "account.signin.blocked", _count: { _all: 12 } })
+        ];
         const accounts = await accountsAtAddress("85.87.156.88", NOW);
         expect(accounts).toHaveLength(1);
         expect(accounts[0]?.id).toBe("user-2");
@@ -217,7 +233,9 @@ describe("accounts at an address", () => {
         sessionRows = Array.from({ length: 400 }, (_, index) =>
             session({ id: `session-${index}`, userId: `user-${index}` })
         );
-        auditGroups = Array.from({ length: 400 }, (_, index) => group({ actorId: `other-${index}` }));
+        auditGroups = Array.from({ length: 400 }, (_, index) =>
+            group({ actorId: `other-${index}` })
+        );
         await accountsAtAddress("85.87.156.88", NOW);
         const asked = userQuery?.id.in ?? [];
         expect(asked.length).toBeLessThanOrEqual(50);

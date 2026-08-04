@@ -21,7 +21,9 @@ const APPROVALS: ReadonlySet<string> = new Set(["approved", "pending", "denied"]
  *  cannot place reads as approved, which is what a session carrying no state row
  *  is - nothing was ever held against it. */
 export function sessionApproval(value: string | null | undefined): SessionApproval {
-    return value !== null && value !== undefined && APPROVALS.has(value) ? (value as SessionApproval) : "approved";
+    return value !== null && value !== undefined && APPROVALS.has(value)
+        ? (value as SessionApproval)
+        : "approved";
 }
 
 /** The browser a session was opened with, preferring Polaris's own copy:

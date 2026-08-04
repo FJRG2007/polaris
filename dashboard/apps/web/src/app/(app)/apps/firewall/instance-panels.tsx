@@ -23,7 +23,16 @@ import { useDisplayFormat } from "@/components/display-format";
 import type { WafAnomalySettings } from "@/lib/waf-anomaly-service";
 import { useCallback, useEffect, useState, useTransition } from "react";
 import type { WafAnomaly, WafJail, WafTrafficSummary } from "@polaris/core";
-import { Activity, Ban, Globe, RadarIcon, RefreshCw, ShieldCheck, ShieldOff, Timer } from "lucide-react";
+import {
+    Activity,
+    Ban,
+    Globe,
+    RadarIcon,
+    RefreshCw,
+    ShieldCheck,
+    ShieldOff,
+    Timer
+} from "lucide-react";
 import {
     blockAnomalyAction,
     getWafAddressActivityAction,
@@ -287,8 +296,8 @@ function TrafficPanel({
                     <Skeleton className="h-32 w-full" />
                 ) : !traffic || traffic.total === 0 ? (
                     <p className="py-6 text-center text-sm text-muted-foreground">
-                        Nothing recorded in this window. The figures come from the edge&apos;s own request log, so a
-                        service reached directly on its port does not appear here.
+                        Nothing recorded in this window. The figures come from the edge&apos;s own
+                        request log, so a service reached directly on its port does not appear here.
                     </p>
                 ) : (
                     <>
@@ -297,11 +306,18 @@ function TrafficPanel({
                             <Stat label="Blocked" value={grouped(traffic.blocked)} tone="danger" />
                             <Stat
                                 label="Share blocked"
-                                value={traffic.blockedRate === null ? "-" : `${traffic.blockedRate.toFixed(1)}%`}
+                                value={
+                                    traffic.blockedRate === null
+                                        ? "-"
+                                        : `${traffic.blockedRate.toFixed(1)}%`
+                                }
                             />
                         </div>
                         <TimeSeriesChart
-                            points={traffic.series.map((point) => ({ t: point.t, v: point.blocked }))}
+                            points={traffic.series.map((point) => ({
+                                t: point.t,
+                                v: point.blocked
+                            }))}
                             from={traffic.from}
                             to={traffic.to}
                             tone="danger"
@@ -310,7 +326,11 @@ function TrafficPanel({
                             formatTime={(at) => format.dateTime(at)}
                         />
                         <div className="grid gap-4 md:grid-cols-3">
-                            <TopList title="Addresses" entries={traffic.topAddresses} onInspect={onInspect} />
+                            <TopList
+                                title="Addresses"
+                                entries={traffic.topAddresses}
+                                onInspect={onInspect}
+                            />
                             <TopList title="Paths" entries={traffic.topPaths} />
                             <TopList title="User agents" entries={traffic.topAgents} />
                         </div>
@@ -325,7 +345,9 @@ function Stat({ label, value, tone }: { label: string; value: string; tone?: "da
     return (
         <div>
             <div className="text-xs text-muted-foreground">{label}</div>
-            <div className={`text-xl font-semibold ${tone === "danger" ? "text-danger" : ""}`}>{value}</div>
+            <div className={`text-xl font-semibold ${tone === "danger" ? "text-danger" : ""}`}>
+                {value}
+            </div>
         </div>
     );
 }
@@ -342,13 +364,18 @@ function TopList({
 }) {
     return (
         <div className="min-w-0">
-            <div className="mb-1.5 text-xs font-medium text-muted-foreground">Top blocked {title.toLowerCase()}</div>
+            <div className="mb-1.5 text-xs font-medium text-muted-foreground">
+                Top blocked {title.toLowerCase()}
+            </div>
             {entries.length === 0 ? (
                 <p className="text-xs text-muted-foreground">None.</p>
             ) : (
                 <ul className="flex flex-col gap-1">
                     {entries.map((entry) => (
-                        <li key={entry.value} className="flex items-baseline justify-between gap-2 text-xs">
+                        <li
+                            key={entry.value}
+                            className="flex items-baseline justify-between gap-2 text-xs"
+                        >
                             {onInspect ? (
                                 <AddressLink ip={entry.value} onInspect={onInspect} />
                             ) : (
@@ -356,7 +383,9 @@ function TopList({
                                     {entry.value}
                                 </span>
                             )}
-                            <span className="shrink-0 tabular-nums text-muted-foreground">{entry.count}</span>
+                            <span className="shrink-0 tabular-nums text-muted-foreground">
+                                {entry.count}
+                            </span>
                         </li>
                     ))}
                 </ul>
@@ -418,15 +447,17 @@ function AnomaliesPanel({
             </CardHeader>
             <CardBody className="flex flex-col gap-3">
                 <p className="text-xs text-muted-foreground">
-                    Traffic that is fine one request at a time and wrong in aggregate. Each address is judged against
-                    what the rest of that route&apos;s visitors do, so a busy endpoint is not an anomaly for being busy.
-                    Trusted addresses are never judged.
+                    Traffic that is fine one request at a time and wrong in aggregate. Each address
+                    is judged against what the rest of that route&apos;s visitors do, so a busy
+                    endpoint is not an anomaly for being busy. Trusted addresses are never judged.
                 </p>
 
                 {loading ? (
                     <Skeleton className="h-20 w-full" />
                 ) : !settings?.enabled ? (
-                    <p className="py-4 text-center text-sm text-muted-foreground">Detection is off.</p>
+                    <p className="py-4 text-center text-sm text-muted-foreground">
+                        Detection is off.
+                    </p>
                 ) : !anomalies || anomalies.length === 0 ? (
                     <p className="py-4 text-center text-sm text-muted-foreground">
                         Nothing unusual in the last ten minutes.
@@ -441,16 +472,26 @@ function AnomaliesPanel({
                                 <div className="min-w-0">
                                     <div className="flex flex-wrap items-center gap-2 text-sm">
                                         <span className="text-xs text-muted-foreground">
-                                            <AddressLink ip={anomaly.ip} callerIp={callerIp} onInspect={onInspect} />
+                                            <AddressLink
+                                                ip={anomaly.ip}
+                                                callerIp={callerIp}
+                                                onInspect={onInspect}
+                                            />
                                         </span>
-                                        <Badge variant={anomaly.severity === "high" ? "danger" : "neutral"}>
+                                        <Badge
+                                            variant={
+                                                anomaly.severity === "high" ? "danger" : "neutral"
+                                            }
+                                        >
                                             {anomaly.kind.replace(/-/g, " ")}
                                         </Badge>
                                         <span className="truncate font-mono text-xs text-muted-foreground">
                                             {anomaly.route}
                                         </span>
                                     </div>
-                                    <p className="mt-0.5 text-xs text-muted-foreground">{anomaly.detail}</p>
+                                    <p className="mt-0.5 text-xs text-muted-foreground">
+                                        {anomaly.detail}
+                                    </p>
                                 </div>
                                 {/* Both verdicts, because a finding an operator
                                     disagrees with is as common as one they act on -
@@ -501,8 +542,9 @@ function AnomaliesPanel({
                             <div className="min-w-0">
                                 <div className="text-sm">Block automatically</div>
                                 <p className="mt-0.5 text-xs text-muted-foreground">
-                                    Bans the address behind anything scored high, without waiting for you. Leave it off
-                                    until the findings above have been right a few times.
+                                    Bans the address behind anything scored high, without waiting
+                                    for you. Leave it off until the findings above have been right a
+                                    few times.
                                 </p>
                             </div>
                             <Switch
@@ -517,28 +559,36 @@ function AnomaliesPanel({
                                 value={settings.overBaseline}
                                 min={2}
                                 max={1000}
-                                onChange={(value) => patchSettings({ ...settings, overBaseline: value })}
+                                onChange={(value) =>
+                                    patchSettings({ ...settings, overBaseline: value })
+                                }
                             />
                             <NumberField
                                 label="Asset fetches"
                                 value={settings.assetMax}
                                 min={5}
                                 max={100000}
-                                onChange={(value) => patchSettings({ ...settings, assetMax: value })}
+                                onChange={(value) =>
+                                    patchSettings({ ...settings, assetMax: value })
+                                }
                             />
                             <NumberField
                                 label="Query variants"
                                 value={settings.variantMax}
                                 min={5}
                                 max={100000}
-                                onChange={(value) => patchSettings({ ...settings, variantMax: value })}
+                                onChange={(value) =>
+                                    patchSettings({ ...settings, variantMax: value })
+                                }
                             />
                             <NumberField
                                 label="Ban for (min)"
                                 value={Math.round(settings.banTimeSec / 60)}
                                 min={1}
                                 max={43200}
-                                onChange={(value) => patchSettings({ ...settings, banTimeSec: value * 60 })}
+                                onChange={(value) =>
+                                    patchSettings({ ...settings, banTimeSec: value * 60 })
+                                }
                             />
                         </div>
                     </div>
@@ -577,8 +627,8 @@ function BansPanel({
                     <Skeleton className="h-20 w-full" />
                 ) : !bans || bans.length === 0 ? (
                     <p className="py-4 text-center text-sm text-muted-foreground">
-                        Nobody is banned. Addresses appear here when they trip a jail below, or when a reputation
-                        provider flags them.
+                        Nobody is banned. Addresses appear here when they trip a jail below, or when
+                        a reputation provider flags them.
                     </p>
                 ) : (
                     <div className="-mx-2 overflow-x-auto">
@@ -595,7 +645,11 @@ function BansPanel({
                                 {bans.map((ban) => (
                                     <tr key={ban.ip} className="border-t border-border">
                                         <td className="px-2 py-2 text-xs">
-                                            <AddressLink ip={ban.ip} callerIp={callerIp} onInspect={onInspect} />
+                                            <AddressLink
+                                                ip={ban.ip}
+                                                callerIp={callerIp}
+                                                onInspect={onInspect}
+                                            />
                                             {ban.offences > 1 ? (
                                                 <span className="ml-2 text-muted-foreground">
                                                     {ban.offences}x
@@ -624,7 +678,9 @@ function BansPanel({
                                                     mutate(
                                                         (current) => ({
                                                             ...current,
-                                                            bans: current.bans?.filter((row) => row.ip !== ban.ip)
+                                                            bans: current.bans?.filter(
+                                                                (row) => row.ip !== ban.ip
+                                                            )
                                                         }),
                                                         () => liftWafBanAction(ban.ip)
                                                     )
@@ -658,7 +714,8 @@ function JailsPanel({
     const [error, setError] = useState<string | null>(null);
     const [pending, start] = useTransition();
     const current = draft ?? jails ?? [];
-    const dirty = draft !== null && jails !== undefined && JSON.stringify(draft) !== JSON.stringify(jails);
+    const dirty =
+        draft !== null && jails !== undefined && JSON.stringify(draft) !== JSON.stringify(jails);
 
     function update(id: string, patch: Partial<WafJail>) {
         setDraft(current.map((jail) => (jail.id === id ? { ...jail, ...patch } : jail)));
@@ -700,18 +757,23 @@ function JailsPanel({
             </CardHeader>
             <CardBody className="flex flex-col gap-3">
                 <p className="text-xs text-muted-foreground">
-                    Counted from the edge&apos;s request log rather than per request, so watching an address costs a
-                    visitor nothing. A repeat offender is held progressively longer.
+                    Counted from the edge&apos;s request log rather than per request, so watching an
+                    address costs a visitor nothing. A repeat offender is held progressively longer.
                 </p>
                 {loading ? (
                     <Skeleton className="h-32 w-full" />
                 ) : (
                     current.map((jail) => (
-                        <div key={jail.id} className="flex flex-col gap-2 rounded-md border border-border px-3 py-2.5">
+                        <div
+                            key={jail.id}
+                            className="flex flex-col gap-2 rounded-md border border-border px-3 py-2.5"
+                        >
                             <div className="flex items-start justify-between gap-3">
                                 <div className="min-w-0">
                                     <div className="text-sm">{jail.label}</div>
-                                    <p className="mt-0.5 text-xs text-muted-foreground">{jail.description}</p>
+                                    <p className="mt-0.5 text-xs text-muted-foreground">
+                                        {jail.description}
+                                    </p>
                                 </div>
                                 <Switch
                                     checked={jail.enabled}
@@ -733,14 +795,18 @@ function JailsPanel({
                                         value={Math.round(jail.findTimeSec / 60)}
                                         min={1}
                                         max={1440}
-                                        onChange={(value) => update(jail.id, { findTimeSec: value * 60 })}
+                                        onChange={(value) =>
+                                            update(jail.id, { findTimeSec: value * 60 })
+                                        }
                                     />
                                     <NumberField
                                         label="Ban for (min)"
                                         value={Math.round(jail.banTimeSec / 60)}
                                         min={1}
                                         max={43200}
-                                        onChange={(value) => update(jail.id, { banTimeSec: value * 60 })}
+                                        onChange={(value) =>
+                                            update(jail.id, { banTimeSec: value * 60 })
+                                        }
                                     />
                                 </div>
                             ) : null}
@@ -776,7 +842,8 @@ function NumberField({
                 max={max}
                 onChange={(event) => {
                     const next = Number(event.target.value);
-                    if (Number.isFinite(next)) onChange(Math.min(max, Math.max(min, Math.round(next))));
+                    if (Number.isFinite(next))
+                        onChange(Math.min(max, Math.max(min, Math.round(next))));
                 }}
                 className="h-8 w-24 rounded-md border border-border bg-background px-2 text-sm text-foreground"
             />
@@ -809,7 +876,10 @@ function TrustedPanel({
     const [error, setError] = useState<string | null>(null);
     const [pending, start] = useTransition();
     const current = draft ?? trusted ?? [];
-    const dirty = draft !== null && trusted !== undefined && JSON.stringify(draft) !== JSON.stringify(trusted);
+    const dirty =
+        draft !== null &&
+        trusted !== undefined &&
+        JSON.stringify(draft) !== JSON.stringify(trusted);
     const canAddSelf = callerIp !== null && callerIp !== undefined && !current.includes(callerIp);
 
     // The list can also be added to from a finding in the panel above, and a draft
@@ -842,15 +912,21 @@ function TrustedPanel({
                     Trusted addresses
                 </CardTitle>
                 {dirty ? (
-                    <Button type="button" size="sm" disabled={pending} onClick={() => save(current)}>
+                    <Button
+                        type="button"
+                        size="sm"
+                        disabled={pending}
+                        onClick={() => save(current)}
+                    >
                         Save
                     </Button>
                 ) : null}
             </CardHeader>
             <CardBody className="flex flex-col gap-3">
                 <p className="text-xs text-muted-foreground">
-                    Never banned and never reported as an anomaly. Loopback is always trusted. Add your own address or
-                    range so your everyday use of the instance is not read as an attack on it.
+                    Never banned and never reported as an anomaly. Loopback is always trusted. Add
+                    your own address or range so your everyday use of the instance is not read as an
+                    attack on it.
                 </p>
                 {loading ? (
                     <Skeleton className="h-16 w-full" />
@@ -894,11 +970,14 @@ function IntelPanel() {
             <CardBody>
                 <p className="text-xs text-muted-foreground">
                     Blocks addresses already known for scanning or attacks. Connect{" "}
-                    <Link href="/integrations" className="text-primary underline-offset-2 hover:underline">
+                    <Link
+                        href="/integrations"
+                        className="text-primary underline-offset-2 hover:underline"
+                    >
                         Dymo API or Criminal IP
                     </Link>{" "}
-                    to switch them on. They are asked in the background about addresses seen in your traffic, never
-                    while a request is waiting.
+                    to switch them on. They are asked in the background about addresses seen in your
+                    traffic, never while a request is waiting.
                 </p>
             </CardBody>
         </Card>
@@ -923,7 +1002,15 @@ function statusTone(status: number): string {
  * panel above the requests answers directly, for the reader it is willing to name
  * accounts to.
  */
-function AddressDialog({ ip, hours, onClose }: { ip: string | null; hours: number; onClose: () => void }) {
+function AddressDialog({
+    ip,
+    hours,
+    onClose
+}: {
+    ip: string | null;
+    hours: number;
+    onClose: () => void;
+}) {
     const format = useDisplayFormat();
     const [loaded, setLoaded] = useState<AddressReport | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -951,7 +1038,8 @@ function AddressDialog({ ip, hours, onClose }: { ip: string | null; hours: numbe
                 <DialogHeader className="pr-8">
                     <DialogTitle className="font-mono">{ip}</DialogTitle>
                     <DialogDescription>
-                        Every request from this address in the last {windowLabel}, read from the edge&apos;s own log.
+                        Every request from this address in the last {windowLabel}, read from the
+                        edge&apos;s own log.
                     </DialogDescription>
                 </DialogHeader>
 
@@ -973,8 +1061,8 @@ function AddressDialog({ ip, hours, onClose }: { ip: string | null; hours: numbe
                     </div>
                 ) : activity.total === 0 ? (
                     <p className="py-6 text-center text-sm text-muted-foreground">
-                        Nothing from this address in that window. A ban outlives the log it was made from, so an older
-                        one can be enforced with nothing left here to show for it.
+                        Nothing from this address in that window. A ban outlives the log it was made
+                        from, so an older one can be enforced with nothing left here to show for it.
                     </p>
                 ) : (
                     <div className="flex flex-col gap-4">
@@ -982,10 +1070,16 @@ function AddressDialog({ ip, hours, onClose }: { ip: string | null; hours: numbe
                             <Stat label="Requests" value={grouped(activity.total)} />
                             <Stat label="Blocked" value={grouped(activity.blocked)} tone="danger" />
                             {activity.firstSeen ? (
-                                <Stat label="First seen" value={format.dateTime(activity.firstSeen)} />
+                                <Stat
+                                    label="First seen"
+                                    value={format.dateTime(activity.firstSeen)}
+                                />
                             ) : null}
                             {activity.lastSeen ? (
-                                <Stat label="Last seen" value={format.dateTime(activity.lastSeen)} />
+                                <Stat
+                                    label="Last seen"
+                                    value={format.dateTime(activity.lastSeen)}
+                                />
                             ) : null}
                         </div>
 
@@ -999,8 +1093,12 @@ function AddressDialog({ ip, hours, onClose }: { ip: string | null; hours: numbe
                                         key={entry.value}
                                         className="rounded-md border border-border px-1.5 py-0.5 font-mono text-xs"
                                     >
-                                        <span className={statusTone(Number(entry.value))}>{entry.value}</span>
-                                        <span className="ml-1.5 text-muted-foreground">{grouped(entry.count)}</span>
+                                        <span className={statusTone(Number(entry.value))}>
+                                            {entry.value}
+                                        </span>
+                                        <span className="ml-1.5 text-muted-foreground">
+                                            {grouped(entry.count)}
+                                        </span>
                                     </span>
                                 ))}
                             </div>
@@ -1018,7 +1116,10 @@ function AddressDialog({ ip, hours, onClose }: { ip: string | null; hours: numbe
                                                 key={entry.value}
                                                 className="flex items-baseline justify-between gap-2 text-xs"
                                             >
-                                                <span className="truncate font-mono" title={entry.value}>
+                                                <span
+                                                    className="truncate font-mono"
+                                                    title={entry.value}
+                                                >
                                                     {entry.value}
                                                 </span>
                                                 <span className="shrink-0 tabular-nums text-muted-foreground">
@@ -1031,7 +1132,9 @@ function AddressDialog({ ip, hours, onClose }: { ip: string | null; hours: numbe
                             ) : null}
                             {activity.agents.length > 0 ? (
                                 <div className="min-w-0">
-                                    <div className="mb-1 text-xs font-medium text-muted-foreground">Calling itself</div>
+                                    <div className="mb-1 text-xs font-medium text-muted-foreground">
+                                        Calling itself
+                                    </div>
                                     <ul className="flex flex-col gap-0.5">
                                         {activity.agents.map((agent) => (
                                             <li
@@ -1072,10 +1175,15 @@ function AddressDialog({ ip, hours, onClose }: { ip: string | null; hours: numbe
                                             <td className="px-2 py-1.5 font-mono text-muted-foreground">
                                                 {request.method}
                                             </td>
-                                            <td className={`px-2 py-1.5 font-mono tabular-nums ${statusTone(request.status)}`}>
+                                            <td
+                                                className={`px-2 py-1.5 font-mono tabular-nums ${statusTone(request.status)}`}
+                                            >
                                                 {request.status}
                                             </td>
-                                            <td className="max-w-0 truncate px-2 py-1.5 font-mono" title={request.path}>
+                                            <td
+                                                className="max-w-0 truncate px-2 py-1.5 font-mono"
+                                                title={request.path}
+                                            >
                                                 {request.path}
                                             </td>
                                         </tr>
@@ -1086,8 +1194,8 @@ function AddressDialog({ ip, hours, onClose }: { ip: string | null; hours: numbe
 
                         {activity.truncated ? (
                             <p className="text-xs text-muted-foreground">
-                                Showing the {grouped(activity.requests.length)} most recent of {grouped(activity.total)}.
-                                The counts above cover all of them.
+                                Showing the {grouped(activity.requests.length)} most recent of{" "}
+                                {grouped(activity.total)}. The counts above cover all of them.
                             </p>
                         ) : null}
                     </div>

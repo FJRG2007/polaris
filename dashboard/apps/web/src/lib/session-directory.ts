@@ -18,8 +18,18 @@ import { recordAudit } from "@/lib/audit-service";
 import { networkPublicIp } from "@/lib/network-service";
 import { listUserPasskeys, type PasskeyView } from "@/lib/passkey-directory";
 import { describeDevice, isIpv4, isPrivateIp, type SignInRecord } from "@polaris/core";
-import { clientHost, clientIp, clientUserAgent, clientUserAgentBrands } from "@/lib/request-context";
-import { sessionApproval, sessionSignIn, sessionUserAgent, type SessionApproval } from "@/lib/session-row";
+import {
+    clientHost,
+    clientIp,
+    clientUserAgent,
+    clientUserAgentBrands
+} from "@/lib/request-context";
+import {
+    sessionApproval,
+    sessionSignIn,
+    sessionUserAgent,
+    type SessionApproval
+} from "@/lib/session-row";
 import {
     adoptTrustedDevice,
     currentTrustedDevice,
@@ -109,7 +119,11 @@ function isLocalAddress(ip: string): boolean {
     return isIpv4(ip) && isPrivateIp(ip);
 }
 
-function toSessionView(row: SessionRow, currentSessionId: string, publicIp: string | null): SessionView {
+function toSessionView(
+    row: SessionRow,
+    currentSessionId: string,
+    publicIp: string | null
+): SessionView {
     const ip = row.state?.ip ?? row.ipAddress;
     return {
         id: row.id,
@@ -139,7 +153,10 @@ function toSessionView(row: SessionRow, currentSessionId: string, publicIp: stri
  * reading somebody else's list passes their own and gets no match, which is
  * exactly right - none of those sessions is the one they are reading from.
  */
-export async function listUserSessions(userId: string, currentSessionId: string): Promise<SessionView[]> {
+export async function listUserSessions(
+    userId: string,
+    currentSessionId: string
+): Promise<SessionView[]> {
     const rows = await liveSessionRows(userId);
     const publicIp = await pairedPublicIp(rows.map((row) => row.state?.ip ?? row.ipAddress));
     return rows.map((row) => toSessionView(row, currentSessionId, publicIp));
@@ -156,7 +173,12 @@ export async function listUserSessions(userId: string, currentSessionId: string)
  */
 export async function sessionDeviceLabels(userId: string): Promise<Map<string, string>> {
     const rows = await liveSessionRows(userId);
-    return new Map(rows.map((row) => [row.id, describeDevice(sessionUserAgent(row), row.state?.userAgentBrands)]));
+    return new Map(
+        rows.map((row) => [
+            row.id,
+            describeDevice(sessionUserAgent(row), row.state?.userAgentBrands)
+        ])
+    );
 }
 
 /**
@@ -167,7 +189,10 @@ export async function sessionDeviceLabels(userId: string): Promise<Map<string, s
  * the record has to travel with them or the screen that says where sessions came
  * from would lose the one the reader is sitting at.
  */
-export async function sessionSignInRecord(userId: string, sessionId: string): Promise<SignInRecord> {
+export async function sessionSignInRecord(
+    userId: string,
+    sessionId: string
+): Promise<SignInRecord> {
     const state = await prisma.sessionState.findFirst({
         where: { sessionId, userId },
         select: { signInMethod: true, secondFactor: true }
@@ -294,9 +319,15 @@ export async function trustedDeviceDetail(
         return { device, identified: false, sessions: [], passkeys: [] };
     }
 
-    const [rows, passkeys] = await Promise.all([liveSessionRows(userId), listUserPasskeys(userId, userAgent)]);
+    const [rows, passkeys] = await Promise.all([
+        liveSessionRows(userId),
+        listUserPasskeys(userId, userAgent)
+    ]);
     const matched = rows.filter((row) => sessionUserAgent(row) === userAgent);
-    const publicIp = await pairedPublicIp([view.ip, ...matched.map((row) => row.state?.ip ?? row.ipAddress)]);
+    const publicIp = await pairedPublicIp([
+        view.ip,
+        ...matched.map((row) => row.state?.ip ?? row.ipAddress)
+    ]);
     return {
         device: toTrustedDeviceRow(view, publicIp),
         identified: true,
@@ -337,13 +368,23 @@ export async function revokeDeviceSessions(
 export async function revokeUserSession(userId: string, sessionId: string): Promise<void> {
     const result = await prisma.session.deleteMany({ where: { id: sessionId, userId } });
     if (result.count > 0) {
-        await recordAudit({ actorId: userId, action: "account.session.revoked", targetType: "session", targetId: sessionId });
+        await recordAudit({
+            actorId: userId,
+            action: "account.session.revoked",
+            targetType: "session",
+            targetId: sessionId
+        });
     }
 }
 
 /** End every session except the caller's own. Returns how many were ended. */
-export async function revokeOtherSessions(userId: string, currentSessionId: string): Promise<number> {
-    const result = await prisma.session.deleteMany({ where: { userId, id: { not: currentSessionId } } });
+export async function revokeOtherSessions(
+    userId: string,
+    currentSessionId: string
+): Promise<number> {
+    const result = await prisma.session.deleteMany({
+        where: { userId, id: { not: currentSessionId } }
+    });
     if (result.count > 0) {
         await recordAudit({
             actorId: userId,

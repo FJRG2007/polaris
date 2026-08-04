@@ -12,7 +12,11 @@ export const dynamic = "force-dynamic";
 /** `?user=<id>` opens that account's dialog on arrival, so a screen that names
  *  somebody - the firewall, naming who is signed in from an address it is about
  *  to ban - can hand the reader the account itself rather than its name. */
-export default async function UsersAdminPage({ searchParams }: { searchParams: Promise<{ user?: string }> }) {
+export default async function UsersAdminPage({
+    searchParams
+}: {
+    searchParams: Promise<{ user?: string }>;
+}) {
     const { user } = await searchParams;
     const admin = await requireAdmin();
     const [users, invites, recoveries, groups, mail, roles] = await Promise.all([

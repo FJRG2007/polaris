@@ -21,7 +21,12 @@
 import { prisma } from "@polaris/db";
 import { auditIpHash } from "@/lib/audit-service";
 import { describeDevice, type SignInRecord } from "@polaris/core";
-import { sessionApproval, sessionSignIn, sessionUserAgent, type SessionApproval } from "@/lib/session-row";
+import {
+    sessionApproval,
+    sessionSignIn,
+    sessionUserAgent,
+    type SessionApproval
+} from "@/lib/session-row";
 
 /** One session that address opened, live or since expired. */
 export interface AddressSession {
@@ -66,7 +71,11 @@ export interface AddressAccount {
 }
 
 /** The sign-in outcomes the activity log records, in the order they are counted. */
-const SIGN_IN_ACTIONS = ["account.signin", "account.signin.blocked", "account.signin.awaiting-approval"];
+const SIGN_IN_ACTIONS = [
+    "account.signin",
+    "account.signin.blocked",
+    "account.signin.awaiting-approval"
+];
 
 /** Enough sessions to describe any real address. A NAT gateway carrying more
  *  than this is already answered by the accounts, not by every row behind them. */
@@ -88,7 +97,9 @@ interface AccountSignIns {
 
 /** Newest first and bounded, so the union of the two reads below can be cut to
  *  the same ceiling and still be the newest sessions the address has held. */
-async function sessionRowsMatching(where: { ipAddress: string } | { state: { is: { ip: string } } }) {
+async function sessionRowsMatching(
+    where: { ipAddress: string } | { state: { is: { ip: string } } }
+) {
     return prisma.session.findMany({
         where,
         orderBy: { createdAt: "desc" },
@@ -216,7 +227,11 @@ export async function accountsAtAddress(ip: string, now = Date.now()): Promise<A
     const [rows, signIns] = await Promise.all([sessionRowsAt(ip), signInsAt(ip)]);
     const live = rows.filter((row) => row.expiresAt.getTime() > now);
     const ids = [
-        ...new Set([...live.map((row) => row.userId), ...rows.map((row) => row.userId), ...signIns.keys()])
+        ...new Set([
+            ...live.map((row) => row.userId),
+            ...rows.map((row) => row.userId),
+            ...signIns.keys()
+        ])
     ].slice(0, ACCOUNT_LIMIT);
     if (ids.length === 0) return [];
 
@@ -245,8 +260,13 @@ export async function accountsAtAddress(ip: string, now = Date.now()): Promise<A
                 sessions: held,
                 live: held.filter((session) => session.live).length,
                 signIns: seen?.signIns ?? { accepted: 0, refused: 0, awaiting: 0 },
-                lastAt: [seen?.lastAt ?? "", ...held.map((session) => session.lastSeenAt)].sort().at(-1) ?? ""
+                lastAt:
+                    [seen?.lastAt ?? "", ...held.map((session) => session.lastSeenAt)]
+                        .sort()
+                        .at(-1) ?? ""
             };
         })
-        .sort((a, b) => Number(b.live > 0) - Number(a.live > 0) || b.lastAt.localeCompare(a.lastAt));
+        .sort(
+            (a, b) => Number(b.live > 0) - Number(a.live > 0) || b.lastAt.localeCompare(a.lastAt)
+        );
 }

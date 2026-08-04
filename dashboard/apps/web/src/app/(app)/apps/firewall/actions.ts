@@ -16,7 +16,13 @@ import { syncDashboardRoute } from "@/lib/domain-edge";
 import { requirePermission, userHasManage } from "@/lib/session";
 import { accountsAtAddress, type AddressAccount } from "@/lib/address-accounts";
 import { wafAddressActivity, wafLogWindow, wafTraffic } from "@/lib/waf-analytics-service";
-import { getWafInherited, getWafRule, setWafRule, type WafInheritedView, type WafRuleView } from "@/lib/waf-service";
+import {
+    getWafInherited,
+    getWafRule,
+    setWafRule,
+    type WafInheritedView,
+    type WafRuleView
+} from "@/lib/waf-service";
 import {
     getWafIgnoreList,
     getWafJails,
@@ -63,7 +69,11 @@ const wafJailSchema = z.object({
     enabled: z.boolean(),
     maxRetry: z.number().int().min(1).max(1000),
     findTimeSec: z.number().int().min(10).max(86400),
-    banTimeSec: z.number().int().min(60).max(30 * 24 * 3600)
+    banTimeSec: z
+        .number()
+        .int()
+        .min(60)
+        .max(30 * 24 * 3600)
 });
 
 /** How a feed rule is doing, for the row and the page that open onto it. Instance-wide
@@ -82,7 +92,10 @@ export interface WafFeedView {
  * managed row that shows the scope's own switch alone says "Off" for a pack the
  * instance is already enforcing, and a feed row would have nothing to show at all.
  */
-export async function getWafRuleAction(input: { scopeType: WafScopeType; scopeId: string }): Promise<{
+export async function getWafRuleAction(input: {
+    scopeType: WafScopeType;
+    scopeId: string;
+}): Promise<{
     rule?: WafRuleView;
     inherited?: WafInheritedView;
     tor?: WafFeedView;
@@ -98,7 +111,9 @@ export async function getWafRuleAction(input: { scopeType: WafScopeType; scopeId
         ]);
         return { rule, inherited, tor };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not load the firewall rule" };
+        return {
+            error: caught instanceof Error ? caught.message : "Could not load the firewall rule"
+        };
     }
 }
 
@@ -155,7 +170,12 @@ export async function setWafRuleAction(
     try {
         const { scopeType, scopeId, ...rule } = input;
         await setWafRule(user.id, scopeType, scopeId, rule);
-        await recordAudit({ actorId: user.id, action: "deploy.waf.set", targetType: scopeType, targetId: scopeId || "global" });
+        await recordAudit({
+            actorId: user.id,
+            action: "deploy.waf.set",
+            targetType: scopeType,
+            targetId: scopeId || "global"
+        });
         // Polaris's own rule lives on the dashboard's route rather than an app's, so
         // it is the dashboard route that has to be republished for it to take effect.
         if (scopeType === "polaris") {
@@ -169,7 +189,9 @@ export async function setWafRuleAction(
         revalidatePath("/apps/deploy");
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not save the firewall rule" };
+        return {
+            error: caught instanceof Error ? caught.message : "Could not save the firewall rule"
+        };
     }
 }
 
@@ -231,7 +253,9 @@ export async function getWafRuleMatchesAction(input: {
         }
         return { matches, from, to };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not read recent traffic" };
+        return {
+            error: caught instanceof Error ? caught.message : "Could not read recent traffic"
+        };
     }
 }
 
@@ -259,11 +283,17 @@ export interface WafPrincipalOption {
  * of colleagues on the same instance rather than anything the caller could not already
  * see. It is a read - who exists - and never a write to any of them.
  */
-export async function listWafPrincipalsAction(): Promise<{ principals?: WafPrincipalOption[]; error?: string }> {
+export async function listWafPrincipalsAction(): Promise<{
+    principals?: WafPrincipalOption[];
+    error?: string;
+}> {
     await requirePermission("deploy.manage");
     try {
         const [users, groups, roles] = await Promise.all([
-            prisma.user.findMany({ select: { id: true, name: true, email: true }, orderBy: { name: "asc" } }),
+            prisma.user.findMany({
+                select: { id: true, name: true, email: true },
+                orderBy: { name: "asc" }
+            }),
             prisma.group.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
             prisma.role.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } })
         ]);
@@ -271,8 +301,16 @@ export async function listWafPrincipalsAction(): Promise<{ principals?: WafPrinc
             principals: [
                 // Roles and groups first: naming one is how an operator writes a rule
                 // that keeps meaning what they meant after the next person joins.
-                ...roles.map((role) => ({ ref: `role:${role.id}`, type: "role" as const, label: role.name })),
-                ...groups.map((group) => ({ ref: `group:${group.id}`, type: "group" as const, label: group.name })),
+                ...roles.map((role) => ({
+                    ref: `role:${role.id}`,
+                    type: "role" as const,
+                    label: role.name
+                })),
+                ...groups.map((group) => ({
+                    ref: `group:${group.id}`,
+                    type: "group" as const,
+                    label: group.name
+                })),
                 ...users.map((user) => ({
                     ref: `user:${user.id}`,
                     type: "user" as const,
@@ -329,7 +367,9 @@ export async function getWafOverviewAction(hours = 24): Promise<{
             anomalySettings
         };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not load the firewall overview" };
+        return {
+            error: caught instanceof Error ? caught.message : "Could not load the firewall overview"
+        };
     }
 }
 
@@ -392,7 +432,10 @@ export async function getWafAddressActivityAction(
         ]);
         return { activity, accounts };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not read that address's activity" };
+        return {
+            error:
+                caught instanceof Error ? caught.message : "Could not read that address's activity"
+        };
     }
 }
 
@@ -402,11 +445,18 @@ export async function setWafJailsAction(jails: WafJailSettings[]): Promise<{ err
     if (!parsed.success) return { error: "Those jail settings are not valid" };
     try {
         await setWafJails(parsed.data);
-        await recordAudit({ actorId: user.id, action: "waf.jails.set", targetType: "global", targetId: "jails" });
+        await recordAudit({
+            actorId: user.id,
+            action: "waf.jails.set",
+            targetType: "global",
+            targetId: "jails"
+        });
         revalidatePath(FIREWALL_PATH);
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not save the jail settings" };
+        return {
+            error: caught instanceof Error ? caught.message : "Could not save the jail settings"
+        };
     }
 }
 
@@ -416,7 +466,12 @@ export async function setWafIgnoreListAction(entries: string[]): Promise<{ error
     if (!parsed.success) return { error: "Enter valid IP addresses or CIDR ranges" };
     try {
         await setWafIgnoreList(parsed.data);
-        await recordAudit({ actorId: user.id, action: "waf.jails.ignore", targetType: "global", targetId: "ignore" });
+        await recordAudit({
+            actorId: user.id,
+            action: "waf.jails.ignore",
+            targetType: "global",
+            targetId: "ignore"
+        });
         revalidatePath(FIREWALL_PATH);
         return {};
     } catch (caught) {
@@ -432,7 +487,12 @@ export async function liftWafBanAction(ip: string): Promise<{ error?: string }> 
     if (!parsed.success) return { error: "That is not a valid address" };
     try {
         await removeWafBan(parsed.data);
-        await recordAudit({ actorId: user.id, action: "waf.ban.lift", targetType: "ip", targetId: parsed.data });
+        await recordAudit({
+            actorId: user.id,
+            action: "waf.ban.lift",
+            targetType: "ip",
+            targetId: parsed.data
+        });
         revalidatePath(FIREWALL_PATH);
         return {};
     } catch (caught) {
@@ -446,31 +506,49 @@ export async function setTorBlockedAction(enabled: boolean): Promise<{ error?: s
     const user = await requirePermission("system.manage");
     try {
         await setWafFeedEnabled("tor", enabled);
-        await recordAudit({ actorId: user.id, action: "waf.feed.tor", targetType: "global", targetId: String(enabled) });
+        await recordAudit({
+            actorId: user.id,
+            action: "waf.feed.tor",
+            targetType: "global",
+            targetId: String(enabled)
+        });
         revalidatePath(FIREWALL_PATH);
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not change the Tor setting" };
+        return {
+            error: caught instanceof Error ? caught.message : "Could not change the Tor setting"
+        };
     }
 }
 
 const anomalySettingsSchema = z.object({
     enabled: z.boolean(),
     autoBlock: z.boolean(),
-    banTimeSec: z.number().int().min(60).max(30 * 24 * 3600),
+    banTimeSec: z
+        .number()
+        .int()
+        .min(60)
+        .max(30 * 24 * 3600),
     minHits: z.number().int().min(5).max(100000),
     overBaseline: z.number().int().min(2).max(1000),
     assetMax: z.number().int().min(5).max(100000),
     variantMax: z.number().int().min(5).max(100000)
 });
 
-export async function setWafAnomalySettingsAction(settings: WafAnomalySettings): Promise<{ error?: string }> {
+export async function setWafAnomalySettingsAction(
+    settings: WafAnomalySettings
+): Promise<{ error?: string }> {
     const user = await requirePermission("system.manage");
     const parsed = anomalySettingsSchema.safeParse(settings);
     if (!parsed.success) return { error: "Those anomaly settings are not valid" };
     try {
         await setWafAnomalySettings(parsed.data);
-        await recordAudit({ actorId: user.id, action: "waf.anomalies.set", targetType: "global", targetId: "anomalies" });
+        await recordAudit({
+            actorId: user.id,
+            action: "waf.anomalies.set",
+            targetType: "global",
+            targetId: "anomalies"
+        });
         revalidatePath(FIREWALL_PATH);
         return {};
     } catch (caught) {
@@ -494,7 +572,12 @@ export async function blockAnomalyAction(ip: string, note: string): Promise<{ er
             until: new Date(Date.now() + settings.banTimeSec * 1000)
         });
         await publishWafIntel();
-        await recordAudit({ actorId: user.id, action: "waf.anomaly.block", targetType: "ip", targetId: parsed.data });
+        await recordAudit({
+            actorId: user.id,
+            action: "waf.anomaly.block",
+            targetType: "ip",
+            targetId: parsed.data
+        });
         revalidatePath(FIREWALL_PATH);
         return {};
     } catch (caught) {
