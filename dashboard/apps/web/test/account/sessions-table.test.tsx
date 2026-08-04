@@ -29,6 +29,18 @@ function session(overrides: Partial<SessionView> = {}): SessionView {
         createdAt: "2026-08-01T10:00:00.000Z",
         expiresAt: "2026-08-08T10:00:00.000Z",
         signIn: { method: "password", secondFactor: "totp" },
+        authorizedBy: null,
+        ...overrides
+    };
+}
+
+/** The device that answered for a session, as its row remembers it. */
+function authorizer(overrides: Partial<NonNullable<SessionView["authorizedBy"]>> = {}) {
+    return {
+        sessionId: "22222222-2222-4222-8222-222222222222",
+        device: "Safari on iOS",
+        live: true,
+        current: false,
         ...overrides
     };
 }
@@ -91,6 +103,35 @@ describe("the session table", () => {
     it("admits it does not know rather than implying nothing was asked for", () => {
         const markup = render([session({ signIn: { method: null, secondFactor: null } })]);
         expect(markup).toContain("Sign-in not recorded");
+    });
+
+    // A session somebody else answered for is the one worth tracing: if the device
+    // that answered is not one the owner still has, everything it let in is suspect.
+    it("names the device that allowed a session, and links to what it did", () => {
+        const markup = render([session({ authorizedBy: authorizer() })]);
+        expect(markup).toContain("Allowed by");
+        expect(markup).toContain("Safari on iOS");
+        expect(markup).toContain("/account/activity?session=22222222-2222-4222-8222-222222222222");
+    });
+
+    it("says a scanned code was scanned rather than approved", () => {
+        const markup = render([
+            session({ signIn: { method: "qr-code", secondFactor: null }, authorizedBy: authorizer() })
+        ]);
+        expect(markup).toContain("Code scanned by");
+    });
+
+    // The label outlives the session that gave the answer, and saying it has gone
+    // is the point: a device signed out since is not one that can be asked.
+    it("keeps naming an authorizer that has since been signed out, and stops linking to it", () => {
+        const markup = render([session({ authorizedBy: authorizer({ live: false }) })]);
+        expect(markup).toContain("Safari on iOS");
+        expect(markup).toContain("Signed out since");
+        expect(markup).not.toContain("/account/activity?session=22222222-2222-4222-8222-222222222222");
+    });
+
+    it("says nothing about an authorizer for the sessions nobody had to answer for", () => {
+        expect(render([session()])).not.toContain("Allowed by");
     });
 
     it("labels its row actions, which carry no text of their own", () => {

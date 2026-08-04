@@ -229,7 +229,13 @@ async function createSessionState(input: {
                 userAgentBrands: userAgentBrands ?? null,
                 host: host ?? null,
                 signInMethod: signIn.method,
-                secondFactor: signIn.secondFactor
+                secondFactor: signIn.secondFactor,
+                // Set only for a sign-in somebody else had to answer for - a
+                // scanned code. The other way in that needs an answer, the
+                // approval on Account > Sessions, comes after this row exists
+                // and writes itself onto it there.
+                authorizedBySessionId: signIn.authorizedBy?.sessionId ?? null,
+                authorizedByDevice: signIn.authorizedBy?.device ?? null
             }
         });
     } catch {
@@ -255,7 +261,14 @@ async function createSessionState(input: {
         targetType: "session",
         targetId: input.sessionId,
         sessionId: input.sessionId,
-        metadata: { method: signIn.method, secondFactor: signIn.secondFactor }
+        metadata: {
+            method: signIn.method,
+            secondFactor: signIn.secondFactor,
+            // Named in the log as well as on the session: the session ends, this
+            // does not, and "which of my devices let that one in" is a question
+            // asked long after the answer has been signed out.
+            ...(signIn.authorizedBy ? { authorizedBy: signIn.authorizedBy.device } : {})
+        }
     });
 
     if (approval === "pending") {

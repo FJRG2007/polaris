@@ -12,9 +12,10 @@
 
 import { ScanView } from "./scan-view";
 import { requireUser } from "@/lib/session";
+import { ScanHistory } from "./scan-history";
 import { getUserSecurity } from "@polaris/auth";
 import { qrUserCodeField } from "@polaris/core";
-import { describeSignInCode } from "@/lib/qr-sign-in-service";
+import { describeSignInCode, listQrSignInAnswers } from "@/lib/qr-sign-in-service";
 
 export const dynamic = "force-dynamic";
 
@@ -27,7 +28,11 @@ export default async function ScanPage({
     const params = await searchParams;
     const raw = typeof params.code === "string" ? params.code : null;
     const parsed = raw ? qrUserCodeField.safeParse(raw) : null;
-    const request = parsed?.success ? await describeSignInCode(parsed.data, user.id) : null;
+    const [request, security, answers] = await Promise.all([
+        parsed?.success ? describeSignInCode(parsed.data, user.id) : null,
+        getUserSecurity(user.id),
+        listQrSignInAnswers(user.id, user.sessionId)
+    ]);
 
     return (
         <div className="mx-auto flex max-w-xl flex-col gap-4">
@@ -37,11 +42,11 @@ export default async function ScanPage({
                     Let a sign-in through on a device that cannot ask for your password.
                 </p>
             </div>
-            <ScanView
-                request={request}
-                scanned={raw !== null}
-                hasPin={(await getUserSecurity(user.id)).hasPin}
-            />
+            <ScanView request={request} scanned={raw !== null} hasPin={security.hasPin} />
+            {/* Every code this account has answered, under the thing that answers
+                them. A code allowed by mistake is noticed here or not at all: the
+                session it opened looks like any other sign-in on the list. */}
+            <ScanHistory answers={answers} />
         </div>
     );
 }

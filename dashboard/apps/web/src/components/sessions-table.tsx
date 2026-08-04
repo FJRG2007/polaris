@@ -22,13 +22,50 @@ import { signInSummary } from "@polaris/core";
 import { Badge, Button, cn } from "@polaris/ui";
 import { RelativeTime } from "@/components/relative-time";
 import type { SessionView } from "@/lib/session-directory";
-import { History, LogOut, MonitorSmartphone } from "lucide-react";
 import { addressLine, DeviceAddress } from "@/components/device-address";
+import { History, KeyRound, LogOut, MonitorSmartphone } from "lucide-react";
 
 /** Where a session came from, as one line, for the surfaces too narrow to hold
  *  the columns - and for the approval card, which is not a table at all. */
 export function sessionOrigin(session: SessionView): string {
     return [addressLine(session), session.host].filter(Boolean).join(" - ") || "Unknown location";
+}
+
+/**
+ * Which device let this session in, on the row for the session it let in.
+ *
+ * Two sign-ins here were not answered by the person signing in - one approved
+ * from this very list, one let through by scanning the code on its screen - and
+ * until this line existed the list said only that somebody had allowed them. The
+ * device that gave the answer is the fact that matters: if it is one the owner
+ * does not have any more, every session it let in is suspect, and this is the
+ * screen where that is acted on.
+ *
+ * The label is what was recorded at the time. A session that has since been
+ * signed out still names its device and simply stops linking anywhere.
+ */
+export function AuthorizedBy({ session }: { session: SessionView }) {
+    const authorizer = session.authorizedBy;
+    if (!authorizer) return null;
+    const how = session.signIn.method === "qr-code" ? "Code scanned by" : "Allowed by";
+    return (
+        <p className="flex flex-wrap items-center gap-1 truncate text-xs text-muted-foreground">
+            <KeyRound className="size-3 shrink-0" aria-hidden />
+            <span>{how}</span>
+            {authorizer.live ? (
+                <Link
+                    href={`/account/activity?session=${authorizer.sessionId}`}
+                    className="min-w-0 truncate underline-offset-2 hover:text-foreground hover:underline"
+                >
+                    {authorizer.device}
+                </Link>
+            ) : (
+                <span className="min-w-0 truncate">{authorizer.device}</span>
+            )}
+            {authorizer.current ? <Badge variant="neutral">This device</Badge> : null}
+            {!authorizer.live ? <Badge variant="warning">Signed out since</Badge> : null}
+        </p>
+    );
 }
 
 export function SessionsTable({
@@ -120,6 +157,7 @@ export function SessionsTable({
                                                     Last active <RelativeTime iso={session.lastSeenAt} />
                                                 </p>
                                             ) : null}
+                                            <AuthorizedBy session={session} />
                                         </div>
                                     </div>
                                 </td>

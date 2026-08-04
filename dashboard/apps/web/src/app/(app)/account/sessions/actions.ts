@@ -165,7 +165,13 @@ export async function decideLoginApprovalAction(
             return { error: `Too many attempts. Try again in ${Math.ceil(throttle.retryAfterMs / 60000)} minutes.` };
         }
     }
-    const result = await decideLoginApproval(user.id, parsed.data, approve === true, String(pin ?? ""));
+    const result = await decideLoginApproval(
+        user.id,
+        parsed.data,
+        approve === true,
+        String(pin ?? ""),
+        user.sessionId
+    );
     if (!result.error) revalidatePath("/account/sessions");
     return result;
 }

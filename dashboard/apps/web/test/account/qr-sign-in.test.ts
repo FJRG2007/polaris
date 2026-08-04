@@ -30,6 +30,8 @@ interface DeviceRow {
 
 const OWNER = "11111111-1111-1111-1111-111111111111";
 const STRANGER = "22222222-2222-2222-2222-222222222222";
+/** The session doing the scanning: a phone, signed in already. */
+const PHONE = "33333333-3333-3333-3333-333333333333";
 
 let rows: DeviceRow[] = [];
 let hasPin = true;
@@ -37,9 +39,19 @@ let pinAccepted = true;
 let throttled = false;
 /** Every call the flow made, in order, so the sequence can be asserted. */
 let calls: string[] = [];
+/** What the approved sign-in was told about the device that let it in. */
+let authorizer: { sessionId: string; device: string } | null = null;
+/** Entries the log was asked to keep, so the history can be read back. */
+let audits: Record<string, unknown>[] = [];
+/** Entries the log already holds, as the history reads them. */
+let answered: Record<string, unknown>[] = [];
 
 vi.mock("next/headers", () => ({
-    headers: async () => new Headers({ "x-forwarded-for": "203.0.113.9" }),
+    headers: async () =>
+        new Headers({
+            "x-forwarded-for": "203.0.113.9",
+            "user-agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0) Safari/605"
+        }),
     cookies: async () => ({ set: () => undefined })
 }));
 
@@ -58,7 +70,11 @@ vi.mock("@polaris/db", () => ({
                 return { count: 0 };
             }
         },
-        session: { findMany: async () => [] }
+        session: { findMany: async () => [] },
+        auditLog: {
+            findMany: async ({ where }: { where: { action: { in: string[] } } }) =>
+                answered.filter((row) => where.action.in.includes(row.action as string))
+        }
     }
 }));
 
@@ -88,6 +104,10 @@ vi.mock("@polaris/auth", () => ({
         calls.push("rotation-pass");
     },
     getUserSecurity: async () => ({ hasPin }),
+    noteSignInAuthorizer: async (_userId: string, note: { sessionId: string; device: string }) => {
+        calls.push("authorizer");
+        authorizer = note;
+    },
     verifyQuickPin: async () => {
         calls.push("pin");
         return pinAccepted;
@@ -95,16 +115,22 @@ vi.mock("@polaris/auth", () => ({
 }));
 
 vi.mock("@/lib/auth", () => ({ auth: {} }));
-vi.mock("@/lib/audit-service", () => ({ recordAudit: async () => undefined }));
+vi.mock("@/lib/session-device", () => ({
+    sessionDeviceLabels: async () => new Map([[PHONE, "Safari on iOS"]])
+}));
+vi.mock("@/lib/audit-service", () => ({
+    recordAudit: async (event: Record<string, unknown>) => {
+        audits.push(event);
+    }
+}));
 vi.mock("@/lib/geo-service", () => ({ resolveGeo: async () => ({ countryCode: "ES" }) }));
 vi.mock("@/lib/domain-service", () => ({ appBaseUrl: async () => "https://polaris.example.com" }));
 vi.mock("@/lib/rate-limit-service", () => ({
     rateLimit: async () => ({ ok: !throttled, retryAfterMs: 900_000 })
 }));
 
-const { decideSignInCode, describeSignInCode, openSignInCode, redeemSignInCode } = await import(
-    "../../src/lib/qr-sign-in-service"
-);
+const { decideSignInCode, describeSignInCode, listQrSignInAnswers, openSignInCode, redeemSignInCode } =
+    await import("../../src/lib/qr-sign-in-service");
 
 /** A code waiting on a decision, unclaimed unless a holder is named. */
 function waiting(overrides: Partial<DeviceRow> = {}): DeviceRow {
@@ -128,6 +154,9 @@ beforeEach(() => {
     pinAccepted = true;
     throttled = false;
     calls = [];
+    authorizer = null;
+    audits = [];
+    answered = [];
 });
 
 describe("the code the sign-in screen shows", () => {
@@ -175,35 +204,55 @@ describe("what the person answering is shown", () => {
 
 describe("allowing a sign-in", () => {
     it("goes through on the right PIN", async () => {
-        const result = await decideSignInCode(OWNER, { userCode: "ABCD1234", approve: true, pin: "1234" });
+        const result = await decideSignInCode(OWNER, PHONE, { userCode: "ABCD1234", approve: true, pin: "1234" });
         expect(result.error).toBeUndefined();
-        expect(calls).toEqual(["pin", "claim", "approve"]);
+        expect(calls).toEqual(["pin", "claim", "approve", "authorizer"]);
+    });
+
+    // The session this opens is written on the other device's next request, which
+    // knows nothing about who allowed it. This note is the only way it can say.
+    it("leaves the scanning device for the session it lets in to collect", async () => {
+        await decideSignInCode(OWNER, PHONE, { userCode: "ABCD1234", approve: true, pin: "1234" });
+        expect(authorizer).toEqual({ sessionId: PHONE, device: "Safari on iOS" });
+    });
+
+    it("records the answer against the session that gave it, naming both devices", async () => {
+        await decideSignInCode(OWNER, PHONE, { userCode: "ABCD1234", approve: true, pin: "1234" });
+        expect(audits[0]).toMatchObject({
+            action: "account.signin.qr-approved",
+            sessionId: PHONE,
+            metadata: {
+                device: "Chrome on Windows",
+                host: "polaris.example.com",
+                scannedOn: "Safari on iOS"
+            }
+        });
     });
 
     it("refuses an account that has never set a PIN, and says where to set one", async () => {
         hasPin = false;
-        const result = await decideSignInCode(OWNER, { userCode: "ABCD1234", approve: true, pin: "1234" });
+        const result = await decideSignInCode(OWNER, PHONE, { userCode: "ABCD1234", approve: true, pin: "1234" });
         expect(result.error).toContain("PIN");
         expect(calls).not.toContain("approve");
     });
 
     it("refuses a wrong PIN without answering the code", async () => {
         pinAccepted = false;
-        const result = await decideSignInCode(OWNER, { userCode: "ABCD1234", approve: true, pin: "9999" });
+        const result = await decideSignInCode(OWNER, PHONE, { userCode: "ABCD1234", approve: true, pin: "9999" });
         expect(result.error).toBe("That PIN is not right.");
         expect(calls).toEqual(["pin"]);
     });
 
     it("stops guessing once the attempts run out, before the PIN is even checked", async () => {
         throttled = true;
-        const result = await decideSignInCode(OWNER, { userCode: "ABCD1234", approve: true, pin: "1234" });
+        const result = await decideSignInCode(OWNER, PHONE, { userCode: "ABCD1234", approve: true, pin: "1234" });
         expect(result.error).toContain("Too many attempts");
         expect(calls).toEqual([]);
     });
 
     it("will not answer a code claimed by another account", async () => {
         rows = [waiting({ userId: STRANGER })];
-        const result = await decideSignInCode(OWNER, { userCode: "ABCD1234", approve: true, pin: "1234" });
+        const result = await decideSignInCode(OWNER, PHONE, { userCode: "ABCD1234", approve: true, pin: "1234" });
         expect(result.error).toContain("no longer valid");
         expect(calls).toEqual([]);
     });
@@ -211,9 +260,75 @@ describe("allowing a sign-in", () => {
 
 describe("refusing a sign-in", () => {
     it("costs no PIN - it only ever closes a door", async () => {
-        const result = await decideSignInCode(OWNER, { userCode: "ABCD1234", approve: false, pin: "" });
+        const result = await decideSignInCode(OWNER, PHONE, { userCode: "ABCD1234", approve: false, pin: "" });
         expect(result.error).toBeUndefined();
         expect(calls).toEqual(["claim", "deny"]);
+    });
+
+    // Nothing was let in, so nothing must be left for a session to collect: a
+    // note left by a refusal would label whatever signed in next.
+    it("leaves no authorizer behind", async () => {
+        await decideSignInCode(OWNER, PHONE, { userCode: "ABCD1234", approve: false, pin: "" });
+        expect(authorizer).toBeNull();
+        expect(audits[0]).toMatchObject({ action: "account.signin.qr-denied", sessionId: PHONE });
+    });
+});
+
+/** One entry the log already holds about an answered code. */
+function entry(overrides: Record<string, unknown> = {}) {
+    return {
+        id: "audit-1",
+        action: "account.signin.qr-approved",
+        sessionId: PHONE,
+        at: new Date("2026-08-04T10:00:00Z"),
+        metadata: JSON.stringify({
+            device: "Chrome on Windows",
+            origin: "203.0.113.9 - ES",
+            host: "polaris.example.com",
+            scannedOn: "Safari on iOS"
+        }),
+        ...overrides
+    };
+}
+
+describe("the codes this account has answered", () => {
+    it("reads back what was let in and which device read the code", async () => {
+        answered = [entry()];
+        const [answer] = await listQrSignInAnswers(OWNER, PHONE);
+        expect(answer).toMatchObject({
+            allowed: true,
+            device: "Chrome on Windows",
+            origin: "203.0.113.9 - ES",
+            host: "polaris.example.com",
+            scannedOn: "Safari on iOS",
+            here: true
+        });
+    });
+
+    it("keeps the refusals, which are the ones worth noticing", async () => {
+        answered = [entry({ action: "account.signin.qr-denied" })];
+        expect((await listQrSignInAnswers(OWNER, PHONE))[0]?.allowed).toBe(false);
+    });
+
+    it("says the reader is not the device that scanned, when it is not", async () => {
+        answered = [entry()];
+        expect((await listQrSignInAnswers(OWNER, "another-session"))[0]?.here).toBe(false);
+    });
+
+    // Entries written before the scanning device was named fall back to what that
+    // session is called now, and to nothing at all once it has ended.
+    it("names the scanning session for an older entry, and admits when it cannot", async () => {
+        answered = [entry({ metadata: JSON.stringify({ device: "Chrome on Windows" }) })];
+        expect((await listQrSignInAnswers(OWNER, PHONE))[0]?.scannedOn).toBe("Safari on iOS");
+
+        answered = [entry({ metadata: null, sessionId: "ended-session" })];
+        const [older] = await listQrSignInAnswers(OWNER, PHONE);
+        expect(older?.scannedOn).toBeNull();
+        expect(older?.device).toBe("Unknown device");
+    });
+
+    it("has nothing to show for an account that has never answered one", async () => {
+        expect(await listQrSignInAnswers(OWNER, PHONE)).toEqual([]);
     });
 });
 

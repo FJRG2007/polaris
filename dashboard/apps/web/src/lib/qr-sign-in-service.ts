@@ -24,6 +24,7 @@
  * asked and good once.
  */
 
+import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { prisma } from "@polaris/db";
 import { resolveGeo } from "@/lib/geo-service";
@@ -31,14 +32,16 @@ import { cookies, headers } from "next/headers";
 import { recordAudit } from "@/lib/audit-service";
 import { appBaseUrl } from "@/lib/domain-service";
 import { rateLimit } from "@/lib/rate-limit-service";
-import { clientHost, clientIp, clientUserAgent } from "@/lib/request-context";
+import { sessionDeviceLabels } from "@/lib/session-device";
 import { describeDevice, QR_SIGN_IN_PATH, type QrSignInDecision } from "@polaris/core";
+import { clientHost, clientIp, clientUserAgent, clientUserAgentBrands } from "@/lib/request-context";
 import {
     beginSessionRotation,
     claimDeviceCode,
     decideDeviceCode,
     exchangeDeviceCode,
     getUserSecurity,
+    noteSignInAuthorizer,
     openDeviceCode,
     verifyQuickPin
 } from "@polaris/auth";
@@ -53,6 +56,11 @@ const OPEN_WINDOW_MS = 10 * 60 * 1000;
  *  the same short secret standing in front of the same decision. */
 const APPROVAL_LIMIT = 5;
 const APPROVAL_WINDOW_MS = 15 * 60 * 1000;
+
+/** The two entries the log keeps about a scanned code, named once so the write
+ *  below and the history above cannot disagree about what to look for. */
+const QR_APPROVED = "account.signin.qr-approved";
+const QR_DENIED = "account.signin.qr-denied";
 
 /** What the sign-in screen needs to show a code and wait on it. */
 export interface QrSignInCode {
@@ -180,6 +188,86 @@ export async function describeSignInCode(userCode: string, userId: string): Prom
     };
 }
 
+/** One code this account has answered, as the history lists it. */
+export interface QrSignInAnswer {
+    readonly id: string;
+    readonly at: string;
+    readonly allowed: boolean;
+    /** The browser that was asking to be let in, as it was described then. */
+    readonly device: string;
+    /** Its address and country, as one line, or null when neither was recorded. */
+    readonly origin: string | null;
+    /** Which of this deployment's names its sign-in screen was on. */
+    readonly host: string | null;
+    /** The device that read the code. Null for an answer given before Polaris
+     *  recorded which one it was, and for one whose session has since ended
+     *  without leaving a label. */
+    readonly scannedOn: string | null;
+    /** Whether the device that read it is the one reading this page. */
+    readonly here: boolean;
+}
+
+/** What one of these entries carries. Stored by Polaris, but parsed rather than
+ *  trusted: it is a JSON column that has changed shape once already. */
+const answerMetadata = z.object({
+    device: z.string().optional(),
+    origin: z.string().optional(),
+    host: z.string().nullish(),
+    scannedOn: z.string().optional()
+});
+
+/**
+ * The codes this account has answered, newest first.
+ *
+ * From the activity log rather than from the codes themselves: a code is deleted
+ * the moment it is spent or expires, so the row that would answer "what have I
+ * let in?" is gone by the time anybody asks. The log is what outlives it, and it
+ * already carries what the person answering was shown at the time.
+ *
+ * An entry written before the scanning device was named falls back to whatever
+ * that session is called now, which is nothing once it has ended - and the screen
+ * says so rather than implying the scan came from nowhere.
+ */
+export async function listQrSignInAnswers(
+    userId: string,
+    currentSessionId: string,
+    limit = 20
+): Promise<QrSignInAnswer[]> {
+    const rows = await prisma.auditLog.findMany({
+        where: { actorId: userId, action: { in: [QR_APPROVED, QR_DENIED] } },
+        orderBy: { at: "desc" },
+        take: limit,
+        select: { id: true, action: true, metadata: true, sessionId: true, at: true }
+    });
+    if (rows.length === 0) return [];
+
+    const labels = await sessionDeviceLabels(userId);
+    return rows.map((row) => {
+        const parsed = answerMetadata.safeParse(readJson(row.metadata));
+        const meta = parsed.success ? parsed.data : {};
+        return {
+            id: row.id,
+            at: row.at.toISOString(),
+            allowed: row.action === QR_APPROVED,
+            device: meta.device || "Unknown device",
+            origin: meta.origin || null,
+            host: meta.host ?? null,
+            scannedOn: meta.scannedOn ?? (row.sessionId ? (labels.get(row.sessionId) ?? null) : null),
+            here: row.sessionId !== null && row.sessionId === currentSessionId
+        };
+    });
+}
+
+/** A stored JSON document, or nothing at all when it will not parse. */
+function readJson(raw: string | null): unknown {
+    if (!raw) return null;
+    try {
+        return JSON.parse(raw);
+    } catch {
+        return null;
+    }
+}
+
 /**
  * Answer a scanned code.
  *
@@ -190,6 +278,9 @@ export async function describeSignInCode(userCode: string, userId: string): Prom
  */
 export async function decideSignInCode(
     userId: string,
+    /** The session answering. Recorded against the sign-in it allows and against
+     *  the log entry, so both can say which device gave the answer. */
+    bySessionId: string,
     decision: QrSignInDecision
 ): Promise<{ error?: string }> {
     const request = await describeSignInCode(decision.userCode, userId);
@@ -213,12 +304,22 @@ export async function decideSignInCode(
     const result = await decideDeviceCode(auth, decision.userCode, decision.approve, store);
     if (result.error) return result;
 
+    // What this device is, from the request that is answering: the scan happens
+    // here and the session it lets in is written on another device's next request,
+    // which has nothing of its own to say about who allowed it.
+    const scanner = describeDevice(await clientUserAgent(), await clientUserAgentBrands());
+    if (decision.approve) await noteSignInAuthorizer(userId, { sessionId: bySessionId, device: scanner });
+
     await recordAudit({
         actorId: userId,
-        action: decision.approve ? "account.signin.qr-approved" : "account.signin.qr-denied",
+        action: decision.approve ? QR_APPROVED : QR_DENIED,
         targetType: "device-code",
         targetId: decision.userCode,
-        metadata: { device: request.device, origin: request.origin }
+        sessionId: bySessionId,
+        // The sign-in that was answered, as the person answering it saw it. The
+        // scanning device is named too rather than left to the session id, which
+        // says nothing once that session has ended.
+        metadata: { device: request.device, origin: request.origin, host: request.host, scannedOn: scanner }
     });
     return {};
 }

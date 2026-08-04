@@ -15,6 +15,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@polaris/db";
 import { cookies } from "next/headers";
 import { recordAudit } from "@/lib/audit-service";
+import { sessionDevice } from "@/lib/session-device";
 import { networkPublicIp } from "@/lib/network-service";
 import { listUserPasskeys, type PasskeyView } from "@/lib/passkey-directory";
 import { clientHost, clientIp, clientUserAgent, clientUserAgentBrands } from "@/lib/request-context";
@@ -34,6 +35,23 @@ import {
     verifyQuickPin,
     type TrustedDeviceView
 } from "@polaris/auth";
+
+/**
+ * The device that answered for a session, as its row shows it.
+ *
+ * The label is what was recorded when the answer was given, not what that device
+ * is called now: it has to survive being signed out, and a session that no longer
+ * exists cannot be asked what it was. `sessionId` is kept so the history of that
+ * device can be opened while it is still around, and `live` says whether it is.
+ */
+export interface SessionAuthorizer {
+    sessionId: string;
+    device: string;
+    /** Whether that session is still signed in. */
+    live: boolean;
+    /** Whether it is the session reading this list. */
+    current: boolean;
+}
 
 export interface SessionView {
     id: string;
@@ -55,6 +73,10 @@ export interface SessionView {
      *  opened before Polaris recorded it, which reads as unknown rather than as
      *  a sign-in that skipped everything. */
     signIn: SignInRecord;
+    /** The device that let this session in, for the two sign-ins somebody else
+     *  answers: one approved from this list, one let through by scanning its
+     *  code. Null for every other session, which is most of them. */
+    authorizedBy: SessionAuthorizer | null;
     lastSeenAt: string;
     createdAt: string;
     expiresAt: string;
@@ -90,10 +112,18 @@ async function liveSessionRows(userId: string) {
     });
 }
 
+/** The ids in a set, for the questions a row asks about the other rows - whether
+ *  the session that let it in is still one of them. */
+function idsOf(rows: readonly { id: string }[]): ReadonlySet<string> {
+    return new Set(rows.map((row) => row.id));
+}
+
 type SessionRow = Awaited<ReturnType<typeof liveSessionRows>>[number];
 
 /** The browser a session was opened with, preferring Polaris's own copy:
- *  better-auth's column is written once and never followed. */
+ *  better-auth's column is written once and never followed. Kept here because
+ *  matching one device's things together needs the raw string, which never
+ *  leaves this module - the readable name comes from sessionDevice. */
 function sessionUserAgent(row: SessionRow): string | null {
     return row.state?.userAgent ?? row.userAgent ?? null;
 }
@@ -123,15 +153,21 @@ function isLocalAddress(ip: string): boolean {
     return isIpv4(ip) && isPrivateIp(ip);
 }
 
-function toSessionView(row: SessionRow, currentSessionId: string, publicIp: string | null): SessionView {
+function toSessionView(
+    row: SessionRow,
+    currentSessionId: string,
+    publicIp: string | null,
+    liveIds: ReadonlySet<string>
+): SessionView {
     const approval = row.state?.approval ?? "approved";
     const ip = row.state?.ip ?? row.ipAddress;
+    const authorizerId = row.state?.authorizedBySessionId ?? null;
     return {
         id: row.id,
         current: row.id === currentSessionId,
         approval: (APPROVALS.has(approval) ? approval : "approved") as SessionView["approval"],
         locked: row.state?.lockedAt != null,
-        device: describeDevice(sessionUserAgent(row), row.state?.userAgentBrands),
+        device: sessionDevice(row),
         ip,
         publicIp: ip && isLocalAddress(ip) ? publicIp : null,
         country: row.state?.country ?? null,
@@ -140,6 +176,17 @@ function toSessionView(row: SessionRow, currentSessionId: string, publicIp: stri
             method: parseSignInMethod(row.state?.signInMethod),
             secondFactor: parseSecondFactor(row.state?.secondFactor)
         },
+        // The id alone is not enough to name the device - the session that gave
+        // the answer may be gone - so the stored label is what is shown, and the
+        // id only decides whether its history can still be opened.
+        authorizedBy: authorizerId
+            ? {
+                  sessionId: authorizerId,
+                  device: row.state?.authorizedByDevice ?? "A device that is no longer signed in",
+                  live: liveIds.has(authorizerId),
+                  current: authorizerId === currentSessionId
+              }
+            : null,
         lastSeenAt: (row.state?.lastSeenAt ?? row.createdAt).toISOString(),
         createdAt: row.createdAt.toISOString(),
         expiresAt: row.expiresAt.toISOString()
@@ -160,21 +207,8 @@ function toSessionView(row: SessionRow, currentSessionId: string, publicIp: stri
 export async function listUserSessions(userId: string, currentSessionId: string): Promise<SessionView[]> {
     const rows = await liveSessionRows(userId);
     const publicIp = await pairedPublicIp(rows.map((row) => row.state?.ip ?? row.ipAddress));
-    return rows.map((row) => toSessionView(row, currentSessionId, publicIp));
-}
-
-/**
- * What each of a user's live sessions is called, by session id.
- *
- * The label only, for the screens that name a session beside something else -
- * the activity log says which device an entry came from. Kept apart from the
- * list above so naming a session costs one query and never the address lookup a
- * full row pays for. A session that has since ended is simply absent, which is
- * how the caller knows to say so.
- */
-export async function sessionDeviceLabels(userId: string): Promise<Map<string, string>> {
-    const rows = await liveSessionRows(userId);
-    return new Map(rows.map((row) => [row.id, describeDevice(sessionUserAgent(row), row.state?.userAgentBrands)]));
+    const live = idsOf(rows);
+    return rows.map((row) => toSessionView(row, currentSessionId, publicIp, live));
 }
 
 /**
@@ -321,7 +355,9 @@ export async function trustedDeviceDetail(
     return {
         device: toTrustedDeviceRow(view, publicIp),
         identified: true,
-        sessions: matched.map((row) => toSessionView(row, currentSessionId, publicIp)),
+        // Judged against every live session, not only the ones this device holds:
+        // the answer that let one of them in usually came from another device.
+        sessions: matched.map((row) => toSessionView(row, currentSessionId, publicIp, idsOf(rows))),
         passkeys
     };
 }
@@ -376,6 +412,31 @@ export async function revokeOtherSessions(userId: string, currentSessionId: stri
 }
 
 /**
+ * The device an approval was given from, as the session it lets in will remember
+ * it.
+ *
+ * Read from the answering session rather than from the request that carries it,
+ * so it reads exactly as that session's own row does in the list beside it - and
+ * scoped by the account, so an id from anywhere else names nothing rather than
+ * naming somebody else's device. Nothing to say leaves both columns alone.
+ */
+async function approver(
+    userId: string,
+    bySessionId: string | undefined
+): Promise<{ authorizedBySessionId?: string; authorizedByDevice?: string }> {
+    if (!bySessionId) return {};
+    const row = await prisma.session.findFirst({
+        where: { id: bySessionId, userId },
+        select: { userAgent: true, state: { select: { userAgent: true, userAgentBrands: true } } }
+    });
+    if (!row) return {};
+    return {
+        authorizedBySessionId: bySessionId,
+        authorizedByDevice: sessionDevice(row)
+    };
+}
+
+/**
  * Approve or refuse a pending sign-in from an already-trusted session. A refusal
  * ends the waiting session immediately rather than leaving it parked, so a
  * rejected attempt holds nothing.
@@ -388,7 +449,10 @@ export async function decideLoginApproval(
     userId: string,
     sessionId: string,
     approve: boolean,
-    pin?: string
+    pin?: string,
+    /** The session giving the answer, recorded on the one it lets in. Omitted
+     *  only by a caller that has no session of its own to name. */
+    bySessionId?: string
 ): Promise<{ error?: string }> {
     const state = await prisma.sessionState.findFirst({
         where: { sessionId, userId, approval: "pending" },
@@ -402,7 +466,15 @@ export async function decideLoginApproval(
         }
         await prisma.sessionState.update({
             where: { sessionId },
-            data: { approval: "approved", lastSeenAt: new Date() }
+            data: {
+                approval: "approved",
+                lastSeenAt: new Date(),
+                // Who let it in, kept on the session rather than only in the log:
+                // the list of what is signed in is where somebody notices a device
+                // they do not recognise, and "and this one was let in by the
+                // laptop I lost" is the answer they need in the same place.
+                ...(await approver(userId, bySessionId))
+            }
         });
     } else {
         await prisma.session.deleteMany({ where: { id: sessionId, userId } });

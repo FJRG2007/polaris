@@ -69,7 +69,14 @@ export {
     getEnforcedRules,
     type UserSecuritySettings
 } from "./security.js";
-export { carrySignInRecord, noteSecondFactor, noteSignIn, takeSignInRecord } from "./sign-in-record.js";
+export {
+    carrySignInRecord,
+    noteSecondFactor,
+    noteSignIn,
+    noteSignInAuthorizer,
+    takeSignInRecord,
+    type CollectedSignIn
+} from "./sign-in-record.js";
 export {
     openDeviceCode,
     claimDeviceCode,

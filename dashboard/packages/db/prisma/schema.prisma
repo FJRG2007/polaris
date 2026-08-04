@@ -497,6 +497,13 @@ model UserSecurity {
     pendingSignInMethod  String?
     pendingSignInFactor  String?
     pendingSignInAt      DateTime?
+    // The device that let that sign-in through, when one did: the session that
+    // scanned its code. Travels with the note above and is collected by the same
+    // session, because the scan happens on one device and the session it opens is
+    // written by another. The label is kept beside the id so the record survives
+    // the scanning session being signed out.
+    pendingAuthorizerId     String?   @db.Uuid
+    pendingAuthorizerDevice String?
     // A recent password confirmation, so an action that has just asked for the
     // password does not ask again for the ceremony it starts. Bound to the
     // session that proved it, because it is that browser's proof and nobody
@@ -702,6 +709,15 @@ model SessionState {
     // than reading an absent second factor as "no second step".
     signInMethod String?
     secondFactor String?
+    // The session that let this one in, when one did: the device that approved it
+    // from Account > Sessions, or that scanned the code on its sign-in screen.
+    // Null for a session nobody had to answer for, which is most of them.
+    //
+    // No foreign key, and the device label is stored beside the id on purpose: the
+    // authorizing session can be signed out, and "a laptop let this in" must not
+    // become "nothing let this in" the moment that laptop goes.
+    authorizedBySessionId String?  @db.Uuid
+    authorizedByDevice    String?
     // An administrator looking at Polaris as somebody else. Exactly one of the
     // two is set: viewAsUserId is another account this session is acting as,
     // viewAsRoleId is a role whose grants stand in for the administrator's own.

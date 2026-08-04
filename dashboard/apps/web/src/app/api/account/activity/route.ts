@@ -14,7 +14,7 @@
 import { z } from "zod";
 import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/session";
-import { sessionDeviceLabels } from "@/lib/session-directory";
+import { sessionDeviceLabels } from "@/lib/session-device";
 import { listUserActivity, listUserActivitySessions } from "@/lib/audit-service";
 
 export const runtime = "nodejs";
