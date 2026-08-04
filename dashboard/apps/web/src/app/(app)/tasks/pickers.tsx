@@ -205,11 +205,12 @@ export function StatusDot({ color, className }: { color: string; className?: str
 /**
  * What a state looks like, as a shape rather than only a colour.
  *
- * Three shapes, one per stage of the work, so a row is readable at a glance and
- * stays readable to somebody who cannot tell the colours apart:
+ * One shape per stage of the work, so a row is readable at a glance and stays
+ * readable to somebody who cannot tell the colours apart:
  *
  *   - not started: a broken ring, open and clearly empty
  *   - under way: a ring with the middle filled in
+ *   - held up: a ring with the middle barred, the way a hold reads everywhere
  *   - finished: a solid disc with a tick
  *
  * Drawn rather than composed out of borders because a dashed CSS border on a
@@ -265,7 +266,17 @@ export function StatusIcon({
                             ? { strokeDasharray: "3.6 2.7", strokeLinecap: "round" as const }
                             : {})}
                     />
-                    {type !== "open" && <circle cx="10" cy="10" r="4" fill="currentColor" />}
+                    {core.isBlockedStatus(type) ? (
+                        <path
+                            d="M6.4 10h7.2"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2.4"
+                            strokeLinecap="round"
+                        />
+                    ) : (
+                        type !== "open" && <circle cx="10" cy="10" r="4" fill="currentColor" />
+                    )}
                 </>
             )}
         </svg>

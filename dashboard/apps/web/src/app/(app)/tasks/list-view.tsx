@@ -377,7 +377,8 @@ export function ListScreen({
         const { taken, dropped } = holdSelection(next);
         setSelection(taken);
         if (dropped > 0) {
-            setError(`A selection holds ${taken.size} tasks at a time, so ${dropped} were left out.`);
+            const left = dropped === 1 ? "one task was" : `${dropped} tasks were`;
+            setError(`A selection holds ${taken.size} tasks at a time, so ${left} left out.`);
         }
     };
 
