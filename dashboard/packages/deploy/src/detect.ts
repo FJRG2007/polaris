@@ -176,11 +176,13 @@ function workspaceRoot(levels: readonly DirectorySnapshot[]): DirectorySnapshot 
  * something older than it asked for and fails its own engine check. Astro asking
  * for >=22.12.0 lands on 22.3.0 and refuses to build.
  *
- * This only reports it. Asking for a different major was tried and is worse: which
- * majors a given builder carries is not knowable from here, and naming one it does
- * not have silently falls all the way back to its default - turning a Node 22 build
- * into a Node 18 one. Saying what the project needs, and leaving the choice alone,
- * is the only honest answer available.
+ * This only reports it, and the reason is worth writing down. Asking for a
+ * different major was tried and is worse: which majors a builder carries depends
+ * on its version, and naming one it does not have does not error - it falls all
+ * the way back to its default, turning a Node 22 build into a Node 18 one. The
+ * actual fix is upstream of here: a current builder resolves `>=22.12.0` to a
+ * major that satisfies it without being asked, which is why onboarding pins and
+ * upgrades one rather than using whatever the machine happens to carry.
  */
 export function unmetNodeRequirement(range: string | undefined): string | null {
     if (!range) return null;
@@ -327,7 +329,7 @@ export function detectBuild(snapshot: RepoSnapshot): DetectedBuild | null {
     }
 
     if (nodeRequirement) {
-        note = `${note}; it needs Node ${nodeRequirement}, and the builder ships one pinned release per major - loosen engines.node or use a Dockerfile if the build refuses`;
+        note = `${note}; it needs Node ${nodeRequirement} - if the build refuses, the builder on this server is old and re-running its setup upgrades it`;
     }
 
     return {

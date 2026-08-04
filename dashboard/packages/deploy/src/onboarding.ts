@@ -31,6 +31,19 @@ const DEFAULT_VOLUME_ROOT = "/var/lib/polaris/volumes";
 const DEFAULT_TRAEFIK_IMAGE = "traefik:v3.1";
 const DEFAULT_GUARD_IMAGE = "ghcr.io/fjrg2007/polaris-edge-guard:latest";
 
+/**
+ * The builder that turns a repository with no Dockerfile into an image, and the
+ * version Polaris expects of it.
+ *
+ * Pinned and upgraded rather than "whatever is on the box", because this one
+ * choice decides which language runtimes exist. A nixpacks from 2024 knows Node
+ * 18, 20 and 22 and pins each to one release from its own era; a project asking
+ * for Node >=22.12 gets 22.3 and fails its own engine check, and asking that old
+ * build for a newer major does not error - it silently falls back to Node 18.
+ * Every workaround for that is a worse version of upgrading the tool.
+ */
+const NIXPACKS_VERSION = "1.41.0";
+
 /** Build the onboarding bash script for a remote server. */
 export function onboardingScript(options: OnboardingOptions): string {
     const deployRoot = options.deployRoot ?? DEFAULT_DEPLOY_ROOT;
@@ -64,10 +77,24 @@ export function onboardingScript(options: OnboardingOptions): string {
         "  curl -fsSL https://get.docker.com | sh;",
         "fi",
         "docker --version",
+        // The builder for repositories with no Dockerfile. Upgraded when it is
+        // older than the pin, not merely installed when absent: a machine set up a
+        // year ago carries a build that cannot produce a current language runtime,
+        // and nothing about that is visible until somebody's app fails its own
+        // engine check.
+        'echo "== build toolchain =="',
+        `NIXPACKS_WANT=${NIXPACKS_VERSION}`,
+        'NIXPACKS_HAVE="$(nixpacks --version 2>/dev/null | awk \'{print $2}\')"',
+        'if [ "$NIXPACKS_HAVE" != "$NIXPACKS_WANT" ]; then',
+        '  echo "installing nixpacks $NIXPACKS_WANT (found: ${NIXPACKS_HAVE:-none})";',
+        // The installer reads the version it should fetch from the environment.
+        "  NIXPACKS_VERSION=\"$NIXPACKS_WANT\" bash -c \"$(curl -fsSL https://nixpacks.com/install.sh)\";",
+        "fi",
+        "nixpacks --version",
         `mkdir -p ${deployRoot} ${volumeRoot} /var/lib/polaris/traefik`,
         `docker network inspect ${net} >/dev/null 2>&1 || docker network create ${net}`,
         'echo "== starting Traefik =="',
-        `docker rm -f polaris-traefik >/dev/null 2>&1 || true`,
+        "docker rm -f polaris-traefik >/dev/null 2>&1 || true",
         [
             "docker run -d --name polaris-traefik --restart unless-stopped",
             `--network ${net}`,

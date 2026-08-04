@@ -330,9 +330,10 @@ describe("a Node version the builder probably cannot meet", () => {
         expect(detectBuild(alone({ manifest: { dependencies: { astro: "7" } } }))?.nodeRequirement).toBeNull();
     });
 
-    it("puts it in the note, so the build log carries the reason it failed", () => {
+    it("puts it in the note, pointing at the builder rather than at the project", () => {
+        // The project is not doing anything wrong; an old builder on the server is.
         expect(astro(">=22.12.0")?.note).toContain(">=22.12.0");
-        expect(astro(">=22.12.0")?.note).toContain("engines.node");
+        expect(astro(">=22.12.0")?.note).toContain("builder on this server is old");
     });
 
     it("reads the nearest declaration, so an app overrides its workspace root", () => {
