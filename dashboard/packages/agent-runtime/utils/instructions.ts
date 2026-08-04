@@ -70,7 +70,7 @@ function buildRuntimeContext(ctx: InstructionsContext): string {
   let gitStatus: string | undefined;
   try {
     gitStatus =
-      execSync("git status --short", { encoding: "utf-8", stdio: "pipe" }).trim() || "(clean)";
+      execSync("git status --short", { windowsHide: true, encoding: "utf-8", stdio: "pipe" }).trim() || "(clean)";
   } catch {
     // git not available or not in a repo
   }

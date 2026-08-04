@@ -719,8 +719,8 @@ export function CreatePullRequestReviewTool(ctx: ToolContext) {
           ctx.toolState.noopReviewSubmissions += 1;
           log.info(`skipping review submission: ${skip.reason}`);
           // an agent that keeps submitting nothing is not converging. refuse
-          // rather than let it keep guessing - the next thing it guesses is a
-          // placeholder body, which posts permanently. see
+          // rather than let it keep guessing - the next thing it guesses is an
+          // invented body, which posts permanently. see
           // MAX_CONSECUTIVE_NOOP_SUBMISSIONS.
           if (ctx.toolState.noopReviewSubmissions >= MAX_CONSECUTIVE_NOOP_SUBMISSIONS) {
             throw new Error(

@@ -58,6 +58,7 @@ function detectSandboxMethod(): SandboxMethod {
   // try unprivileged unshare first (works on some systems)
   try {
     const result = spawnSync("unshare", ["--pid", "--fork", "--mount-proc", "true"], {
+      windowsHide: true,
       timeout: 5000,
       stdio: "ignore",
     });
@@ -73,6 +74,7 @@ function detectSandboxMethod(): SandboxMethod {
   // sudo unshare (works on GHA runners)
   try {
     const result = spawnSync("sudo", ["unshare", "--pid", "--fork", "--mount-proc", "true"], {
+      windowsHide: true,
       timeout: 5000,
       stdio: "ignore",
     });
@@ -205,6 +207,7 @@ function resolveRepoRoot(): string {
   // to process.cwd() so we never throw from the shell-tool init path.
   try {
     _repoRoot = spawnSync("git", ["rev-parse", "--show-toplevel"], {
+      windowsHide: true,
       cwd: process.cwd(),
       stdio: ["ignore", "pipe", "ignore"],
       encoding: "utf-8",
@@ -217,7 +220,13 @@ function resolveRepoRoot(): string {
 }
 
 function spawnShell(params: SpawnParams): ChildProcess {
-  const spawnOpts = { env: params.env, cwd: params.cwd, stdio: params.stdio, detached: true };
+  const spawnOpts = {
+    windowsHide: true,
+    env: params.env,
+    cwd: params.cwd,
+    stdio: params.stdio,
+    detached: true
+  };
   const sandboxMethod = detectSandboxMethod();
   const ci = process.env.CI === "true";
 
@@ -245,7 +254,7 @@ function spawnShell(params: SpawnParams): ChildProcess {
         "-c",
         `${PROC_CLEANUP} ${SOCKET_CLEANUP} ${fsMounts} ${params.command}`,
       ],
-      spawnOpts
+      { ...spawnOpts, windowsHide: true }
     );
   }
 
@@ -280,11 +289,11 @@ function spawnShell(params: SpawnParams): ChildProcess {
         "-c",
         `${PROC_CLEANUP} ${SOCKET_CLEANUP} ${fsMounts} exec su -p -s /bin/bash ${username} -c '${escaped}'`,
       ],
-      { ...spawnOpts, env: {} }
+      { ...spawnOpts, windowsHide: true, env: {} }
     );
   }
 
-  return spawn("bash", ["-c", params.command], spawnOpts);
+  return spawn("bash", ["-c", params.command], { ...spawnOpts, windowsHide: true });
 }
 
 /** kill process and its entire process group */

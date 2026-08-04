@@ -20,7 +20,7 @@ export {
  * @returns The path to the CLI executable, or null if not found
  */
 export function findCliPath(name: string): string | null {
-  const result = spawnSync("which", [name], { encoding: "utf-8" });
+  const result = spawnSync("which", [name], { windowsHide: true, encoding: "utf-8" });
   if (result.status === 0 && result.stdout) {
     const cliPath = result.stdout.trim();
     if (cliPath && existsSync(cliPath)) {

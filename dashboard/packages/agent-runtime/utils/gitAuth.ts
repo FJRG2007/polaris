@@ -75,7 +75,7 @@ function hashFile(path: string): string {
  * caught by verifyGitBinary() before each authenticated call.
  */
 export function resolveGit(): void {
-  const whichPath = execSync("which git", { encoding: "utf-8" }).trim();
+  const whichPath = execSync("which git", { windowsHide: true, encoding: "utf-8" }).trim();
   const resolvedPath = realpathSync(whichPath);
   const sha256 = hashFile(resolvedPath);
   gitBinary = { path: resolvedPath, sha256 };

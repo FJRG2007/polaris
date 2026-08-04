@@ -20,6 +20,7 @@ export const MAX_POST_RUN_RETRIES = 3;
 export function getGitStatus(): string {
   try {
     return execFileSync("git", ["status", "--porcelain"], {
+      windowsHide: true,
       encoding: "utf-8",
       timeout: 10_000,
     }).trim();

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
+import { // enigma: vendored upstream file - named imports kept so upstream diffs still apply (VENDOR.md)
   getModelEnvVars,
   getModelProvider,
   isBedrockAnthropicId,

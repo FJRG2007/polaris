@@ -1,4 +1,4 @@
-import {
+import { // enigma: vendored upstream file - named imports kept so upstream diffs still apply (VENDOR.md)
   BEDROCK_MODEL_ID_ENV,
   getModelEnvVars,
   OPENAI_COMPATIBLE_API_KEY_ENV,

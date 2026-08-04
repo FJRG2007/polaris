@@ -214,6 +214,7 @@ function bootOpencodeServer(params: {
     params.cliPath,
     ["serve", "--port", "0", "--hostname", "127.0.0.1", "--print-logs", "--log-level", logLevel],
     {
+      windowsHide: true,
       cwd: params.cwd,
       env: params.env,
       stdio: ["ignore", "pipe", "pipe"],

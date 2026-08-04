@@ -65,6 +65,7 @@ export function ensureBrowserDaemon(toolState: ToolState): string | undefined {
   const agentBrowserVersion = getDevDependencyVersion("agent-browser");
   log.info(`installing agent-browser@${agentBrowserVersion}...`);
   const install = spawnSync("npm", ["install", "-g", `agent-browser@${agentBrowserVersion}`], {
+    windowsHide: true,
     stdio: "pipe",
     encoding: "utf-8",
   });
@@ -78,7 +79,7 @@ export function ensureBrowserDaemon(toolState: ToolState): string | undefined {
 
   let binDir: string;
   try {
-    const binPath = execFileSync("which", ["agent-browser"], { encoding: "utf-8" }).trim();
+    const binPath = execFileSync("which", ["agent-browser"], { windowsHide: true, encoding: "utf-8" }).trim();
     binDir = dirname(binPath);
     log.info(`agent-browser binary: ${binPath}`);
   } catch {
@@ -93,6 +94,7 @@ export function ensureBrowserDaemon(toolState: ToolState): string | undefined {
   // `open about:blank` triggers daemon auto-start and returns once the daemon + browser are ready
   log.info("starting browser daemon...");
   const seed = spawnSync("agent-browser", ["open", "about:blank"], {
+    windowsHide: true,
     env,
     stdio: "pipe",
     encoding: "utf-8",
@@ -122,6 +124,7 @@ export function closeBrowserDaemon(toolState: ToolState): void {
   try {
     log.info("closing browser daemon...");
     spawnSync("agent-browser", ["close"], {
+      windowsHide: true,
       env: filterEnv(),
       stdio: "pipe",
       timeout: 10_000,

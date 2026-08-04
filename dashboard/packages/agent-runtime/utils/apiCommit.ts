@@ -170,6 +170,7 @@ async function createBlobEntry(params: {
     mode = stat.mode & 0o100 ? "100755" : "100644";
     const cleanSha = $("git", ["hash-object", "-w", "--", absPath], { log: false }).trim();
     content = execFileSync("git", ["cat-file", "blob", cleanSha], {
+      windowsHide: true,
       cwd: params.repoRoot,
       maxBuffer: 2 * MAX_BLOB_BYTES,
     });

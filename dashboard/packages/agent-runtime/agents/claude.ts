@@ -1060,6 +1060,7 @@ function installManagedSettings(params: ManagedSettingsParams): void {
   try {
     execFileSync("sudo", ["mkdir", "-p", MANAGED_SETTINGS_DIR]);
     execFileSync("sudo", ["tee", MANAGED_SETTINGS_PATH], {
+      windowsHide: true,
       input: content,
       stdio: ["pipe", "ignore", "pipe"],
     });

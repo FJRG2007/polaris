@@ -356,7 +356,7 @@ async function lookupReferences(params: LookupReferencesParams) {
       "--",
       ":(top)",
     ],
-    { env: resolveEnv(undefined), stdio: ["ignore", "pipe", "pipe"] }
+    { windowsHide: true, env: resolveEnv(undefined), stdio: ["ignore", "pipe", "pipe"] }
   );
   const state = createGrepRecordState();
   const maxAtomLength = Math.max(...params.candidates.map((candidate) => candidate.atom.length));

@@ -9,7 +9,7 @@ import {
   SpawnTimeoutError,
   spawn,
 } from "../utils/subprocess.ts";
-import {
+import { // enigma: vendored upstream file - named imports kept so upstream diffs still apply (VENDOR.md)
   type AgentResult,
   type AgentRunContext,
   type AgentUsage,

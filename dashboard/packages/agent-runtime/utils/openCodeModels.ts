@@ -40,6 +40,7 @@ function readModels(cliPath: string): Set<string> {
   // than a throw, and `stdio` keeps it out of the job log (execFileSync leaks
   // it to the parent, so a config error printed once per capture).
   const result = spawnSync(cliPath, ["models"], {
+    windowsHide: true,
     encoding: "utf-8",
     timeout: 30_000,
     env: process.env,

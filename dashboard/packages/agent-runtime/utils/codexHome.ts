@@ -176,18 +176,19 @@ function bootstrapPolarisDataDir(): void {
   // user" assumption.
   let primaryGroup: string;
   try {
-    primaryGroup = execFileSync("id", ["-gn", user], { stdio: "pipe", encoding: "utf-8" }).trim();
+    primaryGroup = execFileSync("id", ["-gn", user], { windowsHide: true, stdio: "pipe", encoding: "utf-8" }).trim();
   } catch {
     primaryGroup = user;
   }
   // `-n` (non-interactive) makes sudo fail-fast on locked-down runners
   // instead of prompting and timing out.
   try {
-    execFileSync("sudo", ["-n", "mkdir", "-p", POLARIS_DATA_DIR], { stdio: "pipe" });
+    execFileSync("sudo", ["-n", "mkdir", "-p", POLARIS_DATA_DIR], { windowsHide: true, stdio: "pipe" });
     execFileSync("sudo", ["-n", "chown", `${user}:${primaryGroup}`, POLARIS_DATA_DIR], {
+      windowsHide: true,
       stdio: "pipe",
     });
-    execFileSync("sudo", ["-n", "chmod", "700", POLARIS_DATA_DIR], { stdio: "pipe" });
+    execFileSync("sudo", ["-n", "chmod", "700", POLARIS_DATA_DIR], { windowsHide: true, stdio: "pipe" });
   } catch (err) {
     throw new Error(
       `failed to bootstrap ${POLARIS_DATA_DIR} (required for codex auth in CI): ${err instanceof Error ? err.message : String(err)}. ` +

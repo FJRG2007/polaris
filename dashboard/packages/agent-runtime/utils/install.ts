@@ -121,6 +121,7 @@ export async function installFromNpmTarball(params: InstallFromNpmTarballParams)
   // Extract tarball
   log.debug(`» extracting tarball...`);
   const extractResult = spawnSync("tar", ["-xzf", tarballPath, "-C", tempDir], {
+    windowsHide: true,
     stdio: "pipe",
     encoding: "utf-8",
   });
@@ -343,6 +344,7 @@ export async function installFromGithubTarball(
   // extract tar.gz
   log.debug(`» extracting tarball...`);
   const extractResult = spawnSync("tar", ["-xzf", tarballPath, "-C", tempDir], {
+    windowsHide: true,
     stdio: "pipe",
     encoding: "utf-8",
   });
@@ -402,6 +404,7 @@ export async function installFromDirectTarball(
 
   log.debug(`» extracting tarball...`);
   const extractResult = spawnSync("tar", tarArgs, {
+    windowsHide: true,
     stdio: "pipe",
     encoding: "utf-8",
   });
@@ -459,6 +462,7 @@ export async function installFromCurl(params: InstallFromCurlParams): Promise<st
   log.debug(`» installing to temp directory at ${tempDir}...`);
 
   const installResult = spawnSync("bash", [installScriptPath], {
+    windowsHide: true,
     cwd: tempDir,
     env: {
       // Run the install script with HOME set to temp directory
