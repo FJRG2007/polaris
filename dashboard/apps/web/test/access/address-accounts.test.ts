@@ -30,8 +30,9 @@ interface AuditGroup {
 }
 
 let sessionRows: SessionRow[] = [];
+let movedRows: SessionRow[] = [];
 let auditGroups: AuditGroup[] = [];
-let sessionQuery: Record<string, unknown> | null = null;
+let sessionQueries: Record<string, unknown>[] = [];
 let auditQuery: Record<string, unknown> | null = null;
 let userQuery: { id: { in: string[] } } | null = null;
 
@@ -48,8 +49,8 @@ vi.mock("@polaris/db", () => ({
     prisma: {
         session: {
             findMany: async (args: Record<string, unknown>) => {
-                sessionQuery = args;
-                return sessionRows;
+                sessionQueries.push(args);
+                return "ipAddress" in (args.where as Record<string, unknown>) ? sessionRows : movedRows;
             }
         },
         auditLog: {
@@ -104,18 +105,30 @@ function group(overrides: Partial<AuditGroup> = {}): AuditGroup {
 
 beforeEach(() => {
     sessionRows = [];
+    movedRows = [];
     auditGroups = [];
-    sessionQuery = null;
+    sessionQueries = [];
     auditQuery = null;
     userQuery = null;
 });
 
 describe("accounts at an address", () => {
-    it("asks for sessions opened at the address and sessions that moved to it", async () => {
+    // Two reads rather than one `OR`: neither index can be used for a query that
+    // matches the column or the other table's, so asking both at once scans every
+    // session ever opened.
+    it("asks separately for sessions opened at the address and sessions that moved to it", async () => {
         await accountsAtAddress("85.87.156.88", NOW);
-        expect(sessionQuery?.where).toEqual({
-            OR: [{ ipAddress: "85.87.156.88" }, { state: { is: { ip: "85.87.156.88" } } }]
-        });
+        expect(sessionQueries.map((query) => query.where)).toEqual([
+            { ipAddress: "85.87.156.88" },
+            { state: { is: { ip: "85.87.156.88" } } }
+        ]);
+    });
+
+    it("merges the two without listing a session that both found twice", async () => {
+        sessionRows = [session()];
+        movedRows = [session(), session({ id: "session-2", createdAt: new Date("2026-08-04T11:00:00Z") })];
+        const accounts = await accountsAtAddress("85.87.156.88", NOW);
+        expect(accounts[0]?.sessions.map((entry) => entry.id)).toEqual(["session-2", "session-1"]);
     });
 
     // The log stores the address hashed, so it can only be asked this way - and
@@ -210,5 +223,23 @@ describe("accounts at an address", () => {
         expect(asked.length).toBeLessThanOrEqual(50);
         // Whoever a ban would actually cut off is who survives the cut.
         expect(asked.every((id) => id.startsWith("user-"))).toBe(true);
+    });
+
+    // Which is by whether the session is still open, not by how recently it was
+    // opened: an account signed in from here since last month is what a ban would
+    // break, and an account whose session expired yesterday is not.
+    it("keeps whoever is still signed in over whoever only opened a session more recently", async () => {
+        sessionRows = [
+            ...Array.from({ length: 60 }, (_, index) =>
+                session({
+                    id: `expired-${index}`,
+                    userId: `gone-${index}`,
+                    expiresAt: new Date("2026-08-03T10:00:00Z")
+                })
+            ),
+            session({ id: "held", createdAt: new Date("2026-07-01T10:00:00Z") })
+        ];
+        await accountsAtAddress("85.87.156.88", NOW);
+        expect(userQuery?.id.in).toContain("user-1");
     });
 });

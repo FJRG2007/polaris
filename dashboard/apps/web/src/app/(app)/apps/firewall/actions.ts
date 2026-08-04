@@ -383,7 +383,12 @@ export async function getWafAddressActivityAction(
     try {
         const [activity, accounts] = await Promise.all([
             wafAddressActivity(address.data, window.data),
-            user.isAdmin ? accountsAtAddress(address.data).catch(() => undefined) : undefined
+            user.isAdmin
+                ? accountsAtAddress(address.data).catch((error) => {
+                      console.error("polaris: could not read the accounts at an address:", error);
+                      return undefined;
+                  })
+                : undefined
         ]);
         return { activity, accounts };
     } catch (caught) {

@@ -86,18 +86,11 @@ interface AccountSignIns {
     lastAt: string;
 }
 
-/**
- * Every stored session opened from, or last seen at, this address.
- *
- * Both columns are matched because they hold different moments: better-auth
- * writes the address once when the session is created and never follows it,
- * while Polaris's own record is re-stamped whenever the session is evaluated
- * from somewhere new. A session that started at this address and moved, and one
- * that moved to it, are both sessions this address has held.
- */
-async function sessionRowsAt(ip: string) {
+/** Newest first and bounded, so the union of the two reads below can be cut to
+ *  the same ceiling and still be the newest sessions the address has held. */
+async function sessionRowsMatching(where: { ipAddress: string } | { state: { is: { ip: string } } }) {
     return prisma.session.findMany({
-        where: { OR: [{ ipAddress: ip }, { state: { is: { ip } } }] },
+        where,
         orderBy: { createdAt: "desc" },
         take: SESSION_LIMIT,
         select: {
@@ -120,6 +113,34 @@ async function sessionRowsAt(ip: string) {
             }
         }
     });
+}
+
+/**
+ * Every stored session opened from, or last seen at, this address.
+ *
+ * Both columns are matched because they hold different moments: better-auth
+ * writes the address once when the session is created and never follows it,
+ * while Polaris's own record is re-stamped whenever the session is evaluated
+ * from somewhere new. A session that started at this address and moved, and one
+ * that moved to it, are both sessions this address has held.
+ *
+ * Asked as two questions rather than one `OR`, because the second half is a
+ * lookup in another table: an index and a subquery cannot be combined into one
+ * read, so a single query matching either would give up on the index for the
+ * column that has one and scan every session ever opened. Sessions are only ever
+ * deleted one at a time, when somebody signs out or is signed out, so that scan
+ * grows for the life of the instance. Two indexed reads merged here do not.
+ */
+async function sessionRowsAt(ip: string) {
+    const [opened, moved] = await Promise.all([
+        sessionRowsMatching({ ipAddress: ip }),
+        sessionRowsMatching({ state: { is: { ip } } })
+    ]);
+    const byId = new Map(opened.map((row) => [row.id, row]));
+    for (const row of moved) byId.set(row.id, row);
+    return [...byId.values()]
+        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+        .slice(0, SESSION_LIMIT);
 }
 
 function toAddressSession(row: SessionRow, now: number): AddressSession {
@@ -186,13 +207,17 @@ async function signInsAt(ip: string): Promise<Map<string, AccountSignIns>> {
  * session is the thing a ban would cut off.
  *
  * Which is also the order the names are cut off in when there are more than can
- * be carried: whoever holds a session here first, newest session first, then
- * whoever only ever signed in, most recent attempt first. What a ban would break
- * is the half worth keeping.
+ * be carried: whoever is signed in from here now first, newest session first,
+ * then whoever held one that has since expired, then whoever only ever signed
+ * in, most recent attempt first. What a ban would break is the half worth
+ * keeping.
  */
 export async function accountsAtAddress(ip: string, now = Date.now()): Promise<AddressAccount[]> {
     const [rows, signIns] = await Promise.all([sessionRowsAt(ip), signInsAt(ip)]);
-    const ids = [...new Set([...rows.map((row) => row.userId), ...signIns.keys()])].slice(0, ACCOUNT_LIMIT);
+    const live = rows.filter((row) => row.expiresAt.getTime() > now);
+    const ids = [
+        ...new Set([...live.map((row) => row.userId), ...rows.map((row) => row.userId), ...signIns.keys()])
+    ].slice(0, ACCOUNT_LIMIT);
     if (ids.length === 0) return [];
 
     const users = await prisma.user.findMany({
