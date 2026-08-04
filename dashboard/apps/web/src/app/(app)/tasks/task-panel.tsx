@@ -22,6 +22,7 @@
 import * as actions from "./actions";
 import { tagColorFor } from "./pickers";
 import { ShareDialog } from "./task-share";
+import { taskOverlay } from "./optimistic";
 import { runAction } from "@/lib/run-action";
 import type { SpaceContext } from "@/lib/tasks/facts";
 import { CopyButton } from "@/components/copy-button";
@@ -106,11 +107,23 @@ export function TaskPanel({
         setOpenId(id);
     };
 
-    /** Apply a change locally, then persist it. A refused write reloads the task
-     *  rather than leaving the screen showing something that did not happen. */
+    /**
+     * Apply a change locally, then persist it. A refused write reloads the task
+     * rather than leaving the screen showing something that did not happen.
+     *
+     * The local half is what makes assigning somebody here feel like a click rather
+     * than a request: the panel reloads the whole task afterwards, and waiting for
+     * that round trip before repainting is a visible pause on the one control people
+     * use most. Only the fields a change resolves to are applied; anything the server
+     * derives arrives with the reload.
+     */
     const patch = async (input: Record<string, unknown>) => {
         if (!detail || !openId) return;
         setError("");
+        const overlay = taskOverlay(input, context);
+        setDetail((current) =>
+            current ? { ...current, task: { ...current.task, ...overlay } } : current
+        );
         const result = await runAction(() => actions.updateTaskAction({ taskId: openId, ...input }), setError);
         if (result?.error) setError(result.error);
         load(openId);

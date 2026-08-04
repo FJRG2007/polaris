@@ -10,11 +10,12 @@
  * already exist.
  */
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import * as actions from "./actions";
 import * as core from "@polaris/core";
 import { runAction } from "@/lib/run-action";
 import type { TaskEdit } from "./views/shared";
+import { taskOverlay, type TaskOverlay } from "./optimistic";
 import type { SpaceContext, TaskRow } from "@/lib/tasks/facts";
 import { TaskMenu, type TaskCommands } from "./views/task-actions";
 import { AvatarStack, ProgressBar, StatusDot, StatusMarker } from "./pickers";
@@ -157,32 +158,50 @@ export function SubtaskSection({
     onCreateTag?: (name: string, color: string) => Promise<string | null>;
 }) {
     const canEdit = context.canEdit;
-    const progress = core.rollupProgress(subtasks.map((task) => ({ statusType: task.statusType })));
     const [dragging, setDragging] = useState<string | null>(null);
     const [deleting, setDeleting] = useState<TaskRow | null>(null);
+    // Optimistic overlay, exactly as the list and the board keep one: a subtask is a
+    // task and answers the same menu, so reassigning one from here has to repaint on
+    // the click rather than on the reload. Cleared when fresh rows arrive.
+    const [pending, setPending] = useState<Record<string, TaskOverlay>>({});
+    const rows = useMemo(
+        () => subtasks.map((task) => ({ ...task, ...pending[task.id] })),
+        [subtasks, pending]
+    );
+
+    const progress = core.rollupProgress(rows.map((task) => ({ statusType: task.statusType })));
+
+    const reload = () => {
+        setPending({});
+        onChanged();
+    };
 
     const move = async (targetId: string) => {
         if (!dragging || dragging === targetId) return;
-        const position = neighbours(subtasks, targetId, dragging);
+        const position = neighbours(rows, targetId, dragging);
         const moved = dragging;
         setDragging(null);
         onError("");
         await runAction(() => actions.moveTaskAction({ taskId: moved, ...position }), onError);
-        onChanged();
+        reload();
     };
 
     const edit = async (subtaskId: string, change: TaskEdit) => {
         onError("");
+        setPending((current) => ({
+            ...current,
+            [subtaskId]: { ...current[subtaskId], ...taskOverlay(change, context) }
+        }));
         const result = await runAction(() => actions.updateTaskAction({ taskId: subtaskId, ...change }), onError);
         if (result?.error) onError(result.error);
-        onChanged();
+        reload();
     };
 
     const duplicate = async (subtaskId: string) => {
         onError("");
         const result = await runAction(() => actions.duplicateTaskAction(subtaskId), onError);
         if (result?.error) onError(result.error);
-        onChanged();
+        reload();
     };
 
     /**
@@ -286,7 +305,7 @@ export function SubtaskSection({
                             onError
                         );
                         if (result?.error) onError(result.error);
-                        onChanged();
+                        reload();
                     }}
                 />
             )}
@@ -305,7 +324,7 @@ export function SubtaskSection({
                     const result = await runAction(() => actions.deleteTaskAction(deleting.id), onError);
                     if (result?.error) onError(result.error);
                     setDeleting(null);
-                    onChanged();
+                    reload();
                 }}
             />
         </section>

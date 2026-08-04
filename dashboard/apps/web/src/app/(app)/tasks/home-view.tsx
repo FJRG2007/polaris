@@ -16,6 +16,7 @@ import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
 import type { TaskEdit } from "./views/shared";
 import { Fragment, useMemo, useState } from "react";
+import { taskOverlay, type TaskOverlay } from "./optimistic";
 import type { RunningTimer } from "@/lib/tasks/time-service";
 import { useDisplayFormat } from "@/components/display-format";
 import { TaskMenu, type TaskCommands } from "./views/task-actions";
@@ -63,15 +64,26 @@ export function HomeView({
     const [deleting, setDeleting] = useState<TaskRow | null>(null);
     const [error, setError] = useState("");
 
+    // Optimistic overlay: what a menu changed before the server said so. Dropped
+    // wholesale on the reload that follows, which is what the server derived from the
+    // same change (a completion date, a recurrence) comes back in.
+    const [pending, setPending] = useState<Record<string, TaskOverlay>>({});
+    const rows = useMemo(() => tasks.map((task) => ({ ...task, ...pending[task.id] })), [tasks, pending]);
+
+    const refresh = () => {
+        setPending({});
+        router.refresh();
+    };
+
     const groups = useMemo(() => {
         const now = new Date();
-        const byId = new Map(tasks.map((task) => [task.id, task]));
+        const byId = new Map(rows.map((task) => [task.id, task]));
         const buckets = new Map<core.DueBucket, TaskRow[]>();
         // Soonest first, which is what the screen says it is - and inside a pile
         // where the dates are equal or absent, most urgent first. "No due date"
         // has nothing else to go on, so without this it is in the order the
         // database happened to return.
-        for (const facts of core.sortTasks(tasks.map(toFacts), { field: "dueDate", direction: "asc" })) {
+        for (const facts of core.sortTasks(rows.map(toFacts), { field: "dueDate", direction: "asc" })) {
             const task = byId.get(facts.id);
             if (!task) continue;
             const bucket = core.dueBucket(facts, now, format.weekStartsOn);
@@ -82,17 +94,26 @@ export function HomeView({
         return core.DUE_BUCKETS.map((bucket) => ({ bucket, tasks: buckets.get(bucket) ?? [] })).filter(
             (group) => group.tasks.length > 0
         );
-    }, [tasks, format.weekStartsOn]);
+    }, [rows, format.weekStartsOn]);
 
     // The panel belongs to the space of whatever task is open.
-    const openSpaceId = tasks.find((task) => task.id === openTaskId)?.spaceId;
+    const openSpaceId = rows.find((task) => task.id === openTaskId)?.spaceId;
     const openContext = openSpaceId ? contexts[openSpaceId] : undefined;
 
+    /** A change made from a row's menu, applied here before it is sent so the row
+     *  repaints on the click. A refused write reloads and the overlay goes with it. */
     const edit = async (task: TaskRow, change: TaskEdit) => {
         setError("");
+        const context = contexts[task.spaceId];
+        if (context) {
+            setPending((current) => ({
+                ...current,
+                [task.id]: { ...current[task.id], ...taskOverlay(change, context) }
+            }));
+        }
         const result = await runAction(() => actions.updateTaskAction({ taskId: task.id, ...change }), setError);
         if (result?.error) setError(result.error);
-        router.refresh();
+        refresh();
     };
 
     /**
@@ -113,7 +134,7 @@ export function HomeView({
                 setError("");
                 const result = await runAction(() => actions.duplicateTaskAction(task.id), setError);
                 if (result?.error) setError(result.error);
-                router.refresh();
+                refresh();
             },
             onDelete: () => setDeleting(task)
         };
@@ -146,7 +167,7 @@ export function HomeView({
                             type="button"
                             onClick={async () => {
                                 await runAction(() => actions.stopTimerAction(), setError);
-                                router.refresh();
+                                refresh();
                             }}
                             className="inline-flex items-center gap-1.5 rounded-md border border-border px-2 py-1 text-xs transition-colors hover:bg-muted"
                         >
@@ -246,7 +267,7 @@ export function HomeView({
                 taskId={openTaskId}
                 context={openContext}
                 onClose={() => setOpenTaskId(null)}
-                onChanged={() => router.refresh()}
+                onChanged={() => refresh()}
             />
             )}
 
@@ -263,7 +284,7 @@ export function HomeView({
                     const result = await runAction(() => actions.deleteTaskAction(deleting.id), setError);
                     if (result?.error) setError(result.error);
                     setDeleting(null);
-                    router.refresh();
+                    refresh();
                 }}
             />
         </div>

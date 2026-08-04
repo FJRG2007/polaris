@@ -281,6 +281,12 @@ function Thread({
     const [deleting, setDeleting] = useState(false);
     const [pending, startTransition] = useTransition();
     const scrollRef = useRef<HTMLDivElement>(null);
+    // Who this was just handed to, before the list has been re-read. Without it the
+    // select snaps back to the old name for as long as the round trip takes, which
+    // reads as the click having missed. Cleared when a fresh conversation arrives.
+    const [assignedTo, setAssignedTo] = useState<string | null | undefined>(undefined);
+
+    useEffect(() => setAssignedTo(undefined), [conversation.id, conversation.assigneeId]);
 
     const load = useCallback(async () => {
         try {
@@ -386,13 +392,15 @@ function Thread({
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
                     <Select
-                        value={conversation.assigneeId ?? "none"}
-                        onValueChange={(value) =>
+                        value={(assignedTo === undefined ? conversation.assigneeId : assignedTo) ?? "none"}
+                        onValueChange={(value) => {
+                            const assigneeId = value === "none" ? null : value;
+                            setAssignedTo(assigneeId);
                             void assignConversationAction({
                                 conversationId: conversation.id,
-                                assigneeId: value === "none" ? null : value
-                            }).then(onSent)
-                        }
+                                assigneeId
+                            }).then(onSent);
+                        }}
                         options={[
                             { value: "none", label: "Unassigned" },
                             ...agents.map((agent) => ({ value: agent.id, label: agent.name }))

@@ -20,6 +20,7 @@ import * as core from "@polaris/core";
 import { FilterBar } from "./filter-bar";
 import { TaskPanel } from "./task-panel";
 import { BoardView } from "./views/board";
+import { taskOverlay } from "./optimistic";
 import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
 import { GanttView } from "./views/schedule";
@@ -188,26 +189,10 @@ export function ListScreen({
      * goes with it.
      */
     const editTask = async (task: TaskRow, change: TaskEdit) => {
-        // The overlay is written into, so it is the mutable shape of a row.
-        const optimistic: { -readonly [Key in keyof TaskRow]?: TaskRow[Key] } = {};
-        if (change.statusId !== undefined) {
-            const status = context.statuses.find((entry) => entry.id === change.statusId);
-            if (status) {
-                optimistic.statusId = status.id;
-                optimistic.statusName = status.name;
-                optimistic.statusColor = status.color;
-                optimistic.statusType = status.type;
-            }
-        }
-        if (change.priority !== undefined) optimistic.priority = change.priority;
-        if (change.dueDate !== undefined) optimistic.dueDate = change.dueDate;
-        if (change.assigneeIds !== undefined) {
-            optimistic.assignees = context.people.filter((person) => change.assigneeIds?.includes(person.id));
-        }
-        if (change.tagIds !== undefined) {
-            optimistic.tags = context.tags.filter((tag) => change.tagIds?.includes(tag.id));
-        }
-        setPending((current) => ({ ...current, [task.id]: { ...current[task.id], ...optimistic } }));
+        setPending((current) => ({
+            ...current,
+            [task.id]: { ...current[task.id], ...taskOverlay(change, context) }
+        }));
 
         const result = await runAction(() => actions.updateTaskAction({ taskId: task.id, ...change }), setError);
         if (result?.error) setError(result.error);
