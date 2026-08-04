@@ -1196,15 +1196,18 @@ export function wouldCycle(edges: readonly DependencyEdge[], blockerId: string, 
 
 /** The ids of tasks that cannot start yet because something unfinished blocks
  *  them. Used to mark a card rather than to prevent the move: people override
- *  their own process, and a warning respects that while a block does not. */
+ *  their own process, and a warning respects that while a block does not.
+ *
+ *  A blocker sitting on no status at all still blocks, which is `blockerHolds`
+ *  and is what the server answers the same question with: only work that reached
+ *  a finished kind gets out of the way, and an unknown blocker is not that. */
 export function blockedTaskIds(
     edges: readonly DependencyEdge[],
     statusById: ReadonlyMap<string, work.TaskStatusType>
 ): Set<string> {
     const blocked = new Set<string>();
     for (const edge of edges) {
-        const blockerStatus = statusById.get(edge.blockerId);
-        if (blockerStatus && !work.isFinishedStatus(blockerStatus)) blocked.add(edge.blockedId);
+        if (blockerHolds(statusById.get(edge.blockerId))) blocked.add(edge.blockedId);
     }
     return blocked;
 }

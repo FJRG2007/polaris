@@ -25,6 +25,12 @@ export interface AutomationEventInput {
     readonly actorId: string | null;
 }
 
+export interface AutomationBatchInput {
+    readonly trigger: core.AutomationTrigger;
+    readonly taskIds: readonly string[];
+    readonly actorId: string | null;
+}
+
 /** The projection the engine needs to decide whether a rule applies. */
 const FACT_SELECT = {
     id: true,
@@ -57,19 +63,28 @@ const FACT_SELECT = {
 type FactRecord = Prisma.TaskGetPayload<{ select: typeof FACT_SELECT }>;
 
 /**
- * Whether unfinished work this task depends on is still in its way.
+ * Which of these tasks have unfinished work still in their way.
  *
  * The one part of blocked-ness that is a question about other rows, so it is a
  * query rather than a field, exactly as the screens ask it. A rule reading
  * "Blocked is Yes" has to mean here what the same condition means in a saved
  * view, and three quarters of the answer is not a condition anybody would trust.
+ *
+ * Asked for the whole batch at once, and only when a rule actually reads the
+ * field: it is the one lookup here that no rule may ever need.
  */
-async function dependsOnUnfinished(taskId: string): Promise<boolean> {
+async function blockedByDependency(taskIds: readonly string[]): Promise<Set<string>> {
     const edges = await prisma.taskDependency.findMany({
-        where: { blockedId: taskId, type: "blocks" },
-        select: { blocker: { select: { status: { select: { type: true } } } } }
+        where: { blockedId: { in: [...taskIds] }, type: "blocks" },
+        select: { blockedId: true, blocker: { select: { status: { select: { type: true } } } } }
     });
-    return edges.some((edge) => core.blockerHolds(edge.blocker.status?.type as core.TaskStatusType | undefined));
+    const held = new Set<string>();
+    for (const edge of edges) {
+        if (core.blockerHolds(edge.blocker.status?.type as core.TaskStatusType | undefined)) {
+            held.add(edge.blockedId);
+        }
+    }
+    return held;
 }
 
 function toFacts(record: FactRecord, blocked: boolean): core.TaskFacts {
@@ -133,59 +148,107 @@ export async function hasAutomationsFor(
  * write; it is a no-op when the space has no rules for that trigger.
  */
 export async function runAutomations(event: AutomationEventInput): Promise<void> {
-    const record = await prisma.task.findUnique({ where: { id: event.taskId }, select: FACT_SELECT });
-    if (!record) return;
+    await runAutomationsFor({ trigger: event.trigger, taskIds: [event.taskId], actorId: event.actorId });
+}
+
+/**
+ * The same thing for a selection: one event that happened to many tasks.
+ *
+ * Everything a rule needs that is not per-task is read once for the batch - the
+ * rows, the rules in every space they span, and the dependency lookup - because
+ * a write that touched five hundred tasks would otherwise re-ask all three five
+ * hundred times per trigger. What stays per task is applying the actions, which
+ * are writes to that task and have nowhere else to go.
+ */
+export async function runAutomationsFor(event: AutomationBatchInput): Promise<void> {
+    const taskIds = [...new Set(event.taskIds)];
+    if (taskIds.length === 0) return;
+
+    const records = await prisma.task.findMany({ where: { id: { in: taskIds } }, select: FACT_SELECT });
+    if (records.length === 0) return;
 
     const stored = await prisma.taskAutomation.findMany({
-        where: { spaceId: record.spaceId, trigger: event.trigger, enabled: true },
+        where: {
+            spaceId: { in: [...new Set(records.map((record) => record.spaceId))] },
+            trigger: event.trigger,
+            enabled: true
+        },
         orderBy: { createdAt: "asc" }
     });
     if (stored.length === 0) return;
 
-    // Only once there is a rule to match against: the dependency lookup is a
-    // query, and a space with no rules for this trigger has already returned.
-    const now = new Date();
-    const facts = toFacts(
-        record,
-        core.taskIsBlocked(
-            {
-                statusType: (record.status?.type as core.TaskStatusType) ?? "open",
-                dependsOnUnfinished: await dependsOnUnfinished(record.id),
-                blockedUntil: record.blockedUntil,
-                blockedNote: record.blockedNote
-            },
-            now
-        )
-    );
-    const selected = core.selectAutomations(
-        stored.map((rule) => ({
-            id: rule.id,
-            trigger: rule.trigger as core.AutomationTrigger,
-            conditions: core.parseTaskFilter(rule.conditions),
-            enabled: rule.enabled,
-            listId: rule.listId
-        })),
-        { trigger: event.trigger, task: facts },
-        now
-    );
+    // Parsed once per rule rather than once per task it is matched against, and
+    // grouped by space because that is how each row picks the rules it answers to.
+    const rules = stored.map((rule) => ({
+        id: rule.id,
+        spaceId: rule.spaceId,
+        name: rule.name,
+        trigger: rule.trigger as core.AutomationTrigger,
+        conditions: core.parseTaskFilter(rule.conditions),
+        enabled: rule.enabled,
+        listId: rule.listId,
+        actions: parseActions(rule.actions)
+    }));
+    const perSpace = new Map<string, typeof rules>();
+    for (const rule of rules) {
+        const held = perSpace.get(rule.spaceId);
+        if (held) held.push(rule);
+        else perSpace.set(rule.spaceId, [rule]);
+    }
 
-    for (const rule of selected) {
-        const definition = stored.find((entry) => entry.id === rule.id);
-        if (!definition) continue;
-        try {
-            for (const action of parseActions(definition.actions)) {
-                await applyAction(record, action, event.actorId);
+    const involved = records.filter((record) => perSpace.has(record.spaceId));
+    if (involved.length === 0) return;
+
+    // A rule that never asks whether a task is held up does not pay for the
+    // answer. When none of them asks, the flag is left false rather than guessed:
+    // nothing reads it, so a wrong value cannot reach a decision.
+    const readsBlocked = rules.some((rule) => rule.conditions.conditions.some((one) => one.field === "blocked"));
+    const heldUp = readsBlocked ? await blockedByDependency(involved.map((record) => record.id)) : new Set<string>();
+
+    const now = new Date();
+    // Counted rather than incremented per run: a rule that fired on forty rows is
+    // forty runs and one write.
+    const runs = new Map<string, number>();
+    const lines: Prisma.TaskActivityCreateManyInput[] = [];
+
+    for (const record of involved) {
+        const facts = toFacts(
+            record,
+            core.taskIsBlocked(
+                {
+                    statusType: (record.status?.type as core.TaskStatusType) ?? "open",
+                    dependsOnUnfinished: heldUp.has(record.id),
+                    blockedUntil: record.blockedUntil,
+                    blockedNote: record.blockedNote
+                },
+                now
+            )
+        );
+        const scoped = perSpace.get(record.spaceId) ?? [];
+        const selected = core.selectAutomations(scoped, { trigger: event.trigger, task: facts }, now);
+
+        for (const rule of selected) {
+            const definition = scoped.find((entry) => entry.id === rule.id);
+            if (!definition) continue;
+            try {
+                for (const action of definition.actions) {
+                    await applyAction(record, action, event.actorId);
+                }
+                runs.set(rule.id, (runs.get(rule.id) ?? 0) + 1);
+                lines.push({ taskId: record.id, userId: null, action: "automation", toValue: definition.name });
+            } catch (caught) {
+                console.error(`polaris: automation "${definition.name}" failed:`, caught);
             }
-            await prisma.taskAutomation.update({
-                where: { id: rule.id },
-                data: { runCount: { increment: 1 }, lastRunAt: new Date() }
-            });
-            await prisma.taskActivity.create({
-                data: { taskId: event.taskId, userId: null, action: "automation", toValue: definition.name }
-            });
-        } catch (caught) {
-            console.error(`polaris: automation "${definition.name}" failed:`, caught);
         }
+    }
+
+    if (lines.length > 0) await prisma.taskActivity.createMany({ data: lines });
+    const ranAt = new Date();
+    for (const [ruleId, count] of runs) {
+        await prisma.taskAutomation.update({
+            where: { id: ruleId },
+            data: { runCount: { increment: count }, lastRunAt: ranAt }
+        });
     }
 }
 

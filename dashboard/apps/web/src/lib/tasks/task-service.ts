@@ -20,8 +20,8 @@ import { prisma, type Prisma } from "@polaris/db";
 import { notify } from "@/lib/notifications/dispatch";
 import type { PersonRef, TagRef, TaskRow } from "./facts";
 import { listCommits, type CommitLink } from "./commit-service";
-import { hasAutomationsFor, runAutomations } from "./automation-service";
 import { listAttachments, type AttachmentView } from "./attachment-service";
+import { hasAutomationsFor, runAutomations, runAutomationsFor } from "./automation-service";
 
 // ---------------------------------------------------------------------------
 // Reading
@@ -630,7 +630,8 @@ export async function updateTask(actorId: string, input: core.TaskUpdateInput): 
             recurrence: true,
             blockedUntil: true,
             blockedNote: true,
-            assignees: { select: { userId: true } }
+            assignees: { select: { userId: true } },
+            tags: { select: { tagId: true } }
         }
     });
     if (!before) throw new Error("That task no longer exists");
@@ -673,7 +674,13 @@ export async function updateTask(actorId: string, input: core.TaskUpdateInput): 
     if (input.assigneeIds !== undefined) {
         await setAssignees(actorId, input.taskId, input.assigneeIds, before.assignees.map((entry) => entry.userId));
     }
+    // Which tags this write is actually putting on the task, read from what it
+    // held rather than from what was sent: the whole set arrives every time, so
+    // saving a task with the tags it already had is not "a tag was added".
+    let tagsAdded = false;
     if (input.tagIds !== undefined) {
+        const held = new Set(before.tags.map((entry) => entry.tagId));
+        tagsAdded = input.tagIds.some((tagId) => !held.has(tagId));
         await prisma.$transaction([
             prisma.taskTagLink.deleteMany({ where: { taskId: input.taskId } }),
             prisma.taskTagLink.createMany({ data: input.tagIds.map((tagId) => ({ taskId: input.taskId, tagId })) })
@@ -732,6 +739,7 @@ export async function updateTask(actorId: string, input: core.TaskUpdateInput): 
     if (input.dueDate !== undefined && input.dueDate) {
         await runAutomations({ trigger: "task.dueDateSet", taskId: input.taskId, actorId });
     }
+    if (tagsAdded) await runAutomations({ trigger: "task.tagAdded", taskId: input.taskId, actorId });
 }
 
 /**
@@ -1062,12 +1070,24 @@ export async function bulkUpdate(
             where: { taskId: { in: ids }, userId: { in: input.removeAssigneeIds } }
         });
     }
+    const tagged: string[] = [];
     if (input.addTagIds?.length) {
         const tagIds = input.addTagIds;
+        // Which rows the tag is news to, read before the write for the same reason
+        // as the assignees: a rule listening for a tag should not fire on the forty
+        // rows that already carried it.
+        const already = await prisma.taskTagLink.findMany({
+            where: { taskId: { in: ids }, tagId: { in: tagIds } },
+            select: { taskId: true, tagId: true }
+        });
+        const held = new Set(already.map((entry) => `${entry.taskId}:${entry.tagId}`));
         await prisma.taskTagLink.deleteMany({ where: { taskId: { in: ids }, tagId: { in: tagIds } } });
         await prisma.taskTagLink.createMany({
             data: ids.flatMap((taskId) => tagIds.map((tagId) => ({ taskId, tagId })))
         });
+        for (const taskId of ids) {
+            if (tagIds.some((tagId) => !held.has(`${taskId}:${tagId}`))) tagged.push(taskId);
+        }
     }
     if (input.removeTagIds?.length) {
         await prisma.taskTagLink.deleteMany({ where: { taskId: { in: ids }, tagId: { in: input.removeTagIds } } });
@@ -1145,13 +1165,14 @@ export async function bulkUpdate(
         ["task.dueDateSet", input.dueDate ? ids : []],
         ["task.moved", movedList],
         ["task.assigneeAdded", [...handedTo.keys()]],
-        ["task.assigneeRemoved", [...takenFrom]]
+        ["task.assigneeRemoved", [...takenFrom]],
+        ["task.tagAdded", tagged]
     ];
     const pending = raised.filter(([, tasks]) => tasks.length > 0);
     const triggers = pending.map(([trigger]) => trigger);
     if (pending.length > 0 && (await hasAutomationsFor([...spacesTouched], triggers))) {
         for (const [trigger, tasks] of pending) {
-            for (const taskId of tasks) await runAutomations({ trigger, taskId, actorId });
+            await runAutomationsFor({ trigger, taskIds: tasks, actorId });
         }
     }
 

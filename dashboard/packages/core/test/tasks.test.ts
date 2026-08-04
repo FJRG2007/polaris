@@ -735,6 +735,11 @@ describe("dependencies", () => {
         ]);
         expect([...engine.blockedTaskIds(edges, resolved)]).toEqual([]);
     });
+
+    it("keeps a blocker nobody knows the status of in the way", () => {
+        expect([...engine.blockedTaskIds(edges, new Map())]).toEqual(["b", "c"]);
+        expect(engine.blockerHolds(undefined)).toBe(true);
+    });
 });
 
 describe("recurrence", () => {

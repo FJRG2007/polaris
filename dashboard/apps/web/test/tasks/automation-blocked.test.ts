@@ -12,28 +12,28 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const SPACE = "s1";
 
-const taskFindUnique = vi.fn(async (_args: unknown) => null as unknown);
+const taskFindMany = vi.fn(async (_args: unknown) => [] as unknown[]);
 const automationFindMany = vi.fn(async (_args: unknown) => [] as unknown[]);
 const automationUpdate = vi.fn(async (_args: unknown) => ({}));
 const dependencyFindMany = vi.fn(async (_args: unknown) => [] as unknown[]);
-const activityCreate = vi.fn(async (_args: unknown) => ({}));
+const activityCreateMany = vi.fn(async (_args: unknown) => ({ count: 0 }));
 const taskUpdate = vi.fn(async (_args: unknown) => ({}));
 
 vi.mock("@polaris/db", () => ({
     prisma: {
-        task: { findUnique: taskFindUnique, update: taskUpdate },
+        task: { findMany: taskFindMany, update: taskUpdate },
         taskAutomation: { findMany: automationFindMany, update: automationUpdate },
         taskDependency: { findMany: dependencyFindMany },
-        taskActivity: { create: activityCreate }
+        taskActivity: { createMany: activityCreateMany }
     }
 }));
 
-const { runAutomations } = await import("../../src/lib/tasks/automation-service");
+const { runAutomations, runAutomationsFor } = await import("../../src/lib/tasks/automation-service");
 
 /** The projection the engine loads, with the parts a block can come from. */
-function task(overrides: Partial<Record<string, unknown>> = {}) {
-    taskFindUnique.mockResolvedValueOnce({
-        id: "t1",
+function facts(id: string, overrides: Partial<Record<string, unknown>> = {}) {
+    return {
+        id,
         name: "Ship it",
         spaceId: SPACE,
         listId: "l1",
@@ -59,15 +59,21 @@ function task(overrides: Partial<Record<string, unknown>> = {}) {
         tags: [],
         fieldValues: [],
         ...overrides
-    });
+    };
 }
 
-/** One rule: when the status changes and the task is blocked, add a comment. */
+/** The one task the engine will load for this call. */
+function task(overrides: Partial<Record<string, unknown>> = {}) {
+    taskFindMany.mockResolvedValueOnce([facts("t1", overrides)]);
+}
+
+/** One rule: when the status changes and the task is blocked, archive it. */
 function blockedRule(values: string[] = ["true"]) {
     automationFindMany.mockResolvedValueOnce([
         {
             id: "r1",
             name: "Flag it",
+            spaceId: SPACE,
             trigger: "task.statusChanged",
             listId: null,
             enabled: true,
@@ -103,7 +109,7 @@ describe("a rule conditioned on blocked", () => {
     it("fires for a task waiting on unfinished work", async () => {
         task();
         blockedRule();
-        dependencyFindMany.mockResolvedValueOnce([{ blocker: { status: { type: "active" } } }]);
+        dependencyFindMany.mockResolvedValueOnce([{ blockedId: "t1", blocker: { status: { type: "active" } } }]);
 
         await runAutomations({ trigger: "task.statusChanged", taskId: "t1", actorId: null });
 
@@ -122,7 +128,7 @@ describe("a rule conditioned on blocked", () => {
     it("does not fire once the blocker is finished and nothing else holds it", async () => {
         task();
         blockedRule();
-        dependencyFindMany.mockResolvedValueOnce([{ blocker: { status: { type: "done" } } }]);
+        dependencyFindMany.mockResolvedValueOnce([{ blockedId: "t1", blocker: { status: { type: "done" } } }]);
 
         await runAutomations({ trigger: "task.statusChanged", taskId: "t1", actorId: null });
 
@@ -136,5 +142,60 @@ describe("a rule conditioned on blocked", () => {
         await runAutomations({ trigger: "task.statusChanged", taskId: "t1", actorId: null });
 
         expect(ran()).toBe(true);
+    });
+
+    it("does not ask what blocks a task when no rule reads it", async () => {
+        task();
+        automationFindMany.mockResolvedValueOnce([
+            {
+                id: "r2",
+                name: "Always",
+                spaceId: SPACE,
+                trigger: "task.statusChanged",
+                listId: null,
+                enabled: true,
+                conditions: JSON.stringify({ match: "all", conditions: [] }),
+                actions: JSON.stringify([{ type: "archive" }])
+            }
+        ]);
+
+        await runAutomations({ trigger: "task.statusChanged", taskId: "t1", actorId: null });
+
+        expect(ran()).toBe(true);
+        expect(dependencyFindMany).not.toHaveBeenCalled();
+    });
+});
+
+describe("a rule raised for a selection", () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        dependencyFindMany.mockResolvedValue([]);
+    });
+
+    it("reads the rows, the rules and the blockers once for the whole batch", async () => {
+        taskFindMany.mockResolvedValueOnce([
+            facts("t1", { status: { type: "blocked" } }),
+            facts("t2", { status: { type: "blocked" } }),
+            facts("t3")
+        ]);
+        blockedRule();
+
+        await runAutomationsFor({ trigger: "task.statusChanged", taskIds: ["t1", "t2", "t3"], actorId: null });
+
+        expect(taskFindMany).toHaveBeenCalledTimes(1);
+        expect(automationFindMany).toHaveBeenCalledTimes(1);
+        expect(dependencyFindMany).toHaveBeenCalledTimes(1);
+        // Two of the three matched, so the rule is one write carrying two runs.
+        expect(automationUpdate).toHaveBeenCalledTimes(1);
+        expect(automationUpdate).toHaveBeenCalledWith(
+            expect.objectContaining({ data: expect.objectContaining({ runCount: { increment: 2 } }) })
+        );
+        expect(taskUpdate).toHaveBeenCalledTimes(2);
+    });
+
+    it("does nothing at all for an empty selection", async () => {
+        await runAutomationsFor({ trigger: "task.statusChanged", taskIds: [], actorId: null });
+
+        expect(taskFindMany).not.toHaveBeenCalled();
     });
 });
