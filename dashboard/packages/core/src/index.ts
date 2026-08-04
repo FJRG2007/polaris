@@ -40,6 +40,7 @@ export * from "./analytics-report.js";
 export * from "./waf-intel.js";
 export * from "./certificates.js";
 export * from "./waf-presets.js";
+export * from "./waf-managed.js";
 export * from "./waf-analytics.js";
 export * from "./tasks.js";
 export * from "./schemas/storage.js";

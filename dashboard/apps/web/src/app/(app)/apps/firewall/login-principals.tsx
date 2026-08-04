@@ -106,7 +106,7 @@ export function LoginPrincipals({
     }, []);
 
     return (
-        <div className="flex flex-col gap-4 bg-muted/30 py-3 pl-10 pr-4">
+        <div className="flex flex-col gap-4">
             <GrantList
                 title="Who gets in"
                 empty="Anyone with a Polaris account gets in. Name a role, a group or a person to narrow it to them."

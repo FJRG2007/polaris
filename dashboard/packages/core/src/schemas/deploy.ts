@@ -246,8 +246,22 @@ export type WafRuleAction = (typeof WAF_RULE_ACTIONS)[number];
 export const WAF_RULES_MAX = 32;
 const CONDITIONS_MAX = 8;
 const VALUES_MAX = 64;
+/**
+ * Tests one rule may hold across every level of its nesting.
+ *
+ * The per-level cap alone does not bound a nested rule: eight groups of eight groups
+ * of eight tests is 512, each with up to 64 values, in a header stamped onto every
+ * request to the route. This is the bound that actually matters, and it is generous
+ * enough that no rule anyone writes by hand meets it.
+ */
+export const WAF_RULE_TESTS_MAX = 32;
 
-export const wafConditionSchema = z.object({
+/** How a group reads its members: every one of them, or any one. */
+export const WAF_CONDITION_MATCHES = ["all", "any"] as const;
+export type WafConditionMatch = (typeof WAF_CONDITION_MATCHES)[number];
+
+/** One test against one fact of the request. */
+export const wafLeafConditionSchema = z.object({
     field: z.enum(WAF_RULE_FIELDS),
     operator: z.enum(WAF_RULE_OPERATORS),
     /** Matched as an OR: any value satisfying the operator satisfies the condition.
@@ -255,16 +269,72 @@ export const wafConditionSchema = z.object({
     values: z.array(z.string().trim().min(1).max(512)).min(1).max(VALUES_MAX)
 });
 
-export type WafCondition = z.infer<typeof wafConditionSchema>;
+export type WafLeafCondition = z.infer<typeof wafLeafConditionSchema>;
 
-export const wafCustomRuleSchema = z.object({
-    /** Names the rule in the list and in the block reason; not an identifier. */
-    name: z.string().trim().min(1).max(80),
-    enabled: z.boolean().default(true),
-    action: z.enum(WAF_RULE_ACTIONS),
-    /** All must match, so a rule reads as one sentence with "and" in it. */
-    conditions: z.array(wafConditionSchema).min(1).max(CONDITIONS_MAX)
-});
+/**
+ * A group of conditions read together.
+ *
+ * Nesting is what lets one rule say "from this network, AND (asking for /admin OR
+ * carrying an admin cookie)" - which without it is two rules that have to be kept in
+ * step by hand, or one that is simply not expressible.
+ *
+ * Built by explicit levels rather than by `z.lazy`, so the depth limit is the schema
+ * rather than a check bolted onto it: a rule's own list is an implicit `all`, a group
+ * inside it may hold groups, and those hold tests. Three levels is what an operator
+ * can still read at a glance, and every rule anyone writes fits in it.
+ */
+function wafConditionGroup<Inner extends z.ZodTypeAny>(inner: Inner) {
+    return z.object({
+        match: z.enum(WAF_CONDITION_MATCHES),
+        conditions: z.array(inner).min(1).max(CONDITIONS_MAX)
+    });
+}
+
+const wafInnerGroupSchema = wafConditionGroup(wafLeafConditionSchema);
+const wafGroupSchema = wafConditionGroup(z.union([wafLeafConditionSchema, wafInnerGroupSchema]));
+
+/**
+ * One entry of a rule: a test, or a group of them.
+ *
+ * A union rather than a tagged shape, so every rule written before nesting existed
+ * still parses exactly as it did - a stored condition carries `field` and no `match`,
+ * and the two members cannot be confused for one another.
+ */
+export const wafConditionSchema = z.union([wafLeafConditionSchema, wafGroupSchema]);
+
+export type WafCondition = z.infer<typeof wafConditionSchema>;
+export type WafConditionGroup = z.infer<typeof wafGroupSchema>;
+
+/** Whether a condition is a group rather than a test against a fact. */
+export function isWafConditionGroup(condition: WafCondition): condition is WafConditionGroup {
+    return "match" in condition;
+}
+
+/** How many tests a condition holds, counting through every group inside it. */
+export function wafConditionTests(condition: WafCondition): number {
+    if (!isWafConditionGroup(condition)) return 1;
+    return condition.conditions.reduce((total, entry) => total + wafConditionTests(entry), 0);
+}
+
+export const wafCustomRuleSchema = z
+    .object({
+        /** Names the rule in the list and in the block reason; not an identifier. */
+        name: z.string().trim().min(1).max(80),
+        enabled: z.boolean().default(true),
+        action: z.enum(WAF_RULE_ACTIONS),
+        /** All must match, so a rule reads as one sentence with "and" in it. */
+        conditions: z.array(wafConditionSchema).min(1).max(CONDITIONS_MAX)
+    })
+    .superRefine((value, ctx) => {
+        const tests = value.conditions.reduce((total, entry) => total + wafConditionTests(entry), 0);
+        if (tests > WAF_RULE_TESTS_MAX) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ["conditions"],
+                message: `At most ${WAF_RULE_TESTS_MAX} conditions in one rule`
+            });
+        }
+    });
 
 export type WafCustomRule = z.infer<typeof wafCustomRuleSchema>;
 

@@ -3,8 +3,11 @@
  *
  * A rule is a list of conditions over facts the edge already has about a request -
  * where it came from, what it asked for, what it said it was - and an action to take
- * when they all hold. Rules are tried in order and the first match decides, so a
- * narrow `allow` above a broad `block` is an exception rather than a contradiction.
+ * when they all hold. A condition is either one test or a group of them read as an
+ * `all` or an `any`, which is what lets one rule say "from this network, and asking
+ * for either of these two things". Rules are tried in order and the first match
+ * decides, so a narrow `allow` above a broad `block` is an exception rather than a
+ * contradiction.
  *
  * Deliberately pure and I/O-free: the same function runs in the co-located edge
  * guard, where there is no database to consult, and in tests, where there is nothing
@@ -14,7 +17,8 @@
  */
 
 import { ipAllowed } from "./cidr.js";
-import type { WafCondition, WafCustomRule, WafRuleAction } from "./schemas/deploy.js";
+import { isWafConditionGroup } from "./schemas/deploy.js";
+import type { WafCondition, WafCustomRule, WafLeafCondition, WafRuleAction } from "./schemas/deploy.js";
 
 /** The request as the edge forwards it. Any fact can be missing - a client is not
  *  obliged to send a user agent, and a proxy may not forward an address. */
@@ -35,7 +39,7 @@ const NEGATIVE = new Set(["not_equals", "not_contains", "not_starts_with", "not_
  * query string are compared as sent; a hostname, a method and a user agent are not
  * case-sensitive in any way an operator would expect to have to think about.
  */
-function factFor(field: WafCondition["field"], facts: WafRequestFacts): string | null {
+function factFor(field: WafLeafCondition["field"], facts: WafRequestFacts): string | null {
     switch (field) {
         case "ip":
             return facts.ip ?? null;
@@ -53,7 +57,7 @@ function factFor(field: WafCondition["field"], facts: WafRequestFacts): string |
 }
 
 /** The value as it is compared, matching how the fact was normalized. */
-function normalizeValue(field: WafCondition["field"], value: string): string {
+function normalizeValue(field: WafLeafCondition["field"], value: string): string {
     const trimmed = value.trim();
     if (field === "host" || field === "user_agent") return trimmed.toLowerCase();
     if (field === "method") return trimmed.toUpperCase();
@@ -61,7 +65,7 @@ function normalizeValue(field: WafCondition["field"], value: string): string {
 }
 
 /** Whether one value satisfies the operator against the fact. */
-function matchesValue(operator: WafCondition["operator"], fact: string, value: string): boolean {
+function matchesValue(operator: WafLeafCondition["operator"], fact: string, value: string): boolean {
     switch (operator) {
         case "equals":
         case "not_equals":
@@ -79,7 +83,7 @@ function matchesValue(operator: WafCondition["operator"], fact: string, value: s
 }
 
 /**
- * Whether one condition holds.
+ * Whether one test holds.
  *
  * A missing fact never satisfies a condition, including a negative one: "the user
  * agent is not curl" must not become true for a request that sent no user agent at
@@ -87,7 +91,7 @@ function matchesValue(operator: WafCondition["operator"], fact: string, value: s
  * address is the one field with its own comparison - an entry there is an IP or a
  * CIDR range, so it is matched by containment rather than by string.
  */
-function conditionHolds(condition: WafCondition, facts: WafRequestFacts): boolean {
+function leafHolds(condition: WafLeafCondition, facts: WafRequestFacts): boolean {
     const fact = factFor(condition.field, facts);
     if (fact === null || fact === "") return false;
 
@@ -99,6 +103,20 @@ function conditionHolds(condition: WafCondition, facts: WafRequestFacts): boolea
     const values = condition.values.map((value) => normalizeValue(condition.field, value));
     const anyMatch = values.some((value) => matchesValue(condition.operator, fact, value));
     return NEGATIVE.has(condition.operator) ? !anyMatch : anyMatch;
+}
+
+/**
+ * Whether one condition holds - a test, or a group read as its own `all`/`any`.
+ *
+ * Short-circuits the way the operators read, so a group whose answer is already
+ * settled costs nothing more: a rule's cost is what its first few conditions decide,
+ * not what it could look at.
+ */
+export function conditionHolds(condition: WafCondition, facts: WafRequestFacts): boolean {
+    if (!isWafConditionGroup(condition)) return leafHolds(condition, facts);
+    return condition.match === "any"
+        ? condition.conditions.some((entry) => conditionHolds(entry, facts))
+        : condition.conditions.every((entry) => conditionHolds(entry, facts));
 }
 
 /** Whether every one of a rule's conditions holds. */

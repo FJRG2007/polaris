@@ -9,7 +9,7 @@
 
 import { describe, expect, it } from "vitest";
 import { evaluateWafRules } from "../src/waf-rules.js";
-import type { WafCustomRule } from "../src/schemas/deploy.js";
+import { wafConditionTests, wafCustomRuleSchema, type WafCustomRule } from "../src/schemas/deploy.js";
 
 function rule(overrides: Partial<WafCustomRule> & Pick<WafCustomRule, "conditions">): WafCustomRule {
     return { name: "rule", enabled: true, action: "block", ...overrides };
@@ -70,6 +70,120 @@ describe("combining conditions", () => {
 
         expect(evaluateWafRules(rules, { path: "/api/things", method: "DELETE" })?.action).toBe("block");
         expect(evaluateWafRules(rules, { path: "/api/things", method: "GET" })).toBeNull();
+    });
+
+    it("reads a nested group as its own any", () => {
+        const rules = [
+            rule({
+                conditions: [
+                    { field: "ip", operator: "equals", values: ["203.0.113.0/24"] },
+                    {
+                        match: "any",
+                        conditions: [
+                            { field: "path", operator: "starts_with", values: ["/admin"] },
+                            { field: "query", operator: "contains", values: ["debug=1"] }
+                        ]
+                    }
+                ]
+            })
+        ];
+
+        expect(evaluateWafRules(rules, { ip: "203.0.113.9", path: "/admin/users" })?.action).toBe("block");
+        expect(evaluateWafRules(rules, { ip: "203.0.113.9", path: "/", query: "debug=1" })?.action).toBe("block");
+        // Inside the network but doing neither of the two things the group names.
+        expect(evaluateWafRules(rules, { ip: "203.0.113.9", path: "/about" })).toBeNull();
+        // Doing one of them from outside the network.
+        expect(evaluateWafRules(rules, { ip: "198.51.100.2", path: "/admin/users" })).toBeNull();
+    });
+
+    it("reads a nested group as its own all", () => {
+        const rules = [
+            rule({
+                conditions: [
+                    {
+                        match: "all",
+                        conditions: [
+                            { field: "path", operator: "starts_with", values: ["/api"] },
+                            { field: "method", operator: "equals", values: ["POST"] }
+                        ]
+                    }
+                ]
+            })
+        ];
+
+        expect(evaluateWafRules(rules, { path: "/api/things", method: "POST" })?.action).toBe("block");
+        expect(evaluateWafRules(rules, { path: "/api/things", method: "GET" })).toBeNull();
+    });
+
+    it("carries the match down a second level of nesting", () => {
+        const rules = [
+            rule({
+                conditions: [
+                    {
+                        match: "any",
+                        conditions: [
+                            { field: "user_agent", operator: "contains", values: ["curl"] },
+                            {
+                                match: "all",
+                                conditions: [
+                                    { field: "method", operator: "equals", values: ["POST"] },
+                                    { field: "path", operator: "ends_with", values: [".php"] }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            })
+        ];
+
+        expect(evaluateWafRules(rules, { userAgent: "curl/8.4.0" })?.action).toBe("block");
+        expect(evaluateWafRules(rules, { method: "POST", path: "/x.php" })?.action).toBe("block");
+        // The inner group is an `all`, so half of it is not enough.
+        expect(evaluateWafRules(rules, { method: "POST", path: "/x.html" })).toBeNull();
+    });
+});
+
+describe("what a rule may hold", () => {
+    it("still accepts a rule written before groups existed", () => {
+        const parsed = wafCustomRuleSchema.safeParse({
+            name: "old",
+            enabled: true,
+            action: "block",
+            conditions: [{ field: "path", operator: "starts_with", values: ["/wp-admin"] }]
+        });
+
+        expect(parsed.success).toBe(true);
+    });
+
+    it("refuses a rule with more tests than the wire format should carry", () => {
+        const test = { field: "path", operator: "contains", values: ["x"] };
+        const group = { match: "any", conditions: Array.from({ length: 8 }, () => test) };
+        const parsed = wafCustomRuleSchema.safeParse({
+            name: "too much",
+            action: "block",
+            // 8 groups of 8 is 64 tests, twice what one rule may hold.
+            conditions: Array.from({ length: 8 }, () => group)
+        });
+
+        expect(parsed.success).toBe(false);
+    });
+
+    it("counts the tests inside every group", () => {
+        expect(
+            wafConditionTests({
+                match: "any",
+                conditions: [
+                    { field: "path", operator: "contains", values: ["a"] },
+                    {
+                        match: "all",
+                        conditions: [
+                            { field: "path", operator: "contains", values: ["b"] },
+                            { field: "path", operator: "contains", values: ["c"] }
+                        ]
+                    }
+                ]
+            })
+        ).toBe(3);
     });
 });
 

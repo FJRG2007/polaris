@@ -15,11 +15,22 @@
  */
 
 import { useState } from "react";
+import { PageHeader, Section } from "./page-parts";
 import { Button, Input, Select } from "@polaris/ui";
 import { ChipList, validAddress } from "./chip-list";
-import { ArrowLeft, Plus, TriangleAlert, X } from "lucide-react";
-import type { WafCondition, WafCustomRule, WafRuleField, WafRuleOperator } from "@polaris/core";
+import { Brackets, Plus, TriangleAlert, X } from "lucide-react";
+import { isWafConditionGroup, WAF_RULE_TESTS_MAX, wafConditionTests } from "@polaris/core";
+import type {
+    WafCondition,
+    WafConditionGroup,
+    WafCustomRule,
+    WafLeafCondition,
+    WafRuleField,
+    WafRuleOperator
+} from "@polaris/core";
 import {
+    emptyCondition,
+    emptyGroup,
     FIELD_OPTIONS,
     IP_OPERATORS,
     operatorOptions,
@@ -64,14 +75,23 @@ export function emptyRule(count: number): WafCustomRule {
     };
 }
 
+/** Whether any test anywhere in the tree is still waiting for a value. A half-written
+ *  condition matches nothing or everything depending on its operator, which is the one
+ *  thing that must never reach the edge. */
+function anyEmpty(conditions: readonly WafCondition[]): boolean {
+    return conditions.some((condition) =>
+        isWafConditionGroup(condition) ? anyEmpty(condition.conditions) : condition.values.length === 0
+    );
+}
+
 /** Why this rule cannot be saved yet, or null when it can. Every reason is something
  *  the reader can see and fix on this screen. */
 function blockingReason(rule: WafCustomRule): string | null {
     if (rule.name.trim() === "") return "Give the rule a name.";
     if (rule.conditions.length === 0) return "Add at least one condition.";
-    if (rule.conditions.some((condition) => condition.values.length === 0)) {
-        return "Every condition needs at least one value.";
-    }
+    if (anyEmpty(rule.conditions)) return "Every condition needs at least one value.";
+    const tests = rule.conditions.reduce((total, condition) => total + wafConditionTests(condition), 0);
+    if (tests > WAF_RULE_TESTS_MAX) return `A rule can hold at most ${WAF_RULE_TESTS_MAX} conditions.`;
     return null;
 }
 
@@ -100,28 +120,11 @@ export function RuleEditor({
     const blocked = blockingReason(rule);
     const creating = index === null;
 
-    function patchCondition(at: number, next: WafCondition) {
-        setRule({ ...rule, conditions: rule.conditions.map((entry, i) => (i === at ? next : entry)) });
-    }
-
     return (
         <div className="flex flex-col gap-4">
-            <div className="flex items-center gap-2">
-                <button
-                    type="button"
-                    onClick={onCancel}
-                    aria-label="Back to the rule list"
-                    title="Back"
-                    className="inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                    <ArrowLeft className="size-4 shrink-0" aria-hidden="true" />
-                </button>
-                <h2 className="min-w-0 truncate text-lg font-semibold">
-                    {creating ? "Create custom rule" : "Edit custom rule"}
-                </h2>
-            </div>
+            <PageHeader title={creating ? "Create custom rule" : "Edit custom rule"} onBack={onCancel} />
 
-            <Field
+            <Section
                 title="Rule name"
                 hint="Names the rule in the list and in the reason a blocked request is refused with."
             >
@@ -135,40 +138,19 @@ export function RuleEditor({
                     className="max-w-xl"
                     onChange={(event) => setRule({ ...rule, name: event.target.value })}
                 />
-            </Field>
+            </Section>
 
-            <Field
+            <Section
                 title="When incoming requests match..."
-                hint="Every condition must hold. Within one condition, any of its values is enough."
+                hint="Every condition must hold. Within one condition, any of its values is enough. Group conditions to ask for any one of them instead."
             >
                 <div className="flex flex-col gap-3">
-                    {rule.conditions.map((condition, at) => (
-                        <ConditionRow
-                            key={at}
-                            condition={condition}
-                            first={at === 0}
-                            removable={rule.conditions.length > 1}
-                            onChange={(next) => patchCondition(at, next)}
-                            onRemove={() =>
-                                setRule({ ...rule, conditions: rule.conditions.filter((_, i) => i !== at) })
-                            }
-                        />
-                    ))}
-                    <Button
-                        type="button"
-                        variant="secondary"
-                        size="sm"
-                        className="w-fit"
-                        onClick={() =>
-                            setRule({
-                                ...rule,
-                                conditions: [...rule.conditions, { field: "path", operator: "contains", values: [] }]
-                            })
-                        }
-                    >
-                        <Plus className="size-3.5 shrink-0" aria-hidden="true" />
-                        And
-                    </Button>
+                    <ConditionList
+                        conditions={rule.conditions}
+                        match="all"
+                        depth={0}
+                        onChange={(conditions) => setRule({ ...rule, conditions })}
+                    />
 
                     <div className="mt-1 flex flex-col gap-1.5">
                         <span className="text-xs font-medium text-muted-foreground">Expression preview</span>
@@ -177,9 +159,9 @@ export function RuleEditor({
                         </pre>
                     </div>
                 </div>
-            </Field>
+            </Section>
 
-            <Field title="Then take action...">
+            <Section title="Then take action...">
                 <div className="flex flex-col gap-1.5">
                     <span className="text-xs font-medium text-muted-foreground">Choose action</span>
                     <Select
@@ -191,9 +173,9 @@ export function RuleEditor({
                     />
                     <p className="text-xs text-muted-foreground">{ACTION_EFFECT[rule.action]}</p>
                 </div>
-            </Field>
+            </Section>
 
-            <Field
+            <Section
                 title="Execution order"
                 hint="Rules are evaluated in order. Where this one sits decides whether it gets the request before or after the others."
             >
@@ -236,9 +218,9 @@ export function RuleEditor({
                         </div>
                     ) : null}
                 </div>
-            </Field>
+            </Section>
 
-            <Field title="Status" hint="Controls whether the rule evaluates incoming traffic.">
+            <Section title="Status" hint="Controls whether the rule evaluates incoming traffic.">
                 <fieldset className="flex flex-col gap-2">
                     <legend className="sr-only">Status</legend>
                     <Radio
@@ -254,7 +236,7 @@ export function RuleEditor({
                         onSelect={() => setRule({ ...rule, enabled: false })}
                     />
                 </fieldset>
-            </Field>
+            </Section>
 
             {blocked ? (
                 <p className="flex items-start gap-1.5 text-xs text-danger">
@@ -287,36 +269,158 @@ function startingPosition(index: number | null): RulePosition {
     return index === 0 ? { kind: "first" } : { kind: "after", index: index - 1 };
 }
 
-/** One titled block of the form. A sibling surface rather than a card inside the
- *  page's card - the same reason the list is a table and not a stack of boxes. */
-function Field({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
+/** How deep a group may sit before the schema stops accepting one. Three levels of
+ *  reading is already the limit of what an operator can hold in their head, and it is
+ *  the same bound `wafConditionSchema` is built to. */
+const GROUP_DEPTH_MAX = 2;
+
+/**
+ * One level of the condition tree: the rule's own list, or a group's members.
+ *
+ * The joiner between rows is drawn here rather than by each row, because it is a fact
+ * about the list they are in - "and" at the top, whichever word the group matches on
+ * inside one. A row that drew its own would be stating its parent's rule from the
+ * wrong place, and would have to be told anyway.
+ */
+function ConditionList({
+    conditions,
+    match,
+    depth,
+    onChange
+}: {
+    conditions: readonly WafCondition[];
+    /** How this level reads its members, which is what the joiner says. */
+    match: "all" | "any";
+    depth: number;
+    onChange: (next: WafCondition[]) => void;
+}) {
+    const joiner = match === "any" ? "or" : "and";
+    const replace = (at: number, next: WafCondition): void =>
+        onChange(conditions.map((entry, index) => (index === at ? next : entry)));
+
     return (
-        <section className="flex flex-col gap-3 rounded-lg border border-border bg-card px-4 py-4">
-            <div className="flex flex-col gap-1">
-                <h3 className="text-sm font-semibold">{title}</h3>
-                {hint ? <p className="text-xs text-muted-foreground">{hint}</p> : null}
+        <div className="flex flex-col gap-2">
+            {conditions.map((condition, at) => (
+                <div key={at} className="flex flex-col gap-2">
+                    {at === 0 ? null : <span className="text-xs font-medium text-muted-foreground">{joiner}</span>}
+                    {isWafConditionGroup(condition) ? (
+                        <ConditionGroupBlock
+                            group={condition}
+                            depth={depth + 1}
+                            removable={conditions.length > 1}
+                            onChange={(next) => replace(at, next)}
+                            onRemove={() => onChange(conditions.filter((_, index) => index !== at))}
+                        />
+                    ) : (
+                        <ConditionRow
+                            condition={condition}
+                            removable={conditions.length > 1}
+                            onChange={(next) => replace(at, next)}
+                            onRemove={() => onChange(conditions.filter((_, index) => index !== at))}
+                        />
+                    )}
+                </div>
+            ))}
+
+            <div className="flex flex-wrap gap-2">
+                <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    className="w-fit"
+                    onClick={() => onChange([...conditions, emptyCondition()])}
+                >
+                    <Plus className="size-3.5 shrink-0" aria-hidden="true" />
+                    {match === "any" ? "Or" : "And"}
+                </Button>
+                {depth < GROUP_DEPTH_MAX ? (
+                    <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        className="w-fit"
+                        title="A group holds several conditions and is satisfied by any one of them"
+                        onClick={() => onChange([...conditions, emptyGroup()])}
+                    >
+                        <Brackets className="size-3.5 shrink-0" aria-hidden="true" />
+                        Group
+                    </Button>
+                ) : null}
             </div>
-            {children}
-        </section>
+        </div>
+    );
+}
+
+const MATCH_OPTIONS = [
+    { value: "any", label: "any of these" },
+    { value: "all", label: "all of these" }
+];
+
+/** A group, drawn as an indented surface so the bracket in the expression preview has
+ *  something on screen that corresponds to it. */
+function ConditionGroupBlock({
+    group,
+    depth,
+    removable,
+    onChange,
+    onRemove
+}: {
+    group: WafConditionGroup;
+    depth: number;
+    removable: boolean;
+    onChange: (next: WafConditionGroup) => void;
+    onRemove: () => void;
+}) {
+    return (
+        <div className="flex flex-col gap-2 rounded-md border border-border bg-muted/20 px-3 py-3">
+            <div className="flex items-center gap-2">
+                <span className="text-xs font-medium text-muted-foreground">Matches</span>
+                <Select
+                    value={group.match}
+                    aria-label="How this group matches"
+                    className="w-36"
+                    options={MATCH_OPTIONS}
+                    onValueChange={(value) => onChange({ ...group, match: value as WafConditionGroup["match"] })}
+                />
+                {removable ? (
+                    <button
+                        type="button"
+                        onClick={onRemove}
+                        aria-label="Remove this group"
+                        title="Remove the group"
+                        className="ml-auto inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                        <X className="size-3.5 shrink-0" aria-hidden="true" />
+                    </button>
+                ) : null}
+            </div>
+            <ConditionList
+                conditions={group.conditions}
+                match={group.match}
+                depth={depth}
+                // The schema types the innermost group as holding tests only, which is
+                // the depth limit expressed in the type. The list above cannot produce
+                // one deeper - it stops offering Group at GROUP_DEPTH_MAX - so this is
+                // narrowing back to what was already true rather than asserting it.
+                onChange={(conditions) => onChange({ ...group, conditions } as WafConditionGroup)}
+            />
+        </div>
     );
 }
 
 function ConditionRow({
     condition,
-    first,
     removable,
     onChange,
     onRemove
 }: {
-    condition: WafCondition;
-    first: boolean;
+    condition: WafLeafCondition;
     removable: boolean;
-    onChange: (next: WafCondition) => void;
+    onChange: (next: WafLeafCondition) => void;
     onRemove: () => void;
 }) {
     return (
         <div className="flex flex-col gap-2">
-            {first ? null : <span className="text-xs font-medium text-muted-foreground">and</span>}
             <div className="flex flex-wrap items-end gap-2">
                 <label className="flex min-w-0 flex-col gap-1.5 text-xs font-medium text-muted-foreground">
                     Field

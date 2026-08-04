@@ -10,11 +10,13 @@
  * The expression is not a second source of truth. It is a rendering of the same
  * `WafCustomRule` the engine evaluates, in the shape an operator who has used a WAF
  * before already reads: values within a condition are an `or`, conditions are joined
- * by `and`. It is deliberately not editable - a text expression the engine cannot
- * parse back would be a second rule format to keep in step with the first.
+ * by `and`, and a group is a bracket joined by whichever of the two it matches on.
+ * It is deliberately not editable - a text expression the engine cannot parse back
+ * would be a second rule format to keep in step with the first.
  */
 
-import type { WafCondition, WafCustomRule, WafRuleField, WafRuleOperator } from "@polaris/core";
+import { isWafConditionGroup } from "@polaris/core";
+import type { WafCondition, WafCustomRule, WafLeafCondition, WafRuleField, WafRuleOperator } from "@polaris/core";
 
 /** What each field is called where an operator reads it, rather than where it is
  *  stored. */
@@ -94,8 +96,13 @@ function quote(value: string): string {
 }
 
 /** One condition as an expression. Several values are an `or` over the same field,
- *  which is what the engine does with them. */
+ *  which is what the engine does with them; a group is its own bracket, joined by
+ *  whichever word it matches on. */
 function conditionExpression(condition: WafCondition): string {
+    if (isWafConditionGroup(condition)) {
+        const joiner = condition.match === "any" ? " or " : " and ";
+        return `(${condition.conditions.map(conditionExpression).join(joiner)})`;
+    }
     const field = FIELD_TOKENS[condition.field];
     const operator = OPERATOR_TOKENS[condition.operator];
     if (condition.values.length === 0) return `${field} ${operator} ...`;
@@ -107,7 +114,13 @@ function conditionExpression(condition: WafCondition): string {
 export function ruleExpression(rule: Pick<WafCustomRule, "conditions">): string {
     if (rule.conditions.length === 0) return "";
     const parts = rule.conditions.map(conditionExpression);
-    return parts.length === 1 ? `(${parts[0]!})` : parts.map((part) => `(${part})`).join(" and ");
+    return parts.length === 1 ? bracket(parts[0]!) : parts.map(bracket).join(" and ");
+}
+
+/** A part in brackets, unless it already brought its own - a group renders its own
+ *  pair, and `((a or b))` reads as a mistake rather than as nesting. */
+function bracket(part: string): string {
+    return part.startsWith("(") && part.endsWith(")") ? part : `(${part})`;
 }
 
 /** The rule as a sentence, for the list's Description column. Long value lists are
@@ -120,10 +133,26 @@ export function ruleDescription(rule: Pick<WafCustomRule, "conditions">): string
 const VALUES_SHOWN = 3;
 
 function describeCondition(condition: WafCondition): string {
+    if (isWafConditionGroup(condition)) {
+        const joiner = condition.match === "any" ? " or " : " and ";
+        return `(${condition.conditions.map(describeCondition).join(joiner)})`;
+    }
     const field = FIELD_LABELS[condition.field];
     const operator = OPERATOR_LABELS[condition.operator];
     if (condition.values.length === 0) return `${field} ${operator} ...`;
     const shown = condition.values.slice(0, VALUES_SHOWN).join(", ");
     const rest = condition.values.length - VALUES_SHOWN;
     return rest > 0 ? `${field} ${operator} ${shown} and ${rest} more` : `${field} ${operator} ${shown}`;
+}
+
+/** A group with nothing in it yet, offered when one is added. Starts on `any`, which
+ *  is the reason to open a group at all - an `all` is what the rule's own list
+ *  already does. */
+export function emptyGroup(): WafCondition {
+    return { match: "any", conditions: [emptyCondition(), emptyCondition()] };
+}
+
+/** A test with nothing in it yet. */
+export function emptyCondition(): WafLeafCondition {
+    return { field: "path", operator: "contains", values: [] };
 }

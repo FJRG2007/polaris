@@ -43,6 +43,39 @@ describe("guard rule codec", () => {
         expect(decodeGuardRule(encodeGuardRule(rule))).toEqual(rule);
     });
 
+    it("round-trips a rule with nested condition groups", () => {
+        // The decoder re-validates every rule and drops the ones that fail, so a
+        // group the schema does not recognise would not be a visible error - it would
+        // be a rule that quietly stops being enforced at the edge.
+        const nested = {
+            name: "admin from outside",
+            enabled: true,
+            action: "block" as const,
+            conditions: [
+                { field: "ip" as const, operator: "not_equals" as const, values: ["203.0.113.0/24"] },
+                {
+                    match: "any" as const,
+                    conditions: [
+                        { field: "path" as const, operator: "starts_with" as const, values: ["/admin"] },
+                        {
+                            match: "all" as const,
+                            conditions: [
+                                { field: "method" as const, operator: "equals" as const, values: ["POST"] },
+                                { field: "query" as const, operator: "contains" as const, values: ["debug=1"] }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        };
+
+        const decoded = decodeGuardRule(
+            encodeGuardRule({ deny: [], requireLogin: false, rules: [nested] })
+        );
+
+        expect(decoded.rules).toEqual([nested]);
+    });
+
     it("treats an absent header as a no-op", () => {
         expect(decodeGuardRule(undefined)).toEqual({
             deny: [],
