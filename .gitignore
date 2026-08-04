@@ -61,6 +61,12 @@ id_ed25519.pub
 known_hosts
 *.log
 secrets.*
+# ...but a TypeScript module *about* secrets is source, not a secret. `secrets.*`
+# is here for credential dumps (secrets.json, secrets.env, secrets.yaml); a .ts
+# file is never one. Same trap as the route above, and it fails the same silent
+# way: the file builds locally, is never committed, and the build dies wherever
+# it is checked out fresh.
+!**/secrets.ts
 *.pem
 *.key
 
