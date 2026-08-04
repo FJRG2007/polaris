@@ -15,7 +15,7 @@
 
 import { RefreshCw } from "lucide-react";
 import { Button, Select } from "@polaris/ui";
-import type { DisplayFormat } from "@polaris/core";
+import { sessionName, type DisplayFormat } from "@polaris/core";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { UserActivityEntry } from "@/lib/audit-service";
 import { useDisplayFormat } from "@/components/display-format";
@@ -46,10 +46,19 @@ interface ActivityPayload {
     sessions: ActivitySession[];
 }
 
-/** How one session reads in the filter and in the table's own column. */
-function sessionName(session: ActivitySession, format: DisplayFormat): string {
+/**
+ * How one session reads in the filter and in the table's own column.
+ *
+ * The name leads and the device follows it, because a filter listing "Chrome on
+ * Windows" three times is a filter nobody can pick from. The name is derived
+ * from the id here rather than sent with the row: it is a pure function of
+ * something the payload already carries, so shipping it would be shipping a
+ * second copy of the same fact.
+ */
+function sessionLabel(session: ActivitySession, format: DisplayFormat): string {
     if (session.id === NO_SESSION) return "Outside a session";
-    if (session.label) return session.current ? `${session.label} (this device)` : session.label;
+    const named = [sessionName(session.id), session.label].filter(Boolean).join(" - ");
+    if (named) return session.current ? `${named} (this device)` : named;
     return session.lastAt ? `Signed-out session - ${format.date(session.lastAt)}` : "Signed-out session";
 }
 
@@ -74,7 +83,7 @@ export function ActivityView() {
     });
 
     const sessions = data?.sessions ?? [];
-    const names = new Map(sessions.map((session) => [session.id, sessionName(session, format)]));
+    const names = new Map(sessions.map((session) => [session.id, sessionLabel(session, format)]));
     const rows: ActivityRow[] | null =
         data?.items.map((entry) => ({
             id: entry.id,
@@ -103,7 +112,7 @@ export function ActivityView() {
                     className="h-8 w-full sm:w-72"
                     options={[
                         { value: ALL, label: "All sessions" },
-                        ...sessions.map((session) => ({ value: session.id, label: sessionName(session, format) }))
+                        ...sessions.map((session) => ({ value: session.id, label: sessionLabel(session, format) }))
                     ]}
                 />
                 <Button

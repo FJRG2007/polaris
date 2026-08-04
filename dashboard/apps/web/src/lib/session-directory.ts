@@ -15,8 +15,8 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@polaris/db";
 import { cookies } from "next/headers";
 import { recordAudit } from "@/lib/audit-service";
-import { sessionDevice } from "@/lib/session-device";
 import { networkPublicIp } from "@/lib/network-service";
+import { sessionClient, sessionDevice } from "@/lib/session-device";
 import { listUserPasskeys, type PasskeyView } from "@/lib/passkey-directory";
 import { clientHost, clientIp, clientUserAgent, clientUserAgentBrands } from "@/lib/request-context";
 import {
@@ -25,6 +25,7 @@ import {
     isPrivateIp,
     parseSecondFactor,
     parseSignInMethod,
+    sessionName,
     type SignInRecord
 } from "@polaris/core";
 import {
@@ -59,7 +60,16 @@ export interface SessionView {
     current: boolean;
     approval: "approved" | "pending" | "denied";
     locked: boolean;
+    /** What this session is called - "Pegasus" - so a row can be pointed at in a
+     *  sentence. Worked out from the id and never stored; see `sessionName`. */
+    name: string;
     device: string;
+    /** The same claim as `device`, split so a table can column it and draw the
+     *  marks. Versions are null where the client stated none. */
+    browser: string;
+    browserVersion: string | null;
+    os: string;
+    osVersion: string | null;
     ip: string | null;
     /** The address this network reaches the internet from, set only when `ip` is
      *  a local one. A row that says 192.168.1.131 and nothing else cannot be
@@ -162,12 +172,18 @@ function toSessionView(
     const approval = row.state?.approval ?? "approved";
     const ip = row.state?.ip ?? row.ipAddress;
     const authorizerId = row.state?.authorizedBySessionId ?? null;
+    const client = sessionClient(row);
     return {
         id: row.id,
         current: row.id === currentSessionId,
         approval: (APPROVALS.has(approval) ? approval : "approved") as SessionView["approval"],
         locked: row.state?.lockedAt != null,
-        device: sessionDevice(row),
+        name: sessionName(row.id),
+        device: client.label,
+        browser: client.browser,
+        browserVersion: client.browserVersion,
+        os: client.os,
+        osVersion: client.osVersion,
         ip,
         publicIp: ip && isLocalAddress(ip) ? publicIp : null,
         country: row.state?.country ?? null,

@@ -18,6 +18,7 @@ export * from "./connection-providers.js";
 export * from "./sign-in-methods.js";
 export * from "./request-origin.js";
 export * from "./user-agent.js";
+export * from "./session-names.js";
 export * from "./password-safety.js";
 export * from "./paths.js";
 export * from "./format.js";

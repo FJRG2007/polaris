@@ -20,7 +20,14 @@
 
 export interface ClientReading {
     browser: string;
+    /** The major version, as the client stated it, or null when it stated none.
+     *  Major only: a table asking "is this browser current" is answered by 131,
+     *  and 131.0.6778.86 is four numbers nobody reads. */
+    browserVersion: string | null;
     os: string;
+    /** The operating system's version, where the claim carries one. Null on
+     *  Linux, which names no version, and on anything unrecognised. */
+    osVersion: string | null;
     /** "Brave on Windows" - the single string a table cell or a card shows. */
     label: string;
 }
@@ -41,42 +48,76 @@ const MAX_BRANDS = 256;
  * and only its first quoted token taken - reading every quoted string in the
  * header would name browsers after their version numbers.
  */
-function brandFromHints(brands: string | null | undefined): string | null {
+function brandFromHints(brands: string | null | undefined): { name: string; version: string | null } | null {
     if (!brands) return null;
     for (const entry of brands.slice(0, MAX_BRANDS).split(",")) {
         const name = entry.match(/"([^"]{1,40})"/)?.[1]?.trim();
         if (!name || UNNAMED_BRAND.test(name)) continue;
+        // The version is the brand's own `v="..."`, read from this entry alone.
+        // Taken from the header at large it would be whichever brand came first,
+        // which on a Chromium is the padding entry's made-up number.
+        const version = entry.match(/v="(\d{1,4})/)?.[1] ?? null;
         // Chrome is the only one that brands itself with the vendor attached.
-        return name === "Google Chrome" ? "Chrome" : name;
+        return { name: name === "Google Chrome" ? "Chrome" : name, version };
     }
     return null;
 }
 
-function browserFromUserAgent(userAgent: string): string {
-    return (
-        /\bEdg\//.test(userAgent) ? "Edge"
-        : /\bOPR\//.test(userAgent) ? "Opera"
-        : /\bVivaldi\//.test(userAgent) ? "Vivaldi"
-        : /\bSamsungBrowser\//.test(userAgent) ? "Samsung Internet"
-        : /\bFirefox\//.test(userAgent) ? "Firefox"
-        : /\bChrome\//.test(userAgent) ? "Chrome"
-        : /\bSafari\//.test(userAgent) ? "Safari"
-        : "Browser"
-    );
+/**
+ * The browser a user-agent claims, and the token its version is written in.
+ *
+ * Order matters and is the whole trick: every Chromium keeps `Chrome/` in the
+ * string and Safari's token trails all of them, so the narrower claim is tested
+ * first and the broadest last. Safari states its own version as `Version/`,
+ * because the number after `Safari/` is the engine build and not what anybody
+ * calls their browser.
+ */
+const BROWSERS: readonly { readonly test: RegExp; readonly name: string; readonly version: RegExp }[] = [
+    { test: /\bEdg\//, name: "Edge", version: /\bEdg\/(\d{1,4})/ },
+    { test: /\bOPR\//, name: "Opera", version: /\bOPR\/(\d{1,4})/ },
+    { test: /\bVivaldi\//, name: "Vivaldi", version: /\bVivaldi\/(\d{1,4})/ },
+    { test: /\bSamsungBrowser\//, name: "Samsung Internet", version: /\bSamsungBrowser\/(\d{1,4})/ },
+    { test: /\bFirefox\//, name: "Firefox", version: /\bFirefox\/(\d{1,4})/ },
+    { test: /\bChrome\//, name: "Chrome", version: /\bChrome\/(\d{1,4})/ },
+    { test: /\bSafari\//, name: "Safari", version: /\bVersion\/(\d{1,4})/ }
+];
+
+function browserFromUserAgent(userAgent: string): { name: string; version: string | null } {
+    for (const entry of BROWSERS) {
+        if (!entry.test.test(userAgent)) continue;
+        return { name: entry.name, version: userAgent.match(entry.version)?.[1] ?? null };
+    }
+    return { name: "Browser", version: null };
 }
 
-/** Android and ChromeOS both say Linux, and an iPad says Mac, so the narrower
- *  claims are read first. */
-function osFromUserAgent(userAgent: string): string {
-    return (
-        /Windows/.test(userAgent) ? "Windows"
-        : /Android/.test(userAgent) ? "Android"
-        : /iPhone|iPad|iPod|iOS/.test(userAgent) ? "iOS"
-        : /Mac OS X|Macintosh/.test(userAgent) ? "macOS"
-        : /CrOS/.test(userAgent) ? "ChromeOS"
-        : /Linux/.test(userAgent) ? "Linux"
-        : "Unknown OS"
-    );
+/**
+ * The operating system a user-agent claims, and its version where it states one.
+ *
+ * Android and ChromeOS both say Linux, and an iPad says Mac, so the narrower
+ * claims are read first. Apple writes its versions with underscores, so those
+ * come back as the dots people read them in.
+ *
+ * Windows is the one that cannot be pinned down: 10 and 11 both report
+ * `Windows NT 10.0`, deliberately, so the number is left off rather than
+ * guessed. Telling them apart needs `sec-ch-ua-platform-version`, which is a
+ * high-entropy hint a site has to ask for and this deployment does not.
+ */
+const OPERATING_SYSTEMS: readonly { readonly test: RegExp; readonly name: string; readonly version?: RegExp }[] = [
+    { test: /Windows/, name: "Windows" },
+    { test: /Android/, name: "Android", version: /Android (\d{1,3}(?:\.\d{1,3})?)/ },
+    { test: /iPhone|iPad|iPod|iOS/, name: "iOS", version: /OS (\d{1,3}(?:[._]\d{1,3})?)/ },
+    { test: /Mac OS X|Macintosh/, name: "macOS", version: /Mac OS X (\d{1,3}(?:[._]\d{1,3})?)/ },
+    { test: /CrOS/, name: "ChromeOS", version: /CrOS \S+ (\d{1,5}(?:\.\d{1,5})?)/ },
+    { test: /Linux/, name: "Linux" }
+];
+
+function osFromUserAgent(userAgent: string): { name: string; version: string | null } {
+    for (const entry of OPERATING_SYSTEMS) {
+        if (!entry.test.test(userAgent)) continue;
+        const version = entry.version ? (userAgent.match(entry.version)?.[1] ?? null) : null;
+        return { name: entry.name, version: version?.replace(/_/g, ".") ?? null };
+    }
+    return { name: "Unknown OS", version: null };
 }
 
 /**
@@ -90,10 +131,33 @@ export function describeClient(
     userAgent: string | null | undefined,
     brands?: string | null
 ): ClientReading {
-    if (!userAgent) return { browser: "Unknown browser", os: "Unknown OS", label: "Unknown device" };
-    const browser = brandFromHints(brands) ?? browserFromUserAgent(userAgent);
+    if (!userAgent) {
+        return {
+            browser: "Unknown browser",
+            browserVersion: null,
+            os: "Unknown OS",
+            osVersion: null,
+            label: "Unknown device"
+        };
+    }
+
+    const claimed = browserFromUserAgent(userAgent);
+    const hinted = brandFromHints(brands);
+    // The hints name the browser; the user-agent is the fallback. A rebadged
+    // Chromium sends both, and its own `Brave/` token does not exist - so where
+    // the hints named it and gave no number, the user-agent's Chrome version is
+    // the one it actually ships, which is the number worth showing.
+    const browser = hinted?.name ?? claimed.name;
+    const browserVersion = hinted?.version ?? claimed.version;
     const os = osFromUserAgent(userAgent);
-    return { browser, os, label: `${browser} on ${os}` };
+
+    return {
+        browser,
+        browserVersion,
+        os: os.name,
+        osVersion: os.version,
+        label: `${browser} on ${os.name}`
+    };
 }
 
 /** The one-line reading, for the lists that show a device as a single string. */

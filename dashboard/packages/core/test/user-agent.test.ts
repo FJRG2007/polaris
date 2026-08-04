@@ -24,9 +24,45 @@ describe("describeClient", () => {
     it("reads the browser and system out of a user-agent", () => {
         expect(describeClient(CHROME_WINDOWS)).toEqual({
             browser: "Chrome",
+            browserVersion: "131",
             os: "Windows",
+            // 10 and 11 both report NT 10.0, so no number is claimed.
+            osVersion: null,
             label: "Chrome on Windows"
         });
+    });
+
+    it("takes the major version only, which is the one anybody reads", () => {
+        expect(describeClient(CHROME_WINDOWS).browserVersion).toBe("131");
+        expect(describeClient(FIREFOX_LINUX).browserVersion).toBe("130");
+    });
+
+    it("reads Safari's own version rather than the engine build behind it", () => {
+        // `Safari/605.1.15` is WebKit's number; `Version/17.5` is the browser's.
+        expect(describeClient(SAFARI_IPAD).browserVersion).toBe("17");
+    });
+
+    it("takes the version from the brand it named, not the first one in the header", () => {
+        // The padding entry leads and carries a made-up number; reading the
+        // header at large would report Brave as version 24.
+        const brands = '"Not_A Brand";v="24", "Chromium";v="131", "Brave";v="130"';
+        expect(describeClient(CHROME_WINDOWS, brands)).toMatchObject({
+            browser: "Brave",
+            browserVersion: "130"
+        });
+    });
+
+    it("falls back to the user-agent's version when the hints name a brand without one", () => {
+        // A rebadged Chromium has no token of its own in the user-agent, so the
+        // Chrome version it ships is the number worth showing.
+        expect(describeClient(CHROME_WINDOWS, '"Brave"').browserVersion).toBe("131");
+    });
+
+    it("states the system version where the claim carries one, dotted not underscored", () => {
+        expect(describeClient(CHROME_ANDROID).osVersion).toBe("14");
+        expect(describeClient(SAFARI_IPAD).osVersion).toBe("17.5");
+        // Linux names no version, and inventing one would be a claim nobody made.
+        expect(describeClient(FIREFOX_LINUX).osVersion).toBeNull();
     });
 
     it("names the browser the user-agent hides, from the client hints", () => {

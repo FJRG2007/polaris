@@ -12,7 +12,7 @@
  */
 
 import { prisma } from "@polaris/db";
-import { describeDevice } from "@polaris/core";
+import { describeClient, type ClientReading } from "@polaris/core";
 
 /** A session as this module reads it: better-auth's own columns, and Polaris's
  *  copy beside them. Structural, so any narrower select satisfies it. */
@@ -22,13 +22,19 @@ export interface DescribableSession {
 }
 
 /**
- * The one-line name for a session's browser.
+ * What a session's client says it is, in full: browser, system and the version
+ * of each, where the claim carries one.
  *
  * Polaris's own copy of the user-agent comes first: better-auth writes its
  * column once, when the session opens, and never follows it afterwards.
  */
+export function sessionClient(row: DescribableSession): ClientReading {
+    return describeClient(row.state?.userAgent ?? row.userAgent, row.state?.userAgentBrands);
+}
+
+/** The one-line name, for the screens that show a device as a single string. */
 export function sessionDevice(row: DescribableSession): string {
-    return describeDevice(row.state?.userAgent ?? row.userAgent, row.state?.userAgentBrands);
+    return sessionClient(row).label;
 }
 
 /**

@@ -18,12 +18,14 @@
  */
 
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { signInSummary } from "@polaris/core";
 import { Badge, Button, cn } from "@polaris/ui";
+import { History, KeyRound, LogOut } from "lucide-react";
 import { RelativeTime } from "@/components/relative-time";
 import type { SessionView } from "@/lib/session-directory";
+import { BrowserMark, SystemMark } from "@/components/client-marks";
 import { addressLine, DeviceAddress } from "@/components/device-address";
-import { History, KeyRound, LogOut, MonitorSmartphone } from "lucide-react";
 
 /** Where a session came from, as one line, for the surfaces too narrow to hold
  *  the columns - and for the approval card, which is not a table at all. */
@@ -68,6 +70,26 @@ export function AuthorizedBy({ session }: { session: SessionView }) {
     );
 }
 
+/**
+ * One of the two "what is this" columns: the mark, the name, and the version
+ * where the client stated one.
+ *
+ * The version is quieter than the name on purpose. Somebody scanning this column
+ * is looking for "which of these is Firefox", and only stops on the number once
+ * they have found the row - so the number must not compete for the first read.
+ * Where no version was claimed nothing is drawn: a dash would read as a version
+ * that is missing rather than one that was never sent.
+ */
+function ClientCell({ mark, name, version }: { mark: ReactNode; name: string; version: string | null }) {
+    return (
+        <span className="flex items-center gap-2">
+            {mark}
+            <span className="truncate">{name}</span>
+            {version ? <span className="tabular-nums text-muted-foreground">{version}</span> : null}
+        </span>
+    );
+}
+
 export function SessionsTable({
     sessions,
     busyId,
@@ -104,6 +126,12 @@ export function SessionsTable({
                         <th className="w-full max-w-0 px-3 py-2 font-medium">Device</th>
                         {compact ? null : (
                             <>
+                                {/* The two halves of what the device claims to be,
+                                    each its own column so a list can be scanned down
+                                    one of them. They arrive before the address: what
+                                    it is is asked more often than where it was. */}
+                                <th className="hidden px-3 py-2 font-medium md:table-cell">App</th>
+                                <th className="hidden px-3 py-2 font-medium md:table-cell">System</th>
                                 <th className="hidden px-3 py-2 font-medium lg:table-cell">Address</th>
                                 <th className="hidden px-3 py-2 font-medium xl:table-cell">Domain</th>
                                 <th className="hidden px-3 py-2 font-medium lg:table-cell">Last active</th>
@@ -116,7 +144,7 @@ export function SessionsTable({
                     {sessions.length === 0 ? (
                         <tr>
                             <td
-                                colSpan={compact ? 2 : 5}
+                                colSpan={compact ? 2 : 7}
                                 className="px-3 py-8 text-center text-muted-foreground"
                             >
                                 {emptyLabel}
@@ -130,13 +158,19 @@ export function SessionsTable({
                             >
                                 <td className="w-full max-w-0 px-3 py-2">
                                     <div className="flex items-center gap-3">
-                                        <MonitorSmartphone className="size-4 shrink-0 text-muted-foreground" />
+                                        {/* The browser's own mark rather than a
+                                            generic screen: on a list of six rows it
+                                            is what the eye lands on first. */}
+                                        <BrowserMark browser={session.browser} />
                                         <div className="min-w-0">
                                             <p className="flex flex-wrap items-center gap-1.5">
                                                 {/* min-w-0: a truncating flex item still refuses to
                                                     shrink past its text without it, which is what
                                                     widens the row on a phone. */}
-                                                <span className="min-w-0 truncate">{session.device}</span>
+                                                <span className="min-w-0 truncate font-medium">{session.name}</span>
+                                                <span className="min-w-0 truncate text-muted-foreground">
+                                                    {session.device}
+                                                </span>
                                                 {session.current ? <Badge variant="primary">This device</Badge> : null}
                                                 {session.locked ? <Badge>Locked</Badge> : null}
                                                 {/* How it got in, beside what it is: the two questions a
@@ -163,6 +197,20 @@ export function SessionsTable({
                                 </td>
                                 {compact ? null : (
                                     <>
+                                        <td className="hidden whitespace-nowrap px-3 py-2 text-xs md:table-cell">
+                                            <ClientCell
+                                                mark={<BrowserMark browser={session.browser} />}
+                                                name={session.browser}
+                                                version={session.browserVersion}
+                                            />
+                                        </td>
+                                        <td className="hidden whitespace-nowrap px-3 py-2 text-xs md:table-cell">
+                                            <ClientCell
+                                                mark={<SystemMark os={session.os} />}
+                                                name={session.os}
+                                                version={session.osVersion}
+                                            />
+                                        </td>
                                         <td className="hidden whitespace-nowrap px-3 py-2 text-xs text-muted-foreground lg:table-cell">
                                             <DeviceAddress address={session} />
                                         </td>

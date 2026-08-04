@@ -20,7 +20,12 @@ function session(overrides: Partial<SessionView> = {}): SessionView {
         current: false,
         approval: "approved",
         locked: false,
+        name: "Pegasus",
         device: "Chrome on Windows",
+        browser: "Chrome",
+        browserVersion: "131",
+        os: "Windows",
+        osVersion: null,
         ip: "192.168.1.131",
         publicIp: null,
         country: "ES",
@@ -54,9 +59,37 @@ function render(sessions: SessionView[]): string {
 describe("the session table", () => {
     it("names every column a session is judged by", () => {
         const markup = render([session()]);
-        for (const column of ["Device", "Address", "Domain", "Last active"]) {
+        for (const column of ["Device", "App", "System", "Address", "Domain", "Last active"]) {
             expect(markup).toContain(`>${column}</th>`);
         }
+    });
+
+    it("gives the session a name of its own, so two identical rows can be told apart", () => {
+        // Three rows all reading "Chrome on Windows" is the case this exists for.
+        const markup = render([session({ id: "a", name: "Pegasus" }), session({ id: "b", name: "Onyx" })]);
+        expect(markup).toContain("Pegasus");
+        expect(markup).toContain("Onyx");
+    });
+
+    it("states the browser and the system with the version each one claimed", () => {
+        const markup = render([session({ browser: "Firefox", browserVersion: "130", os: "iOS", osVersion: "17.5" })]);
+        expect(markup).toContain("Firefox");
+        expect(markup).toContain("130");
+        expect(markup).toContain("iOS");
+        expect(markup).toContain("17.5");
+    });
+
+    it("draws no version where the client claimed none", () => {
+        // A dash would read as a version that went missing rather than one that
+        // was never sent - Windows never states which of 10 or 11 it is.
+        const markup = render([session({ os: "Windows", osVersion: null })]);
+        expect(markup).not.toContain(">-</span>");
+    });
+
+    it("draws the browser's own mark rather than one generic device glyph", () => {
+        // Chrome's mark carries its brand blue; a row that fell back to the
+        // neutral globe would not.
+        expect(render([session({ browser: "Chrome" })])).toContain("#4285F4");
     });
 
     it("keeps two sessions on the same machine apart by the address each was opened on", () => {
