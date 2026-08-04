@@ -18,16 +18,19 @@ import { recordAudit } from "@/lib/audit-service";
 import { networkPublicIp } from "@/lib/network-service";
 import { sessionClient, sessionDevice } from "@/lib/session-device";
 import { listUserPasskeys, type PasskeyView } from "@/lib/passkey-directory";
-import { clientHost, clientIp, clientUserAgent, clientUserAgentBrands } from "@/lib/request-context";
+import { describeDevice, isIpv4, isPrivateIp, sessionName, type SignInRecord } from "@polaris/core";
 import {
-    describeDevice,
-    isIpv4,
-    isPrivateIp,
-    parseSecondFactor,
-    parseSignInMethod,
-    sessionName,
-    type SignInRecord
-} from "@polaris/core";
+    clientHost,
+    clientIp,
+    clientUserAgent,
+    clientUserAgentBrands
+} from "@/lib/request-context";
+import {
+    sessionApproval,
+    sessionSignIn,
+    sessionUserAgent,
+    type SessionApproval
+} from "@/lib/session-row";
 import {
     adoptTrustedDevice,
     currentTrustedDevice,
@@ -58,7 +61,7 @@ export interface SessionView {
     id: string;
     /** Whether this is the session making the request. */
     current: boolean;
-    approval: "approved" | "pending" | "denied";
+    approval: SessionApproval;
     locked: boolean;
     /** What this session is called - "Pegasus" - so a row can be pointed at in a
      *  sentence. Worked out from the id and never stored; see `sessionName`. */
@@ -104,8 +107,6 @@ export function describeOrigin(
     return where ? `${device} - ${where}` : device;
 }
 
-const APPROVALS: ReadonlySet<string> = new Set(["approved", "pending", "denied"]);
-
 /** Every live session a user holds, newest first, as stored. */
 async function liveSessionRows(userId: string) {
     return prisma.session.findMany({
@@ -129,14 +130,6 @@ function idsOf(rows: readonly { id: string }[]): ReadonlySet<string> {
 }
 
 type SessionRow = Awaited<ReturnType<typeof liveSessionRows>>[number];
-
-/** The browser a session was opened with, preferring Polaris's own copy:
- *  better-auth's column is written once and never followed. Kept here because
- *  matching one device's things together needs the raw string, which never
- *  leaves this module - the readable name comes from sessionDevice. */
-function sessionUserAgent(row: SessionRow): string | null {
-    return row.state?.userAgent ?? row.userAgent ?? null;
-}
 
 /**
  * The address this network is seen at from outside, but only when a list holds
@@ -169,14 +162,13 @@ function toSessionView(
     publicIp: string | null,
     liveIds: ReadonlySet<string>
 ): SessionView {
-    const approval = row.state?.approval ?? "approved";
     const ip = row.state?.ip ?? row.ipAddress;
     const authorizerId = row.state?.authorizedBySessionId ?? null;
     const client = sessionClient(row);
     return {
         id: row.id,
         current: row.id === currentSessionId,
-        approval: (APPROVALS.has(approval) ? approval : "approved") as SessionView["approval"],
+        approval: sessionApproval(row.state?.approval),
         locked: row.state?.lockedAt != null,
         name: sessionName(row.id),
         device: client.label,
@@ -188,10 +180,7 @@ function toSessionView(
         publicIp: ip && isLocalAddress(ip) ? publicIp : null,
         country: row.state?.country ?? null,
         host: row.state?.host ?? null,
-        signIn: {
-            method: parseSignInMethod(row.state?.signInMethod),
-            secondFactor: parseSecondFactor(row.state?.secondFactor)
-        },
+        signIn: sessionSignIn(row.state),
         // The id alone is not enough to name the device - the session that gave
         // the answer may be gone - so the stored label is what is shown, and the
         // id only decides whether its history can still be opened.
@@ -220,7 +209,10 @@ function toSessionView(
  * reading somebody else's list passes their own and gets no match, which is
  * exactly right - none of those sessions is the one they are reading from.
  */
-export async function listUserSessions(userId: string, currentSessionId: string): Promise<SessionView[]> {
+export async function listUserSessions(
+    userId: string,
+    currentSessionId: string
+): Promise<SessionView[]> {
     const rows = await liveSessionRows(userId);
     const publicIp = await pairedPublicIp(rows.map((row) => row.state?.ip ?? row.ipAddress));
     const live = idsOf(rows);
@@ -235,15 +227,15 @@ export async function listUserSessions(userId: string, currentSessionId: string)
  * the record has to travel with them or the screen that says where sessions came
  * from would lose the one the reader is sitting at.
  */
-export async function sessionSignInRecord(userId: string, sessionId: string): Promise<SignInRecord> {
+export async function sessionSignInRecord(
+    userId: string,
+    sessionId: string
+): Promise<SignInRecord> {
     const state = await prisma.sessionState.findFirst({
         where: { sessionId, userId },
         select: { signInMethod: true, secondFactor: true }
     });
-    return {
-        method: parseSignInMethod(state?.signInMethod),
-        secondFactor: parseSecondFactor(state?.secondFactor)
-    };
+    return sessionSignIn(state);
 }
 
 /**
@@ -365,9 +357,15 @@ export async function trustedDeviceDetail(
         return { device, identified: false, sessions: [], passkeys: [] };
     }
 
-    const [rows, passkeys] = await Promise.all([liveSessionRows(userId), listUserPasskeys(userId, userAgent)]);
+    const [rows, passkeys] = await Promise.all([
+        liveSessionRows(userId),
+        listUserPasskeys(userId, userAgent)
+    ]);
     const matched = rows.filter((row) => sessionUserAgent(row) === userAgent);
-    const publicIp = await pairedPublicIp([view.ip, ...matched.map((row) => row.state?.ip ?? row.ipAddress)]);
+    const publicIp = await pairedPublicIp([
+        view.ip,
+        ...matched.map((row) => row.state?.ip ?? row.ipAddress)
+    ]);
     return {
         device: toTrustedDeviceRow(view, publicIp),
         identified: true,
@@ -410,13 +408,23 @@ export async function revokeDeviceSessions(
 export async function revokeUserSession(userId: string, sessionId: string): Promise<void> {
     const result = await prisma.session.deleteMany({ where: { id: sessionId, userId } });
     if (result.count > 0) {
-        await recordAudit({ actorId: userId, action: "account.session.revoked", targetType: "session", targetId: sessionId });
+        await recordAudit({
+            actorId: userId,
+            action: "account.session.revoked",
+            targetType: "session",
+            targetId: sessionId
+        });
     }
 }
 
 /** End every session except the caller's own. Returns how many were ended. */
-export async function revokeOtherSessions(userId: string, currentSessionId: string): Promise<number> {
-    const result = await prisma.session.deleteMany({ where: { userId, id: { not: currentSessionId } } });
+export async function revokeOtherSessions(
+    userId: string,
+    currentSessionId: string
+): Promise<number> {
+    const result = await prisma.session.deleteMany({
+        where: { userId, id: { not: currentSessionId } }
+    });
     if (result.count > 0) {
         await recordAudit({
             actorId: userId,

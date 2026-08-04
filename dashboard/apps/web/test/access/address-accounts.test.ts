@@ -30,13 +30,21 @@ interface AuditGroup {
 }
 
 let sessionRows: SessionRow[] = [];
+let movedRows: SessionRow[] = [];
 let auditGroups: AuditGroup[] = [];
-let sessionQuery: Record<string, unknown> | null = null;
+let sessionQueries: Record<string, unknown>[] = [];
 let auditQuery: Record<string, unknown> | null = null;
+let userQuery: { id: { in: string[] } } | null = null;
 
 const PEOPLE = [
     { id: "user-1", name: "Ada Lovelace", email: "ada@example.com", image: null, bannedAt: null },
-    { id: "user-2", name: "", email: "grace@example.com", image: null, bannedAt: new Date("2026-08-01T00:00:00Z") }
+    {
+        id: "user-2",
+        name: "",
+        email: "grace@example.com",
+        image: null,
+        bannedAt: new Date("2026-08-01T00:00:00Z")
+    }
 ];
 
 // The real hash reaches for node:crypto through a module that pulls in the whole
@@ -47,8 +55,10 @@ vi.mock("@polaris/db", () => ({
     prisma: {
         session: {
             findMany: async (args: Record<string, unknown>) => {
-                sessionQuery = args;
-                return sessionRows;
+                sessionQueries.push(args);
+                return "ipAddress" in (args.where as Record<string, unknown>)
+                    ? sessionRows
+                    : movedRows;
             }
         },
         auditLog: {
@@ -58,8 +68,10 @@ vi.mock("@polaris/db", () => ({
             }
         },
         user: {
-            findMany: async ({ where }: { where: { id: { in: string[] } } }) =>
-                PEOPLE.filter((person) => where.id.in.includes(person.id))
+            findMany: async ({ where }: { where: { id: { in: string[] } } }) => {
+                userQuery = where;
+                return PEOPLE.filter((person) => where.id.in.includes(person.id));
+            }
         }
     }
 }));
@@ -101,17 +113,33 @@ function group(overrides: Partial<AuditGroup> = {}): AuditGroup {
 
 beforeEach(() => {
     sessionRows = [];
+    movedRows = [];
     auditGroups = [];
-    sessionQuery = null;
+    sessionQueries = [];
     auditQuery = null;
+    userQuery = null;
 });
 
 describe("accounts at an address", () => {
-    it("asks for sessions opened at the address and sessions that moved to it", async () => {
+    // Two reads rather than one `OR`: neither index can be used for a query that
+    // matches the column or the other table's, so asking both at once scans every
+    // session ever opened.
+    it("asks separately for sessions opened at the address and sessions that moved to it", async () => {
         await accountsAtAddress("85.87.156.88", NOW);
-        expect(sessionQuery?.where).toEqual({
-            OR: [{ ipAddress: "85.87.156.88" }, { state: { is: { ip: "85.87.156.88" } } }]
-        });
+        expect(sessionQueries.map((query) => query.where)).toEqual([
+            { ipAddress: "85.87.156.88" },
+            { state: { is: { ip: "85.87.156.88" } } }
+        ]);
+    });
+
+    it("merges the two without listing a session that both found twice", async () => {
+        sessionRows = [session()];
+        movedRows = [
+            session(),
+            session({ id: "session-2", createdAt: new Date("2026-08-04T11:00:00Z") })
+        ];
+        const accounts = await accountsAtAddress("85.87.156.88", NOW);
+        expect(accounts[0]?.sessions.map((entry) => entry.id)).toEqual(["session-2", "session-1"]);
     });
 
     // The log stores the address hashed, so it can only be asked this way - and
@@ -130,7 +158,10 @@ describe("accounts at an address", () => {
     it("gathers an account's sessions under it, and names it by its email when it has no name", async () => {
         sessionRows = [session(), session({ id: "session-2", userId: "user-2" })];
         const accounts = await accountsAtAddress("85.87.156.88", NOW);
-        expect(accounts.map((account) => account.name)).toEqual(["Ada Lovelace", "grace@example.com"]);
+        expect(accounts.map((account) => account.name)).toEqual([
+            "Ada Lovelace",
+            "grace@example.com"
+        ]);
         expect(accounts[0]?.sessions).toHaveLength(1);
         expect(accounts[0]?.sessions[0]?.device).toBe("Chrome on Windows");
         expect(accounts[1]?.banned).toBe(true);
@@ -151,7 +182,9 @@ describe("accounts at an address", () => {
     // The whole point of reading the log as well: an address that failed its way
     // through an account's network rules leaves no session behind at all.
     it("names an account that only ever had sign-ins refused here", async () => {
-        auditGroups = [group({ actorId: "user-2", action: "account.signin.blocked", _count: { _all: 12 } })];
+        auditGroups = [
+            group({ actorId: "user-2", action: "account.signin.blocked", _count: { _all: 12 } })
+        ];
         const accounts = await accountsAtAddress("85.87.156.88", NOW);
         expect(accounts).toHaveLength(1);
         expect(accounts[0]?.id).toBe("user-2");
@@ -183,5 +216,48 @@ describe("accounts at an address", () => {
 
     it("has nothing to say about an address nobody has ever been seen on", async () => {
         expect(await accountsAtAddress("85.87.156.88", NOW)).toEqual([]);
+    });
+
+    // The log is asked about the gateway a whole company signs in through as
+    // readily as about one attacker, and it holds a group per account and
+    // outcome, so the question itself has to be bounded rather than the answer.
+    it("asks the log for the most recent sign-ins only, and a bounded number of them", async () => {
+        await accountsAtAddress("85.87.156.88", NOW);
+        expect(auditQuery?.orderBy).toEqual({ _max: { at: "desc" } });
+        expect(typeof auditQuery?.take).toBe("number");
+    });
+
+    // Every account named is carried to the browser whole, and the panel draws
+    // six of them. A shared address must not turn that into the directory.
+    it("looks up no more accounts than it is willing to carry back", async () => {
+        sessionRows = Array.from({ length: 400 }, (_, index) =>
+            session({ id: `session-${index}`, userId: `user-${index}` })
+        );
+        auditGroups = Array.from({ length: 400 }, (_, index) =>
+            group({ actorId: `other-${index}` })
+        );
+        await accountsAtAddress("85.87.156.88", NOW);
+        const asked = userQuery?.id.in ?? [];
+        expect(asked.length).toBeLessThanOrEqual(50);
+        // Whoever a ban would actually cut off is who survives the cut.
+        expect(asked.every((id) => id.startsWith("user-"))).toBe(true);
+    });
+
+    // Which is by whether the session is still open, not by how recently it was
+    // opened: an account signed in from here since last month is what a ban would
+    // break, and an account whose session expired yesterday is not.
+    it("keeps whoever is still signed in over whoever only opened a session more recently", async () => {
+        sessionRows = [
+            ...Array.from({ length: 60 }, (_, index) =>
+                session({
+                    id: `expired-${index}`,
+                    userId: `gone-${index}`,
+                    expiresAt: new Date("2026-08-03T10:00:00Z")
+                })
+            ),
+            session({ id: "held", createdAt: new Date("2026-07-01T10:00:00Z") })
+        ];
+        await accountsAtAddress("85.87.156.88", NOW);
+        expect(userQuery?.id.in).toContain("user-1");
     });
 });

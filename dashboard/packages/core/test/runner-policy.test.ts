@@ -28,6 +28,22 @@ import {
 
 const hasShell = spawnSync("sh", ["-c", "exit 0"]).status === 0;
 
+/**
+ * The environment with nothing a workflow running these tests put in it.
+ *
+ * The guard reads its whole world out of `GITHUB_*`, so anything left there by
+ * the run executing this file is another job's answer to the question being
+ * asked. On a pull request against this repository the ambient
+ * `GITHUB_EVENT_PATH` is a real pull request payload, which is exactly what the
+ * cases below that deliberately supply none are checking the guard refuses to
+ * find. `RUNNER_*` goes with it: the same runner points it at a bundled node.
+ */
+const AMBIENT = Object.fromEntries(
+    Object.entries(process.env).filter(
+        ([name]) => !name.startsWith("GITHUB_") && !name.startsWith("RUNNER_")
+    )
+);
+
 /** Run the guard the way the runner does, and report what the job would get. */
 function runGuard(
     policy: RunnerRepoPolicy,
@@ -45,7 +61,7 @@ function runGuard(
         full.GITHUB_EVENT_PATH = payload;
     }
 
-    const result = spawnSync("sh", [script], { env: { ...process.env, ...full }, encoding: "utf8" });
+    const result = spawnSync("sh", [script], { env: { ...AMBIENT, ...full }, encoding: "utf8" });
     let facts = null;
     try {
         facts = parseJobFacts(readFileSync(join(root, JOB_FACTS_FILE), "utf8"));

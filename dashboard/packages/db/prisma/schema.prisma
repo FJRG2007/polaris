@@ -289,6 +289,9 @@ model Session {
     state SessionState?
 
     @@index([userId])
+    // The firewall asks which accounts an address holds sessions on. Without the
+    // index that is a scan of every session open on the instance.
+    @@index([ipAddress])
 }
 
 model Account {
@@ -734,6 +737,9 @@ model SessionState {
     user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
     @@index([userId])
+    // The other half of the same question: a session that moved to the address
+    // is recorded here rather than on the session row.
+    @@index([ip])
 }
 
 // A sign-in waiting to be let in from a phone: the QR code on the sign-in screen.

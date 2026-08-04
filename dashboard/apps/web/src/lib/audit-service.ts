@@ -83,7 +83,15 @@ export async function listActivity(limit = 100) {
     return prisma.auditLog.findMany({
         orderBy: { at: "desc" },
         take: limit,
-        select: { id: true, actorId: true, action: true, targetType: true, targetId: true, metadata: true, at: true }
+        select: {
+            id: true,
+            actorId: true,
+            action: true,
+            targetType: true,
+            targetId: true,
+            metadata: true,
+            at: true
+        }
     });
 }
 
@@ -107,7 +115,9 @@ export interface ActivityEntry {
  */
 export async function listActivityFeed(limit = 200): Promise<ActivityEntry[]> {
     const events = await listActivity(limit);
-    const actorIds = [...new Set(events.map((event) => event.actorId).filter((id): id is string => Boolean(id)))];
+    const actorIds = [
+        ...new Set(events.map((event) => event.actorId).filter((id): id is string => Boolean(id)))
+    ];
     const actors =
         actorIds.length === 0
             ? []
@@ -164,7 +174,15 @@ export async function listUserActivity(
         where: { actorId: userId, ...(sessionId === undefined ? {} : { sessionId }) },
         orderBy: { at: "desc" },
         take: limit,
-        select: { id: true, action: true, targetType: true, targetId: true, metadata: true, sessionId: true, at: true }
+        select: {
+            id: true,
+            action: true,
+            targetType: true,
+            targetId: true,
+            metadata: true,
+            sessionId: true,
+            at: true
+        }
     });
     return rows.map((row) => ({
         id: row.id,
@@ -190,6 +208,9 @@ export async function listUserActivitySessions(userId: string): Promise<Activity
         _max: { at: true }
     });
     return groups
-        .map((group) => ({ id: group.sessionId, lastAt: (group._max.at ?? new Date(0)).toISOString() }))
+        .map((group) => ({
+            id: group.sessionId,
+            lastAt: (group._max.at ?? new Date(0)).toISOString()
+        }))
         .sort((a, b) => b.lastAt.localeCompare(a.lastAt));
 }

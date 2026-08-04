@@ -40,7 +40,9 @@ export function AddressAccounts({ accounts }: { accounts: readonly AddressAccoun
                 Accounts seen here
             </div>
             {accounts.length === 0 ? (
-                <p className="text-xs text-muted-foreground">No account has signed in from this address.</p>
+                <p className="text-xs text-muted-foreground">
+                    No account has signed in from this address.
+                </p>
             ) : (
                 <ul className="flex flex-col gap-2">
                     {accounts.slice(0, ACCOUNT_ROWS).map((account) => (
@@ -59,11 +61,17 @@ export function AddressAccounts({ accounts }: { accounts: readonly AddressAccoun
                                             {account.name}
                                         </Link>
                                         {account.live > 0 ? (
-                                            <Badge variant="primary">{account.live} signed in now</Badge>
+                                            <Badge variant="primary">
+                                                {account.live} signed in now
+                                            </Badge>
                                         ) : null}
-                                        {account.banned ? <Badge variant="danger">Banned</Badge> : null}
+                                        {account.banned ? (
+                                            <Badge variant="danger">Banned</Badge>
+                                        ) : null}
                                     </p>
-                                    <p className="truncate text-xs text-muted-foreground">{account.email}</p>
+                                    <p className="truncate text-xs text-muted-foreground">
+                                        {account.email}
+                                    </p>
                                     <SignInTally signIns={account.signIns} />
                                     <ul className="mt-1 flex flex-col gap-0.5">
                                         {account.sessions.slice(0, SESSION_ROWS).map((session) => (
@@ -75,7 +83,9 @@ export function AddressAccounts({ accounts }: { accounts: readonly AddressAccoun
                                                     {session.device}
                                                 </span>
                                                 {session.host ? (
-                                                    <span className="min-w-0 truncate">{session.host}</span>
+                                                    <span className="min-w-0 truncate">
+                                                        {session.host}
+                                                    </span>
                                                 ) : null}
                                                 <span>{signInSummary(session.signIn)}</span>
                                                 <span>
@@ -84,7 +94,9 @@ export function AddressAccounts({ accounts }: { accounts: readonly AddressAccoun
                                                 </span>
                                                 {!session.live ? <Badge>Expired</Badge> : null}
                                                 {session.approval === "pending" ? (
-                                                    <Badge variant="warning">Waiting for approval</Badge>
+                                                    <Badge variant="warning">
+                                                        Waiting for approval
+                                                    </Badge>
                                                 ) : null}
                                                 {session.approval === "denied" ? (
                                                     <Badge variant="danger">Refused</Badge>
@@ -94,8 +106,11 @@ export function AddressAccounts({ accounts }: { accounts: readonly AddressAccoun
                                     </ul>
                                     {account.sessions.length > SESSION_ROWS ? (
                                         <p className="mt-0.5 text-xs text-muted-foreground">
-                                            and {grouped(account.sessions.length - SESSION_ROWS)} more session
-                                            {account.sessions.length - SESSION_ROWS === 1 ? "" : "s"}
+                                            and {grouped(account.sessions.length - SESSION_ROWS)}{" "}
+                                            more session
+                                            {account.sessions.length - SESSION_ROWS === 1
+                                                ? ""
+                                                : "s"}
                                         </p>
                                     ) : null}
                                 </div>
