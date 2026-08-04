@@ -19,8 +19,9 @@ down; only minting a *new* login token needs Polaris up.
 ## Request contract
 
 Traefik chains two middlewares ahead of the guard: a `headers` middleware that sets
-`X-Polaris-Waf` (base64 of `{d: denyCidrs, l: requireLogin}`), and the `forwardAuth`
-middleware pointing here. The guard reads:
+`X-Polaris-Waf` (base64 of `{d: denyCidrs, l: requireLogin, a: loginUrl,
+n: admittedPrincipals, y: refusedPrincipals}`), and the `forwardAuth` middleware
+pointing here. The guard reads:
 
 - `X-Polaris-Waf` - the per-route rule (a client cannot forge it; Traefik sets it).
 - `X-Forwarded-For` - the client IP (leftmost entry). Trusts Traefik's view; behind a
@@ -33,12 +34,46 @@ middleware pointing here. The guard reads:
 | Var | Purpose | Default |
 |---|---|---|
 | `POLARIS_AUTH_SECRET` | HMAC secret to verify edge tokens (deny-only routes need none) | - |
-| `POLARIS_PUBLIC_URL` | Polaris base URL to redirect to for login | - |
+| `POLARIS_PUBLIC_URL` | Fallback Polaris base URL for a login redirect, used only when the route's rule carries none (see below) | - |
 | `POLARIS_EDGE_COOKIE` | Edge-token cookie name | `polaris.edge` |
 | `POLARIS_EDGE_GUARD_PORT` | Listen port | `8080` |
+
+## Where the login lives
+
+`a` carries the address Polaris answers on, and the guard prefers it over
+`POLARIS_PUBLIC_URL`. The environment is written when this sidecar is deployed and
+defaults to the LAN name, so a guard trusting it sends anyone off the network to
+`polaris.local` - a name that resolves on that network and nowhere else. The rule is
+rewritten whenever routes are published, so it follows the configured domain. A value
+that is not an absolute http(s) URL is dropped rather than redirected to.
+
+## Who the login admits
+
+A rule can name the users, groups and roles its login lets through (`n`: one list per
+firewall scope that named anybody, and a visitor must satisfy every list, so a narrower
+scope can only restrict a broader one) and the ones it never lets through (`y`: every
+scope's refusals together, and a refusal beats any list that admits the same visitor).
+Naming nobody means any account, which is what require-login meant before this existed.
+
+Each entry can carry a window (`f`/`u`, unix seconds) it applies in. It is read on
+every request against this guard's clock, so a grant starts and lapses when it says it
+does rather than when the holder's token happens to expire.
+
+The token carries the principals its holder resolved to when Polaris minted it, so
+this is answered offline like the login itself - and membership is therefore as fresh
+as the token, not as fresh as the database.
+
+A visitor no list names, or one a refusal names, is **403** rather than redirected:
+Polaris checks the same thing before minting, from the live rule, while the guard checks
+the rule its edge was last written with. On a remote server those two disagree until the
+next deploy, and bouncing the visitor back would loop. The exception is a token minted
+before this existed, which carries no principals at all and is sent back for one that
+does - that cannot loop, because what it returns with is precisely the field it lacked.
 
 ## Fail-closed behavior
 
 - A denylist with an unresolvable client IP -> **403**.
-- A malformed `X-Polaris-Waf` header -> treated as **require-login** (never dropped).
+- A malformed `X-Polaris-Waf` header -> treated as **require-login** (never dropped),
+  admitting any account: an unreadable rule must send a visitor to a login, not lock
+  out the operator on their way to fix it.
 - Deny is checked before login: a denied IP is blocked even with a valid token.

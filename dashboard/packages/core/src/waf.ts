@@ -10,13 +10,39 @@
 
 import { expandWafPresets } from "./waf-presets.js";
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { wafCustomRuleSchema, type WafCustomRule } from "./schemas/deploy.js";
+import { wafCustomRuleSchema, type WafCustomRule, type WafPrincipalGrant } from "./schemas/deploy.js";
 
-/** The per-route rule the guard enforces. Empty denylist, no packs, no custom rules
- *  and no login = a no-op. */
+/** The per-route rule the guard enforces. Empty denylist, no packs, no custom rules,
+ *  no principal lists and no login = a no-op. */
 export interface GuardRule {
     readonly deny: readonly string[];
     readonly requireLogin: boolean;
+    /**
+     * Where the guard sends a visitor to sign in, without a trailing slash.
+     *
+     * Carried per route rather than read from the guard's own environment, because the
+     * environment is written once when the sidecar is deployed and the address Polaris
+     * answers on is a setting an operator changes afterwards. A guard that redirected to
+     * the address it was born with would send anyone off the LAN to a name that resolves
+     * nowhere, which is exactly what the LAN default (`polaris.local`) does.
+     *
+     * Optional: an edge config written before this existed carries no such key, and the
+     * guard falls back to its environment as it always did.
+     */
+    readonly loginUrl?: string;
+    /**
+     * One principal list per scope that admitted anybody; a visitor must satisfy every
+     * one of them. Empty (the common case) means the login admits any account, which
+     * is what `requireLogin` meant before there was anything to narrow it with.
+     *
+     * Optional on the way in - an edge config written before this existed carries no
+     * such key, and its route admits any account exactly as it did - and always
+     * present on the way out.
+     */
+    readonly loginAllowLists?: readonly (readonly WafPrincipalGrant[])[];
+    /** Principals refused whatever admits them, unioned across scopes. Checked before
+     *  the lists above and never overridden by them. */
+    readonly loginDeny?: readonly WafPrincipalGrant[];
     /** Refuse requests whose headers do not hold together as a browser's. Optional on
      *  the way in (an older edge config predates it), always present on the way out. */
     readonly browserIntegrity?: boolean;
@@ -40,15 +66,29 @@ export interface GuardRule {
     readonly rules: readonly WafCustomRule[];
 }
 
-/** Encode a guard rule for the X-Polaris-Waf header (base64 of compact JSON:
- *  `d` = denylist, `l` = require-login, `b` = browser integrity, `s` = SQL injection
- *  protection, `x` = XSS protection, `e` = email obfuscation, `p` = pack ids,
- *  `r` = custom rules). */
+/**
+ * Encode a guard rule for the X-Polaris-Waf header (base64 of compact JSON: `d` =
+ * denylist, `l` = require-login, `a` = where to sign in, `n` = the principal lists that
+ * login admits, `y` = the principals it refuses, `b` = browser integrity, `s` = SQL
+ * injection protection, `x` = XSS protection, `e` = email obfuscation, `p` = pack ids,
+ * `r` = custom rules).
+ *
+ * The login keys are left out entirely when they say nothing, which is the case on
+ * essentially every route. They decode to the same empty result either way, and this
+ * header is stamped onto every single request to every route on the instance - so a key
+ * that would always be there and always say nothing is worth not sending.
+ */
 export function encodeGuardRule(rule: GuardRule): string {
+    const allowLists = (rule.loginAllowLists ?? []).filter((list) => list.length > 0);
+    const deny = rule.loginDeny ?? [];
+    const loginUrl = rule.requireLogin ? normalizeLoginUrl(rule.loginUrl) : null;
     return Buffer.from(
         JSON.stringify({
             d: rule.deny,
             l: rule.requireLogin,
+            ...(loginUrl ? { a: loginUrl } : {}),
+            ...(allowLists.length > 0 ? { n: allowLists.map(encodeGrants) } : {}),
+            ...(deny.length > 0 ? { y: encodeGrants(deny) } : {}),
             b: rule.browserIntegrity === true,
             s: rule.sqlInjectionProtection === true,
             x: rule.xssProtection === true,
@@ -59,9 +99,39 @@ export function encodeGuardRule(rule: GuardRule): string {
     ).toString("base64");
 }
 
+/** Grants on the wire: `r` = the principal, `f`/`u` = the window, both left out when
+ *  the entry simply applies (which is most of them). */
+function encodeGrants(grants: readonly WafPrincipalGrant[]): Record<string, unknown>[] {
+    return grants.map((grant) => ({
+        r: grant.ref,
+        ...(grant.from !== undefined ? { f: grant.from } : {}),
+        ...(grant.until !== undefined ? { u: grant.until } : {})
+    }));
+}
+
+/**
+ * An absolute http(s) origin with no trailing slash, or null.
+ *
+ * Checked rather than trusted because the value ends up in a `Location` header: only
+ * Traefik can set the rule header, but a misconfigured address must fail to a login
+ * that does not happen rather than to a redirect somewhere unintended.
+ */
+function normalizeLoginUrl(value: string | undefined): string | null {
+    if (!value) return null;
+    try {
+        const url = new URL(value);
+        if (url.protocol !== "http:" && url.protocol !== "https:") return null;
+        return `${url.origin}${url.pathname.replace(/\/+$/, "")}`;
+    } catch {
+        return null;
+    }
+}
+
 const EMPTY_RULE: GuardRule = {
     deny: [],
     requireLogin: false,
+    loginAllowLists: [],
+    loginDeny: [],
     browserIntegrity: false,
     sqlInjectionProtection: false,
     xssProtection: false,
@@ -76,6 +146,11 @@ const EMPTY_RULE: GuardRule = {
 const FAIL_CLOSED: GuardRule = {
     deny: [],
     requireLogin: true,
+    // Empty rather than a list nobody satisfies: an unreadable header should send the
+    // visitor to a login, not refuse every account on the instance including the
+    // operator on their way to fix it.
+    loginAllowLists: [],
+    loginDeny: [],
     browserIntegrity: false,
     sqlInjectionProtection: true,
     xssProtection: true,
@@ -134,6 +209,9 @@ function decodeUncached(header: string): GuardRule {
             const obj = raw as {
                 d?: unknown;
                 l?: unknown;
+                a?: unknown;
+                n?: unknown;
+                y?: unknown;
                 b?: unknown;
                 i?: unknown;
                 s?: unknown;
@@ -152,6 +230,9 @@ function decodeUncached(header: string): GuardRule {
             return {
                 deny,
                 requireLogin: obj.l === true,
+                loginUrl: normalizeLoginUrl(typeof obj.a === "string" ? obj.a : undefined) ?? undefined,
+                loginAllowLists: parsePrincipalLists(obj.n),
+                loginDeny: parseGrants(obj.y),
                 browserIntegrity: obj.b === true,
                 sqlInjectionProtection: obj.s === true || legacy,
                 xssProtection: obj.x === true || legacy,
@@ -164,6 +245,79 @@ function decodeUncached(header: string): GuardRule {
         // Fall through to the fail-closed default below.
     }
     return FAIL_CLOSED;
+}
+
+/**
+ * The allowlists that survive decoding, in the order they were encoded.
+ *
+ * A list that decodes to nothing is dropped rather than kept as an empty one: an empty
+ * list would be a constraint no visitor can satisfy, so a garbled entry would lock
+ * everyone out of the route instead of leaving the remaining lists to decide. The
+ * refusal that matters - the login itself - is carried by `requireLogin` and is not
+ * affected either way.
+ */
+function parsePrincipalLists(value: unknown): WafPrincipalGrant[][] {
+    if (!Array.isArray(value)) return [];
+    const lists: WafPrincipalGrant[][] = [];
+    for (const entry of value) {
+        const list = parseGrants(entry);
+        if (list.length > 0) lists.push(list);
+    }
+    return lists;
+}
+
+/**
+ * The grants that survive decoding.
+ *
+ * A garbled entry is dropped rather than kept with its window lost: an entry whose
+ * expiry failed to decode would go on admitting somebody the operator had already
+ * written an end date for, which is the one way this can fail that nobody would notice.
+ */
+function parseGrants(value: unknown): WafPrincipalGrant[] {
+    if (!Array.isArray(value)) return [];
+    const grants: WafPrincipalGrant[] = [];
+    for (const entry of value) {
+        if (!entry || typeof entry !== "object") continue;
+        const { r, f, u } = entry as { r?: unknown; f?: unknown; u?: unknown };
+        if (typeof r !== "string" || r.length === 0) continue;
+        if ((f !== undefined && typeof f !== "number") || (u !== undefined && typeof u !== "number")) continue;
+        grants.push({ ref: r, from: f as number | undefined, until: u as number | undefined });
+    }
+    return grants;
+}
+
+/** How a login rule answers one signed-in visitor. */
+export type PrincipalVerdict = "admitted" | "refused" | "not-admitted";
+
+/**
+ * Whether a visitor holding `held` gets past a rule's principal lists at `now`
+ * (unix seconds).
+ *
+ * Deny first and final, then the allowlists: each one ANDs and its own entries OR, so a
+ * scope names who it admits and every scope that named anybody gets a veto - which is
+ * what lets a narrower scope restrict a broader one's list and never widen it. An entry
+ * outside its window is not there at all, on either side. No lists and no denials is the
+ * "any account" case and passes, so this is safe to call unconditionally.
+ *
+ * Lives here rather than in either caller because both the guard (deciding a request)
+ * and Polaris (deciding whether to mint a token for one) have to answer it the same way.
+ * Two implementations of this are two answers, and the disagreement would show up as a
+ * redirect loop between them rather than as a wrong page.
+ */
+export function principalVerdict(
+    rule: Pick<GuardRule, "loginAllowLists" | "loginDeny">,
+    held: ReadonlySet<string>,
+    now: number
+): PrincipalVerdict {
+    const applies = (grant: WafPrincipalGrant): boolean =>
+        held.has(grant.ref) &&
+        (grant.from === undefined || now >= grant.from) &&
+        (grant.until === undefined || now < grant.until);
+
+    if ((rule.loginDeny ?? []).some(applies)) return "refused";
+    const lists = rule.loginAllowLists ?? [];
+    if (lists.length === 0) return "admitted";
+    return lists.every((list) => list.some(applies)) ? "admitted" : "not-admitted";
 }
 
 /** The custom rules that survive validation, in the order they were encoded. */
@@ -226,14 +380,31 @@ export interface EdgeToken {
     readonly sub: string;
     readonly aud: string;
     readonly exp: number;
+    /**
+     * The principals this token proves its holder resolved to when it was minted -
+     * themselves, their groups, and their roles - so the guard can answer "may THIS
+     * account in?" offline, the way it already answers "is this account signed in?".
+     *
+     * Absent means the token was minted before Polaris carried membership at all. That
+     * is not the same as "belongs to nothing", and the guard treats it differently:
+     * see `evaluate` in the edge guard, which re-mints instead of refusing.
+     *
+     * Membership is therefore as fresh as the token, not as fresh as the database. A
+     * visitor removed from a group keeps whatever the group let them reach until their
+     * token expires - the same trade the offline check already makes for the login
+     * itself, and the reason the TTL is hours rather than days.
+     */
+    readonly prn?: readonly string[];
 }
 
 /** Sign an edge token as `<payload>.<sig>` (HMAC-SHA256 over the payload). Mirrors
- *  the signed-cookie HMAC pattern used elsewhere (access-lock/share/file-request). */
+ *  the signed-cookie HMAC pattern used elsewhere (access-lock/share/file-request).
+ *  `prn` is always written, empty list included, so a token minted by a current
+ *  Polaris is always distinguishable from one that predates membership. */
 export function signEdgeToken(token: EdgeToken, secret: string): string {
-    const payload = Buffer.from(JSON.stringify({ sub: token.sub, aud: token.aud, exp: token.exp })).toString(
-        "base64url"
-    );
+    const payload = Buffer.from(
+        JSON.stringify({ sub: token.sub, aud: token.aud, exp: token.exp, prn: token.prn ?? [] })
+    ).toString("base64url");
     const sig = createHmac("sha256", secret).update(`edge:${payload}`).digest("base64url");
     return `${payload}.${sig}`;
 }
@@ -262,7 +433,7 @@ export function verifyEdgeToken(
     try {
         const raw: unknown = JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
         if (raw && typeof raw === "object") {
-            const obj = raw as { sub?: unknown; aud?: unknown; exp?: unknown };
+            const obj = raw as { sub?: unknown; aud?: unknown; exp?: unknown; prn?: unknown };
             if (
                 typeof obj.sub === "string" &&
                 typeof obj.aud === "string" &&
@@ -270,7 +441,12 @@ export function verifyEdgeToken(
                 obj.exp > now &&
                 (audience === undefined || obj.aud === audience)
             ) {
-                return { sub: obj.sub, aud: obj.aud, exp: obj.exp };
+                // Left undefined when the payload carries no `prn` at all, which is how
+                // a token minted before membership existed stays recognisable as one.
+                const prn = Array.isArray(obj.prn)
+                    ? obj.prn.filter((v): v is string => typeof v === "string")
+                    : undefined;
+                return { sub: obj.sub, aud: obj.aud, exp: obj.exp, prn };
             }
         }
     } catch {

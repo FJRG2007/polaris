@@ -7,8 +7,8 @@
  */
 
 import { createHash } from "node:crypto";
-import type { WafCustomRule } from "@polaris/core";
 import { encodeGuardRule } from "@polaris/core/waf";
+import type { WafCustomRule, WafPrincipalGrant } from "@polaris/core";
 
 export type CertResolver = "le" | "internal" | "none";
 
@@ -30,6 +30,15 @@ export interface TraefikWaf {
     /** Ordered custom rules, carried to the guard in the same header as the denylist. */
     readonly rules?: readonly WafCustomRule[];
     readonly requireLogin?: boolean;
+    /** Where the guard sends a visitor to sign in. Carried per route because the guard's
+     *  own environment is written when its sidecar is deployed and cannot follow the
+     *  address an operator configures for Polaris afterwards. */
+    readonly loginUrl?: string;
+    /** One principal list per scope that named who its login admits; a visitor must
+     *  satisfy every one. Empty means any account, so it changes nothing on its own. */
+    readonly loginAllowLists?: readonly (readonly WafPrincipalGrant[])[];
+    /** Principals refused whatever admits them, unioned across scopes. */
+    readonly loginDeny?: readonly WafPrincipalGrant[];
     /** Refuse requests whose headers do not hold together as a browser's. Needs the
      *  guard, like the denylist and the custom rules. */
     readonly browserIntegrity?: boolean;
@@ -120,6 +129,9 @@ function wafMiddlewares(
             presets: waf.presets ?? [],
             rules: waf.rules ?? [],
             requireLogin: waf.requireLogin === true,
+            loginUrl: waf.loginUrl,
+            loginAllowLists: waf.loginAllowLists ?? [],
+            loginDeny: waf.loginDeny ?? [],
             browserIntegrity: waf.browserIntegrity === true,
             sqlInjectionProtection: waf.sqlInjectionProtection === true,
             xssProtection: waf.xssProtection === true,

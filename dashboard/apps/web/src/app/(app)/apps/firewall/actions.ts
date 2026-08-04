@@ -7,6 +7,7 @@
  */
 
 import { z } from "zod";
+import { prisma } from "@polaris/db";
 import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/session";
 import { recordAudit } from "@/lib/audit-service";
@@ -43,6 +44,8 @@ import {
     type WafCustomRule,
     type WafJail,
     type WafAnomaly,
+    type WafPrincipalGrant,
+    type WafPrincipalType,
     type WafScopeType,
     type WafTrafficSummary
 } from "@polaris/core";
@@ -90,6 +93,8 @@ export interface WafScopeRule {
     ipAllowlist: string[];
     ipDenylist: string[];
     requireLogin: boolean;
+    loginAllowPrincipals: WafPrincipalGrant[];
+    loginDenyPrincipals: WafPrincipalGrant[];
     browserIntegrity: boolean;
     sqlInjectionProtection: boolean;
     xssProtection: boolean;
@@ -121,6 +126,57 @@ export async function setWafRuleAction(
         return {};
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Could not save the firewall rule" };
+    }
+}
+
+/** Somebody a require-login rule can name, as the picker lists them. */
+export interface WafPrincipalOption {
+    /** `<type>:<id>`, the form the rule stores and the edge compares. */
+    readonly ref: string;
+    readonly type: WafPrincipalType;
+    readonly label: string;
+    /** What tells two people with the same name apart. Absent for groups and roles,
+     *  whose names are unique already. */
+    readonly sublabel?: string;
+}
+
+/**
+ * Who a require-login rule can be narrowed to: every user, group and role on the
+ * instance.
+ *
+ * Its own round trip rather than part of the rule, because most scopes never require a
+ * login and the ones that do usually admit everybody - so loading the directory with
+ * the firewall would make every operator pay for the few who narrow it.
+ *
+ * Gated on `deploy.manage` like the rule itself and nothing stricter: naming who may
+ * reach a service is part of configuring it, and the list is names and email addresses
+ * of colleagues on the same instance rather than anything the caller could not already
+ * see. It is a read - who exists - and never a write to any of them.
+ */
+export async function listWafPrincipalsAction(): Promise<{ principals?: WafPrincipalOption[]; error?: string }> {
+    await requirePermission("deploy.manage");
+    try {
+        const [users, groups, roles] = await Promise.all([
+            prisma.user.findMany({ select: { id: true, name: true, email: true }, orderBy: { name: "asc" } }),
+            prisma.group.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
+            prisma.role.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } })
+        ]);
+        return {
+            principals: [
+                // Roles and groups first: naming one is how an operator writes a rule
+                // that keeps meaning what they meant after the next person joins.
+                ...roles.map((role) => ({ ref: `role:${role.id}`, type: "role" as const, label: role.name })),
+                ...groups.map((group) => ({ ref: `group:${group.id}`, type: "group" as const, label: group.name })),
+                ...users.map((user) => ({
+                    ref: `user:${user.id}`,
+                    type: "user" as const,
+                    label: user.name,
+                    sublabel: user.email
+                }))
+            ]
+        };
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not load the directory" };
     }
 }
 

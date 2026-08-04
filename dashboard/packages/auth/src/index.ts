@@ -137,6 +137,7 @@ export {
     getPolicy,
     attachPolicy,
     detachPolicy,
+    principalsOfUser,
     resolvePrincipalPolicyStatements,
     type PrincipalType,
     type PolicySummary

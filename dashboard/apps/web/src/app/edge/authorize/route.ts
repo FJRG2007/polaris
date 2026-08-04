@@ -7,12 +7,20 @@
  * directly (cross-origin), which is why the token travels in the URL for one hop;
  * it is bound to the app host (`aud`) so it is useless anywhere else. Node runtime
  * so it can read the session and sign with the auth secret.
+ *
+ * Being signed in is not always enough: the service's firewall rule can name which
+ * users, groups or roles the login admits and which it refuses, each only within a
+ * window if the operator set one. That is checked here, against the live rule, and the
+ * principals the account resolved to travel in the token so the guard can keep checking
+ * it offline afterwards.
  */
 
 import { loadEnv } from "@polaris/config";
-import { signEdgeToken } from "@polaris/core/waf";
-import { isManagedDeployHost } from "@/lib/deploy-service";
 import { getSession } from "@/lib/session";
+import { resolveWaf } from "@/lib/waf-service";
+import { principalsOfUser } from "@polaris/auth";
+import { deployAppIdForHost } from "@/lib/deploy-service";
+import { principalVerdict, signEdgeToken } from "@polaris/core/waf";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -36,7 +44,8 @@ export async function GET(request: Request): Promise<Response> {
     } catch {
         return new Response("Invalid redirect", { status: 400 });
     }
-    if (!(await isManagedDeployHost(appOrigin.host))) {
+    const applicationId = await deployAppIdForHost(appOrigin.host);
+    if (!applicationId) {
         return new Response("Invalid redirect", { status: 400 });
     }
 
@@ -52,10 +61,39 @@ export async function GET(request: Request): Promise<Response> {
         });
     }
 
-    const secret = loadEnv().POLARIS_AUTH_SECRET;
+    const userId = (session.user as { id: string }).id;
     const now = Math.floor(Date.now() / 1000);
+    const [waf, principals] = await Promise.all([resolveWaf(applicationId), principalsOfUser(userId)]);
+    const held = new Set(principals.map((entry) => `${entry.principalType}:${entry.principalId}`));
+    // Signed in, but this service's firewall names who may reach it and this account is
+    // not one of them - or is one of the accounts it refuses. Answered here rather than
+    // left to the guard: the guard is where a visitor ends up after this hop, so minting
+    // a token it will reject is how a redirect loop starts. It is also the only place
+    // that can say why - the guard sees a rule and a token, never an account.
+    const verdict = principalVerdict(
+        { loginAllowLists: waf.loginAllowLists, loginDeny: waf.loginDeny },
+        held,
+        now
+    );
+    if (verdict !== "admitted") {
+        return new Response(
+            verdict === "refused"
+                ? "Your account has been blocked from this service."
+                : "Your account does not have access to this service.",
+            { status: 403, headers: { "content-type": "text/plain; charset=utf-8" } }
+        );
+    }
+
+    const secret = loadEnv().POLARIS_AUTH_SECRET;
     const token = signEdgeToken(
-        { sub: (session.user as { id: string }).id, aud: appOrigin.host, exp: now + EDGE_TOKEN_TTL_SECONDS },
+        {
+            sub: userId,
+            aud: appOrigin.host,
+            exp: now + EDGE_TOKEN_TTL_SECONDS,
+            // Carried so the guard can answer the same question offline on every later
+            // request, without Polaris and without a membership lookup at the edge.
+            prn: [...held]
+        },
         secret
     );
     const callback = new URL("/edge/callback", appOrigin);

@@ -7,9 +7,9 @@
  * no statements.
  */
 
-import { policyDocumentSchema, type PolicyStatement } from "@polaris/core";
 import { prisma } from "@polaris/db";
 import { getUserGroupIds } from "./groups.js";
+import { policyDocumentSchema, type PolicyStatement } from "@polaris/core";
 
 /** The kinds of principal a policy can attach to. */
 export type PrincipalType = "user" | "group" | "role";
@@ -135,21 +135,33 @@ export async function detachPolicy(
 }
 
 /**
- * Every policy statement that applies to a user, gathered across the principals
- * they resolve to: themselves, each group they belong to, and each role they
- * hold. This is the set fed to the engine for both global-capability and
- * Drive-resource decisions (the caller supplies the action and resource).
+ * Every principal a user resolves to: themselves, each group they belong to, and
+ * each role they hold. Anything that grants by principal - a policy attachment, a
+ * Drive ACL, the firewall's require-login list - is answering "does this user match
+ * one of these?", and it has to be the same set of three every time or the same
+ * grant would mean different things in different places.
  */
-export async function resolvePrincipalPolicyStatements(userId: string): Promise<PolicyStatement[]> {
+export async function principalsOfUser(
+    userId: string
+): Promise<{ principalType: PrincipalType; principalId: string }[]> {
     const [groupIds, roleRows] = await Promise.all([
         getUserGroupIds(userId),
         prisma.userRole.findMany({ where: { userId }, select: { roleId: true } })
     ]);
-    const principals: { principalType: PrincipalType; principalId: string }[] = [
+    return [
         { principalType: "user", principalId: userId },
         ...groupIds.map((id) => ({ principalType: "group" as const, principalId: id })),
         ...roleRows.map((row) => ({ principalType: "role" as const, principalId: row.roleId }))
     ];
+}
+
+/**
+ * Every policy statement that applies to a user, gathered across the principals
+ * they resolve to. This is the set fed to the engine for both global-capability and
+ * Drive-resource decisions (the caller supplies the action and resource).
+ */
+export async function resolvePrincipalPolicyStatements(userId: string): Promise<PolicyStatement[]> {
+    const principals = await principalsOfUser(userId);
 
     const attachments = await prisma.policyAttachment.findMany({
         where: { OR: principals },

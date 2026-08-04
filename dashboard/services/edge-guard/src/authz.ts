@@ -21,9 +21,23 @@
  *      are verified offline - so access survives a Polaris outage until the token
  *      expires. The token is bound to the app host (`aud`), so it cannot be replayed
  *      against another app even if it leaks via the callback URL.
+ *
+ * A rule can also name WHO the login admits and who it refuses, each entry optionally
+ * only within a window, and the token carries the principals its holder resolved to -
+ * so that question is answered offline as well, against this guard's own clock. It is a
+ * refusal rather than another trip to Polaris: Polaris decides from the live rule and
+ * the guard from the rule its edge was last written with, and on a remote server those
+ * two can disagree until the next deploy - so bouncing a rejected visitor back to
+ * Polaris would have it mint a token the guard rejects again, forever. The one exception
+ * is a token from before principals existed, which proves nothing about membership and
+ * cannot loop because what it is sent back for is precisely the field it lacks.
+ *
+ * Where the login lives comes from the rule too, for the same reason: this sidecar's
+ * environment is written when it is deployed and cannot follow a domain configured
+ * afterwards.
  */
 
-import { decodeGuardRule, verifyEdgeToken } from "@polaris/core/waf";
+import { decodeGuardRule, principalVerdict, verifyEdgeToken, type GuardRule } from "@polaris/core/waf";
 import {
     browserIntegrityFailure,
     evaluateWafRules,
@@ -55,7 +69,8 @@ export interface GuardRequest {
 export interface GuardConfig {
     /** Shared HMAC secret (POLARIS_AUTH_SECRET) used to verify edge tokens. */
     readonly secret: string;
-    /** Polaris base URL the guard redirects to for a login (e.g. https://polaris). */
+    /** Fallback Polaris base URL for a login redirect (e.g. https://polaris), used only
+     *  when the route's own rule does not carry one - see `loginRedirect`. */
     readonly authorizeUrl: string;
     /** Edge-token cookie name (e.g. "polaris.edge"). */
     readonly cookieName: string;
@@ -104,10 +119,21 @@ function originalUrl(req: GuardRequest, proto: string): string | undefined {
     return req.forwardedHost ? `${proto}://${req.forwardedHost}${req.forwardedUri ?? "/"}` : undefined;
 }
 
-/** Build the Polaris login URL to redirect an unauthenticated visitor to. */
-function loginRedirect(cfg: GuardConfig, req: GuardRequest, proto: string): string {
-    const original = originalUrl(req, proto) ?? cfg.authorizeUrl;
-    return `${cfg.authorizeUrl}/edge/authorize?redirect=${encodeURIComponent(original)}`;
+/**
+ * Build the Polaris login URL to redirect an unauthenticated visitor to.
+ *
+ * The route's own rule says where Polaris answers, and the environment is only the
+ * fallback for an edge written before rules carried it. That order matters: the
+ * environment is set when this sidecar is deployed and defaults to the LAN name, so a
+ * guard trusting it would send anyone off the network to `polaris.local` - a name that
+ * resolves on that network and nowhere else, which is a login the visitor can never
+ * reach. The rule is rewritten whenever routes are published, so it follows the address
+ * the operator actually configured.
+ */
+function loginRedirect(cfg: GuardConfig, req: GuardRequest, proto: string, rule: GuardRule): string {
+    const base = rule.loginUrl ?? cfg.authorizeUrl;
+    const original = originalUrl(req, proto) ?? base;
+    return `${base}/edge/authorize?redirect=${encodeURIComponent(original)}`;
 }
 
 /** Confine a post-login redirect to the app's own host, so the guard is never an
@@ -223,11 +249,44 @@ export function evaluate(req: GuardRequest, cfg: GuardConfig): GuardDecision {
                     setCookie: buildCookie(cfg.cookieName, token, proto === "https", maxAge)
                 };
             }
-            return { status: 302, location: loginRedirect(cfg, req, proto) };
+            return { status: 302, location: loginRedirect(cfg, req, proto, rule) };
         }
         const token = readCookie(req.cookie, cfg.cookieName);
-        if (verifyEdgeToken(token, cfg.secret, cfg.now, host)) return { status: 200 };
-        return { status: 302, location: loginRedirect(cfg, req, proto) };
+        const verified = verifyEdgeToken(token, cfg.secret, cfg.now, host);
+        if (verified) return admits(verified, rule, cfg, req, proto);
+        return { status: 302, location: loginRedirect(cfg, req, proto, rule) };
     }
     return { status: 200 };
+}
+
+/**
+ * Decide a signed-in visitor against the principals the rule names.
+ *
+ * Three outcomes rather than two. A token minted before Polaris carried membership has
+ * no `prn` at all: it proves who the holder is and nothing about what they belong to,
+ * so a rule that names a group cannot be answered from it and the visitor is sent back
+ * for a token that can be - which is a one-time cost per token, on upgrade only. A
+ * token that does carry membership is final: it is refused outright rather than sent
+ * back, because Polaris has already made this same decision from the live rule and
+ * sending it there again could only loop.
+ *
+ * The verdict is taken against the guard's own clock, so a grant that starts or lapses
+ * does so on time rather than whenever the holder's token happens to expire.
+ */
+function admits(
+    token: { readonly sub: string; readonly prn?: readonly string[] },
+    rule: GuardRule,
+    cfg: GuardConfig,
+    req: GuardRequest,
+    proto: string
+): GuardDecision {
+    const named = (rule.loginAllowLists?.length ?? 0) > 0 || (rule.loginDeny?.length ?? 0) > 0;
+    if (!named) return { status: 200 };
+    if (!token.prn) return { status: 302, location: loginRedirect(cfg, req, proto, rule) };
+    // `user:<sub>` is proven by the signature over `sub` itself, so it holds even for a
+    // token minted while the account belonged to nothing.
+    const held = new Set([`user:${token.sub}`, ...token.prn]);
+    const verdict = principalVerdict(rule, held, cfg.now);
+    if (verdict === "admitted") return { status: 200 };
+    return { status: 403, reason: verdict === "refused" ? "refused by this scope" : "not admitted by this scope" };
 }

@@ -18,8 +18,8 @@
  */
 
 import { writeFile } from "node:fs/promises";
-import type { WafCustomRule } from "@polaris/core";
 import { encodeGuardRule, signEdgeOrigin } from "@polaris/core/waf";
+import type { WafCustomRule, WafPrincipalGrant } from "@polaris/core";
 
 /** One app hostname to route, with the origin the edge should dial. */
 export interface AppRoute {
@@ -44,6 +44,15 @@ export interface AppRoute {
     readonly presets?: readonly string[];
     readonly rules?: readonly WafCustomRule[];
     readonly requireLogin?: boolean;
+    /** Where the guard sends a visitor to sign in - the address Polaris is reachable at
+     *  from wherever the visitor is, which is a setting rather than something either
+     *  edge can work out for itself. */
+    readonly loginUrl?: string;
+    /** One principal list per scope that named who its login admits; a visitor must
+     *  satisfy every one. Empty means any account, so it changes nothing on its own. */
+    readonly loginAllowLists?: readonly (readonly WafPrincipalGrant[])[];
+    /** Principals refused whatever admits them, unioned across scopes. */
+    readonly loginDeny?: readonly WafPrincipalGrant[];
     /** Refuse requests whose headers do not hold together as a browser's. Needs the
      *  guard, like the denylist and the custom rules. */
     readonly browserIntegrity?: boolean;
@@ -175,6 +184,9 @@ function routeMiddlewares(
         const rule = encodeGuardRule({
             deny: route.deny ?? [],
             requireLogin: route.requireLogin === true,
+            loginUrl: route.loginUrl,
+            loginAllowLists: route.loginAllowLists ?? [],
+            loginDeny: route.loginDeny ?? [],
             browserIntegrity: route.browserIntegrity === true,
             sqlInjectionProtection: route.sqlInjectionProtection === true,
             xssProtection: route.xssProtection === true,

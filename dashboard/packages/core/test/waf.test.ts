@@ -1,6 +1,7 @@
+import { createHmac } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { wafRuleInputSchema, WAF_LIST_MAX } from "../src/schemas/deploy.js";
-import { decodeGuardRule, encodeGuardRule, signEdgeToken, verifyEdgeToken } from "../src/waf.js";
+import { decodeGuardRule, encodeGuardRule, principalVerdict, signEdgeToken, verifyEdgeToken } from "../src/waf.js";
 
 const SECRET = "unit-test-secret-16chars";
 const HOST = "app.example.com";
@@ -19,6 +20,9 @@ describe("guard rule codec", () => {
         const rule = {
             deny: ["10.0.0.0/8", "203.0.113.5"],
             requireLogin: true,
+            loginUrl: "https://polaris.example.com",
+            loginAllowLists: [[{ ref: "group:ops" }], [{ ref: "user:u1", until: NOW + 3600 }]],
+            loginDeny: [{ ref: "role:contractor", from: NOW }],
             browserIntegrity: false,
             sqlInjectionProtection: true,
             xssProtection: true,
@@ -33,6 +37,8 @@ describe("guard rule codec", () => {
         expect(decodeGuardRule(undefined)).toEqual({
             deny: [],
             requireLogin: false,
+            loginAllowLists: [],
+            loginDeny: [],
             browserIntegrity: false,
             sqlInjectionProtection: false,
             xssProtection: false,
@@ -46,6 +52,10 @@ describe("guard rule codec", () => {
         expect(decodeGuardRule("###not-valid###")).toEqual({
             deny: [],
             requireLogin: true,
+            // No principal list, deliberately: an unreadable header must send a visitor
+            // to a login, not refuse every account including the operator fixing it.
+            loginAllowLists: [],
+            loginDeny: [],
             browserIntegrity: false,
             sqlInjectionProtection: true,
             xssProtection: true,
@@ -60,6 +70,8 @@ describe("guard rule codec", () => {
         expect(decodeGuardRule(header)).toEqual({
             deny: ["10.0.0.1"],
             requireLogin: false,
+            loginAllowLists: [],
+            loginDeny: [],
             browserIntegrity: false,
             sqlInjectionProtection: false,
             xssProtection: false,
@@ -67,6 +79,61 @@ describe("guard rule codec", () => {
             presets: [],
             rules: []
         });
+    });
+
+    it("reads a header from before principals as admitting any account", () => {
+        // An edge materialized before this control existed carries no `n` key at all.
+        // That route required a login and let any account through, and it has to keep
+        // doing exactly that until it is rewritten.
+        const header = Buffer.from(JSON.stringify({ d: [], l: true })).toString("base64");
+        expect(decodeGuardRule(header).loginAllowLists).toEqual([]);
+        expect(decodeGuardRule(header).loginDeny).toEqual([]);
+    });
+
+    it("drops a principal list that decodes to nothing rather than keeping it empty", () => {
+        // An empty list is a constraint nobody satisfies, so keeping one would turn a
+        // garbled entry into a route nobody can reach.
+        const header = Buffer.from(
+            JSON.stringify({ d: [], l: true, n: [[{ r: "group:ops" }], [], [3, null], "nope"] })
+        ).toString("base64");
+        expect(decodeGuardRule(header).loginAllowLists).toEqual([[{ ref: "group:ops" }]]);
+    });
+
+    it("drops a grant whose window did not decode, rather than keeping it unbounded", () => {
+        // An expiry that silently became "never" is the one way this can fail that
+        // nobody would notice, so the entry goes rather than its bound.
+        const header = Buffer.from(
+            JSON.stringify({
+                d: [],
+                l: true,
+                y: [
+                    { r: "user:u1", u: "soon" },
+                    { r: "user:u2", u: NOW }
+                ]
+            })
+        ).toString("base64");
+        expect(decodeGuardRule(header).loginDeny).toEqual([{ ref: "user:u2", until: NOW }]);
+    });
+
+    it("keeps the login address off a rule that does not need one", () => {
+        // The header is stamped onto every request to the route, so a key that could
+        // only ever go unread is one not worth sending.
+        const encoded = encodeGuardRule({
+            deny: [],
+            requireLogin: false,
+            loginUrl: "https://polaris.example.com",
+            rules: []
+        });
+        expect(decodeGuardRule(encoded).loginUrl).toBeUndefined();
+    });
+
+    it("refuses a login address that is not an absolute http(s) URL", () => {
+        // It ends up in a Location header, so a misconfigured one has to fail to a login
+        // that does not happen rather than to a redirect somewhere unintended.
+        for (const loginUrl of ["polaris.example.com", "javascript:alert(1)", "/edge"]) {
+            const encoded = encodeGuardRule({ deny: [], requireLogin: true, loginUrl, rules: [] });
+            expect(decodeGuardRule(encoded).loginUrl).toBeUndefined();
+        }
     });
 
     it("reads a pre-split header as both injection checks", () => {
@@ -91,7 +158,21 @@ describe("guard rule codec", () => {
 describe("edge token", () => {
     it("verifies a valid, host-bound, unexpired token", () => {
         const token = signEdgeToken({ sub: "u1", aud: HOST, exp: NOW + 60 }, SECRET);
-        expect(verifyEdgeToken(token, SECRET, NOW, HOST)).toEqual({ sub: "u1", aud: HOST, exp: NOW + 60 });
+        expect(verifyEdgeToken(token, SECRET, NOW, HOST)).toEqual({ sub: "u1", aud: HOST, exp: NOW + 60, prn: [] });
+    });
+
+    it("carries the principals it was minted with", () => {
+        const prn = ["user:u1", "group:ops"];
+        const token = signEdgeToken({ sub: "u1", aud: HOST, exp: NOW + 60, prn }, SECRET);
+        expect(verifyEdgeToken(token, SECRET, NOW, HOST)?.prn).toEqual(prn);
+    });
+
+    it("leaves prn undefined for a token minted before principals existed", () => {
+        // Signed by hand, because signEdgeToken always writes the key now - which is
+        // exactly what makes its absence a reliable signal of an old token.
+        const payload = Buffer.from(JSON.stringify({ sub: "u1", aud: HOST, exp: NOW + 60 })).toString("base64url");
+        const sig = createHmac("sha256", SECRET).update(`edge:${payload}`).digest("base64url");
+        expect(verifyEdgeToken(`${payload}.${sig}`, SECRET, NOW, HOST)?.prn).toBeUndefined();
     });
 
     it("rejects a token bound to another host", () => {
@@ -135,6 +216,8 @@ describe("wafRuleInputSchema", () => {
             ipAllowlist: ["10.0.0.0/8"],
             ipDenylist: [],
             requireLogin: false,
+            loginAllowPrincipals: [],
+            loginDenyPrincipals: [],
             browserIntegrity: false,
             sqlInjectionProtection: true,
             xssProtection: true,
@@ -172,5 +255,83 @@ describe("wafRuleInputSchema", () => {
     it("caps a list at WAF_LIST_MAX entries", () => {
         const many = Array.from({ length: WAF_LIST_MAX + 1 }, (_, i) => `10.0.${Math.floor(i / 256)}.${i % 256}`);
         expect(wafRuleInputSchema.safeParse({ ipDenylist: many }).success).toBe(false);
+    });
+
+    it("accepts the three principal kinds and rejects anything else", () => {
+        const ok = wafRuleInputSchema.safeParse({
+            loginAllowPrincipals: [{ ref: "user:abc" }, { ref: "group:ops-1" }, { ref: "role:admin" }]
+        });
+        expect(ok.success).toBe(true);
+        // A bare id names nothing in particular, and an unknown kind would be stored,
+        // shipped to the edge and silently matched against nobody.
+        expect(wafRuleInputSchema.safeParse({ loginAllowPrincipals: [{ ref: "abc" }] }).success).toBe(false);
+        expect(wafRuleInputSchema.safeParse({ loginAllowPrincipals: [{ ref: "host:abc" }] }).success).toBe(false);
+        expect(wafRuleInputSchema.safeParse({ loginAllowPrincipals: [{ ref: "user:" }] }).success).toBe(false);
+    });
+
+    it("rejects a window that ends before it starts", () => {
+        // Not merely useless: it reads as a grant while admitting nobody, ever.
+        const result = wafRuleInputSchema.safeParse({
+            loginAllowPrincipals: [{ ref: "user:abc", from: NOW + 60, until: NOW }]
+        });
+        expect(result.success).toBe(false);
+    });
+
+    it("rejects a principal named in both lists", () => {
+        const result = wafRuleInputSchema.safeParse({
+            loginAllowPrincipals: [{ ref: "group:ops" }],
+            loginDenyPrincipals: [{ ref: "group:ops" }]
+        });
+        expect(result.success).toBe(false);
+    });
+});
+
+describe("principalVerdict", () => {
+    const held = new Set(["user:u1", "group:ops"]);
+
+    it("admits anybody when no scope named anyone", () => {
+        expect(principalVerdict({}, held, NOW)).toBe("admitted");
+        expect(principalVerdict({ loginAllowLists: [], loginDeny: [] }, new Set(), NOW)).toBe("admitted");
+    });
+
+    it("admits a visitor matching any entry of a list", () => {
+        const lists = [[{ ref: "group:sales" }, { ref: "user:u1" }]];
+        expect(principalVerdict({ loginAllowLists: lists }, held, NOW)).toBe("admitted");
+    });
+
+    it("does not admit a visitor matching no entry", () => {
+        expect(principalVerdict({ loginAllowLists: [[{ ref: "group:sales" }]] }, held, NOW)).toBe("not-admitted");
+    });
+
+    it("requires every scope's list, so a narrower scope can only restrict", () => {
+        // In the broad scope's list and not in the narrow one's: the narrow scope wins.
+        const lists = [[{ ref: "group:ops" }], [{ ref: "group:release" }]];
+        expect(principalVerdict({ loginAllowLists: lists }, held, NOW)).toBe("not-admitted");
+        expect(principalVerdict({ loginAllowLists: [[{ ref: "group:ops" }], [{ ref: "user:u1" }]] }, held, NOW)).toBe(
+            "admitted"
+        );
+    });
+
+    it("refuses a denied principal even when a list admits them", () => {
+        const rule = { loginAllowLists: [[{ ref: "group:ops" }]], loginDeny: [{ ref: "user:u1" }] };
+        expect(principalVerdict(rule, held, NOW)).toBe("refused");
+    });
+
+    it("ignores a grant that has not started and one that has expired", () => {
+        const early = [[{ ref: "group:ops", from: NOW + 60 }]];
+        expect(principalVerdict({ loginAllowLists: early }, held, NOW)).toBe("not-admitted");
+        expect(principalVerdict({ loginAllowLists: early }, held, NOW + 60)).toBe("admitted");
+
+        const lapsing = [[{ ref: "group:ops", until: NOW + 60 }]];
+        expect(principalVerdict({ loginAllowLists: lapsing }, held, NOW)).toBe("admitted");
+        expect(principalVerdict({ loginAllowLists: lapsing }, held, NOW + 60)).toBe("not-admitted");
+    });
+
+    it("applies a refusal only inside its own window", () => {
+        // A suspension, rather than a removal somebody has to remember to undo.
+        const rule = { loginDeny: [{ ref: "group:ops", from: NOW, until: NOW + 60 }] };
+        expect(principalVerdict(rule, held, NOW - 1)).toBe("admitted");
+        expect(principalVerdict(rule, held, NOW)).toBe("refused");
+        expect(principalVerdict(rule, held, NOW + 60)).toBe("admitted");
     });
 });

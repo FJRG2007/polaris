@@ -26,6 +26,7 @@
  */
 
 import { RuleList } from "./rule-list";
+import { LoginPrincipals } from "./login-principals";
 import { ChipList, validAddress } from "./chip-list";
 import { Button, Skeleton, Switch } from "@polaris/ui";
 import { useCallback, useEffect, useState } from "react";
@@ -41,6 +42,8 @@ const BLANK: WafScopeRule = {
     ipAllowlist: [],
     ipDenylist: [],
     requireLogin: false,
+    loginAllowPrincipals: [],
+    loginDenyPrincipals: [],
     browserIntegrity: false,
     sqlInjectionProtection: true,
     xssProtection: true,
@@ -312,6 +315,17 @@ export function WafEditor({
                             checked={saved.requireLogin}
                             disabled={busy}
                             onChange={(on) => persist({ requireLogin: on })}
+                        />
+                    ) : null}
+                    {/* Only under the switch that gives them meaning. The lists are kept
+                        either way, so switching the login off and back on comes back to
+                        the same people rather than to everybody. */}
+                    {offerLogin && saved.requireLogin ? (
+                        <LoginPrincipals
+                            admitted={saved.loginAllowPrincipals}
+                            refused={saved.loginDenyPrincipals}
+                            disabled={busy}
+                            onChange={(next) => persist(next)}
                         />
                     ) : null}
                 </div>

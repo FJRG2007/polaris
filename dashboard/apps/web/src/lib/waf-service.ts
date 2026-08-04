@@ -2,8 +2,10 @@
  * WAF rule resolution and persistence. Rules live at four scopes for a deployed
  * service (global, project, environment, application) and are merged least-privilege:
  * allowlists AND (each scope can only narrow, never widen), denylists union,
- * requireLogin ORs, and custom rules concatenate broadest-scope-first so a global
- * rule is tried before a project's. The merged result is materialized into each
+ * requireLogin ORs, the principals a login admits AND like the allowlists while the
+ * ones it refuses union like the denylists, and custom rules concatenate
+ * broadest-scope-first so a global rule is tried before a project's.
+ * The merged result is materialized into each
  * server's edge (Traefik) by the router generators, so the controls keep enforcing
  * when the Polaris control plane is down. Every read/write is ownership-checked.
  *
@@ -20,8 +22,10 @@ import {
     WAF_SCOPE_ORDER,
     wafCustomRuleSchema,
     wafRuleInputSchema,
+    wafPrincipalGrantSchema,
     type ResolvedWaf,
     type WafCustomRule,
+    type WafPrincipalGrant,
     type WafRuleInput,
     type WafScopeType
 } from "@polaris/core";
@@ -64,6 +68,22 @@ function parseList(json: string): string[] {
     }
 }
 
+/** Principal grants as stored, validated on read for the same reason the custom rules
+ *  below are: one entry that no longer parses must not take the rest of the list -
+ *  and with it the narrowing the operator wrote - down with it. */
+function parseGrants(json: string): WafPrincipalGrant[] {
+    try {
+        const parsed: unknown = JSON.parse(json);
+        if (!Array.isArray(parsed)) return [];
+        return parsed.flatMap((entry) => {
+            const grant = wafPrincipalGrantSchema.safeParse(entry);
+            return grant.success ? [grant.data] : [];
+        });
+    } catch {
+        return [];
+    }
+}
+
 /**
  * Custom rules as stored. Validated on read rather than cast: they were written by a
  * validated action, but a rule that survived a schema change is a rule the edge would
@@ -87,6 +107,8 @@ interface RuleRow {
     readonly ipAllowlist: string;
     readonly ipDenylist: string;
     readonly requireLogin: boolean;
+    readonly loginAllowPrincipals: string;
+    readonly loginDenyPrincipals: string;
     readonly browserIntegrity: boolean;
     readonly sqlInjectionProtection: boolean;
     readonly xssProtection: boolean;
@@ -101,6 +123,8 @@ const RULE_SELECT = {
     ipAllowlist: true,
     ipDenylist: true,
     requireLogin: true,
+    loginAllowPrincipals: true,
+    loginDenyPrincipals: true,
     browserIntegrity: true,
     sqlInjectionProtection: true,
     xssProtection: true,
@@ -114,6 +138,8 @@ function mergeRules(rows: readonly RuleRow[]): ResolvedWaf {
     const rank = (scopeType: string): number => WAF_SCOPE_ORDER[scopeType as WafScopeType] ?? 99;
     const ordered = [...rows].sort((a, b) => rank(a.scopeType) - rank(b.scopeType));
     const allowLists: string[][] = [];
+    const loginAllowLists: WafPrincipalGrant[][] = [];
+    const loginDeny: WafPrincipalGrant[] = [];
     const deny = new Set<string>();
     const presets = new Set<string>();
     const rules: WafCustomRule[] = [];
@@ -128,6 +154,14 @@ function mergeRules(rows: readonly RuleRow[]): ResolvedWaf {
     for (const row of ordered) {
         const allow = parseList(row.ipAllowlist);
         if (allow.length > 0) allowLists.push(allow);
+        // Collected the same way, and an empty one is dropped for the same reason: a
+        // scope that named nobody has not narrowed anything, so it must not turn into a
+        // list that admits nobody.
+        const admitted = parseGrants(row.loginAllowPrincipals);
+        if (admitted.length > 0) loginAllowLists.push(admitted);
+        // Refusals flatten instead, like the address denylist right below: a refusal
+        // applies wherever it was written, so which scope wrote it changes nothing.
+        loginDeny.push(...parseGrants(row.loginDenyPrincipals));
         for (const entry of parseList(row.ipDenylist)) deny.add(entry);
         // A pack union, not a per-scope list: a pack enabled anywhere above applies
         // here too, and a child scope cannot switch off a parent's. Turning one off
@@ -148,6 +182,8 @@ function mergeRules(rows: readonly RuleRow[]): ResolvedWaf {
         allowLists,
         deny: [...deny],
         requireLogin,
+        loginAllowLists,
+        loginDeny,
         browserIntegrity,
         sqlInjectionProtection,
         xssProtection,
@@ -168,6 +204,8 @@ const EMPTY_WAF: ResolvedWaf = {
     allowLists: [],
     deny: [],
     requireLogin: false,
+    loginAllowLists: [],
+    loginDeny: [],
     browserIntegrity: false,
     sqlInjectionProtection: true,
     xssProtection: true,
@@ -182,6 +220,8 @@ const DEFAULT_GLOBAL_ROW: RuleRow = {
     ipAllowlist: "[]",
     ipDenylist: "[]",
     requireLogin: false,
+    loginAllowPrincipals: "[]",
+    loginDenyPrincipals: "[]",
     browserIntegrity: false,
     sqlInjectionProtection: true,
     xssProtection: true,
@@ -344,6 +384,9 @@ export interface WafRuleView {
     readonly ipAllowlist: string[];
     readonly ipDenylist: string[];
     readonly requireLogin: boolean;
+    /** Who this scope alone admits and refuses - not what it inherits. */
+    readonly loginAllowPrincipals: WafPrincipalGrant[];
+    readonly loginDenyPrincipals: WafPrincipalGrant[];
     readonly browserIntegrity: boolean;
     readonly sqlInjectionProtection: boolean;
     readonly xssProtection: boolean;
@@ -404,6 +447,8 @@ export async function getWafRule(
             ipAllowlist: true,
             ipDenylist: true,
             requireLogin: true,
+            loginAllowPrincipals: true,
+            loginDenyPrincipals: true,
             browserIntegrity: true,
             sqlInjectionProtection: true,
             xssProtection: true,
@@ -421,6 +466,8 @@ export async function getWafRule(
             ipAllowlist: [],
             ipDenylist: [],
             requireLogin: false,
+            loginAllowPrincipals: [],
+            loginDenyPrincipals: [],
             browserIntegrity: false,
             sqlInjectionProtection: true,
             xssProtection: true,
@@ -433,6 +480,8 @@ export async function getWafRule(
         ipAllowlist: parseList(row.ipAllowlist),
         ipDenylist: parseList(row.ipDenylist),
         requireLogin: row.requireLogin,
+        loginAllowPrincipals: parseGrants(row.loginAllowPrincipals),
+        loginDenyPrincipals: parseGrants(row.loginDenyPrincipals),
         browserIntegrity: row.browserIntegrity,
         sqlInjectionProtection: row.sqlInjectionProtection,
         xssProtection: row.xssProtection,
@@ -505,6 +554,8 @@ export async function setWafRule(
         parsed.ipDenylist.length === 0 &&
         parsed.rules.length === 0 &&
         parsed.presets.length === 0 &&
+        parsed.loginAllowPrincipals.length === 0 &&
+        parsed.loginDenyPrincipals.length === 0 &&
         !parsed.requireLogin &&
         !parsed.browserIntegrity &&
         parsed.sqlInjectionProtection &&
@@ -521,6 +572,8 @@ export async function setWafRule(
         ipAllowlist: JSON.stringify(parsed.ipAllowlist),
         ipDenylist: JSON.stringify(parsed.ipDenylist),
         requireLogin: parsed.requireLogin,
+        loginAllowPrincipals: JSON.stringify(parsed.loginAllowPrincipals),
+        loginDenyPrincipals: JSON.stringify(parsed.loginDenyPrincipals),
         browserIntegrity: parsed.browserIntegrity,
         sqlInjectionProtection: parsed.sqlInjectionProtection,
         xssProtection: parsed.xssProtection,

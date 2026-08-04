@@ -159,6 +159,61 @@ export const WAF_LIST_MAX = 256;
 /** A list of IP/CIDR entries, each validated the same way as a drop-point allowlist. */
 const wafCidrList = z.array(cidrOrIp).max(WAF_LIST_MAX, `At most ${WAF_LIST_MAX} entries`);
 
+/** The kinds of principal a require-login rule can name. The same three a policy
+ *  attaches to, so "who" means one thing across the instance. */
+export const WAF_PRINCIPAL_TYPES = ["user", "group", "role"] as const;
+export type WafPrincipalType = (typeof WAF_PRINCIPAL_TYPES)[number];
+
+/**
+ * One named principal, written as `<type>:<id>`.
+ *
+ * A single string rather than a pair of fields because it is stored, merged,
+ * deduplicated and compared as one value: it dedupes with `Set` and matches with one
+ * comparison, where a type and an id would have to be flattened into this anyway.
+ */
+export const wafPrincipalRef = z
+    .string()
+    .trim()
+    .max(80)
+    .regex(new RegExp(`^(${WAF_PRINCIPAL_TYPES.join("|")}):[0-9a-zA-Z_-]{1,64}$`), "Not a valid principal");
+
+/**
+ * A moment a grant starts or stops applying, in unix seconds.
+ *
+ * Seconds rather than an ISO string because the edge compares this against its own
+ * clock on every request, and the same number is what travels in the rule header, is
+ * stored, and is merged - one representation end to end, and no date parsing in the
+ * hot path. The UI converts to and from a local datetime on the way in and out.
+ */
+const wafGrantMoment = z.number().int().min(0).max(4102444800);
+
+/**
+ * One principal a login rule names, with the window the entry applies in.
+ *
+ * Both bounds are optional and independent: `from` alone is access that begins later,
+ * `until` alone is access that lapses, both is a booked window, neither - the common
+ * case - is an entry that simply applies. The window is evaluated at the edge on every
+ * request rather than baked into anything, so a grant that lapses stops working then
+ * and not whenever a token happens to expire.
+ */
+export const wafPrincipalGrantSchema = z
+    .object({
+        ref: wafPrincipalRef,
+        /** Inclusive. Before it, the entry is not there yet. */
+        from: wafGrantMoment.optional(),
+        /** Exclusive. From it on, the entry is spent. */
+        until: wafGrantMoment.optional()
+    })
+    .refine((grant) => grant.from === undefined || grant.until === undefined || grant.from < grant.until, {
+        message: "The start must come before the expiry",
+        path: ["until"]
+    });
+
+export type WafPrincipalGrant = z.infer<typeof wafPrincipalGrantSchema>;
+
+/** The principals one scope names, capped like every other list on a rule. */
+const wafPrincipalList = z.array(wafPrincipalGrantSchema).max(WAF_LIST_MAX, `At most ${WAF_LIST_MAX} entries`);
+
 /**
  * What a custom rule can look at. Every one of these is a fact the edge already
  * forwards to the guard, so a rule never needs a lookup to decide - which is what
@@ -224,6 +279,29 @@ export const wafRuleInputSchema = z
         ipDenylist: wafCidrList.default([]),
         requireLogin: z.boolean().default(false),
         /**
+         * Who the login admits, as `user:`/`group:`/`role:` refs.
+         *
+         * Empty means every account on the instance, which is what `requireLogin` alone
+         * has always meant - so an existing rule keeps behaving exactly as it did, and
+         * "signed in" stays the answer until somebody narrows it. A non-empty list is
+         * read as an allowlist: only a visitor resolving to one of these gets in.
+         *
+         * Kept independent of `requireLogin` rather than nested under it, so turning the
+         * login off and back on does not lose the list somebody wrote.
+         */
+        loginAllowPrincipals: wafPrincipalList.default([]),
+        /**
+         * Who the login refuses, whatever else admits them.
+         *
+         * Checked before the allowlist and never overridden by it, the way the address
+         * denylist sits above the address allowlist: an account named here is out even
+         * if a group it belongs to is admitted, which is what makes "everyone in
+         * Engineering except this contractor" expressible in one rule. Unions across
+         * scopes for the same reason a refusal always does - a narrower scope must not
+         * be able to re-admit whoever a broader one shut out.
+         */
+        loginDenyPrincipals: wafPrincipalList.default([]),
+        /**
          * Refuse requests whose headers do not hold together as a browser's.
          *
          * Off by default, unlike the rule packs, and deliberately: it is a heuristic
@@ -274,6 +352,18 @@ export const wafRuleInputSchema = z
                 message: `"${overlap}" is in both the allow and deny lists`
             });
         }
+        // Same warning for the people lists, and for the same reason: deny wins at the
+        // edge either way, so naming somebody twice is an operator contradicting
+        // themselves rather than something that can widen access.
+        const deniedPrincipals = new Set(value.loginDenyPrincipals.map((grant) => grant.ref));
+        const namedTwice = value.loginAllowPrincipals.find((grant) => deniedPrincipals.has(grant.ref));
+        if (namedTwice) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ["loginDenyPrincipals"],
+                message: `"${namedTwice.ref}" is both admitted and refused`
+            });
+        }
     });
 
 export type WafRuleInput = z.infer<typeof wafRuleInputSchema>;
@@ -288,6 +378,18 @@ export interface ResolvedWaf {
     readonly deny: readonly string[];
     /** True if any scope requires a Polaris login. */
     readonly requireLogin: boolean;
+    /**
+     * One non-empty principal list per scope that admits anybody. A visitor must satisfy
+     * every list, exactly as they must satisfy every IP allowlist above: a child scope
+     * can narrow who its parent admitted and never widen it. A scope that names nobody
+     * contributes no list, so it constrains nothing - which is why the common case
+     * (login required, nobody named anywhere) stays "any account".
+     */
+    readonly loginAllowLists: readonly (readonly WafPrincipalGrant[])[];
+    /** Union of every scope's refused principals, flattened for the same reason the
+     *  address denylist is: a refusal applies wherever it was written, so which scope
+     *  wrote it changes nothing about who it stops. */
+    readonly loginDeny: readonly WafPrincipalGrant[];
     /** True if any scope arms the browser integrity check. Unions like requireLogin:
      *  it refuses traffic, so a narrower scope must not be able to switch off a
      *  broader one's decision to refuse it. */

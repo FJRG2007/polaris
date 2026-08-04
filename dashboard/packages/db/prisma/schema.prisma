@@ -2436,6 +2436,16 @@ model WafRule {
     ipAllowlist  String   @default("[]")
     ipDenylist   String   @default("[]")
     requireLogin Boolean  @default(false)
+    // Who that login admits and who it refuses, as JSON arrays of
+    // {ref:"<type>:<id>", from?, until?} - the principal (user, group or role) and the
+    // unix-second window the entry applies in, both bounds optional.
+    // Empty allow means any account on the instance, which is what requireLogin meant
+    // on its own - so a scope only narrows once somebody names someone here. Allow
+    // narrows across scopes the way ipAllowlist does (a visitor must satisfy every
+    // scope that named anybody, so a child can restrict a parent and never widen it);
+    // deny unions like ipDenylist and wins over any allow.
+    loginAllowPrincipals String @default("[]")
+    loginDenyPrincipals  String @default("[]")
     // Refuse requests whose headers do not hold together as a browser's. Unions
     // across scopes like requireLogin - it refuses traffic, so a narrower scope
     // cannot switch off a broader one's decision to refuse it.

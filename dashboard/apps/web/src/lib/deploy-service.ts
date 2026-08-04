@@ -10,7 +10,6 @@ import { join } from "node:path";
 import { prisma } from "@polaris/db";
 import { loadEnv } from "@polaris/config";
 import { createWriteStream } from "node:fs";
-import { getPublicIp } from "./domain-service";
 import { commitUrl } from "./deploy/commit-url";
 import { decryptSecret } from "@polaris/storage";
 import { mkdir, readFile } from "node:fs/promises";
@@ -19,6 +18,7 @@ import { getLatestCommit } from "./github-service";
 import { wipeVolume } from "./deploy-volume-service";
 import { resolveAutoDomain } from "./network-service";
 import { resolveMountTarget } from "./storage-service";
+import { appBaseUrl, getPublicIp } from "./domain-service";
 import { resolveWaf, resolveWafBatch } from "./waf-service";
 import { LocalRouter, type AppRoute } from "./deploy/router";
 import { getFlagsForEnvironment } from "./deploy-project-service";
@@ -712,6 +712,8 @@ export async function syncAppRoutes(): Promise<void> {
             allowLists: [],
             deny: [],
             requireLogin: false,
+            loginAllowLists: [],
+            loginDeny: [],
             browserIntegrity: false,
             sqlInjectionProtection: true,
             xssProtection: true,
@@ -719,6 +721,11 @@ export async function syncAppRoutes(): Promise<void> {
             presets: [],
             rules: []
         };
+        // Where a require-login route sends a visitor to sign in. Resolved once for the
+        // whole edge and written into every route, because the guard cannot work it out:
+        // it knows the address it was deployed with, and the address Polaris answers on
+        // is a setting that changes without redeploying anything.
+        const loginUrl = await appBaseUrl();
         for (const domain of localDomains) {
             const rule = waf.get(domain.applicationId) ?? emptyWaf;
             localRoutes.push({
@@ -732,6 +739,9 @@ export async function syncAppRoutes(): Promise<void> {
                 presets: rule.presets,
                 rules: rule.rules,
                 requireLogin: rule.requireLogin,
+                loginUrl,
+                loginAllowLists: rule.loginAllowLists,
+                loginDeny: rule.loginDeny,
                 browserIntegrity: rule.browserIntegrity,
                 sqlInjectionProtection: rule.sqlInjectionProtection,
                 xssProtection: rule.xssProtection,
@@ -751,6 +761,9 @@ export async function syncAppRoutes(): Promise<void> {
                 presets: rule.presets,
                 rules: rule.rules,
                 requireLogin: rule.requireLogin,
+                loginUrl,
+                loginAllowLists: rule.loginAllowLists,
+                loginDeny: rule.loginDeny,
                 browserIntegrity: rule.browserIntegrity,
                 sqlInjectionProtection: rule.sqlInjectionProtection,
                 xssProtection: rule.xssProtection,
@@ -767,23 +780,26 @@ export async function syncAppRoutes(): Promise<void> {
 }
 
 /**
- * Whether a hostname is one this instance actually routes: an enabled domain or a
- * live quick-tunnel host. The edge login handoff mints a host-bound token, so the
- * authorize endpoint checks this before signing and redirecting - a redirect target
- * that is not a managed deploy host is refused, so the endpoint can never be turned
- * into an open redirector or a token oracle for an arbitrary site.
+ * The service behind a hostname this instance actually routes - an enabled domain or a
+ * live quick-tunnel host - or null if it routes no such thing.
+ *
+ * Two callers, one lookup. The edge login handoff mints a host-bound token, so the
+ * authorize endpoint refuses a redirect target that is not a managed deploy host: that
+ * is what stops the endpoint being turned into an open redirector or a token oracle for
+ * an arbitrary site. It then has to resolve the same host to the service whose firewall
+ * rule says who that login admits, which is the id this returns.
  */
-export async function isManagedDeployHost(host: string): Promise<boolean> {
+export async function deployAppIdForHost(host: string): Promise<string | null> {
     const trimmed = host.trim();
-    if (!trimmed) return false;
+    if (!trimmed) return null;
     const domain = await prisma.domain.findFirst({
         where: { enabled: true, hostname: { in: [trimmed, trimmed.toLowerCase()] } },
-        select: { id: true }
+        select: { applicationId: true }
     });
-    if (domain) return true;
+    if (domain) return domain.applicationId;
     const needle = trimmed.toLowerCase();
     const tunnelAppIds = await quickTunnelAppIds();
-    return tunnelAppIds.some((appId) => tunnelHostForApp(appId).toLowerCase() === needle);
+    return tunnelAppIds.find((appId) => tunnelHostForApp(appId).toLowerCase() === needle) ?? null;
 }
 
 /**
@@ -1283,7 +1299,13 @@ async function buildAppPlan(
         resolvedWaf.browserIntegrity ||
         resolvedWaf.sqlInjectionProtection ||
         resolvedWaf.xssProtection
-            ? resolvedWaf
+            ? // The login address rides along for the same reason it does on a local
+              // route: the remote server's guard would otherwise redirect to whatever
+              // address it was deployed with. Baked in at deploy here rather than
+              // applied live, which is how everything else in this plan reaches a
+              // remote server - so changing the Polaris domain reaches these routes on
+              // their next deploy.
+              { ...resolvedWaf, loginUrl: resolvedWaf.requireLogin ? await appBaseUrl() : undefined }
             : undefined;
 
     // Publish the app on a stable host port so it is reachable over the host's IP
