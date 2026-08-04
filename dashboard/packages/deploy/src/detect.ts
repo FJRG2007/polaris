@@ -71,10 +71,9 @@ export interface DetectedBuild {
     /** Nix packages the start command needs. A built site needs something to serve
      *  it; a server framework serves itself and needs none. */
     readonly packages: readonly string[];
-    /** The Node major to ask the builder for, when what the project declares it
-     *  needs is more than the builder would have picked. Null leaves the choice
-     *  alone, which is the answer for almost every project. */
-    readonly nodeVersion: string | null;
+    /** The Node range this project declares, when the builder is unlikely to meet
+     *  it. Reported, never acted on - see unmetNodeRequirement. */
+    readonly nodeRequirement: string | null;
     /** One line for the deployment log, so a wrong guess is diagnosable from the
      *  output rather than from the source. */
     readonly note: string;
@@ -121,7 +120,11 @@ const FRAMEWORKS: readonly Framework[] = [
         foreignAdapters: ["@astrojs/vercel", "@astrojs/netlify", "@astrojs/cloudflare"]
     },
     { dep: "@nestjs/core", label: "NestJS", start: "node dist/main.js" },
-    { dep: "@angular/core", label: "Angular", dist: "dist" },
+    // No `dist`: Angular writes dist/<project>/browser, and the project name is in
+    // angular.json rather than anywhere read here. Serving the wrong directory
+    // builds cleanly and then serves a file listing, which is worse than saying
+    // nothing and letting the operator name the start command.
+    { dep: "@angular/core", label: "Angular" },
     { dep: "vue", label: "Vue", dist: "dist" },
     { dep: "react-scripts", label: "Create React App", dist: "build" },
     { dep: "vite", label: "Vite", dist: "dist" },
@@ -166,46 +169,27 @@ function workspaceRoot(levels: readonly DirectorySnapshot[]): DirectorySnapshot 
 }
 
 /**
- * The Node majors a builder can actually produce. Each one is pinned to a fixed
- * package set, so `nodejs_22` is one specific 22.x and not the newest - which is
- * the whole reason this exists.
+ * A Node requirement the builder is likely to refuse, or null.
+ *
+ * The builder maps a major to one pinned release - its `nodejs_22` is one specific
+ * 22.x, not the newest - so a project needing a version from *inside* a major gets
+ * something older than it asked for and fails its own engine check. Astro asking
+ * for >=22.12.0 lands on 22.3.0 and refuses to build.
+ *
+ * This only reports it. Asking for a different major was tried and is worse: which
+ * majors a given builder carries is not knowable from here, and naming one it does
+ * not have silently falls all the way back to its default - turning a Node 22 build
+ * into a Node 18 one. Saying what the project needs, and leaving the choice alone,
+ * is the only honest answer available.
  */
-const NODE_MAJORS = [18, 20, 22, 24] as const;
-
-/**
- * The Node major to ask for, given what the project says it needs.
- *
- * The builder already reads `engines.node` and picks the matching major, and for
- * `>=22` that is right. It goes wrong the moment a project needs a version from
- * *inside* a major - Astro asking for >=22.12.0 gets the pinned 22.3.0 and refuses
- * to build - because a major is pinned to one release, not to its latest.
- *
- * So the assumption here is deliberately pessimistic: a major is treated as
- * offering only its `.0`. Anything asking for more than that gets the next major
- * up, which satisfies it by construction and needs no table of which patch each
- * one happens to carry.
- *
- * Only for a range that is open at the top. `^22.12.0` and `22.x` mean the project
- * chose that major, and moving it off would be overruling a decision rather than
- * completing one; those keep what they asked for. Null means say nothing and leave
- * the builder to it.
- */
-export function nodeMajorFor(range: string | undefined): string | null {
+export function unmetNodeRequirement(range: string | undefined): string | null {
     if (!range) return null;
     const wanted = range.trim();
-    // An upper bound, a caret or a tilde all pin the major deliberately.
-    if (/[<^~]/.test(wanted) || /\d+\.x/i.test(wanted)) return null;
-
     const minimum = /(?:>=?\s*)?v?(\d+)(?:\.(\d+))?(?:\.(\d+))?/.exec(wanted);
     if (!minimum) return null;
-    const major = Number(minimum[1]);
-    const minor = Number(minimum[2] ?? 0);
-    const patch = Number(minimum[3] ?? 0);
-    // Satisfied by the major's own .0; nothing to say.
-    if (minor === 0 && patch === 0) return null;
-
-    const next = NODE_MAJORS.find((candidate) => candidate > major);
-    return next ? String(next) : null;
+    // A major's own .0 satisfies it, which is what the builder provides.
+    if (Number(minimum[2] ?? 0) === 0 && Number(minimum[3] ?? 0) === 0) return null;
+    return wanted;
 }
 
 /** What this project says it needs to run on, nearest declaration first. */
@@ -275,7 +259,7 @@ export function detectBuild(snapshot: RepoSnapshot): DetectedBuild | null {
     const deps = dependencies(manifest);
     const framework = FRAMEWORKS.find((entry) => entry.dep in deps);
     const scripts = manifest.scripts ?? {};
-    const nodeVersion = nodeMajorFor(declaredNodeRange(snapshot.levels));
+    const nodeRequirement = unmetNodeRequirement(declaredNodeRange(snapshot.levels));
 
     // Pointed at a workspace root rather than at an app in it. Nothing here can be
     // started - a workspace root is a container, and its build script builds every
@@ -290,30 +274,20 @@ export function detectBuild(snapshot: RepoSnapshot): DetectedBuild | null {
             build: null,
             start: null,
             packages: [],
-            nodeVersion,
+            nodeRequirement,
             note: "a workspace root rather than an app - set the root directory to the app inside it you want to deploy"
         };
     }
 
-    // Nothing to add about how to run it. The runtime it needs is still worth
-    // saying, though: a project that declares a version from inside a major gets
-    // the major's pinned release and fails on its own engine check, which has
-    // nothing to do with how it starts.
-    if (!framework && !workspaceBuild) {
-        if (!nodeVersion) return null;
-        return {
-            framework: "Node.js",
-            buildRoot,
-            install: null,
-            build: null,
-            start: null,
-            packages: [],
-            nodeVersion,
-            note: `Node ${nodeVersion}, because this project asks for more than the default major offers`
-        };
-    }
+    // Nothing to add: a plain Node project that says how to start itself, and no
+    // workspace to point the commands at, is exactly what nixpacks already does.
+    if (!framework && !workspaceBuild) return null;
 
-    const build = scripts.build ? runScript(manager, "build", workspace) : null;
+    // Only when it has to differ. Outside a workspace the command is exactly what
+    // the builder would have run, and overriding a phase to restate it is how the
+    // install phase lost its package-manager bootstrap - the same trap, one phase
+    // along.
+    const build = scripts.build && workspace ? runScript(manager, "build", workspace) : null;
     const packages: string[] = [];
     let start: string | null = null;
     let note: string;
@@ -323,7 +297,9 @@ export function detectBuild(snapshot: RepoSnapshot): DetectedBuild | null {
     const foreignAdapter = framework?.foreignAdapters?.find((adapter) => adapter in deps);
 
     if (scripts.start) {
-        start = runScript(manager, "start", workspace);
+        // Same rule: outside a workspace the builder already runs this script, and
+        // says so itself.
+        start = workspace ? runScript(manager, "start", workspace) : null;
         note = `${label}, started with its own start script`;
     } else if (servesItself) {
         // The framework knows how to serve itself; run it from the app's directory,
@@ -350,7 +326,9 @@ export function detectBuild(snapshot: RepoSnapshot): DetectedBuild | null {
         note = `${label}, but nothing here says how to start it - set a start command`;
     }
 
-    if (nodeVersion) note = `${note}; on Node ${nodeVersion}, which is what it asks for`;
+    if (nodeRequirement) {
+        note = `${note}; it needs Node ${nodeRequirement}, and the builder ships one pinned release per major - loosen engines.node or use a Dockerfile if the build refuses`;
+    }
 
     return {
         framework: label,
@@ -359,7 +337,7 @@ export function detectBuild(snapshot: RepoSnapshot): DetectedBuild | null {
         build,
         start,
         packages,
-        nodeVersion,
+        nodeRequirement,
         note: workspaceBuild ? `${note}; built from the workspace root for ${workspace}` : note
     };
 }

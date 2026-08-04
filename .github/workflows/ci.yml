@@ -4,9 +4,35 @@ name: CI
 # rather than publishing whatever the last commit happened to leave behind.
 
 on:
+  # Only when something it actually checks changed. This used to run on every
+  # push, so a dashboard-only commit paid for a full clippy and cargo test of the
+  # whole workspace before failing to say anything about itself. workflow_call is
+  # deliberately unfiltered: dashboard-publish.yml gates its image on this, and a
+  # gate that skips itself is not a gate.
   push:
+    paths:
+      - "crates/**"
+      - "plugins/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "rust-toolchain.toml"
+      - ".github/workflows/ci.yml"
   pull_request:
+    paths:
+      - "crates/**"
+      - "plugins/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "rust-toolchain.toml"
+      - ".github/workflows/ci.yml"
   workflow_call:
+
+# A push that supersedes another stops it: the older answer is about a commit
+# nobody is waiting on any more, and it holds a runner the new one needs.
+# Releases are never cancelled - see the tag workflows.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   rust:

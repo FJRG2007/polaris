@@ -18,6 +18,12 @@ on:
       - ".github/workflows/dashboard-ci.yml"
   workflow_call:
 
+# A push that supersedes another stops it, so a run of pushes costs one build
+# rather than one per commit.
+concurrency:
+  group: dashboard-ci-${{ github.ref }}
+  cancel-in-progress: true
+
 defaults:
   run:
     working-directory: dashboard
@@ -33,6 +39,17 @@ jobs:
           node-version: "22"
           cache: npm
           cache-dependency-path: dashboard/package-lock.json
+
+      # The Next build is most of this job's wall clock, and almost all of it is
+      # recompiling code that did not change. Keyed on the lockfile so a dependency
+      # change starts clean, and restored across commits otherwise.
+      - uses: actions/cache@v4
+        with:
+          path: dashboard/apps/web/.next/cache
+          key: next-${{ runner.os }}-${{ hashFiles('dashboard/package-lock.json') }}-${{ github.sha }}
+          restore-keys: |
+            next-${{ runner.os }}-${{ hashFiles('dashboard/package-lock.json') }}-
+            next-${{ runner.os }}-
 
       - run: npm ci
       - run: npm run db:generate

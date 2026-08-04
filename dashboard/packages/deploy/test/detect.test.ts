@@ -60,15 +60,21 @@ describe("a framework that never wrote a start script", () => {
         const plan = detectBuild(alone({ manifest: { scripts: { build: "next build" }, dependencies: { next: "15" } } }));
         expect(plan?.framework).toBe("Next.js");
         expect(plan?.start).toBe("next start");
-        expect(plan?.build).toBe("npm run build");
+        // Nothing else: the builder runs `npm run build` and installs by itself,
+        // and restating either only risks replacing a phase that was already right.
+        expect(plan?.build).toBeNull();
         expect(plan?.install).toBeNull();
     });
 
-    it("prefers the project's own start script over the framework default", () => {
+    it("says nothing at all when the project already has a start script", () => {
+        // The builder runs it. Overriding here would swap the project's own script
+        // for a restatement of it, which can only lose.
         const plan = detectBuild(
             alone({ manifest: { scripts: { build: "next build", start: "next start -p 8080" }, dependencies: { next: "15" } } })
         );
-        expect(plan?.start).toBe("npm run start");
+        expect(plan?.start).toBeNull();
+        expect(plan?.build).toBeNull();
+        expect(plan?.note).toContain("its own start script");
     });
 
     it("recognizes a meta-framework before the view library under it", () => {
@@ -161,7 +167,8 @@ describe("a monorepo builds from the workspace root", () => {
             ]
         });
         expect(plan?.buildRoot).toBe("service");
-        expect(plan?.build).toBe("npm run build");
+        // Not a workspace, so the builder's own commands are already right.
+        expect(plan?.build).toBeNull();
     });
 });
 
@@ -272,16 +279,6 @@ describe("the workspace root is not always the repository root", () => {
 });
 
 describe("the package manager comes from the lockfile", () => {
-    const manifest = { scripts: { build: "vite build", start: "node ." }, dependencies: { next: "15" } };
-
-    it("reads pnpm, yarn, bun and npm to know how to run a script", () => {
-        const at = (lock: string) => detectBuild(alone({ files: ["package.json", lock], manifest }));
-        expect(at("pnpm-lock.yaml")?.build).toBe("pnpm run build");
-        expect(at("yarn.lock")?.build).toBe("yarn build");
-        expect(at("bun.lockb")?.build).toBe("bun run build");
-        expect(at("package-lock.json")?.build).toBe("npm run build");
-    });
-
     it("uses each manager's own way of addressing a workspace", () => {
         const member = { name: "web", scripts: { build: "next build", start: "next start" }, dependencies: { next: "15" } };
         const at = (lock: string) => detectBuild(workspace(member, lock));
@@ -292,12 +289,18 @@ describe("the package manager comes from the lockfile", () => {
     });
 });
 
-describe("the runtime the project says it needs", () => {
+describe("a Node version the builder probably cannot meet", () => {
     /**
-     * The failure this exists for: an Astro project declaring `>=22.12.0` gets the
-     * builder's pinned 22.3.0 - because a major maps to one fixed release, not to
-     * its latest - and Astro refuses to build on it. Nothing about that is visible
-     * from the start command, so it has to be settled separately.
+     * The builder maps a major to one pinned release - its `nodejs_22` is one
+     * specific 22.x - so a project needing a version from inside a major gets
+     * something older than it asked for and fails its own engine check. Astro
+     * asking for >=22.12.0 lands on 22.3.0 and refuses to build.
+     *
+     * This is reported and never acted on, and the reason is a regression: asking
+     * for a different major was tried, and which majors a given builder carries is
+     * not knowable from here. Naming one it does not have does not fail - it falls
+     * all the way back to that builder's default, which turned a Node 22 build into
+     * a Node 18 one. Reporting is the only honest option left.
      */
     const astro = (node: string) =>
         detectBuild(
@@ -307,30 +310,29 @@ describe("the runtime the project says it needs", () => {
             })
         );
 
-    it("asks for the next major when a version inside one is required", () => {
-        expect(astro(">=22.12.0")?.nodeVersion).toBe("24");
+    it("reports a requirement that reaches inside a major", () => {
+        expect(astro(">=22.12.0")?.nodeRequirement).toBe(">=22.12.0");
     });
 
-    it("says nothing when the major's own .0 already satisfies it", () => {
-        expect(astro(">=22")?.nodeVersion).toBeNull();
-        expect(astro(">=22.0.0")?.nodeVersion).toBeNull();
+    it("never proposes a different major, however tempting", () => {
+        // The whole point: the plan says what is needed and changes nothing about
+        // which runtime is asked for.
+        expect(JSON.stringify(astro(">=22.12.0"))).not.toContain("NIXPACKS_NODE_VERSION");
     });
 
-    it("leaves a deliberately pinned major alone", () => {
-        // These chose the major; moving it would overrule a decision rather than
-        // complete one.
-        for (const range of ["^22.12.0", "~22.12.0", "22.x", ">=22.12.0 <23"]) {
-            expect(astro(range)?.nodeVersion, range).toBeNull();
-        }
+    it("stays quiet when the major's own .0 already satisfies it", () => {
+        expect(astro(">=22")?.nodeRequirement).toBeNull();
+        expect(astro(">=22.0.0")?.nodeRequirement).toBeNull();
     });
 
-    it("says nothing when the project never declared one", () => {
-        expect(astro("")?.nodeVersion).toBeNull();
-        expect(detectBuild(alone({ manifest: { dependencies: { astro: "7" } } }))?.nodeVersion).toBeNull();
+    it("stays quiet when the project never declared one", () => {
+        expect(astro("")?.nodeRequirement).toBeNull();
+        expect(detectBuild(alone({ manifest: { dependencies: { astro: "7" } } }))?.nodeRequirement).toBeNull();
     });
 
-    it("keeps quiet rather than promise a major that does not exist", () => {
-        expect(astro(">=24.9.0")?.nodeVersion).toBeNull();
+    it("puts it in the note, so the build log carries the reason it failed", () => {
+        expect(astro(">=22.12.0")?.note).toContain(">=22.12.0");
+        expect(astro(">=22.12.0")?.note).toContain("engines.node");
     });
 
     it("reads the nearest declaration, so an app overrides its workspace root", () => {
@@ -353,18 +355,7 @@ describe("the runtime the project says it needs", () => {
                 }
             ]
         };
-        expect(detectBuild(nested)?.nodeVersion).toBe("24");
-    });
-
-    it("still says which runtime it picked when there is nothing else to add", () => {
-        // A plain Node app that starts itself would otherwise be left alone
-        // entirely - but the engine it needs is still worth settling.
-        const plan = detectBuild(
-            alone({ manifest: { scripts: { start: "node index.js" }, engines: { node: ">=22.12.0" } } })
-        );
-        expect(plan?.nodeVersion).toBe("24");
-        expect(plan?.start).toBeNull();
-        expect(plan?.build).toBeNull();
+        expect(detectBuild(nested)?.nodeRequirement).toBe(">=22.12.0");
     });
 });
 

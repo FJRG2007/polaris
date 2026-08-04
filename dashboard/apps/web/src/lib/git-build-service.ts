@@ -118,7 +118,6 @@ async function configureBuild(
 
     const config = nixpacksConfig({
         packages: detected?.packages,
-        nodeVersion: detected?.nodeVersion,
         install: commands.installCommand || detected?.install,
         build: commands.buildCommand || detected?.build,
         start: commands.startCommand || detected?.start
