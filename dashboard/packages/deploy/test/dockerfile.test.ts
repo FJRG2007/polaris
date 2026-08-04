@@ -59,6 +59,37 @@ describe("a project that serves itself", () => {
     });
 });
 
+describe("an install that cannot be refused over the calendar", () => {
+    /**
+     * pnpm will not install a package published in the last day, on by default and
+     * with nothing configured anywhere. In a build that check guards nothing - the
+     * lockfile is already written and hash-pinned, and the install resolves nothing
+     * - it only decides that a project which updated a dependency this morning
+     * cannot be deployed until tomorrow. Verified against pnpm 11.20 in a clean
+     * node:22-slim: ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION, cleared by this name.
+     */
+    it("sets it before anything is installed", () => {
+        const file = generateDockerfile(plan({ install: "pnpm install --frozen-lockfile" }));
+        expect(file).toContain("ENV PNPM_CONFIG_MINIMUM_RELEASE_AGE=0");
+        expect(file.indexOf("ENV PNPM_CONFIG_MINIMUM_RELEASE_AGE=0")).toBeLessThan(file.indexOf("RUN "));
+    });
+
+    it("sets it in the stage that installs, for a built site", () => {
+        const file = generateDockerfile(plan({ staticDirectory: "dist", start: null }));
+        const declared = file.indexOf("ENV PNPM_CONFIG_MINIMUM_RELEASE_AGE=0");
+        expect(declared).toBeGreaterThan(-1);
+        // The builder stage, not the nginx one that installs nothing.
+        expect(declared).toBeLessThan(file.indexOf("FROM nginx:alpine"));
+    });
+
+    it("declares it rather than folding it into the command, so a hand-set install gets it too", () => {
+        // A service can set its own install command, and Polaris never rewrites one.
+        const file = generateDockerfile(plan({ install: "pnpm install --production" }));
+        expect(file).toContain("ENV PNPM_CONFIG_MINIMUM_RELEASE_AGE=0");
+        expect(file).toContain("pnpm install --production");
+    });
+});
+
 describe("the package manager has to exist before it is used", () => {
     it("turns corepack on for pnpm", () => {
         // The Node images ship corepack disabled, so pnpm's first invocation is

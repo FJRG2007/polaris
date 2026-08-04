@@ -23,6 +23,9 @@
 
 /** What goes into the file. Every field is optional; all absent writes nothing. */
 export interface NixpacksConfig {
+    /** Environment for the build. Additive - it sets names, it does not replace a
+     *  phase - so this is the one thing here that is safe for any stack. */
+    readonly variables?: Readonly<Record<string, string>>;
     /** Extra Nix packages the image needs, beyond what the provider installs. */
     readonly packages?: readonly string[];
     readonly install?: string | null;
@@ -55,6 +58,10 @@ function quote(value: string): string {
  */
 export function nixpacksConfig(config: NixpacksConfig): string | null {
     const lines: string[] = [];
+    const variables = Object.entries(config.variables ?? {});
+    if (variables.length > 0) {
+        lines.push("[variables]", ...variables.map(([name, value]) => `${name} = ${quote(value)}`), "");
+    }
     if (config.packages && config.packages.length > 0) {
         // Extended, never replaced: this phase is where the language runtime comes
         // from, and a bare list here would leave an image holding a static file

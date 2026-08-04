@@ -18,6 +18,8 @@
  * Python or Go deploy working.
  */
 
+import { INSTALL_ENV } from "./install-env.js";
+
 /** How the image is assembled for one recognized project. */
 export interface DockerfilePlan {
     /** Base image for the stage that installs and builds. */
@@ -65,7 +67,9 @@ function sourceDir(appDirectory: string): string {
  */
 function ensurePackageManager(command: string | null): string | null {
     if (!command) return null;
-    const manager = /^(pnpm|yarn)\b/.exec(command)?.[1];
+    // Anywhere in the command, not only at the front: an install is a compound
+    // shell command, so the manager's name is not necessarily the first word.
+    const manager = /\b(pnpm|yarn)\b/.exec(command)?.[1];
     if (!manager) return null;
     return `(corepack enable ${manager} || corepack enable || npm i -g ${manager}) >/dev/null 2>&1 || true`;
 }
@@ -106,6 +110,7 @@ function staticDockerfile(plan: DockerfilePlan): string[] {
     return [
         `FROM ${plan.buildImage} AS builder`,
         `WORKDIR ${WORKSPACE}`,
+        ...installEnv(),
         "COPY . .",
         ...workspaceStep(plan),
         // Only when the app is not the root, which is already the working directory.
@@ -119,6 +124,13 @@ function staticDockerfile(plan: DockerfilePlan): string[] {
         `EXPOSE ${plan.port}`,
         'CMD ["nginx", "-g", "daemon off;"]'
     ];
+}
+
+/** The environment every install here runs under, set before anything installs.
+ *  Declared rather than folded into the command so it also covers an install
+ *  command the service set by hand, which Polaris never rewrites. */
+function installEnv(): string[] {
+    return Object.entries(INSTALL_ENV).map(([name, value]) => `ENV ${name}=${value}`);
 }
 
 /** The workspace-level install, as its own layer so it survives a change that
@@ -137,6 +149,7 @@ function serverDockerfile(plan: DockerfilePlan): string[] {
     return [
         `FROM ${plan.runtimeImage}`,
         `WORKDIR ${WORKSPACE}`,
+        ...installEnv(),
         "COPY . .",
         ...workspaceStep(plan),
         // Only when the app is not the root, which is already the working directory.

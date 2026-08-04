@@ -239,18 +239,42 @@ function declaredNodeRange(levels: readonly DirectorySnapshot[]): string | undef
     return undefined;
 }
 
+/** Said once, before the loose install runs, so a red error followed by a build
+ *  that carried on is not left looking like a fluke. */
+const DRIFT_NOTE = "Lockfile does not match the manifest; installing from the manifest instead.";
+
+/**
+ * Try the exact install, and fall back to resolving from the manifest.
+ *
+ * A frozen install refuses a lockfile that no longer matches its package.json.
+ * On a workstation that is the point - it is how you find out someone committed
+ * half a dependency change. In a build it is the difference between a deployment
+ * and no deployment, over a file the person deploying may not even be able to
+ * regenerate. Vercel and the rest never attempt the strict install at all; this
+ * prefers it and keeps going, which is stricter than they are and still lands.
+ *
+ * The fallback only ever runs where the build was about to fail outright, so it
+ * cannot make a working deployment worse.
+ */
+function withFallback(strict: string, loose: string): string {
+    return `(${strict} || (echo "${DRIFT_NOTE}" && ${loose}))`;
+}
+
 /** The install command for a package manager, run wherever the lockfile is. */
 function installCommand(manager: PackageManager, files: readonly string[]): string {
     switch (manager) {
         case "pnpm":
-            return "pnpm install --frozen-lockfile";
+            return withFallback("pnpm install --frozen-lockfile", "pnpm install --no-frozen-lockfile");
         case "yarn":
-            return "yarn install --frozen-lockfile";
+            // Yarn 2 and up rejects `--frozen-lockfile` as an option rather than
+            // failing the install, so the fallback is what carries those versions.
+            return withFallback("yarn install --frozen-lockfile", "yarn install");
         case "bun":
+            // Already the loose install: bun only freezes when it sees CI set.
             return "bun install";
         case "npm":
             // `npm ci` needs a lockfile and refuses without one.
-            return files.includes("package-lock.json") ? "npm ci" : "npm install";
+            return files.includes("package-lock.json") ? withFallback("npm ci", "npm install") : "npm install";
     }
 }
 

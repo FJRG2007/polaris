@@ -21,6 +21,7 @@ import {
     detectBuild,
     generateDockerfile,
     GENERATED_DOCKERFILE,
+    INSTALL_ENV,
     nixpacksConfig,
     type BuildContext,
     type PackageManifest,
@@ -133,7 +134,8 @@ async function configureBuild(
         return { dockerfile: GENERATED_DOCKERFILE };
     }
 
-    if ((await listDirectory(configDir)).some((name) => name === "nixpacks.toml" || name === "nixpacks.json")) {
+    const entries = await listDirectory(configDir);
+    if (entries.some((name) => name === "nixpacks.toml" || name === "nixpacks.json")) {
         log("Using the nixpacks configuration in the repository.\n");
         return { root: detected?.buildRoot };
     }
@@ -141,19 +143,24 @@ async function configureBuild(
     // Not recognized, or recognized as something no image can be written for. The
     // auto-detecting builder is left in charge exactly as before; anything the
     // service set by hand is still passed to it.
+    //
+    // The install environment goes in only where it applies. It is the builder that
+    // installs here, so it is the builder that would otherwise refuse a lockfile
+    // holding anything published today - but a stack with no pnpm lockfile has
+    // nothing to gain from it, and for those the file written stays byte-for-byte
+    // what it was.
     const config = nixpacksConfig({
+        variables: entries.includes("pnpm-lock.yaml") ? INSTALL_ENV : undefined,
         install: commands.installCommand,
         build: commands.buildCommand,
         start: commands.startCommand
     });
-    if (!config) {
-        if (!detected) log("No framework recognized; letting the builder work it out.\n");
-        return { root: detected?.buildRoot };
-    }
 
     const overridden = (["installCommand", "buildCommand", "startCommand"] as const).filter((key) => commands[key]);
-    log(`Using the ${overridden.map((key) => key.replace("Command", "")).join(", ")} command set on this service.\n`);
-    await writeFile(join(configDir, "nixpacks.toml"), config, "utf8");
+    if (overridden.length > 0) log(`Using the ${overridden.map((key) => key.replace("Command", "")).join(", ")} command set on this service.\n`);
+    else if (!detected) log("No framework recognized; letting the builder work it out.\n");
+
+    if (config) await writeFile(join(configDir, "nixpacks.toml"), config, "utf8");
     return { root: detected?.buildRoot };
 }
 

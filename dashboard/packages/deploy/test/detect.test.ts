@@ -348,7 +348,7 @@ describe("what the image is built from", () => {
                 manifest: { scripts: { build: "next build" }, dependencies: { next: "15" } }
             })
         );
-        expect(plan?.image?.install).toBe("pnpm install --frozen-lockfile");
+        expect(plan?.image?.install).toContain("pnpm install --frozen-lockfile");
         expect(plan?.image?.build).toBe("pnpm run build");
         // No start script, so the framework's own way of starting.
         expect(plan?.image?.start).toBe("next start");
@@ -358,7 +358,7 @@ describe("what the image is built from", () => {
         const plan = detectBuild(
             workspace({ name: "web", scripts: { build: "next build", start: "next start" }, dependencies: { next: "15" } })
         );
-        expect(plan?.image?.workspaceInstall).toBe("pnpm install --frozen-lockfile");
+        expect(plan?.image?.workspaceInstall).toContain("pnpm install --frozen-lockfile");
         expect(plan?.image?.install).toBeNull();
         // The Dockerfile's WORKDIR does the scoping, so no --filter is needed.
         expect(plan?.image?.build).toBe("pnpm run build");
@@ -379,6 +379,43 @@ describe("what the image is built from", () => {
         );
         expect(plan?.image).toBeNull();
         expect(plan?.note).toContain("@astrojs/node");
+    });
+});
+
+describe("an install that cannot be refused over the lockfile", () => {
+    /**
+     * A frozen install refuses a lockfile that has drifted from its manifest. That
+     * is the right answer on a workstation and the wrong one here: it stops a
+     * deployment over a file, and the person deploying is often not the person who
+     * can regenerate it. The strict install is still what is tried first - the
+     * platforms this is modelled on do not even attempt it - and the fallback only
+     * ever runs where the build was going to fail anyway.
+     */
+    const installFor = (files: string[], lockAware = {}) =>
+        detectBuild(alone({ files: ["package.json", ...files], manifest: { dependencies: { next: "15" }, ...lockAware } }))?.image?.install ??
+        "";
+
+    it.each([
+        ["pnpm", ["pnpm-lock.yaml"], "pnpm install --frozen-lockfile", "pnpm install --no-frozen-lockfile"],
+        // Yarn 2 and up rejects the option outright rather than failing the install.
+        ["yarn", ["yarn.lock"], "yarn install --frozen-lockfile", "yarn install"],
+        ["npm", ["package-lock.json"], "npm ci", "npm install"]
+    ])("tries the exact install for %s, then resolves from the manifest", (_manager, files, strict, loose) => {
+        const install = installFor(files);
+        expect(install).toContain(strict);
+        expect(install).toContain("|| (echo");
+        expect(install).toContain("Lockfile does not match the manifest");
+        expect(install.indexOf(strict)).toBeLessThan(install.lastIndexOf(loose));
+    });
+
+    it("does not invent a lockfile for a project without one", () => {
+        // `npm ci` refuses outright when there is nothing to install from, so the
+        // fallback would be the only half that ever ran.
+        expect(installFor([])).toBe("npm install");
+    });
+
+    it("leaves bun alone, which only freezes when it sees CI set", () => {
+        expect(installFor(["bun.lock"])).toBe("bun install");
     });
 });
 

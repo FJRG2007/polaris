@@ -17,6 +17,15 @@ describe("nixpacksConfig", () => {
         expect(nixpacksConfig({ install: null, build: null, start: null, packages: [] })).toBeNull();
     });
 
+    it("carries build environment without touching a single phase", () => {
+        // The only thing here that is safe for a stack Polaris has not recognized:
+        // it adds names, where a phase would replace what the provider worked out.
+        const rendered = nixpacksConfig({ variables: { PNPM_CONFIG_MINIMUM_RELEASE_AGE: "0" } }) ?? "";
+        expect(rendered).toContain('[variables]\nPNPM_CONFIG_MINIMUM_RELEASE_AGE = "0"');
+        expect(rendered).not.toContain("[phases.");
+        expect(rendered).not.toContain("[start]");
+    });
+
     it("writes only the phases it was given", () => {
         const rendered = nixpacksConfig({ start: "next start" }) ?? "";
         expect(rendered).toContain('[start]\ncmd = "next start"');
