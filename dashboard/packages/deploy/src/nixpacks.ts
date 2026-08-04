@@ -28,6 +28,10 @@ export interface NixpacksConfig {
     readonly install?: string | null;
     readonly build?: string | null;
     readonly start?: string | null;
+    /** The Node major to build on. Written as a variable rather than as a package
+     *  because the builder reads it while choosing its own packages - naming the
+     *  package instead would fight that choice rather than inform it. */
+    readonly nodeVersion?: string | null;
 }
 
 /** Nixpacks' marker for "and everything that was already here". Without it an
@@ -55,6 +59,11 @@ function quote(value: string): string {
  */
 export function nixpacksConfig(config: NixpacksConfig): string | null {
     const lines: string[] = [];
+    // First, because the builder reads the variables in this file before it works
+    // out which packages the project needs.
+    if (config.nodeVersion) {
+        lines.push("[variables]", `NIXPACKS_NODE_VERSION = ${quote(config.nodeVersion)}`, "");
+    }
     if (config.packages && config.packages.length > 0) {
         // Extended, never replaced: this phase is where the language runtime comes
         // from, and a bare list here would leave an image holding a static file

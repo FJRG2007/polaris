@@ -60,6 +60,7 @@ import {
     Play,
     Plus,
     RotateCw,
+    ScrollText,
     Search,
     ShieldCheck,
     Square,
@@ -205,6 +206,12 @@ function depBadge(deployment: DepSummary): { label: string; cls: string } {
     if (["queued", "deploying"].includes(deployment.status))
         return { label: deployment.status.toUpperCase(), cls: "bg-warning/15 text-warning" };
     return { label: "REMOVED", cls: "bg-muted text-muted-foreground" };
+}
+
+/** Whether a deployment has stopped moving. Everything else is still queued or
+ *  building, and has no container behind it yet. */
+function isSettled(deployment: DepSummary): boolean {
+    return !["queued", "deploying"].includes(deployment.status);
 }
 
 function depTitle(deployment: DepSummary): string {
@@ -609,7 +616,13 @@ function DeploymentLogsView({
 }) {
     const CATS = ["Details", "Build Logs", "Deploy Logs", "HTTP Logs", "Network Flow Logs"] as const;
     const format = useDisplayFormat();
-    const [cat, setCat] = useState<(typeof CATS)[number]>("Deploy Logs");
+    // While it is still going there is only one log worth opening: the build's.
+    // The runtime log belongs to a container that does not exist yet, and landing
+    // on it means being shown an error about the absence rather than the progress
+    // you came to watch.
+    const [cat, setCat] = useState<(typeof CATS)[number]>(
+        deployment && !isSettled(deployment) ? "Build Logs" : "Deploy Logs"
+    );
     const badge = deployment ? depBadge(deployment) : null;
 
     return (
@@ -659,7 +672,7 @@ function DeploymentLogsView({
             ) : cat === "Build Logs" ? (
                 <LogStream deploymentId={deploymentId} onDone={onDone} />
             ) : cat === "Deploy Logs" ? (
-                <RuntimeLogView appId={app.id} />
+                <RuntimeLogView appId={app.id} deployment={deployment} onSeeBuild={() => setCat("Build Logs")} />
             ) : cat === "HTTP Logs" ? (
                 <HttpLogsView appId={app.id} deploymentStart={deployment?.createdAt ?? null} />
             ) : cat === "Network Flow Logs" ? (
@@ -747,13 +760,33 @@ function LogStream({ deploymentId, onDone }: { deploymentId: string; onDone: () 
     );
 }
 
-/** Live runtime stdout/stderr of the app's container - what the app prints while
- *  running, distinct from the build log. Polled while the tab is open. */
-function RuntimeLogView({ appId }: { appId: string }) {
+/**
+ * Live runtime stdout/stderr of the app's container - what the app prints while
+ * running, distinct from the build log. Polled while the tab is open.
+ *
+ * A deployment that has not finished has no container to read, and one that
+ * failed never got one. Both used to surface whatever the engine said about the
+ * absence - "the command failed (exit 1)" over a deploy that was building
+ * perfectly well - which describes the query rather than the deployment. Those
+ * two states are answered here instead, and point at the log that does exist.
+ */
+function RuntimeLogView({
+    appId,
+    deployment,
+    onSeeBuild
+}: {
+    appId: string;
+    deployment: DepSummary | null;
+    onSeeBuild: () => void;
+}) {
     const [log, setLog] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const pending = deployment !== null && !isSettled(deployment);
+    const failed = deployment !== null && ["failed", "cancelled", "rolled_back"].includes(deployment.status);
 
     useEffect(() => {
+        // Nothing to poll for: there is no container behind either state.
+        if (pending || failed) return;
         let active = true;
         let timer: ReturnType<typeof setTimeout>;
         async function poll(): Promise<void> {
@@ -782,8 +815,23 @@ function RuntimeLogView({ appId }: { appId: string }) {
             active = false;
             clearTimeout(timer);
         };
-    }, [appId]);
+    }, [appId, pending, failed]);
 
+    if (pending || failed) {
+        return (
+            <div className="flex flex-col items-center gap-3 py-10 text-center">
+                <p className="text-sm text-muted-foreground">
+                    {pending
+                        ? "Nothing is running yet - this deployment is still being built."
+                        : "This deployment never started. It failed while it was being built."}
+                </p>
+                <Button size="sm" variant="outline" onClick={onSeeBuild}>
+                    <ScrollText className="size-4" />
+                    {pending ? "Watch the build" : "See what went wrong"}
+                </Button>
+            </div>
+        );
+    }
     if (error) return <Empty text={error} />;
     if (log === null) return <Loading />;
     if (!log.trim()) {

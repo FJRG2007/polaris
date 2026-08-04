@@ -96,6 +96,24 @@ describe("a built site is not a process", () => {
         expect(plan?.packages).toEqual([]);
     });
 
+    it("says what to change when the build is aimed at another platform", () => {
+        // @astrojs/vercel writes .vercel/output, not a servable dist and not a
+        // server. Serving `dist` would build cleanly and then serve nothing, which
+        // is a worse answer than naming the one required change.
+        const plan = detectBuild(
+            alone({
+                manifest: {
+                    scripts: { build: "astro build" },
+                    dependencies: { astro: "7", "@astrojs/vercel": "11" }
+                }
+            })
+        );
+        expect(plan?.start).toBeNull();
+        expect(plan?.packages).toEqual([]);
+        expect(plan?.note).toContain("@astrojs/vercel");
+        expect(plan?.note).toContain("@astrojs/node");
+    });
+
     it("serves the output from inside the app directory in a workspace", () => {
         const plan = detectBuild(workspace({ name: "web", scripts: { build: "vite build" }, dependencies: { vite: "6" } }));
         expect(plan?.start).toBe("caddy file-server --root apps/web/dist --listen :${PORT:-3000}");
@@ -271,6 +289,82 @@ describe("the package manager comes from the lockfile", () => {
         expect(at("yarn.lock")?.build).toBe("yarn workspace web build");
         expect(at("bun.lockb")?.build).toBe("bun run --filter web build");
         expect(at("package-lock.json")?.build).toBe("npm run build -w web");
+    });
+});
+
+describe("the runtime the project says it needs", () => {
+    /**
+     * The failure this exists for: an Astro project declaring `>=22.12.0` gets the
+     * builder's pinned 22.3.0 - because a major maps to one fixed release, not to
+     * its latest - and Astro refuses to build on it. Nothing about that is visible
+     * from the start command, so it has to be settled separately.
+     */
+    const astro = (node: string) =>
+        detectBuild(
+            alone({
+                files: ["package.json", "pnpm-lock.yaml"],
+                manifest: { scripts: { build: "astro build" }, dependencies: { astro: "7" }, engines: { node } }
+            })
+        );
+
+    it("asks for the next major when a version inside one is required", () => {
+        expect(astro(">=22.12.0")?.nodeVersion).toBe("24");
+    });
+
+    it("says nothing when the major's own .0 already satisfies it", () => {
+        expect(astro(">=22")?.nodeVersion).toBeNull();
+        expect(astro(">=22.0.0")?.nodeVersion).toBeNull();
+    });
+
+    it("leaves a deliberately pinned major alone", () => {
+        // These chose the major; moving it would overrule a decision rather than
+        // complete one.
+        for (const range of ["^22.12.0", "~22.12.0", "22.x", ">=22.12.0 <23"]) {
+            expect(astro(range)?.nodeVersion, range).toBeNull();
+        }
+    });
+
+    it("says nothing when the project never declared one", () => {
+        expect(astro("")?.nodeVersion).toBeNull();
+        expect(detectBuild(alone({ manifest: { dependencies: { astro: "7" } } }))?.nodeVersion).toBeNull();
+    });
+
+    it("keeps quiet rather than promise a major that does not exist", () => {
+        expect(astro(">=24.9.0")?.nodeVersion).toBeNull();
+    });
+
+    it("reads the nearest declaration, so an app overrides its workspace root", () => {
+        const nested: RepoSnapshot = {
+            levels: [
+                {
+                    path: "",
+                    files: ["package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml"],
+                    manifest: { workspaces: ["apps/*"], engines: { node: ">=20" } }
+                },
+                {
+                    path: "apps/web",
+                    files: ["package.json"],
+                    manifest: {
+                        name: "web",
+                        scripts: { build: "astro build", start: "node ." },
+                        dependencies: { astro: "7" },
+                        engines: { node: ">=22.12.0" }
+                    }
+                }
+            ]
+        };
+        expect(detectBuild(nested)?.nodeVersion).toBe("24");
+    });
+
+    it("still says which runtime it picked when there is nothing else to add", () => {
+        // A plain Node app that starts itself would otherwise be left alone
+        // entirely - but the engine it needs is still worth settling.
+        const plan = detectBuild(
+            alone({ manifest: { scripts: { start: "node index.js" }, engines: { node: ">=22.12.0" } } })
+        );
+        expect(plan?.nodeVersion).toBe("24");
+        expect(plan?.start).toBeNull();
+        expect(plan?.build).toBeNull();
     });
 });
 
