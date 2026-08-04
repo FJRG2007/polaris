@@ -163,24 +163,47 @@ export function githubLinkCallbackUrl(baseUrl: string): string {
     return `${baseUrl}/api/integrations/github/link/callback`;
 }
 
-/** The manifest describing the app GitHub will create for this Polaris instance. */
-export function buildAppManifest(baseUrl: string, name: string): Record<string, unknown> {
+/** The single webhook URL a GitHub App has. Everything Polaris listens for arrives
+ *  here: push drives auto-deploy, workflow_job tells the runner pools which
+ *  repository has work waiting, and the rest are what start an agent run. */
+export function githubWebhookUrl(baseUrl: string): string {
+    return `${baseUrl}/api/deploy/github/webhook`;
+}
+
+/**
+ * The manifest describing the app GitHub will create for this Polaris instance.
+ *
+ * Two addresses, because two different parties follow them. `origin` is where the
+ * administrator's browser is right now, so it is what the redirect back has to land
+ * on - that is the only host the CSRF cookie was set for. `publicUrl` is where
+ * GitHub's own servers can reach this instance, and it is null on a LAN-only one.
+ *
+ * A webhook URL GitHub cannot resolve does not merely sit idle: GitHub validates it
+ * while reading the manifest and refuses the whole thing ("Hook url is not supported
+ * because it isn't reachable over the public Internet"), so no app is created at all.
+ * The subscription is therefore declared only when there is a public address. Without
+ * one the app is created with no webhook, which is what a LAN install can have: Deploy
+ * and the runner pools already poll, and the URL can be filled in on GitHub once the
+ * instance has a domain.
+ */
+export function buildAppManifest(input: { name: string; origin: string; publicUrl: string | null }): Record<string, unknown> {
+    const { name, origin, publicUrl } = input;
+    // Where a person is returned to after linking their own GitHub account to their
+    // Polaris one, which is what lets a runner pool serve "these people's
+    // repositories" without anybody typing a login for them. Both addresses are
+    // registered when they differ: that round trip returns to whichever host the
+    // person started it on.
+    const callbacks = [githubLinkCallbackUrl(origin)];
+    if (publicUrl && publicUrl !== origin) callbacks.push(githubLinkCallbackUrl(publicUrl));
     return {
         name,
-        url: baseUrl,
-        // Where a person is returned to after linking their own GitHub account to
-        // their Polaris one, which is what lets a runner pool serve "these
-        // people's repositories" without anybody typing a login for them.
-        callback_urls: [githubLinkCallbackUrl(baseUrl)],
-        // A GitHub App has exactly one webhook URL, so everything Polaris listens
-        // for arrives here. Push drives auto-deploy, workflow_job tells the runner
-        // pools which repository has work waiting, and the rest are what start an
-        // agent run. GitHub must be able to reach this URL, so it only fires for
-        // instances with a public domain (LAN installs use polling).
-        hook_attributes: { url: `${baseUrl}/api/deploy/github/webhook`, active: true },
-        default_events: [...APP_EVENTS],
-        redirect_url: `${baseUrl}/api/integrations/github/callback`,
-        setup_url: `${baseUrl}/api/integrations/github/callback`,
+        url: publicUrl ?? origin,
+        callback_urls: callbacks,
+        ...(publicUrl
+            ? { hook_attributes: { url: githubWebhookUrl(publicUrl), active: true }, default_events: [...APP_EVENTS] }
+            : {}),
+        redirect_url: `${origin}/api/integrations/github/callback`,
+        setup_url: `${origin}/api/integrations/github/callback`,
         setup_on_update: true,
         public: false,
         default_permissions: { ...APP_PERMISSIONS }

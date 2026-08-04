@@ -8,9 +8,9 @@ import { getGithubStatus } from "@/lib/github-service";
 import { getRunnerAccess } from "@/lib/github-runners";
 import { connectionCallbackUrl } from "@/lib/connections/oauth";
 import { listIntegrationStates } from "@/lib/integration-service";
-import { appBaseUrl, getDomainConfig } from "@/lib/domain-service";
 import { CONNECTION_PROVIDERS, findConnectionProvider } from "@polaris/core";
 import { IntegrationsView, type IntegrationCard } from "./integrations-view";
+import { appBaseUrl, getDomainConfig, publicAppUrl } from "@/lib/domain-service";
 import { connectionLimit, connectionSignInAllowed } from "@/lib/connections/store";
 import { getCloudflareAccountStatus } from "@/lib/integrations/cloudflare-account-service";
 import { INTEGRATIONS, readDymoConfig, readVirusTotalConfig } from "@/lib/integrations/registry";
@@ -31,7 +31,7 @@ export default async function IntegrationsPage() {
     // Three of these reach outside the box (GitHub twice, Cloudflare once), so
     // they are awaited together rather than one after another - in sequence the
     // page took as long as all of them added up.
-    const [states, github, domains, cloudflare, baseUrl, githubLimit, googleLimit, signIn] = await Promise.all([
+    const [states, github, domains, cloudflare, baseUrl, publicUrl, githubLimit, googleLimit, signIn] = await Promise.all([
         listIntegrationStates(),
         getGithubStatus(),
         // DuckDNS config lives with the domain settings (Setting keys), not an Integration row.
@@ -42,6 +42,10 @@ export default async function IntegrationsPage() {
         // The address the deployment is reachable at, which is what decides the
         // redirect URI an operator has to register on their Google client.
         appBaseUrl(),
+        // The same address, but only when GitHub's own servers could reach it: a
+        // new App is created without a webhook when they cannot, and the dialog
+        // says so before somebody creates one and waits for events.
+        publicAppUrl(),
         // How many accounts of each service one person may connect, shown in the
         // dialog that sets it.
         connectionLimit("github"),
@@ -91,6 +95,7 @@ export default async function IntegrationsPage() {
             githubHtmlUrl: entry.slug === "github" ? github.htmlUrl ?? undefined : undefined,
             githubRunnersReady: entry.slug === "github" ? runners?.ready : undefined,
             githubRunnersAdvice: entry.slug === "github" ? runners?.advice ?? undefined : undefined,
+            githubPublicUrl: entry.slug === "github" ? publicUrl ?? undefined : undefined,
             cloudflareApiConnected: entry.slug === "cloudflare" ? cloudflare.connected : undefined,
             cloudflareDnsConnected: entry.slug === "cloudflare" ? cloudflare.dnsReady : undefined,
             cloudflareAccountName: entry.slug === "cloudflare" ? cloudflare.accountName ?? undefined : undefined,

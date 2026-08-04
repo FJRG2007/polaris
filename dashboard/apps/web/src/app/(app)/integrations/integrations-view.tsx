@@ -80,6 +80,9 @@ export interface IntegrationCard {
     githubRunnersReady?: boolean;
     /** GitHub: what to change so it can, when it cannot. */
     githubRunnersAdvice?: string;
+    /** GitHub: the address GitHub's own servers can reach this instance at, unset
+     *  when there is none - then a new App gets no webhook. */
+    githubPublicUrl?: string;
     /** Google: the OAuth client id, which is not a secret. */
     googleClientId?: string;
     /** Google: the redirect URI to register on that client. */
@@ -1198,6 +1201,13 @@ function GitHubConnect({ card, onClose }: { card: IntegrationCard; onClose: () =
                                 Create a GitHub App for this Polaris instance in one step. GitHub will ask you to
                                 confirm, then to choose which repositories it can access.
                             </p>
+                            {!card.githubPublicUrl ? (
+                                <p className="text-muted-foreground">
+                                    This instance has no address GitHub can reach, so the app is created without a
+                                    webhook. Deploys and runner pools poll instead; agent triggers need the webhook,
+                                    which you can add on GitHub once a domain is set.
+                                </p>
+                            ) : null}
                             <a
                                 href="/api/integrations/github/new"
                                 className="inline-flex w-fit items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"

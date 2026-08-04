@@ -237,6 +237,18 @@ export async function appBaseUrl(): Promise<string> {
 }
 
 /**
+ * The app URL, but only when it is one the public internet can reach - otherwise
+ * null. Anything handed to an outside service that will call back here needs this
+ * rather than `appBaseUrl()`: on a LAN-only install that resolves to a name only
+ * this network knows, and a provider that validates the address (GitHub refuses an
+ * app manifest whose webhook is unreachable) rejects the whole registration.
+ */
+export async function publicAppUrl(): Promise<string | null> {
+    const url = await appBaseUrl();
+    return publicHostname(url) ? url.replace(/\/+$/, "") : null;
+}
+
+/**
  * Base URL for share links and drop points. Same chain as the app URL, except an
  * explicitly configured sharing domain wins and the app domain is consulted only
  * after the reachable addresses - sharing is where a throwaway or free hostname
