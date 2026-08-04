@@ -736,7 +736,8 @@ export async function updateTask(actorId: string, input: core.TaskUpdateInput): 
     if (input.priority !== undefined && input.priority !== before.priority) {
         await runAutomations({ trigger: "task.priorityChanged", taskId: input.taskId, actorId });
     }
-    if (input.dueDate !== undefined && input.dueDate) {
+    // The same reading as a selection: a date the task did not already carry.
+    if (input.dueDate && new Date(input.dueDate).getTime() !== before.dueDate?.getTime()) {
         await runAutomations({ trigger: "task.dueDateSet", taskId: input.taskId, actorId });
     }
     if (tagsAdded) await runAutomations({ trigger: "task.tagAdded", taskId: input.taskId, actorId });
@@ -1111,6 +1112,7 @@ export async function bulkUpdate(
     const statusChanged: string[] = [];
     const completed: string[] = [];
     const priorityChanged: string[] = [];
+    const dueDateSet: string[] = [];
     const movedList: string[] = [];
 
     for (const task of before) {
@@ -1137,7 +1139,15 @@ export async function bulkUpdate(
                 core.TASK_PRIORITY_LABELS[input.priority]
             );
         }
-        if (input.dueDate !== undefined) line("due", task.dueDate?.toISOString() ?? null, input.dueDate ?? null);
+        if (input.dueDate !== undefined) {
+            // "A due date is set" means a date this row did not already have.
+            // Clearing one is not setting one, and re-sending the date forty rows
+            // already carried is not either.
+            if (input.dueDate && new Date(input.dueDate).getTime() !== task.dueDate?.getTime()) {
+                dueDateSet.push(task.id);
+            }
+            line("due", task.dueDate?.toISOString() ?? null, input.dueDate ?? null);
+        }
         if (input.listId !== undefined && input.listId !== task.listId) {
             movedList.push(task.id);
             line("moved");
@@ -1162,7 +1172,7 @@ export async function bulkUpdate(
         ["task.statusChanged", statusChanged],
         ["task.completed", completed],
         ["task.priorityChanged", priorityChanged],
-        ["task.dueDateSet", input.dueDate ? ids : []],
+        ["task.dueDateSet", dueDateSet],
         ["task.moved", movedList],
         ["task.assigneeAdded", [...handedTo.keys()]],
         ["task.assigneeRemoved", [...takenFrom]],

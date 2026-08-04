@@ -205,6 +205,15 @@ describe("applying a change to a selection", () => {
         expect(raisedFor("task.assigneeAdded")).toEqual(["a"]);
     });
 
+    it("raises the due-date rules only where the date moved", async () => {
+        const due = new Date("2026-03-04T00:00:00.000Z");
+        const allowed = selection([row({ id: "a" }), row({ id: "b", dueDate: due })]);
+
+        await bulkUpdate(ACTOR, allowed, { taskIds: ["a", "b"], dueDate: due.toISOString() });
+
+        expect(raisedFor("task.dueDateSet")).toEqual(["a"]);
+    });
+
     it("raises the tag rules only where the tag is new", async () => {
         const allowed = selection([row({ id: "a" }), row({ id: "b" })]);
         tagFindMany.mockResolvedValueOnce([{ taskId: "b", tagId: "bug" }]);
