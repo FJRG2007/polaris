@@ -35,6 +35,13 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
+env:
+  # Incremental compilation is for a machine that keeps its target directory
+  # between edits. A runner does not: every artifact it produces is a bigger cache
+  # to save and restore, for a rebuild that never happens.
+  CARGO_INCREMENTAL: "0"
+  CARGO_TERM_COLOR: always
+
 jobs:
   rust:
     runs-on: ubuntu-latest
@@ -44,7 +51,11 @@ jobs:
         with:
           components: clippy, rustfmt
       - uses: Swatinem/rust-cache@v2
+      # Instant, and the failure people hit most: run it before anything compiles.
       - run: cargo fmt --all -- --check
+      # `--all-targets` compiles the tests too, so `cargo test` below reuses that
+      # work rather than starting its own build. Same flags as before: this is
+      # about how long the gates take, not about which code they accept.
       - run: cargo clippy --all-targets -- -D warnings
       - run: cargo test --all
       - name: Check generated Python is up to date

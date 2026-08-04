@@ -6,6 +6,13 @@ name: Dashboard CI
 # Also callable, so dashboard-publish.yml can gate an image on it: an image built
 # from a commit that failed here is one every deployment is then offered as an
 # update, which is how a red build reaches production.
+#
+# Two jobs rather than one, and the split is deliberate. Everything used to run in
+# a line: build every package, build the app, then typecheck, lint and test - so
+# the gates waited on a Next build they have nothing to do with. They need the
+# packages' declarations and nothing more. Now the app build and the gates run
+# beside each other, and the run costs the longer of the two instead of the sum.
+# Both still run: nothing is skipped to make this faster.
 
 on:
   push:
@@ -30,8 +37,15 @@ defaults:
   run:
     working-directory: dashboard
 
+env:
+  # Nothing here is interactive, and neither of these tells anyone anything.
+  NEXT_TELEMETRY_DISABLED: "1"
+  NPM_CONFIG_FUND: "false"
+  NPM_CONFIG_AUDIT: "false"
+
 jobs:
-  build:
+  checks:
+    name: typecheck, lint, test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -42,9 +56,30 @@ jobs:
           cache: npm
           cache-dependency-path: dashboard/package-lock.json
 
-      # The Next build is most of this job's wall clock, and almost all of it is
-      # recompiling code that did not change. Keyed on the lockfile so a dependency
-      # change starts clean, and restored across commits otherwise.
+      - run: npm ci --prefer-offline
+      - run: npm run db:generate
+      # The packages only. They publish the declarations everything below reads;
+      # the app's own build is another job's problem and nothing here waits on it.
+      - run: npm run build:packages
+      - run: npm run typecheck
+      - run: npm run lint --if-present
+      - run: npm run test
+
+  app:
+    name: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: dashboard/package-lock.json
+
+      # Most of a Next build is recompiling what did not change. Keyed on the
+      # lockfile so a dependency change starts clean, and restored across commits
+      # otherwise.
       - uses: actions/cache@v4
         with:
           path: dashboard/apps/web/.next/cache
@@ -53,11 +88,7 @@ jobs:
             next-${{ runner.os }}-${{ hashFiles('dashboard/package-lock.json') }}-
             next-${{ runner.os }}-
 
-      - run: npm ci
+      - run: npm ci --prefer-offline
       - run: npm run db:generate
-      # Packages consume each other's built declarations, so build before the
-      # type/test gates; the build itself is dependency-ordered.
-      - run: npm run build
-      - run: npm run typecheck
-      - run: npm run lint --if-present
-      - run: npm run test
+      - run: npm run build:packages
+      - run: npm run build -w @polaris/web
