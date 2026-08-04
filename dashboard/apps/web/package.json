@@ -16,6 +16,7 @@
     "dependencies": {
         "@better-auth/passkey": "1.6.25",
         "@github/relative-time-element": "4.4.4",
+        "@polaris/agent-runtime": "*",
         "@polaris/auth": "0.1.0",
         "@polaris/config": "0.1.0",
         "@polaris/core": "0.1.0",

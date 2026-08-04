@@ -172,19 +172,85 @@ export function buildAppManifest(baseUrl: string, name: string): Record<string, 
         // their Polaris one, which is what lets a runner pool serve "these
         // people's repositories" without anybody typing a login for them.
         callback_urls: [githubLinkCallbackUrl(baseUrl)],
-        // Webhooks are inactive until the build system needs them; the URL is set so
-        // enabling them later needs no app edit.
-        // Push events drive auto-deploy; workflow_job tells the runner pools which
-        // repository has work waiting. GitHub must be able to reach this URL, so it
-        // only fires for instances with a public domain (LAN installs use polling).
+        // A GitHub App has exactly one webhook URL, so everything Polaris listens
+        // for arrives here. Push drives auto-deploy, workflow_job tells the runner
+        // pools which repository has work waiting, and the rest are what start an
+        // agent run. GitHub must be able to reach this URL, so it only fires for
+        // instances with a public domain (LAN installs use polling).
         hook_attributes: { url: `${baseUrl}/api/deploy/github/webhook`, active: true },
-        default_events: ["push", "workflow_job"],
+        default_events: [...APP_EVENTS],
         redirect_url: `${baseUrl}/api/integrations/github/callback`,
         setup_url: `${baseUrl}/api/integrations/github/callback`,
         setup_on_update: true,
         public: false,
-        default_permissions: { contents: "read", metadata: "read" }
+        default_permissions: { ...APP_PERMISSIONS }
     };
+}
+
+/**
+ * What the App asks for, and why each one is here.
+ *
+ * Deploy needed two read permissions. An agent works inside the repository, so it
+ * needs to write what it is there to produce, and nothing beyond that: there is
+ * no administration, no member management and no access to another installation.
+ *
+ * Widening this list does not widen an App that already exists. GitHub requires
+ * the owner to accept new permissions, which is why `missingAppPermissions`
+ * exists and why Integrations surfaces the gap instead of letting a dispatch fail
+ * with a bare 403.
+ */
+export const APP_PERMISSIONS: Readonly<Record<string, string>> = {
+    // Read the repository, and write the branches an agent pushes.
+    contents: "write",
+    metadata: "read",
+    // Open pull requests, review them, and comment on them.
+    pull_requests: "write",
+    // Triage issues and answer them.
+    issues: "write",
+    // Dispatch the workflow a run happens in, and read its logs when CI fails.
+    actions: "write",
+    // Post the run-status check a pull request shows while a run is in flight.
+    checks: "write",
+    // Write the workflow file itself. GitHub gates this separately from contents.
+    workflows: "write"
+};
+
+// Deliberately absent: `secrets`. A run gets its provider key from this instance
+// over its authenticated run-context call, not from a copy written into the
+// repository. That keeps one place to rotate a key, leaves no copy behind on a
+// repository somebody later disables, and costs the App one less permission.
+
+/** Events the App subscribes to. Everything an agent can be started by, plus the
+ *  two Deploy and Runners already relied on. */
+export const APP_EVENTS: readonly string[] = [
+    "push",
+    "workflow_job",
+    "workflow_run",
+    "issues",
+    "issue_comment",
+    "pull_request",
+    "pull_request_review",
+    "pull_request_review_comment",
+    "check_suite"
+];
+
+/**
+ * Permissions this installation was never granted, in the order they are declared.
+ *
+ * GitHub reports what it granted, so this compares against what the App now asks
+ * for. `write` satisfies a `read` requirement; nothing else does. An installation
+ * with no recorded permissions is treated as complete rather than broken: those
+ * rows predate the recording, and a refresh fills them in.
+ */
+export function missingAppPermissions(granted: Record<string, string>): string[] {
+    if (Object.keys(granted).length === 0) return [];
+    return Object.entries(APP_PERMISSIONS)
+        .filter(([name, needed]) => {
+            const held = granted[name];
+            if (!held) return true;
+            return needed === "write" && held !== "write";
+        })
+        .map(([name]) => name);
 }
 
 /** Where the manifest form POSTs to create the app under the user's account. */
@@ -434,6 +500,52 @@ export async function listGithubInstallations(): Promise<
         accountType: install.accountType,
         permissions: install.permissions ?? {}
     }));
+}
+
+export interface GithubPermissionGap {
+    /** Installations that have not accepted everything the App now asks for. */
+    installations: Array<{ login: string; missing: string[] }>;
+    /** Where the owner reviews and accepts them, or null when the App page is
+     *  unknown (the PAT method, or a row written before the URL was recorded). */
+    reviewUrl: string | null;
+}
+
+/**
+ * Installations still running on an older permission set.
+ *
+ * An App that gains a permission does not gain it on anything it is already
+ * installed on: GitHub holds the request until the owner accepts it. Until they
+ * do, every call needing the new permission fails with a 403 that names nothing,
+ * on a screen that had no reason to expect it. So the gap is reported where the
+ * App is managed, before anybody enables a repository against it.
+ */
+export async function githubPermissionGap(): Promise<GithubPermissionGap> {
+    const state = await getIntegrationState(PROVIDER);
+    if (state?.config.method !== "app") return { installations: [], reviewUrl: null };
+    const installs = Array.isArray(state.config.installations) ? (state.config.installations as Installation[]) : [];
+    const htmlUrl = typeof state.config.htmlUrl === "string" ? state.config.htmlUrl : null;
+    return {
+        installations: installs
+            .map((install) => ({ login: install.login, missing: missingAppPermissions(install.permissions ?? {}) }))
+            .filter((row) => row.missing.length > 0),
+        // The App's own page is where the owner is shown the pending request.
+        reviewUrl: htmlUrl ? `${htmlUrl}/permissions/update` : null
+    };
+}
+
+/**
+ * The login people write to address the App, without the `[bot]` suffix GitHub
+ * appends to the account it creates for it.
+ *
+ * Instance-specific: the App is named when it is created, so nothing that matches
+ * a mention may be a constant. Null for the PAT method, which has no App and
+ * therefore nothing to address.
+ */
+export async function githubAppHandle(): Promise<string | null> {
+    const state = await getIntegrationState(PROVIDER);
+    if (state?.config.method !== "app") return null;
+    const slug = typeof state.config.appSlug === "string" ? state.config.appSlug : null;
+    return slug || null;
 }
 
 /** Forget the GitHub connection and its secret(s). */

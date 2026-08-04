@@ -3730,6 +3730,11 @@ model AgentRun {
     // The container `server` runs happen in, so the log can be streamed and the
     // run can be cancelled.
     containerId String?
+    // SHA-256 of the token this run authenticates its callbacks with. The raw
+    // value is handed to the runtime once, at dispatch, and never stored: a
+    // database dump therefore cannot be replayed as a live run credential. The
+    // token stops working when the run reaches a terminal state.
+    tokenHash   String?
     // Who asked, for a manual run. Null when a webhook did.
     startedById String?  @db.Uuid
     startedAt   DateTime?

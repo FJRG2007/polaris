@@ -15,8 +15,21 @@
  */
 
 import { recordWorkflowJob } from "@/lib/runners/runner-demand";
+import { handleAgentWebhook } from "@/lib/agents/agent-webhook";
 import { branchFromRef, triggerAutoDeploysForPush } from "@/lib/deploy-service";
-import { getGithubWebhookSecret, verifyWebhookSignature } from "@/lib/github-service";
+import { getGithubWebhookSecret, githubAppHandle, verifyWebhookSignature } from "@/lib/github-service";
+
+/** Events that concern the Agents app. Named rather than inferred so an event
+ *  GitHub adds later is ignored until somebody decides what it means. */
+const AGENT_EVENTS = new Set([
+    "issues",
+    "issue_comment",
+    "pull_request",
+    "pull_request_review",
+    "pull_request_review_comment",
+    "check_suite",
+    "workflow_run"
+]);
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -82,6 +95,21 @@ export async function POST(request: Request): Promise<Response> {
             labels: payload.workflow_job?.labels ?? []
         });
         return Response.json({ pools: moved });
+    }
+
+    // Everything an agent can be started by, plus the workflow_run that closes a
+    // run out when its job was cancelled or killed and reported nothing itself.
+    if (event && AGENT_EVENTS.has(event)) {
+        let payload: unknown;
+        try {
+            payload = JSON.parse(raw);
+        } catch {
+            return new Response("bad payload", { status: 400 });
+        }
+        const appHandle = await githubAppHandle();
+        if (!appHandle) return Response.json({ ok: true });
+        const runs = await handleAgentWebhook({ event, payload, appHandle });
+        return Response.json({ runs: runs.length });
     }
 
     if (event !== "push") return Response.json({ ignored: event });

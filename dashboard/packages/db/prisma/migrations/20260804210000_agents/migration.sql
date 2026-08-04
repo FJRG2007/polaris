@@ -113,6 +113,10 @@ CREATE TABLE "AgentRun" (
     -- The container a `server` run happens in, so its log can be streamed and the
     -- run can be cancelled.
     "containerId" TEXT,
+    -- SHA-256 of the token this run authenticates its callbacks with. The raw
+    -- value is handed to the runtime once and never stored, so a database dump
+    -- cannot be replayed as a live run credential.
+    "tokenHash" TEXT,
     -- Who asked, for a manual run. Null when a webhook did. No foreign key: a run
     -- is a record of what happened, and deleting the account must not erase it.
     "startedById" UUID,
