@@ -50,9 +50,30 @@ function authorizer(overrides: Partial<NonNullable<SessionView["authorizedBy"]>>
     };
 }
 
+/** The table as the account's own list draws it: the reader may open a session's
+ *  history, which is what `activityHref` says. */
 function render(sessions: SessionView[]): string {
     return renderToStaticMarkup(
-        <SessionsTable sessions={sessions} busyId={null} emptyLabel="Nothing is signed in." onRevoke={() => {}} />
+        <SessionsTable
+            sessions={sessions}
+            busyId={null}
+            emptyLabel="Nothing is signed in."
+            activityHref={(session) => `/account/activity?session=${session.id}`}
+            onRevoke={() => {}}
+        />
+    );
+}
+
+/** The table as an administrator reading somebody else's account draws it: no
+ *  history to open, because that log is the account holder's own. */
+function renderForAdmin(sessions: SessionView[]): string {
+    return renderToStaticMarkup(
+        <SessionsTable
+            sessions={sessions}
+            busyId={null}
+            emptyLabel="Nothing is signed in."
+            onRevoke={() => {}}
+        />
     );
 }
 
@@ -167,6 +188,16 @@ describe("the session table", () => {
         expect(render([session()])).not.toContain("Allowed by");
     });
 
+    // The history behind that link is the account holder's own. An administrator
+    // following it would land on their own log filtered by somebody else's
+    // session, which resolves to nothing - so the name stays and the link goes.
+    it("names the authorizer but does not link it when the log is not the reader's", () => {
+        const markup = renderForAdmin([session({ authorizedBy: authorizer() })]);
+        expect(markup).toContain("Allowed by");
+        expect(markup).toContain("Safari on iOS");
+        expect(markup).not.toContain("/account/activity?session=");
+    });
+
     it("labels its row actions, which carry no text of their own", () => {
         expect(render([session()])).toContain('aria-label="Sign Chrome on Windows out"');
     });
@@ -186,7 +217,7 @@ describe("the session table", () => {
     });
 
     it("leaves the history out where the reader has no business reading it", () => {
-        expect(render([session()])).not.toContain("Activity from");
+        expect(renderForAdmin([session()])).not.toContain("Activity from");
     });
 
     it("explains an empty table instead of showing an empty frame", () => {

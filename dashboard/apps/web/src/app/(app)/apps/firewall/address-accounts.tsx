@@ -24,7 +24,7 @@ import { grouped } from "./page-parts";
 import { Avatar } from "@/components/avatar";
 import { signInSummary } from "@polaris/core";
 import { RelativeTime } from "@/components/relative-time";
-import type { AddressAccount } from "@/lib/address-accounts";
+import type { AddressAccount, AddressAccounts as AddressAccountsView } from "@/lib/address-accounts";
 
 /** As many accounts and sessions as read as a list rather than as a wall. Each
  *  is followed by a line saying what was left out, since an address behind an
@@ -32,20 +32,21 @@ import type { AddressAccount } from "@/lib/address-accounts";
 const ACCOUNT_ROWS = 6;
 const SESSION_ROWS = 3;
 
-export function AddressAccounts({ accounts }: { accounts: readonly AddressAccount[] }) {
+export function AddressAccounts({ accounts }: { accounts: AddressAccountsView }) {
+    const { list, more } = accounts;
     return (
         <div>
             <div className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
                 <Users className="size-4" />
                 Accounts seen here
             </div>
-            {accounts.length === 0 ? (
+            {list.length === 0 ? (
                 <p className="text-xs text-muted-foreground">
                     No account has signed in from this address.
                 </p>
             ) : (
                 <ul className="flex flex-col gap-2">
-                    {accounts.slice(0, ACCOUNT_ROWS).map((account) => (
+                    {list.slice(0, ACCOUNT_ROWS).map((account) => (
                         <li key={account.id} className="rounded-md border border-border p-2">
                             <div className="flex items-start gap-2">
                                 <Avatar person={account} size={28} />
@@ -117,9 +118,14 @@ export function AddressAccounts({ accounts }: { accounts: readonly AddressAccoun
                             </div>
                         </li>
                     ))}
-                    {accounts.length > ACCOUNT_ROWS ? (
+                    {/* "at least" whenever the server itself had to cut: on a shared
+                        address the rest is exactly what an exact-looking number would
+                        be hiding, and this line is read as the whole picture. */}
+                    {list.length > ACCOUNT_ROWS || more ? (
                         <li className="text-xs text-muted-foreground">
-                            and {grouped(accounts.length - ACCOUNT_ROWS)} more, least recently seen
+                            and {more ? "at least " : ""}
+                            {grouped(Math.max(list.length - ACCOUNT_ROWS, 1))} more, least recently
+                            seen
                         </li>
                     ) : null}
                 </ul>

@@ -70,6 +70,15 @@ export interface AddressAccount {
     readonly lastAt: string;
 }
 
+/** The accounts an address touched, and whether there were more of them. */
+export interface AddressAccounts {
+    readonly list: readonly AddressAccount[];
+    /** True when the address reached more accounts than were carried back, so a
+     *  screen can say it is showing part of the picture without claiming to know
+     *  how much of it. */
+    readonly more: boolean;
+}
+
 /** The sign-in outcomes the activity log records, in the order they are counted. */
 const SIGN_IN_ACTIONS = [
     "account.signin",
@@ -223,17 +232,21 @@ async function signInsAt(ip: string): Promise<Map<string, AccountSignIns>> {
  * in, most recent attempt first. What a ban would break is the half worth
  * keeping.
  */
-export async function accountsAtAddress(ip: string, now = Date.now()): Promise<AddressAccount[]> {
+export async function accountsAtAddress(ip: string, now = Date.now()): Promise<AddressAccounts> {
     const [rows, signIns] = await Promise.all([sessionRowsAt(ip), signInsAt(ip)]);
     const live = rows.filter((row) => row.expiresAt.getTime() > now);
-    const ids = [
-        ...new Set([
-            ...live.map((row) => row.userId),
-            ...rows.map((row) => row.userId),
-            ...signIns.keys()
-        ])
-    ].slice(0, ACCOUNT_LIMIT);
-    if (ids.length === 0) return [];
+    const found = new Set([
+        ...live.map((row) => row.userId),
+        ...rows.map((row) => row.userId),
+        ...signIns.keys()
+    ]);
+    // Whether anything was left out, never how much: counting the rest means a
+    // scan of the log on exactly the addresses where it is largest, which is
+    // where somebody asks. The screen says "at least" rather than a number it
+    // would have to invent.
+    const more = found.size > ACCOUNT_LIMIT || signIns.size >= ACCOUNT_LIMIT;
+    const ids = [...found].slice(0, ACCOUNT_LIMIT);
+    if (ids.length === 0) return { list: [], more: false };
 
     const users = await prisma.user.findMany({
         where: { id: { in: ids } },
@@ -247,7 +260,7 @@ export async function accountsAtAddress(ip: string, now = Date.now()): Promise<A
         sessions.set(row.userId, list);
     }
 
-    return users
+    const list = users
         .map((user) => {
             const held = sessions.get(user.id) ?? [];
             const seen = signIns.get(user.id);
@@ -269,4 +282,5 @@ export async function accountsAtAddress(ip: string, now = Date.now()): Promise<A
         .sort(
             (a, b) => Number(b.live > 0) - Number(a.live > 0) || b.lastAt.localeCompare(a.lastAt)
         );
+    return { list, more };
 }

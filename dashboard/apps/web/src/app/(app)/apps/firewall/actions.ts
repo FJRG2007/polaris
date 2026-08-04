@@ -14,7 +14,7 @@ import { recordAudit } from "@/lib/audit-service";
 import { syncAppRoutes } from "@/lib/deploy-service";
 import { syncDashboardRoute } from "@/lib/domain-edge";
 import { requirePermission, userHasManage } from "@/lib/session";
-import { accountsAtAddress, type AddressAccount } from "@/lib/address-accounts";
+import { accountsAtAddress, type AddressAccounts } from "@/lib/address-accounts";
 import { wafAddressActivity, wafLogWindow, wafTraffic } from "@/lib/waf-analytics-service";
 import {
     getWafInherited,
@@ -411,11 +411,16 @@ function countEntries(json: string | undefined): number {
  * the dialog was opened for and the evidence a ban is judged on; replacing them
  * with an error because the second, optional question could not be answered would
  * withhold the answer the reader came for.
+ *
+ * Naming them is recorded. The log holds addresses hashed precisely so they are not
+ * kept in the clear, and this is the one path that reverses that - an administrator
+ * submits an address and is told which accounts have signed in from it. A read that
+ * turns the log's own privacy inside out is worth a line of its own.
  */
 export async function getWafAddressActivityAction(
     ip: string,
     hours = 24
-): Promise<{ activity?: WafAddressActivity; accounts?: AddressAccount[]; error?: string }> {
+): Promise<{ activity?: WafAddressActivity; accounts?: AddressAccounts; error?: string }> {
     const user = await requirePermission("system.manage");
     const address = core.cidrOrIp.safeParse(ip);
     if (!address.success) return { error: "That is not a valid address" };
@@ -436,6 +441,17 @@ export async function getWafAddressActivityAction(
                   })
                 : undefined
         ]);
+        // Only when they were actually named: a range, a reader who may not have
+        // them, and a lookup that failed all leave nothing to have looked at.
+        if (accounts) {
+            await recordAudit({
+                actorId: user.id,
+                action: "waf.address.accounts",
+                targetType: "ip",
+                targetId: address.data,
+                metadata: { accounts: accounts.list.length }
+            });
+        }
         return { activity, accounts };
     } catch (caught) {
         return {

@@ -10,11 +10,11 @@
  * be slower than reading it.
  */
 
-import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Avatar } from "@/components/avatar";
 import { InviteDialog } from "./invite-dialog";
 import { revokeInviteAction } from "./actions";
+import { useEffect, useMemo, useState } from "react";
 import type { RoleOption } from "@/lib/role-service";
 import { RecoveryRequests } from "./recovery-requests";
 import { UserDetailDialog } from "./user-detail-dialog";
@@ -83,6 +83,14 @@ export function UsersAdmin({
     // Held by id, not by value: the row is re-read from the server after every
     // change, and a copy taken when the dialog opened would go stale behind it.
     const [openId, setOpenId] = useState<string | null>(openUserId ?? null);
+
+    // A link arriving at ?user= must open that account however it arrives. Seeded
+    // state alone only covers the first mount, so going back to a link already
+    // followed - the ordinary way to return to it - left the dialog shut on a URL
+    // that says it is open.
+    useEffect(() => {
+        if (openUserId) setOpenId(openUserId);
+    }, [openUserId]);
 
     const shown = useMemo(() => {
         const needle = query.trim().toLowerCase();

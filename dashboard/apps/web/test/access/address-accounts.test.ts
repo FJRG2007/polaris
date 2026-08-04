@@ -138,7 +138,7 @@ describe("accounts at an address", () => {
             session(),
             session({ id: "session-2", createdAt: new Date("2026-08-04T11:00:00Z") })
         ];
-        const accounts = await accountsAtAddress("85.87.156.88", NOW);
+        const { list: accounts } = await accountsAtAddress("85.87.156.88", NOW);
         expect(accounts[0]?.sessions.map((entry) => entry.id)).toEqual(["session-2", "session-1"]);
     });
 
@@ -157,7 +157,7 @@ describe("accounts at an address", () => {
 
     it("gathers an account's sessions under it, and names it by its email when it has no name", async () => {
         sessionRows = [session(), session({ id: "session-2", userId: "user-2" })];
-        const accounts = await accountsAtAddress("85.87.156.88", NOW);
+        const { list: accounts } = await accountsAtAddress("85.87.156.88", NOW);
         expect(accounts.map((account) => account.name)).toEqual([
             "Ada Lovelace",
             "grace@example.com"
@@ -174,7 +174,7 @@ describe("accounts at an address", () => {
             session({ id: "session-old", expiresAt: new Date("2026-08-03T10:00:00Z") }),
             session({ id: "session-now" })
         ];
-        const accounts = await accountsAtAddress("85.87.156.88", NOW);
+        const { list: accounts } = await accountsAtAddress("85.87.156.88", NOW);
         expect(accounts[0]?.sessions.map((entry) => entry.live)).toEqual([false, true]);
         expect(accounts[0]?.live).toBe(1);
     });
@@ -185,7 +185,7 @@ describe("accounts at an address", () => {
         auditGroups = [
             group({ actorId: "user-2", action: "account.signin.blocked", _count: { _all: 12 } })
         ];
-        const accounts = await accountsAtAddress("85.87.156.88", NOW);
+        const { list: accounts } = await accountsAtAddress("85.87.156.88", NOW);
         expect(accounts).toHaveLength(1);
         expect(accounts[0]?.id).toBe("user-2");
         expect(accounts[0]?.signIns).toEqual({ accepted: 0, refused: 12, awaiting: 0 });
@@ -199,7 +199,7 @@ describe("accounts at an address", () => {
             group({ action: "account.signin.awaiting-approval", _count: { _all: 1 } }),
             group({ actorId: "user-2", _count: { _all: 5 } })
         ];
-        const accounts = await accountsAtAddress("85.87.156.88", NOW);
+        const { list: accounts } = await accountsAtAddress("85.87.156.88", NOW);
         const ada = accounts.find((account) => account.id === "user-1");
         expect(ada?.signIns).toEqual({ accepted: 3, refused: 2, awaiting: 1 });
         expect(accounts.find((account) => account.id === "user-2")?.signIns.accepted).toBe(5);
@@ -210,12 +210,12 @@ describe("accounts at an address", () => {
     it("puts an account that is signed in now above one that only tried", async () => {
         sessionRows = [session({ userId: "user-2" })];
         auditGroups = [group({ _max: { at: new Date("2026-08-04T11:59:00Z") } })];
-        const accounts = await accountsAtAddress("85.87.156.88", NOW);
+        const { list: accounts } = await accountsAtAddress("85.87.156.88", NOW);
         expect(accounts.map((account) => account.id)).toEqual(["user-2", "user-1"]);
     });
 
     it("has nothing to say about an address nobody has ever been seen on", async () => {
-        expect(await accountsAtAddress("85.87.156.88", NOW)).toEqual([]);
+        expect(await accountsAtAddress("85.87.156.88", NOW)).toEqual({ list: [], more: false });
     });
 
     // The log is asked about the gateway a whole company signs in through as

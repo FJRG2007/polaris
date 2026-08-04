@@ -41,8 +41,8 @@ function account(overrides: Partial<AddressAccount> = {}): AddressAccount {
     };
 }
 
-function render(accounts: AddressAccount[]): string {
-    return renderToStaticMarkup(<AddressAccounts accounts={accounts} />);
+function render(list: AddressAccount[], more = false): string {
+    return renderToStaticMarkup(<AddressAccounts accounts={{ list, more }} />);
 }
 
 describe("the accounts behind an address", () => {
@@ -99,5 +99,19 @@ describe("the accounts behind an address", () => {
         expect(markup).toContain("Person 5");
         expect(markup).not.toContain("Person 6");
         expect(markup).toContain("and 3 more");
+        expect(markup).not.toContain("at least");
+    });
+
+    // The server cuts the list too, and on a shared address the rest is exactly
+    // what an exact-looking number would be hiding.
+    it("stops claiming an exact number once the server itself had to cut", () => {
+        const many = Array.from({ length: 9 }, (_, index) =>
+            account({ id: `user-${index}`, name: `Person ${index}` })
+        );
+        expect(render(many, true)).toContain("and at least 3 more");
+    });
+
+    it("still says there are more when the cut left nothing extra to show", () => {
+        expect(render([account()], true)).toContain("and at least 1 more");
     });
 });

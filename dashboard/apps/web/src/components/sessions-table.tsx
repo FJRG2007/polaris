@@ -44,9 +44,11 @@ export function sessionOrigin(session: SessionView): string {
  * screen where that is acted on.
  *
  * The label is what was recorded at the time. A session that has since been
- * signed out still names its device and simply stops linking anywhere.
+ * signed out still names its device and simply stops linking anywhere - and so
+ * does one an administrator is reading, since the history behind that link is
+ * the account holder's own and this reader is not them.
  */
-export function AuthorizedBy({ session }: { session: SessionView }) {
+export function AuthorizedBy({ session, ownHistory }: { session: SessionView; ownHistory: boolean }) {
     const authorizer = session.authorizedBy;
     if (!authorizer) return null;
     const how = session.signIn.method === "qr-code" ? "Code scanned by" : "Allowed by";
@@ -54,7 +56,7 @@ export function AuthorizedBy({ session }: { session: SessionView }) {
         <p className="flex flex-wrap items-center gap-1 truncate text-xs text-muted-foreground">
             <KeyRound className="size-3 shrink-0" aria-hidden />
             <span>{how}</span>
-            {authorizer.live ? (
+            {authorizer.live && ownHistory ? (
                 <Link
                     href={`/account/activity?session=${authorizer.sessionId}`}
                     className="min-w-0 truncate underline-offset-2 hover:text-foreground hover:underline"
@@ -191,7 +193,13 @@ export function SessionsTable({
                                                     Last active <RelativeTime iso={session.lastSeenAt} />
                                                 </p>
                                             ) : null}
-                                            <AuthorizedBy session={session} />
+                                            {/* Whether this reader may open a session's
+                                                history is already settled by activityHref;
+                                                the authorizer's link answers to the same. */}
+                                            <AuthorizedBy
+                                                session={session}
+                                                ownHistory={activityHref !== undefined}
+                                            />
                                         </div>
                                     </div>
                                 </td>
