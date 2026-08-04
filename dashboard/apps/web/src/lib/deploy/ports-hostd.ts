@@ -10,7 +10,17 @@ import { HostdClient } from "@polaris/hostd-client";
 import type { BuildRequest, ComposeSpec, ExecResult, ExecSpec, ExecStream, LogOptions, MountTarget, OutputSink, RuntimePorts } from "@polaris/deploy";
 
 export class HostdPorts implements RuntimePorts {
-    private readonly client = new HostdClient();
+    private readonly client: HostdClient;
+
+    /**
+     * `signal` belongs to the deployment these ports serve, and aborting it is what
+     * actually stops the work rather than only recording that it stopped: the daemon
+     * streams each command's output straight from the child process it spawned, and
+     * kills that child when the connection it was writing to goes away.
+     */
+    public constructor(signal?: AbortSignal) {
+        this.client = new HostdClient({ signal });
+    }
 
     public async composeUp(spec: ComposeSpec, onOutput?: OutputSink): Promise<void> {
         const res = await this.client.deployUp(spec);

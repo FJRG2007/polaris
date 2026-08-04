@@ -32,7 +32,7 @@ import { getOrCreateHostTarget, getOrCreateLocalTarget } from "./deploy-target-s
 import { gitBuildContext, type BuildCommands, type GitSource } from "./git-build-service";
 import { quickTunnelAppIds, tunnelHostForApp, stopQuickTunnel } from "./deploy/quick-tunnel-service";
 import { KEPT_RELEASES, currentReleaseRef, keepsReleases, portSubject, releaseMarker, releaseRef, serviceRef } from "./deploy/releases";
-import { bucketHttpMetrics, normalizeRoot, normalizeZoneName, parseHttpLogs, parseWatchPaths, releaseDomain, resolveDockerfilePath, shortHash, shouldDeployForPaths, slugify, type AppDeployPlan, type DeployResult, type HttpLogEntry, type HttpMetricPoint, type RuntimeContext, type RuntimeDriver } from "@polaris/deploy";
+import { bucketHttpMetrics, normalizeRoot, normalizeZoneName, parseHttpLogs, parseWatchPaths, releaseDomain, resolveDockerfilePath, shortHash, shouldDeployForPaths, slugify, type AppDeployPlan, type DeployResult, type HttpLogEntry, type HttpMetricPoint, type RuntimeContext, type RuntimeDriver, type RuntimePorts } from "@polaris/deploy";
 
 /** A locally-installed messaging hub (this catalog app) joins a dedicated web<->hub
  *  network and POSTs inbound events to the web by service DNS - the public app URL
@@ -1976,6 +1976,77 @@ function runDeployment(
     );
 }
 
+/** The states a deployment never moves out of. Named once because three separate
+ *  decisions read it: whether a queued job should still run, whether a verdict may
+ *  overwrite the row, and whether the UI should keep polling. */
+export const TERMINAL_DEPLOY_STATUSES = new Set(["running", "success", "failed", "cancelled", "rolled_back", "stopped", "removed"]);
+
+/**
+ * How long a single deploy may take before it is stopped.
+ *
+ * A build with no bound is a service stuck in DEPLOYING for as long as nobody
+ * notices - the failure this exists for held one for nine hours. Generous, because
+ * a first build with a cold cache on a slow machine is legitimately slow, and the
+ * point is to catch a wedge rather than to hurry anybody.
+ */
+const DEPLOY_DEADLINE_MS = 60 * 60_000;
+
+/** Deployments running in THIS process, so a cancel can reach the work rather than
+ *  only the record of it. Empty after a restart, which is why cancelling also
+ *  settles the row on its own - see `cancelDeployment`. */
+const running = new Map<string, AbortController>();
+
+/**
+ * Stop a deployment that has not finished.
+ *
+ * Two halves, and each is useful without the other. The row is settled here, so a
+ * deployment whose runner died with an earlier Polaris process (a restart mid-build
+ * leaves one reading DEPLOYING forever) can still be cleared. And the abort tears
+ * down the connection the work streams over, which is what ends the command on the
+ * host - a cancel that only wrote to the database would leave the build running and
+ * the operator with no way to tell.
+ */
+export async function cancelDeployment(deploymentId: string, ownerId: string): Promise<void> {
+    // Scoped by the target's owner, the same rule `readDeployment` reads a log by -
+    // so whoever can watch a deploy is whoever can stop it, and no narrower.
+    const deployment = await prisma.deployment.findFirst({
+        where: { id: deploymentId, target: { ownerId } },
+        select: { status: true }
+    });
+    if (!deployment) throw new Error("Deployment not found");
+    if (TERMINAL_DEPLOY_STATUSES.has(deployment.status)) throw new Error("That deploy has already finished");
+
+    running.get(deploymentId)?.abort(new Error("cancelled"));
+    const settled = await settleDeployment(deploymentId, {
+        status: "cancelled",
+        error: "Cancelled",
+        finishedAt: new Date()
+    });
+    await dropReleaseDomain(deploymentId);
+    if (settled) await notifyDeployFinished({ deploymentId, ownerId, ok: false }).catch(() => undefined);
+}
+
+/**
+ * Fail whatever was still in flight when this process started.
+ *
+ * The queue lives in memory, so nothing survives a restart: a row left QUEUED or
+ * DEPLOYING has no runner behind it and never will. Left alone it reads as a deploy
+ * still going, which is the state an operator waits on instead of retrying.
+ */
+export async function recoverAbandonedDeployments(): Promise<void> {
+    const abandoned = await prisma.deployment.updateMany({
+        where: { status: { in: ["queued", "deploying"] } },
+        data: {
+            status: "failed",
+            error: "Polaris restarted while this deploy was running",
+            finishedAt: new Date()
+        }
+    });
+    if (abandoned.count > 0) {
+        console.warn(`polaris: ${abandoned.count} deploy(s) were interrupted by a restart and are marked failed`);
+    }
+}
+
 /**
  * Forget the hostname a release was given when its deploy does not come up. The
  * name is created before the build so the container can answer on it; a build that
@@ -1992,6 +2063,11 @@ async function dropReleaseDomain(deploymentId: string): Promise<void> {
  * file, resolve the ports and driver for the target, run the caller's work with a
  * RuntimeContext streaming into that log, and record the final status. Exported so
  * database-service reuses the exact same lifecycle.
+ *
+ * Interruptible in two ways, both through the same abort: an operator cancelling it,
+ * and the deadline below. Aborting is not a note in the database - it tears down the
+ * connection the work is streaming over, and the far side ends the command when that
+ * connection goes.
  */
 export async function executeDeployment(
     deploymentId: string,
@@ -2002,6 +2078,11 @@ export async function executeDeployment(
     pullImages: string[] = [],
     buildCommands?: BuildCommands
 ): Promise<void> {
+    // Cancelled while it waited its turn on the target's queue. Nothing has started,
+    // so there is nothing to unwind - and starting now would ignore the operator.
+    const queuedRow = await prisma.deployment.findUnique({ where: { id: deploymentId }, select: { status: true } });
+    if (!queuedRow || TERMINAL_DEPLOY_STATUSES.has(queuedRow.status)) return;
+
     await mkdir(logDir(), { recursive: true });
     const logStream = createWriteStream(deployLogPath(deploymentId), { flags: "a" });
     const log = (chunk: Buffer): void => {
@@ -2013,10 +2094,24 @@ export async function executeDeployment(
         data: { status: "deploying", startedAt: new Date(), logPath: `${deploymentId}.log` }
     });
 
-    const ports = await getPorts(target, ownerId);
-    const driver = getDriver(target);
-    const buildContext = buildSource ? gitBuildContext(buildSource, log, buildCommands) : undefined;
+    const controller = new AbortController();
+    running.set(deploymentId, controller);
+    // A build that hangs used to hold the service in DEPLOYING with no way out but a
+    // restart, and nothing here bounded it. The deadline runs the same path an
+    // operator's cancel does, so a wedged deploy ends by itself and says why.
+    const deadline = setTimeout(() => {
+        log(Buffer.from(`\n[error] this deploy passed ${DEPLOY_DEADLINE_MS / 60_000} minutes and was stopped\n`));
+        controller.abort(new Error("timed out"));
+    }, DEPLOY_DEADLINE_MS);
+
+    // Resolved inside the try, not before it: reaching a remote server can fail, and
+    // when this sat above the try that failure escaped with the row still saying
+    // DEPLOYING - a deploy that had already stopped and looked like one still going.
+    let ports: RuntimePorts | undefined;
     try {
+        ports = await getPorts(target, ownerId, controller.signal);
+        const driver = getDriver(target);
+        const buildContext = buildSource ? gitBuildContext(buildSource, log, buildCommands) : undefined;
         // Authenticate to any private registry whose image this deploy pulls, so the
         // pull below (inside the driver) is authorized. A login failure is logged but
         // not fatal - the pull surfaces the real error if the image is truly private.
@@ -2031,30 +2126,77 @@ export async function executeDeployment(
             }
         }
         const result = await run({ ports, target: toTargetInfo(target), log, buildContext }, driver);
-        await prisma.deployment.update({
-            where: { id: deploymentId },
-            data: {
-                status: result.ok ? "running" : "failed",
-                imageTag: result.imageTag,
-                error: result.error,
-                finishedAt: new Date()
-            }
+        // An abort usually surfaces as a thrown connection error below, but work that
+        // was between two steps can come back with a verdict nobody is waiting for any
+        // more. Promoting it would put a release the operator stopped in front of
+        // traffic, which is the one outcome a cancel must never have.
+        if (controller.signal.aborted) {
+            await settleCancelled(deploymentId, ownerId, controller.signal.reason);
+            return;
+        }
+        await settleDeployment(deploymentId, {
+            status: result.ok ? "running" : "failed",
+            imageTag: result.imageTag,
+            error: result.error,
+            finishedAt: new Date()
         });
         if (result.ok) await promoteDeployment(deploymentId);
         else await dropReleaseDomain(deploymentId);
         await notifyDeployFinished({ deploymentId, ownerId, ok: result.ok });
     } catch (error) {
+        if (controller.signal.aborted) {
+            await settleCancelled(deploymentId, ownerId, controller.signal.reason);
+            return;
+        }
         log(Buffer.from(`\n[error] ${error instanceof Error ? error.message : String(error)}\n`));
-        await prisma.deployment.update({
-            where: { id: deploymentId },
-            data: { status: "failed", error: error instanceof Error ? error.message : "deploy failed", finishedAt: new Date() }
+        await settleDeployment(deploymentId, {
+            status: "failed",
+            error: error instanceof Error ? error.message : "deploy failed",
+            finishedAt: new Date()
         });
         await dropReleaseDomain(deploymentId);
         await notifyDeployFinished({ deploymentId, ownerId, ok: false });
     } finally {
-        await ports.dispose();
+        clearTimeout(deadline);
+        if (running.get(deploymentId) === controller) running.delete(deploymentId);
+        await ports?.dispose().catch(() => undefined);
         logStream.end();
     }
+}
+
+/**
+ * Record how a deployment ended, unless it has already ended.
+ *
+ * `updateMany` on a non-terminal row rather than a plain update, because two things
+ * can be writing the verdict at once: a cancel that has already settled the row, and
+ * the runner arriving at its own conclusion moments later. First one wins, and the
+ * one that matters is the operator's.
+ */
+async function settleDeployment(
+    deploymentId: string,
+    data: { status: string; imageTag?: string; error?: string | null; finishedAt: Date }
+): Promise<boolean> {
+    const written = await prisma.deployment.updateMany({
+        where: { id: deploymentId, status: { notIn: [...TERMINAL_DEPLOY_STATUSES] } },
+        data
+    });
+    return written.count > 0;
+}
+
+/** Finish a deployment that was stopped rather than allowed to fail: the release is
+ *  never promoted, its hostname goes the way a failed build's does, and the reason
+ *  says which of the two ways it was stopped. */
+async function settleCancelled(deploymentId: string, ownerId: string, reason: unknown): Promise<void> {
+    const timedOut = reason instanceof Error && reason.message === "timed out";
+    const settled = await settleDeployment(deploymentId, {
+        status: "cancelled",
+        error: timedOut ? `Stopped after ${DEPLOY_DEADLINE_MS / 60_000} minutes without finishing` : "Cancelled",
+        finishedAt: new Date()
+    });
+    await dropReleaseDomain(deploymentId);
+    // Only when this call is the one that settled it: a cancel from the UI has already
+    // told whoever was watching, and saying it twice reads as two failed deploys.
+    if (settled) await notifyDeployFinished({ deploymentId, ownerId, ok: false });
 }
 
 /**

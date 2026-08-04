@@ -47,6 +47,7 @@ import {
     ChevronDown,
     ChevronLeft,
     ChevronRight,
+    CircleStop,
     Download,
     ExternalLink,
     Eye,
@@ -400,10 +401,12 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
     useEffect(reload, [app.id]);
 
     // Poll while a deployment is still in flight so the card reflects the real state
-    // without a manual page reload; stop once everything has reached a terminal state.
+    // without a manual page reload; stop once everything has stopped moving. Asked
+    // through `isSettled` rather than a second list of states kept here: the copy left
+    // "running" out, so a service that had been up for hours went on polling every
+    // three seconds with nothing left to learn.
     useEffect(() => {
-        const TERMINAL = new Set(["success", "failed", "cancelled", "rolled_back", "stopped"]);
-        if (!items?.some((item) => !TERMINAL.has(item.status))) return;
+        if (!items?.some((item) => !isSettled(item))) return;
         const timer = setInterval(reload, 3000);
         return () => clearInterval(timer);
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -581,6 +584,13 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
                                                     <p className="truncate text-xs text-muted-foreground">{deploySubtitle(deployment, app, format)}</p>
                                                 </div>
                                                 <ReleaseLink deployment={deployment} />
+                                                {/* A deploy still in flight is listed
+                                                    here, so this is where it is stopped
+                                                    from - without first opening a log to
+                                                    look for the control. */}
+                                                {!isSettled(deployment) && (
+                                                    <CancelDeployButton deploymentId={deployment.id} onCancelled={reload} />
+                                                )}
                                                 <DeploymentMenu
                                                     app={app}
                                                     deployment={deployment}
@@ -616,13 +626,19 @@ function DeploymentLogsView({
 }) {
     const CATS = ["Details", "Build Logs", "Deploy Logs", "HTTP Logs", "Network Flow Logs"] as const;
     const format = useDisplayFormat();
-    // While it is still going there is only one log worth opening: the build's.
-    // The runtime log belongs to a container that does not exist yet, and landing
-    // on it means being shown an error about the absence rather than the progress
-    // you came to watch.
-    const [cat, setCat] = useState<(typeof CATS)[number]>(
-        deployment && !isSettled(deployment) ? "Build Logs" : "Deploy Logs"
-    );
+    // While it is still going there is only one log worth opening: the build's. The
+    // runtime log belongs to a container that does not exist yet, and landing on it
+    // means being shown an error about the absence rather than the progress you came
+    // to watch.
+    //
+    // Derived rather than picked once at mount, which is what put a just-started deploy
+    // on the wrong one: this panel is opened by the deploy button before the row it
+    // would read exists, so at mount there is nothing yet to say the build is running.
+    // An unknown deployment counts as in flight for the same reason - that is what it
+    // is, every time this is opened without one.
+    const [chosen, setChosen] = useState<(typeof CATS)[number] | null>(null);
+    const building = !deployment || !isSettled(deployment);
+    const cat = chosen ?? (building ? "Build Logs" : "Deploy Logs");
     const badge = deployment ? depBadge(deployment) : null;
 
     return (
@@ -650,6 +666,9 @@ function DeploymentLogsView({
                 {deployment && (
                     <span className="ml-auto text-xs text-muted-foreground">{format.dateTime(deployment.createdAt)}</span>
                 )}
+                {deployment && !isSettled(deployment) && (
+                    <CancelDeployButton deploymentId={deployment.id} onCancelled={onDone} />
+                )}
             </div>
 
             <div className="no-scrollbar flex items-center gap-3 overflow-x-auto border-b border-border/60 text-sm">
@@ -657,7 +676,7 @@ function DeploymentLogsView({
                     <button
                         key={name}
                         type="button"
-                        onClick={() => setCat(name)}
+                        onClick={() => setChosen(name)}
                         className={`-mb-px whitespace-nowrap border-b-2 px-1 py-1.5 transition-colors ${
                             cat === name ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"
                         }`}
@@ -672,7 +691,7 @@ function DeploymentLogsView({
             ) : cat === "Build Logs" ? (
                 <LogStream deploymentId={deploymentId} onDone={onDone} />
             ) : cat === "Deploy Logs" ? (
-                <RuntimeLogView appId={app.id} deployment={deployment} onSeeBuild={() => setCat("Build Logs")} />
+                <RuntimeLogView appId={app.id} deployment={deployment} onSeeBuild={() => setChosen("Build Logs")} />
             ) : cat === "HTTP Logs" ? (
                 <HttpLogsView appId={app.id} deploymentStart={deployment?.createdAt ?? null} />
             ) : cat === "Network Flow Logs" ? (
@@ -681,6 +700,65 @@ function DeploymentLogsView({
                 <LogStream deploymentId={deploymentId} onDone={onDone} />
             )}
         </div>
+    );
+}
+
+/**
+ * Stop a deploy that is still queued or building.
+ *
+ * Offered wherever an unfinished deploy is on screen, because the state it exists for
+ * has no other way out: a build that wedges holds the service in DEPLOYING, and
+ * before this the only recourse was restarting Polaris. It asks first - the build may
+ * be minutes from finishing and the reader cannot tell from a spinner - but only for a
+ * plain confirmation, since redeploying is one click away.
+ */
+function CancelDeployButton({ deploymentId, onCancelled }: { deploymentId: string; onCancelled: () => void }) {
+    const [open, setOpen] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [pending, startTransition] = useTransition();
+
+    return (
+        <>
+            <button
+                type="button"
+                // The row this sits in opens the log; stopping the deploy is not asking
+                // to read it.
+                onClick={(event) => {
+                    event.stopPropagation();
+                    setOpen(true);
+                }}
+                disabled={pending}
+                aria-label="Stop this deploy"
+                title="Stop this deploy"
+                className="shrink-0 rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-danger disabled:opacity-50"
+            >
+                <CircleStop className="size-4" />
+            </button>
+            <ConfirmDeleteDialog
+                open={open}
+                onOpenChange={setOpen}
+                name="this deploy"
+                kind="deploy"
+                requireTyping={false}
+                confirmLabel="Stop it"
+                description="The build stops where it is and the release is never published. Whatever is serving now keeps serving."
+                error={error}
+                pending={pending}
+                onConfirm={() =>
+                    startTransition(async () => {
+                        const result = await deployActions
+                            .cancelDeploymentAction(deploymentId)
+                            .catch(() => ({ error: "That did not go through." }));
+                        if (result?.error) {
+                            setError(result.error);
+                            return;
+                        }
+                        setOpen(false);
+                        onCancelled();
+                    })
+                }
+            />
+        </>
     );
 }
 

@@ -59,12 +59,25 @@ export class HostdClient {
     private readonly socketPath?: string;
     private readonly tcpUrl?: string;
     private readonly tokenFile: string;
+    private readonly signal?: AbortSignal;
 
-    public constructor(options?: { socketPath?: string; tcpUrl?: string; tokenFile?: string }) {
+    /**
+     * `signal` aborts every streaming call this client makes, and it is how a deploy
+     * is stopped rather than merely marked stopped: the daemon streams a command's
+     * output straight from the child process, so the connection going away is what
+     * ends the command. It kills the child on its side when the write fails.
+     */
+    public constructor(options?: {
+        socketPath?: string;
+        tcpUrl?: string;
+        tokenFile?: string;
+        signal?: AbortSignal;
+    }) {
         const env = loadEnv();
         this.socketPath = options?.socketPath ?? env.POLARIS_HOSTD_SOCKET;
         this.tcpUrl = options?.tcpUrl ?? env.POLARIS_HOSTD_URL;
         this.tokenFile = options?.tokenFile ?? env.POLARIS_HOSTD_TOKEN_FILE;
+        this.signal = options?.signal;
     }
 
     /**
@@ -298,12 +311,15 @@ export class HostdClient {
             const onError = (error: Error): void => reject(error);
             socket.once("error", onError);
             socket.on("connect", () => {
-                const head =
-                    `POST /v1/deploy/exec/start/${encodeURIComponent(execId)} HTTP/1.1\r\n` +
-                    "Host: hostd\r\n" +
-                    `Authorization: Bearer ${token}\r\n` +
-                    "Connection: Upgrade\r\n" +
-                    "Upgrade: tcp\r\n\r\n";
+                const head = [
+                    `POST /v1/deploy/exec/start/${encodeURIComponent(execId)} HTTP/1.1`,
+                    "Host: hostd",
+                    `Authorization: Bearer ${token}`,
+                    "Connection: Upgrade",
+                    "Upgrade: tcp",
+                    "",
+                    ""
+                ].join("\r\n");
                 socket.write(head);
             });
             // Consume the daemon's response head; unshift the rest as raw output.
@@ -346,9 +362,12 @@ export class HostdClient {
             if (!headers["content-type"]) headers["content-type"] = "application/json";
             headers["content-length"] = String(Buffer.byteLength(body));
         }
+        // `signal` reaches Node's own request handling, which destroys the socket on
+        // abort. That is the point: the daemon is streaming a child process's output
+        // down this connection, so losing it is what ends the command.
         const options: RequestOptions = this.tcpUrl
-            ? { ...splitTcp(this.tcpUrl), path, method, headers }
-            : { socketPath: this.socketPath, path, method, headers };
+            ? { ...splitTcp(this.tcpUrl), path, method, headers, signal: this.signal }
+            : { socketPath: this.socketPath, path, method, headers, signal: this.signal };
         return new Promise<IncomingMessage>((resolve, reject) => {
             const req = httpRequest(options, (res) => resolve(res));
             req.on("error", reject);

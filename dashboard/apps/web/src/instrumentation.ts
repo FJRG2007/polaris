@@ -29,8 +29,15 @@ export async function register(): Promise<void> {
 
     // Write the Traefik dynamic routes for deployed-app domains on startup, so the
     // edge self-heals after a restart or a fresh dynamic volume. Best-effort.
-    const { syncAppRoutes, reconcileNasMounts } = await import("./lib/deploy-service");
+    const { syncAppRoutes, reconcileNasMounts, recoverAbandonedDeployments } = await import("./lib/deploy-service");
     void syncAppRoutes().catch((error) => console.error("polaris: initial route sync failed:", error));
+
+    // Close out deploys this process cannot possibly be running: the deploy queue is
+    // in memory, so anything left mid-flight by the previous process is abandoned, and
+    // a row that still reads DEPLOYING is one an operator waits on instead of retrying.
+    void recoverAbandonedDeployments().catch((error) =>
+        console.error("polaris: could not close out interrupted deploys:", error)
+    );
 
     // Same for the dashboard's own public hostnames, which the compose labels cannot
     // carry: they are fixed at `up` time, so a domain configured afterwards would only

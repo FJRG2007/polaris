@@ -5,10 +5,10 @@
  * compose-vs-swarm, so the pipeline stays engine- and location-agnostic.
  */
 
-import { ComposeRuntime, SwarmRuntime, type DeployTargetInfo, type RuntimeDriver, type RuntimePorts } from "@polaris/deploy";
-import { getHostConnection } from "../host-service";
-import { HostdPorts } from "./ports-hostd";
 import { SshPorts } from "./ports-ssh";
+import { HostdPorts } from "./ports-hostd";
+import { getHostConnection } from "../host-service";
+import { ComposeRuntime, SwarmRuntime, type DeployTargetInfo, type RuntimeDriver, type RuntimePorts } from "@polaris/deploy";
 
 /** The subset of a DeployTarget row the runtime needs. */
 export interface TargetRow {
@@ -19,17 +19,27 @@ export interface TargetRow {
     readonly proxyNetwork: string;
 }
 
-/** Ports for a target: the host daemon locally, or SSH for a remote Host. */
-export async function getPorts(target: TargetRow, ownerId: string): Promise<RuntimePorts> {
-    if (target.kind === "local" || !target.hostId) return new HostdPorts();
+/**
+ * Ports for a target: the host daemon locally, or SSH for a remote Host.
+ *
+ * `signal` binds them to the lifetime of whatever they are serving, so a cancelled
+ * deploy stops the command it was running instead of only recording that it stopped.
+ * Both backends carry it the same way: the work runs on the other side of a
+ * connection, and that side ends the command when the connection does.
+ */
+export async function getPorts(target: TargetRow, ownerId: string, signal?: AbortSignal): Promise<RuntimePorts> {
+    if (target.kind === "local" || !target.hostId) return new HostdPorts(signal);
     const connection = await getHostConnection(target.hostId, ownerId);
-    return new SshPorts({
-        address: connection.address,
-        port: connection.port,
-        username: connection.username,
-        auth: connection.auth,
-        hostKey: connection.hostKey
-    });
+    return new SshPorts(
+        {
+            address: connection.address,
+            port: connection.port,
+            username: connection.username,
+            auth: connection.auth,
+            hostKey: connection.hostKey
+        },
+        signal
+    );
 }
 
 /** The engine driver for a target: swarm where the target opted into it, else the

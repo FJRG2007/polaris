@@ -29,7 +29,17 @@ export interface SshTarget {
 export class SshPorts implements RuntimePorts {
     private client?: Client;
 
-    public constructor(private readonly target: SshTarget) {}
+    /**
+     * `signal` belongs to the deployment these ports serve. Ending the connection is
+     * how a remote command is stopped: the server kills what it was running when the
+     * channel it was writing to closes, the same way an interrupted ssh session does.
+     */
+    public constructor(
+        private readonly target: SshTarget,
+        signal?: AbortSignal
+    ) {
+        signal?.addEventListener("abort", () => void this.dispose().catch(() => undefined), { once: true });
+    }
 
     private async connect(): Promise<Client> {
         if (this.client) return this.client;
@@ -172,7 +182,7 @@ export class SshPorts implements RuntimePorts {
         let optionValue = staticOpts;
         const useCreds = spec.kind === "smb" && spec.username && spec.password;
         if (useCreds) {
-            lines.push('creds=$(mktemp)', 'chmod 600 "$creds"');
+            lines.push("creds=$(mktemp)", 'chmod 600 "$creds"');
             lines.push(`printf 'username=%s\\npassword=%s\\n' ${quoteArg(spec.username as string)} ${quoteArg(spec.password as string)} > "$creds"`);
             optionValue = staticOpts ? `credentials=$creds,${staticOpts}` : "credentials=$creds";
         }

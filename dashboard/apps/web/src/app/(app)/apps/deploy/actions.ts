@@ -383,6 +383,20 @@ export async function deployApplicationAction(applicationId: string): Promise<{ 
     }
 }
 
+/** Stop a deploy that is still queued or building. Also the way out of one whose
+ *  runner died with an earlier process - see `cancelDeployment`. */
+export async function cancelDeploymentAction(deploymentId: string): Promise<{ error?: string }> {
+    const user = await requirePermission("deploy.manage");
+    try {
+        await deployService.cancelDeployment(deploymentId, user.id);
+        await recordAudit({ actorId: user.id, action: "deploy.app.cancel", targetType: "deployment", targetId: deploymentId });
+        revalidatePath(DEPLOY_PATH);
+        return {};
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not stop the deployment" };
+    }
+}
+
 export async function setAppPortAction(applicationId: string, port: number): Promise<{ error?: string }> {
     const user = await requirePermission("deploy.manage");
     try {
