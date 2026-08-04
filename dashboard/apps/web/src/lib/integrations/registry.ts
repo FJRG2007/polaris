@@ -5,7 +5,13 @@
  * operator has enabled it. New integrations are added here.
  */
 
-export type IntegrationCategory = "Security" | "Notifications" | "Storage" | "Automation" | "Productivity";
+export type IntegrationCategory =
+    | "Security"
+    | "Notifications"
+    | "Storage"
+    | "Automation"
+    | "Productivity"
+    | "Models";
 
 /**
  * A page on the vendor's own site that produces what the dialog is asking for.
@@ -226,6 +232,74 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         requiresApiKey: true,
         apiKeyLabel: "Token",
         apiKeyHelp: "Shown at the top of the page once you sign in."
+    },
+    // Models. These are what the Agents app runs on: a key here is the operator's
+    // own account with that provider, and Polaris adds nothing to the bill. A run
+    // is handed every connected key rather than only the one its model needs, so
+    // a model whose provider is not connected falls back instead of failing.
+    {
+        slug: "anthropic",
+        name: "Anthropic",
+        category: "Models",
+        summary: "Run agents on Claude models.",
+        description:
+            "Connects your Anthropic account so agents can run on Claude. Polaris hands the key to a run over an authenticated call and never writes a copy into your repositories, so rotating it here takes effect everywhere at once. Usage is billed by Anthropic directly.",
+        docsUrl: "https://docs.claude.com/en/api/overview",
+        setupLinks: [{ label: "Create an API key", url: "https://console.anthropic.com/settings/keys" }],
+        requiresApiKey: true,
+        apiKeyLabel: "API key",
+        apiKeyHelp: "Starts with sk-ant-. Needs no particular scope."
+    },
+    {
+        slug: "openai",
+        name: "OpenAI",
+        category: "Models",
+        summary: "Run agents on GPT models.",
+        description:
+            "Connects your OpenAI account so agents can run on GPT models. The key is held here and handed to a run over an authenticated call, never copied into your repositories. Usage is billed by OpenAI directly.",
+        docsUrl: "https://platform.openai.com/docs/api-reference",
+        setupLinks: [{ label: "Create an API key", url: "https://platform.openai.com/api-keys" }],
+        requiresApiKey: true,
+        apiKeyLabel: "API key",
+        apiKeyHelp: "A project key works. Give it access to the models you want agents to use."
+    },
+    {
+        slug: "google-ai",
+        name: "Google AI",
+        category: "Models",
+        summary: "Run agents on Gemini models.",
+        description:
+            "Connects Google AI Studio so agents can run on Gemini. The key is held here and handed to a run over an authenticated call, never copied into your repositories. Usage is billed by Google directly.",
+        docsUrl: "https://ai.google.dev/gemini-api/docs",
+        setupLinks: [{ label: "Create an API key", url: "https://aistudio.google.com/apikey" }],
+        requiresApiKey: true,
+        apiKeyLabel: "API key",
+        apiKeyHelp: "From AI Studio, not a Google Cloud service account."
+    },
+    {
+        slug: "openrouter",
+        name: "OpenRouter",
+        category: "Models",
+        summary: "One key for models from many providers.",
+        description:
+            "Routes agent runs through OpenRouter, which serves models from several providers behind one credential. Useful when you want a model Polaris has no direct integration for, or one key instead of several. Usage is billed by OpenRouter directly.",
+        docsUrl: "https://openrouter.ai/docs",
+        setupLinks: [{ label: "Create an API key", url: "https://openrouter.ai/settings/keys" }],
+        requiresApiKey: true,
+        apiKeyLabel: "API key",
+        apiKeyHelp: "Starts with sk-or-. Set a spend limit on it if you want a ceiling."
+    },
+    {
+        slug: "enigma",
+        name: "Enigma",
+        category: "Models",
+        summary: "Run agents through an OpenAI-compatible gateway.",
+        description:
+            "Points agent runs at an OpenAI-compatible endpoint instead of a provider key, so a run reuses whatever coding-agent subscription is already behind it rather than metering a second one. The endpoint has to be reachable from wherever runs happen: a loopback address works for runs on this box and not for runs on GitHub-hosted machines.",
+        docsUrl: "https://github.com/FJRG2007/enigma",
+        requiresApiKey: true,
+        apiKeyLabel: "Token",
+        apiKeyHelp: "Whatever the endpoint expects. Leave it blank if it accepts unauthenticated calls from this network."
     }
 ];
 

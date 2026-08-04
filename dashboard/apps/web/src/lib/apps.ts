@@ -9,6 +9,7 @@ import type { Permission } from "@polaris/core";
 import {
     Activity,
     Bell,
+    Bot,
     Blocks,
     BookOpen,
     CalendarRange,
@@ -184,6 +185,12 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
         { label: "Servers", href: "/apps/servers", icon: Server, keywords: ["hosts", "machines", "ssh"] },
         { label: "Runners", href: "/apps/runners", icon: Workflow, keywords: ["github actions", "ci"] },
         {
+            label: "Agents",
+            href: "/apps/agents",
+            icon: Bot,
+            keywords: ["coding agent", "ai", "review", "pull requests", "issues", "github"]
+        },
+        {
             label: "Firewall",
             href: "/apps/firewall",
             icon: ShieldCheck,
@@ -323,6 +330,46 @@ export interface AppSubapp {
 }
 
 export const APP_SUBAPPS: AppSubapp[] = [
+    {
+        id: "agents",
+        label: "Agents",
+        icon: Bot,
+        base: "/apps/agents",
+        parent: { label: "Apps", href: "/apps/deploy" },
+        sections: [
+            {
+                label: "Overview",
+                href: "/apps/agents",
+                icon: LayoutDashboard,
+                keywords: ["agents", "coding agent", "ai", "summary"]
+            },
+            {
+                label: "Repositories",
+                href: "/apps/agents/repos",
+                icon: FolderGit2,
+                keywords: ["repos", "enable", "where it runs", "model", "actions", "runners", "server"]
+            },
+            {
+                label: "Automations",
+                href: "/apps/agents/automations",
+                icon: Workflow,
+                keywords: ["triggers", "rules", "issue opened", "pull request", "review", "ci failed"]
+            },
+            {
+                label: "Runs",
+                href: "/apps/agents/runs",
+                icon: History,
+                keywords: ["history", "logs", "failed", "what happened"]
+            },
+            {
+                label: "Set up",
+                href: "/apps/agents/setup",
+                icon: BookOpen,
+                hidden: true,
+                keywords: ["wizard", "getting started", "connect", "install"]
+            }
+        ]
+    },
     {
         id: "runners",
         label: "Runners",
