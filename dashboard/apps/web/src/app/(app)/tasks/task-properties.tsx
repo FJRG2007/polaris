@@ -19,6 +19,7 @@ import { TimerControl } from "./task-conversation";
 import { CustomFieldEditor } from "./custom-fields";
 import type { SpaceContext } from "@/lib/tasks/facts";
 import {
+    Ban,
     CalendarDays,
     ChevronDown,
     ChevronRight,
@@ -57,6 +58,7 @@ export function PropertyRows({
     task,
     context,
     running,
+    waitingOn,
     patch,
     onChanged,
     onError,
@@ -66,6 +68,9 @@ export function PropertyRows({
     context: SpaceContext;
     /** This account has a timer going on this task. */
     running: boolean;
+    /** Unfinished tasks this one waits on. Counted rather than listed, since the
+     *  list of them is a few rows down under Dependencies. */
+    waitingOn: number;
     patch: (input: Record<string, unknown>) => void;
     onChanged: () => void;
     onError: (message: string) => void;
@@ -145,6 +150,41 @@ export function PropertyRows({
                         </button>
                     }
                 />
+            </Property>
+
+            {/* Three things hold work up, and they are recorded in two places
+                because only two of them are facts about this task. A blocking
+                task is an edge, so it is added under Dependencies and only
+                counted here; a date and a reason belong to the task and are
+                edited where they are read. */}
+            <Property icon={<Ban className="size-3.5" />} label="Blocked">
+                <span className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+                    <pickers.DateField
+                        label="Blocked until"
+                        value={task.blockedUntil}
+                        timed={false}
+                        disabled={disabled}
+                        onChange={(blockedUntil) => patch({ blockedUntil })}
+                    />
+                    <input
+                        key={`${task.id}-blocked-note`}
+                        defaultValue={task.blockedNote}
+                        disabled={disabled}
+                        maxLength={200}
+                        aria-label="Why this is blocked"
+                        placeholder="Why, if it is not a task or a date"
+                        onBlur={(event) => {
+                            const blockedNote = event.target.value.trim();
+                            if (blockedNote !== task.blockedNote) patch({ blockedNote });
+                        }}
+                        className="min-w-0 flex-1 rounded-md border border-border bg-background px-2 py-1 text-xs outline-none focus:border-primary disabled:opacity-50"
+                    />
+                    {waitingOn > 0 && (
+                        <span className="text-[11px] text-amber-600">
+                            Waiting on {waitingOn} unfinished {waitingOn === 1 ? "task" : "tasks"}
+                        </span>
+                    )}
+                </span>
             </Property>
 
             <Property icon={<Target className="size-3.5" />} label="Points">

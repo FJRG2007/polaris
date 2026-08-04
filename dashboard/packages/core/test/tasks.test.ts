@@ -230,6 +230,17 @@ describe("filters", () => {
         ).toBe(false);
     });
 
+    it("narrows to the work that is held up, and to the work that is not", () => {
+        const stuck = task({ blocked: true });
+        const held = filter([{ field: "blocked", operator: "is", values: ["true"] }]);
+        const clear = filter([{ field: "blocked", operator: "is", values: ["false"] }]);
+
+        expect(engine.matchesFilter(stuck, held, NOW)).toBe(true);
+        expect(engine.matchesFilter(stuck, clear, NOW)).toBe(false);
+        // A caller that never said is not blocked, the same way it groups.
+        expect(engine.matchesFilter(task(), clear, NOW)).toBe(true);
+    });
+
     it("routes an overdue filter through the same rule the home screen uses", () => {
         const missed = task({ dueDate: new Date("2026-08-01T09:00:00.000Z"), timed: true });
         const finished = task({
@@ -446,6 +457,34 @@ describe("grouping", () => {
             expect(order.get("a-todo")).toBe(order.get("b-todo"));
             expect(order.get("a-doing")).toBe(order.get("b-doing"));
             expect(order.get("b-blocked")).toBe(2);
+        });
+    });
+
+    describe("by whether the work is held up", () => {
+        it("splits the two piles, blocked first", () => {
+            const stuck = task({ id: "stuck", blocked: true });
+            const moving = task({ id: "moving" });
+            const groups = engine.groupTasks([moving, stuck], "blocked");
+
+            expect(groups.map((group) => group.label)).toEqual(["Blocked", "Not blocked"]);
+            expect(groups[0]?.tasks.map((entry) => entry.id)).toEqual(["stuck"]);
+            expect(groups[1]?.tasks.map((entry) => entry.id)).toEqual(["moving"]);
+        });
+
+        it("keeps an empty Blocked column, which is the answer somebody grouped for", () => {
+            const groups = engine.groupTasks([task()], "blocked");
+
+            expect(groups.map((group) => group.label)).toEqual(["Blocked", "Not blocked"]);
+            expect(groups[0]?.tasks).toEqual([]);
+        });
+
+        it("reads a task that never said as not blocked, rather than as its own pile", () => {
+            // `blocked` is optional on the facts: a caller that does not know is
+            // not a third state, and a stray "Other" column would say it was.
+            const groups = engine.groupTasks([task({ blocked: undefined })], "blocked");
+
+            expect(groups).toHaveLength(2);
+            expect(groups[1]?.tasks).toHaveLength(1);
         });
     });
 });

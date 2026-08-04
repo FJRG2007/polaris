@@ -48,7 +48,7 @@ export default async function TaskPermalinkPage({ params }: { params: Promise<{ 
                 ...(scope.partialSpaceIds.includes(resolved.spaceId) ? { id: { in: scope.listIds } } : {})
             },
             orderBy: { order: "asc" },
-            select: { id: true, name: true }
+            select: { id: true, name: true, spaceId: true }
         })
     ]);
 

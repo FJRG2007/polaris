@@ -656,6 +656,23 @@ export async function bulkUpdateAction(input: unknown): Promise<{ count?: number
     }
 }
 
+/** Delete a selection. The ids arrive from the browser like any other list, so
+ *  what is actually deleted is the part of it the caller was cleared to write -
+ *  the same narrowing a bulk edit goes through. */
+export async function deleteTasksAction(input: unknown): Promise<{ count?: number; error?: string }> {
+    const caller = await actor();
+    const parsed = core.taskSelectionSchema.safeParse(input);
+    if (!parsed.success) return { error: "Check the selection and try again" };
+    try {
+        const writable = await access.writableTasks(caller, parsed.data.taskIds, "member");
+        const count = await tasks.deleteTasks(writable.map((task) => task.id));
+        refresh();
+        return { count };
+    } catch (caught) {
+        return failure(caught, "Could not delete those tasks");
+    }
+}
+
 export async function deleteTaskAction(taskId: string): Promise<{ error?: string }> {
     const caller = await actor();
     try {

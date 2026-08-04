@@ -757,6 +757,37 @@ export function DueBadge({
     );
 }
 
+/**
+ * The marker on a row that is held up, and what is holding it.
+ *
+ * A flag on its own only says "go and open this to find out", which is the trip
+ * the board exists to save. The reason is one short line by construction, so it
+ * goes in the label - and since three different things can hold work, the marker
+ * names whichever of them apply rather than guessing at one.
+ */
+export function BlockedMarker({
+    task,
+    format
+}: {
+    task: Pick<TaskRow, "blocked" | "blockedUntil" | "blockedNote">;
+    format: (iso: string) => string;
+}) {
+    if (!task.blocked) return null;
+    const reasons = [
+        task.blockedNote || null,
+        task.blockedUntil ? `until ${format(task.blockedUntil)}` : null
+    ].filter((reason): reason is string => reason !== null);
+    // Nothing written down and no date means the block is an unfinished task,
+    // which the panel lists and a row has no room for.
+    const label = reasons.length > 0 ? `Blocked ${reasons.join(" - ")}` : "Blocked by unfinished work";
+
+    return (
+        <span className="inline-flex shrink-0" title={label} aria-label={label} role="img">
+            <Ban aria-hidden className="size-3.5 shrink-0 text-amber-500" />
+        </span>
+    );
+}
+
 export function ProgressBar({ percent, className }: { percent: number; className?: string }) {
     return (
         <div className={cn("h-1.5 w-full overflow-hidden rounded-full bg-muted", className)}>

@@ -68,8 +68,14 @@ export interface TaskRow {
     readonly commentCount: number;
     /** Seconds logged against this task by everyone. */
     readonly trackedSeconds: number;
-    /** Something unfinished is in this task's way. */
+    /** Something is in this task's way: unfinished work it depends on, a date it
+     *  is waiting for, or a reason somebody wrote down. The three below say
+     *  which, so a marker can name it rather than only flag it. */
     readonly blocked: boolean;
+    /** The day the block lifts by itself, if that is what is holding it. */
+    readonly blockedUntil: string | null;
+    /** Why, in the words of whoever recorded it. Empty when nobody said. */
+    readonly blockedNote: string;
     /** Whether a recurrence rule is attached, so a card can say so. */
     readonly recurring: boolean;
     readonly customValues: Record<string, string>;
@@ -104,6 +110,7 @@ export function toFacts(row: TaskRow): TaskFacts {
         timeEstimate: row.timeEstimate,
         archived: row.archived,
         order: row.order,
+        blocked: row.blocked,
         customValues: row.customValues
     };
 }

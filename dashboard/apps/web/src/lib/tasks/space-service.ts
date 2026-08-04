@@ -204,9 +204,9 @@ async function uniquePrefix(name: string): Promise<string> {
 }
 
 /**
- * Create a space that is usable the moment it exists: the default statuses, one
- * list, and a saved board view. An empty space with no workflow is a dead end
- * that every user then has to assemble by hand.
+ * Create a space that is usable the moment it exists: the default statuses and
+ * labels, one list, and a saved board view. An empty space with no workflow is a
+ * dead end that every user then has to assemble by hand.
  */
 export async function createSpace(
     ownerId: string,
@@ -237,6 +237,14 @@ export async function createSpace(
                 color: status.color,
                 order: (index + 1) * core.ORDER_STEP
             }))
+        });
+
+        // The labels every space starts with. A brand-new space has none, so
+        // nothing here can collide; the same defaults reach the spaces that
+        // existed before them through the migration, which skips whatever a team
+        // had already named for itself.
+        await tx.taskTag.createMany({
+            data: core.DEFAULT_TASK_TAGS.map((tag) => ({ spaceId: space.id, name: tag.name, color: tag.color }))
         });
 
         const list = await tx.taskList.create({

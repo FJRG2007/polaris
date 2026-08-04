@@ -10,7 +10,8 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { taskOverlay } from "../../src/app/(app)/tasks/optimistic";
+import type { TaskRow } from "../../src/lib/tasks/facts";
+import { bulkOverlay, taskOverlay } from "../../src/app/(app)/tasks/optimistic";
 
 const context = {
     statuses: [
@@ -67,5 +68,54 @@ describe("the overlay an edit paints straight away", () => {
         const overlay = taskOverlay({ recurrence: { mode: "weekly" }, name: "Renamed" }, context);
 
         expect(overlay).toEqual({ name: "Renamed" });
+    });
+});
+
+/** A row carrying what a bulk change folds against. */
+function row(overrides: Partial<TaskRow> = {}): TaskRow {
+    return {
+        assignees: [{ id: "u1", name: "Ada", image: null }],
+        tags: [{ id: "t1", name: "bug", color: "#ef4444" }],
+        ...overrides
+    } as TaskRow;
+}
+
+describe("the overlay a change to a selection paints", () => {
+    it("adds a person without dropping the one already there", () => {
+        const overlay = bulkOverlay(row(), { addAssigneeIds: ["u2"] }, context);
+
+        expect(overlay.assignees?.map((person) => person.name)).toEqual(["Ada", "Grace"]);
+    });
+
+    it("takes a person off and leaves the rest", () => {
+        const task = row({
+            assignees: [
+                { id: "u1", name: "Ada", image: null },
+                { id: "u2", name: "Grace", image: null }
+            ]
+        });
+
+        expect(bulkOverlay(task, { removeAssigneeIds: ["u1"] }, context).assignees?.map((p) => p.name)).toEqual([
+            "Grace"
+        ]);
+    });
+
+    it("adds a label the task does not have and keeps the one it does", () => {
+        const overlay = bulkOverlay(row(), { addTagIds: ["t2"] }, context);
+
+        expect(overlay.tags?.map((tag) => tag.name)).toEqual(["bug", "chore"]);
+    });
+
+    it("leaves people and tags alone when the change is about neither", () => {
+        // Folding an untouched set back in would overwrite a row with itself and
+        // repaint every avatar on the board for a priority change.
+        const overlay = bulkOverlay(row(), { priority: "urgent" }, context);
+
+        expect(overlay).toEqual({ priority: "urgent" });
+    });
+
+    it("paints nothing for a move or an archive, which take the row off the screen", () => {
+        expect(bulkOverlay(row(), { listId: "l2" }, context)).toEqual({});
+        expect(bulkOverlay(row(), { archived: true }, context)).toEqual({});
     });
 });

@@ -71,6 +71,8 @@ function taskRow(overrides: Partial<TaskRow> = {}): TaskRow {
         commentCount: 0,
         trackedSeconds: 0,
         blocked: false,
+        blockedUntil: null,
+        blockedNote: "",
         recurring: false,
         customValues: {},
         ...overrides
@@ -85,11 +87,14 @@ function props(rows: TaskRow[]): ViewProps {
         canEdit: true,
         orderable: true,
         selection: new Set<string>(),
+        selected: [],
+        lists: [],
         onOpen: () => {},
         onSelect: () => {},
         onMove: () => {},
         onQuickCreate: () => {},
         onEdit: () => {},
+        onApply: () => {},
         onDuplicate: () => {},
         onDelete: () => {}
     };

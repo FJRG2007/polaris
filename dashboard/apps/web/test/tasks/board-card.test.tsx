@@ -42,6 +42,8 @@ function taskRow(overrides: Partial<TaskRow> = {}): TaskRow {
         commentCount: 0,
         trackedSeconds: 0,
         blocked: false,
+        blockedUntil: null,
+        blockedNote: "",
         recurring: false,
         customValues: {},
         ...overrides
@@ -62,10 +64,13 @@ function commandsFor(task: TaskRow, canEdit = true): TaskCommands {
     };
     return {
         task,
+        targets: [task],
         context,
+        lists: [],
         canEdit,
         onOpen: () => {},
         onEdit: () => {},
+        onApply: () => {},
         onDuplicate: () => {},
         onDelete: () => {}
     };
@@ -73,7 +78,14 @@ function commandsFor(task: TaskRow, canEdit = true): TaskCommands {
 
 function card(task: TaskRow, canEdit = true): string {
     return renderToStaticMarkup(
-        <TaskCard commands={commandsFor(task, canEdit)} selected={false} onDragStart={() => {}} onDropBefore={() => {}} />
+        <TaskCard
+            commands={commandsFor(task, canEdit)}
+            selected={false}
+            positioned
+            onSelect={() => {}}
+            onDragStart={() => {}}
+            onDropBefore={() => {}}
+        />
     );
 }
 

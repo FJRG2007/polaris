@@ -10,14 +10,14 @@
  * already exist.
  */
 
-import { useMemo, useState } from "react";
 import * as actions from "./actions";
 import * as core from "@polaris/core";
+import { useMemo, useState } from "react";
 import { runAction } from "@/lib/run-action";
-import type { TaskEdit } from "./views/shared";
-import { taskOverlay, type TaskOverlay } from "./optimistic";
+import type { TaskBulkEdit, TaskEdit } from "./views/shared";
 import type { SpaceContext, TaskRow } from "@/lib/tasks/facts";
 import { TaskMenu, type TaskCommands } from "./views/task-actions";
+import { bulkOverlay, taskOverlay, type TaskOverlay } from "./optimistic";
 import { AvatarStack, ProgressBar, StatusDot, StatusMarker } from "./pickers";
 import type { ChecklistView, DependencyView } from "@/lib/tasks/task-service";
 import { ArrowUpRight, Ban, Check, Link2, Plus, Trash2, X } from "lucide-react";
@@ -197,6 +197,22 @@ export function SubtaskSection({
         reload();
     };
 
+    /** What the menu writes. It speaks about a set even here, where there is
+     *  only ever one subtask, so archiving works the same way it does on a board
+     *  instead of needing a second write of its own. */
+    const apply = async (subtask: TaskRow, change: TaskBulkEdit) => {
+        onError("");
+        if (change.archived === undefined) {
+            setPending((current) => ({
+                ...current,
+                [subtask.id]: { ...current[subtask.id], ...bulkOverlay(subtask, change, context) }
+            }));
+        }
+        const result = await runAction(() => actions.bulkUpdateAction({ taskIds: [subtask.id], ...change }), onError);
+        if (result?.error) onError(result.error);
+        reload();
+    };
+
     const duplicate = async (subtaskId: string) => {
         onError("");
         const result = await runAction(() => actions.duplicateTaskAction(subtaskId), onError);
@@ -212,10 +228,15 @@ export function SubtaskSection({
      */
     const commandsFor = (subtask: TaskRow): TaskCommands => ({
         task: subtask,
+        targets: [subtask],
         context,
+        // A subtask lives wherever its parent does, so there is no list of its
+        // own to move it between and the menu leaves that verb out.
+        lists: [],
         canEdit,
         onOpen: () => onOpen(subtask.id),
         onEdit: (change) => void edit(subtask.id, change),
+        onApply: (change) => void apply(subtask, change),
         onDuplicate: () => void duplicate(subtask.id),
         onDelete: () => setDeleting(subtask),
         onCreateTag

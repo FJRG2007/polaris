@@ -14,15 +14,24 @@
  * renumber each other's rows.
  */
 
-import { useState } from "react";
 import { cn } from "@polaris/ui";
 import * as core from "@polaris/core";
+import { useMemo, useState } from "react";
 import type { TaskRow } from "@/lib/tasks/facts";
-import type { BoardMove, ViewProps } from "./shared";
 import { useDisplayFormat } from "@/components/display-format";
-import { Ban, MessageSquare, Paperclip, Plus, Repeat } from "lucide-react";
+import { MessageSquare, Paperclip, Plus, Repeat } from "lucide-react";
+import { clickMode, type BoardMove, type SelectMode, type ViewProps } from "./shared";
 import { commandsFor, TaskMenu, TaskStatusMarker, type TaskCommands } from "./task-actions";
-import { AssigneePicker, AvatarStack, DueBadge, PriorityPicker, StatusDot, TagChip, TaskLocation } from "../pickers";
+import {
+    AssigneePicker,
+    AvatarStack,
+    BlockedMarker,
+    DueBadge,
+    PriorityPicker,
+    StatusDot,
+    TagChip,
+    TaskLocation
+} from "../pickers";
 
 /** Where a card was dropped, as neighbours rather than an index. */
 function neighbours(tasks: readonly TaskRow[], targetId: string | null, dragged: string): BoardMove["position"] {
@@ -73,7 +82,7 @@ export function TaskCard({
     positioned: boolean;
     selected: boolean;
     showLocation?: boolean;
-    onSelect?: (event: React.MouseEvent) => void;
+    onSelect: (mode: SelectMode) => void;
 }) {
     const format = useDisplayFormat();
     const [over, setOver] = useState(false);
@@ -111,7 +120,12 @@ export function TaskCard({
             <div
                 role="button"
                 tabIndex={0}
-                onClick={(event) => (onSelect && (event.metaKey || event.ctrlKey) ? onSelect(event) : onOpen())}
+                onMouseDown={(event) => (event.shiftKey ? event.preventDefault() : undefined)}
+                onClick={(event) => {
+                    const mode = clickMode(event);
+                    if (mode) onSelect(mode);
+                    else onOpen();
+                }}
                 onKeyDown={(event) => {
                     if (event.key === "Enter" || event.key === " ") {
                         event.preventDefault();
@@ -135,7 +149,7 @@ export function TaskCard({
                     </span>
                     <span className="font-mono text-[10px] text-muted-foreground">{task.reference}</span>
                     <span className="flex-1" />
-                    {task.blocked && <Ban className="size-3.5 shrink-0 text-amber-500" aria-label="Blocked" />}
+                    <BlockedMarker task={task} format={format.date} />
                     {task.recurring && <Repeat className="size-3.5 shrink-0 text-muted-foreground" aria-label="Repeats" />}
                     {/* Who it is on and how urgent it is, in the corner rather
                         than adrift under the name - and each one is the control
@@ -230,6 +244,9 @@ export function BoardView(props: ViewProps) {
     // statuses. Grouped by assignee or by tag, "add a column" would mean
     // inventing a person or a label, which is not what the button says.
     const canAddColumn = props.onCreateStatus !== undefined && (props.groupBy ?? "status") === "status";
+    // A board is read down each column and then on to the next, which is the
+    // order a shift-click spans.
+    const rendered = useMemo(() => groups.flatMap((group) => group.tasks.map((task) => task.id)), [groups]);
 
     const drop = (groupKey: string, tasks: readonly TaskRow[], targetId: string | null) => {
         if (!dragging) return;
@@ -303,7 +320,7 @@ export function BoardView(props: ViewProps) {
                                 selected={selection.has(task.id)}
                                 showLocation={props.showLocation}
                                 positioned={orderable}
-                                onSelect={() => onSelect(task.id)}
+                                onSelect={(mode) => onSelect(task.id, mode, rendered)}
                                 onDragStart={() => setDragging(task.id)}
                                 onDropBefore={() => drop(group.key, group.tasks, task.id)}
                             />

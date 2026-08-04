@@ -14,7 +14,7 @@
  * is why the overlay is dropped rather than merged when fresh rows arrive.
  */
 
-import type { TaskEdit } from "./views/shared";
+import type { TaskBulkEdit, TaskEdit } from "./views/shared";
 import type { SpaceContext, TaskRow } from "@/lib/tasks/facts";
 
 /** The row shape as an overlay: writable, and every field optional. */
@@ -40,7 +40,9 @@ const PASSTHROUGH = [
     "points",
     "milestone",
     "archived",
-    "sprintId"
+    "sprintId",
+    "blockedUntil",
+    "blockedNote"
 ] as const;
 
 /**
@@ -86,4 +88,39 @@ export function taskOverlay(change: TaskEdit | Record<string, unknown>, context:
     }
 
     return overlay;
+}
+
+/**
+ * The same, for a change a menu is applying to a whole selection.
+ *
+ * People and tags arrive there as additions and removals rather than as a list,
+ * because five tasks have no one set of either to replace. Each row folds the
+ * change into its own set first, and what comes out is an ordinary edit that
+ * `taskOverlay` already knows how to resolve.
+ *
+ * A move and an archive are not resolved at all: both change which rows belong
+ * on the screen rather than what one row shows, and that is the reload's answer.
+ */
+export function bulkOverlay(task: TaskRow, change: TaskBulkEdit, context: Directory): TaskOverlay {
+    const assignees = new Set(task.assignees.map((person) => person.id));
+    for (const id of change.addAssigneeIds ?? []) assignees.add(id);
+    for (const id of change.removeAssigneeIds ?? []) assignees.delete(id);
+
+    const tags = new Set(task.tags.map((tag) => tag.id));
+    for (const id of change.addTagIds ?? []) tags.add(id);
+    for (const id of change.removeTagIds ?? []) tags.delete(id);
+
+    const touchesPeople = change.addAssigneeIds !== undefined || change.removeAssigneeIds !== undefined;
+    const touchesTags = change.addTagIds !== undefined || change.removeTagIds !== undefined;
+
+    return taskOverlay(
+        {
+            statusId: change.statusId,
+            priority: change.priority,
+            dueDate: change.dueDate,
+            assigneeIds: touchesPeople ? [...assignees] : undefined,
+            tagIds: touchesTags ? [...tags] : undefined
+        },
+        context
+    );
 }

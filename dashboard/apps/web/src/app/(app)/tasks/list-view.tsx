@@ -20,20 +20,21 @@ import * as core from "@polaris/core";
 import { FilterBar } from "./filter-bar";
 import { TaskPanel } from "./task-panel";
 import { BoardView } from "./views/board";
-import { taskOverlay } from "./optimistic";
 import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
 import { GanttView } from "./views/schedule";
 import { CalendarView } from "./views/calendar";
+import { keyboardIsBusy } from "@/lib/keyboard";
 import { ListView, TableView } from "./views/rows";
+import { bulkOverlay, taskOverlay } from "./optimistic";
 import { TaskCreateDialog } from "./task-create-dialog";
-import { useMemo, useState, useTransition } from "react";
 import { AssigneePicker, StatusPicker } from "./pickers";
-import type { TaskEdit, ViewProps } from "./views/shared";
 import type { SavedView } from "@/lib/tasks/view-service";
 import { useDisplayFormat } from "@/components/display-format";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { Button, ConfirmDeleteDialog, Select, cn } from "@polaris/ui";
 import { toFacts, type SpaceContext, type TaskRow } from "@/lib/tasks/facts";
+import type { SelectMode, TaskBulkEdit, TaskEdit, TaskListRef, ViewProps } from "./views/shared";
 import { CalendarDays, GanttChart, LayoutList, Plus, Rows3, Search, Table2, X } from "lucide-react";
 
 const VIEW_ICONS: Record<core.TaskViewType, typeof LayoutList> = {
@@ -52,7 +53,8 @@ export interface ListScreenProps {
     readonly tasks: readonly TaskRow[];
     readonly savedViews: readonly SavedView[];
     readonly context: SpaceContext;
-    readonly lists: readonly { id: string; name: string }[];
+    /** Every list in reach, so a task can be moved into one of its own space. */
+    readonly lists: readonly TaskListRef[];
     /** Where a quick-add goes when the screen spans several lists. */
     readonly defaultListId: string | null;
     /** Opened straight away, for a deep link to one task. */
@@ -89,8 +91,10 @@ export function ListScreen({
     const [openTaskId, setOpenTaskId] = useState<string | null>(initialTaskId);
     // The create dialog, and what was already known when it was asked for.
     const [creating, setCreating] = useState<{ name: string; dueDate: string | null } | null>(null);
-    const [deleting, setDeleting] = useState<TaskRow | null>(null);
+    const [deleting, setDeleting] = useState<readonly TaskRow[]>([]);
     const [selection, setSelection] = useState<ReadonlySet<string>>(new Set());
+    // The task a shift-click reaches back to: the last one clicked on its own.
+    const [anchor, setAnchor] = useState<string | null>(null);
     const [error, setError] = useState("");
 
     // Optimistic overlay: what a drag or a tick changed before the server said so.
@@ -367,12 +371,104 @@ export function ListScreen({
     // back to the first list in reach and the dialog asks which one it goes in.
     const createTarget = listId ?? defaultListId ?? lists[0]?.id ?? null;
 
-    const toggleSelect = (taskId: string) => {
+    /**
+     * Selection, read the way a file manager reads it: ctrl-click puts one task
+     * in or takes it out, shift-click takes everything between it and the last
+     * one clicked on its own.
+     *
+     * `ordered` comes from the view rather than from here because a range means
+     * what is between the two rows on screen, and the screen is a board read
+     * down its columns, a table read down its rows, or a list with its subtasks
+     * nested - three different sequences over the same tasks.
+     */
+    const select = (taskId: string, mode: SelectMode, ordered: readonly string[]) => {
+        const from = anchor === null ? -1 : ordered.indexOf(anchor);
+        const to = ordered.indexOf(taskId);
+        if (mode === "range" && from !== -1 && to !== -1) {
+            const span = ordered.slice(Math.min(from, to), Math.max(from, to) + 1);
+            setSelection(new Set([...selection, ...span]));
+            return;
+        }
+
         const next = new Set(selection);
         if (next.has(taskId)) next.delete(taskId);
         else next.add(taskId);
         setSelection(next);
+        // A shift-click with nowhere to reach back to is the first click of the
+        // range, so it becomes the anchor like any other.
+        setAnchor(taskId);
     };
+
+    const clearSelection = () => {
+        setSelection(new Set());
+        setAnchor(null);
+    };
+
+    // The selection as rows, narrowed to what is on screen: an id a filter has
+    // since hidden is not something a bulk verb should quietly write to.
+    const selected = useMemo(() => visible.filter((task) => selection.has(task.id)), [visible, selection]);
+
+    /**
+     * A change from the context menu, applied to whatever it was acting on -
+     * one task, or the whole selection.
+     *
+     * It always goes through the bulk write, including for a single task: the
+     * verbs are the same ones either way, and two paths to them is two places
+     * for the assignee toggle to disagree with itself.
+     */
+    const applyToTasks = async (targets: readonly TaskRow[], change: TaskBulkEdit) => {
+        const taskIds = targets.map((task) => task.id);
+        if (taskIds.length === 0) return;
+
+        // A move and an archive decide which rows belong on this screen at all,
+        // so they are left to the reload rather than painted on rows that are
+        // about to leave.
+        const leaves = change.archived !== undefined || change.listId !== undefined;
+        if (!leaves) {
+            setPending((current) => {
+                const next = { ...current };
+                for (const task of targets) {
+                    next[task.id] = { ...next[task.id], ...bulkOverlay(task, change, context) };
+                }
+                return next;
+            });
+        }
+
+        const result = await runAction(() => actions.bulkUpdateAction({ taskIds, ...change }), setError);
+        if (result?.error) setError(result.error);
+        if (leaves) clearSelection();
+        refresh();
+    };
+
+    /**
+     * The screen's own keys: N starts a task, Escape drops the selection.
+     *
+     * They listen on the window so they work wherever the focus sits on the
+     * board, and stand down whenever something else owns the keyboard - a field
+     * being typed in, an open dialog, an open menu - which is the same rule the
+     * file explorer follows and the reason a task named "New plan" can be typed
+     * at all. Re-bound on every render, so the handler reads the selection that
+     * is on screen rather than one it closed over.
+     */
+    useEffect(() => {
+        function onKeyDown(event: KeyboardEvent) {
+            if (keyboardIsBusy(event)) return;
+            if (event.key === "Escape") {
+                if (selection.size === 0) return;
+                event.preventDefault();
+                clearSelection();
+                return;
+            }
+            // A modifier means the press belongs to the browser or to an editing
+            // shortcut (Ctrl+N opens a window), never to this one.
+            if (event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
+            if (event.key.toLowerCase() !== "n" || !context.canEdit || !createTarget) return;
+            event.preventDefault();
+            setCreating({ name: "", dueDate: null });
+        }
+        window.addEventListener("keydown", onKeyDown);
+        return () => window.removeEventListener("keydown", onKeyDown);
+    });
 
     const viewProps: ViewProps = {
         rows: visible,
@@ -383,11 +479,14 @@ export function ListScreen({
         // those rows is not one anybody could keep.
         orderable: search.trim() === "",
         selection,
+        selected,
+        lists,
         onOpen: setOpenTaskId,
-        onSelect: toggleSelect,
+        onSelect: select,
         onMove: move,
         onQuickCreate: quickCreate,
         onEdit: editTask,
+        onApply: applyToTasks,
         onDuplicate: duplicateTask,
         onDelete: setDeleting,
         // A screen with no list of its own is showing work from several, so each
@@ -435,7 +534,7 @@ export function ListScreen({
                 </div>
                 <span className="flex-1" />
                 {context.canEdit && createTarget && (
-                    <Button size="sm" onClick={() => setCreating({ name: "", dueDate: null })}>
+                    <Button size="sm" title="New task (N)" onClick={() => setCreating({ name: "", dueDate: null })}>
                         <Plus className="size-4" /> New task
                     </Button>
                 )}
@@ -538,51 +637,31 @@ export function ListScreen({
 
             {selection.size > 0 && (
                 <div className="flex flex-wrap items-center gap-2 rounded-lg border border-primary/40 bg-primary/5 px-3 py-2">
-                    <span className="text-sm font-medium">{selection.size} selected</span>
+                    <span className="text-sm font-medium">{selected.length} selected</span>
+                    {/* The same verbs the right-click menu applies, through the
+                        same call: two ways in, one answer to what each one does. */}
                     <StatusPicker
                         statuses={context.statuses}
                         value={null}
-                        onChange={async (statusId) => {
-                            await runAction(
-                                () => actions.bulkUpdateAction({ taskIds: [...selection], statusId }),
-                                setError
-                            );
-                            setSelection(new Set());
-                            refresh();
-                        }}
+                        onChange={(statusId) => void applyToTasks(selected, { statusId })}
                     />
                     <AssigneePicker
                         people={context.people}
                         selected={[]}
-                        onChange={async (ids) => {
-                            await runAction(
-                                () => actions.bulkUpdateAction({ taskIds: [...selection], addAssigneeIds: ids }),
-                                setError
-                            );
-                            setSelection(new Set());
-                            refresh();
-                        }}
+                        onChange={(ids) => void applyToTasks(selected, { addAssigneeIds: ids })}
                     />
-                    <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={async () => {
-                            await runAction(
-                                () => actions.bulkUpdateAction({ taskIds: [...selection], archived: true }),
-                                setError
-                            );
-                            setSelection(new Set());
-                            refresh();
-                        }}
-                    >
+                    <Button size="sm" variant="ghost" onClick={() => void applyToTasks(selected, { archived: true })}>
                         Archive
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => setDeleting(selected)}>
+                        Delete
                     </Button>
                     <span className="flex-1" />
                     <button
                         type="button"
                         aria-label="Clear selection"
-                        title="Clear selection"
-                        onClick={() => setSelection(new Set())}
+                        title="Clear selection (Esc)"
+                        onClick={clearSelection}
                         className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                     >
                         <X className="size-4" />
@@ -603,7 +682,8 @@ export function ListScreen({
             )}
 
             <p className="text-[11px] text-muted-foreground">
-                Ctrl-click (or Cmd-click) a task to select it without opening it.
+                Ctrl-click (or Cmd-click) selects a task without opening it, shift-click takes everything between, Esc
+                clears the selection, and N starts a new task.
             </p>
 
             {createTarget && (
@@ -640,18 +720,22 @@ export function ListScreen({
             />
 
             <ConfirmDeleteDialog
-                open={deleting !== null}
-                onOpenChange={(open) => (open ? undefined : setDeleting(null))}
-                name={deleting?.name ?? ""}
-                kind="task"
+                open={deleting.length > 0}
+                onOpenChange={(open) => (open ? undefined : setDeleting([]))}
+                // One task is named; a selection is counted, since a dialog
+                // listing forty names says less than the number does.
+                name={deleting.length === 1 ? (deleting[0]?.name ?? "") : `${deleting.length} tasks`}
+                kind={deleting.length === 1 ? "task" : "tasks"}
                 requireTyping={false}
-                description="Comments, checklists and tracked time go with it. Archiving keeps all of that and takes it off the board."
-                confirmLabel="Delete task"
+                description="Comments, checklists and tracked time go with them. Archiving keeps all of that and takes them off the board."
+                confirmLabel={deleting.length === 1 ? "Delete task" : `Delete ${deleting.length} tasks`}
                 onConfirm={async () => {
-                    if (!deleting) return;
-                    const result = await runAction(() => actions.deleteTaskAction(deleting.id), setError);
+                    const taskIds = deleting.map((task) => task.id);
+                    if (taskIds.length === 0) return;
+                    const result = await runAction(() => actions.deleteTasksAction({ taskIds }), setError);
                     if (result?.error) setError(result.error);
-                    setDeleting(null);
+                    setDeleting([]);
+                    clearSelection();
                     refresh();
                 }}
             />

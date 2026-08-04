@@ -6,6 +6,7 @@
  * has to teach the hierarchy: a space holds lists, a list holds tasks.
  */
 
+import { prisma } from "@polaris/db";
 import { HomeView } from "./home-view";
 import { SpaceTree } from "./space-tree";
 import { requirePermission } from "@/lib/session";
@@ -24,7 +25,7 @@ export default async function TasksHomePage() {
     const actor: TaskActor = { id: user.id, isAdmin: user.isAdmin };
     const scope = await visibleScope(actor);
 
-    const [tree, tasks, counts, timer] = await Promise.all([
+    const [tree, tasks, counts, timer, lists] = await Promise.all([
         listSpaceTree(user.id, scope, user.isAdmin),
         // Only what is still to do. Ticking a task off is how somebody clears
         // this screen, so leaving it on the list makes the gesture do nothing -
@@ -34,7 +35,17 @@ export default async function TasksHomePage() {
             { limit: 500, openOnly: true }
         ),
         myWorkCounts(user.id, scope),
-        runningTimer(user.id)
+        runningTimer(user.id),
+        // Where a task can be moved from here. The space rides along because
+        // work only moves between lists of its own.
+        prisma.taskList.findMany({
+            where: {
+                archived: false,
+                OR: [{ spaceId: { in: scope.spaceIds } }, { id: { in: scope.listIds } }]
+            },
+            orderBy: { name: "asc" },
+            select: { id: true, name: true, spaceId: true }
+        })
     ]);
 
     // Only the spaces the listed work actually comes from: building a context
@@ -49,7 +60,7 @@ export default async function TasksHomePage() {
     return (
         <div className="flex w-full flex-col gap-6 md:flex-row">
             <SpaceTree spaces={tree} canCreate />
-            <HomeView tasks={tasks} counts={counts} timer={timer} contexts={contexts} />
+            <HomeView tasks={tasks} counts={counts} timer={timer} contexts={contexts} lists={lists} />
         </div>
     );
 }

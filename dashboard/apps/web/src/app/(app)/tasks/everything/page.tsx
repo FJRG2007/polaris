@@ -53,7 +53,9 @@ export default async function EverythingPage() {
                 OR: [{ spaceId: { in: scope.spaceIds } }, { id: { in: scope.listIds } }]
             },
             orderBy: { name: "asc" },
-            select: { id: true, name: true }
+            // The space comes with it: work only moves between lists of its own
+            // space, so a destination has to say which one it belongs to.
+            select: { id: true, name: true, spaceId: true }
         }),
         // The people on the spaces in reach, not the instance's whole directory:
         // a picker here should offer who can actually be given this work.

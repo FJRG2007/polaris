@@ -34,6 +34,7 @@ function operatorsFor(field: core.TaskFilterField): core.TaskFilterOperator[] {
         case "timeEstimate":
             return ["is", "gt", "lt", "between", "isSet", "isNotSet"];
         case "archived":
+        case "blocked":
             return ["is"];
         case "customField":
             return ["is", "isNot", "contains", "isSet", "isNotSet"];
@@ -77,6 +78,7 @@ function choicesFor(
         case "list":
             return context.lists.map((list) => ({ value: list.id, label: list.name }));
         case "archived":
+        case "blocked":
             return [
                 { value: "true", label: "Yes" },
                 { value: "false", label: "No" }

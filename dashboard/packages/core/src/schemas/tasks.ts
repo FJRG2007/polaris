@@ -141,14 +141,38 @@ export const UNFINISHED_STATUS_TYPES = TASK_STATUS_TYPES.filter((type) => !isFin
  * "On hold" is `open` rather than `active`: a parked task is not in progress,
  * and every burndown, report and "what is being worked on" count reads the kind
  * rather than the name.
+ *
+ * "Blocked" is `open` for the same reason, and red because it is the one column
+ * somebody is meant to notice from across the room. It is a stage, not the
+ * whole answer: a task can also be blocked while sitting in any other column,
+ * which is what `blockedUntil`, `blockedNote` and the dependency edges record.
  */
 export const DEFAULT_TASK_STATUSES: readonly { name: string; type: TaskStatusType; color: string }[] = [
     { name: "To do", type: "open", color: "#64748b" },
     { name: "In progress", type: "active", color: "#3b82f6" },
+    { name: "Blocked", type: "open", color: "#ef4444" },
     { name: "On hold", type: "open", color: "#92400e" },
     { name: "In review", type: "active", color: "#eab308" },
     { name: "Done", type: "done", color: "#22c55e" },
     { name: "Cancelled", type: "closed", color: "#71717a" }
+];
+
+/**
+ * The labels every space starts with.
+ *
+ * Three, and all three about work that arrives rather than work that is planned:
+ * a defect, a weakness somebody found, and the hardening that answers it. They
+ * are the labels a team reaches for on their first bad afternoon, and a label
+ * invented on that afternoon is a label nobody else uses.
+ *
+ * The colours are stated rather than derived from the name the way an ad-hoc tag
+ * gets its own, because these three carry a meaning worth reading at a glance:
+ * red is broken, orange is exposed, indigo is the work that closes it.
+ */
+export const DEFAULT_TASK_TAGS: readonly { name: string; color: string }[] = [
+    { name: "bug", color: "#ef4444" },
+    { name: "vulnerability", color: "#f97316" },
+    { name: "security", color: "#6366f1" }
 ];
 
 /**
@@ -270,6 +294,21 @@ export const dependencySchema = z.object({
 
 export type DependencyInput = z.infer<typeof dependencySchema>;
 
+/**
+ * Why a task is held up, in the words of whoever recorded it.
+ *
+ * Three things can hold work, and only one of them is a question the product can
+ * answer for itself: an unfinished task this one depends on, which is the edge
+ * above. The other two are what a person knows and the product cannot - a date
+ * the work is waiting for, and a reason like this one. All three read the same
+ * on a board, because from the outside "blocked" is one state however it came
+ * about.
+ *
+ * Short on purpose: a paragraph about it belongs in the description or a
+ * comment, and this line has to fit on a card's tooltip.
+ */
+export const taskBlockNote = z.string().trim().max(200);
+
 // ---------------------------------------------------------------------------
 // Views, grouping, sorting
 // ---------------------------------------------------------------------------
@@ -285,7 +324,16 @@ export const TASK_VIEW_LABELS: Record<TaskViewType, string> = {
     gantt: "Gantt"
 };
 
-export const TASK_GROUP_FIELDS = ["status", "assignee", "priority", "dueDate", "tag", "list", "none"] as const;
+export const TASK_GROUP_FIELDS = [
+    "status",
+    "assignee",
+    "priority",
+    "dueDate",
+    "tag",
+    "list",
+    "blocked",
+    "none"
+] as const;
 export type TaskGroupField = (typeof TASK_GROUP_FIELDS)[number];
 
 export const TASK_GROUP_LABELS: Record<TaskGroupField, string> = {
@@ -295,6 +343,7 @@ export const TASK_GROUP_LABELS: Record<TaskGroupField, string> = {
     dueDate: "Due date",
     tag: "Tag",
     list: "List",
+    blocked: "Blocked",
     none: "No grouping"
 };
 
@@ -359,6 +408,7 @@ export const TASK_FILTER_FIELDS = [
     "points",
     "timeEstimate",
     "archived",
+    "blocked",
     "customField"
 ] as const;
 export type TaskFilterField = (typeof TASK_FILTER_FIELDS)[number];
@@ -379,6 +429,7 @@ export const TASK_FILTER_LABELS: Record<TaskFilterField, string> = {
     points: "Points",
     timeEstimate: "Estimate",
     archived: "Archived",
+    blocked: "Blocked",
     customField: "Custom field"
 };
 
@@ -913,6 +964,10 @@ export const taskUpdateSchema = z.object({
     parentId: uuid.nullable().optional(),
     milestone: z.boolean().optional(),
     archived: z.boolean().optional(),
+    /** Null clears the block; a date sets one that lifts itself when it passes. */
+    blockedUntil: isoDate.optional(),
+    /** An empty string clears the stated reason, which is how "unblock" arrives. */
+    blockedNote: taskBlockNote.optional(),
     recurrence: recurrenceSchema.nullable().optional()
 });
 
@@ -966,6 +1021,14 @@ export const taskBulkSchema = z.object({
 });
 
 export type TaskBulkInput = z.infer<typeof taskBulkSchema>;
+
+/** A selection to delete. Kept apart from the bulk edit so a delete can never
+ *  arrive carrying a field somebody meant to change instead. */
+export const taskSelectionSchema = z.object({
+    taskIds: z.array(uuid).min(1).max(500)
+});
+
+export type TaskSelectionInput = z.infer<typeof taskSelectionSchema>;
 
 export const commentSchema = z.object({
     taskId: uuid,

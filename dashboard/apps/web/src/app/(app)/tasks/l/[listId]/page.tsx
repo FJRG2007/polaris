@@ -7,12 +7,12 @@
  */
 
 import { prisma } from "@polaris/db";
-import { SpaceTree } from "@/app/(app)/tasks/space-tree";
-import { ListScreen } from "@/app/(app)/tasks/list-view";
 import { requirePermission } from "@/lib/session";
 import { notFound, redirect } from "next/navigation";
 import { listTasks } from "@/lib/tasks/task-service";
 import { listViews } from "@/lib/tasks/view-service";
+import { SpaceTree } from "@/app/(app)/tasks/space-tree";
+import { ListScreen } from "@/app/(app)/tasks/list-view";
 import { buildSpaceContext } from "@/lib/tasks/screen-context";
 import { getList, listSpaceTree } from "@/lib/tasks/space-service";
 import { requireList, visibleScope, type TaskActor } from "@/lib/tasks/access";
@@ -49,7 +49,7 @@ export default async function TaskListPage({ params }: { params: Promise<{ listI
                 ...(scope.partialSpaceIds.includes(list.spaceId) ? { id: { in: scope.listIds } } : {})
             },
             orderBy: { order: "asc" },
-            select: { id: true, name: true }
+            select: { id: true, name: true, spaceId: true }
         })
     ]);
 

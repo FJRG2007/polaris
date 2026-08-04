@@ -34,6 +34,13 @@ export function describeActivity(line: ActivityView): string {
             return `${who} changed who is on it`;
         case "moved":
             return `${who} moved it to another list`;
+        case "blocked":
+            // The reason is worth repeating here: the block itself may be gone by
+            // the time anybody reads back, and why it was there is the part that
+            // explains the week this task did not move.
+            return line.toValue ? `${who} marked it blocked: ${line.toValue}` : `${who} marked it blocked`;
+        case "unblocked":
+            return `${who} cleared the block`;
         case "archived":
             return `${who} archived it`;
         case "recurred":

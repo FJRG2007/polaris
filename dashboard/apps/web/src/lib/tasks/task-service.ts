@@ -71,6 +71,8 @@ const ROW_SELECT = {
     order: true,
     sprintId: true,
     recurrence: true,
+    blockedUntil: true,
+    blockedNote: true,
     completedAt: true,
     createdById: true,
     createdAt: true,
@@ -89,9 +91,13 @@ const ROW_SELECT = {
 type TaskRecord = Prisma.TaskGetPayload<{ select: typeof ROW_SELECT }>;
 
 /**
- * Tracked time and blocked-ness for a set of tasks, in two queries rather than
- * two per row. Both are things a card shows and neither belongs on the task
- * table: time is a sum over entries, blocked is a question about other tasks.
+ * Tracked time and the dependency half of blocked-ness, for a set of tasks, in
+ * two queries rather than two per row. Neither belongs on the task table: time
+ * is a sum over entries, and this kind of block is a question about other tasks.
+ *
+ * The other two kinds - a date the task waits for, a reason somebody wrote down
+ * - are columns on the task itself, and `toRow` folds all three into the one
+ * answer a card draws.
  */
 async function decorate(ids: string[]): Promise<{ tracked: Map<string, number>; blocked: Set<string> }> {
     if (ids.length === 0) return { tracked: new Map(), blocked: new Set() };
@@ -154,7 +160,15 @@ function toRow(
         subtaskCount: record._count.subtasks,
         commentCount: record._count.comments,
         trackedSeconds: tracked.get(record.id) ?? 0,
-        blocked: blocked.has(record.id),
+        blockedUntil: record.blockedUntil?.toISOString() ?? null,
+        blockedNote: record.blockedNote,
+        // The three kinds folded into the one state a board reads. A date that
+        // has passed stops holding the task, which is the whole point of setting
+        // one instead of a note somebody has to remember to clear.
+        blocked:
+            blocked.has(record.id) ||
+            record.blockedNote !== "" ||
+            (record.blockedUntil !== null && record.blockedUntil.getTime() > Date.now()),
         recurring: record.recurrence !== null,
         customValues: Object.fromEntries(record.fieldValues.map((value) => [value.fieldId, value.value]))
     };
@@ -614,6 +628,8 @@ export async function updateTask(actorId: string, input: core.TaskUpdateInput): 
             dueDate: true,
             completedAt: true,
             recurrence: true,
+            blockedUntil: true,
+            blockedNote: true,
             assignees: { select: { userId: true } }
         }
     });
@@ -632,6 +648,10 @@ export async function updateTask(actorId: string, input: core.TaskUpdateInput): 
     if (input.parentId !== undefined) data.parentId = input.parentId;
     if (input.milestone !== undefined) data.milestone = input.milestone;
     if (input.archived !== undefined) data.archived = input.archived;
+    if (input.blockedUntil !== undefined) {
+        data.blockedUntil = input.blockedUntil ? new Date(input.blockedUntil) : null;
+    }
+    if (input.blockedNote !== undefined) data.blockedNote = input.blockedNote;
     if (input.recurrence !== undefined) {
         data.recurrence = input.recurrence ? JSON.stringify(input.recurrence) : null;
     }
@@ -684,6 +704,20 @@ export async function updateTask(actorId: string, input: core.TaskUpdateInput): 
         );
     }
     if (input.archived === true) await logActivity(input.taskId, actorId, "archived");
+    // One line for the whole block, whichever half of it moved: "blocked until
+    // Friday" and "blocked, waiting on legal" are one decision, and two lines in
+    // the history read as two.
+    if (input.blockedUntil !== undefined || input.blockedNote !== undefined) {
+        // Read from what the task ends up holding, not from what was sent:
+        // clearing the date while a written reason stands is still blocked, and
+        // logging it as cleared would put the wrong sentence in the history.
+        const until = input.blockedUntil !== undefined ? input.blockedUntil : (before.blockedUntil?.toISOString() ?? null);
+        const note = input.blockedNote !== undefined ? input.blockedNote : before.blockedNote;
+        const held = Boolean(until) || note !== "";
+        const wasHeld = before.blockedUntil !== null || before.blockedNote !== "";
+        if (held) await logActivity(input.taskId, actorId, "blocked", null, note || null);
+        else if (wasHeld) await logActivity(input.taskId, actorId, "unblocked");
+    }
 
     if (movedTo !== null && movedTo !== before.statusId) {
         await runAutomations({ trigger: "task.statusChanged", taskId: input.taskId, actorId });
@@ -981,6 +1015,15 @@ export async function bulkUpdate(
 
 export async function deleteTask(taskId: string): Promise<void> {
     await prisma.task.delete({ where: { id: taskId } });
+}
+
+/** Delete a selection. The ids arrive already narrowed to the tasks the caller
+ *  may write, so this is one statement rather than a loop of them; subtasks,
+ *  comments and tracked time follow through the schema's cascades either way. */
+export async function deleteTasks(taskIds: readonly string[]): Promise<number> {
+    if (taskIds.length === 0) return 0;
+    const { count } = await prisma.task.deleteMany({ where: { id: { in: [...taskIds] } } });
+    return count;
 }
 
 /** Duplicate a task, including its checklists. Subtasks come along too, because

@@ -51,6 +51,11 @@ export interface TaskFacts {
     readonly timeEstimate: number | null;
     readonly archived: boolean;
     readonly order: number;
+    /** Whether something is holding this task up - unfinished work it depends
+     *  on, a date it waits for, or a reason somebody wrote down. Decided where
+     *  the task is loaded, since only the first of the three is a question about
+     *  other rows. */
+    readonly blocked?: boolean;
     /** Custom field values keyed by field id, as stored (always a string). */
     readonly customValues?: Readonly<Record<string, string>>;
 }
@@ -372,6 +377,8 @@ function factValues(task: TaskFacts, condition: work.TaskFilterCondition): strin
             return [task.name];
         case "archived":
             return [String(task.archived)];
+        case "blocked":
+            return [String(task.blocked ?? false)];
         case "points":
             return task.points === null ? [] : [String(task.points)];
         case "timeEstimate":
@@ -773,8 +780,9 @@ const UNSET_LABELS: Partial<Record<work.TaskGroupField, string>> = {
 
 /**
  * Split tasks into the groups a view draws as columns or headers. Empty groups
- * are kept for status and priority (a board needs its columns even before any
- * work reaches them) and dropped for the rest, where an empty header is noise.
+ * are kept for status, priority and blocked (a board needs its columns even
+ * before any work reaches them, and "nothing is blocked" is worth seeing) and
+ * dropped for the rest, where an empty header is noise.
  */
 export function groupTasks<T extends TaskFacts>(
     tasks: readonly T[],
@@ -823,6 +831,9 @@ export function groupTasks<T extends TaskFacts>(
                 if (task.tagIds.length === 0) push("", task);
                 else for (const id of task.tagIds) push(id, task);
                 break;
+            case "blocked":
+                push(task.blocked ? "blocked" : "clear", task);
+                break;
         }
     }
 
@@ -851,6 +862,11 @@ export function groupTasks<T extends TaskFacts>(
             const found = consume(bucket);
             if (found.length > 0) groups.push({ key: bucket, label: DUE_BUCKET_LABELS[bucket], tasks: found });
         }
+    } else if (groupBy === "blocked") {
+        // Both columns always, even when one is empty: an empty Blocked column is
+        // the answer somebody grouped this way to see.
+        groups.push({ key: "blocked", label: "Blocked", color: "#ef4444", tasks: consume("blocked") });
+        groups.push({ key: "clear", label: "Not blocked", tasks: consume("clear") });
     } else {
         const source =
             groupBy === "assignee"

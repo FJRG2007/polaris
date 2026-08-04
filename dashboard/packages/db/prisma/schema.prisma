@@ -2924,6 +2924,11 @@ model Task {
     sprintId     String?   @db.Uuid
     // Recurrence rule as stringified JSON; see recurrenceSchema in @polaris/core.
     recurrence   String?
+    // Work somebody has said is held up, beyond the dependency edges below. A
+    // date lifts its own block when it passes; a note holds until it is cleared.
+    // Either one marks the task blocked, and so does an unfinished blocker.
+    blockedUntil DateTime?
+    blockedNote  String    @default("")
     // No FK: the trail outlives the account that created the task.
     createdById  String?   @db.Uuid
     createdAt    DateTime  @default(now())

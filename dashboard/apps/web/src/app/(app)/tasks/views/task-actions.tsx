@@ -18,9 +18,22 @@ import * as core from "@polaris/core";
 import { useMemo, useState } from "react";
 import { useAppUrl } from "@/components/app-url";
 import type { TaskRow } from "@/lib/tasks/facts";
-import type { TaskEdit, ViewProps } from "./shared";
 import type { SpaceContext } from "@/lib/tasks/facts";
-import { Ban, Check, Copy, ExternalLink, Flag, Link2, Plus, Tag, Trash2, UserPlus } from "lucide-react";
+import type { TaskBulkEdit, TaskEdit, TaskListRef, ViewProps } from "./shared";
+import {
+    Archive,
+    Ban,
+    Check,
+    Copy,
+    ExternalLink,
+    Flag,
+    FolderInput,
+    Link2,
+    Plus,
+    Tag,
+    Trash2,
+    UserPlus
+} from "lucide-react";
 import {
     AssigneePicker,
     Avatar,
@@ -38,6 +51,7 @@ import {
     ContextMenu,
     ContextMenuContent,
     ContextMenuItem,
+    ContextMenuLabel,
     ContextMenuSeparator,
     ContextMenuSub,
     ContextMenuSubContent,
@@ -53,10 +67,21 @@ import {
 
 export interface TaskCommands {
     readonly task: TaskRow;
+    /**
+     * Every task a menu opened on this one acts on: the whole selection when
+     * this task belongs to it, the way a file manager acts on the highlighted
+     * set rather than the row under the pointer, and just this task otherwise.
+     * Always holds at least `task`.
+     */
+    readonly targets: readonly TaskRow[];
     readonly context: SpaceContext;
+    readonly lists: readonly TaskListRef[];
     readonly canEdit: boolean;
     readonly onOpen: () => void;
+    /** Change this task alone. What the controls on the row itself write. */
     readonly onEdit: (change: TaskEdit) => void;
+    /** Change everything in `targets`. What the menu's verbs write. */
+    readonly onApply: (change: TaskBulkEdit) => void;
     readonly onDuplicate: () => void;
     readonly onDelete: () => void;
     /** Creating a tag from the picker, when the screen offers that. */
@@ -68,14 +93,21 @@ export interface TaskCommands {
 /** Bind one task to what a view can do with it. Every view builds its commands
  *  the same way, so a verb added here reaches all five at once. */
 export function commandsFor(props: ViewProps, task: TaskRow): TaskCommands {
+    // A right-click inside the selection means the selection; outside it means
+    // that one task, and leaves the selection alone.
+    const targets = props.selection.has(task.id) && props.selected.length > 0 ? props.selected : [task];
+
     return {
         task,
+        targets,
         context: props.context,
+        lists: props.lists,
         canEdit: props.canEdit,
         onOpen: () => props.onOpen(task.id),
         onEdit: (change) => props.onEdit(task, change),
+        onApply: (change) => props.onApply(targets, change),
         onDuplicate: () => props.onDuplicate(task),
-        onDelete: () => props.onDelete(task),
+        onDelete: () => props.onDelete(targets),
         onCreateTag: props.onCreateTag,
         onCreateStatus: props.onCreateStatus
     };
@@ -278,11 +310,32 @@ function CreateDialog({
     );
 }
 
+/** The ids every task in a set carries, which is what a tick beside an option
+ *  means once the menu is acting on more than one. Half the selection having a
+ *  label is not the label being on, and offering it as "on" would turn the next
+ *  click into a removal nobody asked for. */
+function sharedBy(tasks: readonly TaskRow[], idsOf: (task: TaskRow) => readonly string[]): Set<string> {
+    const [first, ...rest] = tasks;
+    if (!first) return new Set();
+    const shared = new Set(idsOf(first));
+    for (const task of rest) {
+        const held = new Set(idsOf(task));
+        for (const id of shared) if (!held.has(id)) shared.delete(id);
+    }
+    return shared;
+}
+
 /** Right-click anywhere on a task. */
 export function TaskMenu({ commands, children }: { commands: TaskCommands; children: React.ReactNode }) {
-    const { task, context, canEdit } = commands;
+    const { task, targets, context, canEdit } = commands;
     const baseUrl = useAppUrl();
     const [drafting, setDrafting] = useState<Draft | null>(null);
+
+    // Whether the menu is speaking about a selection rather than the task it was
+    // opened on. The verbs are the same either way; what changes is that the ones
+    // naming a single task - open it, copy its link, copy its reference - have
+    // nothing to name, so they stand down.
+    const many = targets.length > 1;
 
     /**
      * What the submenus are about to show, worked out once instead of on every
@@ -293,18 +346,38 @@ export function TaskMenu({ commands, children }: { commands: TaskCommands; child
      * row, which stays put, so they survive the menu itself opening and closing.
      * The faces are warmed the same way one level up - see the open handler.
      */
-    const assigned = useMemo(() => new Set(task.assignees.map((entry) => entry.id)), [task.assignees]);
-    const tagged = useMemo(() => new Set(task.tags.map((entry) => entry.id)), [task.tags]);
+    const assigned = useMemo(() => sharedBy(targets, (entry) => entry.assignees.map((person) => person.id)), [targets]);
+    const tagged = useMemo(() => sharedBy(targets, (entry) => entry.tags.map((tag) => tag.id)), [targets]);
     const priorities = useMemo(() => core.TASK_PRIORITIES.filter((priority) => priority !== "none"), []);
+    // Ticked only where the whole set already agrees, for the same reason a tag
+    // half the selection carries is not shown as on.
+    const sharedStatusId = targets.every((entry) => entry.statusId === task.statusId) ? task.statusId : null;
+    const sharedPriority = targets.every((entry) => entry.priority === task.priority) ? task.priority : null;
+
+    /**
+     * Where this work can be moved to.
+     *
+     * A task carries its space, and its status, tags and fields are that space's
+     * words - so a move is between lists of one space and nowhere else. A
+     * selection spanning two spaces therefore has no destination at all, and the
+     * submenu says so rather than offering lists that would be refused.
+     */
+    const destinations = useMemo(() => {
+        const spaces = new Set(targets.map((entry) => entry.spaceId));
+        const spaceId = spaces.size === 1 ? [...spaces][0] : null;
+        if (!spaceId) return [];
+        const held = new Set(targets.map((entry) => entry.listId));
+        return commands.lists.filter((list) => list.spaceId === spaceId && !(held.size === 1 && held.has(list.id)));
+    }, [targets, commands.lists]);
 
     const create = async (draft: { name: string; type: core.TaskStatusType; color: string }) => {
         if (drafting === "tag") {
             const id = (await commands.onCreateTag?.(draft.name, draft.color)) ?? null;
-            if (id) commands.onEdit({ tagIds: [...task.tags.map((tag) => tag.id), id] });
+            if (id) commands.onApply({ addTagIds: [id] });
             return id;
         }
         const id = (await commands.onCreateStatus?.(draft.name, draft.type, draft.color)) ?? null;
-        if (id) commands.onEdit({ statusId: id });
+        if (id) commands.onApply({ statusId: id });
         return id;
     };
 
@@ -317,18 +390,24 @@ export function TaskMenu({ commands, children }: { commands: TaskCommands; child
             <ContextMenu onOpenChange={(open) => (open ? preloadAvatars(context.people) : undefined)}>
                 <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
                 <ContextMenuContent className="w-56">
-                    <ContextMenuItem onSelect={commands.onOpen}>
-                        <ExternalLink className="size-3.5" />
-                        Open
-                    </ContextMenuItem>
-                    <ContextMenuItem onSelect={() => void copy(taskLink(baseUrl, task.id))}>
-                        <Link2 className="size-3.5" />
-                        Copy link
-                    </ContextMenuItem>
-                    <ContextMenuItem onSelect={() => void copy(task.reference)}>
-                        <Copy className="size-3.5" />
-                        Copy {task.reference}
-                    </ContextMenuItem>
+                    {many ? (
+                        <ContextMenuLabel>{targets.length} tasks selected</ContextMenuLabel>
+                    ) : (
+                        <>
+                            <ContextMenuItem onSelect={commands.onOpen}>
+                                <ExternalLink className="size-3.5" />
+                                Open
+                            </ContextMenuItem>
+                            <ContextMenuItem onSelect={() => void copy(taskLink(baseUrl, task.id))}>
+                                <Link2 className="size-3.5" />
+                                Copy link
+                            </ContextMenuItem>
+                            <ContextMenuItem onSelect={() => void copy(task.reference)}>
+                                <Copy className="size-3.5" />
+                                Copy {task.reference}
+                            </ContextMenuItem>
+                        </>
+                    )}
 
                     {canEdit && (
                         <>
@@ -342,12 +421,12 @@ export function TaskMenu({ commands, children }: { commands: TaskCommands; child
                                     {context.statuses.map((status) => (
                                         <ContextMenuItem
                                             key={status.id}
-                                            onSelect={() => commands.onEdit({ statusId: status.id })}
+                                            onSelect={() => commands.onApply({ statusId: status.id })}
                                             className="gap-2"
                                         >
                                             <StatusIcon color={status.color} type={status.type} size={16} />
                                             <span className="flex-1 truncate">{status.name}</span>
-                                            {status.id === task.statusId && (
+                                            {status.id === sharedStatusId && (
                                                 <Check className="size-3.5 text-primary" />
                                             )}
                                         </ContextMenuItem>
@@ -376,7 +455,7 @@ export function TaskMenu({ commands, children }: { commands: TaskCommands; child
                                     {priorities.map((priority) => (
                                         <ContextMenuItem
                                             key={priority}
-                                            onSelect={() => commands.onEdit({ priority })}
+                                            onSelect={() => commands.onApply({ priority })}
                                             className="gap-2"
                                         >
                                             <Flag
@@ -385,11 +464,11 @@ export function TaskMenu({ commands, children }: { commands: TaskCommands; child
                                                 style={{ color: core.TASK_PRIORITY_COLORS[priority] }}
                                             />
                                             <span className="flex-1">{core.TASK_PRIORITY_LABELS[priority]}</span>
-                                            {task.priority === priority && <Check className="size-3.5 text-primary" />}
+                                            {sharedPriority === priority && <Check className="size-3.5 text-primary" />}
                                         </ContextMenuItem>
                                     ))}
                                     <ContextMenuItem
-                                        onSelect={() => commands.onEdit({ priority: "none" })}
+                                        onSelect={() => commands.onApply({ priority: "none" })}
                                         className="gap-2 text-muted-foreground"
                                     >
                                         <Ban className="size-3.5" />
@@ -416,13 +495,11 @@ export function TaskMenu({ commands, children }: { commands: TaskCommands; child
                                                 key={person.id}
                                                 className="gap-2"
                                                 onSelect={() =>
-                                                    commands.onEdit({
-                                                        assigneeIds: on
-                                                            ? task.assignees
-                                                                  .filter((entry) => entry.id !== person.id)
-                                                                  .map((entry) => entry.id)
-                                                            : [...task.assignees.map((entry) => entry.id), person.id]
-                                                    })
+                                                    commands.onApply(
+                                                        on
+                                                            ? { removeAssigneeIds: [person.id] }
+                                                            : { addAssigneeIds: [person.id] }
+                                                    )
                                                 }
                                             >
                                                 {/* The same face the row and the
@@ -455,13 +532,9 @@ export function TaskMenu({ commands, children }: { commands: TaskCommands; child
                                                     key={tag.id}
                                                     className="gap-2"
                                                     onSelect={() =>
-                                                        commands.onEdit({
-                                                            tagIds: on
-                                                                ? task.tags
-                                                                      .filter((entry) => entry.id !== tag.id)
-                                                                      .map((entry) => entry.id)
-                                                                : [...task.tags.map((entry) => entry.id), tag.id]
-                                                        })
+                                                        commands.onApply(
+                                                            on ? { removeTagIds: [tag.id] } : { addTagIds: [tag.id] }
+                                                        )
                                                     }
                                                 >
                                                     <span
@@ -490,15 +563,56 @@ export function TaskMenu({ commands, children }: { commands: TaskCommands; child
                                 </ContextMenuSub>
                             )}
 
+                            {/* Only where the screen knows what lists exist. The
+                                work inside a task answers to this menu too, and
+                                a subtask has no list of its own to be moved
+                                between. */}
+                            {commands.lists.length > 0 && (
+                                <ContextMenuSub>
+                                    <ContextMenuSubTrigger>
+                                        <FolderInput className="size-3.5" />
+                                        Move to
+                                    </ContextMenuSubTrigger>
+                                    <ContextMenuSubContent className="max-h-64 w-56 overflow-y-auto">
+                                        {destinations.length === 0 ? (
+                                            <p className="px-2 py-3 text-center text-xs text-muted-foreground">
+                                                {many
+                                                    ? "Work only moves between lists of one space, and this selection spans more than one."
+                                                    : "This space has nowhere else to put it."}
+                                            </p>
+                                        ) : (
+                                            destinations.map((list) => (
+                                                <ContextMenuItem
+                                                    key={list.id}
+                                                    className="gap-2"
+                                                    onSelect={() => commands.onApply({ listId: list.id })}
+                                                >
+                                                    <span className="flex-1 truncate">{list.name}</span>
+                                                </ContextMenuItem>
+                                            ))
+                                        )}
+                                    </ContextMenuSubContent>
+                                </ContextMenuSub>
+                            )}
+
                             <ContextMenuSeparator />
-                            <ContextMenuItem onSelect={commands.onDuplicate}>
-                                <Copy className="size-3.5" />
-                                Duplicate
+                            {!many && (
+                                <ContextMenuItem onSelect={commands.onDuplicate}>
+                                    <Copy className="size-3.5" />
+                                    Duplicate
+                                </ContextMenuItem>
+                            )}
+                            {/* Archiving is how work leaves a board without being
+                                destroyed, so it sits above the delete rather than
+                                beside it. */}
+                            <ContextMenuItem onSelect={() => commands.onApply({ archived: true })}>
+                                <Archive className="size-3.5" />
+                                Archive
                             </ContextMenuItem>
                             <ContextMenuSeparator />
                             <ContextMenuItem variant="danger" onSelect={commands.onDelete}>
                                 <Trash2 className="size-3.5" />
-                                Delete
+                                {many ? `Delete ${targets.length} tasks` : "Delete"}
                             </ContextMenuItem>
                         </>
                     )}

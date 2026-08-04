@@ -14,13 +14,13 @@ import * as core from "@polaris/core";
 import { TaskPanel } from "./task-panel";
 import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
-import type { TaskEdit } from "./views/shared";
 import { Fragment, useMemo, useState } from "react";
-import { taskOverlay, type TaskOverlay } from "./optimistic";
 import type { RunningTimer } from "@/lib/tasks/time-service";
 import { useDisplayFormat } from "@/components/display-format";
 import { TaskMenu, type TaskCommands } from "./views/task-actions";
 import { Card, CardBody, ConfirmDeleteDialog, cn } from "@polaris/ui";
+import { bulkOverlay, taskOverlay, type TaskOverlay } from "./optimistic";
+import type { TaskBulkEdit, TaskEdit, TaskListRef } from "./views/shared";
 import { CircleAlert, Clock, ListChecks, Play, Square } from "lucide-react";
 import { toFacts, type SpaceContext, type TaskRow } from "@/lib/tasks/facts";
 import { AvatarStack, DueBadge, PriorityFlag, StatusDot, StatusMarker, TaskLocation } from "./pickers";
@@ -49,7 +49,8 @@ export function HomeView({
     tasks,
     counts,
     timer,
-    contexts
+    contexts,
+    lists
 }: {
     tasks: readonly TaskRow[];
     counts: HomeCounts;
@@ -57,6 +58,9 @@ export function HomeView({
     /** One context per space the tasks come from, keyed by space id: home spans
      *  every space, and a task's statuses are its own space's. */
     contexts: Readonly<Record<string, SpaceContext>>;
+    /** Where work can be moved to, so the menu here offers what it offers on a
+     *  board. Empty until there is anywhere to move it. */
+    lists: readonly TaskListRef[];
 }) {
     const router = useRouter();
     const format = useDisplayFormat();
@@ -121,15 +125,38 @@ export function HomeView({
      * here is the work somebody is actually doing today, so reassigning it or
      * moving its date should not cost a trip into the list it came from.
      */
+    /** The menu's own verbs, which speak about a set even where there is only
+     *  ever one task: a move and an archive have no single-task write of their
+     *  own, and folding them in here is one path fewer to keep in step. */
+    const apply = async (task: TaskRow, change: TaskBulkEdit) => {
+        setError("");
+        const context = contexts[task.spaceId];
+        // A move and an archive take the task off this screen, so nothing is
+        // painted onto a row that is leaving.
+        const leaves = change.archived !== undefined || change.listId !== undefined;
+        if (context && !leaves) {
+            setPending((current) => ({
+                ...current,
+                [task.id]: { ...current[task.id], ...bulkOverlay(task, change, context) }
+            }));
+        }
+        const result = await runAction(() => actions.bulkUpdateAction({ taskIds: [task.id], ...change }), setError);
+        if (result?.error) setError(result.error);
+        refresh();
+    };
+
     const commandsFor = (task: TaskRow): TaskCommands | null => {
         const context = contexts[task.spaceId];
         if (!context) return null;
         return {
             task,
+            targets: [task],
             context,
+            lists,
             canEdit: context.canEdit,
             onOpen: () => setOpenTaskId(task.id),
             onEdit: (change) => void edit(task, change),
+            onApply: (change) => void apply(task, change),
             onDuplicate: async () => {
                 setError("");
                 const result = await runAction(() => actions.duplicateTaskAction(task.id), setError);

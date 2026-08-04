@@ -19,6 +19,7 @@ import { FolderTree } from "./folder-tree";
 import { fileIconFor } from "./file-icons";
 import { useRouter } from "next/navigation";
 import { formatBytes } from "@polaris/core";
+import { keyboardIsBusy } from "@/lib/keyboard";
 import { ArchiveDialog } from "./archive-dialog";
 import { useDriveInsights } from "./use-drive-insights";
 import { SelectionZipMenu } from "./selection-zip-menu";
@@ -612,9 +613,7 @@ export function FilesView({
     useEffect(() => {
         function onShortcut(event: globalThis.KeyboardEvent) {
             if (renaming || viewerTarget || pendingFolder) return;
-            const target = event.target as HTMLElement | null;
-            if (target?.closest("input, textarea, select, [contenteditable='true']")) return;
-            if (document.querySelector("[role='dialog'], [role='menu']")) return;
+            if (keyboardIsBusy(event)) return;
             const shortcut = matchShortcut(event);
             if (!shortcut) return;
             if (shortcut === "new-folder" || shortcut === "new-file") {

@@ -282,6 +282,11 @@ export function TaskPanel({
                                     task={task}
                                     context={context}
                                     running={runningHere}
+                                    waitingOn={
+                                        detail?.dependencies.filter(
+                                            (edge) => edge.direction === "waitingOn" && !edge.finished
+                                        ).length ?? 0
+                                    }
                                     patch={(input) => void patch(input)}
                                     onChanged={() => {
                                         load(task.id);

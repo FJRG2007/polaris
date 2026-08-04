@@ -9,18 +9,19 @@
  * that reflows is a table you cannot compare rows in.
  */
 
-import { useState } from "react";
 import { cn } from "@polaris/ui";
 import * as core from "@polaris/core";
-import type { ViewProps } from "./shared";
+import { useMemo, useState } from "react";
 import { toFacts } from "@/lib/tasks/facts";
 import { CustomFieldValue } from "../custom-fields";
 import { useDisplayFormat } from "@/components/display-format";
-import { Ban, ChevronDown, ChevronRight, Plus } from "lucide-react";
+import { ChevronDown, ChevronRight, Plus } from "lucide-react";
+import { clickMode, type SelectMode, type ViewProps } from "./shared";
 import { commandsFor, TaskControls, TaskMenu, TaskStatusMarker, type TaskCommands } from "./task-actions";
 import {
     AssigneePicker,
     AvatarStack,
+    BlockedMarker,
     DueBadge,
     DuePicker,
     PriorityPicker,
@@ -47,7 +48,7 @@ function TaskLine({
     /** Whether dropping here would actually put the row here. False while a
      *  search is on, where the rows are ranked by how well they matched. */
     positioned?: boolean;
-    onSelect: () => void;
+    onSelect: (mode: SelectMode) => void;
     onDragStart?: () => void;
     onDropBefore?: () => void;
 }) {
@@ -87,14 +88,21 @@ function TaskLine({
             <div className="flex min-w-0 flex-1 flex-col">
                 <button
                     type="button"
-                    onClick={(event) => (event.metaKey || event.ctrlKey ? onSelect() : onOpen())}
+                    // A shift-click would otherwise drag a text selection across
+                    // half the screen on its way to selecting the rows.
+                    onMouseDown={(event) => (event.shiftKey ? event.preventDefault() : undefined)}
+                    onClick={(event) => {
+                        const mode = clickMode(event);
+                        if (mode) onSelect(mode);
+                        else onOpen();
+                    }}
                     className="flex min-w-0 items-center gap-2 text-left"
                 >
                     <span className="hidden font-mono text-[11px] text-muted-foreground sm:inline">{task.reference}</span>
                     <span className={cn("truncate text-sm", core.isFinishedStatus(task.statusType) && "text-muted-foreground")}>
                         {task.name}
                     </span>
-                    {task.blocked && <Ban className="size-3.5 shrink-0 text-amber-500" aria-label="Blocked" />}
+                    <BlockedMarker task={task} format={format.date} />
                     {task.tags.slice(0, 2).map((tag) => (
                         <TagChip key={tag.id} tag={tag} />
                     ))}
@@ -139,6 +147,24 @@ export function ListView(props: ViewProps) {
         else next.add(key);
         setCollapsed(next);
     };
+
+    /**
+     * The rows as the screen is drawing them - every open group in order, each
+     * nested the way it renders - which is what a shift-click reaches across. A
+     * collapsed group is not on screen, so a range never quietly picks up work
+     * nobody can see.
+     */
+    const rendered = useMemo(
+        () =>
+            groups
+                .filter((group) => !collapsed.has(group.key))
+                .flatMap((group) =>
+                    core
+                        .flattenTree(core.buildTaskTree(group.tasks.map(toFacts)))
+                        .map((node) => node.task.id)
+                ),
+        [groups, collapsed]
+    );
 
     return (
         <div className="flex flex-col gap-4">
@@ -208,7 +234,7 @@ export function ListView(props: ViewProps) {
                                             selected={selection.has(task.id)}
                                             showLocation={props.showLocation}
                                             positioned={orderable}
-                                            onSelect={() => onSelect(task.id)}
+                                            onSelect={(mode) => onSelect(task.id, mode, rendered)}
                                             onDragStart={() => setDragging(task.id)}
                                             onDropBefore={() => {
                                                 if (!dragging) return;
@@ -277,6 +303,8 @@ export function TableView(props: ViewProps) {
     // Every custom field gets a column here: being able to compare them side by
     // side is the whole reason to look at a table rather than a list.
     const columns = context.fields;
+    // A table is flat, so the rows themselves are the order a shift-click spans.
+    const rendered = useMemo(() => rows.map((task) => task.id), [rows]);
 
     return (
         <div className="overflow-x-auto rounded-lg border border-border">
@@ -315,7 +343,12 @@ export function TableView(props: ViewProps) {
                             <td className="max-w-xs px-2 py-1.5">
                                 <button
                                     type="button"
-                                    onClick={(event) => (event.metaKey || event.ctrlKey ? onSelect(task.id) : onOpen(task.id))}
+                                    onMouseDown={(event) => (event.shiftKey ? event.preventDefault() : undefined)}
+                                    onClick={(event) => {
+                                        const mode = clickMode(event);
+                                        if (mode) onSelect(task.id, mode, rendered);
+                                        else onOpen(task.id);
+                                    }}
                                     className="flex w-full items-center gap-2 text-left"
                                 >
                                     <span className="font-mono text-[11px] text-muted-foreground">{task.reference}</span>

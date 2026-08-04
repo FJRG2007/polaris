@@ -32,6 +32,57 @@ export interface TaskEdit {
     readonly dueDate?: string | null;
 }
 
+/**
+ * A change applied to however many tasks the menu is acting on.
+ *
+ * People and tags are added and removed rather than replaced: a selection has no
+ * one set of either to replace, and "put this label on all five" is what the
+ * gesture means anyway. Everything else is the same value on every task.
+ */
+export interface TaskBulkEdit {
+    readonly statusId?: string;
+    readonly priority?: TaskPriority;
+    readonly addAssigneeIds?: string[];
+    readonly removeAssigneeIds?: string[];
+    readonly addTagIds?: string[];
+    readonly removeTagIds?: string[];
+    readonly dueDate?: string | null;
+    /** Move the work into another list of the same space. */
+    readonly listId?: string;
+    readonly archived?: boolean;
+}
+
+/** A list work can be moved into. The space is carried because a screen can span
+ *  several and a task only moves between lists of its own. */
+export interface TaskListRef {
+    readonly id: string;
+    readonly name: string;
+    readonly spaceId: string;
+}
+
+/**
+ * How a click changed the selection: `toggle` for a ctrl-click on one task,
+ * `range` for a shift-click reaching back to the last one clicked.
+ */
+export type SelectMode = "toggle" | "range";
+
+/**
+ * What a click on a task means, read the way every file manager reads it: shift
+ * reaches back to the last task clicked, ctrl (or cmd) toggles that one on its
+ * own, and a plain click opens the task. Null is that plain click.
+ *
+ * Shift is checked first so ctrl-shift is a range too, which is the gesture for
+ * "add this run to what I already have" - and the range here adds rather than
+ * replaces, so the two land in the same place.
+ *
+ * Here rather than in each view so the five of them cannot drift into three
+ * different answers to one gesture.
+ */
+export function clickMode(event: { metaKey: boolean; ctrlKey: boolean; shiftKey: boolean }): SelectMode | null {
+    if (event.shiftKey) return "range";
+    return event.metaKey || event.ctrlKey ? "toggle" : null;
+}
+
 export interface ViewProps {
     readonly rows: readonly TaskRow[];
     readonly groups: readonly TaskGroup<TaskRow>[];
@@ -49,15 +100,31 @@ export interface ViewProps {
      */
     readonly orderable: boolean;
     readonly selection: ReadonlySet<string>;
+    /** The selection as rows, narrowed to what is on screen. Resolved once by the
+     *  screen rather than per row, since every row would otherwise walk the whole
+     *  set to find out what a right-click on it would act on. */
+    readonly selected: readonly TaskRow[];
+    /** The lists work can be moved into, across every space on this screen. */
+    readonly lists: readonly TaskListRef[];
     readonly onOpen: (taskId: string) => void;
-    readonly onSelect: (taskId: string) => void;
+    /**
+     * A click that changed the selection rather than opening the task. `ordered`
+     * is the ids in the order this view is drawing them, because that is what a
+     * shift-click means: everything between the two rows on the screen somebody
+     * is looking at, which a board reads down its columns and a table down its
+     * rows.
+     */
+    readonly onSelect: (taskId: string, mode: SelectMode, ordered: readonly string[]) => void;
     readonly onMove: (move: BoardMove) => void;
     readonly onQuickCreate: (groupKey: string, name: string) => void;
     /** Apply a change from the row itself, optimistically. */
     readonly onEdit: (task: TaskRow, change: TaskEdit) => void;
+    /** Apply a change to everything a menu is acting on, which is one task or a
+     *  whole selection. */
+    readonly onApply: (tasks: readonly TaskRow[], change: TaskBulkEdit) => void;
     readonly onDuplicate: (task: TaskRow) => void;
-    /** Asks for the task to be deleted; the screen owns the confirmation. */
-    readonly onDelete: (task: TaskRow) => void;
+    /** Asks for these tasks to be deleted; the screen owns the confirmation. */
+    readonly onDelete: (tasks: readonly TaskRow[]) => void;
     /** Born where it is needed: a tag typed into a picker that matches nothing. */
     readonly onCreateTag?: (name: string, color: string) => Promise<string | null>;
     /** Whether a row has to say where it lives. True on the screens that mix

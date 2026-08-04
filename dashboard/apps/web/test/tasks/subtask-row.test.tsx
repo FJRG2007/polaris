@@ -55,6 +55,8 @@ function subtask(overrides: Partial<TaskRow> = {}): TaskRow {
         commentCount: 0,
         trackedSeconds: 0,
         blocked: false,
+        blockedUntil: null,
+        blockedNote: "",
         recurring: false,
         customValues: {},
         ...overrides
