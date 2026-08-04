@@ -71,6 +71,24 @@ jobs:
           failed=0
           removed=0
 
+          # Deleting is a write like any other, and a backlog is thousands of them
+          # in a row - which is what the registry throttles rather than refuses,
+          # answering 403 with a rate-limit body. That answer is worth waiting out;
+          # any other one is a real refusal and is reported straight away.
+          delete_version() {
+            attempt=1
+            while :; do
+              answer=$(gh api -X DELETE "$1" 2>&1) && return 0
+              case "$answer" in
+                *"rate limit"*|*"429"*|*"abuse"*) ;;
+                *) echo "$answer"; return 1;;
+              esac
+              [ "$attempt" -ge 3 ] && { echo "still throttled after $attempt tries"; return 1; }
+              sleep $((attempt * 30))
+              attempt=$((attempt + 1))
+            done
+          }
+
           for package in $PACKAGES; do
             echo "::group::$package"
 
@@ -84,6 +102,7 @@ jobs:
             fi
             keep=$(echo "$index" | jq -r '.manifests[]?.digest')
             echo "latest references $(echo "$keep" | grep -c . || true) manifest(s)"
+            refused=0
 
             if ! versions=$(gh api --paginate "/users/$OWNER/packages/container/$package/versions" \
               --jq '.[] | [.id, .name, ((.metadata.container.tags // []) | join(","))] | @tsv' 2>&1); then
@@ -105,12 +124,17 @@ jobs:
                 echo "would delete $digest ${tags:+(tagged $tags)}"
                 continue
               fi
-              if gh api -X DELETE "/users/$OWNER/packages/container/$package/versions/$id" >/dev/null 2>&1; then
+              if delete_version "/users/$OWNER/packages/container/$package/versions/$id"; then
                 echo "deleted $digest ${tags:+(tagged $tags)}"
                 removed=$((removed + 1))
+                refused=0
               else
                 echo "could not delete $digest"
                 failed=1
+                # One refusal is worth reporting; a run of them means the rest of
+                # this package will be refused too, and 800 more calls prove it.
+                refused=$((refused + 1))
+                [ "$refused" -ge 5 ] && { echo "giving up on $package"; break; }
               fi
             done <<EOF
           $versions
