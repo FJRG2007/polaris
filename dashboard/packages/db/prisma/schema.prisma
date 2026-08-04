@@ -2384,6 +2384,13 @@ model Domain {
     enabled       Boolean  @default(true)
     // le | internal | none
     certResolver  String   @default("le")
+    // A certificate the operator supplied for this hostname, served instead of the
+    // managed one. The chain is public material and stored as PEM; the private key is
+    // encrypted at rest like every other secret. Kept even while it is not being
+    // served - a certificate that has lapsed is replaced by the operator, not by us
+    // silently discarding what they uploaded.
+    certPem       String?
+    certKey       String?
     pathPrefix    String?
     createdAt     DateTime @default(now())
     // Reachability, set by the health probe: up | down | unknown. So a free

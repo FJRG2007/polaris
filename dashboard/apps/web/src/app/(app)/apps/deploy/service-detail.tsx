@@ -1816,6 +1816,151 @@ function dnsAdvice(dns: AddDomainDns, hostname: string): string | null {
     return `Point ${hostname}${target} in your DNS provider${dns.detail ? ` - ${dns.detail}` : "."}`;
 }
 
+/**
+ * Put an operator's own certificate on one domain.
+ *
+ * Behind a dialog rather than in the row: it is two long PEM blocks and it is not what
+ * anybody came to this list to do. The icon carries the state, so a domain already
+ * serving a supplied certificate says so without being opened.
+ */
+function DomainCertificateButton({
+    domainId,
+    hostname,
+    supplied,
+    onChanged
+}: {
+    domainId: string;
+    hostname: string;
+    supplied: boolean;
+    onChanged: () => void;
+}) {
+    const [open, setOpen] = useState(false);
+    const [certPem, setCertPem] = useState("");
+    const [keyPem, setKeyPem] = useState("");
+    const [error, setError] = useState<string | null>(null);
+    const [warning, setWarning] = useState<string | null>(null);
+    const [pending, startTransition] = useTransition();
+
+    function save(input: { certPem: string; keyPem: string } | null) {
+        startTransition(async () => {
+            const result = await deployActions
+                .setDomainCertificateAction(domainId, input)
+                .catch((): { error?: string; warning?: string } => ({ error: "That did not go through." }));
+            if (result?.error) {
+                setError(result.error);
+                return;
+            }
+            setError(null);
+            setWarning(result?.warning ?? null);
+            setCertPem("");
+            setKeyPem("");
+            if (!result?.warning) setOpen(false);
+            onChanged();
+        });
+    }
+
+    return (
+        <>
+            <button
+                type="button"
+                onClick={() => setOpen(true)}
+                aria-label={supplied ? `Replace the certificate on ${hostname}` : `Use your own certificate on ${hostname}`}
+                title={supplied ? "Serving your own certificate" : "Use your own certificate"}
+                className={cn(
+                    "shrink-0 rounded p-1 transition-colors hover:bg-muted hover:text-foreground",
+                    supplied ? "text-primary" : "text-muted-foreground md:opacity-0 md:group-hover:opacity-100"
+                )}
+            >
+                <ShieldCheck className="size-3.5" />
+            </button>
+            <Dialog open={open} onOpenChange={setOpen}>
+                <DialogContent>
+                    <DialogTitle>Certificate for {hostname}</DialogTitle>
+                    <div className="flex flex-col gap-3 text-sm">
+                        <p className="text-xs text-muted-foreground">
+                            Polaris issues and renews a certificate for this name on its own. Paste one here to serve
+                            yours instead - it has to cover {hostname} and still be valid, or Polaris keeps using the
+                            one it manages.
+                        </p>
+                        <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                            Certificate chain (PEM)
+                            <Textarea
+                                rows={5}
+                                value={certPem}
+                                onChange={(event) => setCertPem(event.target.value)}
+                                placeholder="The certificate, followed by any intermediates"
+                                className="font-mono text-xs"
+                            />
+                        </label>
+                        <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                            Private key (PEM)
+                            <Textarea
+                                rows={4}
+                                value={keyPem}
+                                onChange={(event) => setKeyPem(event.target.value)}
+                                placeholder="The key that goes with it"
+                                className="font-mono text-xs"
+                            />
+                        </label>
+                        {error && <p className="text-xs text-danger">{error}</p>}
+                        {warning && <p className="text-xs text-warning">{warning}</p>}
+                        <div className="flex items-center gap-2">
+                            <Button size="sm" disabled={pending || !certPem.trim() || !keyPem.trim()} onClick={() => save({ certPem, keyPem })}>
+                                {pending ? <Loader2 className="size-4 animate-spin" /> : "Use this certificate"}
+                            </Button>
+                            {supplied && (
+                                <Button size="sm" variant="outline" disabled={pending} onClick={() => save(null)}>
+                                    Back to the managed one
+                                </Button>
+                            )}
+                        </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
+        </>
+    );
+}
+
+/** One domain's probe result, as the panel overlays it onto what was rendered. */
+type DomainHealth = { healthStatus?: string | null; healthCode?: number | null; healthDetail?: string | null };
+
+/**
+ * Keep the status dots current while the panel is open.
+ *
+ * The health of a domain is the one thing here that changes without anybody doing
+ * something: the poller probes on its own minute, so a domain added a moment ago has no
+ * result yet, and the render that put it on screen never asks again - which left a
+ * working domain showing "not checked yet" until the page was reloaded.
+ *
+ * It asks only while there is an answer worth waiting for - a domain not yet probed, or
+ * one currently failing, which is exactly when somebody is watching for it to recover -
+ * and gives up after a few minutes so an app left open overnight is not polling forever.
+ */
+function useDomainHealth(
+    applicationId: string,
+    domains: readonly { id: string; enabled: boolean; healthStatus?: string }[]
+): Map<string, DomainHealth> {
+    const [health, setHealth] = useState<Map<string, DomainHealth>>(new Map());
+    const [rounds, setRounds] = useState(0);
+    const settled = domains
+        .filter((domain) => domain.enabled)
+        .every((domain) => (health.get(domain.id)?.healthStatus ?? domain.healthStatus) === "up");
+
+    useEffect(() => {
+        if (settled || rounds > 30) return;
+        const timer = setTimeout(() => {
+            void deployActions
+                .domainHealthAction(applicationId)
+                .then((rows) => setHealth(new Map(rows.map((row) => [row.id, row]))))
+                .catch(() => undefined)
+                .finally(() => setRounds((count) => count + 1));
+        }, 10_000);
+        return () => clearTimeout(timer);
+    }, [applicationId, settled, rounds]);
+
+    return health;
+}
+
 function SettingsTab({
     app,
     isGit,
@@ -1867,6 +2012,7 @@ function SettingsTab({
      *  re-rendering does not ask again for a name nothing changed about. */
     const checkedSubdomain = useRef<string | null>(null);
     const [tunnelNonce, setTunnelNonce] = useState(0);
+    const health = useDomainHealth(app.id, app.domains);
     const [error, setError] = useState<string | null>(null);
     // Kept after a successful add: a custom domain works only once its DNS points here,
     // and whether Polaris managed that itself is the one thing the operator has to know.
@@ -2129,7 +2275,9 @@ function SettingsTab({
                     </p>
                 </div>
                 <ul className="flex flex-col gap-1">
-                    {app.domains.map((domain) => (
+                    {app.domains.map((rendered) => {
+                        const domain = { ...rendered, ...(health.get(rendered.id) ?? {}) };
+                        return (
                         <li key={domain.id} className="group flex items-center gap-2">
                             {domain.enabled && (
                                 <span
@@ -2138,7 +2286,7 @@ function SettingsTab({
                                             ? `Not reachable${domain.healthDetail ? ` - ${domain.healthDetail}` : ""}`
                                             : domain.healthStatus === "up"
                                               ? `Reachable${domain.healthCode ? ` (HTTP ${domain.healthCode})` : ""}`
-                                              : "Not checked yet"
+                                              : "Checking..."
                                     }
                                     className={cn(
                                         "size-2 shrink-0 rounded-full",
@@ -2146,7 +2294,7 @@ function SettingsTab({
                                         domain.healthStatus === "down" && "bg-danger",
                                         domain.healthStatus !== "up" &&
                                             domain.healthStatus !== "down" &&
-                                            "bg-muted-foreground/40"
+                                            "animate-pulse bg-muted-foreground/40"
                                     )}
                                 />
                             )}
@@ -2170,6 +2318,12 @@ function SettingsTab({
                             {(domain.kind === "lan" || domain.hostname.endsWith(".plr.local")) && (
                                 <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">local</span>
                             )}
+                            <DomainCertificateButton
+                                domainId={domain.id}
+                                hostname={domain.hostname}
+                                supplied={domain.hasCertificate === true}
+                                onChanged={onChanged}
+                            />
                             <Switch
                                 checked={domain.enabled}
                                 onChange={(next) => startTransition(async () => { await deployActions.setDomainEnabledAction(domain.id, next); onChanged(); })}
@@ -2186,7 +2340,8 @@ function SettingsTab({
                                 </button>
                             </span>
                         </li>
-                    ))}
+                        );
+                    })}
                     <NamedTunnelRow appId={app.id} nonce={tunnelNonce} onChanged={() => setTunnelNonce((nonce) => nonce + 1)} />
                     <QuickTunnelRow appId={app.id} nonce={tunnelNonce} onChanged={() => setTunnelNonce((nonce) => nonce + 1)} />
                     <NgrokTunnelRow appId={app.id} nonce={tunnelNonce} onChanged={() => setTunnelNonce((nonce) => nonce + 1)} />

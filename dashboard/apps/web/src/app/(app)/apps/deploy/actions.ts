@@ -16,6 +16,7 @@ import { recordAudit } from "@/lib/audit-service";
 import * as deployService from "@/lib/deploy-service";
 import { parseGithubRepo } from "@/lib/repo-reference";
 import { getNetworkStatus } from "@/lib/network-service";
+import { setDomainCertificate } from "@/lib/domain-cert-service";
 import { listConnections, getDriver } from "@/lib/storage-service";
 import { getDomainZones, listDeployZones } from "@/lib/domain-zones";
 import { getFlagsForEnvironment } from "@/lib/deploy-project-service";
@@ -642,6 +643,43 @@ export async function zoneSubdomainAction(input: {
     } catch {
         return { subdomain: "", hostname: "", available: false, error: "Could not check that subdomain" };
     }
+}
+
+/**
+ * Put an operator's own certificate on a domain, or clear it with a null.
+ *
+ * Refuses one that would not be served - wrong name, expired, key that does not match
+ * - rather than storing it and silently falling back to the managed certificate, which
+ * would leave the panel claiming a certificate is in use that is not.
+ */
+export async function setDomainCertificateAction(
+    domainId: string,
+    input: { certPem: string; keyPem: string } | null
+): Promise<{ error?: string; warning?: string }> {
+    const user = await requirePermission("deploy.manage");
+    try {
+        const result = await setDomainCertificate(domainId, user.id, input);
+        if (result.error) return result;
+        await recordAudit({
+            actorId: user.id,
+            action: input ? "deploy.domain.cert.set" : "deploy.domain.cert.clear",
+            targetType: "domain",
+            targetId: domainId
+        });
+        revalidatePath(DEPLOY_PATH);
+        return result;
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not save the certificate" };
+    }
+}
+
+/** The current probe result for a service's domains, so the panel can settle its own
+ *  status dots rather than leaving them grey until the page is reloaded. */
+export async function domainHealthAction(
+    applicationId: string
+): Promise<{ id: string; healthStatus: string | null; healthCode: number | null; healthDetail: string | null }[]> {
+    const user = await requirePermission("deploy.read");
+    return deployService.applicationDomainHealth(applicationId, user.id);
 }
 
 export async function removeDomainAction(domainId: string): Promise<void> {

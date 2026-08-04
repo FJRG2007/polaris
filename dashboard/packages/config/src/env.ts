@@ -5,8 +5,8 @@
  * repo-wide POLARIS_ prefix.
  */
 
-import { randomBytes } from "node:crypto";
 import { z } from "zod";
+import { randomBytes } from "node:crypto";
 
 /** Accept the usual truthy spellings for boolean flags coming from a shell. */
 const boolFromEnv = z
@@ -125,6 +125,11 @@ const envSchema = z.object({
      * Containers app can reach the host Engine over a dedicated, forced-command
      * key without mounting the docker socket into the container.
      */
+    /** Contact address on the Let's Encrypt account Polaris registers to order the
+     *  wildcard certificate. Optional - the account is valid without one, it only
+     *  costs the expiry warnings Let's Encrypt would otherwise send. Shared with the
+     *  edge, which reads the same value for its per-hostname orders. */
+    POLARIS_ACME_EMAIL: z.string().optional(),
     POLARIS_SSH_ENABLED: boolFromEnv.default("false"),
     POLARIS_SSH_HOST: z.string().default("host.docker.internal"),
     POLARIS_SSH_USER: z.string().optional(),

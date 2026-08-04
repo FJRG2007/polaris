@@ -819,6 +819,25 @@ export async function ensureApplicationDomain(applicationId: string, ownerId: st
     await addApplicationDomain(applicationId, ownerId, { targetPort });
 }
 
+/**
+ * What the health poller currently says about a service's own domains.
+ *
+ * Its own small read, because health is the one thing on the Public access panel that
+ * changes without anybody doing something: a domain added a moment ago has not been
+ * probed yet, and the page that rendered it will not ask again on its own. Answering
+ * that question cheaply is what lets the panel resolve its own dots instead of showing
+ * "not checked yet" until somebody reloads.
+ */
+export async function applicationDomainHealth(
+    applicationId: string,
+    ownerId: string
+): Promise<{ id: string; healthStatus: string | null; healthCode: number | null; healthDetail: string | null }[]> {
+    return prisma.domain.findMany({
+        where: { applicationId, application: { environment: { project: { ownerId } } } },
+        select: { id: true, healthStatus: true, healthCode: true, healthDetail: true }
+    });
+}
+
 export async function removeApplicationDomain(domainId: string, ownerId: string): Promise<void> {
     await prisma.domain.deleteMany({
         where: { id: domainId, application: { environment: { project: { ownerId } } } }

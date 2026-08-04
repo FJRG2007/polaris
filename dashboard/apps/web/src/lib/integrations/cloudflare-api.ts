@@ -236,6 +236,28 @@ export async function upsertARecord(token: string, zoneId: string, hostname: str
     return upsertRecord(token, zoneId, { type: "A", name: hostname, content: ip, proxied: false, ttl: 300 });
 }
 
+/**
+ * Write the TXT record an ACME DNS-01 challenge is answered with, returning its id so
+ * the caller can take it away again.
+ *
+ * A short TTL because the record exists for the length of one validation and a long
+ * one would keep a spent answer resolvable. Never proxied - Cloudflare's proxy is for
+ * traffic, and this record is only ever read by a resolver.
+ */
+export async function upsertTxtRecord(
+    token: string,
+    zoneId: string,
+    name: string,
+    content: string
+): Promise<string> {
+    return upsertRecord(token, zoneId, { type: "TXT", name, content, proxied: false, ttl: 60 });
+}
+
+/** Every TXT record at a name, so a challenge can clear the ones it wrote. */
+export function findTxtRecords(token: string, zoneId: string, name: string): Promise<CfDnsRecord[]> {
+    return findDnsRecords(token, zoneId, "TXT", name);
+}
+
 /** Best-effort deletion of a DNS record (teardown never blocks on it). */
 export async function deleteDnsRecord(token: string, zoneId: string, recordId: string): Promise<void> {
     await cf(token, "DELETE", `/zones/${zoneId}/dns_records/${recordId}`);

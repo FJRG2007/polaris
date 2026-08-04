@@ -139,6 +139,9 @@ export interface ProjectSummary {
                 healthStatus?: string;
                 healthCode?: number | null;
                 healthDetail?: string | null;
+                /** Whether the operator supplied a certificate for this name. Never the
+                 *  certificate itself - the panel only says which one is in use. */
+                hasCertificate?: boolean;
             }[];
             volumes: {
                 id: string;

@@ -124,7 +124,10 @@ export default async function DeployProjectPage({
                             enabled: domain.enabled,
                             healthStatus: domain.healthStatus,
                             healthCode: domain.healthCode,
-                            healthDetail: domain.healthDetail
+                            healthDetail: domain.healthDetail,
+                            // Whether one was supplied, never the material itself: the
+                            // panel only needs to say which certificate is in use.
+                            hasCertificate: domain.certPem !== null
                         })),
                     tunnelDomains.get(app.id) ?? []
                 ),

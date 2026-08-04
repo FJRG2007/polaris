@@ -62,6 +62,22 @@ export async function register(): Promise<void> {
     const { ensureLocalCa } = await import("./lib/local-ca-service");
     void ensureLocalCa().catch((error) => console.error("polaris: local CA setup failed:", error));
 
+    // Keep one wildcard certificate current for the base every free subdomain is minted
+    // under, so a new service is trusted HTTPS the moment it has a name instead of
+    // waiting out an order of its own. A no-op on an instance with no Cloudflare token
+    // or no deploy domain, which is why it needs no setting to turn it on.
+    const { startWildcardCertRenewal } = await import("./lib/wildcard-cert-service");
+    startWildcardCertRenewal();
+
+    // Re-publish the certificates operators supplied for their own domains. Re-judged
+    // rather than restored: the one thing that changes about a certificate with nobody
+    // touching it is that it expires, and a lapsed one has to stop being served so the
+    // managed certificate takes the name back.
+    const { publishDomainCertificates } = await import("./lib/domain-cert-service");
+    void publishDomainCertificates().catch((error) =>
+        console.error("polaris: publishing domain certificates failed:", error)
+    );
+
     // Move a GitHub token connected instance-wide onto the account of whoever
     // connected it, so it stops serving their private repositories to every other
     // account here. Best-effort and idempotent: a failure leaves the old row in
