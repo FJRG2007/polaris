@@ -22,8 +22,8 @@
 
 import { prisma } from "@polaris/db";
 import { hashToken } from "@polaris/core/tokens";
-import { createPublicKey, createVerify, type JsonWebKey as NodeJsonWebKey } from "node:crypto";
 import { isTerminalRunState, type AgentRunState } from "@polaris/core";
+import { createPublicKey, createVerify, type JsonWebKey as NodeJsonWebKey } from "node:crypto";
 
 /** Audience the runtime asks GitHub to mint its assertion for. Must match the
  *  value in the vendored runtime, which is what a mismatch here would break. */
@@ -125,6 +125,15 @@ export interface AuthenticatedRun {
     ownerId: string;
     installationId: string;
     state: AgentRunState;
+    /**
+     * GitHub's own workflow run id, when the caller proved one.
+     *
+     * Only the OIDC path has it, and it is what correlates a job to its row for
+     * the rest of the run's life: the `workflow_run.completed` webhook knows
+     * this id and nothing else, so a run that never records it can never be
+     * closed out by the webhook.
+     */
+    githubRunId: string | null;
 }
 
 /**
@@ -146,7 +155,7 @@ export async function authenticateRun(headers: Headers): Promise<AuthenticatedRu
     if (bearer) {
         if (bearer.split(".").length === 3) {
             const asserted = await verifyGithubOidc(bearer);
-            if (asserted) return runForRepository(asserted.repository);
+            if (asserted) return runForRepository(asserted.repository, asserted.runId);
         } else {
             const found = await runByToken(bearer);
             if (found) return found;
@@ -157,7 +166,7 @@ export async function authenticateRun(headers: Headers): Promise<AuthenticatedRu
     if (!oidcToken) return null;
     const asserted = await verifyGithubOidc(oidcToken);
     if (!asserted) return null;
-    return runForRepository(asserted.repository);
+    return runForRepository(asserted.repository, asserted.runId);
 }
 
 async function runByToken(token: string): Promise<AuthenticatedRun | null> {
@@ -181,33 +190,46 @@ async function runByToken(token: string): Promise<AuthenticatedRun | null> {
         repoFullName: row.repo.repoFullName,
         ownerId: row.repo.ownerId,
         installationId: row.repo.installationId,
-        state: row.state as AgentRunState
+        state: row.state as AgentRunState,
+        githubRunId: null
     };
 }
 
 /**
- * The run an OIDC-authenticated job belongs to: the newest one this instance
- * dispatched for that repository which has not finished.
+ * The run an OIDC-authenticated job belongs to.
  *
- * GitHub's assertion names the repository, not our run id, and a workflow can be
- * started by hand from the Actions tab with no Polaris row behind it. Answering
- * "no run" there is correct: the job then fails with a message saying this
- * repository is not enabled, rather than being handed a context and a key.
+ * Once a job has recorded GitHub's workflow run id, that id is what identifies
+ * it, and every later call matches exactly. The fallback below is only for a
+ * job's very first call, when nothing has recorded anything yet: it claims the
+ * oldest run on this repository that no job has claimed, so two concurrent jobs
+ * take two different rows instead of both taking the newest. Without that, one
+ * job reads the other's model and instructions and marks the wrong row started.
+ *
+ * A workflow started by hand from the Actions tab has no Polaris row to claim,
+ * so it gets nothing - and then fails saying this repository is not enabled,
+ * rather than being handed a context and the operator's provider keys.
  */
-async function runForRepository(repoFullName: string): Promise<AuthenticatedRun | null> {
-    const row = await prisma.agentRun.findFirst({
-        where: {
-            repo: { repoFullName, enabled: true },
-            state: { in: ["queued", "running"] }
-        },
-        orderBy: { createdAt: "desc" },
-        select: {
-            id: true,
-            state: true,
-            repoId: true,
-            repo: { select: { repoFullName: true, ownerId: true, installationId: true } }
-        }
-    });
+async function runForRepository(repoFullName: string, githubRunId: string | null): Promise<AuthenticatedRun | null> {
+    const open = { repo: { repoFullName, enabled: true }, state: { in: ["queued", "running"] } };
+    const select = {
+        id: true,
+        state: true,
+        repoId: true,
+        repo: { select: { repoFullName: true, ownerId: true, installationId: true } }
+    };
+
+    const claimed = githubRunId
+        ? await prisma.agentRun.findFirst({ where: { ...open, githubRunId }, select })
+        : null;
+
+    const row =
+        claimed ??
+        (await prisma.agentRun.findFirst({
+            where: { ...open, githubRunId: null },
+            orderBy: { createdAt: "asc" },
+            select
+        }));
+
     if (!row) return null;
     return {
         runId: row.id,
@@ -215,6 +237,7 @@ async function runForRepository(repoFullName: string): Promise<AuthenticatedRun 
         repoFullName: row.repo.repoFullName,
         ownerId: row.repo.ownerId,
         installationId: row.repo.installationId,
-        state: row.state as AgentRunState
+        state: row.state as AgentRunState,
+        githubRunId
     };
 }

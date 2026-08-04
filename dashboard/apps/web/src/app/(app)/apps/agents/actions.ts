@@ -73,6 +73,18 @@ export async function enableRepoAction(input: unknown): Promise<{ error?: string
         .safeParse(input);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the settings" };
 
+    // The form's repository is a claim, not proof. Runs dispatch with the
+    // instance's App installation token, which reaches every repository the App
+    // is installed on - so without this, anybody holding `agents.manage` (which
+    // `member` holds by default) could point a push-capable agent at a repository
+    // they cannot even read. Checked against what this person's own linked GitHub
+    // account sees, and the visibility is taken from GitHub rather than from the
+    // form for the same reason: it decides the default shell policy.
+    const reachable = await listReposForUser(user.id).catch(() => null);
+    if (!reachable) return { error: "Polaris could not check your GitHub access. Try again in a moment." };
+    const match = reachable.find((repo) => repo.fullName.toLowerCase() === parsed.data.repoFullName.toLowerCase());
+    if (!match) return { error: "That repository is not one your GitHub account can reach." };
+
     // A model whose provider is not connected produces a run that starts, asks for
     // a key, and fails. Refusing here costs a sentence instead of a failed run.
     const provider = providerForModel(parsed.data.config.model);
@@ -82,9 +94,9 @@ export async function enableRepoAction(input: unknown): Promise<{ error?: string
 
     try {
         await upsertAgentRepo(user.id, {
-            repoFullName: parsed.data.repoFullName,
+            repoFullName: match.fullName,
             installationId: parsed.data.installationId,
-            isPrivate: parsed.data.isPrivate,
+            isPrivate: match.private,
             config: parsed.data.config
         });
     } catch (caught) {
@@ -102,6 +114,13 @@ export async function updateRepoConfigAction(input: unknown): Promise<{ error?: 
 
     const existing = await getAgentRepo(user.id, parsed.data.repoId);
     if (!existing) return { error: "Repository not found" };
+
+    // Same refusal as the enable path: a model whose provider has no stored key
+    // produces a run that starts, asks for one, and fails.
+    const provider = providerForModel(parsed.data.config.model);
+    if (provider && !(await connectedProviders()).includes(provider.slug)) {
+        return { error: `Connect ${provider.name} under Integrations before using this model.` };
+    }
 
     try {
         await upsertAgentRepo(user.id, {

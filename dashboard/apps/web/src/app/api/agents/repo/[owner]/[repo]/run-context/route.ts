@@ -20,7 +20,7 @@
 
 import { prisma } from "@polaris/db";
 import { authenticateRun } from "@/lib/agents/agent-auth";
-import { markRunStarted } from "@/lib/agents/agent-run-service";
+import { issueRunToken, markRunStarted } from "@/lib/agents/agent-run-service";
 import { buildRunContext } from "@/lib/agents/agent-run-context";
 
 export const runtime = "nodejs";
@@ -55,18 +55,26 @@ export async function GET(
     // keeps a settings change mid-flight from redirecting a run already going.
     const run = await prisma.agentRun.findUnique({
         where: { id: caller.runId },
-        select: { mode: true, model: true }
+        select: { mode: true, model: true, trigger: true }
     });
 
-    const instructions = await instructionsFor(caller.repoId, run?.mode ?? null);
+    const instructions = await instructionsFor(caller.repoId, run?.trigger ?? null, run?.mode ?? null);
 
     // Asking for its context is the first thing a run does, so it is also the
     // moment the run stopped being queued. A workflow that never boots therefore
     // stays visibly queued rather than claiming to have started.
-    await markRunStarted(caller.runId, {});
+    //
+    // Recording GitHub's own run id here is what lets the `workflow_run` webhook
+    // close this row out later: that webhook knows GitHub's id and nothing else,
+    // so a run that never records it can only ever be closed by the stale sweep.
+    await markRunStarted(caller.runId, caller.githubRunId ? { githubRunId: caller.githubRunId } : {});
 
     const context = await buildRunContext({
-        runToken: request.headers.get("authorization")?.replace(/^Bearer\s+/i, "").trim() ?? "",
+        // Issued here rather than read back off the request. The caller may have
+        // authenticated with an OIDC assertion, which is not a credential this
+        // instance can accept on later calls, so the run collects a real one in
+        // the reply.
+        runToken: await issueRunToken(caller.runId),
         model: run?.model ?? row.model,
         effort: row.effort,
         push: row.push,
@@ -86,9 +94,17 @@ export async function GET(
  * enabled automations contribute; an operator who turned a rule off does not
  * expect its wording to keep reaching the agent.
  */
-async function instructionsFor(repoId: string, mode: string | null): Promise<string> {
+async function instructionsFor(repoId: string, trigger: string | null, mode: string | null): Promise<string> {
     const rows = await prisma.agentAutomation.findMany({
-        where: { repoId, enabled: true, ...(mode ? { mode } : {}) },
+        where: {
+            repoId,
+            enabled: true,
+            // Scoped to the rule that actually fired. Without this a ci.failed
+            // rule s prose reaches a manual run and a pr.opened rule s reaches a
+            // mention, which is not what the operator wrote it against.
+            ...(trigger ? { trigger } : {}),
+            ...(mode ? { mode } : {})
+        },
         select: { instructions: true },
         orderBy: { createdAt: "asc" }
     });

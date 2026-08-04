@@ -105,6 +105,14 @@ jobs:
           POLARIS_API_URL: ${input.apiUrl}
           INPUT_PROMPT: \${{ inputs.prompt }}
           POLARIS_RUN_ID: \${{ inputs.run_id }}
+          # The runtime requires a token to exist before it does anything, and the
+          # job's own is the one it can legitimately have. It is NOT what
+          # authenticates the run to Polaris: that is the OIDC assertion the
+          # runtime mints and sends alongside, which Polaris verifies against
+          # GitHub's published keys. A real Polaris credential is handed back in
+          # the run-context reply, because a workflow input would be readable by
+          # anybody who can see the Actions tab.
+          INPUT_TOKEN: \${{ github.token }}
         run: node "$RUNNER_TEMP/agent-main.mjs"
 
       # Runs even when the step above was cancelled or timed out, which is the
@@ -114,6 +122,7 @@ jobs:
         env:
           POLARIS_API_URL: ${input.apiUrl}
           POLARIS_RUN_ID: \${{ inputs.run_id }}
+          INPUT_TOKEN: \${{ github.token }}
         run: node "$RUNNER_TEMP/agent-post.mjs"
 `;
 }

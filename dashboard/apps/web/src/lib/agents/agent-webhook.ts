@@ -16,9 +16,10 @@
 
 import { prisma } from "@polaris/db";
 import { dispatchRun } from "@/lib/agents/agent-dispatch";
-import { finishAgentRun } from "@/lib/agents/agent-run-service";
+import { githubAppInstallationToken } from "@/lib/github-service";
 import { ALWAYS_ON_TRIGGER, type AgentTrigger } from "@polaris/core";
 import { agentRepoByFullName } from "@/lib/agents/agent-repo-service";
+import { finishAgentRun, sweepStaleRuns } from "@/lib/agents/agent-run-service";
 
 /** What a webhook boils down to, once the event's shape is out of the way. */
 interface Incident {
@@ -81,7 +82,17 @@ function classify(event: string, payload: Payload, appHandle: string): Incident 
     const fromFork = Boolean(headRepo && payload.repository?.full_name && headRepo !== payload.repository.full_name);
     const base = { issueNumber, prNumber, actor, labels, branch, fromFork };
 
-    const mentionText = [payload.comment?.body, payload.review?.body, payload.issue?.body, payload.pull_request?.body]
+    // A comment or a review body is newly authored by definition: the event IS
+    // somebody writing it. An issue or pull request body is not - it stays on the
+    // item for its whole life, so scanning it on every later `edited`, `labeled`,
+    // `closed` or `synchronize` would re-run the same mention indefinitely. It is
+    // only read on the events that create the item.
+    const authored = payload.action === "opened" || payload.action === "reopened";
+    const mentionText = [
+        payload.comment?.body,
+        payload.review?.body,
+        ...(authored ? [payload.issue?.body, payload.pull_request?.body] : [])
+    ]
         .filter((text): text is string => typeof text === "string")
         .find((text) => mentions(text, appHandle));
     if (mentionText) return { ...base, trigger: ALWAYS_ON_TRIGGER, body: mentionText };
@@ -180,6 +191,13 @@ export async function handleAgentWebhook(params: {
      *  own App. */
     appHandle: string;
 }): Promise<string[]> {
+    // Runs nothing ever reported back on would otherwise sit at `running` with a
+    // live callback token. This is the regularly executing server path that
+    // already touches the domain, so the sweep rides along rather than needing a
+    // scheduler of its own. Deliberately not awaited: it must never delay or fail
+    // the webhook it is hitching on.
+    void sweepStaleRuns().catch(() => undefined);
+
     const payload = params.payload as Payload;
     const repoFullName = payload.repository?.full_name;
     if (!repoFullName) return [];
@@ -202,13 +220,27 @@ export async function handleAgentWebhook(params: {
     // setting nobody would find.
     if (incident.fromFork) return [];
 
-    const rules = repo.automations.filter((row) => row.trigger === incident.trigger);
     // A mention needs no rule: it is somebody addressing the app directly, and a
-    // repository where that did nothing would look installed and be inert.
-    const allowed =
-        incident.trigger === ALWAYS_ON_TRIGGER
-            ? [{ mode: null as string | null }]
-            : rules.filter((row) => matches(parseCondition(row.condition), incident));
+    // repository where that did nothing would look installed and be inert. On a
+    // public repository that would also mean any stranger could spend the
+    // operator's provider credits by commenting, so there it is limited to people
+    // who can already write to the repository. On a private one, everybody who
+    // can comment already has that access.
+    if (incident.trigger === ALWAYS_ON_TRIGGER) {
+        if (!repo.isPrivate && !(await canWriteToRepo(repoFullName, incident.actor))) return [];
+        const result = await dispatchRun({
+            repo,
+            trigger: incident.trigger,
+            prompt: JSON.stringify(params.payload),
+            mode: null,
+            issueNumber: incident.issueNumber,
+            prNumber: incident.prNumber
+        });
+        return [result.runId];
+    }
+
+    const rules = repo.automations.filter((row) => row.trigger === incident.trigger);
+    const allowed = rules.filter((row) => matches(parseCondition(row.condition), incident));
     if (allowed.length === 0) return [];
 
     const started: string[] = [];
@@ -227,6 +259,40 @@ export async function handleAgentWebhook(params: {
         started.push(result.runId);
     }
     return started;
+}
+
+/**
+ * Whether this person can already write to the repository.
+ *
+ * Asked of GitHub rather than inferred, and a failure answers no: the whole point
+ * is to keep a stranger from starting runs on a public repository, and treating
+ * an unreachable API as permission would defeat it on exactly the transient
+ * failure somebody could provoke.
+ */
+async function canWriteToRepo(repoFullName: string, actor: string): Promise<boolean> {
+    if (!actor) return false;
+    const [owner, repo] = repoFullName.split("/");
+    const token = await githubAppInstallationToken(owner).catch(() => null);
+    if (!token) return false;
+    try {
+        const response = await fetch(
+            `https://api.github.com/repos/${owner}/${repo}/collaborators/${encodeURIComponent(actor)}/permission`,
+            {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    Accept: "application/vnd.github+json",
+                    "User-Agent": "polaris",
+                    "X-GitHub-Api-Version": "2022-11-28"
+                },
+                cache: "no-store"
+            }
+        );
+        if (!response.ok) return false;
+        const body = (await response.json()) as { permission?: string };
+        return body.permission === "write" || body.permission === "admin" || body.permission === "maintain";
+    } catch {
+        return false;
+    }
 }
 
 /**

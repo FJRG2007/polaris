@@ -3753,6 +3753,7 @@ model AgentRun {
     repo AgentRepo @relation(fields: [repoId], references: [id], onDelete: Cascade)
 
     @@index([repoId, createdAt])
+    @@unique([tokenHash])
     @@index([state])
     @@index([githubRunId])
 }

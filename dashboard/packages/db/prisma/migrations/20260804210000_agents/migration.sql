@@ -135,6 +135,8 @@ CREATE TABLE "AgentRun" (
 
 -- The run list is per repository, newest first, which is one index rather than two.
 CREATE INDEX "AgentRun_repoId_createdAt_idx" ON "AgentRun"("repoId", "createdAt");
+-- Every authenticated runtime callback resolves itself through this hash.
+CREATE UNIQUE INDEX "AgentRun_tokenHash_key" ON "AgentRun"("tokenHash");
 -- The sweep that closes out runs nothing reported back on reads by state.
 CREATE INDEX "AgentRun_state_idx" ON "AgentRun"("state");
 -- A workflow_run webhook arrives knowing only GitHub's id.

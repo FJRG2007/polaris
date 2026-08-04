@@ -156,6 +156,26 @@ export async function createAgentRun(input: CreateRunInput): Promise<{ id: strin
     return { id: row.id, token };
 }
 
+/**
+ * Re-issue the token a run authenticates its later calls with, and return it.
+ *
+ * Called when a run asks for its context. The token minted at dispatch reaches
+ * the container Polaris starts itself, but a GitHub-scheduled job has no safe
+ * channel for one - a workflow input is readable by anybody who can see the
+ * Actions tab. So the job proves itself with GitHub's OIDC assertion instead,
+ * and collects its credential here, over TLS, in the reply.
+ *
+ * Rotating on every context fetch is deliberate: a run only asks once, so a
+ * second fetch means either a retry, in which case the previous value was never
+ * used, or something replaying the assertion, in which case the old token stops
+ * working.
+ */
+export async function issueRunToken(runId: string): Promise<string> {
+    const token = generateToken();
+    await prisma.agentRun.update({ where: { id: runId }, data: { tokenHash: hashToken(token) } });
+    return token;
+}
+
 /** Note that the run actually started, and where. */
 export async function markRunStarted(runId: string, where: { githubRunId?: string; containerId?: string }): Promise<void> {
     await prisma.agentRun.updateMany({
