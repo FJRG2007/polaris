@@ -62,11 +62,18 @@ function swallow(what: string): (error: unknown) => void {
  * way this survives to a session is the way it describes.
  */
 export async function noteSignIn(userId: string, record: SignInRecord): Promise<void> {
-    await upsertSecurity(userId, {
+    await upsertSecurity(userId, proved(record)).catch(swallow("sign-in not recorded"));
+}
+
+/** The half of a note that says what was proved, freshly stamped. Deliberately
+ *  silent about the authorizer: a scanned code's answer is written before the
+ *  sign-in it allows, so this must leave that half alone rather than erase it. */
+function proved(record: SignInRecord) {
+    return {
         pendingSignInMethod: record.method,
         pendingSignInFactor: record.secondFactor,
         pendingSignInAt: new Date()
-    }).catch(swallow("sign-in not recorded"));
+    };
 }
 
 /**
@@ -187,8 +194,20 @@ export async function takeSignInRecord(userId: string): Promise<CollectedSignIn>
  * same person on the same device, still signed in the way they signed in. Without
  * this it would read as a session that arrived from nowhere, on the very screen
  * that exists to say where sessions came from.
+ *
+ * A rotation is not a sign-in, so it answers for nobody: the authorizer half is
+ * cleared rather than carried. A session that got in by scanned code hands on
+ * that it did, and if an approval nobody came back for has left its half on the
+ * account, this is the one write that would otherwise pair with it - the carried
+ * method says "qr-code" and the replacement session would name a device that
+ * answered for a sign-in which never happened. Cleared here rather than in
+ * noteSignIn because the real scanned-code sign-in is noted after its answer.
  */
 export async function carrySignInRecord(userId: string, record: SignInRecord): Promise<void> {
     if (!record.method && !record.secondFactor) return;
-    await noteSignIn(userId, record);
+    await upsertSecurity(userId, {
+        ...proved(record),
+        pendingAuthorizerId: null,
+        pendingAuthorizerDevice: null
+    }).catch(swallow("carried sign-in not recorded"));
 }

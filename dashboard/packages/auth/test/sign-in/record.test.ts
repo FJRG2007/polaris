@@ -209,4 +209,13 @@ describe("a session being replaced", () => {
         await carrySignInRecord(USER, { method: null, secondFactor: null });
         expect(rows).toHaveLength(0);
     });
+
+    // The carried method is whatever the session signed in with, so a session
+    // that got in by scanned code hands "qr-code" on - which is exactly what an
+    // approval nobody came back for is waiting to pair with.
+    it("answers for nobody, so a left-behind approval does not label the replacement", async () => {
+        await noteSignInAuthorizer(USER, { sessionId: PHONE, device: "Safari on iOS" });
+        await carrySignInRecord(USER, { method: "qr-code", secondFactor: null });
+        expect(await takeSignInRecord(USER)).toEqual({ method: "qr-code", secondFactor: null, authorizedBy: null });
+    });
 });
