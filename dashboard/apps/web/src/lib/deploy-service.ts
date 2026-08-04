@@ -1302,6 +1302,17 @@ async function buildAppPlan(
     // owner set for themselves.
     if (app.sourceType !== "image" && env.PORT === undefined) env.PORT = String(containerPort);
 
+    // And the address it listens on. A framework that defaults to localhost is
+    // right on a laptop and unreachable in a container: it builds, it starts, it
+    // logs that it is serving, and every request from outside the container is
+    // refused. Astro's Node adapter is one, and it fails this way silently - the
+    // deployment looks healthy and answers nothing.
+    //
+    // 0.0.0.0 is the container convention and what the platforms this is modelled
+    // on set; a service that publishes only one port is not made reachable by
+    // binding narrower. Never over a value the owner set for themselves.
+    if (app.sourceType !== "image" && env.HOST === undefined) env.HOST = "0.0.0.0";
+
     // NAS mounts the volumes bind onto: one per distinct storage connection a nas
     // volume uses, so the deploy kernel-mounts each at `<mount_root>/<id>` before the
     // container comes up - the bind `<mount_root>/<id>/<subpath>` then lands on the NAS.

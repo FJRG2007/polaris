@@ -82,6 +82,19 @@ describe("an install that cannot be refused over the calendar", () => {
         expect(declared).toBeLessThan(file.indexOf("FROM nginx:alpine"));
     });
 
+    /**
+     * The same shape, one step along: pnpm blocks a dependency's install scripts
+     * and then exits non-zero for having blocked them, pointing at a command that
+     * wants a human at a prompt. Approving them in the project does not help - the
+     * package.json field that used to say so is no longer read. Verified against
+     * pnpm 11.20: ERR_PNPM_IGNORED_BUILDS on esbuild, cleared by this name.
+     */
+    it("lets a dependency's install scripts run, which is what installing a toolchain is", () => {
+        expect(generateDockerfile(plan({ install: "pnpm install --frozen-lockfile" }))).toContain(
+            "ENV PNPM_CONFIG_DANGEROUSLY_ALLOW_ALL_BUILDS=true"
+        );
+    });
+
     it("declares it rather than folding it into the command, so a hand-set install gets it too", () => {
         // A service can set its own install command, and Polaris never rewrites one.
         const file = generateDockerfile(plan({ install: "pnpm install --production" }));

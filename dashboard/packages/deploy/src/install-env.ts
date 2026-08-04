@@ -24,6 +24,21 @@
  * The practical effect of leaving it on: any project on pnpm that updated a
  * dependency today cannot be deployed until tomorrow.
  */
+/**
+ * pnpm blocks dependency install scripts and then exits non-zero for having
+ * blocked them - `ERR_PNPM_IGNORED_BUILDS`, pointing at an `approve-builds`
+ * command that wants a human at a prompt. Approving them in the project does not
+ * help either: the `pnpm.onlyBuiltDependencies` field in package.json is no longer
+ * read, so a project that already made this decision has it silently dropped and
+ * fails anyway.
+ *
+ * Installing a build toolchain is the moment those scripts are meant to run - it
+ * is how a native dependency gets its binary. And the step immediately after this
+ * one runs the project's own build, which executes that same dependency tree as
+ * code. Refusing a postinstall and then handing the whole of node_modules the
+ * process a second later is not a boundary; the boundary is the build container.
+ */
 export const INSTALL_ENV: Readonly<Record<string, string>> = {
-    PNPM_CONFIG_MINIMUM_RELEASE_AGE: "0"
+    PNPM_CONFIG_MINIMUM_RELEASE_AGE: "0",
+    PNPM_CONFIG_DANGEROUSLY_ALLOW_ALL_BUILDS: "true"
 };
