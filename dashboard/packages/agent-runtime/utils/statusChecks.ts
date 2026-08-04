@@ -1,0 +1,124 @@
+import type { RestEndpointMethodTypes } from "@octokit/rest";
+import type { ToolContext } from "../mcp/server.ts";
+import { primaryRepoState } from "../toolState.ts";
+import { log } from "./cli.ts";
+import {
+  APPROVAL_CHECK_NAME,
+  createTerminalRunStatusCheck,
+  finalizeRunStatusCheck,
+  parseCheckRunId,
+  RUN_STATUS_CHECK_NAME,
+} from "./runStatusCheck.ts";
+
+/**
+ * post the `polaris` (run lifecycle) and `polaris-agent-approval` (review verdict)
+ * commit-status check-runs.
+ *
+ *   - `Polaris` is on by default (`Repo.statusChecks`). the server already created it
+ *     `in_progress` at dispatch, so the work here is a PATCH to its terminal conclusion -
+ *     see `runStatusCheck.ts` for why a second create would leave two contradictory rows.
+ *     the terminal-create fallback covers a payload with no `checkRun` (older server
+ *     build mid-rolling-deploy, or a workflow driven outside Polaris's dispatch path).
+ *   - `polaris-agent-approval` stays opt-in (`Repo.approvalCheck`, default off) and terminal-only:
+ *     it asserts a review verdict, which only exists once a run produces one. anchored
+ *     to the exact reviewed sha so a mid-run push leaves the new head unapproved until
+ *     a follow-up re-review reports.
+ *
+ * best-effort throughout: a check-post failure (transient 5xx, closed PR, revoked
+ * permission) must never flip the run's own outcome. the `workflow_run.completed` webhook
+ * and both stuck-run reaper sweeps close out a check this function fails to finalize.
+ */
+export async function reportStatusChecks(
+  ctx: ToolContext,
+  params: { runSucceeded: boolean }
+): Promise<void> {
+  const event = ctx.payload.event;
+  const pullNumber = event.issue_number;
+  if (event.is_pr !== true || typeof pullNumber !== "number") return;
+  // the check-run id is the authority, not the setting: if the server seeded a check, it
+  // MUST be finalized even when this workflow opted out via `status_checks: disabled`.
+  // the server never parses workflow YAML (it only sees `Repo.statusChecks`), so the
+  // opt-out cannot prevent the seed - and a seeded check left `in_progress` because the
+  // action declined to touch it is strictly worse than the check the user didn't want.
+  const checkRunId = parseCheckRunId(ctx.payload.checkRun);
+  if (checkRunId === undefined && !ctx.payload.runStatusCheck && !ctx.payload.approvalCheck) return;
+
+  const conclusion = params.runSucceeded ? "success" : "failure";
+  const detailsUrl = ctx.runId
+    ? `https://github.com/${ctx.repo.owner}/${ctx.repo.name}/actions/runs/${ctx.runId}`
+    : undefined;
+
+  if (checkRunId !== undefined) {
+    await finalizeRunStatusCheck({
+      octokit: ctx.octokit,
+      owner: ctx.repo.owner,
+      repo: ctx.repo.name,
+      checkRunId,
+      conclusion,
+      detailsUrl,
+      reviewUrl: ctx.toolState.approval?.url,
+    })
+      .then(() => log.info(`» finalized ${RUN_STATUS_CHECK_NAME} check (${conclusion})`))
+      .catch((err) => log.debug(`status checks: ${RUN_STATUS_CHECK_NAME} finalize failed: ${err}`));
+  }
+
+  // everything below needs a head sha, which costs an API call - skip it when there is
+  // nothing left to post.
+  const approval = ctx.toolState.approval;
+  const needsApprovalCheck = ctx.payload.approvalCheck && params.runSucceeded && approval;
+  const needsFallbackRunCheck = ctx.payload.runStatusCheck && checkRunId === undefined;
+  if (!needsApprovalCheck && !needsFallbackRunCheck) return;
+
+  let headSha: string;
+  try {
+    const pr = await ctx.octokit.rest.pulls.get({
+      owner: ctx.repo.owner,
+      repo: ctx.repo.name,
+      pull_number: pullNumber,
+    });
+    headSha = pr.data.head.sha;
+  } catch (err) {
+    log.debug(`status checks: failed to resolve PR #${pullNumber} head sha: ${err}`);
+    return;
+  }
+
+  if (needsFallbackRunCheck) {
+    await createTerminalRunStatusCheck({
+      octokit: ctx.octokit,
+      owner: ctx.repo.owner,
+      repo: ctx.repo.name,
+      headSha: primaryRepoState(ctx.toolState).checkoutSha ?? headSha,
+      conclusion,
+      detailsUrl,
+      reviewUrl: ctx.toolState.approval?.url,
+    })
+      .then(() => log.info(`» posted ${RUN_STATUS_CHECK_NAME} check (${conclusion})`))
+      .catch((err) => log.debug(`status checks: ${RUN_STATUS_CHECK_NAME} post failed: ${err}`));
+  }
+
+  // only assert an approval verdict when the run cleanly completed. the verdict is
+  // recorded before create_pull_request_review actually submits, so on a failed/crashed
+  // run the review may not have landed - leave polaris-agent-approval absent (the next run
+  // resolves it) rather than post a stale verdict.
+  if (!needsApprovalCheck || !approval) return;
+
+  const createParams: RestEndpointMethodTypes["checks"]["create"]["parameters"] = {
+    owner: ctx.repo.owner,
+    repo: ctx.repo.name,
+    name: APPROVAL_CHECK_NAME,
+    head_sha: approval.sha ?? headSha,
+    status: "completed",
+    conclusion: approval.wouldApprove ? "success" : "failure",
+    output: {
+      title: approval.wouldApprove ? "Polaris would approve" : "Polaris would not approve",
+      summary: approval.wouldApprove
+        ? "Polaris has no outstanding review feedback on this PR."
+        : "Polaris has outstanding review feedback or requested changes on this PR.",
+    },
+  };
+  if (detailsUrl) createParams.details_url = detailsUrl;
+  await ctx.octokit.rest.checks
+    .create(createParams)
+    .then(() => log.info(`» posted ${APPROVAL_CHECK_NAME} check`))
+    .catch((err) => log.debug(`status checks: ${APPROVAL_CHECK_NAME} post failed: ${err}`));
+}

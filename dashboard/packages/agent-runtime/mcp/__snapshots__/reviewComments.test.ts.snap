@@ -1,0 +1,71 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`formatReviewData > formats body-only review > content 1`] = `
+"# Review Threads (0) for PR #64 - Review 3531000326 by polaris[bot]
+
+## Review Body
+
+This PR looks great. The retry logic is well-implemented and the tests are comprehensive.
+
+---
+"
+`;
+
+exports[`formatReviewData > formats body-only review > toc 1`] = `""`;
+
+exports[`formatReviewData > formats thread blocks with TOC and correct line numbers > content 1`] = `
+"# Review Threads (1) for PR #49 - Review 3485940013 by cursor[bot]
+
+## TOC
+
+- .github/workflows/test.yml:7 → lines 25-52
+
+## Review Body
+
+### This is the final PR Bugbot will review for you during this billing cycle
+
+Your free Bugbot reviews will reset on November 30
+
+<details>
+<summary>Details</summary>
+
+Your team is on the Bugbot Free tier. On this plan, Bugbot will review limited PRs each billing cycle for each member of your team.
+
+To receive Bugbot reviews on all of your PRs, visit the [Cursor dashboard](https://www.cursor.com/dashboard?tab=bugbot) to activate Pro and start your 14-day free trial.
+</details>
+
+
+
+---
+
+## .github/workflows/test.yml:7 [RESOLVED]
+
+\`\`\`\`comment author=cursor id=2544544046 review=3485940013 thread=PRRT_kwDOPaxxp85iysVl *
+### Bug: GitHub Actions workflow triggered for wrong branch
+
+<!-- **High Severity** -->
+
+<!-- DESCRIPTION START -->
+The \`pull_request\` trigger specifies \`branches: [mainc]\`, but the \`push\` trigger specifies \`branches: [main]\`. This mismatch means pull requests will only trigger tests if targeting a non-existent \`mainc\` branch rather than the actual \`main\` development branch, preventing CI from running on most pull requests.
+<!-- DESCRIPTION END -->
+
+<!-- LOCATIONS START
+.github/workflows/test.yml#L6-L7
+LOCATIONS END -->
+<a href="https://cursor.com/open?data=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImJ1Z2JvdC12MSJ9.eyJ2ZXJzaW9uIjoxLCJ0eXBlIjoiQlVHQk9UX0ZJWF9JTl9DVVJTT1IiLCJkYXRhIjp7InJlZGlzS2V5IjoiYnVnYm90OjllMTgyY2U2LWY0YWMtNDAwNS1hMzQ4LWIyYzJkZTk4OGM1ZSIsImVuY3J5cHRpb25LZXkiOiJmSW93NEdsUGUwYlYtd3M2UC1UNHdHT1JmMGZjakxfWVZEdC00SWNveXo0IiwiYnJhbmNoIjoiZGl2aWRlIn0sImlhdCI6MTc2MzYyMDgxOSwiZXhwIjoxNzY0MjI1NjE5fQ.BjkWsTqiNriojI5v10JcveUY2M50f9eflTNDgWAdjdW9w7E0EEY4GJfyzBrA72neco3qAlc34WipASNuEQbTD1fZvwtJY-TeNTDzoKmwA6gtwICB8t7qT87GPvcbDrdGGWdC8kW1jf-LntTmD0k7gt0AeENRAdRSiD3dbqYFN0huXHaB8f2Y48mpmLcnnUpoaaZe7By-Y0DnILyHppwx3AH75nKE_ZeAee3rQNGX4cwcHgB5emTSM93pMDQhT1vbIRYHMaFkOaW2-kDOA8H2QqxD4mT8VzY3skvxIo5HNZCvqE84NtEygHqkBv88g2EEijOPAAeskfsdp087yIzV9g"><picture><source media="(prefers-color-scheme: dark)" srcset="https://cursor.com/fix-in-cursor-dark.svg"><source media="(prefers-color-scheme: light)" srcset="https://cursor.com/fix-in-cursor-light.svg"><img alt="Fix in Cursor" src="https://cursor.com/fix-in-cursor.svg"></picture></a>&nbsp;<a href="https://cursor.com/agents?data=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImJ1Z2JvdC12MSJ9.eyJ2ZXJzaW9uIjoxLCJ0eXBlIjoiQlVHQk9UX0ZJWF9JTl9XRUIiLCJkYXRhIjp7InJlZGlzS2V5IjoiYnVnYm90OjllMTgyY2U2LWY0YWMtNDAwNS1hMzQ4LWIyYzJkZTk4OGM1ZSIsImVuY3J5cHRpb25LZXkiOiJmSW93NEdsUGUwYlYtd3M2UC1UNHdHT1JmMGZjakxfWVZEdC00SWNveXo0IiwiYnJhbmNoIjoiZGl2aWRlIiwicmVwb093bmVyIjoicHVsbGZyb2dhaSIsInJlcG9OYW1lIjoic2NyYXRjaCIsInByTnVtYmVyIjo0OSwiY29tbWl0U2hhIjoiNThiOGJmNmQ1MWE1Mjg4OGFjNGFkNzA5YWVmYTk2MWFkZDMyNDBiMSJ9LCJpYXQiOjE3NjM2MjA4MTksImV4cCI6MTc2NDIyNTYxOX0.SFDZe8R9uwhPjS55J4i_mV2ybsSZoQYM6YzdUOava4IKy1IK2OrVkVsG3-8p4rRaMBXdDZZ4ObPbtk70KqdAiLEDKBqaFcWqELc49lr0XRKUmu4F6EhESFQOvt7MLSVDIOgee8YRlhS6xtoPDqsRiV2KGOwyLEdCeYdrYz9i1DanIswWSoMRVvkjxZ6GUBYVAUg_JsgAXoKVJ-L9Q5Ygho6acVAr5NlGeBp2f6g49GX4GfDOPeV3SORQS1CjxQVRbjI-g0rW55NIisBEl8279VwG6-dTISNbyasZOB6R3eEmC4vmyAAGJjUsMwqhMPw1oaMMmYNSbtZLDESxME9IUg"><picture><source media="(prefers-color-scheme: dark)" srcset="https://cursor.com/fix-in-web-dark.svg"><source media="(prefers-color-scheme: light)" srcset="https://cursor.com/fix-in-web-light.svg"><img alt="Fix in Web" src="https://cursor.com/fix-in-web.svg"></picture></a>
+
+
+\`\`\`\`
+
+\`\`\`diff file=.github/workflows/test.yml lines=7 side=RIGHT
+@@ -0,0 +1,36 @@
+... (3 lines above) ...
++  push:
++    branches: [main]
++  pull_request:
++    branches: [main]
+\`\`\`
+"
+`;
+
+exports[`formatReviewData > formats thread blocks with TOC and correct line numbers > toc 1`] = `"- .github/workflows/test.yml:7 → lines 25-52"`;

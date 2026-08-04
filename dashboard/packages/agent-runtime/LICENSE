@@ -1,18 +1,3 @@
-Polaris
-Copyright 2026 FJRG2007
-
-This product is licensed under the Apache License, Version 2.0 (see LICENSE).
-
--------------------------------------------------------------------------------
-
-This product includes software developed by Pullfrog, Inc.
-
-dashboard/packages/agent-runtime is derived from the pullfrog project
-(https://github.com/pullfrog/pullfrog), used and modified under the MIT License.
-The full licence text is retained at dashboard/packages/agent-runtime/LICENSE,
-and dashboard/packages/agent-runtime/VENDOR.md records the source commit and
-every change made.
-
 MIT License
 
 Copyright (c) 2026 Pullfrog, Inc.

@@ -1,0 +1,67 @@
+{
+  "owner": "polaris",
+  "name": "test-repo",
+  "pullNumber": 1,
+  "files": [
+    {
+      "sha": "a2d9c355792f1883c26d43d219db006b05781e4c",
+      "filename": "src/format.ts",
+      "status": "modified",
+      "additions": 12,
+      "deletions": 2,
+      "changes": 14,
+      "blob_url": "https://github.com/polaris/test-repo/blob/0311c0fb58fc7faa46e51c174394a4468f379681/src%2Fformat.ts",
+      "raw_url": "https://github.com/polaris/test-repo/raw/0311c0fb58fc7faa46e51c174394a4468f379681/src%2Fformat.ts",
+      "contents_url": "https://api.github.com/repos/polaris/test-repo/contents/src%2Fformat.ts?ref=0311c0fb58fc7faa46e51c174394a4468f379681",
+      "patch": "@@ -1,7 +1,17 @@\n-export function formatCurrency(amount: number) {\n-  return `$${amount.toFixed(2)}`;\n+export function formatCurrency(amount: number, currency = \"USD\") {\n+  return new Intl.NumberFormat(\"en-US\", {\n+    style: \"currency\",\n+    currency,\n+  }).format(amount);\n }\n \n export function formatPercent(value: number) {\n   return `${(value * 100).toFixed(1)}%`;\n }\n+\n+export function formatNumber(value: number, decimals = 2) {\n+  return new Intl.NumberFormat(\"en-US\", {\n+    minimumFractionDigits: decimals,\n+    maximumFractionDigits: decimals,\n+  }).format(value);\n+}"
+    },
+    {
+      "sha": "0786b9ce6870e65c644673745266e87eef057ce4",
+      "filename": "src/math.ts",
+      "status": "modified",
+      "additions": 5,
+      "deletions": 2,
+      "changes": 7,
+      "blob_url": "https://github.com/polaris/test-repo/blob/0311c0fb58fc7faa46e51c174394a4468f379681/src%2Fmath.ts",
+      "raw_url": "https://github.com/polaris/test-repo/raw/0311c0fb58fc7faa46e51c174394a4468f379681/src%2Fmath.ts",
+      "contents_url": "https://api.github.com/repos/polaris/test-repo/contents/src%2Fmath.ts?ref=0311c0fb58fc7faa46e51c174394a4468f379681",
+      "patch": "@@ -3,13 +3,16 @@ export function add(a: number, b: number) {\n }\n \n export function subtract(a: number, b: number) {\n-  return a + b; // bug: should be a - b\n+  return a - b;\n }\n \n export function multiply(a: number, b: number) {\n-  return a * b + 1; // bug: off by one\n+  return a * b;\n }\n \n export function divide(a: number, b: number) {\n+  if (b === 0) {\n+    throw new Error(\"division by zero\");\n+  }\n   return a / b;\n }"
+    },
+    {
+      "sha": "cf92d8f6562c1be779506fec1049f38c9206c869",
+      "filename": "src/old-module.ts",
+      "status": "removed",
+      "additions": 0,
+      "deletions": 4,
+      "changes": 4,
+      "blob_url": "https://github.com/polaris/test-repo/blob/91ef1048326ef786fbcf95f29b3e2555506d2d54/src%2Fold-module.ts",
+      "raw_url": "https://github.com/polaris/test-repo/raw/91ef1048326ef786fbcf95f29b3e2555506d2d54/src%2Fold-module.ts",
+      "contents_url": "https://api.github.com/repos/polaris/test-repo/contents/src%2Fold-module.ts?ref=91ef1048326ef786fbcf95f29b3e2555506d2d54",
+      "patch": "@@ -1,4 +0,0 @@\n-// this module is deprecated and will be removed\n-export function legacyHelper() {\n-  return \"old\";\n-}"
+    },
+    {
+      "sha": "a5bfb8a1be72e4f0816a5c4c83ee784a06559629",
+      "filename": "src/validate.ts",
+      "status": "added",
+      "additions": 11,
+      "deletions": 0,
+      "changes": 11,
+      "blob_url": "https://github.com/polaris/test-repo/blob/0311c0fb58fc7faa46e51c174394a4468f379681/src%2Fvalidate.ts",
+      "raw_url": "https://github.com/polaris/test-repo/raw/0311c0fb58fc7faa46e51c174394a4468f379681/src%2Fvalidate.ts",
+      "contents_url": "https://api.github.com/repos/polaris/test-repo/contents/src%2Fvalidate.ts?ref=0311c0fb58fc7faa46e51c174394a4468f379681",
+      "patch": "@@ -0,0 +1,11 @@\n+export function isPositive(n: number) {\n+  return n > 0;\n+}\n+\n+export function isInRange(value: number, min: number, max: number) {\n+  return value >= min && value <= max;\n+}\n+\n+export function isInteger(n: number) {\n+  return Number.isInteger(n);\n+}"
+    },
+    {
+      "sha": "5815895211d8e3355fdb77b9e216e73a248644d9",
+      "filename": "test/math.test.ts",
+      "status": "modified",
+      "additions": 4,
+      "deletions": 0,
+      "changes": 4,
+      "blob_url": "https://github.com/polaris/test-repo/blob/0311c0fb58fc7faa46e51c174394a4468f379681/test%2Fmath.test.ts",
+      "raw_url": "https://github.com/polaris/test-repo/raw/0311c0fb58fc7faa46e51c174394a4468f379681/test%2Fmath.test.ts",
+      "contents_url": "https://api.github.com/repos/polaris/test-repo/contents/test%2Fmath.test.ts?ref=0311c0fb58fc7faa46e51c174394a4468f379681",
+      "patch": "@@ -17,4 +17,8 @@ describe(\"math\", () => {\n   it(\"divides\", () => {\n     expect(divide(10, 2)).toBe(5);\n   });\n+\n+  it(\"throws on division by zero\", () => {\n+    expect(() => divide(1, 0)).toThrow(\"division by zero\");\n+  });\n });"
+    }
+  ]
+}

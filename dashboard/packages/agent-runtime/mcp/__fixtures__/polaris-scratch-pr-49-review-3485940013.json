@@ -1,0 +1,110 @@
+{
+  "owner": "polaris",
+  "name": "scratch",
+  "pullNumber": 49,
+  "reviewId": 3485940013,
+  "review": {
+    "body": "### This is the final PR Bugbot will review for you during this billing cycle\n\nYour free Bugbot reviews will reset on November 30\n\n<details>\n<summary>Details</summary>\n\nYour team is on the Bugbot Free tier. On this plan, Bugbot will review limited PRs each billing cycle for each member of your team.\n\nTo receive Bugbot reviews on all of your PRs, visit the [Cursor dashboard](https://www.cursor.com/dashboard?tab=bugbot) to activate Pro and start your 14-day free trial.\n</details>\n\n",
+    "user": {
+      "login": "cursor[bot]"
+    }
+  },
+  "threads": [
+    {
+      "id": "PRRT_kwDOPaxxp85iysVl",
+      "path": ".github/workflows/test.yml",
+      "line": null,
+      "startLine": null,
+      "diffSide": "RIGHT",
+      "isResolved": true,
+      "isOutdated": true,
+      "comments": {
+        "nodes": [
+          {
+            "fullDatabaseId": "2544544046",
+            "body": "### Bug: GitHub Actions workflow triggered for wrong branch\n\n<!-- **High Severity** -->\n\n<!-- DESCRIPTION START -->\nThe `pull_request` trigger specifies `branches: [mainc]`, but the `push` trigger specifies `branches: [main]`. This mismatch means pull requests will only trigger tests if targeting a non-existent `mainc` branch rather than the actual `main` development branch, preventing CI from running on most pull requests.\n<!-- DESCRIPTION END -->\n\n<!-- LOCATIONS START\n.github/workflows/test.yml#L6-L7\nLOCATIONS END -->\n<a href=\"https://cursor.com/open?data=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImJ1Z2JvdC12MSJ9.eyJ2ZXJzaW9uIjoxLCJ0eXBlIjoiQlVHQk9UX0ZJWF9JTl9DVVJTT1IiLCJkYXRhIjp7InJlZGlzS2V5IjoiYnVnYm90OjllMTgyY2U2LWY0YWMtNDAwNS1hMzQ4LWIyYzJkZTk4OGM1ZSIsImVuY3J5cHRpb25LZXkiOiJmSW93NEdsUGUwYlYtd3M2UC1UNHdHT1JmMGZjakxfWVZEdC00SWNveXo0IiwiYnJhbmNoIjoiZGl2aWRlIn0sImlhdCI6MTc2MzYyMDgxOSwiZXhwIjoxNzY0MjI1NjE5fQ.BjkWsTqiNriojI5v10JcveUY2M50f9eflTNDgWAdjdW9w7E0EEY4GJfyzBrA72neco3qAlc34WipASNuEQbTD1fZvwtJY-TeNTDzoKmwA6gtwICB8t7qT87GPvcbDrdGGWdC8kW1jf-LntTmD0k7gt0AeENRAdRSiD3dbqYFN0huXHaB8f2Y48mpmLcnnUpoaaZe7By-Y0DnILyHppwx3AH75nKE_ZeAee3rQNGX4cwcHgB5emTSM93pMDQhT1vbIRYHMaFkOaW2-kDOA8H2QqxD4mT8VzY3skvxIo5HNZCvqE84NtEygHqkBv88g2EEijOPAAeskfsdp087yIzV9g\"><picture><source media=\"(prefers-color-scheme: dark)\" srcset=\"https://cursor.com/fix-in-cursor-dark.svg\"><source media=\"(prefers-color-scheme: light)\" srcset=\"https://cursor.com/fix-in-cursor-light.svg\"><img alt=\"Fix in Cursor\" src=\"https://cursor.com/fix-in-cursor.svg\"></picture></a>&nbsp;<a href=\"https://cursor.com/agents?data=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImJ1Z2JvdC12MSJ9.eyJ2ZXJzaW9uIjoxLCJ0eXBlIjoiQlVHQk9UX0ZJWF9JTl9XRUIiLCJkYXRhIjp7InJlZGlzS2V5IjoiYnVnYm90OjllMTgyY2U2LWY0YWMtNDAwNS1hMzQ4LWIyYzJkZTk4OGM1ZSIsImVuY3J5cHRpb25LZXkiOiJmSW93NEdsUGUwYlYtd3M2UC1UNHdHT1JmMGZjakxfWVZEdC00SWNveXo0IiwiYnJhbmNoIjoiZGl2aWRlIiwicmVwb093bmVyIjoicHVsbGZyb2dhaSIsInJlcG9OYW1lIjoic2NyYXRjaCIsInByTnVtYmVyIjo0OSwiY29tbWl0U2hhIjoiNThiOGJmNmQ1MWE1Mjg4OGFjNGFkNzA5YWVmYTk2MWFkZDMyNDBiMSJ9LCJpYXQiOjE3NjM2MjA4MTksImV4cCI6MTc2NDIyNTYxOX0.SFDZe8R9uwhPjS55J4i_mV2ybsSZoQYM6YzdUOava4IKy1IK2OrVkVsG3-8p4rRaMBXdDZZ4ObPbtk70KqdAiLEDKBqaFcWqELc49lr0XRKUmu4F6EhESFQOvt7MLSVDIOgee8YRlhS6xtoPDqsRiV2KGOwyLEdCeYdrYz9i1DanIswWSoMRVvkjxZ6GUBYVAUg_JsgAXoKVJ-L9Q5Ygho6acVAr5NlGeBp2f6g49GX4GfDOPeV3SORQS1CjxQVRbjI-g0rW55NIisBEl8279VwG6-dTISNbyasZOB6R3eEmC4vmyAAGJjUsMwqhMPw1oaMMmYNSbtZLDESxME9IUg\"><picture><source media=\"(prefers-color-scheme: dark)\" srcset=\"https://cursor.com/fix-in-web-dark.svg\"><source media=\"(prefers-color-scheme: light)\" srcset=\"https://cursor.com/fix-in-web-light.svg\"><img alt=\"Fix in Web\" src=\"https://cursor.com/fix-in-web.svg\"></picture></a>\n\n",
+            "createdAt": "2025-11-20T06:40:19Z",
+            "diffHunk": "@@ -0,0 +1,36 @@\n+name: Test\n+\n+on:\n+  push:\n+    branches: [main]\n+  pull_request:\n+    branches: [mainc]",
+            "line": null,
+            "startLine": null,
+            "originalLine": 7,
+            "originalStartLine": null,
+            "author": {
+              "login": "cursor"
+            },
+            "pullRequestReview": {
+              "databaseId": 3485940013,
+              "author": {
+                "login": "cursor"
+              }
+            },
+            "reactionGroups": [
+              {
+                "content": "THUMBS_UP",
+                "reactors": {
+                  "nodes": []
+                }
+              },
+              {
+                "content": "THUMBS_DOWN",
+                "reactors": {
+                  "nodes": []
+                }
+              },
+              {
+                "content": "LAUGH",
+                "reactors": {
+                  "nodes": []
+                }
+              },
+              {
+                "content": "HOORAY",
+                "reactors": {
+                  "nodes": []
+                }
+              },
+              {
+                "content": "CONFUSED",
+                "reactors": {
+                  "nodes": []
+                }
+              },
+              {
+                "content": "HEART",
+                "reactors": {
+                  "nodes": []
+                }
+              },
+              {
+                "content": "ROCKET",
+                "reactors": {
+                  "nodes": []
+                }
+              },
+              {
+                "content": "EYES",
+                "reactors": {
+                  "nodes": []
+                }
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "prFiles": [
+    {
+      "filename": ".github/workflows/test.yml",
+      "patch": "@@ -0,0 +1,36 @@\n+name: Test\n+\n+on:\n+  push:\n+    branches: [main]\n+  pull_request:\n+    branches: [main]\n+\n+jobs:\n+  test:\n+    runs-on: ubuntu-latest\n+\n+    strategy:\n+      matrix:\n+        node-version: [22.x]\n+\n+    steps:\n+      - name: Checkout code\n+        uses: actions/checkout@v4\n+\n+      - name: Setup pnpm\n+        uses: pnpm/action-setup@v2\n+        with:\n+          version: 8\n+\n+      - name: Setup Node.js ${{ matrix.node-version }}\n+        uses: actions/setup-node@v4\n+        with:\n+          node-version: ${{ matrix.node-version }}\n+          cache: 'pnpm'\n+\n+      - name: Install dependencies\n+        run: pnpm install\n+\n+      - name: Run tests\n+        run: pnpm test"
+    },
+    {
+      "filename": "index.test.ts",
+      "patch": "@@ -1,5 +1,5 @@\n import { describe, it, expect } from 'vitest'\n-import { add } from './index.js'\n+import { add, multiply, subtract, divide } from './index.js'\n \n describe('add function', () => {\n   it('should add two positive numbers correctly', () => {\n@@ -25,3 +25,51 @@ describe('add function', () => {\n     expect(add(0.1, 0.2)).toBeCloseTo(0.3)\n   })\n })\n+\n+describe('multiply function', () => {\n+  it('should multiply two positive numbers correctly', () => {\n+    expect(multiply(3, 4)).toBe(12)\n+  })\n+\n+  it('should multiply negative numbers correctly', () => {\n+    expect(multiply(-2, 3)).toBe(-6)\n+    expect(multiply(-2, -3)).toBe(6)\n+  })\n+\n+  it('should handle zero correctly', () => {\n+    expect(multiply(5, 0)).toBe(0)\n+    expect(multiply(0, 5)).toBe(0)\n+  })\n+})\n+\n+describe('subtract function', () => {\n+  it('should subtract two positive numbers correctly', () => {\n+    expect(subtract(10, 3)).toBe(7)\n+  })\n+\n+  it('should handle negative numbers correctly', () => {\n+    expect(subtract(5, -3)).toBe(8)\n+    expect(subtract(-5, 3)).toBe(-8)\n+  })\n+\n+  it('should handle zero correctly', () => {\n+    expect(subtract(5, 0)).toBe(5)\n+    expect(subtract(0, 5)).toBe(-5)\n+  })\n+})\n+\n+describe('divide function', () => {\n+  it('should divide two positive numbers correctly', () => {\n+    expect(divide(10, 2)).toBe(5)\n+  })\n+\n+  it('should handle negative numbers correctly', () => {\n+    expect(divide(-10, 2)).toBe(-5)\n+    expect(divide(10, -2)).toBe(-5)\n+  })\n+\n+  it('should handle decimal results correctly', () => {\n+    expect(divide(10, 3)).toBeCloseTo(3.333, 2)\n+    expect(divide(7, 2)).toBe(3.5)\n+  })\n+})"
+    },
+    {
+      "filename": "index.ts",
+      "patch": "@@ -3,11 +3,13 @@ export function add(a: number, b: number) {\n }\n \n export function multiply(a: number, b: number) {\n-  // Bug: accidentally adding 1 to the result\n-  return a * b + 1;\n+  return a * b;\n }\n \n export function subtract(a: number, b: number) {\n-  // Bug: accidentally adding instead of subtracting\n-  return a + b;\n+  return a - b;\n+}\n+\n+export function divide(a: number, b: number) {\n+  return a / b;\n }"
+    }
+  ]
+}

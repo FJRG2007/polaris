@@ -1,0 +1,14 @@
+{
+  "owner": "polaris",
+  "name": "scratch",
+  "pullNumber": 64,
+  "reviewId": 3531000326,
+  "review": {
+    "body": "This PR looks great. The retry logic is well-implemented and the tests are comprehensive.",
+    "user": {
+      "login": "polaris[bot]"
+    }
+  },
+  "threads": [],
+  "prFiles": []
+}
