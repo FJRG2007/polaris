@@ -29,14 +29,15 @@
 
 import { RuleList } from "./rule-list";
 import { Section } from "./page-parts";
-import { Loader2, Mail } from "lucide-react";
-import { Skeleton, Switch } from "@polaris/ui";
+import { ruleDescription } from "./rule-language";
+import { Loader2, Mail, Search } from "lucide-react";
 import { ManagedRulePage } from "./managed-rule-page";
-import { PredefinedRuleList } from "./predefined-list";
 import { useCallback, useEffect, useState } from "react";
+import { Input, Select, Skeleton, Switch } from "@polaris/ui";
 import { AddressRulesPage, LoginRulePage } from "./access-rules";
 import { emptyRule, RuleEditor, type RulePosition } from "./rule-editor";
-import { getWafRuleAction, setWafRuleAction, type WafScopeRule } from "./actions";
+import { PredefinedRuleList, type PredefinedRuleRow } from "./predefined-list";
+import { getWafRuleAction, getWafRuleMatchesAction, setWafRuleAction, type WafRuleMatches, type WafScopeRule } from "./actions";
 import {
     WAF_MANAGED_RULES,
     WAF_RULES_MAX,
@@ -116,6 +117,11 @@ export function WafEditor({
     // allowlist. Null until somebody edits one, which is what keeps it in step with
     // whatever the last save left behind.
     const [addresses, setAddresses] = useState<{ allow: string[]; deny: string[] } | null>(null);
+    // What each rule matches over recent traffic. Its own round trip: it reads the
+    // edge log, and the rules have to be on screen before that finishes.
+    const [matches, setMatches] = useState<WafRuleMatches | undefined>(undefined);
+    const [search, setSearch] = useState("");
+    const [status, setStatus] = useState<"all" | "active" | "off">("all");
 
     useEffect(() => {
         let active = true;
@@ -123,10 +129,16 @@ export function WafEditor({
         setError(null);
         setView({ kind: "list" });
         setAddresses(null);
+        setMatches(undefined);
         void getWafRuleAction({ scopeType, scopeId }).then((result) => {
             if (!active) return;
             setSaved(result.rule ?? BLANK);
             if (result.error) setError(result.error);
+        });
+        void getWafRuleMatchesAction({ scopeType, scopeId }).then((result) => {
+            // A log that cannot be read is not an error worth interrupting the screen
+            // for - the column simply has nothing to draw.
+            if (active) setMatches(result.matches ?? {});
         });
         return () => {
             active = false;
@@ -248,14 +260,93 @@ export function WafEditor({
         addresses !== null &&
         JSON.stringify([addresses.allow, addresses.deny]) !== JSON.stringify([saved.ipAllowlist, saved.ipDenylist]);
 
+    /** Whether a row survives the search box and the status filter. */
+    const shown = (name: string, description: string, enabled: boolean | null): boolean => {
+        const needle = search.trim().toLowerCase();
+        if (needle && !`${name} ${description}`.toLowerCase().includes(needle)) return false;
+        if (status === "all" || enabled === null) return true;
+        return status === "active" ? enabled : !enabled;
+    };
+
+    const hiddenRules = new Set(
+        saved.rules
+            .map((rule, index) => ({ rule, index }))
+            .filter(({ rule }) => !shown(rule.name, ruleDescription(rule), rule.enabled))
+            .map(({ index }) => index)
+    );
+    const filtering = search.trim() !== "" || status !== "all";
+
+    const accessRows: PredefinedRuleRow[] = [
+        {
+            id: "addresses",
+            name: "IP access rules",
+            description:
+                "Addresses this scope admits and addresses it refuses. A denied address is blocked everywhere, including on its way to a login.",
+            action: { label: "Access", variant: "neutral" },
+            enabled: null,
+            // Enforced before any rule is evaluated, so there is nothing to replay.
+            activity: null,
+            state: addressesUnsaved
+                ? "Unsaved changes"
+                : addressCount === 0
+                  ? "No addresses"
+                  : `${saved.ipAllowlist.length} allowed, ${saved.ipDenylist.length} blocked`
+        },
+        ...(offerLogin
+            ? [
+                  {
+                      id: "login",
+                      name: "Require a Polaris login",
+                      description:
+                          "Visitors must sign in to Polaris to reach the service, and the rule can name which accounts, groups or roles it admits.",
+                      action: { label: "Login", variant: "neutral" as const },
+                      enabled: saved.requireLogin,
+                      activity: null
+                  }
+              ]
+            : [])
+    ];
+
     return (
         <div className="flex flex-col gap-4">
             {description ? <p className="text-sm text-muted-foreground">{description}</p> : null}
 
+            <div className="flex flex-wrap items-center gap-2">
+                <div className="relative min-w-0 flex-1">
+                    <Search
+                        className="pointer-events-none absolute left-2.5 top-1/2 size-4 shrink-0 -translate-y-1/2 text-muted-foreground"
+                        aria-hidden="true"
+                    />
+                    <Input
+                        value={search}
+                        aria-label="Search rules by name"
+                        placeholder="Search rules by name"
+                        className="pl-8"
+                        onChange={(event) => setSearch(event.target.value)}
+                    />
+                </div>
+                <Select
+                    value={status}
+                    aria-label="Show"
+                    className="w-40"
+                    options={[
+                        { value: "all", label: "Show all" },
+                        { value: "active", label: "Active only" },
+                        { value: "off", label: "Off only" }
+                    ]}
+                    onValueChange={(value) => setStatus(value as "all" | "active" | "off")}
+                />
+            </div>
+
             <RuleList
                 rules={saved.rules}
                 max={WAF_RULES_MAX}
-                canEdit={!busy}
+                // Dragging renumbers the list, and the list on screen is not the whole
+                // list while a search is on - so the drag is off rather than moving a
+                // rule the reader cannot see.
+                canEdit={!busy && !filtering}
+                hidden={hiddenRules}
+                matches={matches}
                 onCreate={() => setView({ kind: "custom", index: null, rule: emptyRule(saved.rules.length) })}
                 onEdit={(index) => {
                     const rule = saved.rules[index];
@@ -270,33 +361,7 @@ export function WafEditor({
                 canEdit={!busy}
                 onOpen={(id) => setView(id === "addresses" ? { kind: "addresses" } : { kind: "login" })}
                 onToggle={(_, on) => persist({ requireLogin: on })}
-                rows={[
-                    {
-                        id: "addresses",
-                        name: "IP access rules",
-                        description:
-                            "Addresses this scope admits and addresses it refuses. A denied address is blocked everywhere, including on its way to a login.",
-                        action: { label: "Access", variant: "neutral" },
-                        enabled: null,
-                        state: addressesUnsaved
-                            ? "Unsaved changes"
-                            : addressCount === 0
-                              ? "No addresses"
-                              : `${saved.ipAllowlist.length} allowed, ${saved.ipDenylist.length} blocked`
-                    },
-                    ...(offerLogin
-                        ? [
-                              {
-                                  id: "login",
-                                  name: "Require a Polaris login",
-                                  description:
-                                      "Visitors must sign in to Polaris to reach the service, and the rule can name which accounts, groups or roles it admits.",
-                                  action: { label: "Login", variant: "neutral" as const },
-                                  enabled: saved.requireLogin
-                              }
-                          ]
-                        : [])
-                ]}
+                rows={accessRows.filter((row) => shown(row.name, row.description, row.enabled))}
             />
 
             <PredefinedRuleList
@@ -314,8 +379,11 @@ export function WafEditor({
                     description: rule.description,
                     action: { label: "Block", variant: "danger" as const },
                     enabled: managedEnabled(rule, saved),
-                    caution: rule.caution
-                }))}
+                    caution: rule.caution,
+                    // A signature check has no conditions to replay, so there is
+                    // nothing honest to draw for it.
+                    activity: rule.rules.length === 0 ? null : matches?.[rule.id]
+                })).filter((row) => shown(row.name, row.description, row.enabled))}
             />
 
             <Section

@@ -237,10 +237,43 @@ export const WAF_RULE_OPERATORS = [
 ] as const;
 export type WafRuleOperator = (typeof WAF_RULE_OPERATORS)[number];
 
-/** What happens to a request the rule matches. `allow` stops evaluation and admits
- *  it, so a narrow exception can sit above a broad block. */
-export const WAF_RULE_ACTIONS = ["block", "allow"] as const;
+/**
+ * The signature checks a condition can test directly.
+ *
+ * They are managed rules with a switch of their own, and they were also the one thing
+ * a hand-written rule could not talk about: an operator who wanted "block SQL payloads
+ * on this hostname only" had no way to say it, and exempting a single URL meant an
+ * `allow` that turned off everything else with it. As a condition they compose like
+ * any other, which is also what gives the managed rules a real expression to copy out
+ * of rather than a description of one.
+ *
+ * They read the request the guard already has, so testing one still costs no lookup.
+ */
+export const WAF_RULE_SIGNALS = ["sql_injection", "xss", "browser_integrity"] as const;
+export type WafRuleSignal = (typeof WAF_RULE_SIGNALS)[number];
+
+/**
+ * What happens to a request the rule matches.
+ *
+ * `allow` stops evaluation and admits it, so a narrow exception can sit above a broad
+ * block. `skip` steps over the components it names and lets everything else carry on
+ * deciding, which is the precise version of the same exception: "this client is not
+ * an attacker" rarely means "and nothing else about this request matters".
+ */
+export const WAF_RULE_ACTIONS = ["block", "allow", "skip"] as const;
 export type WafRuleAction = (typeof WAF_RULE_ACTIONS)[number];
+
+/**
+ * What a `skip` rule steps over.
+ *
+ * Each one names a stage of the decision rather than a product, because that is what
+ * the guard actually has to skip: the rules below this one, the managed packs, the two
+ * injection checks, and the browser integrity check. The address denylist is
+ * deliberately absent - it is checked before any rule runs and a rule that could
+ * re-admit a denied address would make the denylist advisory.
+ */
+export const WAF_SKIP_COMPONENTS = ["custom_rules", "managed_rules", "injection_checks", "browser_integrity"] as const;
+export type WafSkipComponent = (typeof WAF_SKIP_COMPONENTS)[number];
 
 /** Caps, so the rule set stays something the edge carries in a header. */
 export const WAF_RULES_MAX = 32;
@@ -271,6 +304,18 @@ export const wafLeafConditionSchema = z.object({
 
 export type WafLeafCondition = z.infer<typeof wafLeafConditionSchema>;
 
+/** One test against a signature check rather than against a fact. `negate` is what
+ *  makes "everything except what the SQL check would refuse" expressible. */
+export const wafSignalConditionSchema = z.object({
+    signal: z.enum(WAF_RULE_SIGNALS),
+    negate: z.boolean().default(false)
+});
+
+export type WafSignalCondition = z.infer<typeof wafSignalConditionSchema>;
+
+/** Either kind of test: against a fact of the request, or against a signature check. */
+const wafTestSchema = z.union([wafLeafConditionSchema, wafSignalConditionSchema]);
+
 /**
  * A group of conditions read together.
  *
@@ -290,24 +335,29 @@ function wafConditionGroup<Inner extends z.ZodTypeAny>(inner: Inner) {
     });
 }
 
-const wafInnerGroupSchema = wafConditionGroup(wafLeafConditionSchema);
-const wafGroupSchema = wafConditionGroup(z.union([wafLeafConditionSchema, wafInnerGroupSchema]));
+const wafInnerGroupSchema = wafConditionGroup(wafTestSchema);
+const wafGroupSchema = wafConditionGroup(z.union([wafTestSchema, wafInnerGroupSchema]));
 
 /**
  * One entry of a rule: a test, or a group of them.
  *
  * A union rather than a tagged shape, so every rule written before nesting existed
  * still parses exactly as it did - a stored condition carries `field` and no `match`,
- * and the two members cannot be confused for one another.
+ * and no two members can be confused for one another (`field`, `signal`, `match`).
  */
-export const wafConditionSchema = z.union([wafLeafConditionSchema, wafGroupSchema]);
+export const wafConditionSchema = z.union([wafTestSchema, wafGroupSchema]);
 
 export type WafCondition = z.infer<typeof wafConditionSchema>;
 export type WafConditionGroup = z.infer<typeof wafGroupSchema>;
 
-/** Whether a condition is a group rather than a test against a fact. */
+/** Whether a condition is a group rather than a single test. */
 export function isWafConditionGroup(condition: WafCondition): condition is WafConditionGroup {
     return "match" in condition;
+}
+
+/** Whether a test reads a signature check rather than a fact of the request. */
+export function isWafSignalCondition(condition: WafCondition): condition is WafSignalCondition {
+    return "signal" in condition;
 }
 
 /** How many tests a condition holds, counting through every group inside it. */
@@ -322,6 +372,12 @@ export const wafCustomRuleSchema = z
         name: z.string().trim().min(1).max(80),
         enabled: z.boolean().default(true),
         action: z.enum(WAF_RULE_ACTIONS),
+        /**
+         * What a `skip` steps over. Ignored by any other action, and kept rather than
+         * cleared when the action changes, so flipping to block and back does not lose
+         * the choice somebody made.
+         */
+        skip: z.array(z.enum(WAF_SKIP_COMPONENTS)).max(WAF_SKIP_COMPONENTS.length).optional(),
         /** All must match, so a rule reads as one sentence with "and" in it. */
         conditions: z.array(wafConditionSchema).min(1).max(CONDITIONS_MAX)
     })
@@ -332,6 +388,15 @@ export const wafCustomRuleSchema = z
                 code: z.ZodIssueCode.custom,
                 path: ["conditions"],
                 message: `At most ${WAF_RULE_TESTS_MAX} conditions in one rule`
+            });
+        }
+        // A skip that skips nothing is a rule that does nothing, which is the one way
+        // this can be saved and then quietly fail to be the exception it was written as.
+        if (value.action === "skip" && (value.skip ?? []).length === 0) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ["skip"],
+                message: "Choose at least one thing to skip"
             });
         }
     });

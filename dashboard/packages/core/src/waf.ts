@@ -64,6 +64,17 @@ export interface GuardRule {
     readonly presets?: readonly string[];
     /** Custom rules in evaluation order, broadest scope first. */
     readonly rules: readonly WafCustomRule[];
+    /**
+     * The enabled packs, expanded. Kept apart from the operator's own rules rather
+     * than appended to them, because a `skip` rule has to be able to name them: "step
+     * over the managed rules" is not expressible against one flat list where a pack
+     * rule is indistinguishable from a hand-written one. Evaluated after `rules`, which
+     * is the same order the single list had, so a custom `allow` still wins.
+     *
+     * Only ever produced by `decodeGuardRule`; nothing encodes it, since the wire
+     * format carries pack ids and expands them on arrival.
+     */
+    readonly managedRules?: readonly WafCustomRule[];
 }
 
 /**
@@ -137,7 +148,8 @@ const EMPTY_RULE: GuardRule = {
     xssProtection: false,
     emailObfuscation: false,
     presets: [],
-    rules: []
+    rules: [],
+    managedRules: []
 };
 /** Everything a rule can refuse with, for a header that arrived unreadable. Both
  *  injection checks are on here even though the empty rule leaves them off: the empty
@@ -156,7 +168,8 @@ const FAIL_CLOSED: GuardRule = {
     xssProtection: true,
     emailObfuscation: false,
     presets: [],
-    rules: []
+    rules: [],
+    managedRules: []
 };
 
 /**
@@ -184,9 +197,12 @@ const DECODED_MAX = 256;
  * the guard's hot path or silently match nothing. One unreadable rule is dropped and
  * the rest still run.
  *
- * Rule packs are expanded here and appended *after* the operator's own rules, so a
- * hand-written `allow` still takes precedence over a managed `block` - the pack is
- * the broad policy and the custom rule above it is the exception.
+ * Rule packs are expanded here into `managedRules`, which the guard runs *after* the
+ * operator's own, so a hand-written `allow` still takes precedence over a managed
+ * `block` - the pack is the broad policy and the custom rule above it is the
+ * exception. They are a separate list rather than appended to `rules` so that a
+ * `skip` rule can name them: against one flat list, "step over the managed rules" is
+ * not something the walk can tell apart from the rules somebody wrote.
  */
 export function decodeGuardRule(header: string | undefined | null): GuardRule {
     if (!header) return EMPTY_RULE;
@@ -238,7 +254,8 @@ function decodeUncached(header: string): GuardRule {
                 xssProtection: obj.x === true || legacy,
                 emailObfuscation: obj.e === true,
                 presets,
-                rules: [...parseRules(obj.r), ...expandWafPresets(presets)]
+                rules: parseRules(obj.r),
+                managedRules: expandWafPresets(presets)
             };
         }
     } catch {

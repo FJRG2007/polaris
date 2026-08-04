@@ -11,6 +11,7 @@ import {
     summarizeWafAddress,
     summarizeWafTraffic,
     type WafAddressActivity,
+    type WafTrafficEntry,
     type WafTrafficSummary
 } from "@polaris/core";
 
@@ -33,6 +34,20 @@ async function readLogTail(): Promise<string> {
     const cut = raw.slice(raw.length - TAIL_BYTES);
     // Drop the partial first line rather than hand the parser half a JSON object.
     return cut.slice(cut.indexOf("\n") + 1);
+}
+
+/**
+ * The parsed log and the window it is being read over.
+ *
+ * Handed out rather than folded, for the one caller that replays the rules over the
+ * traffic instead of summarizing it. Same read, same bounded tail: a second reader
+ * with its own file handling would be a second answer about the same window.
+ */
+export async function wafLogWindow(
+    hours = 24,
+    now = Date.now()
+): Promise<{ entries: WafTrafficEntry[]; from: number; to: number }> {
+    return { entries: parseHttpLogs(await readLogTail()), from: now - hours * 3600 * 1000, to: now };
 }
 
 /** Traffic over the last `hours`, split into allowed and blocked, with the

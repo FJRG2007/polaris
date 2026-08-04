@@ -15,6 +15,7 @@
  * added for the sake of consistency with an editor they did not want.
  */
 
+import { MatchesCell } from "./rule-list";
 import { Badge, Switch } from "@polaris/ui";
 import { ChevronRight, TriangleAlert } from "lucide-react";
 
@@ -32,6 +33,9 @@ export interface PredefinedRuleRow {
     readonly state?: string;
     /** What arming it costs, shown as a warning next to the row. */
     readonly caution?: string;
+    /** What it matches over recent traffic. Absent for a row that is not a rule -
+     *  the address lists are enforced before anything is replayed. */
+    readonly activity?: { total: number; series: number[] } | null;
 }
 
 export function PredefinedRuleList({
@@ -63,6 +67,7 @@ export function PredefinedRuleList({
                             <th className="px-2 py-2 font-medium">Name</th>
                             <th className="px-2 py-2 font-medium">Description</th>
                             <th className="w-24 px-2 py-2 font-medium">Action</th>
+                            <th className="w-32 px-2 py-2 font-medium">Matches</th>
                             <th className="w-28 px-2 py-2 font-medium">Status</th>
                             <th className="w-10 px-2 py-2" aria-label="Open" />
                         </tr>
@@ -97,6 +102,13 @@ export function PredefinedRuleList({
                                 </td>
                                 <td className="px-2 py-2.5 align-top">
                                     <Badge variant={row.action.variant}>{row.action.label}</Badge>
+                                </td>
+                                <td className="px-2 py-2.5 align-top">
+                                    {row.activity === null ? (
+                                        <span className="text-xs text-muted-foreground">-</span>
+                                    ) : (
+                                        <MatchesCell name={row.name} activity={row.activity} />
+                                    )}
                                 </td>
                                 <td className="px-2 py-2.5 align-top">
                                     {row.enabled === null ? (

@@ -8,13 +8,14 @@
 
 import { z } from "zod";
 import { prisma } from "@polaris/db";
+import * as core from "@polaris/core";
 import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/session";
 import { recordAudit } from "@/lib/audit-service";
 import { syncAppRoutes } from "@/lib/deploy-service";
 import { syncDashboardRoute } from "@/lib/domain-edge";
-import { wafAddressActivity, wafTraffic } from "@/lib/waf-analytics-service";
 import { getWafRule, setWafRule, type WafRuleView } from "@/lib/waf-service";
+import { wafAddressActivity, wafLogWindow, wafTraffic } from "@/lib/waf-analytics-service";
 import {
     getWafIgnoreList,
     getWafJails,
@@ -36,19 +37,15 @@ import {
     removeWafBan,
     setWafFeedEnabled
 } from "@/lib/waf-intel-service";
-import {
-    cidrOrIp,
-    WAF_JAIL_IDS,
-    WAF_LIST_MAX,
-    type WafAddressActivity,
-    type WafCustomRule,
-    type WafJail,
-    type WafAnomaly,
-    type WafPrincipalGrant,
-    type WafPrincipalType,
-    type WafScopeType,
-    type WafTrafficSummary
-} from "@polaris/core";
+
+type WafAddressActivity = core.WafAddressActivity;
+type WafAnomaly = core.WafAnomaly;
+type WafCustomRule = core.WafCustomRule;
+type WafJail = core.WafJail;
+type WafPrincipalGrant = core.WafPrincipalGrant;
+type WafPrincipalType = core.WafPrincipalType;
+type WafScopeType = core.WafScopeType;
+type WafTrafficSummary = core.WafTrafficSummary;
 
 /** The two scopes nobody owns: they reach every service on the instance, or the
  *  dashboard itself, so `deploy.manage` (which an ordinary member holds) is not
@@ -60,7 +57,7 @@ const FIREWALL_PATH = "/apps/firewall";
 /** A jail as the panel may change it. The label and the description belong to the
  *  release, so they are not accepted from the client at all. */
 const wafJailSchema = z.object({
-    id: z.enum(WAF_JAIL_IDS),
+    id: z.enum(core.WAF_JAIL_IDS),
     enabled: z.boolean(),
     maxRetry: z.number().int().min(1).max(1000),
     findTimeSec: z.number().int().min(10).max(86400),
@@ -126,6 +123,68 @@ export async function setWafRuleAction(
         return {};
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Could not save the firewall rule" };
+    }
+}
+
+/** What one rule matches over the recent log, keyed as the caller asked for it. */
+export type WafRuleMatches = Record<string, { total: number; series: number[] }>;
+
+/**
+ * What each rule on a scope matches, over the traffic the edge actually saw.
+ *
+ * A replay rather than a record, and the screen says so: the access log knows a
+ * request was refused, not which rule refused it, so counting per rule from the log
+ * alone would be attribution by guesswork. Running the rules over real traffic answers
+ * a better question anyway - it works for a rule that is switched OFF, which is
+ * precisely when somebody is deciding whether to arm it.
+ *
+ * Its own round trip rather than part of the rule, because it reads megabytes of log
+ * and the rules themselves have to be on screen immediately.
+ */
+export async function getWafRuleMatchesAction(input: {
+    scopeType: WafScopeType;
+    scopeId: string;
+    hours?: number;
+}): Promise<{ matches?: WafRuleMatches; from?: number; to?: number; error?: string }> {
+    const user = await requirePermission("deploy.manage");
+    if (OPERATOR_SCOPES.has(input.scopeType)) await requirePermission("system.manage");
+    try {
+        const hours = Math.max(1, Math.min(input.hours ?? 24, 24 * 7));
+        const rule = await getWafRule(user.id, input.scopeType, input.scopeId);
+
+        // A managed rule expands to several rules and the row shows the pack, so each
+        // probe carries the row it belongs to and the parts are summed back together.
+        const owners = new Map<string, string>();
+        const probes = rule.rules.map((entry, index) => {
+            const key = `c${index}`;
+            owners.set(key, `custom:${index}`);
+            return { key, rule: entry };
+        });
+        // Every managed rule, armed or not: "what would this catch here?" is the
+        // question an operator looking at the switch is trying to answer.
+        for (const managed of core.WAF_MANAGED_RULES) {
+            managed.rules.forEach((entry, index) => {
+                const key = `m${managed.id}#${index}`;
+                owners.set(key, managed.id);
+                probes.push({ key, rule: entry });
+            });
+        }
+
+        const { entries, from, to } = await wafLogWindow(hours);
+        const matches: WafRuleMatches = {};
+        for (const [key, value] of core.wafRuleActivity(entries, probes, from, to)) {
+            const owner = owners.get(key);
+            if (!owner) continue;
+            const current = matches[owner] ?? { total: 0, series: value.series.map(() => 0) };
+            current.total += value.total;
+            value.series.forEach((count, index) => {
+                current.series[index] = (current.series[index] ?? 0) + count;
+            });
+            matches[owner] = current;
+        }
+        return { matches, from, to };
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not read recent traffic" };
     }
 }
 
@@ -265,7 +324,7 @@ export async function getWafAddressActivityAction(
     hours = 24
 ): Promise<{ activity?: WafAddressActivity; error?: string }> {
     await requirePermission("system.manage");
-    const address = cidrOrIp.safeParse(ip);
+    const address = core.cidrOrIp.safeParse(ip);
     if (!address.success) return { error: "That is not a valid address" };
     const window = z.number().int().min(1).max(168).safeParse(hours);
     if (!window.success) return { error: "That is not a valid window" };
@@ -292,7 +351,7 @@ export async function setWafJailsAction(jails: WafJailSettings[]): Promise<{ err
 
 export async function setWafIgnoreListAction(entries: string[]): Promise<{ error?: string }> {
     const user = await requirePermission("system.manage");
-    const parsed = z.array(cidrOrIp).max(WAF_LIST_MAX).safeParse(entries);
+    const parsed = z.array(core.cidrOrIp).max(core.WAF_LIST_MAX).safeParse(entries);
     if (!parsed.success) return { error: "Enter valid IP addresses or CIDR ranges" };
     try {
         await setWafIgnoreList(parsed.data);
@@ -308,7 +367,7 @@ export async function setWafIgnoreListAction(entries: string[]): Promise<{ error
  *  which is what makes this safe to offer without a confirmation. */
 export async function liftWafBanAction(ip: string): Promise<{ error?: string }> {
     const user = await requirePermission("system.manage");
-    const parsed = cidrOrIp.safeParse(ip);
+    const parsed = core.cidrOrIp.safeParse(ip);
     if (!parsed.success) return { error: "That is not a valid address" };
     try {
         await removeWafBan(parsed.data);
@@ -362,7 +421,7 @@ export async function setWafAnomalySettingsAction(settings: WafAnomalySettings):
  *  evidence and does not want to wait for automatic blocking to be trusted. */
 export async function blockAnomalyAction(ip: string, note: string): Promise<{ error?: string }> {
     const user = await requirePermission("system.manage");
-    const parsed = cidrOrIp.safeParse(ip);
+    const parsed = core.cidrOrIp.safeParse(ip);
     if (!parsed.success) return { error: "That is not a valid address" };
     try {
         const settings = await getWafAnomalySettings();

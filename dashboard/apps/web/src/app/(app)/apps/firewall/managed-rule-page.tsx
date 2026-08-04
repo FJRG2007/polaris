@@ -18,11 +18,30 @@
  * is the reason anybody opens it.
  */
 
+import * as core from "@polaris/core";
+import { ruleDescription } from "./rule-language";
 import { PageHeader, Section } from "./page-parts";
 import { Badge, Button, Switch } from "@polaris/ui";
-import type { WafManagedRule } from "@polaris/core";
-import { ruleDescription, ruleExpression } from "./rule-language";
+import { CopyButton } from "@/components/copy-button";
 import { CircleOff, Plus, ShieldCheck, TriangleAlert } from "lucide-react";
+
+/**
+ * The expression a signature check is written as.
+ *
+ * It is the same condition a rule of your own can hold, which is what makes copying
+ * this out of here worth offering: `waf.sql_injection and http.host eq "shop"` is a
+ * narrower version of the managed rule, and it is enforced by the same code.
+ */
+function signalExpression(rule: core.WafManagedRule): string | null {
+    if (rule.control.kind !== "setting") return null;
+    const signal =
+        rule.control.setting === "sqlInjectionProtection"
+            ? "sql_injection"
+            : rule.control.setting === "xssProtection"
+              ? "xss"
+              : "browser_integrity";
+    return core.renderWafExpression([{ signal, negate: false }]);
+}
 
 export function ManagedRulePage({
     rule,
@@ -32,7 +51,7 @@ export function ManagedRulePage({
     onToggle,
     onCreateException
 }: {
-    rule: WafManagedRule;
+    rule: core.WafManagedRule;
     enabled: boolean;
     disabled?: boolean;
     onBack: () => void;
@@ -40,6 +59,8 @@ export function ManagedRulePage({
     /** Opens the custom rule editor on an allow rule named after this one. */
     onCreateException: () => void;
 }) {
+    const expression = signalExpression(rule);
+
     return (
         <div className="flex flex-col gap-4">
             <PageHeader title={rule.label} onBack={onBack} />
@@ -82,7 +103,7 @@ export function ManagedRulePage({
             {rule.rules.length > 0 ? (
                 <Section
                     title="Conditions"
-                    hint="Maintained by Polaris and improved in releases. They are evaluated by the same engine as your own rules, after them."
+                    hint="Maintained by Polaris and improved in releases. They are evaluated by the same engine as your own rules, after them - so an expression here can be copied into a rule of your own and will do exactly the same thing."
                 >
                     <div className="flex flex-col gap-4">
                         {rule.rules.map((entry, index) => (
@@ -96,12 +117,19 @@ export function ManagedRulePage({
                                 <p className="text-xs text-muted-foreground [overflow-wrap:anywhere]">
                                     {ruleDescription(entry)}
                                 </p>
-                                <pre className="overflow-x-auto rounded-md bg-muted px-3 py-2 font-mono text-xs text-foreground">
-                                    {ruleExpression(entry)}
-                                </pre>
+                                <Expression value={core.renderWafExpression(entry.conditions)} />
                             </div>
                         ))}
                     </div>
+                </Section>
+            ) : null}
+
+            {expression ? (
+                <Section
+                    title="Expression"
+                    hint="What this check is, as a condition. Copy it into a rule of your own to narrow it - to one hostname, one path, or everything except one client - instead of switching it off for the whole scope."
+                >
+                    <Expression value={expression} />
                 </Section>
             ) : null}
 
@@ -131,13 +159,25 @@ export function ManagedRulePage({
 
             <Section
                 title="Exceptions"
-                hint="Your own rules are evaluated before every managed one, so an allow rule that matches the traffic this refuses admits it without switching the rule off for everything else."
+                hint="Your own rules are evaluated before every managed one, so a rule that matches the traffic this refuses can admit it - or skip this check alone - without switching the rule off for everything else."
             >
                 <Button type="button" variant="secondary" size="sm" className="w-fit" onClick={onCreateException}>
                     <Plus className="size-3.5 shrink-0" aria-hidden="true" />
                     Create an exception
                 </Button>
             </Section>
+        </div>
+    );
+}
+
+/** One expression, in the shape it is read and copied in. */
+function Expression({ value }: { value: string }) {
+    return (
+        <div className="flex items-start gap-2">
+            <pre className="min-w-0 flex-1 overflow-x-auto rounded-md bg-muted px-3 py-2 font-mono text-xs text-foreground">
+                {value}
+            </pre>
+            <CopyButton value={value} label="Copy the expression" className="mt-1.5" />
         </div>
     );
 }

@@ -5,9 +5,17 @@
  * where it came from, what it asked for, what it said it was - and an action to take
  * when they all hold. A condition is either one test or a group of them read as an
  * `all` or an `any`, which is what lets one rule say "from this network, and asking
- * for either of these two things". Rules are tried in order and the first match
- * decides, so a narrow `allow` above a broad `block` is an exception rather than a
- * contradiction.
+ * for either of these two things". Rules are tried in order and the first one to
+ * decide wins, so a narrow `allow` above a broad `block` is an exception rather than a
+ * contradiction. A `skip` does not decide - it records what the request no longer has
+ * to pass and lets the walk carry on, which is the precise version of the same
+ * exception.
+ *
+ * A test can also read one of the signature checks directly (`sql_injection`, `xss`,
+ * `browser_integrity`). Those are managed rules with a switch of their own, and making
+ * them conditions is what lets a rule narrow one to a hostname instead of turning it
+ * off for a whole scope - and what gives every managed rule an expression that can be
+ * copied into a rule of your own.
  *
  * Deliberately pure and I/O-free: the same function runs in the co-located edge
  * guard, where there is no database to consult, and in tests, where there is nothing
@@ -17,8 +25,17 @@
  */
 
 import { ipAllowed } from "./cidr.js";
-import { isWafConditionGroup } from "./schemas/deploy.js";
-import type { WafCondition, WafCustomRule, WafLeafCondition, WafRuleAction } from "./schemas/deploy.js";
+import { injectionFailure } from "./waf-injection.js";
+import { browserIntegrityFailure } from "./waf-integrity.js";
+import { isWafConditionGroup, isWafSignalCondition } from "./schemas/deploy.js";
+import type {
+    WafCondition,
+    WafCustomRule,
+    WafLeafCondition,
+    WafRuleAction,
+    WafSignalCondition,
+    WafSkipComponent
+} from "./schemas/deploy.js";
 
 /** The request as the edge forwards it. Any fact can be missing - a client is not
  *  obliged to send a user agent, and a proxy may not forward an address. */
@@ -29,6 +46,12 @@ export interface WafRequestFacts {
     readonly method?: string | null;
     readonly userAgent?: string | null;
     readonly query?: string | null;
+    /** Read only by the browser integrity signal, which is about the shape of the
+     *  request rather than about what it asked for. Absent everywhere else, and a
+     *  rule that tests the signal without them simply finds a request that fails it. */
+    readonly accept?: string | null;
+    readonly acceptLanguage?: string | null;
+    readonly acceptEncoding?: string | null;
 }
 
 /** The operators that mean "none of the values match" rather than "one does". */
@@ -106,6 +129,30 @@ function leafHolds(condition: WafLeafCondition, facts: WafRequestFacts): boolean
 }
 
 /**
+ * Whether a signature check would refuse this request.
+ *
+ * The same functions the guard runs as managed rules, called here so a hand-written
+ * rule can talk about them: "a SQL payload, but only on this hostname" is one rule
+ * rather than a protection switched off for a whole scope. Only the class being asked
+ * about is scanned, so testing for XSS does not pay for the SQL signatures.
+ */
+function signalHolds(condition: WafSignalCondition, facts: WafRequestFacts): boolean {
+    const hit =
+        condition.signal === "browser_integrity"
+            ? browserIntegrityFailure({
+                  userAgent: facts.userAgent,
+                  accept: facts.accept,
+                  acceptLanguage: facts.acceptLanguage,
+                  acceptEncoding: facts.acceptEncoding
+              }) !== null
+            : injectionFailure(
+                  { path: facts.path, query: facts.query, userAgent: facts.userAgent },
+                  { sql: condition.signal === "sql_injection", xss: condition.signal === "xss" }
+              ) !== null;
+    return condition.negate ? !hit : hit;
+}
+
+/**
  * Whether one condition holds - a test, or a group read as its own `all`/`any`.
  *
  * Short-circuits the way the operators read, so a group whose answer is already
@@ -113,6 +160,7 @@ function leafHolds(condition: WafLeafCondition, facts: WafRequestFacts): boolean
  * not what it could look at.
  */
 export function conditionHolds(condition: WafCondition, facts: WafRequestFacts): boolean {
+    if (isWafSignalCondition(condition)) return signalHolds(condition, facts);
     if (!isWafConditionGroup(condition)) return leafHolds(condition, facts);
     return condition.match === "any"
         ? condition.conditions.some((entry) => conditionHolds(entry, facts))
@@ -131,14 +179,43 @@ export interface WafRuleVerdict {
     readonly rule: WafCustomRule;
 }
 
-/** The first rule that matches, or null when none does and the request carries on
- *  through whatever else the route is protected by. */
-export function evaluateWafRules(
-    rules: readonly WafCustomRule[],
-    facts: WafRequestFacts
-): WafRuleVerdict | null {
+/** What the rule set had to say about one request. */
+export interface WafRuleOutcome {
+    /** The rule that decided it outright, or null when none did and the request
+     *  carries on through whatever else the route is protected by. */
+    readonly verdict: WafRuleVerdict | null;
+    /** What the `skip` rules that matched on the way step over. Empty for almost
+     *  every request, which is why the caller can test it and move on. */
+    readonly skipped: ReadonlySet<WafSkipComponent>;
+    /** The names of those rules, so a skipped check can say what skipped it. */
+    readonly skippedBy: readonly string[];
+}
+
+const NOTHING_SKIPPED: ReadonlySet<WafSkipComponent> = new Set();
+
+/**
+ * Run the rule set over one request.
+ *
+ * `block` and `allow` decide and stop, the way first-match-wins has always worked
+ * here. `skip` does not decide: it notes what the request no longer has to pass and
+ * carries on, so "this SDK is not an attacker" can step over the injection checks
+ * without also stepping over the address denylist or the login. A skip that names the
+ * remaining custom rules stops the walk as well, which is the one that reads like
+ * Cloudflare's - everything below this rule is off for this request.
+ */
+export function evaluateWafRules(rules: readonly WafCustomRule[], facts: WafRequestFacts): WafRuleOutcome {
+    let skipped: Set<WafSkipComponent> | null = null;
+    const skippedBy: string[] = [];
+
     for (const rule of rules) {
-        if (ruleMatches(rule, facts)) return { action: rule.action, rule };
+        if (!ruleMatches(rule, facts)) continue;
+        if (rule.action !== "skip") {
+            return { verdict: { action: rule.action, rule }, skipped: skipped ?? NOTHING_SKIPPED, skippedBy };
+        }
+        skipped ??= new Set();
+        for (const component of rule.skip ?? []) skipped.add(component);
+        skippedBy.push(rule.name);
+        if (skipped.has("custom_rules")) break;
     }
-    return null;
+    return { verdict: null, skipped: skipped ?? NOTHING_SKIPPED, skippedBy };
 }

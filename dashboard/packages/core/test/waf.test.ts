@@ -38,7 +38,8 @@ describe("guard rule codec", () => {
             xssProtection: true,
             emailObfuscation: false,
             presets: [],
-            rules: [CUSTOM_RULE]
+            rules: [CUSTOM_RULE],
+            managedRules: []
         };
         expect(decodeGuardRule(encodeGuardRule(rule))).toEqual(rule);
     });
@@ -87,7 +88,8 @@ describe("guard rule codec", () => {
             xssProtection: false,
             emailObfuscation: false,
             presets: [],
-            rules: []
+            rules: [],
+            managedRules: []
         });
     });
 
@@ -104,7 +106,8 @@ describe("guard rule codec", () => {
             xssProtection: true,
             emailObfuscation: false,
             presets: [],
-            rules: []
+            rules: [],
+            managedRules: []
         });
     });
 
@@ -120,7 +123,8 @@ describe("guard rule codec", () => {
             xssProtection: false,
             emailObfuscation: false,
             presets: [],
-            rules: []
+            rules: [],
+            managedRules: []
         });
     });
 

@@ -13,7 +13,7 @@ import {
 
 /** Run a request through a pack the way the guard does, and report the verdict. */
 function verdict(presetIds: string[], facts: Parameters<typeof evaluateWafRules>[1]) {
-    return evaluateWafRules(expandWafPresets(presetIds), facts);
+    return evaluateWafRules(expandWafPresets(presetIds), facts).verdict;
 }
 
 const BROWSER =
@@ -187,7 +187,7 @@ describe("the wire format", () => {
         expect(header.length).toBeLessThan(120);
     });
 
-    it("expands them on the way out, after the operator's own rules", () => {
+    it("expands them on the way out, apart from the operator's own rules", () => {
         const own = {
             name: "Let my scanner in",
             enabled: true,
@@ -198,13 +198,17 @@ describe("the wire format", () => {
             encodeGuardRule({ deny: [], requireLogin: false, presets: ["scanners"], rules: [own] })
         );
         expect(decoded.presets).toEqual(["scanners"]);
-        expect(decoded.rules[0]).toEqual(own);
-        expect(decoded.rules.length).toBeGreaterThan(1);
+        // The two lists stay apart so a `skip` rule can name the managed half; the
+        // guard runs the operator's first, which is what keeps the exception winning.
+        expect(decoded.rules).toEqual([own]);
+        expect(decoded.managedRules?.length).toBeGreaterThan(0);
 
-        // And that ordering is what lets the exception win over the pack.
         const facts = { ip: "203.0.113.9", userAgent: "sqlmap/1.7", path: "/" };
-        expect(evaluateWafRules(decoded.rules, facts)?.action).toBe("allow");
-        expect(evaluateWafRules(decoded.rules, { ...facts, ip: "203.0.113.10" })?.action).toBe("block");
+        expect(evaluateWafRules(decoded.rules, facts).verdict?.action).toBe("allow");
+        expect(evaluateWafRules(decoded.rules, { ...facts, ip: "203.0.113.10" }).verdict).toBeNull();
+        expect(evaluateWafRules(decoded.managedRules ?? [], { ...facts, ip: "203.0.113.10" }).verdict?.action).toBe(
+            "block"
+        );
     });
 
     it("returns the same decoded object for a repeated header", () => {

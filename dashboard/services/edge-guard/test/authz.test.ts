@@ -555,6 +555,84 @@ describe("injection protection", () => {
         ).toEqual({ status: 200 });
     });
 
+    it("lets a skip rule step over the checks without admitting the request outright", () => {
+        // The difference from `allow`, and the reason `skip` exists: the SDK stops
+        // being scanned for payloads and is still subject to everything else.
+        const skip: WafCustomRule = {
+            name: "our own SDK",
+            enabled: true,
+            action: "skip",
+            skip: ["injection_checks"],
+            conditions: [{ field: "user_agent", operator: "equals", values: ["PolarisSDK/1.0"] }]
+        };
+        const block: WafCustomRule = {
+            name: "not the admin path",
+            enabled: true,
+            action: "block",
+            conditions: [{ field: "path", operator: "starts_with", values: ["/admin"] }]
+        };
+        const header = armed([skip, block]);
+
+        expect(
+            evaluate(
+                {
+                    wafHeader: header,
+                    forwardedHost: HOST,
+                    forwardedUri: "/report?sql=select+name+from+users",
+                    userAgent: "PolarisSDK/1.0"
+                },
+                cfg
+            ).status
+        ).toBe(200);
+        // The same client, still refused by the rule below the skip.
+        expect(
+            evaluate(
+                { wafHeader: header, forwardedHost: HOST, forwardedUri: "/admin", userAgent: "PolarisSDK/1.0" },
+                cfg
+            )
+        ).toEqual({ status: 403, reason: "rule: not the admin path" });
+        // Anybody else still gets scanned.
+        expect(
+            evaluate(
+                {
+                    wafHeader: header,
+                    forwardedHost: HOST,
+                    forwardedUri: "/report?sql=select+name+from+users",
+                    userAgent: "curl/8.4.0"
+                },
+                cfg
+            ).status
+        ).toBe(403);
+    });
+
+    it("lets a skip rule step over the managed packs alone", () => {
+        const skip: WafCustomRule = {
+            name: "our own scanner",
+            enabled: true,
+            action: "skip",
+            skip: ["managed_rules"],
+            conditions: [{ field: "ip", operator: "equals", values: ["203.0.113.7"] }]
+        };
+        const header = encodeGuardRule({
+            deny: [],
+            requireLogin: false,
+            sqlInjectionProtection: true,
+            xssProtection: true,
+            presets: ["scanners"],
+            rules: [skip]
+        });
+        const ours = { wafHeader: header, forwardedHost: HOST, userAgent: "nikto/2.5", forwardedFor: "203.0.113.7" };
+
+        // The pack would refuse this user agent; the skip steps over the pack.
+        expect(evaluate({ ...ours, forwardedUri: "/" }, cfg).status).toBe(200);
+        // And only over the pack: the injection check still runs for that address.
+        expect(evaluate({ ...ours, forwardedUri: "/p?id=1' or 1=1--" }, cfg).status).toBe(403);
+        // Somebody else is still refused by the pack.
+        expect(
+            evaluate({ ...ours, forwardedFor: "198.51.100.2", forwardedUri: "/" }, cfg).status
+        ).toBe(403);
+    });
+
     it("lets a custom allow rule carve out an exception above it", () => {
         const allow: WafCustomRule = {
             name: "the reporting endpoint really does take sql",

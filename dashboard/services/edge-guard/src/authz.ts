@@ -56,6 +56,10 @@ import {
 /** Path (on the app's own domain) the login handoff returns to. */
 const CALLBACK_PATH = "/edge/callback";
 
+/** What almost every request skips, which is nothing. Shared so the common path
+ *  allocates no set at all. */
+const EMPTY_SKIP: ReadonlySet<string> = new Set();
+
 /** The forwarded request facts the guard decides on (all from Traefik headers). */
 export interface GuardRequest {
     readonly wafHeader?: string;
@@ -189,18 +193,40 @@ export function evaluate(req: GuardRequest, cfg: GuardConfig): GuardDecision {
     // Custom rules next, before the login handoff: a rule that admits a request is
     // meant to admit it, and one that blocks it should not first be sent round a
     // login it was never going to be allowed past.
-    if (rule.rules.length > 0) {
+    //
+    // A `skip` rule decides nothing and instead names what the request no longer has
+    // to pass, so the checks below ask whether they were skipped rather than whether a
+    // rule matched. The managed packs are expanded into this same list, which is why
+    // skipping them is a filter on the walk rather than a separate stage: a pack rule
+    // is an ordinary rule that happens to have been written by us.
+    let skipped: ReadonlySet<string> = EMPTY_SKIP;
+    const managed = rule.managedRules ?? [];
+    if (rule.rules.length > 0 || managed.length > 0) {
         const uri = parseUri(req.forwardedUri, proto, host);
-        const verdict = evaluateWafRules(rule.rules, {
+        const facts = {
             ip: clientIp(req.forwardedFor),
             host,
             path: uri?.pathname ?? req.forwardedUri ?? null,
             method: req.forwardedMethod,
             userAgent: req.userAgent,
-            query: uri?.search.replace(/^\?/, "") ?? null
-        });
-        if (verdict?.action === "block") return { status: 403, reason: `rule: ${verdict.rule.name}` };
-        if (verdict?.action === "allow") return { status: 200 };
+            query: uri?.search.replace(/^\?/, "") ?? null,
+            accept: req.accept,
+            acceptLanguage: req.acceptLanguage,
+            acceptEncoding: req.acceptEncoding
+        };
+
+        const own = evaluateWafRules(rule.rules, facts);
+        skipped = own.skipped;
+        if (own.verdict?.action === "block") return { status: 403, reason: `rule: ${own.verdict.rule.name}` };
+        if (own.verdict?.action === "allow") return { status: 200 };
+
+        // The packs, unless a rule above stepped over them. They are only ever `block`
+        // rules, so their outcome cannot skip anything further.
+        if (!skipped.has("managed_rules") && managed.length > 0) {
+            const verdict = evaluateWafRules(managed, facts).verdict;
+            if (verdict?.action === "block") return { status: 403, reason: `rule: ${verdict.rule.name}` };
+            if (verdict?.action === "allow") return { status: 200 };
+        }
     }
 
     // After the custom rules too, and before the integrity check because it is the more
@@ -211,7 +237,7 @@ export function evaluate(req: GuardRequest, cfg: GuardConfig): GuardDecision {
     // check that runs for every request on every route, and the raw request line is
     // what should be scanned anyway - the signatures are matched against the bytes the
     // client actually sent, after this check's own decoding.
-    if (rule.sqlInjectionProtection === true || rule.xssProtection === true) {
+    if (!skipped.has("injection_checks") && (rule.sqlInjectionProtection === true || rule.xssProtection === true)) {
         const uri = req.forwardedUri ?? "";
         const split = uri.indexOf("?");
         const failure = injectionFailure(
@@ -229,7 +255,7 @@ export function evaluate(req: GuardRequest, cfg: GuardConfig): GuardDecision {
     // wrong about something; putting it here means an operator who finds the thing it
     // is wrong about writes an `allow` above it, which is the same exception mechanism
     // every other block on this path already has.
-    if (rule.browserIntegrity === true) {
+    if (!skipped.has("browser_integrity") && rule.browserIntegrity === true) {
         const failure = browserIntegrityFailure({
             userAgent: req.userAgent,
             accept: req.accept,

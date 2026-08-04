@@ -3,10 +3,10 @@
 /**
  * One rule, open for editing.
  *
- * It takes over the screen instead of expanding in place. A rule is four decisions -
- * what it matches, what it then does, where it sits in the order, and whether it is
- * on - and each of them wants room; inline, they turned the list into a wall and hid
- * the order, which is the one thing the list is for.
+ * It takes over the screen instead of expanding in place. A rule is five decisions -
+ * what it matches, what it then does, what that action steps over, where it sits in
+ * the order, and whether it is on - and each of them wants room; inline, they turned
+ * the list into a wall and hid the order, which is the one thing the list is for.
  *
  * Saving is explicit here, and that is the whole reason this screen exists as a
  * separate step. A half-written rule must never reach the edge: a condition with no
@@ -15,38 +15,47 @@
  */
 
 import { useState } from "react";
+import * as core from "@polaris/core";
+import { TriangleAlert } from "lucide-react";
 import { PageHeader, Section } from "./page-parts";
-import { Button, Input, Select } from "@polaris/ui";
-import { ChipList, validAddress } from "./chip-list";
-import { Brackets, Plus, TriangleAlert, X } from "lucide-react";
-import { isWafConditionGroup, WAF_RULE_TESTS_MAX, wafConditionTests } from "@polaris/core";
-import type {
-    WafCondition,
-    WafConditionGroup,
-    WafCustomRule,
-    WafLeafCondition,
-    WafRuleField,
-    WafRuleOperator
-} from "@polaris/core";
-import {
-    emptyCondition,
-    emptyGroup,
-    FIELD_OPTIONS,
-    IP_OPERATORS,
-    operatorOptions,
-    ruleExpression,
-    VALUE_PLACEHOLDER
-} from "./rule-language";
+import { ConditionBuilder } from "./condition-builder";
+import { Button, Checkbox, Input, Select } from "@polaris/ui";
+
+type WafCondition = core.WafCondition;
+type WafCustomRule = core.WafCustomRule;
+type WafSkipComponent = core.WafSkipComponent;
 
 const ACTION_OPTIONS = [
     { value: "block", label: "Block" },
-    { value: "allow", label: "Allow" }
+    { value: "allow", label: "Allow" },
+    { value: "skip", label: "Skip" }
 ];
 
 /** What the chosen action actually does, said where the choice is made. */
 const ACTION_EFFECT: Record<WafCustomRule["action"], string> = {
     block: "Refuses matching requests with 403 and stops evaluating later rules.",
-    allow: "Admits matching requests and stops evaluating later rules, so a rule below cannot block them."
+    allow: "Admits matching requests and stops evaluating later rules, so a rule below cannot block them.",
+    skip: "Steps over the checks below for matching requests and lets everything else carry on deciding. It cannot skip the address rules, which are enforced before any rule runs."
+};
+
+/** What each component is called, and what leaving it on would still do. */
+const SKIP_LABELS: Record<WafSkipComponent, { title: string; detail: string }> = {
+    custom_rules: {
+        title: "All remaining custom rules",
+        detail: "Every rule below this one stops evaluating for the matching request."
+    },
+    managed_rules: {
+        title: "All managed rules",
+        detail: "The rule packs Polaris maintains: scanners, dotfiles, admin panels and the rest."
+    },
+    injection_checks: {
+        title: "The SQL injection and cross-site scripting checks",
+        detail: "The signature scan of the request line."
+    },
+    browser_integrity: {
+        title: "The browser integrity check",
+        detail: "The heuristic that refuses a client claiming to be a browser and not behaving like one."
+    }
 };
 
 /** Where the rule sits. `custom` is the only one that needs a second answer, which is
@@ -77,11 +86,12 @@ export function emptyRule(count: number): WafCustomRule {
 
 /** Whether any test anywhere in the tree is still waiting for a value. A half-written
  *  condition matches nothing or everything depending on its operator, which is the one
- *  thing that must never reach the edge. */
+ *  thing that must never reach the edge. A signature check has no value to wait for. */
 function anyEmpty(conditions: readonly WafCondition[]): boolean {
-    return conditions.some((condition) =>
-        isWafConditionGroup(condition) ? anyEmpty(condition.conditions) : condition.values.length === 0
-    );
+    return conditions.some((condition) => {
+        if (core.isWafSignalCondition(condition)) return false;
+        return core.isWafConditionGroup(condition) ? anyEmpty(condition.conditions) : condition.values.length === 0;
+    });
 }
 
 /** Why this rule cannot be saved yet, or null when it can. Every reason is something
@@ -90,8 +100,9 @@ function blockingReason(rule: WafCustomRule): string | null {
     if (rule.name.trim() === "") return "Give the rule a name.";
     if (rule.conditions.length === 0) return "Add at least one condition.";
     if (anyEmpty(rule.conditions)) return "Every condition needs at least one value.";
-    const tests = rule.conditions.reduce((total, condition) => total + wafConditionTests(condition), 0);
-    if (tests > WAF_RULE_TESTS_MAX) return `A rule can hold at most ${WAF_RULE_TESTS_MAX} conditions.`;
+    const tests = rule.conditions.reduce((total, condition) => total + core.wafConditionTests(condition), 0);
+    if (tests > core.WAF_RULE_TESTS_MAX) return `A rule can hold at most ${core.WAF_RULE_TESTS_MAX} conditions.`;
+    if (rule.action === "skip" && (rule.skip ?? []).length === 0) return "Choose at least one thing to skip.";
     return null;
 }
 
@@ -116,9 +127,9 @@ export function RuleEditor({
     // position picker starts on where it already is rather than on a default that
     // would silently relocate it the moment anything else was edited.
     const [position, setPosition] = useState<RulePosition>(() => startingPosition(index));
-    const expression = ruleExpression(rule);
     const blocked = blockingReason(rule);
     const creating = index === null;
+    const skip = rule.skip ?? [];
 
     return (
         <div className="flex flex-col gap-4">
@@ -142,23 +153,12 @@ export function RuleEditor({
 
             <Section
                 title="When incoming requests match..."
-                hint="Every condition must hold. Within one condition, any of its values is enough. Group conditions to ask for any one of them instead."
+                hint="Every condition must hold. Within one condition, any of its values is enough. Join a row with Or to ask for either instead."
             >
-                <div className="flex flex-col gap-3">
-                    <ConditionList
-                        conditions={rule.conditions}
-                        match="all"
-                        depth={0}
-                        onChange={(conditions) => setRule({ ...rule, conditions })}
-                    />
-
-                    <div className="mt-1 flex flex-col gap-1.5">
-                        <span className="text-xs font-medium text-muted-foreground">Expression preview</span>
-                        <pre className="overflow-x-auto rounded-md bg-muted px-3 py-2 font-mono text-xs text-foreground">
-                            {expression || "Add a condition to see the expression."}
-                        </pre>
-                    </div>
-                </div>
+                <ConditionBuilder
+                    conditions={rule.conditions}
+                    onChange={(conditions) => setRule({ ...rule, conditions })}
+                />
             </Section>
 
             <Section title="Then take action...">
@@ -173,6 +173,38 @@ export function RuleEditor({
                     />
                     <p className="text-xs text-muted-foreground">{ACTION_EFFECT[rule.action]}</p>
                 </div>
+
+                {/* Only under the action that gives them meaning. The choice is kept
+                    either way, so switching to block and back comes back to what was
+                    picked rather than to nothing. */}
+                {rule.action === "skip" ? (
+                    <fieldset className="flex flex-col gap-2 border-t border-border pt-3">
+                        <legend className="text-xs font-medium text-muted-foreground">What to skip</legend>
+                        {(Object.keys(SKIP_LABELS) as WafSkipComponent[]).map((component) => (
+                            <label key={component} className="flex w-fit cursor-pointer items-start gap-2 text-sm">
+                                <Checkbox
+                                    className="mt-0.5"
+                                    checked={skip.includes(component)}
+                                    aria-label={SKIP_LABELS[component].title}
+                                    onChange={(event) =>
+                                        setRule({
+                                            ...rule,
+                                            skip: event.target.checked
+                                                ? [...skip, component]
+                                                : skip.filter((entry) => entry !== component)
+                                        })
+                                    }
+                                />
+                                <span className="min-w-0">
+                                    {SKIP_LABELS[component].title}
+                                    <span className="block text-xs text-muted-foreground">
+                                        {SKIP_LABELS[component].detail}
+                                    </span>
+                                </span>
+                            </label>
+                        ))}
+                    </fieldset>
+                ) : null}
             </Section>
 
             <Section
@@ -267,218 +299,6 @@ export function RuleEditor({
 function startingPosition(index: number | null): RulePosition {
     if (index === null) return { kind: "last" };
     return index === 0 ? { kind: "first" } : { kind: "after", index: index - 1 };
-}
-
-/** How deep a group may sit before the schema stops accepting one. Three levels of
- *  reading is already the limit of what an operator can hold in their head, and it is
- *  the same bound `wafConditionSchema` is built to. */
-const GROUP_DEPTH_MAX = 2;
-
-/**
- * One level of the condition tree: the rule's own list, or a group's members.
- *
- * The joiner between rows is drawn here rather than by each row, because it is a fact
- * about the list they are in - "and" at the top, whichever word the group matches on
- * inside one. A row that drew its own would be stating its parent's rule from the
- * wrong place, and would have to be told anyway.
- */
-function ConditionList({
-    conditions,
-    match,
-    depth,
-    onChange
-}: {
-    conditions: readonly WafCondition[];
-    /** How this level reads its members, which is what the joiner says. */
-    match: "all" | "any";
-    depth: number;
-    onChange: (next: WafCondition[]) => void;
-}) {
-    const joiner = match === "any" ? "or" : "and";
-    const replace = (at: number, next: WafCondition): void =>
-        onChange(conditions.map((entry, index) => (index === at ? next : entry)));
-
-    return (
-        <div className="flex flex-col gap-2">
-            {conditions.map((condition, at) => (
-                <div key={at} className="flex flex-col gap-2">
-                    {at === 0 ? null : <span className="text-xs font-medium text-muted-foreground">{joiner}</span>}
-                    {isWafConditionGroup(condition) ? (
-                        <ConditionGroupBlock
-                            group={condition}
-                            depth={depth + 1}
-                            removable={conditions.length > 1}
-                            onChange={(next) => replace(at, next)}
-                            onRemove={() => onChange(conditions.filter((_, index) => index !== at))}
-                        />
-                    ) : (
-                        <ConditionRow
-                            condition={condition}
-                            removable={conditions.length > 1}
-                            onChange={(next) => replace(at, next)}
-                            onRemove={() => onChange(conditions.filter((_, index) => index !== at))}
-                        />
-                    )}
-                </div>
-            ))}
-
-            <div className="flex flex-wrap gap-2">
-                <Button
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    className="w-fit"
-                    onClick={() => onChange([...conditions, emptyCondition()])}
-                >
-                    <Plus className="size-3.5 shrink-0" aria-hidden="true" />
-                    {match === "any" ? "Or" : "And"}
-                </Button>
-                {depth < GROUP_DEPTH_MAX ? (
-                    <Button
-                        type="button"
-                        variant="secondary"
-                        size="sm"
-                        className="w-fit"
-                        title="A group holds several conditions and is satisfied by any one of them"
-                        onClick={() => onChange([...conditions, emptyGroup()])}
-                    >
-                        <Brackets className="size-3.5 shrink-0" aria-hidden="true" />
-                        Group
-                    </Button>
-                ) : null}
-            </div>
-        </div>
-    );
-}
-
-const MATCH_OPTIONS = [
-    { value: "any", label: "any of these" },
-    { value: "all", label: "all of these" }
-];
-
-/** A group, drawn as an indented surface so the bracket in the expression preview has
- *  something on screen that corresponds to it. */
-function ConditionGroupBlock({
-    group,
-    depth,
-    removable,
-    onChange,
-    onRemove
-}: {
-    group: WafConditionGroup;
-    depth: number;
-    removable: boolean;
-    onChange: (next: WafConditionGroup) => void;
-    onRemove: () => void;
-}) {
-    return (
-        <div className="flex flex-col gap-2 rounded-md border border-border bg-muted/20 px-3 py-3">
-            <div className="flex items-center gap-2">
-                <span className="text-xs font-medium text-muted-foreground">Matches</span>
-                <Select
-                    value={group.match}
-                    aria-label="How this group matches"
-                    className="w-36"
-                    options={MATCH_OPTIONS}
-                    onValueChange={(value) => onChange({ ...group, match: value as WafConditionGroup["match"] })}
-                />
-                {removable ? (
-                    <button
-                        type="button"
-                        onClick={onRemove}
-                        aria-label="Remove this group"
-                        title="Remove the group"
-                        className="ml-auto inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    >
-                        <X className="size-3.5 shrink-0" aria-hidden="true" />
-                    </button>
-                ) : null}
-            </div>
-            <ConditionList
-                conditions={group.conditions}
-                match={group.match}
-                depth={depth}
-                // The schema types the innermost group as holding tests only, which is
-                // the depth limit expressed in the type. The list above cannot produce
-                // one deeper - it stops offering Group at GROUP_DEPTH_MAX - so this is
-                // narrowing back to what was already true rather than asserting it.
-                onChange={(conditions) => onChange({ ...group, conditions } as WafConditionGroup)}
-            />
-        </div>
-    );
-}
-
-function ConditionRow({
-    condition,
-    removable,
-    onChange,
-    onRemove
-}: {
-    condition: WafLeafCondition;
-    removable: boolean;
-    onChange: (next: WafLeafCondition) => void;
-    onRemove: () => void;
-}) {
-    return (
-        <div className="flex flex-col gap-2">
-            <div className="flex flex-wrap items-end gap-2">
-                <label className="flex min-w-0 flex-col gap-1.5 text-xs font-medium text-muted-foreground">
-                    Field
-                    <Select
-                        value={condition.field}
-                        aria-label="Field"
-                        className="w-44"
-                        options={FIELD_OPTIONS}
-                        onValueChange={(value) => {
-                            const field = value as WafRuleField;
-                            // The address field takes different operators, so one that
-                            // no longer applies is replaced rather than left reading
-                            // wrong. Values go with it: an address list is not a
-                            // sensible list of user agents.
-                            const keepsOperator = field !== "ip" || IP_OPERATORS.includes(condition.operator);
-                            const changedKind = (field === "ip") !== (condition.field === "ip");
-                            onChange({
-                                field,
-                                operator: keepsOperator ? condition.operator : "equals",
-                                values: changedKind ? [] : condition.values
-                            });
-                        }}
-                    />
-                </label>
-                <label className="flex min-w-0 flex-col gap-1.5 text-xs font-medium text-muted-foreground">
-                    Operator
-                    <Select
-                        value={condition.operator}
-                        aria-label="Operator"
-                        className="w-48"
-                        options={operatorOptions(condition.field)}
-                        onValueChange={(value) => onChange({ ...condition, operator: value as WafRuleOperator })}
-                    />
-                </label>
-                {removable ? (
-                    <button
-                        type="button"
-                        onClick={onRemove}
-                        aria-label="Remove this condition"
-                        title="Remove"
-                        className="mb-1 inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    >
-                        <X className="size-3.5 shrink-0" aria-hidden="true" />
-                    </button>
-                ) : null}
-            </div>
-            <div className="flex flex-col gap-1.5">
-                <span className="text-xs font-medium text-muted-foreground">Value</span>
-                <ChipList
-                    entries={condition.values}
-                    onChange={(values) => onChange({ ...condition, values })}
-                    placeholder={VALUE_PLACEHOLDER[condition.field]}
-                    validate={condition.field === "ip" ? validAddress : undefined}
-                    invalidMessage={condition.field === "ip" ? "Enter an IP address or a CIDR range." : undefined}
-                />
-            </div>
-        </div>
-    );
 }
 
 /** A radio, styled to match the design system. Native input so the arrow-key

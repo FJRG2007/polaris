@@ -1,22 +1,25 @@
 /**
- * How a rule is said in words and in expression form.
+ * How a rule is said in words, and what the editor's selects offer.
  *
- * One module because the same rule is written three times on this screen - as a
- * sentence in the list, as an expression under the editor, and as the labels on the
- * editor's own selects - and three copies drift. It is also why this is pure and has
- * no "use client": the list renders it, the editor renders it, and a test can assert
- * on it without a DOM.
+ * One module because the same rule is written twice on this screen - as a sentence in
+ * the list and as the labels on the editor's own controls - and two copies drift. It
+ * is pure and has no "use client" for the same reason: the list renders it, the editor
+ * renders it, and a test can assert on it without a DOM.
  *
- * The expression is not a second source of truth. It is a rendering of the same
- * `WafCustomRule` the engine evaluates, in the shape an operator who has used a WAF
- * before already reads: values within a condition are an `or`, conditions are joined
- * by `and`, and a group is a bracket joined by whichever of the two it matches on.
- * It is deliberately not editable - a text expression the engine cannot parse back
- * would be a second rule format to keep in step with the first.
+ * The expression form lives in @polaris/core, not here. It is parsed as well as
+ * rendered now - an operator can edit it and a managed rule can be copied out of - so
+ * it is the server's business as much as the screen's, and the round trip is held by
+ * the same tests the engine is.
  */
 
-import { isWafConditionGroup } from "@polaris/core";
-import type { WafCondition, WafCustomRule, WafLeafCondition, WafRuleField, WafRuleOperator } from "@polaris/core";
+import * as core from "@polaris/core";
+
+type WafCondition = core.WafCondition;
+type WafCustomRule = core.WafCustomRule;
+type WafLeafCondition = core.WafLeafCondition;
+type WafRuleField = core.WafRuleField;
+type WafRuleOperator = core.WafRuleOperator;
+type WafRuleSignal = core.WafRuleSignal;
 
 /** What each field is called where an operator reads it, rather than where it is
  *  stored. */
@@ -27,6 +30,14 @@ export const FIELD_LABELS: Record<WafRuleField, string> = {
     method: "Request method",
     user_agent: "User agent",
     query: "Query string"
+};
+
+/** The signature checks, named as the managed rule that owns them is - so somebody
+ *  who turned "Block SQL injection" on recognises it in the field list. */
+export const SIGNAL_LABELS: Record<WafRuleSignal, string> = {
+    sql_injection: "SQL injection check",
+    xss: "Cross-site scripting check",
+    browser_integrity: "Browser integrity check"
 };
 
 export const OPERATOR_LABELS: Record<WafRuleOperator, string> = {
@@ -40,32 +51,15 @@ export const OPERATOR_LABELS: Record<WafRuleOperator, string> = {
     not_ends_with: "does not end with"
 };
 
-/** The field as an expression names it. Modelled on the wirefilter-style names a
- *  Cloudflare user already knows, so the preview reads as a rule rather than as our
- *  column names in a different font. */
-const FIELD_TOKENS: Record<WafRuleField, string> = {
-    ip: "ip.src",
-    host: "http.host",
-    path: "http.request.uri.path",
-    method: "http.request.method",
-    user_agent: "http.user_agent",
-    query: "http.request.uri.query"
-};
-
-const OPERATOR_TOKENS: Record<WafRuleOperator, string> = {
-    equals: "eq",
-    not_equals: "ne",
-    contains: "contains",
-    not_contains: "not contains",
-    starts_with: "starts_with",
-    not_starts_with: "not starts_with",
-    ends_with: "ends_with",
-    not_ends_with: "not ends_with"
-};
-
 /** An address is matched by containment, not by string, so the operators that read a
  *  value as text have nothing to do there. */
 export const IP_OPERATORS: WafRuleOperator[] = ["equals", "not_equals"];
+
+/** A signature check has no value, so its two operators are the whole choice. */
+export const SIGNAL_OPERATORS = [
+    { value: "matches", label: "would refuse the request" },
+    { value: "not_matches", label: "would not refuse the request" }
+];
 
 /** An example of the value that field takes, so the field says what it wants. */
 export const VALUE_PLACEHOLDER: Record<WafRuleField, string> = {
@@ -77,50 +71,34 @@ export const VALUE_PLACEHOLDER: Record<WafRuleField, string> = {
     query: "debug=1"
 };
 
-export const FIELD_OPTIONS = (Object.keys(FIELD_LABELS) as WafRuleField[]).map((field) => ({
-    value: field,
-    label: FIELD_LABELS[field]
-}));
+/**
+ * The Field select: the request's own facts first, then the checks.
+ *
+ * A signal is offered as a field rather than hidden behind a second control, because
+ * from where an operator is standing "SQL injection check" is the same kind of answer
+ * to "what should this rule look at?" as "User agent" is.
+ */
+export const FIELD_OPTIONS = [
+    ...(Object.keys(FIELD_LABELS) as WafRuleField[]).map((field) => ({
+        value: field,
+        label: FIELD_LABELS[field]
+    })),
+    ...(Object.keys(SIGNAL_LABELS) as WafRuleSignal[]).map((signal) => ({
+        value: `signal:${signal}`,
+        label: SIGNAL_LABELS[signal]
+    }))
+];
+
+/** The value the Field select shows for one condition. */
+export function fieldValue(condition: WafLeafCondition | core.WafSignalCondition): string {
+    return core.isWafSignalCondition(condition) ? `signal:${condition.signal}` : condition.field;
+}
 
 /** The operators that field accepts, so an operator that cannot apply is never
  *  offered rather than being offered and quietly ignored. */
 export function operatorOptions(field: WafRuleField) {
     const operators = field === "ip" ? IP_OPERATORS : (Object.keys(OPERATOR_LABELS) as WafRuleOperator[]);
     return operators.map((operator) => ({ value: operator, label: OPERATOR_LABELS[operator] }));
-}
-
-/** A value as the expression quotes it. Backslashes first, or escaping the quote
- *  would then escape its own escape. */
-function quote(value: string): string {
-    return `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
-}
-
-/** One condition as an expression. Several values are an `or` over the same field,
- *  which is what the engine does with them; a group is its own bracket, joined by
- *  whichever word it matches on. */
-function conditionExpression(condition: WafCondition): string {
-    if (isWafConditionGroup(condition)) {
-        const joiner = condition.match === "any" ? " or " : " and ";
-        return `(${condition.conditions.map(conditionExpression).join(joiner)})`;
-    }
-    const field = FIELD_TOKENS[condition.field];
-    const operator = OPERATOR_TOKENS[condition.operator];
-    if (condition.values.length === 0) return `${field} ${operator} ...`;
-    const parts = condition.values.map((value) => `${field} ${operator} ${quote(value)}`);
-    return parts.length === 1 ? parts[0]! : `(${parts.join(" or ")})`;
-}
-
-/** The whole rule as one expression, in the same order the engine reads it. */
-export function ruleExpression(rule: Pick<WafCustomRule, "conditions">): string {
-    if (rule.conditions.length === 0) return "";
-    const parts = rule.conditions.map(conditionExpression);
-    return parts.length === 1 ? bracket(parts[0]!) : parts.map(bracket).join(" and ");
-}
-
-/** A part in brackets, unless it already brought its own - a group renders its own
- *  pair, and `((a or b))` reads as a mistake rather than as nesting. */
-function bracket(part: string): string {
-    return part.startsWith("(") && part.endsWith(")") ? part : `(${part})`;
 }
 
 /** The rule as a sentence, for the list's Description column. Long value lists are
@@ -133,7 +111,11 @@ export function ruleDescription(rule: Pick<WafCustomRule, "conditions">): string
 const VALUES_SHOWN = 3;
 
 function describeCondition(condition: WafCondition): string {
-    if (isWafConditionGroup(condition)) {
+    if (core.isWafSignalCondition(condition)) {
+        const label = SIGNAL_LABELS[condition.signal];
+        return condition.negate ? `${label} does not fire` : `${label} fires`;
+    }
+    if (core.isWafConditionGroup(condition)) {
         const joiner = condition.match === "any" ? " or " : " and ";
         return `(${condition.conditions.map(describeCondition).join(joiner)})`;
     }
@@ -143,13 +125,6 @@ function describeCondition(condition: WafCondition): string {
     const shown = condition.values.slice(0, VALUES_SHOWN).join(", ");
     const rest = condition.values.length - VALUES_SHOWN;
     return rest > 0 ? `${field} ${operator} ${shown} and ${rest} more` : `${field} ${operator} ${shown}`;
-}
-
-/** A group with nothing in it yet, offered when one is added. Starts on `any`, which
- *  is the reason to open a group at all - an `all` is what the rule's own list
- *  already does. */
-export function emptyGroup(): WafCondition {
-    return { match: "any", conditions: [emptyCondition(), emptyCondition()] };
 }
 
 /** A test with nothing in it yet. */

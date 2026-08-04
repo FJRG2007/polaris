@@ -13,7 +13,9 @@
  * Pure: given entries and a window, produce the summary.
  */
 
+import { ruleMatches } from "./waf-rules.js";
 import type { HttpLogLike } from "./waf-jails.js";
+import type { WafCustomRule } from "./schemas/deploy.js";
 
 /** An entry with the two extra fields the breakdowns need. The jail runner only
  *  needs status/path/ip, so this widens it rather than duplicating it. */
@@ -240,5 +242,97 @@ export function summarizeWafTraffic(
         topAddresses: top(addresses),
         topPaths: top(paths),
         topAgents: top(agents)
+    };
+}
+
+/**
+ * What one rule matches, over the same log.
+ *
+ * This is a REPLAY, not a record, and the distinction is the whole reason it is
+ * honest: the edge log says a request was refused with a 403, not which rule refused
+ * it, so counting per rule from the log alone would mean attributing a block to
+ * whichever rule looks likeliest. Instead the rules are run over the traffic that
+ * really arrived, and the answer is "this is what the rule matches", which is a
+ * different and more useful question than "this is what it caught" - it can be asked
+ * of a rule that is switched off, which is exactly when somebody wants to know.
+ *
+ * The screen has to say so. A count against a rule armed ten minutes ago covers the
+ * whole window, and read as a history that would be a lie.
+ */
+export interface WafRuleActivity {
+    readonly total: number;
+    /** Counts per bucket, oldest first, for the sparkline. */
+    readonly series: readonly number[];
+}
+
+/** One rule to replay, under the key the caller wants the answer back on. */
+export interface WafRuleProbe {
+    readonly key: string;
+    readonly rule: WafCustomRule;
+}
+
+/**
+ * Replay `probes` over `entries`, keyed as they were handed in.
+ *
+ * One pass over the log with every rule asked about each entry, rather than one pass
+ * per rule: the log is the expensive half (megabytes of it), and a rule is a handful
+ * of string comparisons. A disabled rule is replayed like any other - `ruleMatches`
+ * would refuse it, so the check is against its conditions directly.
+ */
+export function wafRuleActivity(
+    entries: readonly WafTrafficEntry[],
+    probes: readonly WafRuleProbe[],
+    from: number,
+    to: number,
+    buckets = 24
+): Map<string, WafRuleActivity> {
+    const count = Math.max(1, Math.min(Math.floor(buckets), 200));
+    const answer = new Map<string, { total: number; series: number[] }>();
+    for (const probe of probes) answer.set(probe.key, { total: 0, series: Array.from({ length: count }, () => 0) });
+    if (!Number.isFinite(from) || !Number.isFinite(to) || to <= from || probes.length === 0) {
+        return new Map([...answer].map(([key, value]) => [key, value]));
+    }
+
+    const width = (to - from) / count;
+    // Enabled or not, the question is what the conditions match, so every rule is
+    // replayed as if it were on.
+    const armed = probes.map((probe) => ({ key: probe.key, rule: { ...probe.rule, enabled: true } }));
+
+    for (const entry of entries) {
+        if (!entry.time) continue;
+        const ms = Date.parse(entry.time);
+        if (!Number.isFinite(ms) || ms < from || ms >= to) continue;
+        const slot = Math.min(count - 1, Math.floor((ms - from) / width));
+        const facts = factsFor(entry);
+        for (const { key, rule } of armed) {
+            if (!ruleMatches(rule, facts)) continue;
+            const bucket = answer.get(key)!;
+            bucket.total += 1;
+            bucket.series[slot]! += 1;
+        }
+    }
+    return answer;
+}
+
+/**
+ * A log entry as the rule engine's facts.
+ *
+ * The log records one path with its query still attached, which the engine keeps
+ * apart - a rule about `http.request.uri.path` must not match on something that is
+ * only in the query string. Splitting here is what keeps a replay saying the same
+ * thing the edge would have said. The integrity headers are not logged at all, so a
+ * rule that reads that check finds a request it cannot vouch for, which is the same
+ * answer the guard gives for a request that sent none.
+ */
+function factsFor(entry: WafTrafficEntry) {
+    const raw = entry.path ?? "";
+    const split = raw.indexOf("?");
+    return {
+        ip: entry.ip === "-" ? null : entry.ip,
+        host: entry.host ?? null,
+        path: split < 0 ? raw : raw.slice(0, split),
+        method: entry.method ?? null,
+        userAgent: entry.userAgent ?? null,
+        query: split < 0 ? null : raw.slice(split + 1)
     };
 }

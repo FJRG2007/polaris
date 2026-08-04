@@ -14,10 +14,10 @@
 
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
-import { wafManagedRule, WAF_MANAGED_RULES, type WafCustomRule } from "@polaris/core";
+import { ruleDescription } from "../../src/app/(app)/apps/firewall/rule-language";
 import { ManagedRulePage } from "../../src/app/(app)/apps/firewall/managed-rule-page";
 import { PredefinedRuleList } from "../../src/app/(app)/apps/firewall/predefined-list";
-import { ruleDescription, ruleExpression } from "../../src/app/(app)/apps/firewall/rule-language";
+import { renderWafExpression, wafManagedRule, WAF_MANAGED_RULES, type WafCustomRule } from "@polaris/core";
 
 function page(id: string): string {
     const rule = wafManagedRule(id);
@@ -109,6 +109,21 @@ describe("the predefined rule list", () => {
     });
 });
 
+describe("a predefined rule an operator wants to reuse", () => {
+    it("gives a signature check an expression, which is the thing to copy", () => {
+        // The point of the whole exercise: the default SQL rule is a condition a rule
+        // of your own can hold, so it can be narrowed instead of switched off.
+        const markup = page("sql-injection");
+
+        expect(markup).toContain("waf.sql_injection");
+        expect(markup).toContain("Expression");
+    });
+
+    it("gives a pack the expression its conditions render to", () => {
+        expect(page("scanners")).toContain("http.user_agent contains");
+    });
+});
+
 describe("a nested rule, written out", () => {
     const nested: WafCustomRule = {
         name: "admin from outside",
@@ -127,7 +142,7 @@ describe("a nested rule, written out", () => {
     };
 
     it("joins a group on the word it matches on, not on the one above it", () => {
-        expect(ruleExpression(nested)).toBe(
+        expect(renderWafExpression(nested.conditions)).toBe(
             '(ip.src ne "203.0.113.0/24") and (http.request.uri.path starts_with "/admin" or http.request.uri.query contains "debug=1")'
         );
     });

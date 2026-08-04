@@ -16,6 +16,7 @@
  */
 
 import { useState } from "react";
+import { Sparkline } from "./sparkline";
 import { ruleDescription } from "./rule-language";
 import type { WafCustomRule } from "@polaris/core";
 import { ChevronDown, ChevronUp, Copy, GripVertical, Pencil, Plus, Trash2 } from "lucide-react";
@@ -28,6 +29,7 @@ import {
     DropdownMenuItem,
     DropdownMenuSeparator,
     DropdownMenuTrigger,
+    Skeleton,
     Switch
 } from "@polaris/ui";
 
@@ -44,6 +46,8 @@ export function RuleList({
     rules,
     max,
     canEdit,
+    hidden,
+    matches,
     onEdit,
     onCreate,
     onChange
@@ -51,6 +55,12 @@ export function RuleList({
     rules: readonly WafCustomRule[];
     max: number;
     canEdit: boolean;
+    /** Indices the current search filters out. The list is never actually filtered -
+     *  every operation here is by index, and renumbering under a search is how a drag
+     *  ends up moving the wrong rule. */
+    hidden?: ReadonlySet<number>;
+    /** What each rule matches over recent traffic, by index. Absent until it arrives. */
+    matches?: Readonly<Record<string, { total: number; series: number[] }>>;
     onEdit: (index: number) => void;
     onCreate: () => void;
     /** The whole list, already reordered/toggled/removed. The caller persists it. */
@@ -108,18 +118,21 @@ export function RuleList({
                                 <th className="px-2 py-2 font-medium">Name</th>
                                 <th className="px-2 py-2 font-medium">Description</th>
                                 <th className="w-24 px-2 py-2 font-medium">Action</th>
+                                <th className="w-32 px-2 py-2 font-medium">Matches</th>
                                 <th className="w-24 px-2 py-2 font-medium">Status</th>
                                 <th className="w-10 px-2 py-2" aria-label="Actions" />
                             </tr>
                         </thead>
                         <tbody>
-                            {rules.map((rule, index) => (
+                            {rules.map((rule, index) =>
+                                hidden?.has(index) ? null : (
                                 <RuleRow
                                     key={index}
                                     rule={rule}
                                     index={index}
                                     total={rules.length}
                                     canEdit={canEdit}
+                                    activity={matches?.[`custom:${index}`]}
                                     over={over === index}
                                     onEdit={() => onEdit(index)}
                                     onDragStart={() => setDragging(index)}
@@ -141,7 +154,8 @@ export function RuleList({
                                     }}
                                     onRemove={() => setDeleting(index)}
                                 />
-                            ))}
+                                )
+                            )}
                         </tbody>
                     </table>
                 </div>
@@ -169,11 +183,51 @@ export function RuleList({
     );
 }
 
+/**
+ * What a rule matches over recent traffic, as a line and a count.
+ *
+ * Shared by the custom rules and the predefined ones, because it says the same thing
+ * on both and the caveat has to be identical: this is a replay of the rule over the
+ * edge log, so it counts what the rule MATCHES rather than what it caught - which is
+ * what makes it worth showing next to a rule that is switched off.
+ */
+export function MatchesCell({
+    name,
+    activity
+}: {
+    name: string;
+    activity?: { total: number; series: number[] };
+}) {
+    if (!activity) return <Skeleton className="h-6 w-24 rounded" />;
+    return (
+        <div className="flex items-center gap-2">
+            <Sparkline
+                series={activity.series}
+                label={`What ${name} matches over the last day, by hour`}
+            />
+            <span
+                className="tabular-nums text-xs text-muted-foreground"
+                title="Requests in the last day this rule matches. Counted by replaying the rule over the edge log, so it is what the rule matches rather than what it caught."
+            >
+                {activity.total}
+            </span>
+        </div>
+    );
+}
+
+/** How each action reads in the Action column. */
+const ACTION_BADGE: Record<WafCustomRule["action"], { label: string; variant: "danger" | "success" | "neutral" }> = {
+    block: { label: "Block", variant: "danger" },
+    allow: { label: "Allow", variant: "success" },
+    skip: { label: "Skip", variant: "neutral" }
+};
+
 function RuleRow({
     rule,
     index,
     total,
     canEdit,
+    activity,
     over,
     onEdit,
     onDragStart,
@@ -189,6 +243,7 @@ function RuleRow({
     index: number;
     total: number;
     canEdit: boolean;
+    activity?: { total: number; series: number[] };
     over: boolean;
     onEdit: () => void;
     onDragStart: () => void;
@@ -246,9 +301,10 @@ function RuleRow({
                 </span>
             </td>
             <td className="px-2 py-2.5 align-top">
-                <Badge variant={rule.action === "block" ? "danger" : "success"}>
-                    {rule.action === "block" ? "Block" : "Allow"}
-                </Badge>
+                <Badge variant={ACTION_BADGE[rule.action].variant}>{ACTION_BADGE[rule.action].label}</Badge>
+            </td>
+            <td className="px-2 py-2.5 align-top">
+                <MatchesCell name={rule.name} activity={activity} />
             </td>
             <td className="px-2 py-2.5 align-top">
                 <div className="flex items-center gap-2">
