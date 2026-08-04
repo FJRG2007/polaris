@@ -37,7 +37,6 @@
  * afterwards.
  */
 
-import { decodeGuardRule, principalVerdict, verifyEdgeToken, type GuardRule } from "@polaris/core/waf";
 import {
     browserIntegrityFailure,
     evaluateWafRules,
@@ -45,6 +44,14 @@ import {
     ipAllowed,
     type WafIntelIndex
 } from "@polaris/core";
+import {
+    decodeGuardRule,
+    membershipTooOld,
+    principalVerdict,
+    principalsSuperseded,
+    verifyEdgeToken,
+    type GuardRule
+} from "@polaris/core/waf";
 
 /** Path (on the app's own domain) the login handoff returns to. */
 const CALLBACK_PATH = "/edge/callback";
@@ -253,8 +260,18 @@ export function evaluate(req: GuardRequest, cfg: GuardConfig): GuardDecision {
         }
         const token = readCookie(req.cookie, cfg.cookieName);
         const verified = verifyEdgeToken(token, cfg.secret, cfg.now, host);
-        if (verified) return admits(verified, rule, cfg, req, proto);
-        return { status: 302, location: loginRedirect(cfg, req, proto, rule) };
+        if (!verified) return { status: 302, location: loginRedirect(cfg, req, proto, rule) };
+        // Polaris re-decided this account after the token was minted - its membership
+        // moved, it was banned, or its sessions were revoked. Asked here rather than
+        // inside the principal check below, because "this account may no longer come in
+        // at all" is not a question about the rule: before this, revoking somebody's
+        // sessions left them still served by every route they already held a token for.
+        // Sending them back cannot loop - a token minted now is not superseded by a
+        // change that predates it.
+        if (principalsSuperseded(verified, cfg.intel?.movedAt(verified.sub) ?? null)) {
+            return { status: 302, location: loginRedirect(cfg, req, proto, rule) };
+        }
+        return admits(verified, rule, cfg, req, proto);
     }
     return { status: 200 };
 }
@@ -262,19 +279,21 @@ export function evaluate(req: GuardRequest, cfg: GuardConfig): GuardDecision {
 /**
  * Decide a signed-in visitor against the principals the rule names.
  *
- * Three outcomes rather than two. A token minted before Polaris carried membership has
- * no `prn` at all: it proves who the holder is and nothing about what they belong to,
- * so a rule that names a group cannot be answered from it and the visitor is sent back
- * for a token that can be - which is a one-time cost per token, on upgrade only. A
- * token that does carry membership is final: it is refused outright rather than sent
- * back, because Polaris has already made this same decision from the live rule and
+ * Three outcomes rather than two. A token that cannot answer the question is sent back
+ * for one that can: either it predates membership entirely (no `prn` - it proves who
+ * the holder is and nothing about what they belong to), or its membership claim has
+ * been overtaken, which is how a group or role change reaches a service that is already
+ * running. Neither can loop, because what the visitor comes back with is precisely what
+ * was missing. A token that *can* answer is final: it is refused outright rather than
+ * sent back, because Polaris has already made this same decision from the live rule and
  * sending it there again could only loop.
  *
- * The verdict is taken against the guard's own clock, so a grant that starts or lapses
- * does so on time rather than whenever the holder's token happens to expire.
+ * Both the verdict and the staleness are taken against the guard's own clock, so a
+ * grant that starts or lapses does so on time rather than whenever the holder's token
+ * happens to expire.
  */
 function admits(
-    token: { readonly sub: string; readonly prn?: readonly string[] },
+    token: { readonly sub: string; readonly iat?: number; readonly prn?: readonly string[] },
     rule: GuardRule,
     cfg: GuardConfig,
     req: GuardRequest,
@@ -283,6 +302,12 @@ function admits(
     const named = (rule.loginAllowLists?.length ?? 0) > 0 || (rule.loginDeny?.length ?? 0) > 0;
     if (!named) return { status: 200 };
     if (!token.prn) return { status: 302, location: loginRedirect(cfg, req, proto, rule) };
+    // The backstop, and only here: a route that names nobody keeps its token for its
+    // full life, while one that decides by membership refuses to act on a claim old
+    // enough that a change could have been missed on an edge no snapshot reaches.
+    if (membershipTooOld(token, cfg.now)) {
+        return { status: 302, location: loginRedirect(cfg, req, proto, rule) };
+    }
     // `user:<sub>` is proven by the signature over `sub` itself, so it holds even for a
     // token minted while the account belonged to nothing.
     const held = new Set([`user:${token.sub}`, ...token.prn]);

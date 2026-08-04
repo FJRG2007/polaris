@@ -16,6 +16,7 @@
 import { prisma } from "@polaris/db";
 import { dirname, join } from "node:path";
 import { verifyIp } from "@/lib/integrations/dymo";
+import { EDGE_TOKEN_TTL_SECONDS } from "@polaris/core/waf";
 import { mkdir, rename, writeFile } from "node:fs/promises";
 import { readDymoConfig } from "@/lib/integrations/registry";
 import { getIntegrationSecret, getIntegrationState } from "@/lib/integration-service";
@@ -289,9 +290,23 @@ export async function publishWafIntel(): Promise<void> {
         }
     }
 
+    // Accounts Polaris has re-decided recently enough that a live edge token could
+    // still be asserting the old answer: membership moved, banned, sessions revoked.
+    // Bounded by the token lifetime rather than kept - an older stamp can only concern
+    // tokens that have already expired, and this file is read on the hot path.
+    const movedSince = new Date(now - EDGE_TOKEN_TTL_SECONDS * 1000);
+    const moved = await prisma.user.findMany({
+        where: { principalsMovedAt: { gt: movedSince } },
+        select: { id: true, principalsMovedAt: true }
+    });
+
     // Later entries overwrite earlier ones in buildWafIntel's map, so bans are added
     // after the feed rather than before it.
-    const snapshot = buildWafIntel([...entries].reverse(), now);
+    const snapshot = buildWafIntel(
+        [...entries].reverse(),
+        now,
+        moved.map((user) => [user.id, user.principalsMovedAt?.getTime() ?? 0] as const)
+    );
     const path = snapshotPath();
     try {
         await mkdir(dirname(path), { recursive: true });

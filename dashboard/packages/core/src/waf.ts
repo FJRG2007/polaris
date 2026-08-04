@@ -381,6 +381,18 @@ export interface EdgeToken {
     readonly aud: string;
     readonly exp: number;
     /**
+     * When this token was minted, unix seconds.
+     *
+     * What makes `prn` below correctable. Membership is a statement about a moment,
+     * and the guard needs to know which moment in order to tell a token that predates
+     * somebody's group change from one that reflects it.
+     *
+     * Absent on a token minted before this existed; the guard reads that as "older
+     * than anything it could be compared against", which sends its holder back for one
+     * that can be.
+     */
+    readonly iat?: number;
+    /**
      * The principals this token proves its holder resolved to when it was minted -
      * themselves, their groups, and their roles - so the guard can answer "may THIS
      * account in?" offline, the way it already answers "is this account signed in?".
@@ -389,24 +401,91 @@ export interface EdgeToken {
      * is not the same as "belongs to nothing", and the guard treats it differently:
      * see `evaluate` in the edge guard, which re-mints instead of refusing.
      *
-     * Membership is therefore as fresh as the token, not as fresh as the database. A
-     * visitor removed from a group keeps whatever the group let them reach until their
-     * token expires - the same trade the offline check already makes for the login
-     * itself, and the reason the TTL is hours rather than days.
+     * This is a claim about `iat`, not about now. Polaris publishes when each account's
+     * membership last moved, so a claim the change has overtaken is spotted at the edge
+     * and re-minted - see `membershipStale`. Absent that snapshot the claim still ages
+     * out on its own, because the guard will not act on one older than
+     * MEMBERSHIP_MAX_AGE_SECONDS when a rule actually names principals.
      */
     readonly prn?: readonly string[];
 }
 
+/**
+ * How old a token's membership claim may be before a rule that names principals stops
+ * acting on it.
+ *
+ * The backstop, not the mechanism: when the snapshot reaches the edge a change is
+ * noticed within seconds, and this only matters where it does not - a server whose
+ * guard has no snapshot volume, or one that has not received a fresh file. Half an
+ * hour rather than minutes, because the price of aging out is a redirect, and a
+ * redirect in the middle of a page's background request is not free.
+ *
+ * Only routes that actually name principals pay it. Everywhere else a token is worth
+ * its full life, which is what keeps this off the overwhelming majority of requests.
+ */
+export const MEMBERSHIP_MAX_AGE_SECONDS = 30 * 60;
+
+/**
+ * How long a minted edge token is valid. After this the visitor re-authenticates,
+ * which requires Polaris to be reachable again.
+ *
+ * Shared rather than owned by the endpoint that mints them, because the snapshot of
+ * re-decided accounts is pruned to exactly this window: an entry older than the longest
+ * a token can live can only concern tokens that have already expired. Two copies of
+ * this number drifting apart would silently shorten that window.
+ */
+export const EDGE_TOKEN_TTL_SECONDS = 8 * 60 * 60;
+
 /** Sign an edge token as `<payload>.<sig>` (HMAC-SHA256 over the payload). Mirrors
  *  the signed-cookie HMAC pattern used elsewhere (access-lock/share/file-request).
- *  `prn` is always written, empty list included, so a token minted by a current
- *  Polaris is always distinguishable from one that predates membership. */
+ *  `prn` and `iat` are always written, so a token minted by a current Polaris is
+ *  always distinguishable from one that predates membership. */
 export function signEdgeToken(token: EdgeToken, secret: string): string {
     const payload = Buffer.from(
-        JSON.stringify({ sub: token.sub, aud: token.aud, exp: token.exp, prn: token.prn ?? [] })
+        JSON.stringify({
+            sub: token.sub,
+            aud: token.aud,
+            exp: token.exp,
+            iat: token.iat ?? Math.floor(Date.now() / 1000),
+            prn: token.prn ?? []
+        })
     ).toString("base64url");
     const sig = createHmac("sha256", secret).update(`edge:${payload}`).digest("base64url");
     return `${payload}.${sig}`;
+}
+
+/**
+ * Whether Polaris has re-decided this account since the token was minted.
+ *
+ * `movedAt` (epoch ms) is what Polaris publishes when an account's groups or roles
+ * change, when it is banned, or when its sessions are revoked - anything that makes a
+ * token's account claim out of date. Absent for essentially every account at any
+ * moment, so this costs one Map lookup and answers "no".
+ *
+ * Asked for EVERY token, not only where a rule names principals, because "this account
+ * may no longer come in at all" is not a question about the rule. Before this, revoking
+ * somebody's sessions did not reach a service already serving them: the guard verifies
+ * tokens offline, and the token outlived the session by hours.
+ *
+ * A token with no `iat` cannot be compared, so a known change supersedes it.
+ */
+export function principalsSuperseded(token: { readonly iat?: number }, movedAt: number | null): boolean {
+    if (movedAt === null) return false;
+    return token.iat === undefined || movedAt > token.iat * 1000;
+}
+
+/**
+ * Whether a token's membership claim is too old to decide a rule that names principals,
+ * at `now` (unix seconds).
+ *
+ * The backstop for an edge the snapshot never reaches: without it, a guard with no
+ * published stamps would act on whatever membership the token was born with for its
+ * whole life. A token with no `iat` carries a claim with no moment attached, which is
+ * precisely what cannot be checked, so it is too old by definition.
+ */
+export function membershipTooOld(token: { readonly iat?: number }, now: number): boolean {
+    if (token.iat === undefined) return true;
+    return now - token.iat > MEMBERSHIP_MAX_AGE_SECONDS;
 }
 
 /**
@@ -433,7 +512,7 @@ export function verifyEdgeToken(
     try {
         const raw: unknown = JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
         if (raw && typeof raw === "object") {
-            const obj = raw as { sub?: unknown; aud?: unknown; exp?: unknown; prn?: unknown };
+            const obj = raw as { sub?: unknown; aud?: unknown; exp?: unknown; iat?: unknown; prn?: unknown };
             if (
                 typeof obj.sub === "string" &&
                 typeof obj.aud === "string" &&
@@ -441,12 +520,13 @@ export function verifyEdgeToken(
                 obj.exp > now &&
                 (audience === undefined || obj.aud === audience)
             ) {
-                // Left undefined when the payload carries no `prn` at all, which is how
-                // a token minted before membership existed stays recognisable as one.
+                // Both left undefined when the payload carries neither, which is how a
+                // token minted before membership existed stays recognisable as one.
                 const prn = Array.isArray(obj.prn)
                     ? obj.prn.filter((v): v is string => typeof v === "string")
                     : undefined;
-                return { sub: obj.sub, aud: obj.aud, exp: obj.exp, prn };
+                const iat = typeof obj.iat === "number" ? obj.iat : undefined;
+                return { sub: obj.sub, aud: obj.aud, exp: obj.exp, iat, prn };
             }
         }
     } catch {

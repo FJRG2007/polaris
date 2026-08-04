@@ -41,6 +41,7 @@ export {
     addGroupMember,
     removeGroupMember,
     getUserGroupIds,
+    markPrincipalsMoved,
     type GroupSummary,
     type GroupMemberInfo
 } from "./groups.js";

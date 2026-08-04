@@ -1,7 +1,17 @@
 import { createHmac } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { wafRuleInputSchema, WAF_LIST_MAX } from "../src/schemas/deploy.js";
-import { decodeGuardRule, encodeGuardRule, principalVerdict, signEdgeToken, verifyEdgeToken } from "../src/waf.js";
+import {
+    decodeGuardRule,
+    encodeGuardRule,
+    membershipTooOld,
+    principalVerdict,
+    principalsSuperseded,
+    signEdgeToken,
+    verifyEdgeToken,
+    EDGE_TOKEN_TTL_SECONDS,
+    MEMBERSHIP_MAX_AGE_SECONDS
+} from "../src/waf.js";
 
 const SECRET = "unit-test-secret-16chars";
 const HOST = "app.example.com";
@@ -157,8 +167,14 @@ describe("guard rule codec", () => {
 
 describe("edge token", () => {
     it("verifies a valid, host-bound, unexpired token", () => {
-        const token = signEdgeToken({ sub: "u1", aud: HOST, exp: NOW + 60 }, SECRET);
-        expect(verifyEdgeToken(token, SECRET, NOW, HOST)).toEqual({ sub: "u1", aud: HOST, exp: NOW + 60, prn: [] });
+        const token = signEdgeToken({ sub: "u1", aud: HOST, exp: NOW + 60, iat: NOW }, SECRET);
+        expect(verifyEdgeToken(token, SECRET, NOW, HOST)).toEqual({
+            sub: "u1",
+            aud: HOST,
+            exp: NOW + 60,
+            iat: NOW,
+            prn: []
+        });
     });
 
     it("carries the principals it was minted with", () => {
@@ -333,5 +349,46 @@ describe("principalVerdict", () => {
         expect(principalVerdict(rule, held, NOW - 1)).toBe("admitted");
         expect(principalVerdict(rule, held, NOW)).toBe("refused");
         expect(principalVerdict(rule, held, NOW + 60)).toBe("admitted");
+    });
+});
+
+describe("a membership claim's freshness", () => {
+    it("round-trips the moment a token was minted", () => {
+        const token = signEdgeToken({ sub: "u1", aud: HOST, exp: NOW + 60, iat: NOW }, SECRET);
+        expect(verifyEdgeToken(token, SECRET, NOW, HOST)?.iat).toBe(NOW);
+    });
+
+    it("treats a token from before this existed as having no moment at all", () => {
+        // Signed by hand: the signer always writes `iat` now, which is what makes its
+        // absence a reliable signal rather than a guess.
+        const payload = Buffer.from(JSON.stringify({ sub: "u1", aud: HOST, exp: NOW + 60 })).toString("base64url");
+        const sig = createHmac("sha256", SECRET).update(`edge:${payload}`).digest("base64url");
+        const token = verifyEdgeToken(`${payload}.${sig}`, SECRET, NOW, HOST);
+        expect(token?.iat).toBeUndefined();
+        // It carries a claim with no moment attached, which is exactly what cannot be
+        // checked - so both questions answer against it.
+        expect(principalsSuperseded(token!, NOW * 1000)).toBe(true);
+        expect(membershipTooOld(token!, NOW)).toBe(true);
+    });
+
+    it("is superseded only by a change that came after it", () => {
+        expect(principalsSuperseded({ iat: NOW }, (NOW + 1) * 1000)).toBe(true);
+        expect(principalsSuperseded({ iat: NOW }, (NOW - 1) * 1000)).toBe(false);
+    });
+
+    it("costs nothing for an account nothing is known about", () => {
+        // Which is every account, almost always - the snapshot names only who moved.
+        expect(principalsSuperseded({ iat: NOW }, null)).toBe(false);
+    });
+
+    it("ages out past the backstop", () => {
+        expect(membershipTooOld({ iat: NOW }, NOW + MEMBERSHIP_MAX_AGE_SECONDS)).toBe(false);
+        expect(membershipTooOld({ iat: NOW }, NOW + MEMBERSHIP_MAX_AGE_SECONDS + 1)).toBe(true);
+    });
+
+    it("prunes to the token lifetime, so the published list cannot grow", () => {
+        // An entry older than the longest a token can live can only concern tokens that
+        // have already expired.
+        expect(MEMBERSHIP_MAX_AGE_SECONDS).toBeLessThan(EDGE_TOKEN_TTL_SECONDS);
     });
 });

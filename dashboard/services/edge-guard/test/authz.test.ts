@@ -17,7 +17,7 @@ const cfg: GuardConfig = { secret: SECRET, authorizeUrl: "https://polaris", cook
 
 /** A Cookie header carrying a signed edge token bound to `aud`, expiring at `exp`. */
 function tokenCookie(sub: string, aud: string, exp: number): string {
-    return `polaris.edge=${signEdgeToken({ sub, aud, exp }, SECRET)}`;
+    return `polaris.edge=${signEdgeToken({ sub, aud, exp, iat: NOW }, SECRET)}`;
 }
 
 describe("evaluate - denylist", () => {
@@ -145,7 +145,7 @@ describe("evaluate - who the login admits", () => {
 
     /** A Cookie header for a token minted with `prn`, as Polaris mints them now. */
     function memberCookie(sub: string, prn: string[]): string {
-        return `polaris.edge=${signEdgeToken({ sub, aud: HOST, exp: NOW + 3600, prn }, SECRET)}`;
+        return `polaris.edge=${signEdgeToken({ sub, aud: HOST, exp: NOW + 3600, iat: NOW, prn }, SECRET)}`;
     }
 
     /** A token as Polaris minted them before it carried membership. Signed by hand,
@@ -602,5 +602,80 @@ describe("injection protection", () => {
         expect(
             evaluate({ wafHeader: xssOnly, forwardedHost: HOST, forwardedUri: "/p?id=1' or 1=1--" }, cfg).status
         ).toBe(200);
+    });
+});
+
+describe("evaluate - an account Polaris re-decided", () => {
+    /** A guard holding a snapshot that says these accounts moved at these times (ms). */
+    function withMoved(moved: Record<string, number>): GuardConfig {
+        const entries: [string, WafIntelEntry][] = [];
+        return { ...cfg, intel: indexWafIntel(buildWafIntel(entries, NOW * 1000, Object.entries(moved))) };
+    }
+
+    /** A token minted at `iat`, carrying membership. */
+    function cookieAt(sub: string, iat: number, prn: string[] = []): string {
+        return `polaris.edge=${signEdgeToken({ sub, aud: HOST, exp: NOW + 3600, iat, prn }, SECRET)}`;
+    }
+
+    const plain = encodeGuardRule({ deny: [], requireLogin: true, rules: [] });
+
+    it("sends back a token minted before the account was re-decided", () => {
+        // A group change, a ban, a revoked session: all of them land here. Before this
+        // the token outlived the decision by hours, on a route already serving them.
+        const decision = evaluate(
+            { wafHeader: plain, forwardedHost: HOST, cookie: cookieAt("user-1", NOW - 60) },
+            withMoved({ "user-1": (NOW - 30) * 1000 })
+        );
+        expect(decision.status).toBe(302);
+    });
+
+    it("keeps a token minted after it", () => {
+        // What the visitor comes back with, so this is also what stops it looping.
+        const decision = evaluate(
+            { wafHeader: plain, forwardedHost: HOST, cookie: cookieAt("user-1", NOW - 10) },
+            withMoved({ "user-1": (NOW - 30) * 1000 })
+        );
+        expect(decision).toEqual({ status: 200 });
+    });
+
+    it("leaves every other account alone", () => {
+        // The snapshot names only who changed, so nobody else pays a redirect for it.
+        const decision = evaluate(
+            { wafHeader: plain, forwardedHost: HOST, cookie: cookieAt("user-2", NOW - 60) },
+            withMoved({ "user-1": (NOW - 30) * 1000 })
+        );
+        expect(decision).toEqual({ status: 200 });
+    });
+
+    it("asks even on a route that names nobody", () => {
+        // "This account may no longer come in at all" is not a question about the rule,
+        // so it is not asked only where the rule happens to name principals.
+        const decision = evaluate(
+            { wafHeader: plain, forwardedHost: HOST, cookie: cookieAt("user-1", NOW - 60) },
+            withMoved({ "user-1": (NOW - 30) * 1000 })
+        );
+        expect(decision.status).toBe(302);
+    });
+
+    it("keeps serving a route that names nobody when a membership claim simply ages", () => {
+        // The age backstop must not reach here: a token good for eight hours would
+        // otherwise bounce every half hour, mid-request, on every protected route.
+        const old = cookieAt("user-1", NOW - 40 * 60, ["user:user-1"]);
+        expect(evaluate({ wafHeader: plain, forwardedHost: HOST, cookie: old }, cfg)).toEqual({ status: 200 });
+    });
+
+    it("re-mints an aged membership claim where the rule decides by it", () => {
+        // The backstop for an edge no snapshot reaches: past MEMBERSHIP_MAX_AGE_SECONDS
+        // the guard stops acting on a membership it cannot know is still true.
+        const wafHeader = encodeGuardRule({
+            deny: [],
+            requireLogin: true,
+            loginAllowLists: [[{ ref: "group:ops" }]],
+            rules: []
+        });
+        const fresh = cookieAt("user-1", NOW - 60, ["user:user-1", "group:ops"]);
+        const aged = cookieAt("user-1", NOW - 40 * 60, ["user:user-1", "group:ops"]);
+        expect(evaluate({ wafHeader, forwardedHost: HOST, cookie: fresh }, cfg)).toEqual({ status: 200 });
+        expect(evaluate({ wafHeader, forwardedHost: HOST, cookie: aged }, cfg).status).toBe(302);
     });
 });

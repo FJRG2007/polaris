@@ -20,14 +20,10 @@ import { getSession } from "@/lib/session";
 import { resolveWaf } from "@/lib/waf-service";
 import { principalsOfUser } from "@polaris/auth";
 import { deployAppIdForHost } from "@/lib/deploy-service";
-import { principalVerdict, signEdgeToken } from "@polaris/core/waf";
+import { EDGE_TOKEN_TTL_SECONDS, principalVerdict, signEdgeToken } from "@polaris/core/waf";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-/** How long a minted edge token is valid. After this the visitor re-authenticates,
- *  which requires Polaris to be reachable again. */
-const EDGE_TOKEN_TTL_SECONDS = 8 * 60 * 60;
 
 export async function GET(request: Request): Promise<Response> {
     const url = new URL(request.url);
@@ -90,6 +86,9 @@ export async function GET(request: Request): Promise<Response> {
             sub: userId,
             aud: appOrigin.host,
             exp: now + EDGE_TOKEN_TTL_SECONDS,
+            // When these principals were true. What lets the guard tell a token that
+            // predates a membership change from one that reflects it.
+            iat: now,
             // Carried so the guard can answer the same question offline on every later
             // request, without Polaris and without a membership lookup at the edge.
             prn: [...held]

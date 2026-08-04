@@ -1,0 +1,11 @@
+-- When an account's groups or roles last moved.
+--
+-- An edge token states the principals its holder resolved to when it was minted, and
+-- the co-located guard trusts that statement offline for hours - which is what keeps a
+-- protected service working while the control plane is down. Without a record of when
+-- membership changed, moving somebody out of a group would not reach a running service
+-- until their token expired.
+--
+-- Null for every existing account, which reads as "nothing recent to correct": their
+-- tokens are judged by age alone, exactly as they were before this column existed.
+ALTER TABLE "User" ADD COLUMN "principalsMovedAt" TIMESTAMP(3);

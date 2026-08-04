@@ -16,7 +16,7 @@
 import { prisma } from "@polaris/db";
 import { recordAudit } from "@/lib/audit-service";
 import { parseStringList, type AccessRulesInput } from "@polaris/core";
-import { updateEnforcedRules, type AccessGroupView } from "@polaris/auth";
+import { markPrincipalsMoved, updateEnforcedRules, type AccessGroupView } from "@polaris/auth";
 
 /** One person, as the directory lists them. */
 export interface DirectoryUser {
@@ -131,9 +131,17 @@ async function wouldStrandInstance(userId: string): Promise<boolean> {
     return others === 0;
 }
 
-/** End every session a user holds, so a change to their access is immediate. */
+/**
+ * End every session a user holds, so a change to their access is immediate.
+ *
+ * The stamp travels with it. A service behind a Polaris login is guarded offline from a
+ * signed token, so ending the sessions here left the person still being served by every
+ * route they already held one for - for hours. Marking the account re-decided is what
+ * reaches those guards.
+ */
 async function dropSessions(userId: string): Promise<void> {
     await prisma.session.deleteMany({ where: { userId } });
+    await markPrincipalsMoved([userId]);
 }
 
 export async function banUser(actorId: string, userId: string, reason: string): Promise<{ error?: string }> {
@@ -186,6 +194,10 @@ export async function setUserRole(actorId: string, userId: string, roleName: str
         prisma.userRole.deleteMany({ where: { userId } }),
         prisma.userRole.create({ data: { userId, roleId: role.id } })
     ]);
+    // Their sessions stay: changing somebody's role is not a reason to sign them out.
+    // Only what the role reaches is re-decided, and this is what carries that to the
+    // guards already serving them.
+    await markPrincipalsMoved([userId]);
     await recordAudit({
         actorId,
         action: "user.role",

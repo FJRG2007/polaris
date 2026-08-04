@@ -52,9 +52,25 @@ export interface WafIntelSnapshot {
     readonly ips: Readonly<Record<string, WafIntelEntry>>;
     /** Ranges, kept separate because they cost a linear scan and are rare. */
     readonly cidrs: readonly (readonly [string, WafIntelEntry])[];
+    /**
+     * When each user's groups and roles last moved, in epoch ms, for the users whose
+     * membership changed recently enough for a live token to still be claiming the
+     * old one.
+     *
+     * An edge token states the principals its holder resolved to when it was minted,
+     * and the guard trusts that statement for hours so it can decide offline. Without
+     * this, moving somebody out of a group would not reach a running service until
+     * their token expired. With it, the guard can see that a token predates the
+     * change and send its holder back for one that does not.
+     *
+     * Only the changes matter, never the memberships themselves - this file is
+     * readable by every guard, and the answer to "who is in what" is not the edge's
+     * business. Pruned to the token lifetime, so it stays a handful of entries.
+     */
+    readonly moved: Readonly<Record<string, number>>;
 }
 
-export const EMPTY_WAF_INTEL: WafIntelSnapshot = { v: WAF_INTEL_VERSION, at: 0, ips: {}, cidrs: [] };
+export const EMPTY_WAF_INTEL: WafIntelSnapshot = { v: WAF_INTEL_VERSION, at: 0, ips: {}, cidrs: [], moved: {} };
 
 /**
  * The snapshot as the guard queries it. Built once per file read, then asked once
@@ -66,6 +82,9 @@ export interface WafIntelIndex {
     readonly size: number;
     /** The entry blocking this address right now, or null. */
     match(ip: string | null | undefined, now: number): WafIntelEntry | null;
+    /** Epoch ms this user's groups or roles last moved, or null if nothing recent
+     *  is known - which is the answer for almost everybody, almost always. */
+    movedAt(userId: string): number | null;
 }
 
 /** True while the entry still applies. A null expiry never lapses; it is withdrawn
@@ -81,6 +100,7 @@ export function indexWafIntel(snapshot: unknown): WafIntelIndex {
     const parsed = asSnapshot(snapshot);
     const ips = new Map<string, WafIntelEntry>(Object.entries(parsed.ips));
     const cidrs = parsed.cidrs;
+    const moved = new Map<string, number>(Object.entries(parsed.moved));
     return {
         at: parsed.at,
         size: ips.size + cidrs.length,
@@ -92,6 +112,9 @@ export function indexWafIntel(snapshot: unknown): WafIntelIndex {
                 if (live(entry, now) && ipAllowed(ip, [range])) return entry;
             }
             return null;
+        },
+        movedAt(userId) {
+            return moved.get(userId) ?? null;
         }
     };
 }
@@ -117,7 +140,13 @@ function asSnapshot(value: unknown): WafIntelSnapshot {
             if (parsed) cidrs.push([pair[0], parsed]);
         }
     }
-    return { v: WAF_INTEL_VERSION, at: typeof raw.at === "number" ? raw.at : 0, ips, cidrs };
+    const moved: Record<string, number> = {};
+    if (raw.moved && typeof raw.moved === "object") {
+        for (const [userId, at] of Object.entries(raw.moved)) {
+            if (typeof at === "number" && Number.isFinite(at)) moved[userId] = at;
+        }
+    }
+    return { v: WAF_INTEL_VERSION, at: typeof raw.at === "number" ? raw.at : 0, ips, cidrs, moved };
 }
 
 function asEntry(value: unknown): WafIntelEntry | null {
@@ -137,7 +166,8 @@ function asEntry(value: unknown): WafIntelEntry | null {
  *  not grow without bound. */
 export function buildWafIntel(
     entries: Iterable<readonly [string, WafIntelEntry]>,
-    now: number
+    now: number,
+    moved: Iterable<readonly [string, number]> = []
 ): WafIntelSnapshot {
     const ips: Record<string, WafIntelEntry> = {};
     const cidrs: [string, WafIntelEntry][] = [];
@@ -146,5 +176,5 @@ export function buildWafIntel(
         if (address.includes("/")) cidrs.push([address, entry]);
         else ips[address] = entry;
     }
-    return { v: WAF_INTEL_VERSION, at: now, ips, cidrs };
+    return { v: WAF_INTEL_VERSION, at: now, ips, cidrs, moved: Object.fromEntries(moved) };
 }

@@ -61,6 +61,12 @@ export function startWafSentinel(): void {
                 await refreshWafFeeds();
                 await pruneWafBans();
             }
+            // Republish every tick, not only when a ban is written. The snapshot also
+            // carries the accounts Polaris has re-decided - a membership change, a ban,
+            // a revoked session - and those happen on a screen that knows nothing about
+            // the edge. Publishing on the ban path alone meant a group change might not
+            // reach a guard until something unrelated banned an address.
+            await publishWafIntel();
         } catch (error) {
             console.error("polaris: the firewall sentinel tick failed:", error);
         } finally {

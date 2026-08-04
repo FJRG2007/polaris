@@ -23,6 +23,26 @@ export interface GroupMemberInfo {
     email: string;
 }
 
+/**
+ * Record that these accounts' groups or roles have moved.
+ *
+ * Called by everything that changes who somebody is in, so the rule lives in one place
+ * rather than in each caller. What reads it is the edge: a service behind a Polaris
+ * login is guarded offline from a token that states the holder's principals, and
+ * without this a token minted before the change would go on asserting the old
+ * membership until it expired. The stamp is published to the guards, which then send
+ * the holder back for a token that reflects the change.
+ *
+ * Deliberately not a session change. Moving somebody between groups, like changing
+ * their email, is not a reason to sign them out - they keep working, and only what
+ * their membership lets them reach is re-decided.
+ */
+export async function markPrincipalsMoved(userIds: readonly string[]): Promise<void> {
+    const ids = [...new Set(userIds.filter((id) => id))];
+    if (ids.length === 0) return;
+    await prisma.user.updateMany({ where: { id: { in: ids } }, data: { principalsMovedAt: new Date() } });
+}
+
 /** Create a group. Throws if the name is already taken. */
 export async function createGroup(name: string, description?: string): Promise<{ id: string }> {
     const trimmed = name.trim();
@@ -35,7 +55,11 @@ export async function createGroup(name: string, description?: string): Promise<{
 
 /** Delete a group (its memberships cascade). System groups are protected. */
 export async function deleteGroup(id: string): Promise<void> {
-    await prisma.group.deleteMany({ where: { id, isSystem: false } });
+    // Read the members before the cascade takes them: after the delete there is
+    // nothing left to say whose membership just changed.
+    const members = await prisma.groupMember.findMany({ where: { groupId: id }, select: { userId: true } });
+    const removed = await prisma.group.deleteMany({ where: { id, isSystem: false } });
+    if (removed.count > 0) await markPrincipalsMoved(members.map((member) => member.userId));
 }
 
 /** All groups with member counts, alphabetical. */
@@ -82,11 +106,13 @@ export async function addGroupMember(groupId: string, userId: string): Promise<v
         create: { groupId, userId },
         update: {}
     });
+    await markPrincipalsMoved([userId]);
 }
 
 /** Remove a user from a group. Idempotent. */
 export async function removeGroupMember(groupId: string, userId: string): Promise<void> {
     await prisma.groupMember.deleteMany({ where: { groupId, userId } });
+    await markPrincipalsMoved([userId]);
 }
 
 /** The ids of every group a user belongs to (used to resolve group-scoped grants). */

@@ -57,6 +57,13 @@ model User {
     // When set, the account is banned: sign-in is refused and sessions are void.
     bannedAt      DateTime?
     banReason     String?
+    // When this account's groups or roles last moved. An edge token states the
+    // principals its holder had when it was minted and the guard trusts that offline
+    // for hours, so without this a membership change would not reach a service that is
+    // already running. Published to the edge (pruned to the token lifetime) so a token
+    // that predates the change is spotted there and re-minted. Deliberately not on the
+    // session: changing who somebody is in must not sign them out.
+    principalsMovedAt DateTime?
     createdAt     DateTime @default(now())
     updatedAt     DateTime @updatedAt
 
