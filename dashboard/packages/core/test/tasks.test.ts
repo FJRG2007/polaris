@@ -183,6 +183,34 @@ describe("a date that holds work up", () => {
     });
 });
 
+describe("everything that holds work up, as one answer", () => {
+    const clear = { statusType: "open", dependsOnUnfinished: false, blockedUntil: null, blockedNote: "" } as const;
+
+    it("reads each of the four on its own", () => {
+        expect(engine.taskIsBlocked(clear, NOW)).toBe(false);
+        expect(engine.taskIsBlocked({ ...clear, statusType: "blocked" }, NOW)).toBe(true);
+        expect(engine.taskIsBlocked({ ...clear, dependsOnUnfinished: true }, NOW)).toBe(true);
+        expect(engine.taskIsBlocked({ ...clear, blockedNote: "Waiting on legal" }, NOW)).toBe(true);
+        expect(engine.taskIsBlocked({ ...clear, blockedUntil: new Date("2026-08-06T00:00:00.000Z") }, NOW)).toBe(true);
+    });
+
+    it("lets a date that has passed stop holding it, with nothing else in the way", () => {
+        const lapsed = { ...clear, blockedUntil: new Date("2026-07-01T00:00:00.000Z") };
+        expect(engine.taskIsBlocked(lapsed, NOW)).toBe(false);
+        // Anything else still standing keeps it held: the date lifting is not
+        // the block lifting.
+        expect(engine.taskIsBlocked({ ...lapsed, blockedNote: "Waiting on legal" }, NOW)).toBe(true);
+    });
+
+    it("counts a blocker that is not finished, including one sitting on no status", () => {
+        expect(engine.blockerHolds("active")).toBe(true);
+        expect(engine.blockerHolds(null)).toBe(true);
+        expect(engine.blockerHolds(undefined)).toBe(true);
+        expect(engine.blockerHolds("done")).toBe(false);
+        expect(engine.blockerHolds("closed")).toBe(false);
+    });
+});
+
 describe("relative dates", () => {
     it("resolves a token against the moment it is asked, not when it was saved", () => {
         const today = engine.resolveRelativeDate("today", NOW);

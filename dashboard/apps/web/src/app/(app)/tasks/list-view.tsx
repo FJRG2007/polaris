@@ -743,7 +743,11 @@ export function ListScreen({
                 // listing forty names says less than the number does.
                 name={deleting.length === 1 ? (deleting[0]?.name ?? "") : `${deleting.length} tasks`}
                 kind={deleting.length === 1 ? "task" : "tasks"}
-                requireTyping={false}
+                // One row of many is asked plainly, the way every other single
+                // delete is. A selection is not one row: it takes every subtask,
+                // comment and hour logged against forty at once, off one click on
+                // a screen where the click before it was a shift-click.
+                requireTyping={deleting.length > 1}
                 description="Comments, checklists and tracked time go with them. Archiving keeps all of that and takes them off the board."
                 confirmLabel={deleting.length === 1 ? "Delete task" : `Delete ${deleting.length} tasks`}
                 onConfirm={async () => {

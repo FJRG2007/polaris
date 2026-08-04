@@ -41,6 +41,8 @@ const FACT_SELECT = {
     timeEstimate: true,
     archived: true,
     order: true,
+    blockedUntil: true,
+    blockedNote: true,
     completedAt: true,
     createdById: true,
     createdAt: true,
@@ -54,7 +56,23 @@ const FACT_SELECT = {
 
 type FactRecord = Prisma.TaskGetPayload<{ select: typeof FACT_SELECT }>;
 
-function toFacts(record: FactRecord): core.TaskFacts {
+/**
+ * Whether unfinished work this task depends on is still in its way.
+ *
+ * The one part of blocked-ness that is a question about other rows, so it is a
+ * query rather than a field, exactly as the screens ask it. A rule reading
+ * "Blocked is Yes" has to mean here what the same condition means in a saved
+ * view, and three quarters of the answer is not a condition anybody would trust.
+ */
+async function dependsOnUnfinished(taskId: string): Promise<boolean> {
+    const edges = await prisma.taskDependency.findMany({
+        where: { blockedId: taskId, type: "blocks" },
+        select: { blocker: { select: { status: { select: { type: true } } } } }
+    });
+    return edges.some((edge) => core.blockerHolds(edge.blocker.status?.type as core.TaskStatusType | undefined));
+}
+
+function toFacts(record: FactRecord, blocked: boolean): core.TaskFacts {
     return {
         id: record.id,
         name: record.name,
@@ -77,6 +95,7 @@ function toFacts(record: FactRecord): core.TaskFacts {
         timeEstimate: record.timeEstimate,
         archived: record.archived,
         order: record.order,
+        blocked,
         customValues: Object.fromEntries(record.fieldValues.map((value) => [value.fieldId, value.value]))
     };
 }
@@ -88,6 +107,25 @@ function parseActions(raw: string): core.AutomationAction[] {
     } catch {
         return [];
     }
+}
+
+/**
+ * Whether any enabled rule in these spaces listens for any of these triggers.
+ *
+ * A write that touches one task simply calls `runAutomations` and lets it return
+ * early. A write that touches a selection asks this first, so a space with no
+ * rules at all costs one query rather than two per task.
+ */
+export async function hasAutomationsFor(
+    spaceIds: readonly string[],
+    triggers: readonly core.AutomationTrigger[]
+): Promise<boolean> {
+    if (spaceIds.length === 0 || triggers.length === 0) return false;
+    const found = await prisma.taskAutomation.findFirst({
+        where: { spaceId: { in: [...spaceIds] }, trigger: { in: [...triggers] }, enabled: true },
+        select: { id: true }
+    });
+    return found !== null;
 }
 
 /**
@@ -104,7 +142,21 @@ export async function runAutomations(event: AutomationEventInput): Promise<void>
     });
     if (stored.length === 0) return;
 
-    const facts = toFacts(record);
+    // Only once there is a rule to match against: the dependency lookup is a
+    // query, and a space with no rules for this trigger has already returned.
+    const now = new Date();
+    const facts = toFacts(
+        record,
+        core.taskIsBlocked(
+            {
+                statusType: (record.status?.type as core.TaskStatusType) ?? "open",
+                dependsOnUnfinished: await dependsOnUnfinished(record.id),
+                blockedUntil: record.blockedUntil,
+                blockedNote: record.blockedNote
+            },
+            now
+        )
+    );
     const selected = core.selectAutomations(
         stored.map((rule) => ({
             id: rule.id,
@@ -114,7 +166,7 @@ export async function runAutomations(event: AutomationEventInput): Promise<void>
             listId: rule.listId
         })),
         { trigger: event.trigger, task: facts },
-        new Date()
+        now
     );
 
     for (const rule of selected) {

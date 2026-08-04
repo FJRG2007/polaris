@@ -335,6 +335,41 @@ export function blockHolds(until: Date | null, now: Date): boolean {
     return until !== null && until.getTime() + DAY_MS > now.getTime();
 }
 
+/** Whether a task this one depends on is still in its way. Anything that has not
+ *  reached a finished kind is, including a blocker sitting on no status at all. */
+export function blockerHolds(type: work.TaskStatusType | null | undefined): boolean {
+    return !type || !work.isFinishedStatus(type);
+}
+
+/** What can hold a task up, in the order the four are cheapest to answer. */
+export interface BlockedInput {
+    readonly statusType: work.TaskStatusType;
+    /** Whether unfinished work this task depends on is still in its way. The one
+     *  of the four that is a question about other rows, so the caller that loaded
+     *  them answers it. */
+    readonly dependsOnUnfinished: boolean;
+    readonly blockedUntil: Date | null;
+    readonly blockedNote: string;
+}
+
+/**
+ * Every way a task gets held up, folded into the one state the product reads.
+ *
+ * Here rather than at each place that loads a task, because a caller that knows
+ * three of the four answers the same question differently: a rule that never
+ * fires and a marker that never appears are the same omission seen from two
+ * screens. A date that has passed stops holding the task, which is the whole
+ * point of setting one instead of a note somebody has to remember to clear.
+ */
+export function taskIsBlocked(input: BlockedInput, now: Date): boolean {
+    return (
+        work.isBlockedStatus(input.statusType) ||
+        input.dependsOnUnfinished ||
+        input.blockedNote !== "" ||
+        blockHolds(input.blockedUntil, now)
+    );
+}
+
 /** What counts as the deadline. A task with no time of day is due at the end of
  *  its day, so an all-day task set for today is not overdue at breakfast. */
 function deadlineOf(task: Pick<TaskFacts, "dueDate" | "timed">): Date | null {

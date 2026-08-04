@@ -18,9 +18,9 @@ import * as core from "@polaris/core";
 import { nextTaskNumber } from "./numbering";
 import { prisma, type Prisma } from "@polaris/db";
 import { notify } from "@/lib/notifications/dispatch";
-import { runAutomations } from "./automation-service";
 import type { PersonRef, TagRef, TaskRow } from "./facts";
 import { listCommits, type CommitLink } from "./commit-service";
+import { hasAutomationsFor, runAutomations } from "./automation-service";
 import { listAttachments, type AttachmentView } from "./attachment-service";
 
 // ---------------------------------------------------------------------------
@@ -112,10 +112,7 @@ async function decorate(ids: string[]): Promise<{ tracked: Map<string, number>; 
     const tracked = new Map(entries.map((entry) => [entry.taskId, entry._sum.seconds ?? 0]));
     const blocked = new Set(
         dependencies
-            .filter((edge) => {
-                const type = edge.blocker.status?.type as core.TaskStatusType | undefined;
-                return !type || !core.isFinishedStatus(type);
-            })
+            .filter((edge) => core.blockerHolds(edge.blocker.status?.type as core.TaskStatusType | undefined))
             .map((edge) => edge.blockedId)
     );
     return { tracked, blocked };
@@ -163,16 +160,15 @@ function toRow(
         trackedSeconds: tracked.get(record.id) ?? 0,
         blockedUntil: record.blockedUntil?.toISOString() ?? null,
         blockedNote: record.blockedNote,
-        // Every way a task gets held up, folded into the one state a board reads:
-        // the stage it is sitting in, work it depends on, a date it waits for, a
-        // reason somebody wrote. A date that has passed stops holding it, which
-        // is the whole point of setting one instead of a note anybody has to
-        // remember to clear.
-        blocked:
-            core.isBlockedStatus((status?.type as core.TaskStatusType) ?? "open") ||
-            blocked.has(record.id) ||
-            record.blockedNote !== "" ||
-            core.blockHolds(record.blockedUntil, new Date()),
+        blocked: core.taskIsBlocked(
+            {
+                statusType: (status?.type as core.TaskStatusType) ?? "open",
+                dependsOnUnfinished: blocked.has(record.id),
+                blockedUntil: record.blockedUntil,
+                blockedNote: record.blockedNote
+            },
+            new Date()
+        ),
         recurring: record.recurrence !== null,
         customValues: Object.fromEntries(record.fieldValues.map((value) => [value.fieldId, value.value]))
     };
@@ -922,8 +918,18 @@ export async function arrangeTasks(taskIds: readonly string[]): Promise<number> 
     return changed.length;
 }
 
-/** Apply one change to a selection. Kept separate from updateTask so the fields
- *  a bulk edit may touch stay an explicit, reviewable list. */
+/**
+ * Apply one change to a selection. Kept separate from updateTask so the fields a
+ * bulk edit may touch stay an explicit, reviewable list.
+ *
+ * What follows the write is not separate, though. The same verbs reach this from
+ * the row's own controls and from a right-click on a single task, and a menu that
+ * quietly skipped the rules, the notification and the next occurrence of a
+ * recurring job would make where you clicked decide what a status change means.
+ * So the follow-ups are the ones a single write raises, per task, driven off what
+ * each row actually changed rather than off what was asked for - a selection of
+ * forty where two were already done raises two status changes, not forty.
+ */
 export async function bulkUpdate(
     actorId: string,
     allowed: readonly { id: string; spaceId: string }[],
@@ -935,6 +941,23 @@ export async function bulkUpdate(
     const ids = allowed.map((task) => task.id);
     if (ids.length === 0) return 0;
     const spacesTouched = new Set(allowed.map((task) => task.spaceId));
+
+    // What each row held before, in one query: the history lines say what moved,
+    // and the rules run only where something did.
+    const before = await prisma.task.findMany({
+        where: { id: { in: ids } },
+        select: {
+            id: true,
+            spaceId: true,
+            name: true,
+            listId: true,
+            statusId: true,
+            priority: true,
+            dueDate: true,
+            completedAt: true,
+            recurrence: true
+        }
+    });
 
     const data: Record<string, unknown> = {};
     if (input.priority !== undefined) data.priority = input.priority;
@@ -962,24 +985,44 @@ export async function bulkUpdate(
     // Resolved for every space before anything is written: a space with nothing
     // by that name refuses the whole change rather than applying it to half the
     // selection. Everything else in `data` is space-agnostic and goes to all.
-    const statusPerSpace = new Map<string, { id: string; completedAt: Date | null }>();
+    const statusPerSpace = new Map<string, { id: string; finished: boolean }>();
     if (input.statusId !== undefined) {
         for (const spaceId of spacesTouched) {
             const status = await statusInSpace(spaceId, input.statusId);
             statusPerSpace.set(spaceId, {
                 id: status.id,
-                completedAt: core.isFinishedStatus(status.type as core.TaskStatusType) ? new Date() : null
+                finished: core.isFinishedStatus(status.type as core.TaskStatusType)
             });
         }
     }
 
     if (statusPerSpace.size > 0) {
         for (const [spaceId, status] of statusPerSpace) {
-            const scoped = allowed.filter((task) => task.spaceId === spaceId).map((task) => task.id);
+            const scoped = before.filter((task) => task.spaceId === spaceId);
+            const scopedIds = scoped.map((task) => task.id);
+            if (scopedIds.length === 0) continue;
+            // A task already carrying a completion date keeps it: the stamp says
+            // when the work was finished, and re-dating it because somebody set
+            // the status of forty rows at once is how a "finished this week"
+            // report starts counting last month's work. Unfinished kinds clear it
+            // outright, which is what reopening means.
             await prisma.task.updateMany({
-                where: { id: { in: scoped } },
-                data: { ...data, statusId: status.id, completedAt: status.completedAt }
+                where: { id: { in: scopedIds } },
+                data: {
+                    ...data,
+                    statusId: status.id,
+                    ...(status.finished ? {} : { completedAt: null })
+                }
             });
+            if (status.finished) {
+                const unstamped = scoped.filter((task) => task.completedAt === null).map((task) => task.id);
+                if (unstamped.length > 0) {
+                    await prisma.task.updateMany({
+                        where: { id: { in: unstamped } },
+                        data: { completedAt: new Date() }
+                    });
+                }
+            }
         }
     } else if (Object.keys(data).length > 0) {
         await prisma.task.updateMany({ where: { id: { in: ids } }, data });
@@ -988,14 +1031,33 @@ export async function bulkUpdate(
     // createMany's skipDuplicates is Postgres-only and the schema has to stay
     // SQLite-portable, so whatever would collide is removed first. Same result,
     // and adding somebody who is already on the task stays a no-op.
+    //
+    // Who was already on which task is read first, so "was just handed this" is
+    // the people it is actually news to rather than everybody named in the change.
+    const handedTo = new Map<string, string[]>();
     if (input.addAssigneeIds?.length) {
         const userIds = input.addAssigneeIds;
+        const already = await prisma.taskAssignee.findMany({
+            where: { taskId: { in: ids }, userId: { in: userIds } },
+            select: { taskId: true, userId: true }
+        });
+        const held = new Set(already.map((entry) => `${entry.taskId}:${entry.userId}`));
         await prisma.taskAssignee.deleteMany({ where: { taskId: { in: ids }, userId: { in: userIds } } });
         await prisma.taskAssignee.createMany({
             data: ids.flatMap((taskId) => userIds.map((userId) => ({ taskId, userId })))
         });
+        for (const taskId of ids) {
+            const added = userIds.filter((userId) => !held.has(`${taskId}:${userId}`));
+            if (added.length > 0) handedTo.set(taskId, added);
+        }
     }
+    const takenFrom = new Set<string>();
     if (input.removeAssigneeIds?.length) {
+        const holders = await prisma.taskAssignee.findMany({
+            where: { taskId: { in: ids }, userId: { in: input.removeAssigneeIds } },
+            select: { taskId: true }
+        });
+        for (const entry of holders) takenFrom.add(entry.taskId);
         await prisma.taskAssignee.deleteMany({
             where: { taskId: { in: ids }, userId: { in: input.removeAssigneeIds } }
         });
@@ -1011,10 +1073,135 @@ export async function bulkUpdate(
         await prisma.taskTagLink.deleteMany({ where: { taskId: { in: ids }, tagId: { in: input.removeTagIds } } });
     }
 
-    await prisma.taskActivity.createMany({
-        data: ids.map((taskId) => ({ taskId, userId: actorId, action: "bulk" }))
-    });
+    // The names a status line needs, for every status either end of the move
+    // mentions: one query for the selection rather than two per row.
+    const statusNames = new Map<string, string>();
+    if (statusPerSpace.size > 0) {
+        const wanted = new Set<string>();
+        for (const status of statusPerSpace.values()) wanted.add(status.id);
+        for (const task of before) if (task.statusId) wanted.add(task.statusId);
+        const rows = await prisma.taskStatus.findMany({
+            where: { id: { in: [...wanted] } },
+            select: { id: true, name: true }
+        });
+        for (const row of rows) statusNames.set(row.id, row.name);
+    }
+
+    const lines: Prisma.TaskActivityCreateManyInput[] = [];
+    const statusChanged: string[] = [];
+    const completed: string[] = [];
+    const priorityChanged: string[] = [];
+    const movedList: string[] = [];
+
+    for (const task of before) {
+        const status = statusPerSpace.get(task.spaceId);
+        const movedTo = status && status.id !== task.statusId ? status : null;
+        const line = (action: string, fromValue: string | null = null, toValue: string | null = null) =>
+            lines.push({ taskId: task.id, userId: actorId, action, fromValue, toValue });
+        const written = lines.length;
+
+        if (movedTo) {
+            statusChanged.push(task.id);
+            if (movedTo.finished) completed.push(task.id);
+            line(
+                "status",
+                task.statusId ? (statusNames.get(task.statusId) ?? null) : null,
+                statusNames.get(movedTo.id) ?? null
+            );
+        }
+        if (input.priority !== undefined && input.priority !== task.priority) {
+            priorityChanged.push(task.id);
+            line(
+                "priority",
+                core.TASK_PRIORITY_LABELS[task.priority as core.TaskPriority],
+                core.TASK_PRIORITY_LABELS[input.priority]
+            );
+        }
+        if (input.dueDate !== undefined) line("due", task.dueDate?.toISOString() ?? null, input.dueDate ?? null);
+        if (input.listId !== undefined && input.listId !== task.listId) {
+            movedList.push(task.id);
+            line("moved");
+        }
+        if (input.archived === true) line("archived");
+        if (handedTo.has(task.id)) line("assignee", null, String(handedTo.get(task.id)?.length ?? 0));
+        else if (takenFrom.has(task.id)) line("assignee");
+        // A change with no line of its own - a sprint, a tag - still leaves a
+        // mark, which is what this stream is for.
+        if (lines.length === written) line("bulk");
+    }
+
+    if (lines.length > 0) await prisma.taskActivity.createMany({ data: lines });
+
+    const names = new Map(before.map((task) => [task.id, task.name]));
+    await announceHandover(handedTo, names, actorId);
+
+    // Rules last, and only for the rows something happened to. Asked once for
+    // the whole selection first: a space with no rules at all is one query rather
+    // than two per task.
+    const raised: [core.AutomationTrigger, readonly string[]][] = [
+        ["task.statusChanged", statusChanged],
+        ["task.completed", completed],
+        ["task.priorityChanged", priorityChanged],
+        ["task.dueDateSet", input.dueDate ? ids : []],
+        ["task.moved", movedList],
+        ["task.assigneeAdded", [...handedTo.keys()]],
+        ["task.assigneeRemoved", [...takenFrom]]
+    ];
+    const pending = raised.filter(([, tasks]) => tasks.length > 0);
+    const triggers = pending.map(([trigger]) => trigger);
+    if (pending.length > 0 && (await hasAutomationsFor([...spacesTouched], triggers))) {
+        for (const [trigger, tasks] of pending) {
+            for (const taskId of tasks) await runAutomations({ trigger, taskId, actorId });
+        }
+    }
+
+    // A recurring job that was just finished does not stay finished, whether it
+    // was ticked on its own row or with thirty others.
+    const recurring = new Set(before.filter((task) => task.recurrence !== null).map((task) => task.id));
+    for (const taskId of completed) {
+        if (recurring.has(taskId)) await rescheduleIfRecurring(taskId, actorId);
+    }
+
     return ids.length;
+}
+
+/**
+ * Tell the people a selection was just handed to.
+ *
+ * One notification each, naming the count, rather than one per task: forty rows
+ * changing hands is one decision, and forty lines in somebody's tray is a reason
+ * to stop reading the tray. A single task is still announced as itself, since
+ * that is the one case where its name and a link to it are the whole message.
+ */
+async function announceHandover(
+    handedTo: ReadonlyMap<string, readonly string[]>,
+    names: ReadonlyMap<string, string>,
+    actorId: string
+): Promise<void> {
+    const perPerson = new Map<string, string[]>();
+    for (const [taskId, userIds] of handedTo) {
+        for (const userId of userIds) {
+            if (userId === actorId) continue;
+            const held = perPerson.get(userId);
+            if (held) held.push(taskId);
+            else perPerson.set(userId, [taskId]);
+        }
+    }
+
+    for (const [userId, taskIds] of perPerson) {
+        const first = taskIds[0] as string;
+        if (taskIds.length === 1) {
+            await announceAssignment(first, names.get(first) ?? "A task", [userId], actorId);
+            continue;
+        }
+        await notify({
+            userId,
+            event: "tasks.assigned",
+            title: `${taskIds.length} tasks assigned to you`,
+            body: "You were put on them in one change.",
+            href: "/tasks"
+        });
+    }
 }
 
 export async function deleteTask(taskId: string): Promise<void> {
