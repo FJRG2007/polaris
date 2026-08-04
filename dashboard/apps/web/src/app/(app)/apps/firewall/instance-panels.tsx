@@ -919,7 +919,9 @@ function statusTone(status: number): string {
  * cannot check is one they either believe or disable. So the requests behind it are
  * here in full: what was asked for, what it got back, and when. It is also how the
  * other direction gets settled, when the address turns out to be a monitoring probe
- * or an office that should never have been banned at all.
+ * or an office that should never have been banned at all - which the accounts
+ * panel above the requests answers directly, for the reader it is willing to name
+ * accounts to.
  */
 function AddressDialog({ ip, hours, onClose }: { ip: string | null; hours: number; onClose: () => void }) {
     const format = useDisplayFormat();
