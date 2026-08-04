@@ -19,6 +19,8 @@ import { spawn } from "node:child_process";
 import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import {
     detectBuild,
+    generateDockerfile,
+    GENERATED_DOCKERFILE,
     nixpacksConfig,
     type BuildContext,
     type PackageManifest,
@@ -44,6 +46,9 @@ export interface BuildCommands {
     installCommand?: string | null;
     buildCommand?: string | null;
     startCommand?: string | null;
+    /** The port the plan publishes, so a generated image listens where the
+     *  deployment expects it rather than on the framework's own default. */
+    port?: number;
 }
 
 /** Whether a repo URL is a scheme we will clone (http/https/git, no ssh/file). */
@@ -100,39 +105,56 @@ async function configureBuild(
     dir: string,
     commands: BuildCommands,
     log: (line: string) => void
-): Promise<string | undefined> {
+): Promise<{ root?: string; dockerfile?: string }> {
     const rootDirectory = commands.rootDirectory || undefined;
     const detected = await snapshot(dir, rootDirectory).then(detectBuild);
     const buildRoot = detected?.buildRoot ?? rootDirectory ?? "";
     const configDir = buildRoot ? join(dir, buildRoot) : dir;
 
-    if ((await listDirectory(configDir)).some((name) => name === "nixpacks.toml" || name === "nixpacks.json")) {
-        log("Using the nixpacks configuration in the repository.\n");
-        return detected?.buildRoot;
-    }
-
-    // Said before anything else: when detection recognized the shape but cannot run
-    // it, this line is the only thing standing between the operator and an opaque
-    // "No start command could be found" from the builder.
     if (detected) log(`Detected ${detected.note}.\n`);
 
+    // Recognized well enough to say exactly how to build it: write a Dockerfile
+    // and use the ordinary Docker path. This is what puts the runtime version
+    // under Polaris's control - an image tag is the current release of that major
+    // whenever it is pulled, where the auto-detecting builder can only offer
+    // whatever its own version was pinned to years ago.
+    if (detected?.image) {
+        const overridden = {
+            install: commands.installCommand || detected.image.install,
+            build: commands.buildCommand || detected.image.build,
+            start: commands.startCommand || detected.image.start
+        };
+        await writeFile(
+            join(dir, GENERATED_DOCKERFILE),
+            generateDockerfile({ ...detected.image, ...overridden, port: commands.port ?? 3000 }),
+            "utf8"
+        );
+        log(`Building on ${detected.image.buildImage}.\n`);
+        return { dockerfile: GENERATED_DOCKERFILE };
+    }
+
+    if ((await listDirectory(configDir)).some((name) => name === "nixpacks.toml" || name === "nixpacks.json")) {
+        log("Using the nixpacks configuration in the repository.\n");
+        return { root: detected?.buildRoot };
+    }
+
+    // Not recognized, or recognized as something no image can be written for. The
+    // auto-detecting builder is left in charge exactly as before; anything the
+    // service set by hand is still passed to it.
     const config = nixpacksConfig({
-        packages: detected?.packages,
-        install: commands.installCommand || detected?.install,
-        build: commands.buildCommand || detected?.build,
-        start: commands.startCommand || detected?.start
+        install: commands.installCommand,
+        build: commands.buildCommand,
+        start: commands.startCommand
     });
     if (!config) {
         if (!detected) log("No framework recognized; letting the builder work it out.\n");
-        return detected?.buildRoot;
+        return { root: detected?.buildRoot };
     }
 
     const overridden = (["installCommand", "buildCommand", "startCommand"] as const).filter((key) => commands[key]);
-    if (overridden.length > 0) {
-        log(`Using the ${overridden.map((key) => key.replace("Command", "")).join(", ")} command set on this service.\n`);
-    }
+    log(`Using the ${overridden.map((key) => key.replace("Command", "")).join(", ")} command set on this service.\n`);
     await writeFile(join(configDir, "nixpacks.toml"), config, "utf8");
-    return detected?.buildRoot;
+    return { root: detected?.buildRoot };
 }
 
 /**
@@ -164,10 +186,10 @@ export function gitBuildContext(
 
         // Best-effort: a repository that defeats detection still deploys exactly as
         // it did before, with the builder left to its own devices.
-        let root: string | undefined;
+        let configured: { root?: string; dockerfile?: string } = {};
         if (commands) {
             try {
-                root = await configureBuild(dir, commands, log);
+                configured = await configureBuild(dir, commands, log);
             } catch (error) {
                 log(`Could not inspect the source: ${error instanceof Error ? error.message : "unknown error"}\n`);
             }
@@ -179,7 +201,7 @@ export function gitBuildContext(
         const cleanup = (): void => void rm(dir, { recursive: true, force: true });
         child.stdout.on("close", cleanup);
         child.stdout.on("error", cleanup);
-        return { tar: child.stdout, root };
+        return { tar: child.stdout, ...configured };
     };
 }
 

@@ -16,8 +16,6 @@
  * instead of guessing over them.
  */
 
-import { BUILDER_UPGRADE_COMMAND } from "./onboarding.js";
-
 /** The parts of a package.json this needs. */
 export interface PackageManifest {
     readonly name?: string;
@@ -73,9 +71,30 @@ export interface DetectedBuild {
     /** Nix packages the start command needs. A built site needs something to serve
      *  it; a server framework serves itself and needs none. */
     readonly packages: readonly string[];
-    /** The Node range this project declares, when the builder is unlikely to meet
-     *  it. Reported, never acted on - see unmetNodeRequirement. */
+    /** The Node range this project declares, when the auto-detecting builder is
+     *  unlikely to meet it. Reported, never acted on - see unmetNodeRequirement. */
     readonly nodeRequirement: string | null;
+    /**
+     * Everything needed to write a Dockerfile for this project, which is how it is
+     * actually built. Present for anything recognized here; absent leaves the whole
+     * job to the auto-detecting builder.
+     *
+     * These commands are complete rather than "only what differs": a Dockerfile has
+     * no builder underneath it to defer the rest to.
+     */
+    readonly image: {
+        readonly buildImage: string;
+        readonly runtimeImage: string;
+        /** The app's directory relative to the repository root. */
+        readonly appDirectory: string;
+        /** The install that runs at the repository root, for a workspace. */
+        readonly workspaceInstall: string | null;
+        readonly install: string | null;
+        readonly build: string | null;
+        readonly start: string | null;
+        /** Built files to serve, relative to the app, rather than a process. */
+        readonly staticDirectory: string | null;
+    } | null;
     /** One line for the deployment log, so a wrong guess is diagnosable from the
      *  output rather than from the source. */
     readonly note: string;
@@ -170,6 +189,21 @@ function workspaceRoot(levels: readonly DirectorySnapshot[]): DirectorySnapshot 
     return null;
 }
 
+/** The Node major to build on: what the project asks for, or a current default.
+ *  A tag like `node:22-slim` is the newest 22.x whenever it is pulled, so a
+ *  declared minimum inside a major is satisfied without anything being pinned. */
+export function nodeImageMajor(range: string | undefined): string {
+    const declared = range?.trim() ? /(\d+)/.exec(range.trim())?.[1] : undefined;
+    const major = declared ? Number(declared) : 0;
+    // Below 18 is out of support everywhere; asking for it usually means the
+    // manifest was written years ago and never revisited.
+    return major >= 18 ? String(major) : DEFAULT_NODE_MAJOR;
+}
+
+/** What a project gets when it does not say. Current LTS rather than the oldest
+ *  thing that still runs. */
+const DEFAULT_NODE_MAJOR = "22";
+
 /**
  * A Node requirement the builder is likely to refuse, or null.
  *
@@ -203,6 +237,28 @@ function declaredNodeRange(levels: readonly DirectorySnapshot[]): string | undef
         if (engines?.node) return engines.node;
     }
     return undefined;
+}
+
+/** The install command for a package manager, run wherever the lockfile is. */
+function installCommand(manager: PackageManager, files: readonly string[]): string {
+    switch (manager) {
+        case "pnpm":
+            return "pnpm install --frozen-lockfile";
+        case "yarn":
+            return "yarn install --frozen-lockfile";
+        case "bun":
+            return "bun install";
+        case "npm":
+            // `npm ci` needs a lockfile and refuses without one.
+            return files.includes("package-lock.json") ? "npm ci" : "npm install";
+    }
+}
+
+/** The image a package manager runs in. Bun is its own runtime and ships its own;
+ *  everything else runs on Node, which carries npm and a corepack shim for the
+ *  other two. */
+function baseImage(manager: PackageManager, nodeMajor: string): string {
+    return manager === "bun" ? "oven/bun:1" : `node:${nodeMajor}-slim`;
 }
 
 /** Run one of the app's own scripts, from the build root. `workspace` is the
@@ -279,6 +335,7 @@ export function detectBuild(snapshot: RepoSnapshot): DetectedBuild | null {
             start: null,
             packages: [],
             nodeRequirement,
+            image: null,
             note: "a workspace root rather than an app - set the root directory to the app inside it you want to deploy"
         };
     }
@@ -330,12 +387,17 @@ export function detectBuild(snapshot: RepoSnapshot): DetectedBuild | null {
         note = `${label}, but nothing here says how to start it - set a start command`;
     }
 
-    if (nodeRequirement) {
-        // The command, not a description of it. A build that refuses on this leaves
-        // the operator on a machine they have a shell on, and the useful thing to
-        // hand them there is the line to paste.
-        note = `${note}; it needs Node ${nodeRequirement}. If the build refuses, the builder on the machine is too old to have that runtime - upgrade it with: ${BUILDER_UPGRADE_COMMAND}`;
-    }
+    // What the image is actually built from. The commands here are complete and
+    // unscoped: a Dockerfile puts the app's own directory under WORKDIR, so a
+    // script runs where it lives and no `--filter` or `cd` is needed. A workspace
+    // installs once at its root, which is where its lockfile is.
+    const nodeMajor = nodeImageMajor(declaredNodeRange(snapshot.levels));
+    const image = baseImage(manager, nodeMajor);
+    const rootInstall = installCommand(manager, (enclosing ?? app).files);
+    const staticDirectory = !scripts.start && !servesItself && !foreignAdapter ? (framework?.dist ?? null) : null;
+
+    if (nodeRequirement) note = `${note}; on Node ${nodeMajor}, which is what it asks for`;
+    else if (!foreignAdapter) note = `${note}; on Node ${nodeMajor}`;
 
     return {
         framework: label,
@@ -345,6 +407,20 @@ export function detectBuild(snapshot: RepoSnapshot): DetectedBuild | null {
         start,
         packages,
         nodeRequirement,
+        image: foreignAdapter
+            ? null
+            : {
+                  buildImage: image,
+                  runtimeImage: image,
+                  appDirectory,
+                  workspaceInstall: workspaceBuild ? rootInstall : null,
+                  install: workspaceBuild ? null : rootInstall,
+                  build: scripts.build ? runScript(manager, "build", null) : null,
+                  start: scripts.start
+                      ? runScript(manager, "start", null)
+                      : (servesItself ?? null),
+                  staticDirectory
+              },
         note: workspaceBuild ? `${note}; built from the workspace root for ${workspace}` : note
     };
 }

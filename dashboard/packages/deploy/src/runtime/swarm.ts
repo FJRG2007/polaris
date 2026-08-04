@@ -40,12 +40,13 @@ export class SwarmRuntime implements RuntimeDriver {
             await ctx.ports.build(
                 {
                     tag: imageTag,
-                    dockerfile: plan.build.dockerfilePath,
+                    // A Dockerfile Polaris generated wins - see the compose runtime.
+                    dockerfile: context.dockerfile ?? plan.build.dockerfilePath,
                     contextTar: context.tar,
                     // Detection may have moved the build up to the repository root -
                     // a workspace cannot install from inside one of its members.
                     root: context.root ?? plan.build.rootDirectory,
-                    builder: plan.build.method === "nixpacks" ? "nixpacks" : "docker"
+                    builder: context.dockerfile || plan.build.method !== "nixpacks" ? "docker" : "nixpacks"
                 },
                 sink
             );

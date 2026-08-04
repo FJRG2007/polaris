@@ -17,4 +17,13 @@ export interface BuildContext {
     /** Where to point a builder that finds its own way around, when detection
      *  moved it. Absent leaves the service's configured root directory in force. */
     readonly root?: string;
+    /**
+     * A Dockerfile Polaris wrote into the context, relative to its root.
+     *
+     * Present means the project was recognized well enough to say exactly how to
+     * build it, and the ordinary Dockerfile path takes over - which is what puts
+     * the runtime version under Polaris's control instead of the build machine's.
+     * Absent leaves the auto-detecting builder in charge, as before.
+     */
+    readonly dockerfile?: string;
 }

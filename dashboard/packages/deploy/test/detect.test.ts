@@ -289,74 +289,96 @@ describe("the package manager comes from the lockfile", () => {
     });
 });
 
-describe("a Node version the builder probably cannot meet", () => {
+describe("the runtime the project asks for", () => {
     /**
-     * The builder maps a major to one pinned release - its `nodejs_22` is one
-     * specific 22.x - so a project needing a version from inside a major gets
-     * something older than it asked for and fails its own engine check. Astro
-     * asking for >=22.12.0 lands on 22.3.0 and refuses to build.
+     * The failure that drove four wrong fixes: an Astro project declaring
+     * >=22.12.0 got the auto-detecting builder's pinned 22.3.0 and refused to
+     * build, and asking that builder for a newer major silently dropped it to 18.
      *
-     * This is reported and never acted on, and the reason is a regression: asking
-     * for a different major was tried, and which majors a given builder carries is
-     * not knowable from here. Naming one it does not have does not fail - it falls
-     * all the way back to that builder's default, which turned a Node 22 build into
-     * a Node 18 one. Reporting is the only honest option left.
+     * Writing a Dockerfile ends the argument. `node:22-slim` is the current 22.x
+     * whenever it is pulled, so a declared minimum inside a major is satisfied
+     * without anything here having to know which patch exists.
      */
-    const astro = (node: string) =>
+    const astro = (node?: string) =>
         detectBuild(
             alone({
                 files: ["package.json", "pnpm-lock.yaml"],
-                manifest: { scripts: { build: "astro build" }, dependencies: { astro: "7" }, engines: { node } }
+                manifest: {
+                    scripts: { build: "astro build", start: "node ./dist/server/entry.mjs" },
+                    dependencies: { astro: "7", "@astrojs/node": "11" },
+                    ...(node ? { engines: { node } } : {})
+                }
             })
         );
 
-    it("reports a requirement that reaches inside a major", () => {
-        expect(astro(">=22.12.0")?.nodeRequirement).toBe(">=22.12.0");
+    it("builds on the major the project declares", () => {
+        expect(astro(">=22.12.0")?.image?.buildImage).toBe("node:22-slim");
+        expect(astro(">=24")?.image?.buildImage).toBe("node:24-slim");
     });
 
-    it("never proposes a different major, however tempting", () => {
-        // The whole point: the plan says what is needed and changes nothing about
-        // which runtime is asked for.
-        expect(JSON.stringify(astro(">=22.12.0"))).not.toContain("NIXPACKS_NODE_VERSION");
+    it("uses a current default when the project never said", () => {
+        // Not the builder's default of 18, which has been out of support for a while.
+        expect(astro()?.image?.buildImage).toBe("node:22-slim");
     });
 
-    it("stays quiet when the major's own .0 already satisfies it", () => {
-        expect(astro(">=22")?.nodeRequirement).toBeNull();
-        expect(astro(">=22.0.0")?.nodeRequirement).toBeNull();
+    it("ignores a declared version too old to be worth honouring", () => {
+        expect(astro(">=14")?.image?.buildImage).toBe("node:22-slim");
     });
 
-    it("stays quiet when the project never declared one", () => {
-        expect(astro("")?.nodeRequirement).toBeNull();
-        expect(detectBuild(alone({ manifest: { dependencies: { astro: "7" } } }))?.nodeRequirement).toBeNull();
+    it("puts bun on its own runtime rather than on Node", () => {
+        const bun = detectBuild(
+            alone({
+                files: ["package.json", "bun.lockb"],
+                manifest: { scripts: { start: "bun run index.ts" }, dependencies: { next: "15" } }
+            })
+        );
+        expect(bun?.image?.buildImage).toBe("oven/bun:1");
     });
 
-    it("puts it in the note, pointing at the builder rather than at the project", () => {
-        // The project is not doing anything wrong; an old builder on the server is.
-        expect(astro(">=22.12.0")?.note).toContain(">=22.12.0");
-        expect(astro(">=22.12.0")?.note).toContain("nixpacks.com/install.sh");
+    it("says which runtime it picked, so the log carries it", () => {
+        expect(astro(">=22.12.0")?.note).toContain("Node 22");
+    });
+});
+
+describe("what the image is built from", () => {
+    it("carries the complete commands, since a Dockerfile has nothing to defer to", () => {
+        const plan = detectBuild(
+            alone({
+                files: ["package.json", "pnpm-lock.yaml"],
+                manifest: { scripts: { build: "next build" }, dependencies: { next: "15" } }
+            })
+        );
+        expect(plan?.image?.install).toBe("pnpm install --frozen-lockfile");
+        expect(plan?.image?.build).toBe("pnpm run build");
+        // No start script, so the framework's own way of starting.
+        expect(plan?.image?.start).toBe("next start");
     });
 
-    it("reads the nearest declaration, so an app overrides its workspace root", () => {
-        const nested: RepoSnapshot = {
-            levels: [
-                {
-                    path: "",
-                    files: ["package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml"],
-                    manifest: { workspaces: ["apps/*"], engines: { node: ">=20" } }
-                },
-                {
-                    path: "apps/web",
-                    files: ["package.json"],
-                    manifest: {
-                        name: "web",
-                        scripts: { build: "astro build", start: "node ." },
-                        dependencies: { astro: "7" },
-                        engines: { node: ">=22.12.0" }
-                    }
-                }
-            ]
-        };
-        expect(detectBuild(nested)?.nodeRequirement).toBe(">=22.12.0");
+    it("installs at the workspace root and builds unscoped inside the app", () => {
+        const plan = detectBuild(
+            workspace({ name: "web", scripts: { build: "next build", start: "next start" }, dependencies: { next: "15" } })
+        );
+        expect(plan?.image?.workspaceInstall).toBe("pnpm install --frozen-lockfile");
+        expect(plan?.image?.install).toBeNull();
+        // The Dockerfile's WORKDIR does the scoping, so no --filter is needed.
+        expect(plan?.image?.build).toBe("pnpm run build");
+        expect(plan?.image?.appDirectory).toBe("apps/web");
+    });
+
+    it("marks a built site as files to serve rather than a process", () => {
+        const plan = detectBuild(alone({ manifest: { scripts: { build: "vite build" }, dependencies: { vite: "6" } } }));
+        expect(plan?.image?.staticDirectory).toBe("dist");
+        expect(plan?.image?.start).toBeNull();
+    });
+
+    it("writes no image for a build aimed at another platform", () => {
+        // Nothing to run and nothing to serve; an image would build and then do
+        // nothing, which is worse than saying what to change.
+        const plan = detectBuild(
+            alone({ manifest: { scripts: { build: "astro build" }, dependencies: { astro: "7", "@astrojs/vercel": "11" } } })
+        );
+        expect(plan?.image).toBeNull();
+        expect(plan?.note).toContain("@astrojs/node");
     });
 });
 

@@ -1388,6 +1388,7 @@ async function buildAppPlan(
         plan.build.method === "nixpacks"
             ? {
                   rootDirectory: plan.build.rootDirectory,
+                  port: containerPort,
                   installCommand: stringOrNull(build.installCommand),
                   buildCommand: stringOrNull(build.buildCommand),
                   startCommand: stringOrNull(build.startCommand)

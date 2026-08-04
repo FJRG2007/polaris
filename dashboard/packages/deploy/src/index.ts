@@ -79,4 +79,5 @@ export { onboardingScript, type OnboardingOptions } from "./onboarding.js";
 export { parseHttpLogs, bucketHttpMetrics, type HttpLogEntry, type HttpMetricPoint } from "./http-logs.js";
 export { detectBuild, type DetectedBuild, type PackageManifest, type RepoSnapshot } from "./detect.js";
 export { nixpacksConfig, type NixpacksConfig } from "./nixpacks.js";
+export { generateDockerfile, GENERATED_DOCKERFILE, type DockerfilePlan } from "./dockerfile.js";
 export type { BuildContext } from "./build-context.js";
