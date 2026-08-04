@@ -249,20 +249,15 @@ export async function publicAppUrl(): Promise<string | null> {
 }
 
 /**
- * The origin a round trip through an outside service has to run on, given the one the
- * browser is currently using. Everything the provider registers and returns to is
- * built from this, so the address Polaris hands out wins: the tab's own hostname is
- * whatever that person typed, and an app registered on it sends the next person to a
- * name their browser cannot resolve.
+ * The origin of a request, as an address a browser can be sent back to.
  *
- * The request's origin is kept only when there is no such address, and even then not
- * verbatim: `0.0.0.0` is the address the server binds every interface on, not one a
- * browser can be sent back to (Chrome refuses it outright), so it becomes the name for
- * the machine the browser already reached it on.
+ * Only one thing is corrected: `0.0.0.0` (and its IPv6 spelling) is the address the
+ * server binds every interface on, not one anybody can navigate to - Chrome refuses
+ * it outright - so it becomes the name for the machine that reached it. Everything
+ * else is left as it is: the browser is loading the dashboard on it right now, which
+ * is the only proof that exists that an address works.
  */
-export async function callbackOrigin(requestOrigin: string): Promise<string> {
-    const app = await publicAppUrl();
-    if (app) return app;
+export function browserOrigin(requestOrigin: string): string {
     const url = new URL(requestOrigin);
     if (["0.0.0.0", "::", "[::]"].includes(url.hostname)) url.hostname = "localhost";
     return url.origin;

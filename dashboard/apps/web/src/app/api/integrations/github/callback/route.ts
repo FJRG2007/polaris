@@ -9,11 +9,21 @@
 
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/session";
-import { callbackOrigin } from "@/lib/domain-service";
 import { exchangeManifestCode, refreshInstallations } from "@/lib/github-service";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+/**
+ * Back to the dashboard without naming a host: the browser resolves it against the
+ * address it is already on, which is the one it got here on. Building an absolute URL
+ * would mean choosing a hostname - and behind a proxy this process sees its own
+ * internal one, which is how a working round trip ended on a page that 404s.
+ */
+function backToIntegrations(outcome?: string): NextResponse {
+    const target = outcome ? `/integrations?github=${outcome}` : "/integrations";
+    return new NextResponse(null, { status: 303, headers: { location: target } });
+}
 
 export async function GET(request: Request): Promise<Response> {
     await requireAdmin();
@@ -22,9 +32,6 @@ export async function GET(request: Request): Promise<Response> {
     const code = url.searchParams.get("code");
     const state = url.searchParams.get("state");
     const installationId = url.searchParams.get("installation_id");
-    // Back to the dashboard on the address it is served at, which is the one the app
-    // was registered with - not necessarily the one this process sees the request on.
-    const integrations = new URL("/integrations", await callbackOrigin(url.origin));
 
     // Step 2: the app was installed. Capture its installations.
     if (installationId) {
@@ -33,8 +40,7 @@ export async function GET(request: Request): Promise<Response> {
         } catch {
             // Non-fatal: the user can refresh from the dialog.
         }
-        integrations.searchParams.set("github", "installed");
-        return NextResponse.redirect(integrations);
+        return backToIntegrations("installed");
     }
 
     // Step 1: the app was just created. Verify state, exchange the code, install.
@@ -45,20 +51,16 @@ export async function GET(request: Request): Promise<Response> {
             .map((part) => part.trim())
             .find((part) => part.startsWith("gh_manifest_state="))
             ?.slice("gh_manifest_state=".length);
-        if (!expected || !state || expected !== state) {
-            integrations.searchParams.set("github", "state_error");
-            return NextResponse.redirect(integrations);
-        }
+        if (!expected || !state || expected !== state) return backToIntegrations("state_error");
         try {
             const { htmlUrl } = await exchangeManifestCode(code);
             const response = NextResponse.redirect(new URL(`${htmlUrl}/installations/new`));
             response.cookies.delete("gh_manifest_state");
             return response;
         } catch {
-            integrations.searchParams.set("github", "error");
-            return NextResponse.redirect(integrations);
+            return backToIntegrations("error");
         }
     }
 
-    return NextResponse.redirect(integrations);
+    return backToIntegrations();
 }

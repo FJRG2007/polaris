@@ -4,8 +4,12 @@
  * This is the regression it exists for: the GitHub App flow built every URL from the
  * tab it was started in, so an instance opened on `http://0.0.0.0:3000` registered an
  * app whose callback GitHub duly sent people to - an address that is the socket the
- * server binds, not one a browser will navigate to. The domain Polaris hands out has
- * to win, exactly as it does for an invite or a share link.
+ * server binds, not one a browser will navigate to.
+ *
+ * The correction is deliberately narrow. Preferring the configured domain outright is
+ * what broke it the other way: a domain saved in settings but not yet routed by the
+ * edge answers 404, and the flow was moved onto it. So only the bind address is
+ * rewritten here, and the domain is used by the caller once it has answered a probe.
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -39,32 +43,17 @@ vi.mock("../../src/lib/domain-zones", () => ({
 
 vi.mock("../../src/lib/polaris-tunnel-service", () => ({ getPolarisPublicUrl: async () => state.tunnel }));
 
-const { callbackOrigin, publicAppUrl } = await import("../../src/lib/domain-service");
+const { browserOrigin, publicAppUrl } = await import("../../src/lib/domain-service");
 
-describe("callbackOrigin", () => {
-    beforeEach(() => {
-        store.clear();
-        state.zoneReachable = false;
-        state.zoneHost = null;
-        state.tunnel = null;
+describe("browserOrigin", () => {
+    it("never hands back the bind address, which no browser can return to", () => {
+        expect(browserOrigin("http://0.0.0.0:3000")).toBe("http://localhost:3000");
+        expect(browserOrigin("http://[::]:3000")).toBe("http://localhost:3000");
     });
 
-    it("registers the configured domain, not the address the browser is on", async () => {
-        store.set("domain.app", "polaris.example.com");
-        expect(await callbackOrigin("http://0.0.0.0:3000")).toBe("https://polaris.example.com");
-    });
-
-    it("keeps a public address the operator is already browsing", async () => {
-        expect(await callbackOrigin("https://polaris.example.com")).toBe("https://polaris.example.com");
-    });
-
-    it("never hands back the bind address, which no browser can return to", async () => {
-        expect(await callbackOrigin("http://0.0.0.0:3000")).toBe("http://localhost:3000");
-        expect(await callbackOrigin("http://[::]:3000")).toBe("http://localhost:3000");
-    });
-
-    it("leaves a LAN address alone when there is nothing public to move to", async () => {
-        expect(await callbackOrigin("http://192.168.1.40:3000")).toBe("http://192.168.1.40:3000");
+    it("leaves an address the browser is demonstrably using alone", () => {
+        expect(browserOrigin("http://192.168.1.40:3000")).toBe("http://192.168.1.40:3000");
+        expect(browserOrigin("https://polaris.example.com")).toBe("https://polaris.example.com");
     });
 });
 
