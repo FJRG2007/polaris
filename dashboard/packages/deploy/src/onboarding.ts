@@ -42,7 +42,12 @@ const DEFAULT_GUARD_IMAGE = "ghcr.io/fjrg2007/polaris-edge-guard:latest";
  * build for a newer major does not error - it silently falls back to Node 18.
  * Every workaround for that is a worse version of upgrading the tool.
  */
-const NIXPACKS_VERSION = "1.41.0";
+export const NIXPACKS_VERSION = "1.41.0";
+
+/** The one line that brings a machine's builder up to what Polaris expects.
+ *  Shown wherever a build fails for want of it, because the operator reading that
+ *  is already on a shell and the useful thing to hand them is the command. */
+export const BUILDER_UPGRADE_COMMAND = `NIXPACKS_VERSION=${NIXPACKS_VERSION} bash -c "$(curl -fsSL https://nixpacks.com/install.sh)"`;
 
 /** Build the onboarding bash script for a remote server. */
 export function onboardingScript(options: OnboardingOptions): string {

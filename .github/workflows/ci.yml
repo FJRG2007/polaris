@@ -27,12 +27,13 @@ on:
       - ".github/workflows/ci.yml"
   workflow_call:
 
-# A push that supersedes another stops it: the older answer is about a commit
-# nobody is waiting on any more, and it holds a runner the new one needs.
-# Releases are never cancelled - see the tag workflows.
+# A superseded run is stopped on a branch, and left to finish on the default one.
+# GitHub records a cancelled run as a failure against its commit - a red mark on
+# work that was fine - and main's history is the one people read. Elsewhere nobody
+# is looking at the superseded commit, so the runner is worth more than the mark.
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   rust:

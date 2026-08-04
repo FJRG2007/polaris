@@ -333,7 +333,7 @@ describe("a Node version the builder probably cannot meet", () => {
     it("puts it in the note, pointing at the builder rather than at the project", () => {
         // The project is not doing anything wrong; an old builder on the server is.
         expect(astro(">=22.12.0")?.note).toContain(">=22.12.0");
-        expect(astro(">=22.12.0")?.note).toContain("builder on this server is old");
+        expect(astro(">=22.12.0")?.note).toContain("nixpacks.com/install.sh");
     });
 
     it("reads the nearest declaration, so an app overrides its workspace root", () => {

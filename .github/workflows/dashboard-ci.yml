@@ -18,11 +18,13 @@ on:
       - ".github/workflows/dashboard-ci.yml"
   workflow_call:
 
-# A push that supersedes another stops it, so a run of pushes costs one build
-# rather than one per commit.
+# A superseded run is stopped on a branch, and left to finish on the default one.
+# GitHub records a cancelled run as a failure against its commit, and main's
+# history is the one people read; a red mark there on work that was fine costs
+# more than the runner it saves.
 concurrency:
   group: dashboard-ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 defaults:
   run:

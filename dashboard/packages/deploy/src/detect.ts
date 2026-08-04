@@ -16,6 +16,8 @@
  * instead of guessing over them.
  */
 
+import { BUILDER_UPGRADE_COMMAND } from "./onboarding.js";
+
 /** The parts of a package.json this needs. */
 export interface PackageManifest {
     readonly name?: string;
@@ -329,7 +331,10 @@ export function detectBuild(snapshot: RepoSnapshot): DetectedBuild | null {
     }
 
     if (nodeRequirement) {
-        note = `${note}; it needs Node ${nodeRequirement} - if the build refuses, the builder on this server is old and re-running its setup upgrades it`;
+        // The command, not a description of it. A build that refuses on this leaves
+        // the operator on a machine they have a shell on, and the useful thing to
+        // hand them there is the line to paste.
+        note = `${note}; it needs Node ${nodeRequirement}. If the build refuses, the builder on the machine is too old to have that runtime - upgrade it with: ${BUILDER_UPGRADE_COMMAND}`;
     }
 
     return {
