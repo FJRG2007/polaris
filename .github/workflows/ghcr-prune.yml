@@ -1,0 +1,122 @@
+name: Prune published images
+
+# Every push of `latest` leaves the image it replaced behind as an untagged
+# version, and those pile up forever: the registry keeps them, nothing pulls
+# them, and they still count against the account. This deletes them, so each
+# package holds exactly what `latest` resolves to now and nothing else.
+#
+# It runs after a publish rather than inside it: the publish only rebuilds the
+# images whose sources changed, and the versions left behind are worth clearing
+# for every package either way. A failure here also cannot turn a successful
+# publish red, which is right - this is housekeeping, not delivery.
+#
+# What is never deleted: the version carrying the `latest` tag, and every digest
+# that version references. A multi-arch image is an index whose per-architecture
+# manifests are themselves untagged, and a build attestation is another untagged
+# child - deleting those would leave `latest` pointing at manifests the registry
+# no longer holds, which breaks the pull for everyone. When the tag cannot be
+# read at all the package is skipped rather than guessed at.
+#
+# A rollback is not affected: update.sh returns to the image already on the box,
+# it does not fetch the old digest again. An installation that has lost its local
+# copy moves to `latest` instead, which is what "no history" means here.
+
+on:
+  workflow_run:
+    workflows: ["Publish dashboard image"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "List what would be deleted without deleting it"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  packages: write
+
+# Two prunes at once would read one tag while the other deletes, so they queue.
+concurrency:
+  group: ghcr-prune
+  cancel-in-progress: false
+
+jobs:
+  prune:
+    # A publish that failed may have pushed nothing, and a cancelled one may have
+    # been interrupted mid-push; neither is a safe moment to decide what is unused.
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Delete every version that is not latest
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OWNER: ${{ github.repository_owner }}
+          DRY_RUN: ${{ inputs.dry_run }}
+          PACKAGES: >-
+            polaris-dashboard
+            polaris-mdns
+            polaris-hostd
+            polaris-updater
+            polaris-messaging-bridge
+            polaris-edge-guard
+        run: |
+          set -uo pipefail
+          repo=$(echo "$OWNER" | tr "[:upper:]" "[:lower:]")
+          failed=0
+          removed=0
+
+          for package in $PACKAGES; do
+            echo "::group::$package"
+
+            # The tag as the registry resolves it now. Everything it names is
+            # load-bearing; anything else in the package is a replaced build.
+            index=$(docker buildx imagetools inspect "ghcr.io/$repo/$package:latest" --raw 2>/dev/null)
+            if [ -z "$index" ]; then
+              echo "no latest tag to read - skipped rather than guessed at"
+              echo "::endgroup::"
+              continue
+            fi
+            keep=$(echo "$index" | jq -r '.manifests[]?.digest')
+            echo "latest references $(echo "$keep" | grep -c . || true) manifest(s)"
+
+            if ! versions=$(gh api --paginate "/users/$OWNER/packages/container/$package/versions" \
+              --jq '.[] | [.id, .name, ((.metadata.container.tags // []) | join(","))] | @tsv' 2>&1); then
+              # A package nobody has published yet has nothing to prune, and is
+              # not a reason to hold the run red until it exists.
+              case "$versions" in
+                *"404"*) echo "not published yet" ;;
+                *) echo "could not list versions: $versions"; failed=1 ;;
+              esac
+              echo "::endgroup::"
+              continue
+            fi
+
+            while IFS=$'\t' read -r id digest tags; do
+              [ -n "${id:-}" ] || continue
+              case ",${tags:-}," in *,latest,*) continue;; esac
+              echo "$keep" | grep -qx "$digest" && continue
+              if [ "${DRY_RUN:-false}" = "true" ]; then
+                echo "would delete $digest ${tags:+(tagged $tags)}"
+                continue
+              fi
+              if gh api -X DELETE "/users/$OWNER/packages/container/$package/versions/$id" >/dev/null 2>&1; then
+                echo "deleted $digest ${tags:+(tagged $tags)}"
+                removed=$((removed + 1))
+              else
+                echo "could not delete $digest"
+                failed=1
+              fi
+            done <<EOF
+          $versions
+          EOF
+            echo "::endgroup::"
+          done
+
+          echo "$removed version(s) removed"
+          exit "$failed"
