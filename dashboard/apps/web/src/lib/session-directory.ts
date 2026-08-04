@@ -366,12 +366,13 @@ export async function trustedDeviceDetail(
         view.ip,
         ...matched.map((row) => row.state?.ip ?? row.ipAddress)
     ]);
+    const live = idsOf(rows);
     return {
         device: toTrustedDeviceRow(view, publicIp),
         identified: true,
         // Judged against every live session, not only the ones this device holds:
         // the answer that let one of them in usually came from another device.
-        sessions: matched.map((row) => toSessionView(row, currentSessionId, publicIp, idsOf(rows))),
+        sessions: matched.map((row) => toSessionView(row, currentSessionId, publicIp, live)),
         passkeys
     };
 }
