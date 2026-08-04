@@ -1004,10 +1004,20 @@ export const taskArrangeSchema = z.object({
 
 export type TaskArrangeInput = z.infer<typeof taskArrangeSchema>;
 
+/**
+ * The most tasks one write may carry.
+ *
+ * A screen loads more than this, and a shift-click can reach across all of it in
+ * one gesture, so the number is not private to the schema: the screen holds a
+ * selection to it and says what it left out, because a selection the server
+ * refuses whole is a change that does nothing and explains nothing.
+ */
+export const TASK_SELECTION_MAX = 500;
+
 /** A change applied to a selection. Kept separate from taskUpdateSchema so the
  *  fields a bulk edit may touch are an explicit, reviewable list. */
 export const taskBulkSchema = z.object({
-    taskIds: z.array(uuid).min(1).max(500),
+    taskIds: z.array(uuid).min(1).max(TASK_SELECTION_MAX),
     statusId: uuid.optional(),
     priority: z.enum(TASK_PRIORITIES).optional(),
     addAssigneeIds: z.array(uuid).max(25).optional(),
@@ -1025,7 +1035,7 @@ export type TaskBulkInput = z.infer<typeof taskBulkSchema>;
 /** A selection to delete. Kept apart from the bulk edit so a delete can never
  *  arrive carrying a field somebody meant to change instead. */
 export const taskSelectionSchema = z.object({
-    taskIds: z.array(uuid).min(1).max(500)
+    taskIds: z.array(uuid).min(1).max(TASK_SELECTION_MAX)
 });
 
 export type TaskSelectionInput = z.infer<typeof taskSelectionSchema>;

@@ -141,6 +141,47 @@ describe("due buckets", () => {
     });
 });
 
+describe("a date that holds work up", () => {
+    // What the picker stores: the start of the day somebody chose, in their own
+    // timezone. UTC-4 is the case that used to break, since local midnight there
+    // is four hours into the following UTC day.
+    const picked = (day: string, offsetHours: number) =>
+        new Date(Date.parse(`${day}T00:00:00.000Z`) - offsetHours * 3600_000);
+
+    it("holds for the whole of the day that was picked, including the day it is set", () => {
+        const today = picked("2026-08-05", -4);
+        expect(engine.blockHolds(today, new Date("2026-08-05T13:00:00.000Z"))).toBe(true);
+        // 23:30 that evening in the timezone it was picked in.
+        expect(engine.blockHolds(today, new Date("2026-08-06T03:30:00.000Z"))).toBe(true);
+    });
+
+    it("lifts itself once that day is over, which is why a date is set instead of a note", () => {
+        const today = picked("2026-08-05", -4);
+        // 00:30 the next morning, where it was picked.
+        expect(engine.blockHolds(today, new Date("2026-08-06T04:30:00.000Z"))).toBe(false);
+    });
+
+    it("does not hold on a day already gone", () => {
+        expect(engine.blockHolds(picked("2026-07-30", 0), NOW)).toBe(false);
+    });
+
+    it("holds for the same span wherever the day was picked", () => {
+        // The same wall-clock day chosen either side of Greenwich lasts a day
+        // each: the rule counts forward from the instant rather than reading a
+        // calendar day off whichever clock happens to be asking.
+        for (const offset of [-4, 0, 2, 13]) {
+            const day = picked("2026-08-05", offset);
+            const lifts = new Date(day.getTime() + 24 * 3600_000);
+            expect(engine.blockHolds(day, new Date(lifts.getTime() - 1))).toBe(true);
+            expect(engine.blockHolds(day, lifts)).toBe(false);
+        }
+    });
+
+    it("is not blocked when no date was set", () => {
+        expect(engine.blockHolds(null, NOW)).toBe(false);
+    });
+});
+
 describe("relative dates", () => {
     it("resolves a token against the moment it is asked, not when it was saved", () => {
         const today = engine.resolveRelativeDate("today", NOW);

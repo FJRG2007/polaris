@@ -31,11 +31,12 @@ import { TaskCreateDialog } from "./task-create-dialog";
 import { AssigneePicker, StatusPicker } from "./pickers";
 import type { SavedView } from "@/lib/tasks/view-service";
 import { useDisplayFormat } from "@/components/display-format";
+import { holdSelection, shortfallMessage } from "./views/shared";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { Button, ConfirmDeleteDialog, Select, cn } from "@polaris/ui";
 import { toFacts, type SpaceContext, type TaskRow } from "@/lib/tasks/facts";
-import type { SelectMode, TaskBulkEdit, TaskEdit, TaskListRef, ViewProps } from "./views/shared";
 import { CalendarDays, GanttChart, LayoutList, Plus, Rows3, Search, Table2, X } from "lucide-react";
+import type { BulkVerb, SelectMode, TaskBulkEdit, TaskEdit, TaskListRef, ViewProps } from "./views/shared";
 
 const VIEW_ICONS: Record<core.TaskViewType, typeof LayoutList> = {
     list: LayoutList,
@@ -371,6 +372,15 @@ export function ListScreen({
     // back to the first list in reach and the dialog asks which one it goes in.
     const createTarget = listId ?? defaultListId ?? lists[0]?.id ?? null;
 
+    /** Take a selection, and say so when it was more than one write may carry. */
+    const hold = (next: ReadonlySet<string>) => {
+        const { taken, dropped } = holdSelection(next);
+        setSelection(taken);
+        if (dropped > 0) {
+            setError(`A selection holds ${taken.size} tasks at a time, so ${dropped} were left out.`);
+        }
+    };
+
     /**
      * Selection, read the way a file manager reads it: ctrl-click puts one task
      * in or takes it out, shift-click takes everything between it and the last
@@ -386,14 +396,14 @@ export function ListScreen({
         const to = ordered.indexOf(taskId);
         if (mode === "range" && from !== -1 && to !== -1) {
             const span = ordered.slice(Math.min(from, to), Math.max(from, to) + 1);
-            setSelection(new Set([...selection, ...span]));
+            hold(new Set([...selection, ...span]));
             return;
         }
 
         const next = new Set(selection);
         if (next.has(taskId)) next.delete(taskId);
         else next.add(taskId);
-        setSelection(next);
+        hold(next);
         // A shift-click with nowhere to reach back to is the first click of the
         // range, so it becomes the anchor like any other.
         setAnchor(taskId);
@@ -407,6 +417,12 @@ export function ListScreen({
     // The selection as rows, narrowed to what is on screen: an id a filter has
     // since hidden is not something a bulk verb should quietly write to.
     const selected = useMemo(() => visible.filter((task) => selection.has(task.id)), [visible, selection]);
+
+    /** Say so when a write reached fewer tasks than the selection it was handed. */
+    const reportShortfall = (count: number | undefined, asked: number, verb: BulkVerb) => {
+        const message = shortfallMessage(count, asked, verb);
+        if (message) setError(message);
+    };
 
     /**
      * A change from the context menu, applied to whatever it was acting on -
@@ -436,6 +452,7 @@ export function ListScreen({
 
         const result = await runAction(() => actions.bulkUpdateAction({ taskIds, ...change }), setError);
         if (result?.error) setError(result.error);
+        else reportShortfall(result?.count, taskIds.length, "Changed");
         if (leaves) clearSelection();
         refresh();
     };
@@ -734,6 +751,7 @@ export function ListScreen({
                     if (taskIds.length === 0) return;
                     const result = await runAction(() => actions.deleteTasksAction({ taskIds }), setError);
                     if (result?.error) setError(result.error);
+                    else reportShortfall(result?.count, taskIds.length, "Deleted");
                     setDeleting([]);
                     clearSelection();
                     refresh();

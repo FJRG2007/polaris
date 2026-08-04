@@ -318,6 +318,23 @@ export const DUE_BUCKET_LABELS: Record<DueBucket, string> = {
     none: "No due date"
 };
 
+/**
+ * Whether a date somebody set is still holding a task up.
+ *
+ * The same rule as a deadline, for the same reason: the field carries a day and
+ * no time, so the block runs to the end of the day that was picked rather than
+ * lapsing at its first moment. "Blocked until Friday" chosen on Friday means the
+ * rest of Friday, and reading the stored instant raw would make it mean nothing
+ * at all.
+ *
+ * Measured forward from that instant instead of against a calendar day, because
+ * the day was picked in the browser's timezone and this is also asked on a server
+ * whose clock is set to something else entirely.
+ */
+export function blockHolds(until: Date | null, now: Date): boolean {
+    return until !== null && until.getTime() + DAY_MS > now.getTime();
+}
+
 /** What counts as the deadline. A task with no time of day is due at the end of
  *  its day, so an all-day task set for today is not overdue at breakfast. */
 function deadlineOf(task: Pick<TaskFacts, "dueDate" | "timed">): Date | null {

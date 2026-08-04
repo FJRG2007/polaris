@@ -612,11 +612,28 @@ export function toDateInput(iso: string | null, withTime: boolean): string {
     return withTime ? `${day}T${pad(date.getHours())}:${pad(date.getMinutes())}` : day;
 }
 
-/** What a date input gives back, as an ISO instant. */
+/**
+ * What a date input gives back, as an ISO instant.
+ *
+ * A day on its own is read in local time, the way `toDateInput` writes one back:
+ * `new Date("2026-08-10")` is UTC midnight, which is the evening of the ninth for
+ * everybody west of Greenwich, so the round trip would hand the field back a date
+ * nobody picked. A day with a time on it is already local by the same rule.
+ */
 export function fromDateInput(value: string): string | null {
     if (!value) return null;
-    const parsed = new Date(value);
-    return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
+    const day = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+    if (!day) {
+        const timed = new Date(value);
+        return Number.isNaN(timed.getTime()) ? null : timed.toISOString();
+    }
+    const [year, month, date] = [Number(day[1]), Number(day[2]), Number(day[3])];
+    const parsed = new Date(year, month - 1, date);
+    // Built from parts rather than parsed, so a day the calendar does not have is
+    // read back rather than trusted: the thirty-first of February rolls forward
+    // into March instead of failing the way a parse would.
+    const real = parsed.getFullYear() === year && parsed.getMonth() === month - 1 && parsed.getDate() === date;
+    return real ? parsed.toISOString() : null;
 }
 
 export function DateField({

@@ -168,7 +168,7 @@ function toRow(
         blocked:
             blocked.has(record.id) ||
             record.blockedNote !== "" ||
-            (record.blockedUntil !== null && record.blockedUntil.getTime() > Date.now()),
+            core.blockHolds(record.blockedUntil, new Date()),
         recurring: record.recurrence !== null,
         customValues: Object.fromEntries(record.fieldValues.map((value) => [value.fieldId, value.value]))
     };

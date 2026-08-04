@@ -14,11 +14,13 @@
 -- gen_random_uuid() is built in on PG 13+ but lives in pgcrypto on older instances.
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
--- Blocked lands just past the last stage that is not finished work, so it sits at the
--- end of what is still in flight and before Done and Cancelled - not off the right
--- edge of the board. The gap between stages is 1024, so +1 slots into it without
--- renumbering anything, and a space whose stages were all dragged about still gets a
--- key that sorts where it should.
+-- Blocked lands just past the first stage that means work is under way, which is where
+-- a space created from today's defaults has it - right after "In progress" and before
+-- everything still ahead of it. A space that has no such stage falls back to the end of
+-- what is not finished work, so it still sits before Done and Cancelled rather than off
+-- the right edge of the board. The gap between stages is 1024, so +1 slots into it
+-- without renumbering anything, and a space whose stages were all dragged about still
+-- gets a key that sorts where it should.
 INSERT INTO "TaskStatus" ("id", "spaceId", "name", "type", "color", "order")
 SELECT
     gen_random_uuid(),
@@ -27,6 +29,11 @@ SELECT
     'open',
     '#ef4444',
     COALESCE(
+        (
+            SELECT MIN(t."order")
+            FROM "TaskStatus" t
+            WHERE t."spaceId" = s."id" AND t."type" = 'active'
+        ),
         (
             SELECT MAX(t."order")
             FROM "TaskStatus" t

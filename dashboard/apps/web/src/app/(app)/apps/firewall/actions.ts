@@ -363,8 +363,9 @@ function countEntries(json: string | undefined): number {
  * Who was signed in from it travels with the requests, and only to an administrator.
  * It is the same second question every time - "is this one of ours?" - and it names
  * accounts, which is the People screen's to give out and no operator's by default.
- * Absent rather than empty when the reader may not have it, so the screen can tell
- * "nobody has ever signed in from here" from "not yours to see".
+ * Absent rather than empty whenever it was not asked - a reader who may not have it,
+ * or a range, which is recorded against no address in particular - so the screen can
+ * tell "nobody has ever signed in from here" from "nobody looked".
  */
 export async function getWafAddressActivityAction(
     ip: string,
@@ -376,9 +377,16 @@ export async function getWafAddressActivityAction(
     const window = z.number().int().min(1).max(168).safeParse(hours);
     if (!window.success) return { error: "That is not a valid window" };
     try {
+        // A ban can be a range, and sessions and sign-ins are recorded against the
+        // one address they came from - so a range matches nothing, and answering it
+        // with an empty list would say "nobody has ever signed in from here" about
+        // addresses nobody looked at. Left out instead, which the screen already
+        // reads as "not asked" rather than as "none".
         const [activity, accounts] = await Promise.all([
             wafAddressActivity(address.data, window.data),
-            user.isAdmin ? accountsAtAddress(address.data) : undefined
+            user.isAdmin && core.isIpAddress(address.data)
+                ? accountsAtAddress(address.data)
+                : undefined
         ]);
         return { activity, accounts };
     } catch (caught) {

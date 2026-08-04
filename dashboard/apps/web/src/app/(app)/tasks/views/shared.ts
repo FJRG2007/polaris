@@ -8,7 +8,13 @@
  */
 
 import type { SpaceContext, TaskRow } from "@/lib/tasks/facts";
-import type { TaskGroup, TaskGroupField, TaskPriority, TaskStatusType } from "@polaris/core";
+import {
+    TASK_SELECTION_MAX,
+    type TaskGroup,
+    type TaskGroupField,
+    type TaskPriority,
+    type TaskStatusType
+} from "@polaris/core";
 
 /** A drag result, described by the neighbours it landed between. */
 export interface BoardMove {
@@ -81,6 +87,43 @@ export type SelectMode = "toggle" | "range";
 export function clickMode(event: { metaKey: boolean; ctrlKey: boolean; shiftKey: boolean }): SelectMode | null {
     if (event.shiftKey) return "range";
     return event.metaKey || event.ctrlKey ? "toggle" : null;
+}
+
+/**
+ * A selection, held to the most tasks one write may carry.
+ *
+ * A screen loads more rows than that and a shift-click crosses them in a single
+ * gesture, so the line is drawn as the selection is made rather than left to the
+ * server - which can only refuse the whole thing, leaving somebody with "check
+ * the selection", nothing applied, and no idea what the limit was. What did not
+ * fit is counted so the screen can say it, because a selection that quietly
+ * stopped short is one somebody acts on believing it covered everything.
+ */
+export function holdSelection(next: ReadonlySet<string>): { taken: ReadonlySet<string>; dropped: number } {
+    if (next.size <= TASK_SELECTION_MAX) return { taken: next, dropped: 0 };
+    return {
+        taken: new Set([...next].slice(0, TASK_SELECTION_MAX)),
+        dropped: next.size - TASK_SELECTION_MAX
+    };
+}
+
+/** What a bulk write did, for the line that reports how much of it landed. */
+export type BulkVerb = "Changed" | "Deleted";
+
+/**
+ * What to say when a write reached fewer tasks than it was handed, and nothing
+ * when it reached them all.
+ *
+ * A selection crosses spaces, and the server drops the tasks this account may
+ * only read rather than refusing the lot - the right answer, and a silent one.
+ * The reader has to be told, most of all for a delete: "20 tasks" was confirmed,
+ * twelve went, and nothing on the screen would ever have said which eight are
+ * still there.
+ */
+export function shortfallMessage(count: number | undefined, asked: number, verb: BulkVerb): string | null {
+    if (count === undefined || count >= asked) return null;
+    const rest = asked - count;
+    return `${verb} ${count} of ${asked}: ${rest === 1 ? "one task is" : `${rest} tasks are`} not yours to change.`;
 }
 
 export interface ViewProps {
