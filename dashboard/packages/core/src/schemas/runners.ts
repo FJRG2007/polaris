@@ -38,7 +38,7 @@ export const runnerExhaustedActionSchema = z.enum(RUNNER_EXHAUSTED_ACTIONS);
 /** A GitHub account login: alphanumerics and single hyphens, 39 characters max,
  *  and never hyphen-terminated. Held to GitHub's own rule because the value is
  *  interpolated into an API path. */
-const githubLoginSchema = z
+export const githubLoginSchema = z
     .string()
     .trim()
     .min(1, "Enter the GitHub account")
@@ -47,7 +47,7 @@ const githubLoginSchema = z
 
 /** A repository name. Wider than a login - dots and underscores are legal - but
  *  still an allowlist rather than free text. */
-const githubRepoSchema = z
+export const githubRepoSchema = z
     .string()
     .trim()
     .min(1, "Enter the repository")

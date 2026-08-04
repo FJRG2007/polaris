@@ -108,6 +108,7 @@ model User {
     notifyDeliveries    NotificationDelivery[]
     enrollments         Enrollment[]
     runnerPools         RunnerPool[]
+    agentRepos          AgentRepo[]
     linkedAccounts      UserConnection[]
     taskSpaces          TaskSpace[]
     taskSpaceMemberships TaskSpaceMember[]
@@ -1224,6 +1225,7 @@ model RunnerPool {
     targets RunnerPoolTarget[]
     secrets RunnerSecret[]
     repos   RunnerRepoConfig[]
+    agentRepos AgentRepo[]
 
     @@index([ownerId])
     @@index([hostId])
@@ -3607,4 +3609,145 @@ model AnalyticsDay {
 
     @@unique([siteId, day, dimension, value])
     @@index([siteId, day])
+}
+
+// ---------------------------------------------------------------------------
+// Agents (coding agents running against enabled repositories)
+// ---------------------------------------------------------------------------
+
+// One repository somebody turned the agent on for.
+//
+// This is configuration, not derived state: it survives GitHub being briefly
+// unreachable, an installation being repaired, and a repository being renamed
+// and renamed back. Nothing here is recomputed from the App's installation list,
+// which is exactly what stops a transient 502 from quietly disabling a
+// repository or resetting the decisions on it.
+model AgentRepo {
+    id            String   @id @default(uuid(7)) @db.Uuid
+    ownerId       String   @db.Uuid
+    // "owner/repo". The key every GitHub path, webhook payload and stored run
+    // agrees on.
+    repoFullName  String
+    // The App installation this repository is reached through. Held rather than
+    // looked up per dispatch: the lookup costs a rate-limited call on a value
+    // that changes when somebody reinstalls the App, and no more often.
+    installationId String
+    // Whether the repository is private, as last observed. Drives the execution
+    // recommendation and the default shell policy, and is refreshed whenever
+    // GitHub tells us - a repository that goes public is a different risk.
+    isPrivate     Boolean  @default(true)
+    // actions | runners | server - where runs happen. See AGENT_EXECUTIONS.
+    execution     String
+    // The pool `runners` execution uses. Null for the other two.
+    poolId        String?  @db.Uuid
+    model         String
+    // low | medium | high | xhigh | max, landed on the running model's own
+    // published range at dispatch. Stored by name so a model changing its range
+    // does not silently change what was asked for.
+    effort        String   @default("medium")
+    // disabled | restricted | enabled - what the agent may do with git.
+    push          String   @default("restricted")
+    // disabled | restricted | enabled - whether it may run commands, and whether
+    // secrets are filtered out of the environment when it does.
+    shell         String
+    enabled       Boolean  @default(true)
+    // When the workflow file was last written into the repository. Null for
+    // `server` execution, which needs no workflow at all, and for a repository
+    // enabled before the write succeeded.
+    workflowInstalledAt DateTime?
+    // Why the last dispatch could not be made, shown on the repository rather
+    // than left in a log nobody opens.
+    error         String?
+    createdAt     DateTime @default(now())
+    updatedAt     DateTime @updatedAt
+
+    owner       User              @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+    pool        RunnerPool?       @relation(fields: [poolId], references: [id], onDelete: SetNull)
+    automations AgentAutomation[]
+    runs        AgentRun[]
+
+    @@unique([ownerId, repoFullName])
+    @@index([repoFullName])
+    @@index([ownerId])
+    @@index([poolId])
+}
+
+// When to start a run, and what to tell it.
+//
+// A repository with no rows here still answers a direct mention: that is not an
+// automation but the baseline of having the App installed, and storing it as a
+// row would let somebody delete the only way to ask the agent for anything.
+model AgentAutomation {
+    id           String   @id @default(uuid(7)) @db.Uuid
+    repoId       String   @db.Uuid
+    // One of AGENT_TRIGGERS. Polaris's own names, not GitHub event names: one
+    // trigger can span several events, and the mapping belongs in the webhook.
+    trigger      String
+    // Stringified JSON narrowing the trigger: labels, branches, authors. An
+    // absent or empty list does not narrow, so a malformed row is permissive in
+    // the same direction the operator's empty form is.
+    condition    String   @default("{}")
+    // The runtime mode to force (Build, Review, ...), or null to let the agent
+    // choose from what it was handed.
+    mode         String?
+    // Operator prose folded into the run's prompt. Never joined with text from
+    // an issue or a comment, which is a different trust level entirely.
+    instructions String   @default("")
+    enabled      Boolean  @default(true)
+    createdAt    DateTime @default(now())
+    updatedAt    DateTime @updatedAt
+
+    repo AgentRepo @relation(fields: [repoId], references: [id], onDelete: Cascade)
+
+    @@index([repoId])
+}
+
+// One run, from the moment something asked for it.
+//
+// The row is written before the run is dispatched, not after it reports in. A
+// dispatch that fails, a workflow that never starts and a container that dies on
+// boot are all things somebody has to be able to see, and none of them would
+// write their own row.
+model AgentRun {
+    id          String   @id @default(uuid(7)) @db.Uuid
+    repoId      String   @db.Uuid
+    // Which of AGENT_TRIGGERS started it, or `manual`.
+    trigger     String
+    // actions | runners | server, as resolved at dispatch. Copied rather than
+    // read back off the repository, because the repository's setting can change
+    // while a run is in flight and the run happened where it happened.
+    execution   String
+    // queued | running | succeeded | failed | cancelled.
+    state       String   @default("queued")
+    mode        String?
+    model       String
+    // What the run was pointed at, when it was pointed at anything.
+    issueNumber Int?
+    prNumber    Int?
+    // GitHub's workflow run id, for the two executions GitHub schedules. Null on
+    // `server` runs and until the dispatch is acknowledged.
+    githubRunId String?
+    // The container `server` runs happen in, so the log can be streamed and the
+    // run can be cancelled.
+    containerId String?
+    // Who asked, for a manual run. Null when a webhook did.
+    startedById String?  @db.Uuid
+    startedAt   DateTime?
+    finishedAt  DateTime?
+    // Token counts as reported by the run, for the usage the operator is paying
+    // their provider for.
+    tokensIn    Int?
+    tokensOut   Int?
+    // Why it failed, in the words shown on the run.
+    error       String?
+    // The structured result a run was asked to produce, as stringified JSON.
+    result      String?
+    createdAt   DateTime @default(now())
+    updatedAt   DateTime @updatedAt
+
+    repo AgentRepo @relation(fields: [repoId], references: [id], onDelete: Cascade)
+
+    @@index([repoId, createdAt])
+    @@index([state])
+    @@index([githubRunId])
 }

@@ -18,6 +18,8 @@ export const PERMISSIONS = [
     "requests.manage",
     "deploy.read",
     "deploy.manage",
+    "agents.read",
+    "agents.manage",
     "tasks.read",
     "tasks.manage",
     "inbox.read",
@@ -55,12 +57,14 @@ export const DEFAULT_ROLES: Record<string, readonly GrantedPermission[]> = {
         "requests.create",
         "deploy.read",
         "deploy.manage",
+        "agents.read",
+        "agents.manage",
         "tasks.read",
         "tasks.manage",
         "inbox.read",
         "inbox.manage"
     ],
-    viewer: ["drive.read", "deploy.read", "tasks.read", "inbox.read"],
+    viewer: ["drive.read", "deploy.read", "agents.read", "tasks.read", "inbox.read"],
     guest: []
 };
 
@@ -89,6 +93,8 @@ export const PERMISSION_META: Readonly<Record<Permission, { area: string; label:
     "requests.manage": { area: "Sharing", label: "Manage everyone's drop points" },
     "deploy.read": { area: "Apps", label: "See deployments, servers and containers" },
     "deploy.manage": { area: "Apps", label: "Deploy, restart and configure apps" },
+    "agents.read": { area: "Apps", label: "See coding-agent repositories and runs" },
+    "agents.manage": { area: "Apps", label: "Enable repositories and start agent runs" },
     "tasks.read": { area: "Tasks", label: "See spaces, lists and tasks" },
     "tasks.manage": { area: "Tasks", label: "Create and change tasks" },
     "inbox.read": { area: "Inbox", label: "Read conversations" },
@@ -114,6 +120,7 @@ export const IMPLIED_PERMISSIONS: Readonly<Partial<Record<Permission, readonly P
     "shares.manage": ["shares.create"],
     "requests.manage": ["requests.create"],
     "deploy.manage": ["deploy.read"],
+    "agents.manage": ["agents.read"],
     "tasks.manage": ["tasks.read"],
     "inbox.manage": ["inbox.read"]
 };
