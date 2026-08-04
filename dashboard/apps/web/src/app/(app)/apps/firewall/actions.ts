@@ -14,6 +14,7 @@ import { recordAudit } from "@/lib/audit-service";
 import { syncAppRoutes } from "@/lib/deploy-service";
 import { syncDashboardRoute } from "@/lib/domain-edge";
 import { requirePermission, userHasManage } from "@/lib/session";
+import { accountsAtAddress, type AddressAccount } from "@/lib/address-accounts";
 import { wafAddressActivity, wafLogWindow, wafTraffic } from "@/lib/waf-analytics-service";
 import { getWafInherited, getWafRule, setWafRule, type WafInheritedView, type WafRuleView } from "@/lib/waf-service";
 import {
@@ -358,18 +359,28 @@ function countEntries(json: string | undefined): number {
  * Its own round trip rather than part of the overview: the evidence for one address
  * is hundreds of lines, nobody opens it for most bans, and loading it with the page
  * would make every operator pay for the one who wanted it.
+ *
+ * Who was signed in from it travels with the requests, and only to an administrator.
+ * It is the same second question every time - "is this one of ours?" - and it names
+ * accounts, which is the People screen's to give out and no operator's by default.
+ * Absent rather than empty when the reader may not have it, so the screen can tell
+ * "nobody has ever signed in from here" from "not yours to see".
  */
 export async function getWafAddressActivityAction(
     ip: string,
     hours = 24
-): Promise<{ activity?: WafAddressActivity; error?: string }> {
-    await requirePermission("system.manage");
+): Promise<{ activity?: WafAddressActivity; accounts?: AddressAccount[]; error?: string }> {
+    const user = await requirePermission("system.manage");
     const address = core.cidrOrIp.safeParse(ip);
     if (!address.success) return { error: "That is not a valid address" };
     const window = z.number().int().min(1).max(168).safeParse(hours);
     if (!window.success) return { error: "That is not a valid window" };
     try {
-        return { activity: await wafAddressActivity(address.data, window.data) };
+        const [activity, accounts] = await Promise.all([
+            wafAddressActivity(address.data, window.data),
+            user.isAdmin ? accountsAtAddress(address.data) : undefined
+        ]);
+        return { activity, accounts };
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Could not read that address's activity" };
     }

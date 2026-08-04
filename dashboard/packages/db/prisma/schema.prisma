@@ -1729,6 +1729,9 @@ model AuditLog {
     @@index([actorId])
     @@index([action])
     @@index([sessionId])
+    // The firewall asks this table what an address did, by hashing the address and
+    // matching. Without the index that is a scan of every action ever taken.
+    @@index([ipHash])
 }
 
 model Setting {

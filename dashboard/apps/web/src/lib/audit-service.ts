@@ -14,6 +14,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@polaris/db";
 import { headers } from "next/headers";
 import { createHash } from "node:crypto";
+import { clientIp } from "@/lib/request-context";
 
 export interface AuditEvent {
     readonly actorId: string | null;
@@ -25,13 +26,23 @@ export interface AuditEvent {
     readonly sessionId?: string;
 }
 
-/** Truncated SHA-256 of the client IP, or undefined when unknown. */
-async function clientIpHash(): Promise<string | undefined> {
-    const store = await headers();
-    const forwarded = store.get("x-forwarded-for")?.split(",")[0]?.trim();
-    const ip = forwarded || store.get("x-real-ip") || undefined;
-    if (!ip) return undefined;
+/**
+ * Truncated SHA-256 of an address, as this log stores it.
+ *
+ * Exported because the hash is one-way: the only way to ask what was done from a
+ * given address is to hash that address the same way and match, and a second copy
+ * of this line would stop agreeing with this one the day either moved.
+ */
+export function auditIpHash(ip: string): string {
     return createHash("sha256").update(ip).digest("hex").slice(0, 16);
+}
+
+/** Truncated SHA-256 of the client IP, or undefined when unknown. Read through
+ *  the same helper the rest of Polaris resolves an address with, so an entry is
+ *  hashed from the address every other subsystem saw. */
+async function clientIpHash(): Promise<string | undefined> {
+    const ip = await clientIp();
+    return ip ? auditIpHash(ip) : undefined;
 }
 
 /**

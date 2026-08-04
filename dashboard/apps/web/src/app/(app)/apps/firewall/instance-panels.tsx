@@ -18,10 +18,11 @@
 import Link from "next/link";
 import { grouped } from "./page-parts";
 import { ChipList, validAddress } from "./chip-list";
+import { AddressAccounts } from "./address-accounts";
 import { useDisplayFormat } from "@/components/display-format";
 import type { WafAnomalySettings } from "@/lib/waf-anomaly-service";
 import { useCallback, useEffect, useState, useTransition } from "react";
-import type { WafAddressActivity, WafAnomaly, WafJail, WafTrafficSummary } from "@polaris/core";
+import type { WafAnomaly, WafJail, WafTrafficSummary } from "@polaris/core";
 import { Activity, Ban, Globe, RadarIcon, RefreshCw, ShieldCheck, ShieldOff, Timer } from "lucide-react";
 import {
     blockAnomalyAction,
@@ -51,6 +52,10 @@ import {
 } from "@polaris/ui";
 
 type Overview = Awaited<ReturnType<typeof getWafOverviewAction>>;
+
+/** What the address dialog is handed: the requests, and - for a reader allowed
+ *  to be told - the accounts the address has been seen on. */
+type AddressReport = Awaited<ReturnType<typeof getWafAddressActivityAction>>;
 
 /** How far back the traffic panel looks. The edge log is the source, so a longer
  *  window is only as good as the log's own rotation - see wafTraffic. */
@@ -918,19 +923,20 @@ function statusTone(status: number): string {
  */
 function AddressDialog({ ip, hours, onClose }: { ip: string | null; hours: number; onClose: () => void }) {
     const format = useDisplayFormat();
-    const [activity, setActivity] = useState<WafAddressActivity | null>(null);
+    const [loaded, setLoaded] = useState<AddressReport | null>(null);
     const [error, setError] = useState<string | null>(null);
     const windowLabel = WINDOWS.find((entry) => entry.hours === hours)?.label ?? `${hours}h`;
+    const activity = loaded?.activity ?? null;
 
     useEffect(() => {
         if (!ip) return;
         let active = true;
-        setActivity(null);
+        setLoaded(null);
         setError(null);
         void getWafAddressActivityAction(ip, hours).then((result) => {
             if (!active) return;
             if (result.error) setError(result.error);
-            else setActivity(result.activity ?? null);
+            else setLoaded(result);
         });
         return () => {
             active = false;
@@ -946,6 +952,15 @@ function AddressDialog({ ip, hours, onClose }: { ip: string | null; hours: numbe
                         Every request from this address in the last {windowLabel}, read from the edge&apos;s own log.
                     </DialogDescription>
                 </DialogHeader>
+
+                {/* Who was signed in from here does not come from the log and does not
+                    depend on the window, so it sits above the requests and is still
+                    there when the window held nothing at all. */}
+                {loaded?.accounts ? (
+                    <div className="mb-4">
+                        <AddressAccounts accounts={loaded.accounts} />
+                    </div>
+                ) : null}
 
                 {error ? (
                     <p className="text-sm text-danger">{error}</p>

@@ -60,7 +60,8 @@ export function UsersAdmin({
     groups,
     roles,
     canSendMail,
-    viewerId
+    viewerId,
+    openUserId
 }: {
     users: DirectoryUser[];
     invites: InviteListItem[];
@@ -70,6 +71,9 @@ export function UsersAdmin({
     roles: RoleOption[];
     canSendMail: boolean;
     viewerId: string;
+    /** The account to open on arrival, from `?user=`. An id that matches nobody
+     *  opens nothing, which is what a link to a deleted account should do. */
+    openUserId?: string | null;
 }) {
     const router = useRouter();
     const format = useDisplayFormat();
@@ -78,7 +82,7 @@ export function UsersAdmin({
     const [inviting, setInviting] = useState(false);
     // Held by id, not by value: the row is re-read from the server after every
     // change, and a copy taken when the dialog opened would go stale behind it.
-    const [openId, setOpenId] = useState<string | null>(null);
+    const [openId, setOpenId] = useState<string | null>(openUserId ?? null);
 
     const shown = useMemo(() => {
         const needle = query.trim().toLowerCase();
@@ -271,7 +275,13 @@ export function UsersAdmin({
                     groups={groups}
                     roles={roles}
                     isSelf={open.id === viewerId}
-                    onOpenChange={(next) => !next && setOpenId(null)}
+                    onOpenChange={(next) => {
+                        if (next) return;
+                        setOpenId(null);
+                        // Drop the id a link arrived with, so reloading the page
+                        // after closing does not open the same account again.
+                        if (openUserId) router.replace("/admin/users");
+                    }}
                 />
             ) : null}
         </div>
