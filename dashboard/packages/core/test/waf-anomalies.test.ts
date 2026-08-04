@@ -144,4 +144,33 @@ describe("detectWafAnomalies", () => {
     it("skips entries with no usable address", () => {
         expect(detectWafAnomalies(hits("-", "/pricing", 500), FROM, TO)).toEqual([]);
     });
+
+    describe("trusted addresses", () => {
+        const entries = [...crowd("/pricing"), ...hits("198.51.100.9", "/pricing", 200)];
+
+        it("never judges one, however it behaves", () => {
+            expect(detectWafAnomalies(entries, FROM, TO, { exempt: ["198.51.100.9"] })).toEqual([]);
+        });
+
+        it("takes a range, which is how a home connection is written", () => {
+            expect(detectWafAnomalies(entries, FROM, TO, { exempt: ["198.51.100.0/24"] })).toEqual([]);
+        });
+
+        it("still counts it towards what the route's traffic looks like", () => {
+            // The exempt address is the crowd here, so removing it from the tally
+            // entirely would leave the address being judged with no baseline at all.
+            const busy = [...hits("203.0.113.7", "/pricing", 100), ...hits("198.51.100.9", "/pricing", 100)];
+            expect(detectWafAnomalies(busy, FROM, TO, { exempt: ["203.0.113.7"] })).toEqual([]);
+        });
+
+        it("judges everyone else exactly as before", () => {
+            const found = detectWafAnomalies(entries, FROM, TO, { exempt: ["203.0.113.1"] });
+            expect(found.some((anomaly) => anomaly.ip === "198.51.100.9")).toBe(true);
+        });
+
+        it("ignores an entry that is not an address", () => {
+            const found = detectWafAnomalies(entries, FROM, TO, { exempt: ["not-an-address"] });
+            expect(found.some((anomaly) => anomaly.ip === "198.51.100.9")).toBe(true);
+        });
+    });
 });

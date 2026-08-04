@@ -68,7 +68,12 @@ describe("the packs a predefined rule shows", () => {
 
     it("gives every predefined rule something to open", () => {
         for (const rule of WAF_MANAGED_RULES) {
-            expect(rule.rules.length + rule.signatures.length).toBeGreaterThan(0);
+            // A feed is the one kind with neither: what it blocks is a fetched list, and
+            // its page shows the list's size and age instead. Anything else with nothing
+            // to show would open onto a page that only repeats its own description.
+            const showsSomething = rule.control.kind === "feed" || rule.rules.length + rule.signatures.length > 0;
+
+            expect(showsSomething).toBe(true);
         }
     });
 });

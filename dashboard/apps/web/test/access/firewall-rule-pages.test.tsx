@@ -83,6 +83,40 @@ describe("the predefined rule list", () => {
         for (const rule of WAF_MANAGED_RULES) expect(markup).toContain(rule.label);
     });
 
+    it("says a rule is on when a broader scope arms it, rather than reading Off", () => {
+        // The whole point: a project's row used to say "Off" for a pack the instance
+        // was already enforcing on its behalf, which is the switch saying the opposite
+        // of what is happening.
+        const markup = renderToStaticMarkup(
+            <PredefinedRuleList
+                title="Managed rules"
+                hint="Signatures and lists Polaris keeps up to date."
+                canEdit
+                onOpen={() => {}}
+                onToggle={() => {}}
+                rows={[
+                    {
+                        id: "scanners",
+                        name: "Block vulnerability scanners",
+                        description: "Blocks sqlmap and the rest.",
+                        action: { label: "Block", variant: "danger" },
+                        enabled: false,
+                        decidedElsewhere: {
+                            on: true,
+                            label: "From a broader scope",
+                            why: "A scope above this one arms it."
+                        }
+                    }
+                ]}
+            />
+        );
+
+        expect(markup).toContain("From a broader scope");
+        expect(markup).not.toContain(">Off<");
+        // And the switch it cannot move does not offer to be moved.
+        expect(markup).toContain("disabled");
+    });
+
     it("reads a row with no switch as what it holds rather than as off", () => {
         const markup = renderToStaticMarkup(
             <PredefinedRuleList
@@ -106,6 +140,50 @@ describe("the predefined rule list", () => {
 
         expect(markup).toContain("2 allowed, 1 blocked");
         expect(markup).not.toContain("Active");
+    });
+});
+
+describe("a rule that is a fetched list", () => {
+    it("is in the catalog, so it is a rule with a page rather than a panel", () => {
+        expect(wafManagedRule("tor")?.label).toBe("Block the Tor network");
+    });
+
+    it("shows the list instead of conditions it does not have", () => {
+        const rule = wafManagedRule("tor");
+        if (!rule) throw new Error("no managed rule tor");
+        const markup = renderToStaticMarkup(
+            <ManagedRulePage
+                rule={rule}
+                enabled
+                feed={{ count: 1398, fetchedAt: "2026-08-04T15:51:00.000Z", error: null }}
+                onBack={() => {}}
+                onToggle={() => {}}
+                onCreateException={() => {}}
+            />
+        );
+
+        expect(markup).toContain("The list");
+        expect(markup).toContain("1,398");
+        // It says it is one switch for everything, which is the thing that would
+        // otherwise surprise somebody switching it from a project's scope.
+        expect(markup).toContain("One switch for the whole instance");
+    });
+
+    it("says so rather than showing an empty list before the first fetch", () => {
+        const rule = wafManagedRule("tor");
+        if (!rule) throw new Error("no managed rule tor");
+        const markup = renderToStaticMarkup(
+            <ManagedRulePage
+                rule={rule}
+                enabled
+                feed={{ count: 0, fetchedAt: null, error: null }}
+                onBack={() => {}}
+                onToggle={() => {}}
+                onCreateException={() => {}}
+            />
+        );
+
+        expect(markup).toContain("Not fetched yet");
     });
 });
 

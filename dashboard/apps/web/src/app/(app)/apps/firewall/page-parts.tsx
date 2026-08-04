@@ -11,6 +11,13 @@
 
 import { ArrowLeft } from "lucide-react";
 
+/** Thousands separators without a locale. Deliberately hand-rolled: toLocaleString
+ *  would pick a separator from the browser, which disagrees with the server on the
+ *  first render and is not the operator's chosen format either. */
+export function grouped(value: number): string {
+    return String(Math.round(value)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+}
+
 /** The title of a page you got to by opening something, with the way back. */
 export function PageHeader({ title, onBack }: { title: string; onBack: () => void }) {
     return (

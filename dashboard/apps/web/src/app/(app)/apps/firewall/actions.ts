@@ -14,8 +14,8 @@ import { requirePermission } from "@/lib/session";
 import { recordAudit } from "@/lib/audit-service";
 import { syncAppRoutes } from "@/lib/deploy-service";
 import { syncDashboardRoute } from "@/lib/domain-edge";
-import { getWafRule, setWafRule, type WafRuleView } from "@/lib/waf-service";
 import { wafAddressActivity, wafLogWindow, wafTraffic } from "@/lib/waf-analytics-service";
+import { getWafInherited, getWafRule, setWafRule, type WafInheritedView, type WafRuleView } from "@/lib/waf-service";
 import {
     getWafIgnoreList,
     getWafJails,
@@ -35,7 +35,8 @@ import {
     publishWafIntel,
     recordWafBan,
     removeWafBan,
-    setWafFeedEnabled
+    setWafFeedEnabled,
+    wafFeedEnabled
 } from "@/lib/waf-intel-service";
 
 type WafAddressActivity = core.WafAddressActivity;
@@ -64,17 +65,51 @@ const wafJailSchema = z.object({
     banTimeSec: z.number().int().min(60).max(30 * 24 * 3600)
 });
 
-export async function getWafRuleAction(input: {
-    scopeType: WafScopeType;
-    scopeId: string;
-}): Promise<{ rule?: WafRuleView; error?: string }> {
+/** How a feed rule is doing, for the row and the page that open onto it. Instance-wide
+ *  however narrow the scope being edited is, which is what the rule's own page says. */
+export interface WafFeedView {
+    readonly enabled: boolean;
+    readonly count: number;
+    readonly fetchedAt: string | null;
+    readonly error: string | null;
+}
+
+/**
+ * One scope's rule, what it inherits, and the feeds that apply to it regardless.
+ *
+ * All three in one round trip because the rule list cannot be drawn without them: a
+ * managed row that shows the scope's own switch alone says "Off" for a pack the
+ * instance is already enforcing, and a feed row would have nothing to show at all.
+ */
+export async function getWafRuleAction(input: { scopeType: WafScopeType; scopeId: string }): Promise<{
+    rule?: WafRuleView;
+    inherited?: WafInheritedView;
+    tor?: WafFeedView;
+    error?: string;
+}> {
     const user = await requirePermission("deploy.manage");
     if (OPERATOR_SCOPES.has(input.scopeType)) await requirePermission("system.manage");
     try {
-        return { rule: await getWafRule(user.id, input.scopeType, input.scopeId) };
+        const [rule, inherited, tor] = await Promise.all([
+            getWafRule(user.id, input.scopeType, input.scopeId),
+            getWafInherited(user.id, input.scopeType, input.scopeId),
+            torFeedView()
+        ]);
+        return { rule, inherited, tor };
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Could not load the firewall rule" };
     }
+}
+
+/** The Tor feed as both the rule list and the overview show it. */
+async function torFeedView(): Promise<WafFeedView> {
+    const feed = await getWafFeed("tor");
+    return {
+        enabled: wafFeedEnabled(feed),
+        count: countEntries(feed?.entries),
+        fetchedAt: feed?.fetchedAt ? feed.fetchedAt.toISOString() : null,
+        error: feed?.error ?? null
+    };
 }
 
 /**
@@ -241,28 +276,28 @@ export async function listWafPrincipalsAction(): Promise<{ principals?: WafPrinc
 
 /**
  * Everything the instance-wide panels show, in one round trip: what the firewall has
- * been doing, who is currently banned, how the jails are set, and which intelligence
- * feeds are on. One action rather than five because the panels are rendered together
+ * been doing, who is currently banned, how the jails are set, and which addresses it
+ * leaves alone. One action rather than five because the panels are rendered together
  * and five would be five waterfalls.
+ *
+ * The Tor list is not here: it is a rule now, and it is read with the rest of them.
  */
 export async function getWafOverviewAction(hours = 24): Promise<{
     traffic?: WafTrafficSummary;
     bans?: WafBanView[];
     jails?: WafJail[];
-    ignore?: string[];
-    tor?: { enabled: boolean; count: number; fetchedAt: string | null; error: string | null };
+    trusted?: string[];
     anomalies?: WafAnomaly[];
     anomalySettings?: WafAnomalySettings;
     error?: string;
 }> {
     await requirePermission("system.manage");
     try {
-        const [traffic, bans, jails, ignore, feed, anomalies, anomalySettings] = await Promise.all([
+        const [traffic, bans, jails, trusted, anomalies, anomalySettings] = await Promise.all([
             wafTraffic(hours),
             listWafBans(),
             getWafJails(),
             getWafIgnoreList(),
-            getWafFeed("tor"),
             currentWafAnomalies(),
             getWafAnomalySettings()
         ]);
@@ -277,15 +312,9 @@ export async function getWafOverviewAction(hours = 24): Promise<{
                 offences: ban.offences
             })),
             jails,
-            ignore,
+            trusted,
             anomalies,
-            anomalySettings,
-            tor: {
-                enabled: feed?.enabled ?? false,
-                count: countEntries(feed?.entries),
-                fetchedAt: feed?.fetchedAt ? feed.fetchedAt.toISOString() : null,
-                error: feed?.error ?? null
-            }
+            anomalySettings
         };
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Could not load the firewall overview" };

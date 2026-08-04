@@ -17,6 +17,7 @@
  * one is the caller's business.
  */
 
+import { ipAllowed } from "./cidr.js";
 import type { HttpLogLike } from "./waf-jails.js";
 
 /** An access-log entry as this reads it. The method is optional because the jails do
@@ -122,6 +123,28 @@ const DEFAULTS: Required<WafAnomalyOptions> = {
     variantMax: 30
 };
 
+/**
+ * What the detector is given on top of the thresholds an operator tunes.
+ *
+ * `exempt` is kept out of `WafAnomalyOptions` deliberately: the numbers above are
+ * settings somebody saved, the exempt list is the firewall's one "never ban these"
+ * list and is owned elsewhere. Keeping them apart is what stops a stored settings
+ * blob from carrying a second, stale copy of it.
+ */
+export interface WafAnomalyInput extends WafAnomalyOptions {
+    /**
+     * Addresses and ranges that are never reported, as bare addresses or CIDR.
+     *
+     * An operator's own address is the case this exists for. They are the heaviest
+     * legitimate user of their own instance - opening every page, reloading, pulling
+     * the same bundle - and against a route's ordinary visitor that reads as a flood.
+     * Reporting it teaches them the detector is wrong, which is worse than missing
+     * something. They still count towards other addresses' baselines: what they do is
+     * normal traffic, it is only a verdict about them that is withheld.
+     */
+    readonly exempt?: readonly string[];
+}
+
 /** The path with its query removed and a trailing slash normalised away, so the same
  *  route is one key however it was written. */
 export function routeOf(path: string | null | undefined): string {
@@ -169,9 +192,10 @@ export function detectWafAnomalies(
     entries: readonly WafTrafficLike[],
     from: number,
     to: number,
-    options: WafAnomalyOptions = {}
+    options: WafAnomalyInput = {}
 ): WafAnomaly[] {
     const config = { ...DEFAULTS, ...options };
+    const exempt = options.exempt ?? [];
     if (!Number.isFinite(from) || !Number.isFinite(to) || to <= from) return [];
 
     // route -> ip -> cell, plus the per-route totals the baseline is taken from.
@@ -209,6 +233,9 @@ export function detectWafAnomalies(
     const found: WafAnomaly[] = [];
     for (const [route, perIp] of byRoute) {
         for (const [ip, cell] of perIp) {
+            // Judged after the cells are built, not before: an exempt address is still
+            // part of what a route's traffic looks like.
+            if (exempt.length > 0 && ipAllowed(ip, exempt)) continue;
             // The baseline excludes the address being judged, which is what stops a
             // single heavy client from defining "normal" as itself on a quiet route.
             const peers = [...perIp].filter(([key]) => key !== ip).map(([, other]) => other.hits);

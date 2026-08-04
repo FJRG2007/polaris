@@ -110,17 +110,17 @@ export function RuleList({
                 </p>
             ) : (
                 <div className="overflow-x-auto border-t border-border">
-                    <table className="w-full min-w-[46rem] text-sm">
+                    <table className="w-full min-w-[48rem] text-sm">
                         <thead>
                             <tr className="text-left text-xs text-muted-foreground">
-                                <th className="w-8 px-2 py-2" aria-label="Reorder" />
-                                <th className="w-14 px-2 py-2 font-medium">Order</th>
-                                <th className="px-2 py-2 font-medium">Name</th>
-                                <th className="px-2 py-2 font-medium">Description</th>
-                                <th className="w-24 px-2 py-2 font-medium">Action</th>
-                                <th className="w-32 px-2 py-2 font-medium">Matches</th>
-                                <th className="w-24 px-2 py-2 font-medium">Status</th>
-                                <th className="w-10 px-2 py-2" aria-label="Actions" />
+                                <th className="w-8 px-2 py-2.5" aria-label="Reorder" />
+                                <th className="w-14 px-2 py-2.5 font-medium">Order</th>
+                                <th className="px-4 py-2.5 font-medium">Name</th>
+                                <th className="px-4 py-2.5 font-medium">Description</th>
+                                <th className="w-24 px-3 py-2.5 font-medium">Action</th>
+                                <th className="w-32 px-3 py-2.5 font-medium">Matches</th>
+                                <th className="w-24 px-3 py-2.5 font-medium">Status</th>
+                                <th className="w-10 px-2 py-2.5" aria-label="Actions" />
                             </tr>
                         </thead>
                         <tbody>
@@ -279,34 +279,34 @@ function RuleRow({
                 over ? "border-t-2 border-t-primary" : ""
             } ${rule.enabled ? "" : "opacity-60"}`}
         >
-            <td className="px-2 py-2.5 align-top">
+            <td className="px-2 py-3.5 align-top">
                 <GripVertical
                     className={`size-4 shrink-0 text-muted-foreground ${canEdit ? "cursor-grab" : "opacity-40"}`}
                     aria-hidden="true"
                 />
             </td>
-            <td className="px-2 py-2.5 align-top tabular-nums text-muted-foreground">{index + 1}</td>
-            <td className="min-w-0 px-2 py-2.5 align-top">
+            <td className="px-2 py-3.5 align-top tabular-nums text-muted-foreground">{index + 1}</td>
+            <td className="min-w-[10rem] px-4 py-3.5 pr-6 align-top">
                 <button
                     type="button"
                     onClick={onEdit}
-                    className="rounded text-left underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="rounded text-left font-medium underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                     {rule.name}
                 </button>
             </td>
-            <td className="max-w-0 px-2 py-2.5 align-top text-muted-foreground">
+            <td className="w-full max-w-0 px-4 py-3.5 align-top text-muted-foreground">
                 <span className="line-clamp-2 [overflow-wrap:anywhere]" title={description}>
                     {description}
                 </span>
             </td>
-            <td className="px-2 py-2.5 align-top">
+            <td className="px-3 py-3.5 align-top">
                 <Badge variant={ACTION_BADGE[rule.action].variant}>{ACTION_BADGE[rule.action].label}</Badge>
             </td>
-            <td className="px-2 py-2.5 align-top">
+            <td className="px-3 py-3.5 align-top">
                 <MatchesCell name={rule.name} activity={activity} />
             </td>
-            <td className="px-2 py-2.5 align-top">
+            <td className="px-3 py-3.5 align-top">
                 <div className="flex items-center gap-2">
                     <Switch
                         checked={rule.enabled}
@@ -317,7 +317,7 @@ function RuleRow({
                     <span className="text-xs text-muted-foreground">{rule.enabled ? "Active" : "Off"}</span>
                 </div>
             </td>
-            <td className="px-2 py-2.5 align-top text-right">
+            <td className="px-2 py-3.5 align-top text-right">
                 <DropdownMenu>
                     <DropdownMenuTrigger
                         aria-label={`Actions for ${rule.name}`}

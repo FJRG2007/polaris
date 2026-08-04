@@ -2,7 +2,8 @@
  * The predefined rules, as one catalog the screen can list and open.
  *
  * Everything the firewall enforces without being written by hand is a rule: the two
- * injection checks, the browser integrity check, and every managed pack. They were
+ * injection checks, the browser integrity check, the Tor exit list, and every managed
+ * pack. They were
  * previously a row of switches with a paragraph each, which is the one shape that
  * cannot answer the question an operator actually arrives with - "what does this
  * block?" - and so gets turned on out of hope or left off out of suspicion.
@@ -13,7 +14,8 @@
  * than a list, so it answers with the families it matches, each carrying the reason
  * the refusal is written with and a request line that really does trigger it. Those
  * examples are asserted against the checks themselves, so the page cannot drift into
- * describing a rule Polaris no longer enforces.
+ * describing a rule Polaris no longer enforces. A feed answers with neither: what it
+ * blocks is a list, and the page shows the list's size and when it was last fetched.
  *
  * The packs are taken from `WAF_PRESETS` rather than restated here: their labels,
  * cautions and rule lists have one home, and this module is a view over it.
@@ -26,10 +28,24 @@ import { WAF_PRESETS, type WafPresetId } from "./waf-presets.js";
  *  stores them so a screen can switch one without a lookup table of its own. */
 export type WafManagedSetting = "sqlInjectionProtection" | "xssProtection" | "browserIntegrity";
 
-/** How a scope turns one of these on: its own boolean, or membership of the pack list. */
+/** The address lists Polaris fetches and enforces at the edge. One today. */
+export const WAF_FEED_IDS = ["tor"] as const;
+
+export type WafFeedId = (typeof WAF_FEED_IDS)[number];
+
+/**
+ * How a rule is turned on: its own boolean on the scope, membership of the scope's
+ * pack list, or - for a rule that is a fetched address list - one switch for the whole
+ * instance.
+ *
+ * A feed is instance-wide because that is what it is: the edge holds the list in memory
+ * and refuses an address before it knows which service was asked for. Offering it per
+ * scope would be a switch that silently means something else.
+ */
 export type WafManagedControl =
     | { readonly kind: "setting"; readonly setting: WafManagedSetting }
-    | { readonly kind: "preset"; readonly preset: WafPresetId };
+    | { readonly kind: "preset"; readonly preset: WafPresetId }
+    | { readonly kind: "feed"; readonly feed: WafFeedId };
 
 /**
  * One family of payload a signature check refuses.
@@ -174,38 +190,51 @@ export const WAF_MANAGED_RULES: readonly WafManagedRule[] = [
     {
         id: "sql-injection",
         label: "Block SQL injection",
-        description:
-            "Refuses a request whose own URL carries a SQL payload. Encoded payloads are decoded first, and a signature only counts within one value - keywords spread across separate parameters are not an injection.",
+        description: "Refuses a request whose URL carries a SQL payload.",
         control: { kind: "setting", setting: "sqlInjectionProtection" },
         rules: [],
         signatures: SQL_SIGNATURES,
-        inspects: "The query string, the path and the user agent. A payload in a request body is not visible to it.",
+        inspects:
+            "The query string, the path and the user agent, decoded first. A signature only counts within one value, so keywords spread across separate parameters are not an injection. A payload in a request body is not visible to it.",
         combines:
             "On everywhere unless a scope switches it off. Any scope can, for what that scope covers, and a narrower one cannot switch it back on - so a service that really does put SQL-looking text in a query string has somewhere to say so."
     },
     {
         id: "xss",
         label: "Block cross-site scripting",
-        description:
-            "Refuses a request whose own URL carries a script payload. Encoded payloads are decoded first, and the lists are kept to what can actually execute rather than to all of HTML.",
+        description: "Refuses a request whose URL carries a script payload.",
         control: { kind: "setting", setting: "xssProtection" },
         rules: [],
         signatures: XSS_SIGNATURES,
-        inspects: "The query string, the path and the user agent. A payload in a request body is not visible to it.",
+        inspects:
+            "The query string, the path and the user agent, decoded first. The lists are kept to what can actually execute rather than to all of HTML. A payload in a request body is not visible to it.",
         combines:
             "On everywhere unless a scope switches it off, and resolved separately from the SQL check - the scope that has to allow one of them rarely has to allow the other."
     },
     {
         id: "browser-integrity",
         label: "Block clients that fake a browser",
-        description:
-            "Refuses a request whose headers do not hold together as a browser's. It never refuses a client for honestly not being a browser, only for claiming to be one and then not behaving like one - so an API on this scope keeps working.",
-        caution: "Off by default. It is a heuristic about the client rather than about what was asked for, so arm it on a scope you know serves browsers.",
+        description: "Refuses a client whose headers do not hold together as a browser's.",
+        caution:
+            "Off by default: it also refuses a request with no user agent at all, which some scripts and health checks send. Arm it where you know what talks to the scope.",
         control: { kind: "setting", setting: "browserIntegrity" },
         rules: [],
         signatures: INTEGRITY_SIGNATURES,
-        inspects: "The User-Agent, Accept, Accept-Language and Accept-Encoding headers.",
+        inspects:
+            "The User-Agent, Accept, Accept-Language and Accept-Encoding headers. Past the missing-user-agent case it only holds a client to what it claimed: curl is honest and passes, a Mozilla user agent with no Accept header is not.",
         combines: UNIONS
+    },
+    {
+        id: "tor",
+        label: "Block the Tor network",
+        description: "Refuses every Tor exit node.",
+        caution: "It also shuts out people who use Tor for ordinary privacy reasons.",
+        control: { kind: "feed", feed: "tor" },
+        rules: [],
+        signatures: [],
+        inspects: "The address the request came from, against a list fetched hourly and held at the edge.",
+        combines:
+            "One switch for the whole instance, wherever it is set. The edge refuses the address before it knows which service was asked for, so this cannot differ per scope."
     },
     ...WAF_PRESETS.map((preset) => ({
         id: preset.id,

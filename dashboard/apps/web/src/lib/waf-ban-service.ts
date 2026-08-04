@@ -34,7 +34,14 @@ const TAIL_BYTES = 4 * 1024 * 1024;
 
 /** The addresses a jail never bans, whatever they do. Loopback is here from the
  *  start: banning it would take out the instance's own health checks. */
-const ALWAYS_IGNORED = ["127.0.0.1", "::1"];
+export const ALWAYS_IGNORED = ["127.0.0.1", "::1"];
+
+/** Every address the firewall leaves alone: loopback plus whatever the operator
+ *  added. One list rather than two, because "never ban this" is one decision and an
+ *  address the jails spare has no business being reported as an anomaly either. */
+export async function wafTrustedAddresses(): Promise<string[]> {
+    return [...ALWAYS_IGNORED, ...(await getWafIgnoreList())];
+}
 
 /** The configured jails, falling back to the defaults for anything unsaved. Stored
  *  settings are merged onto the shipped list rather than replacing it, so a jail

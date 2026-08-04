@@ -9,23 +9,27 @@
  * operator opens this page after something went wrong far more often than before, so
  * the state comes first and the settings sit under it.
  *
- * Rendered only for `system.manage`: bans, jails and intelligence feeds apply to the
- * whole instance and are not a project's to change.
+ * Rendered only for `system.manage`: bans, jails and the trusted list apply to the
+ * whole instance and are not a project's to change. Rendered under the rule LIST rather
+ * than beside the editor, so a rule opened from that list gets a page to itself instead
+ * of one with the whole instance's traffic stapled underneath it.
  */
 
 import Link from "next/link";
+import { grouped } from "./page-parts";
+import { ChipList, validAddress } from "./chip-list";
 import { useDisplayFormat } from "@/components/display-format";
 import type { WafAnomalySettings } from "@/lib/waf-anomaly-service";
 import { useCallback, useEffect, useState, useTransition } from "react";
 import type { WafAddressActivity, WafAnomaly, WafJail, WafTrafficSummary } from "@polaris/core";
-import { Activity, Ban, Globe, RadarIcon, RefreshCw, ShieldOff, Timer, TriangleAlert } from "lucide-react";
+import { Activity, Ban, Globe, RadarIcon, RefreshCw, ShieldCheck, ShieldOff, Timer } from "lucide-react";
 import {
     blockAnomalyAction,
     getWafAddressActivityAction,
     getWafOverviewAction,
     liftWafBanAction,
-    setTorBlockedAction,
     setWafAnomalySettingsAction,
+    setWafIgnoreListAction,
     setWafJailsAction,
     type WafBanView
 } from "./actions";
@@ -48,13 +52,6 @@ import {
 
 type Overview = Awaited<ReturnType<typeof getWafOverviewAction>>;
 
-/** Thousands separators without a locale. Deliberately hand-rolled: toLocaleString
- *  would pick a separator from the browser, which disagrees with the server on the
- *  first render and is not the operator's chosen format either. */
-function grouped(value: number): string {
-    return String(Math.round(value)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-}
-
 /** How far back the traffic panel looks. The edge log is the source, so a longer
  *  window is only as good as the log's own rotation - see wafTraffic. */
 const WINDOWS = [
@@ -73,7 +70,14 @@ export type Mutate = (
     run: () => Promise<{ error?: string }>
 ) => void;
 
-export function FirewallInstancePanels() {
+export function FirewallInstancePanels({
+    /** The address this page is being read over. Marked wherever it appears, and
+     *  offered to the trusted list in one click - "is that me?" is the first question
+     *  anybody asks of a finding, and the page is the only thing that can answer it. */
+    callerIp
+}: {
+    callerIp?: string | null;
+}) {
     const [hours, setHours] = useState(24);
     const [data, setData] = useState<Overview | null>(null);
     const [failure, setFailure] = useState<string | null>(null);
@@ -115,6 +119,28 @@ export function FirewallInstancePanels() {
         [hours, load]
     );
 
+    /**
+     * Add an address to the trusted list, from wherever it was judged.
+     *
+     * The other half of a finding: "block this" was already one click and "this one is
+     * wrong" was a trip to a list somewhere else, so the only cheap answer to a false
+     * positive was to switch the whole detector off.
+     */
+    const trust = useCallback(
+        (ip: string) => {
+            const next = [...new Set([...(data?.trusted ?? []), ip])];
+            mutate(
+                (current) => ({
+                    ...current,
+                    trusted: next,
+                    anomalies: current.anomalies?.filter((entry) => entry.ip !== ip)
+                }),
+                () => setWafIgnoreListAction(next)
+            );
+        },
+        [data, mutate]
+    );
+
     return (
         <div className="flex flex-col gap-4">
             <TrafficPanel
@@ -130,12 +156,26 @@ export function FirewallInstancePanels() {
                 anomalies={data?.anomalies}
                 settings={data?.anomalySettings}
                 loading={!data}
+                callerIp={callerIp}
+                mutate={mutate}
+                onTrust={trust}
+                onInspect={setInspecting}
+            />
+            <TrustedPanel
+                trusted={data?.trusted}
+                loading={!data}
+                callerIp={callerIp}
+                onSaved={() => load(hours)}
+            />
+            <BansPanel
+                bans={data?.bans}
+                loading={!data}
+                callerIp={callerIp}
                 mutate={mutate}
                 onInspect={setInspecting}
             />
-            <BansPanel bans={data?.bans} loading={!data} mutate={mutate} onInspect={setInspecting} />
             <JailsPanel jails={data?.jails} loading={!data} onSaved={() => load(hours)} />
-            <IntelPanel tor={data?.tor} loading={!data} mutate={mutate} />
+            <IntelPanel />
             {failure ? <p className="text-sm text-danger">{failure}</p> : null}
             {data?.error ? <p className="text-sm text-danger">{data.error}</p> : null}
             <AddressDialog ip={inspecting} hours={hours} onClose={() => setInspecting(null)} />
@@ -149,16 +189,38 @@ export function FirewallInstancePanels() {
  * after seeing an address on this page is always "what did it do", and this is the
  * only screen that can answer it.
  */
-function AddressLink({ ip, onInspect }: { ip: string; onInspect: (ip: string) => void }) {
+function AddressLink({
+    ip,
+    callerIp,
+    onInspect
+}: {
+    ip: string;
+    /** The address the page is being read over. Marked, because a home connection
+     *  puts everyone behind one address and a finding about it is usually the
+     *  operator looking at their own traffic. */
+    callerIp?: string | null;
+    onInspect: (ip: string) => void;
+}) {
+    const mine = callerIp !== null && callerIp !== undefined && callerIp === ip;
     return (
-        <button
-            type="button"
-            onClick={() => onInspect(ip)}
-            title={`What ${ip} has been doing`}
-            className="rounded font-mono underline-offset-2 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        >
-            {ip}
-        </button>
+        <span className="inline-flex items-baseline gap-1.5">
+            <button
+                type="button"
+                onClick={() => onInspect(ip)}
+                title={`What ${ip} has been doing`}
+                className="rounded font-mono underline-offset-2 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+                {ip}
+            </button>
+            {mine ? (
+                <span
+                    className="shrink-0 rounded bg-muted px-1 py-0.5 text-[0.625rem] font-medium uppercase tracking-wide text-muted-foreground"
+                    title="The address you are reading this page over. Everyone on your network shares it."
+                >
+                    You
+                </span>
+            ) : null}
+        </span>
     );
 }
 
@@ -309,13 +371,17 @@ function AnomaliesPanel({
     anomalies,
     settings,
     loading,
+    callerIp,
     mutate,
+    onTrust,
     onInspect
 }: {
     anomalies: WafAnomaly[] | undefined;
     settings: WafAnomalySettings | undefined;
     loading: boolean;
+    callerIp?: string | null;
     mutate: Mutate;
+    onTrust: (ip: string) => void;
     onInspect: (ip: string) => void;
 }) {
     const high = (anomalies ?? []).filter((anomaly) => anomaly.severity === "high").length;
@@ -345,9 +411,9 @@ function AnomaliesPanel({
             </CardHeader>
             <CardBody className="flex flex-col gap-3">
                 <p className="text-xs text-muted-foreground">
-                    Traffic that is fine one request at a time and wrong in aggregate: a file pulled hundreds of times,
-                    a route walked rather than used, a payload in a query string. Each address is judged against what
-                    the rest of that route&apos;s visitors do, so a busy endpoint is not an anomaly just for being busy.
+                    Traffic that is fine one request at a time and wrong in aggregate. Each address is judged against
+                    what the rest of that route&apos;s visitors do, so a busy endpoint is not an anomaly for being busy.
+                    Trusted addresses are never judged.
                 </p>
 
                 {loading ? (
@@ -368,7 +434,7 @@ function AnomaliesPanel({
                                 <div className="min-w-0">
                                     <div className="flex flex-wrap items-center gap-2 text-sm">
                                         <span className="text-xs text-muted-foreground">
-                                            <AddressLink ip={anomaly.ip} onInspect={onInspect} />
+                                            <AddressLink ip={anomaly.ip} callerIp={callerIp} onInspect={onInspect} />
                                         </span>
                                         <Badge variant={anomaly.severity === "high" ? "danger" : "neutral"}>
                                             {anomaly.kind.replace(/-/g, " ")}
@@ -379,23 +445,44 @@ function AnomaliesPanel({
                                     </div>
                                     <p className="mt-0.5 text-xs text-muted-foreground">{anomaly.detail}</p>
                                 </div>
-                                <button
-                                    type="button"
-                                    aria-label={`Block ${anomaly.ip}`}
-                                    title="Block this address"
-                                    onClick={() =>
-                                        mutate(
-                                            (current) => ({
-                                                ...current,
-                                                anomalies: current.anomalies?.filter((entry) => entry.ip !== anomaly.ip)
-                                            }),
-                                            () => blockAnomalyAction(anomaly.ip, `${anomaly.route}: ${anomaly.detail}`)
-                                        )
-                                    }
-                                    className="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-danger/10 hover:text-danger"
-                                >
-                                    <Ban className="size-3.5" />
-                                </button>
+                                {/* Both verdicts, because a finding an operator
+                                    disagrees with is as common as one they act on -
+                                    and with only the ban here, the cheapest way to
+                                    say "this is wrong" was to switch detection off. */}
+                                <div className="flex shrink-0 items-center gap-1">
+                                    <button
+                                        type="button"
+                                        aria-label={`Trust ${anomaly.ip}`}
+                                        title="This is not an attack: never judge this address"
+                                        onClick={() => onTrust(anomaly.ip)}
+                                        className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                    >
+                                        <ShieldCheck className="size-3.5" />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        aria-label={`Block ${anomaly.ip}`}
+                                        title="Block this address"
+                                        onClick={() =>
+                                            mutate(
+                                                (current) => ({
+                                                    ...current,
+                                                    anomalies: current.anomalies?.filter(
+                                                        (entry) => entry.ip !== anomaly.ip
+                                                    )
+                                                }),
+                                                () =>
+                                                    blockAnomalyAction(
+                                                        anomaly.ip,
+                                                        `${anomaly.route}: ${anomaly.detail}`
+                                                    )
+                                            )
+                                        }
+                                        className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-danger/10 hover:text-danger"
+                                    >
+                                        <Ban className="size-3.5" />
+                                    </button>
+                                </div>
                             </li>
                         ))}
                     </ul>
@@ -457,11 +544,13 @@ function AnomaliesPanel({
 function BansPanel({
     bans,
     loading,
+    callerIp,
     mutate,
     onInspect
 }: {
     bans: WafBanView[] | undefined;
     loading: boolean;
+    callerIp?: string | null;
     mutate: Mutate;
     onInspect: (ip: string) => void;
 }) {
@@ -481,8 +570,8 @@ function BansPanel({
                     <Skeleton className="h-20 w-full" />
                 ) : !bans || bans.length === 0 ? (
                     <p className="py-4 text-center text-sm text-muted-foreground">
-                        Nobody is banned. Addresses appear here when they trip a jail below or a reputation provider
-                        flags them.
+                        Nobody is banned. Addresses appear here when they trip a jail below, or when a reputation
+                        provider flags them.
                     </p>
                 ) : (
                     <div className="-mx-2 overflow-x-auto">
@@ -499,7 +588,7 @@ function BansPanel({
                                 {bans.map((ban) => (
                                     <tr key={ban.ip} className="border-t border-border">
                                         <td className="px-2 py-2 text-xs">
-                                            <AddressLink ip={ban.ip} onInspect={onInspect} />
+                                            <AddressLink ip={ban.ip} callerIp={callerIp} onInspect={onInspect} />
                                             {ban.offences > 1 ? (
                                                 <span className="ml-2 text-muted-foreground">
                                                     {ban.offences}x
@@ -604,8 +693,8 @@ function JailsPanel({
             </CardHeader>
             <CardBody className="flex flex-col gap-3">
                 <p className="text-xs text-muted-foreground">
-                    Counted from the edge&apos;s request log, not per request, so watching an address over five minutes
-                    costs a visitor nothing. A repeat offender is held progressively longer.
+                    Counted from the edge&apos;s request log rather than per request, so watching an address costs a
+                    visitor nothing. A repeat offender is held progressively longer.
                 </p>
                 {loading ? (
                     <Skeleton className="h-32 w-full" />
@@ -688,69 +777,107 @@ function NumberField({
     );
 }
 
-function IntelPanel({
-    tor,
+/**
+ * The addresses the firewall leaves alone.
+ *
+ * The list the jails already had, finally on screen - and now governing the anomaly
+ * detector too, which is what the operator's own address needed. A home connection puts
+ * a whole household behind one public address, and the person configuring the firewall
+ * is by far its heaviest user: every page, every reload, every asset. Against a route's
+ * ordinary visitor that is a flood, and a detector that reports it is a detector nobody
+ * believes the day it is right.
+ */
+function TrustedPanel({
+    trusted,
     loading,
-    mutate
+    callerIp,
+    onSaved
 }: {
-    tor: { enabled: boolean; count: number; fetchedAt: string | null; error: string | null } | undefined;
+    trusted: string[] | undefined;
     loading: boolean;
-    mutate: Mutate;
+    callerIp?: string | null;
+    onSaved: () => void;
 }) {
-    const format = useDisplayFormat();
+    const [draft, setDraft] = useState<string[] | null>(null);
+    const [error, setError] = useState<string | null>(null);
+    const [pending, start] = useTransition();
+    const current = draft ?? trusted ?? [];
+    const dirty = draft !== null && trusted !== undefined && JSON.stringify(draft) !== JSON.stringify(trusted);
+    const canAddSelf = callerIp !== null && callerIp !== undefined && !current.includes(callerIp);
 
+    function save(entries: string[]) {
+        setError(null);
+        start(async () => {
+            const result = await setWafIgnoreListAction(entries);
+            if (result.error) {
+                setError(result.error);
+                return;
+            }
+            setDraft(null);
+            onSaved();
+        });
+    }
+
+    return (
+        <Card>
+            <CardHeader className="flex flex-wrap items-center justify-between gap-2">
+                <CardTitle className="flex items-center gap-2">
+                    <ShieldCheck className="size-4 text-muted-foreground" />
+                    Trusted addresses
+                </CardTitle>
+                {dirty ? (
+                    <Button type="button" size="sm" disabled={pending} onClick={() => save(current)}>
+                        Save
+                    </Button>
+                ) : null}
+            </CardHeader>
+            <CardBody className="flex flex-col gap-3">
+                <p className="text-xs text-muted-foreground">
+                    Never banned and never reported as an anomaly. Loopback is always trusted. Add your own address or
+                    range so your everyday use of the instance is not read as an attack on it.
+                </p>
+                {loading ? (
+                    <Skeleton className="h-16 w-full" />
+                ) : (
+                    <>
+                        <ChipList
+                            entries={current}
+                            placeholder="203.0.113.4 or 203.0.113.0/24"
+                            disabled={pending}
+                            validate={validAddress}
+                            invalidMessage="Enter an IP address or a CIDR range."
+                            onChange={setDraft}
+                        />
+                        {canAddSelf ? (
+                            <button
+                                type="button"
+                                disabled={pending}
+                                onClick={() => save([...current, callerIp])}
+                                className="w-fit text-xs text-primary underline-offset-2 hover:underline disabled:opacity-50"
+                            >
+                                Trust this device (<span className="font-mono">{callerIp}</span>)
+                            </button>
+                        ) : null}
+                    </>
+                )}
+                {error ? <p className="text-xs text-danger">{error}</p> : null}
+            </CardBody>
+        </Card>
+    );
+}
+
+function IntelPanel() {
     return (
         <Card>
             <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                     <Globe className="size-4 text-muted-foreground" />
-                    Threat intelligence
+                    Reputation providers
                 </CardTitle>
             </CardHeader>
-            <CardBody className="flex flex-col gap-3">
-                {loading ? (
-                    <Skeleton className="h-16 w-full" />
-                ) : (
-                    <div className="flex items-start justify-between gap-3 rounded-md border border-border px-3 py-2.5">
-                        <div className="min-w-0">
-                            <div className="text-sm">Block the Tor network</div>
-                            <p className="mt-0.5 text-xs text-muted-foreground">
-                                Refuses every Tor exit node. The list is fetched hourly and held at the edge, so a
-                                request is never delayed by looking one up.
-                            </p>
-                            {/* Only once there is a list. Between switching it on and
-                                the first fetch landing there is no count to show, and
-                                "0 exit nodes" would read as a broken feed. */}
-                            {tor?.enabled && tor.count > 0 ? (
-                                <p className="mt-1 text-xs text-muted-foreground">
-                                    {grouped(tor.count)} exit nodes
-                                    {tor.fetchedAt ? `, updated ${format.dateTime(tor.fetchedAt)}` : ""}
-                                </p>
-                            ) : null}
-                            {tor?.error ? (
-                                <p className="mt-1 flex items-start gap-1.5 text-xs text-warning">
-                                    <TriangleAlert className="mt-0.5 size-3 shrink-0" />
-                                    Last refresh failed ({tor.error}). The previous list is still being enforced.
-                                </p>
-                            ) : null}
-                        </div>
-                        <Switch
-                            checked={tor?.enabled ?? false}
-                            aria-label="Block the Tor network"
-                            onChange={(on) =>
-                                mutate(
-                                    (current) => ({
-                                        ...current,
-                                        tor: { count: 0, fetchedAt: null, error: null, ...current.tor, enabled: on }
-                                    }),
-                                    () => setTorBlockedAction(on)
-                                )
-                            }
-                        />
-                    </div>
-                )}
+            <CardBody>
                 <p className="text-xs text-muted-foreground">
-                    Reputation providers block addresses already known for scanning or attacks. Connect{" "}
+                    Blocks addresses already known for scanning or attacks. Connect{" "}
                     <Link href="/integrations" className="text-primary underline-offset-2 hover:underline">
                         Dymo API or Criminal IP
                     </Link>{" "}

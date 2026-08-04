@@ -62,6 +62,19 @@ export async function getWafFeed(id: string) {
     return prisma.wafIpFeed.findUnique({ where: { id } });
 }
 
+/**
+ * Whether a feed is enforced, given its row or the absence of one.
+ *
+ * Absence means on. Nothing legitimate reaches a home server from a Tor exit node, and
+ * a protection that only exists once somebody finds the switch protects the people who
+ * were already looking. An operator who wants Tor traffic turns it off and the row
+ * records that, which is why absence can safely be read as the default rather than as
+ * "never decided".
+ */
+export function wafFeedEnabled(feed: { readonly enabled: boolean } | null): boolean {
+    return feed?.enabled ?? true;
+}
+
 /** Turn a feed on or off. Turning it on refreshes immediately so the operator sees
  *  a count rather than an empty list they have to wait out. */
 export async function setWafFeedEnabled(id: string, enabled: boolean): Promise<void> {
@@ -81,8 +94,8 @@ export async function setWafFeedEnabled(id: string, enabled: boolean): Promise<v
  */
 export async function refreshWafFeeds(force = false): Promise<void> {
     const feed = await prisma.wafIpFeed.findUnique({ where: { id: TOR_FEED_ID } });
-    if (!feed?.enabled) return;
-    const age = feed.fetchedAt ? Date.now() - feed.fetchedAt.getTime() : Infinity;
+    if (!wafFeedEnabled(feed)) return;
+    const age = feed?.fetchedAt ? Date.now() - feed.fetchedAt.getTime() : Infinity;
     if (!force && age < FEED_TTL_MS) return;
     try {
         const response = await fetch(TOR_EXIT_LIST_URL, {
@@ -95,14 +108,20 @@ export async function refreshWafFeeds(force = false): Promise<void> {
             .map((line) => line.trim())
             .filter((line) => line !== "" && !line.startsWith("#"));
         if (entries.length === 0) throw new Error("the exit list came back empty");
-        await prisma.wafIpFeed.update({
+        // Upserted rather than updated: the feed is on before anyone has saved a row
+        // for it, so the first successful fetch is what creates one.
+        const fetched = { entries: JSON.stringify(entries), fetchedAt: new Date(), error: null };
+        await prisma.wafIpFeed.upsert({
             where: { id: TOR_FEED_ID },
-            data: { entries: JSON.stringify(entries), fetchedAt: new Date(), error: null }
+            create: { id: TOR_FEED_ID, enabled: true, ...fetched },
+            update: fetched
         });
     } catch (caught) {
-        await prisma.wafIpFeed.update({
+        const message = caught instanceof Error ? caught.message : "the refresh failed";
+        await prisma.wafIpFeed.upsert({
             where: { id: TOR_FEED_ID },
-            data: { error: caught instanceof Error ? caught.message : "the refresh failed" }
+            create: { id: TOR_FEED_ID, enabled: true, error: message },
+            update: { error: message }
         });
     }
 }
@@ -283,7 +302,7 @@ export async function publishWafIntel(): Promise<void> {
     }
 
     const feed = await prisma.wafIpFeed.findUnique({ where: { id: TOR_FEED_ID } });
-    if (feed?.enabled) {
+    if (feed && wafFeedEnabled(feed)) {
         for (const ip of parseEntries(feed.entries)) {
             // A jail ban says more than "this is a Tor exit", so it wins the slot.
             entries.push([ip, { reason: "tor", until: null }]);

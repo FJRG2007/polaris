@@ -10,6 +10,7 @@
 
 import { readFile } from "node:fs/promises";
 import { parseHttpLogs } from "@polaris/deploy";
+import { wafTrustedAddresses } from "@/lib/waf-ban-service";
 import { getSetting, setSetting } from "@/lib/setting-store";
 import { recordWafBan, publishWafIntel } from "@/lib/waf-intel-service";
 import { detectWafAnomalies, type WafAnomaly, type WafAnomalyOptions } from "@polaris/core";
@@ -65,14 +66,22 @@ export async function setWafAnomalySettings(settings: WafAnomalySettings): Promi
     await setSetting(SETTINGS_KEY, JSON.stringify(settings));
 }
 
-/** What the detector currently sees. Empty when it is switched off or there is no
- *  edge log to read, which the panel reports as such rather than as "all clear". */
+/**
+ * What the detector currently sees. Empty when it is switched off or there is no edge
+ * log to read, which the panel reports as such rather than as "all clear".
+ *
+ * The trusted addresses are passed through rather than filtered out afterwards: an
+ * operator's own address is the heaviest legitimate user of their own instance, and
+ * against a route's ordinary visitor that reads as a flood. Reporting it and then
+ * hiding the finding would still ban it when automatic blocking is on.
+ */
 export async function currentWafAnomalies(now = Date.now()): Promise<WafAnomaly[]> {
     const settings = await getWafAnomalySettings();
     if (!settings.enabled) return [];
     const raw = await readLogTail();
     if (!raw) return [];
-    return detectWafAnomalies(parseHttpLogs(raw), now - WINDOW_MS, now, settings);
+    const exempt = await wafTrustedAddresses();
+    return detectWafAnomalies(parseHttpLogs(raw), now - WINDOW_MS, now, { ...settings, exempt });
 }
 
 /**

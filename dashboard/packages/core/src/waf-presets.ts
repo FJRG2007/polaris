@@ -229,7 +229,7 @@ export const WAF_PRESETS: readonly WafPreset[] = [
     {
         id: "scanners",
         label: "Block vulnerability scanners",
-        description: "Blocks agents that exist to probe for holes - sqlmap, nikto, nmap, wpscan and the like.",
+        description: "Blocks sqlmap, nikto, nmap, wpscan and the rest of the probing agents.",
         defaultAt: "instance",
         rules: [
             {
@@ -249,8 +249,7 @@ export const WAF_PRESETS: readonly WafPreset[] = [
     {
         id: "dotfiles",
         label: "Block exposed secrets and dotfiles",
-        description:
-            "Blocks requests for .env, .git, SSH keys, database dumps and editor folders. Certificate validation under /.well-known/ still gets through.",
+        description: "Blocks requests for .env, .git, SSH keys, database dumps and editor folders.",
         defaultAt: "instance",
         rules: [
             {
@@ -273,8 +272,7 @@ export const WAF_PRESETS: readonly WafPreset[] = [
     {
         id: "directory-listing",
         label: "Block directory listing",
-        description:
-            "Refuses the two ways a served directory listing gets used: the sort links a listing page generates, and reads of directories that should never be browsable at all.",
+        description: "Blocks the sort links a listing page generates, and reads of directories nothing should browse.",
         defaultAt: "instance",
         rules: [
             {
@@ -297,10 +295,9 @@ export const WAF_PRESETS: readonly WafPreset[] = [
     {
         id: "admin-panels",
         label: "Block exposed admin panels",
-        description:
-            "Blocks probes for Adminer, pgAdmin, Portainer, Jenkins, Grafana, Spring Actuator and the Kubernetes API - the front-ends an attacker checks for before anything else.",
+        description: "Blocks probes for Adminer, pgAdmin, Portainer, Jenkins, Grafana and the Kubernetes API.",
         defaultAt: "instance",
-        caution: "Turn this off on a scope that is deliberately serving one of these.",
+        caution: "Turn it off on a scope that deliberately serves one of these.",
         rules: [
             {
                 name: "Admin panel paths",
@@ -313,8 +310,7 @@ export const WAF_PRESETS: readonly WafPreset[] = [
     {
         id: "cms-probes",
         label: "Block WordPress and PHP probing",
-        description:
-            "Blocks /wp-admin, /phpmyadmin, .php and the rest of the standard exploit sweep. On a service that does not run PHP, a request for any of them is never a visitor.",
+        description: "Blocks /wp-admin, /phpmyadmin, .php and the rest of the standard exploit sweep.",
         defaultAt: "application",
         wrongFor: ["php", "wordpress"],
         rules: [
@@ -335,9 +331,9 @@ export const WAF_PRESETS: readonly WafPreset[] = [
     {
         id: "ai-crawlers",
         label: "Block AI crawlers",
-        description: "Blocks GPTBot, ClaudeBot, PerplexityBot, Bytespider and other model and answer-engine agents.",
+        description: "Blocks GPTBot, ClaudeBot, PerplexityBot and other model and answer-engine agents.",
         defaultAt: null,
-        caution: "Well-behaved agents identify themselves honestly; one that lies about its user agent is not stopped by this.",
+        caution: "Only stops agents that identify themselves honestly.",
         rules: [
             {
                 name: "AI crawler user agents",
@@ -352,7 +348,7 @@ export const WAF_PRESETS: readonly WafPreset[] = [
         label: "Block search engine crawlers",
         description: "Blocks Googlebot, bingbot, Slurp, LinkedInBot and other indexers.",
         defaultAt: null,
-        caution: "This removes the service from search results. Turn it on for something private, not for a public site.",
+        caution: "Removes the service from search results. For something private, not a public site.",
         rules: [
             {
                 name: "Search crawler user agents",

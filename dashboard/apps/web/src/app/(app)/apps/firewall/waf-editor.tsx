@@ -27,17 +27,18 @@
  * on screen.
  */
 
+import Fuse from "fuse.js";
 import { RuleList } from "./rule-list";
 import { Section } from "./page-parts";
 import { ruleDescription } from "./rule-language";
 import { Loader2, Mail, Search } from "lucide-react";
 import { ManagedRulePage } from "./managed-rule-page";
 import { useCallback, useEffect, useState } from "react";
+import type { WafInheritedView } from "@/lib/waf-service";
 import { Input, Select, Skeleton, Switch } from "@polaris/ui";
 import { AddressRulesPage, LoginRulePage } from "./access-rules";
 import { emptyRule, RuleEditor, type RulePosition } from "./rule-editor";
 import { PredefinedRuleList, type PredefinedRuleRow } from "./predefined-list";
-import { getWafRuleAction, getWafRuleMatchesAction, setWafRuleAction, type WafRuleMatches, type WafScopeRule } from "./actions";
 import {
     WAF_MANAGED_RULES,
     WAF_RULES_MAX,
@@ -46,6 +47,15 @@ import {
     type WafManagedRule,
     type WafScopeType
 } from "@polaris/core";
+import {
+    getWafRuleAction,
+    getWafRuleMatchesAction,
+    setTorBlockedAction,
+    setWafRuleAction,
+    type WafFeedView,
+    type WafRuleMatches,
+    type WafScopeRule
+} from "./actions";
 
 /** The scope as nothing has ever been written to it. The injection checks and
  *  obfuscation are on here for the same reason they are on in the schema: that is the
@@ -73,20 +83,80 @@ type View =
     | { readonly kind: "addresses" }
     | { readonly kind: "login" };
 
-/** Whether the scope currently enforces a predefined rule. */
-function managedEnabled(rule: WafManagedRule, saved: WafScopeRule): boolean {
-    return rule.control.kind === "preset"
-        ? saved.presets.includes(rule.control.preset)
-        : saved[rule.control.setting];
+/** Whether this scope's own rule arms a predefined rule. A feed is not stored on a
+ *  scope at all, so it answers from the instance switch. */
+function managedEnabled(rule: WafManagedRule, saved: WafScopeRule, tor: WafFeedView | null): boolean {
+    if (rule.control.kind === "preset") return saved.presets.includes(rule.control.preset);
+    if (rule.control.kind === "feed") return tor?.enabled ?? false;
+    return saved[rule.control.setting];
 }
 
 /** The patch that switches one on or off, whichever half of the scope holds it. */
 function managedPatch(rule: WafManagedRule, saved: WafScopeRule, on: boolean): Partial<WafScopeRule> {
     if (rule.control.kind === "setting") return { [rule.control.setting]: on };
+    if (rule.control.kind === "feed") return {};
     const preset = rule.control.preset;
     return {
         presets: on ? [...saved.presets, preset] : saved.presets.filter((id) => id !== preset)
     };
+}
+
+/** Said once, because the row and the rule's own page both say it. */
+const ARMED_ABOVE = {
+    label: "From a broader scope",
+    why: "A scope above this one arms it, and a narrower scope cannot switch a refusal off. Write an allow rule above it to carve out an exception."
+};
+
+const OFF_ABOVE = {
+    label: "Off above",
+    why: "A scope above this one switched it off for everything it covers, and a narrower scope cannot switch it back on."
+};
+
+const INSTANCE_FEED = {
+    label: "Instance-wide",
+    why: "One switch for the whole instance: the edge refuses the address before it knows which service was asked for. Open the rule to change it."
+};
+
+/**
+ * Who decides this rule, when it is not this scope.
+ *
+ * Without it every managed rule on a project reads "Off" while the instance-wide
+ * default is refusing scanners on its behalf - a switch saying the opposite of what is
+ * happening. The two directions are not symmetric because the rules are not: a pack and
+ * the integrity check union downward, so a broader scope can only turn them ON; the
+ * injection checks intersect, so a broader scope can only turn them OFF.
+ *
+ * Nothing is returned when this scope also holds the setting itself - the switch stays
+ * live so it can be cleared, and the row falls back to this state once it is.
+ */
+function decidedElsewhere(
+    rule: WafManagedRule,
+    saved: WafScopeRule,
+    inherited: WafInheritedView | null,
+    tor: WafFeedView | null,
+    canOperate: boolean
+): { on: boolean; label: string; why: string } | undefined {
+    if (rule.control.kind === "feed") {
+        // Never switched from the row: an operator changes it on the rule's own page,
+        // where the size of the list and "this applies everywhere" are on screen with
+        // the switch. Flipping the whole instance from a project's row is not something
+        // to do in passing.
+        return {
+            on: tor?.enabled ?? false,
+            ...INSTANCE_FEED,
+            why: canOperate ? INSTANCE_FEED.why : "Set by whoever runs this instance."
+        };
+    }
+    if (!inherited) return undefined;
+    if (rule.control.kind === "preset") {
+        if (saved.presets.includes(rule.control.preset)) return undefined;
+        return inherited.presets.includes(rule.control.preset) ? { on: true, ...ARMED_ABOVE } : undefined;
+    }
+    if (rule.control.setting === "browserIntegrity") {
+        if (saved.browserIntegrity) return undefined;
+        return inherited.browserIntegrity ? { on: true, ...ARMED_ABOVE } : undefined;
+    }
+    return inherited[rule.control.setting] ? undefined : { on: false, ...OFF_ABOVE };
 }
 
 export function WafEditor({
@@ -98,17 +168,30 @@ export function WafEditor({
     offerLogin = true,
     /** An address to suggest adding to the allowlist - the one the page is being read
      *  over, so an operator narrowing access does not narrow themselves out of it. */
-    callerIp
+    callerIp,
+    /** Whether the reader runs the instance. Only they can change something that is
+     *  one switch for all of it, which the Tor list is. */
+    canOperate = false,
+    /** Traffic, bans and jails, which are instance-wide and belong under the rule list
+     *  rather than under whichever rule happens to be open. Rendered by the caller
+     *  because it is a server component; shown here only on the list. */
+    instancePanels
 }: {
     scopeType: WafScopeType;
     scopeId: string;
     description?: string;
     offerLogin?: boolean;
     callerIp?: string | null;
+    canOperate?: boolean;
+    instancePanels?: React.ReactNode;
 }) {
     // What the server holds. Every immediate change is composed against this, so a
     // half-typed address list can never ride along with a switch.
     const [saved, setSaved] = useState<WafScopeRule | null>(null);
+    // What the scopes above this one already enforce, and the instance-wide feeds.
+    // Read with the rule because a row cannot be drawn honestly without them.
+    const [inherited, setInherited] = useState<WafInheritedView | null>(null);
+    const [tor, setTor] = useState<WafFeedView | null>(null);
     const [view, setView] = useState<View>({ kind: "list" });
     const [error, setError] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
@@ -126,6 +209,8 @@ export function WafEditor({
     useEffect(() => {
         let active = true;
         setSaved(null);
+        setInherited(null);
+        setTor(null);
         setError(null);
         setView({ kind: "list" });
         setAddresses(null);
@@ -133,6 +218,8 @@ export function WafEditor({
         void getWafRuleAction({ scopeType, scopeId }).then((result) => {
             if (!active) return;
             setSaved(result.rule ?? BLANK);
+            setInherited(result.inherited ?? null);
+            setTor(result.tor ?? null);
             if (result.error) setError(result.error);
         });
         void getWafRuleMatchesAction({ scopeType, scopeId }).then((result) => {
@@ -172,6 +259,28 @@ export function WafEditor({
         [scopeType, scopeId]
     );
 
+    /**
+     * Switch a feed on or off. Its own path rather than `persist`, because it is not
+     * part of any scope's rule: the edge holds the list in memory and refuses an
+     * address before it knows which service was asked for.
+     */
+    const persistTor = useCallback((on: boolean) => {
+        setTor((current) => {
+            const previous = current;
+            setError(null);
+            setBusy(true);
+            void setTorBlockedAction(on)
+                .then((result) => {
+                    if (result.error) {
+                        setTor(previous);
+                        setError(result.error);
+                    }
+                })
+                .finally(() => setBusy(false));
+            return { count: 0, fetchedAt: null, error: null, ...current, enabled: on };
+        });
+    }, []);
+
     if (!saved) return <LoadingShape />;
 
     const backToList = (): void => setView({ kind: "list" });
@@ -198,13 +307,20 @@ export function WafEditor({
         // A pack this build no longer ships can still be named by a saved scope. The
         // list does not offer a row for it, so getting here means a stale link.
         if (!rule) return <MissingRule onBack={backToList} />;
+        const feed = rule.control.kind === "feed";
         return (
             <ManagedRulePage
                 rule={rule}
-                enabled={managedEnabled(rule, saved)}
-                disabled={busy}
+                enabled={managedEnabled(rule, saved, tor)}
+                disabled={busy || (feed && !canOperate)}
+                // A feed is the one rule this page can change instance-wide, so the
+                // switch stays live here for an operator - the row does not offer it.
+                decidedElsewhere={
+                    feed && canOperate ? undefined : decidedElsewhere(rule, saved, inherited, tor, canOperate)
+                }
+                feed={feed ? (tor ?? { count: 0, fetchedAt: null, error: null }) : undefined}
                 onBack={backToList}
-                onToggle={(on) => persist(managedPatch(rule, saved, on))}
+                onToggle={(on) => (feed ? persistTor(on) : persist(managedPatch(rule, saved, on)))}
                 onCreateException={() =>
                     setView({
                         kind: "custom",
@@ -260,28 +376,11 @@ export function WafEditor({
         addresses !== null &&
         JSON.stringify([addresses.allow, addresses.deny]) !== JSON.stringify([saved.ipAllowlist, saved.ipDenylist]);
 
-    /** Whether a row survives the search box and the status filter. */
-    const shown = (name: string, description: string, enabled: boolean | null): boolean => {
-        const needle = search.trim().toLowerCase();
-        if (needle && !`${name} ${description}`.toLowerCase().includes(needle)) return false;
-        if (status === "all" || enabled === null) return true;
-        return status === "active" ? enabled : !enabled;
-    };
-
-    const hiddenRules = new Set(
-        saved.rules
-            .map((rule, index) => ({ rule, index }))
-            .filter(({ rule }) => !shown(rule.name, ruleDescription(rule), rule.enabled))
-            .map(({ index }) => index)
-    );
-    const filtering = search.trim() !== "" || status !== "all";
-
     const accessRows: PredefinedRuleRow[] = [
         {
             id: "addresses",
             name: "IP access rules",
-            description:
-                "Addresses this scope admits and addresses it refuses. A denied address is blocked everywhere, including on its way to a login.",
+            description: "Addresses this scope admits, and addresses it refuses before anything else is checked.",
             action: { label: "Access", variant: "neutral" },
             enabled: null,
             // Enforced before any rule is evaluated, so there is nothing to replay.
@@ -297,8 +396,7 @@ export function WafEditor({
                   {
                       id: "login",
                       name: "Require a Polaris login",
-                      description:
-                          "Visitors must sign in to Polaris to reach the service, and the rule can name which accounts, groups or roles it admits.",
+                      description: "Visitors sign in to Polaris first, and the rule can name which accounts it admits.",
                       action: { label: "Login", variant: "neutral" as const },
                       enabled: saved.requireLogin,
                       activity: null
@@ -306,6 +404,65 @@ export function WafEditor({
               ]
             : [])
     ];
+
+    const managedRows: PredefinedRuleRow[] = WAF_MANAGED_RULES.map((rule) => ({
+        id: rule.id,
+        name: rule.label,
+        description: rule.description,
+        action: { label: "Block", variant: "danger" as const },
+        enabled: managedEnabled(rule, saved, tor),
+        decidedElsewhere: decidedElsewhere(rule, saved, inherited, tor, canOperate),
+        caution: rule.caution,
+        // A signature check and a fetched list have no conditions to replay, so there
+        // is nothing honest to draw for them.
+        activity: rule.rules.length === 0 ? null : matches?.[rule.id]
+    }));
+
+    /**
+     * The search, over every row on the screen at once.
+     *
+     * Fuzzy rather than a substring test: the rules are named in the operator's second
+     * language as often as their first, and "scaner"/"wordpres"/"tor exit" all have to
+     * find the row somebody meant. Rebuilt each render rather than memoised - it is a
+     * few dozen short strings, and a stale index would silently stop finding a rule
+     * that was just renamed.
+     */
+    const needle = search.trim();
+    const found =
+        needle === ""
+            ? null
+            : new Set(
+                  new Fuse(
+                      [
+                          ...saved.rules.map((rule, index) => ({
+                              key: `custom:${index}`,
+                              name: rule.name,
+                              description: ruleDescription(rule)
+                          })),
+                          ...accessRows.map((row) => ({ key: `row:${row.id}`, name: row.name, description: row.description })),
+                          ...managedRows.map((row) => ({ key: `row:${row.id}`, name: row.name, description: row.description }))
+                      ],
+                      { keys: ["name", "description"], threshold: 0.35, ignoreLocation: true, minMatchCharLength: 2 }
+                  )
+                      .search(needle)
+                      .map((hit) => hit.item.key)
+              );
+
+    /** Whether a row survives the search and the status filter. `enabled` is what is
+     *  actually being enforced, so "Off only" does not list a rule armed from above. */
+    const shown = (key: string, enabled: boolean | null): boolean => {
+        if (found && !found.has(key)) return false;
+        if (status === "all" || enabled === null) return true;
+        return status === "active" ? enabled : !enabled;
+    };
+
+    const hiddenRules = new Set(
+        saved.rules
+            .map((rule, index) => ({ rule, index }))
+            .filter(({ rule, index }) => !shown(`custom:${index}`, rule.enabled))
+            .map(({ index }) => index)
+    );
+    const filtering = needle !== "" || status !== "all";
 
     return (
         <div className="flex flex-col gap-4">
@@ -357,33 +514,27 @@ export function WafEditor({
 
             <PredefinedRuleList
                 title="Access rules"
-                hint="Who reaches this scope at all, by address and by account. Both are checked before any rule above."
+                hint="Who reaches this scope at all. Both are checked before any rule above."
                 canEdit={!busy}
                 onOpen={(id) => setView(id === "addresses" ? { kind: "addresses" } : { kind: "login" })}
                 onToggle={(_, on) => persist({ requireLogin: on })}
-                rows={accessRows.filter((row) => shown(row.name, row.description, row.enabled))}
+                rows={accessRows.filter((row) => shown(`row:${row.id}`, row.enabled))}
             />
 
             <PredefinedRuleList
                 title="Managed rules"
-                hint="Signatures and lists Polaris keeps up to date. Open one to read the conditions it enforces. A rule enabled on a broader scope also applies here."
+                hint="Signatures and lists Polaris keeps up to date. Open one to read what it enforces."
                 canEdit={!busy}
                 onOpen={(id) => setView({ kind: "managed", id })}
                 onToggle={(id, on) => {
                     const rule = wafManagedRule(id);
-                    if (rule) persist(managedPatch(rule, saved, on));
+                    // A feed is not part of any scope's rule, and its row never offers
+                    // the switch - persisting the scope for it would be a no-op write.
+                    if (rule && rule.control.kind !== "feed") persist(managedPatch(rule, saved, on));
                 }}
-                rows={WAF_MANAGED_RULES.map((rule) => ({
-                    id: rule.id,
-                    name: rule.label,
-                    description: rule.description,
-                    action: { label: "Block", variant: "danger" as const },
-                    enabled: managedEnabled(rule, saved),
-                    caution: rule.caution,
-                    // A signature check has no conditions to replay, so there is
-                    // nothing honest to draw for it.
-                    activity: rule.rules.length === 0 ? null : matches?.[rule.id]
-                })).filter((row) => shown(row.name, row.description, row.enabled))}
+                rows={managedRows.filter((row) =>
+                    shown(`row:${row.id}`, row.decidedElsewhere ? row.decidedElsewhere.on : row.enabled)
+                )}
             />
 
             <Section
@@ -396,10 +547,9 @@ export function WafEditor({
                         <div className="min-w-0">
                             <div className="text-sm">Email address obfuscation</div>
                             <p className="mt-0.5 text-xs text-muted-foreground">
-                                Replaces email addresses in served HTML with an encoded token the page decodes in the
-                                browser, so the address is not in the source. Visitors see no change. It stops
-                                harvesters that read source without running JavaScript, which is most of them; one
-                                driving a real browser still reads it.
+                                Replaces email addresses in served HTML with a token the page decodes in the browser,
+                                so the address is not in the source. Visitors see no change. A harvester driving a real
+                                browser still reads it.
                             </p>
                         </div>
                     </div>
@@ -418,6 +568,11 @@ export function WafEditor({
                     ? "Applies to the public domains Polaris answers on. The local network name is served separately and stays reachable."
                     : "The local edge applies changes instantly; a service on a remote server picks them up on its next deploy."}
             </p>
+
+            {/* Under the rules rather than under whichever rule is open: what the
+                firewall has been doing is instance-wide, and repeating it below every
+                rule page made it read as part of that rule. */}
+            {instancePanels}
         </div>
     );
 }

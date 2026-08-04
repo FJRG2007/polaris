@@ -491,6 +491,107 @@ export async function getWafRule(
     };
 }
 
+/**
+ * What a scope is already enforcing because something above it says so.
+ *
+ * The editor writes one scope's own row, so without this every managed rule on a
+ * project reads "Off" while the instance-wide default is refusing scanners on its
+ * behalf - a switch that says the opposite of what is happening, which is the one thing
+ * a firewall screen must never do.
+ *
+ * The two directions are not symmetric, because the rules are not: a pack or the
+ * integrity check unions downward (true here means armed above and unstoppable from
+ * here), while the injection checks and obfuscation intersect (false here means a
+ * broader scope switched it off and this one cannot switch it back on).
+ */
+export interface WafInheritedView {
+    readonly presets: string[];
+    readonly browserIntegrity: boolean;
+    readonly requireLogin: boolean;
+    readonly sqlInjectionProtection: boolean;
+    readonly xssProtection: boolean;
+    readonly emailObfuscation: boolean;
+}
+
+/** Nothing above it: the two instance-wide scopes, and any scope whose parents are
+ *  all unwritten. */
+const NOTHING_INHERITED: WafInheritedView = {
+    presets: [],
+    browserIntegrity: false,
+    requireLogin: false,
+    sqlInjectionProtection: true,
+    xssProtection: true,
+    emailObfuscation: true
+};
+
+/**
+ * The scopes strictly above this one, resolved into a single view.
+ *
+ * `polaris` and `global` inherit nothing - one is the dashboard's own ingress and takes
+ * no part in a service's merge, the other is the top of that merge. Everything else
+ * gets the global row (real or defaulted) plus whichever of its parents exist.
+ */
+export async function getWafInherited(
+    ownerId: string,
+    scopeType: WafScopeType,
+    scopeId: string
+): Promise<WafInheritedView> {
+    await assertScopeOwner(ownerId, scopeType, scopeId);
+    if (scopeType === "polaris" || scopeType === "global") return NOTHING_INHERITED;
+
+    // Which parents to look for. An application is the only scope with more than one,
+    // and the machine it runs on is reached through its target rather than its project.
+    const filters: { scopeType: WafScopeType; scopeId: string }[] = [];
+    if (scopeType === "server" || scopeType === "application") {
+        const hostId =
+            scopeType === "server"
+                ? scopeId
+                : ((
+                      await prisma.application.findUnique({
+                          where: { id: scopeId },
+                          select: { target: { select: { hostId: true } } }
+                      })
+                  )?.target?.hostId ?? null);
+        if (hostId) {
+            if (scopeType === "application") filters.push({ scopeType: "server", scopeId: hostId });
+            for (const groupId of (await groupsOfHosts([hostId])).get(hostId) ?? []) {
+                filters.push({ scopeType: "server-group", scopeId: groupId });
+            }
+        }
+    }
+    if (scopeType === "environment") {
+        const environment = await prisma.environment.findUnique({
+            where: { id: scopeId },
+            select: { projectId: true }
+        });
+        if (environment) filters.push({ scopeType: "project", scopeId: environment.projectId });
+    }
+    if (scopeType === "application") {
+        const app = await prisma.application.findUnique({
+            where: { id: scopeId },
+            select: { environmentId: true, environment: { select: { projectId: true } } }
+        });
+        if (app) {
+            filters.push({ scopeType: "project", scopeId: app.environment.projectId });
+            filters.push({ scopeType: "environment", scopeId: app.environmentId });
+        }
+    }
+
+    const rows = await prisma.wafRule.findMany({
+        where: { OR: [{ scopeType: "global", scopeId: "" }, ...filters] },
+        select: RULE_SELECT
+    });
+    const merged = mergeRules(withInstanceDefaults(rows));
+    return {
+        presets: [...merged.presets],
+        browserIntegrity: merged.browserIntegrity,
+        requireLogin: merged.requireLogin,
+        sqlInjectionProtection: merged.sqlInjectionProtection,
+        xssProtection: merged.xssProtection,
+        emailObfuscation: merged.emailObfuscation
+    };
+}
+
 /** Set once the dashboard's scope has been brought up to the full pack list, so it is
  *  brought up exactly once and an operator who then switches something off keeps it
  *  switched off. */

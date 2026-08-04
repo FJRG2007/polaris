@@ -13,11 +13,11 @@
  * further and never loosen.
  */
 
+import { WafEditor } from "./waf-editor";
 import { notFound } from "next/navigation";
 import { ScopePicker } from "./scope-picker";
 import { listHosts } from "@/lib/host-service";
 import { clientIp } from "@/lib/request-context";
-import { WafEditor } from "./waf-editor";
 import { listProjectScopes } from "@/lib/deploy-service";
 import { listHostGroups } from "@/lib/host-group-service";
 import { FirewallInstancePanels } from "./instance-panels";
@@ -101,6 +101,9 @@ export default async function FirewallPage({
         notFound();
     }
     const label = options.find((option) => option.id === scopeId)?.label ?? "";
+    // Read once: the editor offers it for the allowlist, and the anomaly panel marks
+    // the reader's own address so a finding about themselves reads as one.
+    const callerIp = (await clientIp()) ?? null;
 
     return (
         <div className="mx-auto flex w-full max-w-5xl flex-col gap-5">
@@ -133,14 +136,16 @@ export default async function FirewallPage({
                     // Polaris has a login of its own; sending its visitors round the
                     // guard's cross-domain handoff to reach it would be a loop.
                     offerLogin={kind !== "polaris"}
-                    callerIp={(await clientIp()) ?? null}
+                    callerIp={callerIp}
+                    canOperate={canOperate}
+                    // Traffic, bans and jails are instance-wide however narrow the scope
+                    // above happens to be, so they are shown to whoever runs the instance
+                    // rather than to a project's members. Handed to the editor rather
+                    // than rendered beside it: they belong under the rule LIST, and a
+                    // rule opened from it is a page of its own.
+                    instancePanels={canOperate ? <FirewallInstancePanels callerIp={callerIp} /> : null}
                 />
             )}
-
-            {/* Traffic, bans, jails and intelligence feeds are instance-wide however
-                narrow the scope above happens to be, so they are shown to whoever runs
-                the instance rather than to a project's members. */}
-            {canOperate ? <FirewallInstancePanels /> : null}
         </div>
     );
 }
