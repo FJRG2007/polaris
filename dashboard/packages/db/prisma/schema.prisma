@@ -2860,8 +2860,9 @@ model TaskStatus {
     id        String   @id @default(uuid(7)) @db.Uuid
     spaceId   String   @db.Uuid
     name      String
-    // open | active | done | closed - the kind the product reasons about, so
-    // "is this finished" never depends on the name somebody typed.
+    // See TASK_STATUS_TYPES in @polaris/core: open | active | blocked | done |
+    // closed - the kind the product reasons about, so "is this finished" and
+    // "is this held up" never depend on the name somebody typed.
     type      String   @default("open")
     color     String   @default("#64748b")
     order     Float    @default(1024)

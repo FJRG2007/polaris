@@ -6,10 +6,11 @@
 -- filter and was grouped under "Not blocked" - the column said one thing and every
 -- other screen said the opposite.
 --
--- Only the stage the previous migration created is converted. A team that named their
--- own stage something else is left alone: the kind is a claim about what a stage means,
--- and guessing it from a name is exactly what the kind exists to stop. They can say so
--- themselves on the stage editor, which now offers Blocked alongside the other kinds.
+-- Only the stage the previous migration created is converted, matched on the three
+-- values it wrote and nothing else. A stage a team made itself is left alone: the kind
+-- is a claim about what a stage means, and guessing it from a name is exactly what the
+-- kind exists to stop. They can say so themselves on the stage editor, which now offers
+-- Blocked alongside the other kinds.
 UPDATE "TaskStatus"
 SET "type" = 'blocked'
-WHERE lower("name") = 'blocked' AND "type" = 'open';
+WHERE "name" = 'Blocked' AND "type" = 'open' AND "color" = '#ef4444';

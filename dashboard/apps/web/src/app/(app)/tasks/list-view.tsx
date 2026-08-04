@@ -652,7 +652,7 @@ export function ListScreen({
                 </p>
             )}
 
-            {selection.size > 0 && (
+            {selected.length > 0 && (
                 <div className="flex flex-wrap items-center gap-2 rounded-lg border border-primary/40 bg-primary/5 px-3 py-2">
                     <span className="text-sm font-medium">{selected.length} selected</span>
                     {/* The same verbs the right-click menu applies, through the
