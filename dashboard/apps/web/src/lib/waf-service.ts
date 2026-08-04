@@ -540,23 +540,30 @@ export async function getWafInherited(
     if (scopeType === "polaris" || scopeType === "global") return NOTHING_INHERITED;
 
     // Which parents to look for. An application is the only scope with more than one,
-    // and the machine it runs on is reached through its target rather than its project.
+    // and the machine it runs on is reached through its target rather than its project -
+    // so it is read in the same query as its environment and project, the way resolveWaf
+    // already does, rather than in a second round trip for the host alone.
     const filters: { scopeType: WafScopeType; scopeId: string }[] = [];
-    if (scopeType === "server" || scopeType === "application") {
-        const hostId =
-            scopeType === "server"
-                ? scopeId
-                : ((
-                      await prisma.application.findUnique({
-                          where: { id: scopeId },
-                          select: { target: { select: { hostId: true } } }
-                      })
-                  )?.target?.hostId ?? null);
-        if (hostId) {
-            if (scopeType === "application") filters.push({ scopeType: "server", scopeId: hostId });
-            for (const groupId of (await groupsOfHosts([hostId])).get(hostId) ?? []) {
-                filters.push({ scopeType: "server-group", scopeId: groupId });
+    let hostId: string | null = scopeType === "server" ? scopeId : null;
+    if (scopeType === "application") {
+        const app = await prisma.application.findUnique({
+            where: { id: scopeId },
+            select: {
+                environmentId: true,
+                environment: { select: { projectId: true } },
+                target: { select: { hostId: true } }
             }
+        });
+        if (app) {
+            hostId = app.target?.hostId ?? null;
+            if (hostId) filters.push({ scopeType: "server", scopeId: hostId });
+            filters.push({ scopeType: "project", scopeId: app.environment.projectId });
+            filters.push({ scopeType: "environment", scopeId: app.environmentId });
+        }
+    }
+    if (hostId) {
+        for (const groupId of (await groupsOfHosts([hostId])).get(hostId) ?? []) {
+            filters.push({ scopeType: "server-group", scopeId: groupId });
         }
     }
     if (scopeType === "environment") {
@@ -565,16 +572,6 @@ export async function getWafInherited(
             select: { projectId: true }
         });
         if (environment) filters.push({ scopeType: "project", scopeId: environment.projectId });
-    }
-    if (scopeType === "application") {
-        const app = await prisma.application.findUnique({
-            where: { id: scopeId },
-            select: { environmentId: true, environment: { select: { projectId: true } } }
-        });
-        if (app) {
-            filters.push({ scopeType: "project", scopeId: app.environment.projectId });
-            filters.push({ scopeType: "environment", scopeId: app.environmentId });
-        }
     }
 
     const rows = await prisma.wafRule.findMany({

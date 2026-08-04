@@ -145,6 +145,7 @@ export function AddressRulesPage({
 
 export function LoginRulePage({
     required,
+    requiredAbove = false,
     admitted,
     refused,
     disabled,
@@ -152,12 +153,16 @@ export function LoginRulePage({
     onChange
 }: {
     required: boolean;
+    /** A scope above this one already demands a login. It unions downward, so this
+     *  scope cannot waive it and the switch must not pretend otherwise. */
+    requiredAbove?: boolean;
     admitted: WafPrincipalGrant[];
     refused: WafPrincipalGrant[];
     disabled?: boolean;
     onBack: () => void;
     onChange: (patch: LoginPrincipalsPatch & { requireLogin?: boolean }) => void;
 }) {
+    const on = required || requiredAbove;
     return (
         <div className="flex flex-col gap-4">
             <PageHeader title="Require a Polaris login" onBack={onBack} />
@@ -176,19 +181,25 @@ export function LoginRulePage({
             <Section title="Status" hint="Whether this scope demands a login at all.">
                 <div className="flex items-center gap-3">
                     <Switch
-                        checked={required}
-                        disabled={disabled}
-                        onChange={(on) => onChange({ requireLogin: on })}
-                        aria-label={`${required ? "Stop requiring" : "Require"} a Polaris login`}
+                        checked={on}
+                        disabled={disabled || requiredAbove}
+                        onChange={(next) => onChange({ requireLogin: next })}
+                        aria-label={`${on ? "Stop requiring" : "Require"} a Polaris login`}
                     />
-                    <span className="text-sm">{required ? "A login is required" : "No login is required"}</span>
+                    <span className="text-sm">{on ? "A login is required" : "No login is required"}</span>
                 </div>
+                {requiredAbove ? (
+                    <p className="text-xs text-muted-foreground">
+                        A scope above this one requires a login, and a narrower scope cannot waive it. The lists below
+                        still apply: every scope that names who it admits gets a say.
+                    </p>
+                ) : null}
             </Section>
 
             {/* Only under the switch that gives them meaning. The lists are kept either
                 way, so switching the login off and back on comes back to the same
                 people rather than to everybody. */}
-            {required ? (
+            {on ? (
                 <Section title="Who it admits" hint="Named nobody means anyone with a Polaris account.">
                     <LoginPrincipals admitted={admitted} refused={refused} disabled={disabled} onChange={onChange} />
                 </Section>

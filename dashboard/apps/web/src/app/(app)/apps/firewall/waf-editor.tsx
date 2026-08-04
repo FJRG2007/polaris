@@ -263,23 +263,36 @@ export function WafEditor({
      * Switch a feed on or off. Its own path rather than `persist`, because it is not
      * part of any scope's rule: the edge holds the list in memory and refuses an
      * address before it knows which service was asked for.
+     *
+     * The effects are outside the updater on purpose. An updater runs twice under
+     * StrictMode, and this one is not pure - firing it there sent the action twice, and
+     * with it two audit rows, two forced fetches of the exit list and two publishes.
+     *
+     * Re-read afterwards rather than trusting the optimistic value: arming a feed
+     * fetches the list on the server, so the count and the timestamp only exist after
+     * the round trip. Without this the rule's page kept saying the list had not arrived
+     * while the edge was already enforcing it.
      */
-    const persistTor = useCallback((on: boolean) => {
-        setTor((current) => {
-            const previous = current;
+    const persistTor = useCallback(
+        (on: boolean) => {
+            const previous = tor;
             setError(null);
             setBusy(true);
+            setTor({ count: 0, fetchedAt: null, error: null, ...previous, enabled: on });
             void setTorBlockedAction(on)
-                .then((result) => {
+                .then(async (result) => {
                     if (result.error) {
                         setTor(previous);
                         setError(result.error);
+                        return;
                     }
+                    const fresh = await getWafRuleAction({ scopeType, scopeId });
+                    if (fresh.tor) setTor(fresh.tor);
                 })
                 .finally(() => setBusy(false));
-            return { count: 0, fetchedAt: null, error: null, ...current, enabled: on };
-        });
-    }, []);
+        },
+        [tor, scopeType, scopeId]
+    );
 
     if (!saved) return <LoadingShape />;
 
@@ -318,7 +331,10 @@ export function WafEditor({
                 decidedElsewhere={
                     feed && canOperate ? undefined : decidedElsewhere(rule, saved, inherited, tor, canOperate)
                 }
-                feed={feed ? (tor ?? { count: 0, fetchedAt: null, error: null }) : undefined}
+                // Only an operator is told how the fetch is going; for everybody else
+                // the rule is on or off and the plumbing is not theirs. The action
+                // withholds the figures too, so this is not the only gate.
+                feed={feed && canOperate ? (tor ?? { count: 0, fetchedAt: null, error: null }) : undefined}
                 onBack={backToList}
                 onToggle={(on) => (feed ? persistTor(on) : persist(managedPatch(rule, saved, on)))}
                 onCreateException={() =>
@@ -360,6 +376,7 @@ export function WafEditor({
         return (
             <LoginRulePage
                 required={saved.requireLogin}
+                requiredAbove={inherited?.requireLogin ?? false}
                 admitted={saved.loginAllowPrincipals}
                 refused={saved.loginDenyPrincipals}
                 disabled={busy}
@@ -399,6 +416,17 @@ export function WafEditor({
                       description: "Visitors sign in to Polaris first, and the rule can name which accounts it admits.",
                       action: { label: "Login", variant: "neutral" as const },
                       enabled: saved.requireLogin,
+                      // Unions downward like a pack: a project demanding a login means
+                      // its services demand one, and the row has to say so rather than
+                      // showing this scope's unused "off".
+                      decidedElsewhere:
+                          !saved.requireLogin && inherited?.requireLogin
+                              ? {
+                                    on: true,
+                                    label: ARMED_ABOVE.label,
+                                    why: "A scope above this one requires a login, and a narrower scope cannot waive it."
+                                }
+                              : undefined,
                       activity: null
                   }
               ]
@@ -463,6 +491,7 @@ export function WafEditor({
             .map(({ index }) => index)
     );
     const filtering = needle !== "" || status !== "all";
+    const obfuscationOffAbove = inherited !== null && !inherited.emailObfuscation;
 
     return (
         <div className="flex flex-col gap-4">
@@ -551,11 +580,17 @@ export function WafEditor({
                                 so the address is not in the source. Visitors see no change. A harvester driving a real
                                 browser still reads it.
                             </p>
+                            {/* It intersects across scopes, so a broader one can only
+                                switch it OFF - and this switch would otherwise sit on
+                                "on" while nothing was being rewritten. */}
+                            {obfuscationOffAbove ? (
+                                <p className="mt-1 text-xs text-muted-foreground">{OFF_ABOVE.why}</p>
+                            ) : null}
                         </div>
                     </div>
                     <Switch
-                        checked={saved.emailObfuscation}
-                        disabled={busy}
+                        checked={saved.emailObfuscation && !obfuscationOffAbove}
+                        disabled={busy || obfuscationOffAbove}
                         onChange={(on) => persist({ emailObfuscation: on })}
                         aria-label="Email address obfuscation"
                     />

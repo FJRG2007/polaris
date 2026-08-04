@@ -230,12 +230,26 @@ export function detectWafAnomalies(
         if (entry.method) cell.methods.add(entry.method.toUpperCase());
     }
 
+    // Answered once per address rather than once per address per route. The same client
+    // shows up on every route it touched, and each answer re-parses the whole exempt
+    // list through try/catch - which on a busy window is thousands of throws for a
+    // question whose answer cannot change between routes.
+    const exemptions = new Map<string, boolean>();
+    const isExempt = (ip: string): boolean => {
+        if (exempt.length === 0) return false;
+        const known = exemptions.get(ip);
+        if (known !== undefined) return known;
+        const verdict = ipAllowed(ip, exempt);
+        exemptions.set(ip, verdict);
+        return verdict;
+    };
+
     const found: WafAnomaly[] = [];
     for (const [route, perIp] of byRoute) {
         for (const [ip, cell] of perIp) {
             // Judged after the cells are built, not before: an exempt address is still
             // part of what a route's traffic looks like.
-            if (exempt.length > 0 && ipAllowed(ip, exempt)) continue;
+            if (isExempt(ip)) continue;
             // The baseline excludes the address being judged, which is what stops a
             // single heavy client from defining "normal" as itself on a quiet route.
             const peers = [...perIp].filter(([key]) => key !== ip).map(([, other]) => other.hits);

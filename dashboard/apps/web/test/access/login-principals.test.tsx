@@ -25,6 +25,7 @@ vi.mock("../../src/app/(app)/apps/firewall/actions", () => ({
 }));
 
 const { LoginPrincipals } = await import("../../src/app/(app)/apps/firewall/login-principals");
+const { LoginRulePage } = await import("../../src/app/(app)/apps/firewall/access-rules");
 
 function render(admitted: WafPrincipalGrant[], refused: WafPrincipalGrant[]): string {
     return renderToStaticMarkup(
@@ -59,5 +60,38 @@ describe("the require-login panel", () => {
     it("keeps a refused principal that no longer exists visible, since it still applies", () => {
         const markup = render([], [{ ref: "group:gone" }]);
         expect(markup).toContain("group:gone");
+    });
+});
+
+describe("the require-login page, when a broader scope already demands one", () => {
+    function page(required: boolean, requiredAbove: boolean): string {
+        return renderToStaticMarkup(
+            <LoginRulePage
+                required={required}
+                requiredAbove={requiredAbove}
+                admitted={[]}
+                refused={[]}
+                onBack={() => {}}
+                onChange={() => {}}
+            />
+        );
+    }
+
+    it("says a login is required rather than showing this scope's unused off", () => {
+        // requireLogin unions downward, so a project demanding one means its services
+        // demand one - and the switch here cannot take it back.
+        const markup = page(false, true);
+
+        expect(markup).toContain("A login is required");
+        expect(markup).toContain("cannot waive it");
+    });
+
+    it("still offers the lists, because every scope naming who it admits gets a say", () => {
+        expect(page(false, true)).toContain("Who gets in");
+    });
+
+    it("leaves the switch alone when this scope is the one deciding", () => {
+        expect(page(false, false)).toContain("No login is required");
+        expect(page(false, false)).not.toContain("cannot waive it");
     });
 });

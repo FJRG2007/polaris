@@ -98,13 +98,12 @@ export async function setWafIgnoreList(entries: readonly string[]): Promise<void
  */
 export async function runWafJails(now = Date.now()): Promise<{ scanned: number; banned: number }> {
     try {
-        const [jails, configured] = await Promise.all([getWafJails(), getWafIgnoreList()]);
+        const [jails, ignore] = await Promise.all([getWafJails(), wafTrustedAddresses()]);
         if (!jails.some((jail) => jail.enabled)) return { scanned: 0, banned: 0 };
 
         const entries = parseHttpLogs(await readLogTail());
         if (entries.length === 0) return { scanned: 0, banned: 0 };
 
-        const ignore = [...ALWAYS_IGNORED, ...configured];
         const seen = entries.map((entry) => entry.ip).filter((ip) => ip && ip !== "-");
         const verdicts = detectWafBans({
             entries,

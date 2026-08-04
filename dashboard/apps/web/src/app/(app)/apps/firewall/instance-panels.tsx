@@ -128,6 +128,8 @@ export function FirewallInstancePanels({
      */
     const trust = useCallback(
         (ip: string) => {
+            // Seeded from what the server holds, not from anything half-typed below:
+            // the panel drops its draft when this lands, so the two cannot disagree.
             const next = [...new Set([...(data?.trusted ?? []), ip])];
             mutate(
                 (current) => ({
@@ -804,6 +806,15 @@ function TrustedPanel({
     const current = draft ?? trusted ?? [];
     const dirty = draft !== null && trusted !== undefined && JSON.stringify(draft) !== JSON.stringify(trusted);
     const canAddSelf = callerIp !== null && callerIp !== undefined && !current.includes(callerIp);
+
+    // The list can also be added to from a finding in the panel above, and a draft
+    // typed here would then be a stale copy that took the new address back out again
+    // the moment somebody pressed Save. The server's answer wins; what was half-typed
+    // was never a decision.
+    const saved = JSON.stringify(trusted ?? []);
+    useEffect(() => {
+        setDraft(null);
+    }, [saved]);
 
     function save(entries: string[]) {
         setError(null);

@@ -10,10 +10,10 @@ import { z } from "zod";
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { revalidatePath } from "next/cache";
-import { requirePermission } from "@/lib/session";
 import { recordAudit } from "@/lib/audit-service";
 import { syncAppRoutes } from "@/lib/deploy-service";
 import { syncDashboardRoute } from "@/lib/domain-edge";
+import { requirePermission, userHasManage } from "@/lib/session";
 import { wafAddressActivity, wafLogWindow, wafTraffic } from "@/lib/waf-analytics-service";
 import { getWafInherited, getWafRule, setWafRule, type WafInheritedView, type WafRuleView } from "@/lib/waf-service";
 import {
@@ -93,7 +93,7 @@ export async function getWafRuleAction(input: { scopeType: WafScopeType; scopeId
         const [rule, inherited, tor] = await Promise.all([
             getWafRule(user.id, input.scopeType, input.scopeId),
             getWafInherited(user.id, input.scopeType, input.scopeId),
-            torFeedView()
+            torFeedView(await userHasManage(user, "system.manage"))
         ]);
         return { rule, inherited, tor };
     } catch (caught) {
@@ -101,11 +101,22 @@ export async function getWafRuleAction(input: { scopeType: WafScopeType; scopeId
     }
 }
 
-/** The Tor feed as both the rule list and the overview show it. */
-async function torFeedView(): Promise<WafFeedView> {
+/**
+ * The Tor feed as the rule list shows it.
+ *
+ * Whether the rule is on is part of the rule and goes to anyone who may read the scope.
+ * How the fetch is going does not: the size of the list, when it last landed and why it
+ * last failed are the instance's own plumbing, and a project member editing their own
+ * service has no use for "the exit list responded 503" - it is a detail about
+ * infrastructure they do not run. So the switch travels and the diagnostics only go to
+ * an operator.
+ */
+async function torFeedView(detailed: boolean): Promise<WafFeedView> {
     const feed = await getWafFeed("tor");
+    const enabled = wafFeedEnabled(feed);
+    if (!detailed) return { enabled, count: 0, fetchedAt: null, error: null };
     return {
-        enabled: wafFeedEnabled(feed),
+        enabled,
         count: countEntries(feed?.entries),
         fetchedAt: feed?.fetchedAt ? feed.fetchedAt.toISOString() : null,
         error: feed?.error ?? null
