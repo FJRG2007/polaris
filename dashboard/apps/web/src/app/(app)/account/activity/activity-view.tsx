@@ -15,10 +15,10 @@
 
 import { RefreshCw } from "lucide-react";
 import { Button, Select } from "@polaris/ui";
-import { sessionName, type DisplayFormat } from "@polaris/core";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { UserActivityEntry } from "@/lib/audit-service";
 import { useDisplayFormat } from "@/components/display-format";
+import { sessionName, type DisplayFormat } from "@polaris/core";
 import { useLiveResource } from "@/components/use-live-resource";
 import { ActivityTable, type ActivityRow } from "@/components/activity-table";
 
@@ -57,9 +57,16 @@ interface ActivityPayload {
  */
 function sessionLabel(session: ActivitySession, format: DisplayFormat): string {
     if (session.id === NO_SESSION) return "Outside a session";
-    const named = [sessionName(session.id), session.label].filter(Boolean).join(" - ");
-    if (named) return session.current ? `${named} (this device)` : named;
-    return session.lastAt ? `Signed-out session - ${format.date(session.lastAt)}` : "Signed-out session";
+    const name = sessionName(session.id);
+    // Nothing names a session that has ended, so the row has to. The derived name
+    // still leads - it is what this session was called in the list while it was
+    // live, which is how somebody recognises it here - but it cannot stand on its
+    // own, or a session that is gone reads exactly like one still signed in.
+    if (!session.label) {
+        return session.lastAt ? `${name} - signed out ${format.date(session.lastAt)}` : `${name} - signed out`;
+    }
+    const named = `${name} - ${session.label}`;
+    return session.current ? `${named} (this device)` : named;
 }
 
 export function ActivityView() {

@@ -104,12 +104,13 @@ export function priorityRank(priority: TaskPriority): number {
  * kinds so the product can reason about progress without reading names. "A task
  * is done" is a question about the kind, never about a label somebody typed.
  */
-export const TASK_STATUS_TYPES = ["open", "active", "done", "closed"] as const;
+export const TASK_STATUS_TYPES = ["open", "active", "blocked", "done", "closed"] as const;
 export type TaskStatusType = (typeof TASK_STATUS_TYPES)[number];
 
 export const TASK_STATUS_TYPE_LABELS: Record<TaskStatusType, string> = {
     open: "Not started",
     active: "Active",
+    blocked: "Blocked",
     done: "Done",
     closed: "Closed"
 };
@@ -117,9 +118,24 @@ export const TASK_STATUS_TYPE_LABELS: Record<TaskStatusType, string> = {
 export const TASK_STATUS_TYPE_HINTS: Record<TaskStatusType, string> = {
     open: "Work that has not been picked up yet.",
     active: "Work in progress. Counts as started but not finished.",
+    blocked: "Work that cannot move. Marked as held up wherever it appears, without anybody having to say why.",
     done: "Finished work. Completing a task moves it to the first status of this kind.",
     closed: "Filed away without being completed: cancelled, duplicate, or won't do."
 };
+
+/**
+ * Whether work in a status of this kind is held up.
+ *
+ * A kind rather than a name, for the same reason `isFinishedStatus` is: a space
+ * calls its stage whatever it likes - "Blocked", "Bloqueado", "Waiting on legal"
+ * - and the product must not be reading those words to decide anything. Saying
+ * so is how a stage a team dragged onto their own board joins the marker, the
+ * filter and the grouping that already exist for the other two ways a task gets
+ * held up.
+ */
+export function isBlockedStatus(type: TaskStatusType): boolean {
+    return type === "blocked";
+}
 
 /** Whether a status kind stops the clock on a task. */
 export function isFinishedStatus(type: TaskStatusType): boolean {
@@ -142,15 +158,17 @@ export const UNFINISHED_STATUS_TYPES = TASK_STATUS_TYPES.filter((type) => !isFin
  * and every burndown, report and "what is being worked on" count reads the kind
  * rather than the name.
  *
- * "Blocked" is `open` for the same reason, and red because it is the one column
- * somebody is meant to notice from across the room. It is a stage, not the
- * whole answer: a task can also be blocked while sitting in any other column,
- * which is what `blockedUntil`, `blockedNote` and the dependency edges record.
+ * "Blocked" is its own kind, and red because it is the one column somebody is
+ * meant to notice from across the room. The kind is what joins it to everything
+ * else that means held up: a task sitting there is marked, filtered and grouped
+ * as blocked exactly like one waiting on another task, a date or a written
+ * reason. The stage and those three are the same state reached four ways, not
+ * two ideas that happen to share a word.
  */
 export const DEFAULT_TASK_STATUSES: readonly { name: string; type: TaskStatusType; color: string }[] = [
     { name: "To do", type: "open", color: "#64748b" },
     { name: "In progress", type: "active", color: "#3b82f6" },
-    { name: "Blocked", type: "open", color: "#ef4444" },
+    { name: "Blocked", type: "blocked", color: "#ef4444" },
     { name: "On hold", type: "open", color: "#92400e" },
     { name: "In review", type: "active", color: "#eab308" },
     { name: "Done", type: "done", color: "#22c55e" },

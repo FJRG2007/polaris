@@ -1,5 +1,6 @@
 import * as engine from "../src/tasks.js";
 import { describe, expect, it } from "vitest";
+import * as work from "../src/schemas/tasks.js";
 import type { Recurrence, TaskFilter } from "../src/schemas/tasks.js";
 import {
     FOLDER_DEPTH_LIMIT,
@@ -498,6 +499,31 @@ describe("grouping", () => {
             expect(order.get("a-todo")).toBe(order.get("b-todo"));
             expect(order.get("a-doing")).toBe(order.get("b-doing"));
             expect(order.get("b-blocked")).toBe(2);
+        });
+    });
+
+    describe("the blocked stage and the blocked state", () => {
+        it("treats the stage as a kind, so a renamed one still counts", () => {
+            // The whole reason this is a kind: a space calling its column
+            // "Bloqueado" must read as held up, and one calling a column
+            // "Blocked" while meaning something else must not.
+            expect(work.isBlockedStatus("blocked")).toBe(true);
+            expect(work.isBlockedStatus("open")).toBe(false);
+            expect(work.isBlockedStatus("active")).toBe(false);
+        });
+
+        it("counts blocked work as unfinished, so it stays on the open lists", () => {
+            expect(work.isFinishedStatus("blocked")).toBe(false);
+            expect(work.UNFINISHED_STATUS_TYPES).toContain("blocked");
+            expect(work.FINISHED_STATUS_TYPES).not.toContain("blocked");
+        });
+
+        it("ships the default Blocked stage as that kind", () => {
+            // A stage named Blocked that was not of the blocked kind is exactly
+            // the disagreement this pairing exists to prevent: the column says
+            // held up and the marker, the filter and the grouping say otherwise.
+            const stage = work.DEFAULT_TASK_STATUSES.find((entry) => entry.name === "Blocked");
+            expect(stage?.type).toBe("blocked");
         });
     });
 

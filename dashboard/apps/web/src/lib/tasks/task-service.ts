@@ -95,9 +95,10 @@ type TaskRecord = Prisma.TaskGetPayload<{ select: typeof ROW_SELECT }>;
  * two queries rather than two per row. Neither belongs on the task table: time
  * is a sum over entries, and this kind of block is a question about other tasks.
  *
- * The other two kinds - a date the task waits for, a reason somebody wrote down
- * - are columns on the task itself, and `toRow` folds all three into the one
- * answer a card draws.
+ * The other ways a task gets held up need no query at all: the stage it sits in
+ * arrives with the row, and the date it waits for and the reason somebody wrote
+ * are columns on the task itself. `toRow` folds all four into the one answer a
+ * card draws.
  */
 async function decorate(ids: string[]): Promise<{ tracked: Map<string, number>; blocked: Set<string> }> {
     if (ids.length === 0) return { tracked: new Map(), blocked: new Set() };
@@ -162,10 +163,13 @@ function toRow(
         trackedSeconds: tracked.get(record.id) ?? 0,
         blockedUntil: record.blockedUntil?.toISOString() ?? null,
         blockedNote: record.blockedNote,
-        // The three kinds folded into the one state a board reads. A date that
-        // has passed stops holding the task, which is the whole point of setting
-        // one instead of a note somebody has to remember to clear.
+        // Every way a task gets held up, folded into the one state a board reads:
+        // the stage it is sitting in, work it depends on, a date it waits for, a
+        // reason somebody wrote. A date that has passed stops holding it, which
+        // is the whole point of setting one instead of a note anybody has to
+        // remember to clear.
         blocked:
+            core.isBlockedStatus((status?.type as core.TaskStatusType) ?? "open") ||
             blocked.has(record.id) ||
             record.blockedNote !== "" ||
             core.blockHolds(record.blockedUntil, new Date()),
