@@ -26,10 +26,10 @@ import { memberOrgIds, orgIdsWhere } from "./orgs/org-service";
 import { getFlagsForEnvironment } from "./deploy-project-service";
 import { resolveRegistryLogin } from "./registry-credential-service";
 import { notifyDeployFinished } from "./notifications/deploy-events";
-import { deployHostname, type ZoneMintFailure } from "./domain-zones";
 import { githubCloneAuthHeader, githubTokenForOwner } from "./github-access";
 import { applicationDefaultWafPresets, isTunnelHostname } from "@polaris/core";
 import { getDriver, getPorts, toTargetInfo, type TargetRow } from "./deploy/runtime";
+import { deployHostname, deployZoneHosts, type ZoneMintFailure } from "./domain-zones";
 import { getOrCreateHostTarget, getOrCreateLocalTarget } from "./deploy-target-service";
 import { gitBuildContext, type BuildCommands, type GitSource } from "./git-build-service";
 import { quickTunnelAppIds, tunnelHostForApp, stopQuickTunnel } from "./deploy/quick-tunnel-service";
@@ -840,7 +840,7 @@ export async function syncAppRoutes(): Promise<void> {
             });
         }
     }
-    await new LocalRouter().sync(localRoutes);
+    await new LocalRouter(await deployZoneHosts()).sync(localRoutes);
     if (remotePending.length > 0) {
         console.warn(
             `polaris: ${remotePending.length} remote-server domain(s) await a per-server edge and are not routed by the local edge: ${remotePending.join(", ")}`
@@ -1263,6 +1263,11 @@ export async function deleteApplication(applicationId: string, ownerId: string):
     await prisma.deployment.deleteMany({ where: { deployableType: "application", deployableId: applicationId } });
     await prisma.envVar.deleteMany({ where: { scopeType: "application", scopeId: applicationId } });
     await prisma.application.delete({ where: { id: applicationId } });
+    // The delete cascades the app's Domain rows, but the edge is not the database: its
+    // routers stay until they are rewritten, and one pointing at a container that no
+    // longer exists answers for the hostname as an app that is merely down. Resynced
+    // here so a deleted app's name goes back to being an unclaimed one.
+    await syncAppRoutes().catch(() => undefined);
 }
 
 /**

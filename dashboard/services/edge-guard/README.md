@@ -83,6 +83,26 @@ probing. A client that did not ask for `text/html` gets the same facts as plain 
 The reference is generated per response and stored nowhere, so it currently identifies
 nothing. It becomes the recorded block id once blocks are recorded.
 
+## What a visitor to an empty hostname sees
+
+Deploy hostnames sit under a wildcard, so every name in the zone reaches the edge
+whether or not anything was deployed on it. The guard's proxy listener serves the page
+for those, on two paths Traefik rewrites to:
+
+| Path | Reached from | Answers |
+|---|---|---|
+| `/__polaris/vacant` | the catch-all router, for a name no app claims | **404**, "there is nothing running here" |
+| `/__polaris/vacant/down` | an app router's `errors` middleware on 502/503/504 | **502**, "this app is not running" |
+
+Both are served before the signed-origin check, since the point is that there is no
+origin. The state is the path and not a parameter: Traefik's rewrite keeps the visitor's
+own query string, so a `?state=` would be theirs to set.
+
+Every response carries `X-Polaris-Page: vacant`. Polaris fetches the path and checks for
+it before pointing the edge here at all - a sidecar too old to know these paths answers
+with its generic `Bad gateway`, and an app's error page pointed at that would be worse
+than the 502 it replaced.
+
 ## Fail-closed behavior
 
 - A denylist with an unresolvable client IP -> **403**.

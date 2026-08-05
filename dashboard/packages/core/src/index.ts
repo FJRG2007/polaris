@@ -46,6 +46,8 @@ export * from "./waf-presets.js";
 export * from "./waf-managed.js";
 export * from "./waf-expression.js";
 export * from "./waf-analytics.js";
+export * from "./edge-page.js";
+export * from "./vacant-page.js";
 export * from "./waf-block-page.js";
 export * from "./tasks.js";
 export * from "./schemas/storage.js";

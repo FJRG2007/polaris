@@ -27,18 +27,20 @@
  * with its `compress` middleware, exactly as it would be without the proxy.
  */
 
+import { sendVacant } from "./vacant.js";
 import type { Duplex } from "node:stream";
 import { sendBlocked } from "./block-page.js";
 import { connect as netConnect } from "node:net";
 import { request as httpsRequest } from "node:https";
 import { clientIp, evaluate, type GuardConfig } from "./authz.js";
 import { decodeGuardRule, verifyEdgeOrigin } from "@polaris/core/waf";
+import { createServer, request as httpRequest, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import {
     EMAIL_DECODE_PATH,
     EMAIL_DECODE_SCRIPT,
-    obfuscateEmailsInHtml
+    obfuscateEmailsInHtml,
+    VACANT_PATH
 } from "@polaris/core";
-import { createServer, request as httpRequest, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 
 /** The header Traefik stamps with the signed upstream for a proxied route. */
 export const ORIGIN_HEADER = "x-polaris-origin";
@@ -161,6 +163,16 @@ export function createProxyServer(config: () => GuardConfig): Server {
         }
         if (url === EMAIL_DECODE_PATH || url.startsWith(`${EMAIL_DECODE_PATH}?`)) {
             serveDecodeScript(res);
+            return;
+        }
+        // Ahead of the origin check, because a vacant name has no origin to be signed:
+        // this is the one thing the proxy answers on its own account.
+        if (url === VACANT_PATH || url.startsWith(`${VACANT_PATH}/`) || url.startsWith(`${VACANT_PATH}?`)) {
+            sendVacant(res, {
+                host: header(req, "x-forwarded-host") ?? header(req, "host"),
+                accept: header(req, "accept"),
+                path: url
+            });
             return;
         }
 

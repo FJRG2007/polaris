@@ -20,6 +20,7 @@
 import { writeFile } from "node:fs/promises";
 import { encodeGuardRule, signEdgeOrigin } from "@polaris/core/waf";
 import type { WafCustomRule, WafPrincipalGrant } from "@polaris/core";
+import { VACANT_DOWN_PATH, VACANT_HEADER, VACANT_HEADER_VALUE, VACANT_PATH } from "@polaris/core";
 
 /** One app hostname to route, with the origin the edge should dial. */
 export interface AppRoute {
@@ -105,6 +106,7 @@ const PROXY_PROBE_TTL_MS = 30_000;
 const PROXY_PROBE_TIMEOUT_MS = 2000;
 
 let proxyProbe: { at: number; reachable: boolean } | null = null;
+let vacantProbe: { at: number; reachable: boolean } | null = null;
 
 /**
  * Whether the guard's proxy listener is actually answering.
@@ -134,11 +136,41 @@ export async function guardProxyReachable(now: number = Date.now()): Promise<boo
     return reachable;
 }
 
+/**
+ * Whether the guard can serve the page for a name with nothing behind it.
+ *
+ * Asked separately from `guardProxyReachable`, and asked by fetching the page itself
+ * rather than `/health`: a guard old enough to have the proxy listener but not this
+ * path answers there with its generic `Bad gateway`, and pointing an app's error page
+ * at that would turn a stopped container into a worse error than the 502 it had. The
+ * response header is what a guard that really does serve the page replies with.
+ */
+export async function guardVacantReachable(now: number = Date.now()): Promise<boolean> {
+    if (vacantProbe && now - vacantProbe.at < PROXY_PROBE_TTL_MS) return vacantProbe.reachable;
+    let reachable = false;
+    try {
+        const response = await fetch(`${guardProxyUrl()}${VACANT_PATH}`, {
+            signal: AbortSignal.timeout(PROXY_PROBE_TIMEOUT_MS)
+        });
+        reachable = response.headers.get(VACANT_HEADER) === VACANT_HEADER_VALUE;
+    } catch {
+        reachable = false;
+    }
+    vacantProbe = { at: now, reachable };
+    return reachable;
+}
+
 /** Options a render needs that it cannot work out on its own (they take IO). */
 export interface RenderOptions {
     /** Whether the guard's proxy listener is answering. False routes every obfuscated
      *  route direct instead, unobfuscated but serving. */
     readonly proxyAvailable?: boolean;
+    /** The zones whose unclaimed names get the "nothing is running here" page
+     *  (`plr.example.com`). Empty leaves them to the edge's own bare 404. */
+    readonly vacantZones?: readonly string[];
+    /** Whether the guard serves that page. False writes none of it, so a stale sidecar
+     *  keeps today's behaviour rather than being pointed at a path it does not have. */
+    readonly vacantAvailable?: boolean;
 }
 
 /**
@@ -227,6 +259,52 @@ function routeMiddlewares(
     return names;
 }
 
+/** The vacant page's router, service and middleware names. Shared by the catch-all and
+ *  by every app route's error page, which are the same service reached two ways. */
+const VACANT = "polaris-vacant";
+const VACANT_ERRORS = `${VACANT}-errors`;
+const VACANT_REWRITE = `${VACANT}-rewrite`;
+
+/** A zone host as a regex fragment that matches it literally. Dots are the only
+ *  metacharacter a hostname can contain, and `[.]` avoids a backslash - which YAML
+ *  would read as an escape of its own inside the quoted rule. */
+function hostPattern(zone: string): string {
+    return zone.replace(/\./g, "[.]");
+}
+
+/** A zone host safe to write into the edge config. Anything else is dropped rather
+ *  than escaped: a stored value that is not a hostname is a bug upstream, and the
+ *  edge refusing to load its whole config over it would take every app down. */
+function usableZone(zone: string): boolean {
+    return /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/.test(zone);
+}
+
+/**
+ * The routers that answer for a name in a deploy zone that no app claims.
+ *
+ * Priority 1 so it loses to every app router: Traefik otherwise ranks by rule length,
+ * and this rule is longer than the `Host()` of the app it would then shadow. One label
+ * deep, because that is exactly what the zone's wildcard DNS record covers - a deeper
+ * name never resolves, so answering for it would be answering for nothing.
+ *
+ * `tls: {}` rather than a resolver, deliberately: ordering a certificate per unclaimed
+ * name would hand anyone walking the zone the ability to burn the instance's ACME
+ * quota. The wildcard certificate the zone already has covers these names anyway.
+ */
+function vacantRouters(zones: readonly string[]): string[] {
+    const rule = zones
+        .map((zone) => `HostRegexp(\`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?[.]${hostPattern(zone)}$\`)`)
+        .join(" || ");
+    return [
+        `    ${VACANT}:\n      rule: "${rule}"\n      entryPoints: [websecure]\n      priority: 1\n      service: ${VACANT}\n      middlewares: [${VACANT_REWRITE}]\n      tls: {}`,
+        // Served over plain HTTP as well, rather than redirected onto https: a name
+        // nothing has deployed on may have no certificate a browser trusts, and a
+        // warning interstitial in front of "there is nothing here" tells the visitor
+        // less than the page does.
+        `    ${VACANT}-http:\n      rule: "${rule}"\n      entryPoints: [web]\n      priority: 1\n      service: ${VACANT}\n      middlewares: [${VACANT_REWRITE}]`
+    ];
+}
+
 /** Render Traefik dynamic config for a set of app routes. Shared by every Router
  *  implementation so local and remote edges serve byte-identical config. */
 export function renderDynamicConfig(routes: readonly AppRoute[], options: RenderOptions = {}): string {
@@ -235,10 +313,29 @@ export function renderDynamicConfig(routes: readonly AppRoute[], options: Render
     const defs = new Map<string, string>([
         ["polaris-redirect-https", "    polaris-redirect-https:\n      redirectScheme:\n        scheme: https"]
     ]);
+    const zones = options.vacantAvailable === false ? [] : (options.vacantZones ?? []).filter(usableZone);
+    // The guard serves the page, so it is one service reached by both the catch-all
+    // router and every app route's error page.
+    const vacant = zones.length > 0 || (options.vacantAvailable === true && routes.length > 0);
+    if (vacant) {
+        defs.set(VACANT_REWRITE, `    ${VACANT_REWRITE}:\n      replacePath:\n        path: "${VACANT_PATH}"`);
+        // 502/503/504 only: those are the statuses Traefik itself produces when it
+        // cannot reach the app. A 500 is the app answering, and replacing its own error
+        // page with "not running" would be wrong about what happened and lose whatever
+        // it was trying to say.
+        defs.set(
+            VACANT_ERRORS,
+            `    ${VACANT_ERRORS}:\n      errors:\n        status: ["502", "503", "504"]\n        service: ${VACANT}\n        query: "${VACANT_DOWN_PATH}"`
+        );
+        services.push(`    ${VACANT}:\n      loadBalancer:\n        servers:\n          - url: "${guardProxyUrl()}"`);
+    }
     for (const route of routes) {
         const name = `polaris-app-${route.id}`;
         const dial = `${route.dialHost}:${route.dialPort}`;
-        const appMw = routeMiddlewares(route, name, defs, options);
+        // First in the chain, so it wraps the rest of it and the service behind it. It
+        // only ever fires on a status the app never returned, so nothing else in the
+        // chain is affected by sitting inside it.
+        const appMw = [...(vacant ? [VACANT_ERRORS] : []), ...routeMiddlewares(route, name, defs, options)];
         const appMwLine = appMw.length > 0 ? `\n      middlewares: [${appMw.join(", ")}]` : "";
         if (route.certResolver === "none") {
             routers.push(
@@ -252,7 +349,9 @@ export function renderDynamicConfig(routes: readonly AppRoute[], options: Render
             // The http router redirects to https; the allowlist still applies here, but
             // the guard runs only on the canonical https URL (redirect goes first).
             const httpMw = [
-                ...appMw.filter((m) => m !== "polaris-waf-guard" && !m.endsWith("-waf-ctx")),
+                ...appMw.filter(
+                    (m) => m !== "polaris-waf-guard" && m !== VACANT_ERRORS && !m.endsWith("-waf-ctx")
+                ),
                 "polaris-redirect-https"
             ];
             routers.push(
@@ -265,6 +364,8 @@ export function renderDynamicConfig(routes: readonly AppRoute[], options: Render
         const upstream = proxied(route, options) ? guardProxyUrl() : `http://${dial}`;
         services.push(`    ${name}:\n      loadBalancer:\n        servers:\n          - url: "${upstream}"`);
     }
+    // Last, so it loses the length-ranked tie to every app router above it.
+    if (zones.length > 0) routers.push(...vacantRouters(zones));
     if (routers.length === 0) return "http: {}\n";
     const middlewares = [...defs.values()].join("\n");
     return `http:\n  routers:\n${routers.join("\n")}\n  services:\n${services.join("\n")}\n  middlewares:\n${middlewares}\n`;
@@ -275,16 +376,33 @@ export class LocalRouter implements Router {
     private readonly file =
         `${process.env.POLARIS_TRAEFIK_DYNAMIC_DIR ?? "/dynamic"}/polaris-apps.yml`;
 
+    /** `vacantZones` are the deploy zones whose unclaimed names get the "nothing is
+     *  running here" page. The caller resolves them, because the zone layout is Polaris
+     *  state and this module is the seam that must work for a remote edge too. */
+    public constructor(private readonly vacantZones: readonly string[] = []) {}
+
     public async sync(routes: readonly AppRoute[]): Promise<void> {
         // Only worth asking when something would actually be pointed at the proxy.
         const wantsProxy = routes.some((route) => route.emailObfuscation === true);
-        const proxyAvailable = wantsProxy ? await guardProxyReachable() : true;
+        const [proxyAvailable, vacantAvailable] = await Promise.all([
+            wantsProxy ? guardProxyReachable() : Promise.resolve(true),
+            guardVacantReachable()
+        ]);
         if (wantsProxy && !proxyAvailable) {
             const affected = routes.filter((route) => route.emailObfuscation === true).length;
             console.warn(
                 `polaris: the edge guard's proxy is not answering on ${guardProxyUrl()}; routing ${affected} domain(s) direct, without email obfuscation. Update the polaris-edge-guard container to restore it.`
             );
         }
-        await writeFile(this.file, renderDynamicConfig(routes, { proxyAvailable }), "utf8");
+        if (!vacantAvailable) {
+            console.warn(
+                `polaris: the edge guard does not serve ${VACANT_PATH} on ${guardProxyUrl()}; an unused hostname keeps answering with the edge's own 404 and a stopped app with Bad Gateway. Update the polaris-edge-guard container to restore it.`
+            );
+        }
+        await writeFile(
+            this.file,
+            renderDynamicConfig(routes, { proxyAvailable, vacantAvailable, vacantZones: this.vacantZones }),
+            "utf8"
+        );
     }
 }

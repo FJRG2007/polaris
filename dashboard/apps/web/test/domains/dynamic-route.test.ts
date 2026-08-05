@@ -162,3 +162,91 @@ describe("a route with injection protection", () => {
         expect(renderDynamicConfig([route({ xssProtection: true })])).toContain("polaris-waf-guard");
     });
 });
+
+/**
+ * The catch-all is the one router in this file that must LOSE. Every hostname in the
+ * zone matches it, so a mistake in its priority does not break one route, it serves
+ * "there is nothing here" for the whole instance.
+ */
+describe("names in a deploy zone with nothing on them", () => {
+    const zoned = (routes: AppRoute[] = []) =>
+        renderDynamicConfig(routes, { vacantZones: ["plr.example.com"], vacantAvailable: true });
+
+    it("answers one label deep under the zone, and nothing else", () => {
+        const config = zoned();
+
+        expect(config).toContain("HostRegexp(`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?[.]plr[.]example[.]com$`)");
+        // The dot is a regex metacharacter and a backslash is a YAML escape, so the
+        // literal dot is written as a class instead of being escaped.
+        expect(config).not.toContain("\\.");
+    });
+
+    it("ranks below every app router, which Traefik would otherwise order by length", () => {
+        const config = zoned([route()]);
+        const vacant = config.slice(config.indexOf("    polaris-vacant:"));
+
+        expect(vacant).toContain("priority: 1");
+        expect(config).toContain('rule: "Host(`app.example.com`)"');
+    });
+
+    it("orders no certificate for a name nobody deployed", () => {
+        // A resolver here would let anyone walking the zone spend the instance's ACME
+        // quota one unclaimed name at a time.
+        const vacant = zoned().split("    polaris-vacant:")[1] ?? "";
+
+        expect(vacant).toContain("tls: {}");
+        expect(vacant).not.toContain("certResolver");
+    });
+
+    it("serves the page over plain HTTP too, rather than redirecting onto a certificate it may not have", () => {
+        const config = zoned();
+        const http = config.slice(config.indexOf("    polaris-vacant-http:")).split("\n").slice(0, 6).join("\n");
+
+        expect(http).toContain("entryPoints: [web]");
+        expect(http).toContain("service: polaris-vacant");
+        expect(http).not.toContain("polaris-redirect-https");
+    });
+
+    it("is written out of the config entirely when no zone is configured", () => {
+        const config = renderDynamicConfig([route()], { vacantAvailable: false });
+
+        expect(config).not.toContain("polaris-vacant");
+    });
+});
+
+describe("an app whose container is not answering", () => {
+    it("gets the page in place of Traefik's Bad Gateway", () => {
+        const config = renderDynamicConfig([route()], { vacantAvailable: true });
+
+        expect(config).toContain("polaris-vacant-errors");
+        expect(config).toContain('status: ["502", "503", "504"]');
+        expect(config).toContain('query: "/__polaris/vacant/down"');
+    });
+
+    it("leaves the app's own errors alone", () => {
+        // A 500 is the app answering. Replacing its error page would be wrong about
+        // what happened and would throw away whatever it was trying to say.
+        expect(renderDynamicConfig([route()], { vacantAvailable: true })).not.toContain('"500"');
+    });
+
+    it("wraps the rest of the chain rather than sitting inside it", () => {
+        const config = renderDynamicConfig([route({ deny: ["203.0.113.0/24"] })], { vacantAvailable: true });
+        const middlewares = /middlewares: \[([^\]]+)\]/.exec(config)?.[1] ?? "";
+
+        expect(middlewares.split(", ")[0]).toBe("polaris-vacant-errors");
+    });
+
+    it("is left off the router that only redirects", () => {
+        const config = renderDynamicConfig([route()], { vacantAvailable: true });
+        const http = config.slice(config.indexOf("    polaris-app-abc-http:"));
+
+        expect(http.split("\n")[4]).not.toContain("polaris-vacant-errors");
+    });
+
+    it("is not written at all against a guard too old to serve the page", () => {
+        const config = renderDynamicConfig([route()], { vacantAvailable: false });
+
+        expect(config).not.toContain("polaris-vacant-errors");
+        expect(config).toContain('url: "http://10.0.0.7:8123"');
+    });
+});

@@ -12,6 +12,7 @@
  */
 
 import { z } from "zod";
+import { getSetting, setSetting } from "./setting-store";
 import {
     pickZone,
     zoneHost,
@@ -204,6 +205,23 @@ export async function deployZoneBase(label?: string): Promise<string | null> {
     if (!config.baseDomain) return null;
     const zone = pickZone(config.zones, "deploy", label);
     return zone ? zoneHost(zone, config.baseDomain) : null;
+}
+
+/**
+ * Every zone deployed services get hostnames under, deduplicated.
+ *
+ * All of them rather than the primary, because a name in any deploy zone is a name
+ * Polaris minted and then stopped serving; and unlike the picker, this is not gated on
+ * the zone's DNS being verified - a zone whose records were never checked can still be
+ * the one a stale link points at.
+ */
+export async function deployZoneHosts(): Promise<string[]> {
+    const config = await getDomainZones();
+    if (!config.baseDomain) return [];
+    const hosts = config.zones
+        .filter((zone) => zone.scope === "deploy")
+        .map((zone) => zoneHost(zone, config.baseDomain));
+    return [...new Set(hosts)];
 }
 
 /** The hostname Polaris's own dashboard lives on, or null when no domain is set. */

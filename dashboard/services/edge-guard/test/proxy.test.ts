@@ -13,7 +13,14 @@ import { createServer, type Server } from "node:http";
 import { describe, expect, it, afterAll, beforeAll } from "vitest";
 import { createProxyServer, ORIGIN_HEADER } from "../src/proxy.js";
 import { encodeGuardRule, signEdgeOrigin } from "@polaris/core/waf";
-import { decodeObfuscatedEmail, EMAIL_DECODE_PATH } from "@polaris/core";
+import {
+    decodeObfuscatedEmail,
+    EMAIL_DECODE_PATH,
+    VACANT_DOWN_PATH,
+    VACANT_HEADER,
+    VACANT_HEADER_VALUE,
+    VACANT_PATH
+} from "@polaris/core";
 
 const SECRET = "test-secret-at-least-16-chars";
 
@@ -191,6 +198,41 @@ describe("the upstream header", () => {
         });
 
         expect(response.status).toBe(502);
+    });
+});
+
+/**
+ * The one thing this listener answers without an upstream, because the whole point is
+ * that there is not one. Reached with no signed origin, which is the request every
+ * other path here is refused for.
+ */
+describe("a hostname with nothing behind it", () => {
+    it("serves the page in place of the generic bad gateway", async () => {
+        const response = await fetch(`${proxyUrl}${VACANT_PATH}`, {
+            headers: { accept: "text/html", "x-forwarded-host": "gone.plr.example.com" }
+        });
+        const body = await response.text();
+
+        expect(response.status).toBe(404);
+        expect(response.headers.get(VACANT_HEADER)).toBe(VACANT_HEADER_VALUE);
+        expect(body).toContain("There is nothing running here");
+        expect(body).toContain("gone.plr.example.com");
+        expect(body).not.toContain("Bad gateway");
+    });
+
+    it("serves the stopped-app page on the path an error page asks for", async () => {
+        const response = await fetch(`${proxyUrl}${VACANT_DOWN_PATH}`, {
+            headers: { accept: "text/html", "x-forwarded-host": "app.plr.example.com" }
+        });
+
+        expect(response.status).toBe(502);
+        expect(await response.text()).toContain("This app is not running");
+    });
+
+    it("does not shadow an app's own paths", async () => {
+        respond = () => ({ body: "<html>the app</html>" });
+
+        expect((await get("/dashboard")).body).toContain("the app");
     });
 });
 
