@@ -31,6 +31,7 @@ import { formatJsonValue, log } from "../utils/cli.ts";
 import { installFromNpmTarball } from "../utils/install.ts";
 import { findProviderErrorMatch } from "../utils/providerErrors.ts";
 import { resolveRunEffort } from "../utils/runEffort.ts";
+import { exposeAgentOnPath, installEnigma } from "../utils/enigma.ts";
 import { addSkill, installBundledSkills } from "../utils/skills.ts";
 import {
   DEFAULT_MAX_RETAINED_BYTES,
@@ -1078,6 +1079,13 @@ export const claude = agent({
   run: async (ctx) => {
     const cliPath = await installClaudeCli();
 
+    // Polaris departure: the quality gate that runs before the push drives its
+    // own agent passes and looks the binary up by name, and this is the only
+    // place that knows where it landed.
+    if (ctx.enigma) {
+      exposeAgentOnPath({ name: "claude", cliPath, tmpdir: ctx.tmpdir });
+    }
+
     const specifier = ctx.payload.proxyModel ?? ctx.resolvedModel;
     // claude-code on Bedrock takes the bare AWS model ID - no provider prefix
     // to strip. agent selection already decides whether the model is Anthropic;
@@ -1115,6 +1123,13 @@ export const claude = agent({
     });
 
     installBundledSkills({ home: homeEnv.HOME });
+
+    // Polaris departure: the operator's own standards, whatever model is driving
+    // this run. Installed before the settings below are written, because it
+    // writes a settings file of its own that they have to be able to correct.
+    if (ctx.enigma) {
+      installEnigma({ home: homeEnv.HOME, version: ctx.enigma.version, env: homeEnv });
+    }
 
     const mcpConfigPath = writeMcpConfig(ctx);
     const effort = resolveRunEffort(ctx);

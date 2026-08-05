@@ -14,11 +14,10 @@
  * surprise on somebody's build machine.
  */
 
-import Fuse from "fuse.js";
-import { GitHubMark } from "@/components/brand-icons";
+import { Loader2, X } from "lucide-react";
 import type { RunnerScopeInput } from "@polaris/core";
+import { RepoPicker } from "@/components/repo-picker";
 import { Badge, Checkbox, Input, Select } from "@polaris/ui";
-import { Check, Loader2, Lock, Search, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { githubReposAction, previewScopeAction, runnerPrincipalsAction, searchGithubReposAction } from "./actions";
 
@@ -31,18 +30,13 @@ const SCOPE_OPTIONS = [
     { value: "group", label: "A Polaris group" }
 ];
 
-interface RepoOption {
-    fullName: string;
-    private: boolean;
-}
-
 interface Principals {
     people: Array<{ userId: string; name: string; login: string }>;
     groups: Array<{ id: string; name: string; linked: number }>;
 }
 
-/** How long to wait after the last keystroke before asking GitHub. */
-const SEARCH_DEBOUNCE_MS = 350;
+/** How long to wait after the last keystroke before re-resolving a scope. */
+const PREVIEW_DEBOUNCE_MS = 350;
 
 export interface ScopeState {
     kind: RunnerScopeInput["kind"];
@@ -91,10 +85,7 @@ export function ScopeField({
      *  that serves nothing. */
     onPreview: (result: { count: number; note: string | null }) => void;
 }) {
-    const [repos, setRepos] = useState<RepoOption[]>([]);
     const [connected, setConnected] = useState(true);
-    const [query, setQuery] = useState("");
-    const [found, setFound] = useState<RepoOption[]>([]);
     const [principals, setPrincipals] = useState<Principals | null>(null);
     const [preview, setPreview] = useState<{ count: number; note: string | null } | null>(null);
     const [checking, setChecking] = useState(false);
@@ -102,42 +93,18 @@ export function ScopeField({
     const needsRepos = state.kind === "repo" || state.kind === "repos";
     const needsPeople = state.kind === "users" || state.kind === "group";
 
-    useEffect(() => {
-        if (!needsRepos) return;
-        void githubReposAction()
-            .then((result) => {
-                setConnected(result.connected);
-                setRepos(result.repos.map((repo) => ({ fullName: repo.fullName, private: repo.private })));
-            })
-            .catch(() => undefined);
-    }, [needsRepos]);
+    // Whether the account is connected decides one line of copy here, so it is
+    // read alongside the picker's own load rather than in a second call.
+    const listRepos = useCallback(async () => {
+        const result = await githubReposAction();
+        setConnected(result.connected);
+        return result;
+    }, []);
 
     useEffect(() => {
         if (!needsPeople) return;
         void runnerPrincipalsAction().then(setPrincipals).catch(() => undefined);
     }, [needsPeople]);
-
-    // Anything the loaded list does not already hold is looked up on GitHub once
-    // the typing settles.
-    useEffect(() => {
-        const term = query.trim();
-        if (!needsRepos || term.length < 2) {
-            setFound([]);
-            return;
-        }
-        let live = true;
-        const timer = setTimeout(() => {
-            void searchGithubReposAction(term)
-                .then((result) => {
-                    if (live) setFound(result.repos.map((repo) => ({ fullName: repo.fullName, private: repo.private })));
-                })
-                .catch(() => undefined);
-        }, SEARCH_DEBOUNCE_MS);
-        return () => {
-            live = false;
-            clearTimeout(timer);
-        };
-    }, [query, needsRepos]);
 
     // What it comes to, asked for whenever the answer would change. Debounced,
     // because an account name is resolved as it is typed and every keystroke would
@@ -164,7 +131,7 @@ export function ScopeField({
                 .finally(() => {
                     if (live) setChecking(false);
                 });
-        }, SEARCH_DEBOUNCE_MS);
+        }, PREVIEW_DEBOUNCE_MS);
         return () => {
             live = false;
             clearTimeout(timer);
@@ -174,22 +141,14 @@ export function ScopeField({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [serialized]);
 
-    const fuse = useMemo(() => new Fuse(repos, { keys: ["fullName"], threshold: 0.4, ignoreLocation: true }), [repos]);
-    const trimmed = query.trim();
-    const mine = trimmed ? fuse.search(trimmed, { limit: 12 }).map((match) => match.item) : repos.slice(0, 12);
-    const owned = new Set(mine.map((repo) => repo.fullName));
-    const offered = [...mine, ...found.filter((repo) => !owned.has(repo.fullName))];
-
     const pick = useCallback(
         (fullName: string) => {
             if (state.kind === "repo") {
                 onChange({ ...state, repos: [fullName] });
-                setQuery("");
                 return;
             }
             if (state.repos.includes(fullName)) return;
             onChange({ ...state, repos: [...state.repos, fullName] });
-            setQuery("");
         },
         [state, onChange]
     );
@@ -231,36 +190,15 @@ export function ScopeField({
 
                     {state.kind === "repos" || state.repos.length === 0 ? (
                         <>
-                            <div className="relative">
-                                <Search className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                                <Input
-                                    value={query}
-                                    onChange={(event) => setQuery(event.target.value)}
-                                    placeholder="owner/repo, or a GitHub URL"
-                                    className="pl-8"
-                                    autoCapitalize="none"
-                                    autoCorrect="off"
-                                    spellCheck={false}
-                                />
-                            </div>
-                            {offered.length > 0 ? (
-                                <ul className="max-h-40 overflow-y-auto rounded-md border border-border/60">
-                                    {offered.map((repo) => (
-                                        <li key={repo.fullName}>
-                                            <button
-                                                type="button"
-                                                onClick={() => pick(repo.fullName)}
-                                                className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm hover:bg-muted/40"
-                                            >
-                                                <GitHubMark className="size-3.5 shrink-0 text-muted-foreground" />
-                                                <span className="min-w-0 flex-1 truncate">{repo.fullName}</span>
-                                                {repo.private ? <Lock className="size-3 text-muted-foreground" /> : null}
-                                                {state.repos.includes(repo.fullName) ? <Check className="size-3.5" /> : null}
-                                            </button>
-                                        </li>
-                                    ))}
-                                </ul>
-                            ) : null}
+                            <RepoPicker
+                                cacheKey="runners"
+                                list={listRepos}
+                                search={searchGithubReposAction}
+                                onPick={(repo) => pick(repo.fullName)}
+                                selected={state.repos}
+                                placeholder="owner/repo, or a GitHub URL"
+                                maxHeightClass="max-h-40"
+                            />
                             {!connected ? (
                                 <Hint>
                                     GitHub is not connected, so only public repositories can be found. Connect it under

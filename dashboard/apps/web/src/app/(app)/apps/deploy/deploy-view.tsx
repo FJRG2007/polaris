@@ -8,20 +8,18 @@
  * says plainly when it needs the full edition rather than failing silently.
  */
 
-import Fuse from "fuse.js";
 import { FilesPanel } from "./files-panel";
 import * as deployActions from "./actions";
 import { TerminalPanel } from "./terminal-panel";
 import { LogViewer } from "@/components/log-viewer";
-import { externalGitUrl } from "@/lib/repo-reference";
 import { DbEngineIcon } from "@/components/db-engine-icon";
 import { isLocalDomain, primaryDomain } from "./domain-rank";
 import { stageDatabaseDeleteAction } from "./project-actions";
 import { DockerMark, GitHubMark } from "@/components/brand-icons";
+import { RepoPicker, type PickerRepo } from "@/components/repo-picker";
 import {
     useCallback,
     useEffect,
-    useMemo,
     useRef,
     useState,
     useTransition,
@@ -66,9 +64,7 @@ import {
     Lock,
     Plug,
     Plus,
-    RefreshCw,
     Rocket,
-    Search,
     TerminalSquare,
     Trash2
 } from "lucide-react";
@@ -868,12 +864,6 @@ function NewImageForm({ environmentId, onDone }: { environmentId: string; onDone
     );
 }
 
-interface RepoOption {
-    fullName: string;
-    defaultBranch: string;
-    private: boolean;
-}
-
 /** What the picker settled on. `fullName` is null for a git URL somewhere other
  *  than GitHub, which is what decides whether the clone is authenticated. */
 interface RepoChoice {
@@ -882,18 +872,6 @@ interface RepoChoice {
     defaultBranch: string;
     private: boolean;
 }
-
-// Session cache of the connected account's repos so reopening the dialog is
-// instant; the Refresh button re-fetches from GitHub.
-let repoCache: RepoOption[] | null = null;
-let repoCacheConnected = false;
-// Answers already had from GitHub's search, so backspacing back through a query
-// does not ask again for something just asked.
-const searchCache = new Map<string, RepoOption[]>();
-
-/** How long the typing has to settle before GitHub is asked. Repositories already
- *  loaded are matched on every keystroke regardless; only the call waits. */
-const SEARCH_DEBOUNCE_MS = 350;
 
 type Builder = "dockerfile" | "nixpacks";
 
@@ -911,20 +889,13 @@ function nameFromUrl(url: string): string {
 /**
  * Choosing what to deploy.
  *
- * One field takes everything: a repository name to search for, `owner/repo`, a
- * URL copied from the browser, an SSH remote, or a git URL somewhere other than
- * GitHub. Repositories the connected account can already see are matched locally
- * as the operator types (fuzzy, so a typo still lands); anything else is looked
- * up on GitHub once the typing settles, which is what makes a public repository
- * nobody here owns reachable - including with GitHub not connected at all.
+ * The repository field is the shared picker; everything below it is what only a
+ * deploy asks for - the name, the branch, the builder and where it runs.
  */
 function NewGithubForm({ environmentId, onDone }: { environmentId: string; onDone: () => void; }) {
-    const [loading, setLoading] = useState(repoCache === null);
-    const [connected, setConnected] = useState(repoCacheConnected);
-    const [repos, setRepos] = useState<RepoOption[]>(repoCache ?? []);
-    const [query, setQuery] = useState("");
-    const [found, setFound] = useState<RepoOption[]>([]);
-    const [searching, setSearching] = useState(false);
+    // Null until the picker's first read answers, so the "not connected" notice
+    // does not flash before anybody has been asked.
+    const [connected, setConnected] = useState<boolean | null>(null);
     const [choice, setChoice] = useState<RepoChoice | null>(null);
     const [name, setName] = useState("");
     const [branch, setBranch] = useState("");
@@ -937,79 +908,15 @@ function NewGithubForm({ environmentId, onDone }: { environmentId: string; onDon
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
 
-    const load = useCallback((force: boolean) => {
-        if (!force && repoCache !== null) {
-            setRepos(repoCache);
-            setConnected(repoCacheConnected);
-            setLoading(false);
-            return;
-        }
-        setLoading(true);
-        void deployActions
-            .githubReposAction()
-            .then((result) => {
-                repoCache = result.repos;
-                repoCacheConnected = result.connected;
-                setRepos(result.repos);
-                setConnected(result.connected);
-            })
-            .catch(() => undefined)
-            .finally(() => setLoading(false));
+    // Whether the account is connected decides one line of copy here and whether
+    // the clone is authenticated, so it is read alongside the picker's own load.
+    const listRepos = useCallback(async () => {
+        const result = await deployActions.githubReposAction();
+        setConnected(result.connected);
+        return result;
     }, []);
 
-    useEffect(() => {
-        load(false);
-    }, [load]);
-
-    const trimmed = query.trim();
-    const external = externalGitUrl(trimmed);
-
-    const fuse = useMemo(
-        () => new Fuse(repos, { keys: ["fullName"], threshold: 0.4, ignoreLocation: true }),
-        [repos]
-    );
-    const mine = trimmed ? fuse.search(trimmed, { limit: 20 }).map((match) => match.item) : repos;
-
-    // Ask GitHub for whatever the loaded list does not already hold. A URL that is
-    // not GitHub's is nothing to search for - it is the answer already.
-    useEffect(() => {
-        const term = query.trim();
-        if (term.length < 2 || externalGitUrl(term)) {
-            setFound([]);
-            setSearching(false);
-            return;
-        }
-        const cached = searchCache.get(term);
-        if (cached) {
-            setFound(cached);
-            setSearching(false);
-            return;
-        }
-        setSearching(true);
-        let live = true;
-        const timer = setTimeout(() => {
-            void deployActions
-                .searchGithubReposAction(term)
-                .then((result) => {
-                    searchCache.set(term, result.repos);
-                    if (live) setFound(result.repos);
-                })
-                .catch(() => undefined)
-                .finally(() => {
-                    if (live) setSearching(false);
-                });
-        }, SEARCH_DEBOUNCE_MS);
-        return () => {
-            live = false;
-            clearTimeout(timer);
-        };
-    }, [query]);
-
-    const owned = new Set(mine.map((repo) => repo.fullName));
-    const discovered = found.filter((repo) => !owned.has(repo.fullName));
-    const empty = !external && mine.length === 0 && discovered.length === 0;
-
-    function pickRepo(repo: RepoOption) {
+    function pickRepo(repo: PickerRepo) {
         setChoice({
             url: `https://github.com/${repo.fullName}`,
             fullName: repo.fullName,
@@ -1044,7 +951,6 @@ function NewGithubForm({ environmentId, onDone }: { environmentId: string; onDon
 
     function clearChoice() {
         setChoice(null);
-        setQuery("");
         setName("");
         setBranch("");
     }
@@ -1074,7 +980,7 @@ function NewGithubForm({ environmentId, onDone }: { environmentId: string; onDon
 
     return (
         <div className="flex flex-col gap-3">
-            {!connected && !loading && (
+            {connected === false && (
                 <p className="rounded-md border border-border/60 bg-surface/40 px-3 py-2 text-xs text-muted-foreground">
                     Searching public repositories.{" "}
                     <a href="/account/connections" className="text-primary hover:underline">
@@ -1098,80 +1004,14 @@ function NewGithubForm({ environmentId, onDone }: { environmentId: string; onDon
                     </Button>
                 </div>
             ) : (
-                <div className="flex flex-col gap-2">
-                    <div className="flex items-center gap-2">
-                        <div className="relative flex-1">
-                            <Search className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                            <Input
-                                autoFocus
-                                value={query}
-                                onChange={(event) => setQuery(event.target.value)}
-                                placeholder="Search repositories, or paste a repo URL"
-                                autoCapitalize="none"
-                                autoCorrect="off"
-                                spellCheck={false}
-                                inputMode="url"
-                                aria-label="Repository"
-                                className="pl-8 pr-8"
-                            />
-                            {searching && (
-                                <Loader2 className="absolute right-2.5 top-1/2 size-4 -translate-y-1/2 animate-spin text-muted-foreground" />
-                            )}
-                        </div>
-                        {connected && (
-                            <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                title="Refresh repositories"
-                                aria-label="Refresh repositories"
-                                disabled={loading}
-                                onClick={() => load(true)}
-                            >
-                                <RefreshCw className={`size-4 ${loading ? "animate-spin" : ""}`} />
-                            </Button>
-                        )}
-                    </div>
-
-                    <div className="max-h-56 overflow-auto overscroll-contain rounded-md border border-border/60">
-                        {external ? (
-                            <button
-                                type="button"
-                                onClick={() => pickUrl(external)}
-                                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-muted"
-                            >
-                                <Globe className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-                                <span className="min-w-0 flex-1 truncate">{external}</span>
-                                <span className="shrink-0 text-xs text-muted-foreground">Use this URL</span>
-                            </button>
-                        ) : loading && repos.length === 0 ? (
-                            <div className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
-                                <Loader2 className="size-4 animate-spin" /> Loading repositories...
-                            </div>
-                        ) : empty ? (
-                            <p className="px-3 py-8 text-center text-sm text-muted-foreground">
-                                {searching
-                                    ? "Searching GitHub..."
-                                    : trimmed
-                                      ? "No repository matches."
-                                      : "Type a repository name, or paste its URL."}
-                            </p>
-                        ) : (
-                            <>
-                                {mine.length > 0 && (
-                                    <RepoGroup
-                                        label={connected ? "Your repositories" : "Repositories"}
-                                        repos={mine}
-                                        onPick={pickRepo}
-                                    />
-                                )}
-                                {discovered.length > 0 && (
-                                    <RepoGroup label="Public on GitHub" repos={discovered} onPick={pickRepo} />
-                                )}
-                            </>
-                        )}
-                    </div>
-                </div>
+                <RepoPicker
+                    cacheKey="deploy"
+                    autoFocus
+                    list={listRepos}
+                    search={deployActions.searchGithubReposAction}
+                    onPick={pickRepo}
+                    onPickUrl={pickUrl}
+                />
             )}
 
             {choice && (
@@ -1248,39 +1088,6 @@ function NewGithubForm({ environmentId, onDone }: { environmentId: string; onDon
 
 /** One labelled block of repository rows. Both sources render the same row, so a
  *  repository looks the same whether it came from the account or from a search. */
-function RepoGroup({
-    label,
-    repos,
-    onPick
-}: {
-    label: string;
-    repos: RepoOption[];
-    onPick: (repo: RepoOption) => void;
-}) {
-    return (
-        <div>
-            <p className="sticky top-0 bg-surface/95 px-3 py-1 text-xs font-medium uppercase tracking-wide text-muted-foreground backdrop-blur">
-                {label}
-            </p>
-            {repos.map((repo) => (
-                <button
-                    key={repo.fullName}
-                    type="button"
-                    onClick={() => onPick(repo)}
-                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-muted"
-                >
-                    <GitHubMark className="size-4 shrink-0 text-muted-foreground" />
-                    <span className="min-w-0 flex-1 truncate">{repo.fullName}</span>
-                    <span className="flex shrink-0 items-center gap-2 pl-2 text-xs text-muted-foreground">
-                        {repo.private && <Lock className="size-3.5" />}
-                        {repo.defaultBranch}
-                    </span>
-                </button>
-            ))}
-        </div>
-    );
-}
-
 /** Picking this means "start an instance of its own", the default. */
 const DEDICATED = "__dedicated__";
 

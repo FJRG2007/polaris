@@ -25,6 +25,17 @@ export interface LearningsHeading {
   endLine: number;
 }
 
+/**
+ * Polaris departure: what Enigma to install into the agent's home before it
+ * starts, so the run works to the operator's standards whatever model is
+ * driving it. Null when the instance turned it off.
+ */
+export interface EnigmaSettings {
+  /** npm version spec, pinned by Polaris so two runs of one repository work to
+   *  the same standards. */
+  version: string;
+}
+
 export interface RepoSettings {
   model: string | null;
   // reasoning-effort position on [0,1], landed on the running model's own
@@ -35,6 +46,8 @@ export interface RepoSettings {
   postCheckoutScript: string | null;
   prepushScript: string | null;
   stopScript: string | null;
+  // Polaris departure. see EnigmaSettings.
+  enigma: EnigmaSettings | null;
   push: PushPermission;
   shell: ShellPermission;
   prApproveEnabled: boolean;
@@ -107,6 +120,7 @@ const defaultSettings: RepoSettings = {
   postCheckoutScript: null,
   prepushScript: null,
   stopScript: null,
+  enigma: null,
   push: "restricted",
   shell: "restricted",
   prApproveEnabled: false,
@@ -219,6 +233,7 @@ export async function fetchRunContext(params: {
         postCheckoutScript: data.settings?.postCheckoutScript ?? null,
         prepushScript: data.settings?.prepushScript ?? null,
         stopScript: data.settings?.stopScript ?? null,
+        enigma: data.settings?.enigma ?? null,
         learningsHeadings: data.settings?.learningsHeadings ?? [],
         xrepoBrief: data.settings?.xrepoBrief ?? null,
         xrepoLearnings: data.settings?.xrepoLearnings ?? null,

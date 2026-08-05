@@ -19,6 +19,7 @@ import { z } from "zod";
 import { githubLoginSchema, githubRepoSchema } from "./runners.js";
 import {
     AGENT_EXECUTIONS,
+    AGENT_GATE_MODES,
     AGENT_PUSH_POLICIES,
     AGENT_RUN_STATES,
     AGENT_SHELL_POLICIES,
@@ -30,6 +31,7 @@ export const agentTriggerSchema = z.enum(AGENT_TRIGGERS);
 export const agentRunStateSchema = z.enum(AGENT_RUN_STATES);
 export const agentPushPolicySchema = z.enum(AGENT_PUSH_POLICIES);
 export const agentShellPolicySchema = z.enum(AGENT_SHELL_POLICIES);
+export const agentGateModeSchema = z.enum(AGENT_GATE_MODES);
 
 /** The named reasoning levels the form offers. Stored by name and turned into the
  *  runtime's position on the running model's own ladder when a run is dispatched,
@@ -83,7 +85,13 @@ export const agentRepoConfigSchema = z
         effort: agentEffortSchema.default("medium"),
         push: agentPushPolicySchema,
         shell: agentShellPolicySchema,
-        enabled: z.boolean().default(true)
+        enabled: z.boolean().default(true),
+        // Null is "inherit from the organization, or from the instance". Storing
+        // the inherited value instead would freeze it the moment somebody changed
+        // the tier above, which is the whole thing the tiers exist to avoid.
+        pullRequests: z.boolean().nullable().default(null),
+        issues: z.boolean().nullable().default(null),
+        gate: agentGateModeSchema.nullable().default(null)
     })
     .refine((value) => value.execution !== "runners" || value.poolId !== null, {
         message: "Pick the runner pool this repository should use",
@@ -91,6 +99,34 @@ export const agentRepoConfigSchema = z
     });
 
 export type AgentRepoConfigInput = z.infer<typeof agentRepoConfigSchema>;
+
+/**
+ * What one tier above a repository decides.
+ *
+ * Every field is nullable for the same reason the repository's own overrides
+ * are: a tier that says nothing about a setting must not vote on it. The scope
+ * is either the whole instance or one GitHub account, and which of the two it is
+ * comes from the `scope` field rather than from which endpoint was called, so
+ * one action serves both screens.
+ */
+export const agentDefaultsSchema = z.object({
+    /** Empty for the instance-wide row; a GitHub account or organization login
+     *  otherwise. */
+    scope: z.union([z.literal(""), githubLoginSchema]).default(""),
+    execution: agentExecutionSchema.nullable().default(null),
+    poolId: z.string().uuid().nullable().default(null),
+    model: agentModelSchema.nullable().default(null),
+    effort: agentEffortSchema.nullable().default(null),
+    push: agentPushPolicySchema.nullable().default(null),
+    shell: agentShellPolicySchema.nullable().default(null),
+    publicRepos: z.boolean().nullable().default(null),
+    privateRepos: z.boolean().nullable().default(null),
+    pullRequests: z.boolean().nullable().default(null),
+    issues: z.boolean().nullable().default(null),
+    gate: agentGateModeSchema.nullable().default(null)
+});
+
+export type AgentDefaultsInput = z.infer<typeof agentDefaultsSchema>;
 
 /** Enabling a repository: its identity, plus how it should run. */
 export const enableAgentRepoSchema = z.object({

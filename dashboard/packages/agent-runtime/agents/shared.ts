@@ -4,6 +4,7 @@ import type { ToolState } from "../toolState.ts";
 import { log } from "../utils/cli.ts";
 import type { ResolvedInstructions } from "../utils/instructions.ts";
 import type { ResolvedPayload } from "../utils/payload.ts";
+import type { EnigmaSettings } from "../utils/runContext.ts";
 import type { TodoTracker } from "../utils/todoTracking.ts";
 
 // maximum number of stderr lines to keep in the rolling buffer during agent execution
@@ -148,6 +149,12 @@ export interface AgentRunContext {
    * guidance. null when the repo has no stop hook configured.
    */
   stopScript?: string | null | undefined;
+  /**
+   * Polaris departure. what Enigma to install into the agent's home before it
+   * starts, so the run works to the operator's standards whatever model is
+   * driving it. null when the instance turned it off.
+   */
+  enigma?: EnigmaSettings | null | undefined;
   /**
    * mutable per-run state shared with the MCP server (by reference). post-run
    * gates read fresh values from it after each agent attempt - `summaryFilePath`,

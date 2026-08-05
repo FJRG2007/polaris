@@ -19,9 +19,11 @@
  */
 
 import { prisma } from "@polaris/db";
+import { appBaseUrl } from "@/lib/domain-service";
 import { authenticateRun } from "@/lib/agents/agent-auth";
-import { issueRunToken, markRunStarted } from "@/lib/agents/agent-run-service";
 import { buildRunContext } from "@/lib/agents/agent-run-context";
+import { policyForRepo } from "@/lib/agents/agent-defaults-service";
+import { issueRunToken, markRunStarted } from "@/lib/agents/agent-run-service";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -44,7 +46,18 @@ export async function GET(
 
     const row = await prisma.agentRepo.findUnique({
         where: { id: caller.repoId },
-        select: { enabled: true, model: true, effort: true, push: true, shell: true }
+        select: {
+            enabled: true,
+            model: true,
+            effort: true,
+            push: true,
+            shell: true,
+            repoFullName: true,
+            ownerId: true,
+            pullRequests: true,
+            issues: true,
+            gate: true
+        }
     });
     if (!row?.enabled) {
         return Response.json({ reason: "commercial", error: "agent runs are not enabled for this repository" }, { status: 402 });
@@ -58,7 +71,11 @@ export async function GET(
         select: { mode: true, model: true, trigger: true }
     });
 
-    const instructions = await instructionsFor(caller.repoId, run?.trigger ?? null, run?.mode ?? null);
+    const [instructions, policy, apiUrl] = await Promise.all([
+        instructionsFor(caller.repoId, run?.trigger ?? null, run?.mode ?? null),
+        policyForRepo(row.ownerId, row),
+        appBaseUrl()
+    ]);
 
     // Asking for its context is the first thing a run does, so it is also the
     // moment the run stopped being queued. A workflow that never boots therefore
@@ -80,7 +97,14 @@ export async function GET(
         push: row.push,
         shell: row.shell,
         instructions,
-        mode: run?.mode ?? null
+        mode: run?.mode ?? null,
+        gate: policy.gate,
+        runId: caller.runId,
+        apiUrl: (apiUrl ?? "").replace(/\/+$/, ""),
+        // The operator's own words where there are any, and what started the run
+        // otherwise. Never text from an issue or a comment: this reaches the
+        // gate's review pass as the standard the diff is judged against.
+        intent: instructions || `A ${run?.trigger ?? "manual"} agent run on ${row.repoFullName}.`
     });
 
     return Response.json(context, { headers: { "cache-control": "no-store" } });

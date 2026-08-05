@@ -1,11 +1,13 @@
 "use client";
 
 import { RunState } from "../run-state";
-import { Play, Square } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { cancelRunAction, startRunAction } from "../actions";
 import type { AgentRunView } from "@/lib/agents/agent-run-service";
+import { Check, Loader2, Play, Square, TriangleAlert } from "lucide-react";
+import { GATE_STEP_LABELS, type GateStepReport } from "@/lib/agents/agent-gate";
 import { AGENT_EXECUTION_LABELS, AGENT_TRIGGER_LABELS, isTerminalRunState } from "@polaris/core";
 import {
     Button,
@@ -27,10 +29,25 @@ import {
  * of what it did into the pull request, which is where the person reviewing it is
  * already looking.
  */
+/** How often a run that is still going is re-read. The gate reports a step at a
+ *  time and a screen that only moved on reload would make a working pipeline
+ *  look stuck. */
+const REFRESH_MS = 5000;
+
 export function RunsView({ runs, repos }: { runs: AgentRunView[]; repos: string[] }) {
     const [starting, setStarting] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [, startTransition] = useTransition();
+    const router = useRouter();
+
+    // Only while something is actually moving. A screen of finished runs polls
+    // nothing.
+    const live = runs.some((run) => !isTerminalRunState(run.state));
+    useEffect(() => {
+        if (!live) return;
+        const timer = setInterval(() => router.refresh(), REFRESH_MS);
+        return () => clearInterval(timer);
+    }, [live, router]);
 
     const cancel = (run: AgentRunView) => {
         startTransition(() => {
@@ -85,6 +102,7 @@ export function RunsView({ runs, repos }: { runs: AgentRunView[]; repos: string[
                                                 </a>
                                             </div>
                                             {run.error ? <p className="mt-1 text-xs text-red-400">{run.error}</p> : null}
+                                            <GateSteps steps={run.gateSteps} />
                                         </td>
                                         <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">
                                             {AGENT_TRIGGER_LABELS[run.trigger]}
@@ -118,6 +136,40 @@ export function RunsView({ runs, repos }: { runs: AgentRunView[]; repos: string[
 
             {starting ? <StartRunDialog repos={repos} onClose={() => setStarting(false)} /> : null}
         </div>
+    );
+}
+
+/**
+ * What the quality gate is doing, under the run it belongs to.
+ *
+ * Shown as it happens rather than only once it is over: the gate can hold a push
+ * for minutes, and a run that looks idle for that long reads as broken. A failed
+ * step keeps what it said, because that is the thing somebody has to act on.
+ */
+function GateSteps({ steps }: { steps: GateStepReport[] }) {
+    if (steps.length === 0) return null;
+    return (
+        <ul className="mt-1.5 space-y-1">
+            {steps.map((step) => (
+                <li key={`${step.step}-${step.at}`} className="text-xs">
+                    <span className="flex items-center gap-1.5 text-muted-foreground">
+                        {step.state === "running" ? (
+                            <Loader2 className="size-3 shrink-0 animate-spin" />
+                        ) : step.state === "passed" ? (
+                            <Check className="size-3 shrink-0 text-emerald-400" />
+                        ) : (
+                            <TriangleAlert className="size-3 shrink-0 text-red-400" />
+                        )}
+                        {GATE_STEP_LABELS[step.step]}
+                    </span>
+                    {step.state === "failed" && step.detail ? (
+                        <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap rounded-md bg-surface/60 px-2 py-1 text-[11px] text-red-300">
+                            {step.detail}
+                        </pre>
+                    ) : null}
+                </li>
+            ))}
+        </ul>
     );
 }
 

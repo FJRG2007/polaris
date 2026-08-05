@@ -13,7 +13,9 @@ import { prisma } from "@polaris/db";
 import { getCapabilities } from "@polaris/config";
 import { appBaseUrl } from "@/lib/domain-service";
 import { parseLabels } from "@/lib/runners/runner-labels";
+import { inheritedConfig } from "@/lib/agents/agent-defaults-service";
 import {
+    DEFAULT_AGENT_PUSH_POLICY,
     defaultShellPolicy,
     recommendExecution,
     type AgentExecution,
@@ -35,6 +37,11 @@ export interface AgentRepoView {
     push: string;
     shell: string;
     enabled: boolean;
+    /** Null means "inherit", from the organization tier and then the instance's.
+     *  What they resolve to is `policyForRepo`. */
+    pullRequests: boolean | null;
+    issues: boolean | null;
+    gate: string | null;
     workflowInstalledAt: Date | null;
     error: string | null;
     automationCount: number;
@@ -64,6 +71,9 @@ export async function listAgentRepos(ownerId: string): Promise<AgentRepoView[]> 
         push: row.push,
         shell: row.shell,
         enabled: row.enabled,
+        pullRequests: row.pullRequests,
+        issues: row.issues,
+        gate: row.gate,
         workflowInstalledAt: row.workflowInstalledAt,
         error: row.error,
         automationCount: row._count.automations,
@@ -186,6 +196,9 @@ export async function upsertAgentRepo(ownerId: string, input: EnableAgentRepoInp
         push: input.config.push,
         shell: input.config.shell,
         enabled: input.config.enabled,
+        pullRequests: input.config.pullRequests,
+        issues: input.config.issues,
+        gate: input.config.gate,
         // A change of execution invalidates whatever workflow is in the repository,
         // so the installer runs again rather than trusting the stamp.
         error: null
@@ -213,23 +226,38 @@ export async function removeAgentRepo(ownerId: string, repoId: string): Promise<
     return count > 0;
 }
 
-/** The default configuration offered for a repository nobody has configured yet. */
+/**
+ * The configuration offered for a repository nobody has configured yet.
+ *
+ * Whatever the tiers above it answered wins; the rest comes from the repository
+ * itself. The execution falls back to the recommendation rather than to a fixed
+ * value because the right answer depends on what this instance can do, and the
+ * shell falls back to the visibility for the reason in `defaultShellPolicy`.
+ */
 export async function defaultConfigFor(
     ownerId: string,
     repoFullName: string,
     isPrivate: boolean,
     model: string
 ): Promise<AgentRepoConfigInput & { advice: ExecutionAdvice }> {
-    const advice = await adviseExecution(ownerId, repoFullName, isPrivate);
-    const pools = advice.execution === "runners" ? await poolsServing(ownerId, repoFullName) : [];
+    const [advice, inherited] = await Promise.all([
+        adviseExecution(ownerId, repoFullName, isPrivate),
+        inheritedConfig(ownerId, repoFullName)
+    ]);
+    const execution = inherited.execution ?? advice.execution;
+    const pools = execution === "runners" ? await poolsServing(ownerId, repoFullName) : [];
     return {
-        execution: advice.execution,
-        poolId: pools[0]?.id ?? null,
-        model,
-        effort: "medium",
-        push: "restricted",
-        shell: defaultShellPolicy(isPrivate),
+        execution,
+        poolId: execution === "runners" ? (inherited.poolId ?? pools[0]?.id ?? null) : null,
+        model: inherited.model ?? model,
+        effort: (inherited.effort as AgentRepoConfigInput["effort"]) ?? "medium",
+        push: inherited.push ?? DEFAULT_AGENT_PUSH_POLICY,
+        shell: inherited.shell ?? defaultShellPolicy(isPrivate),
         enabled: true,
+        // The tiers already answer these; a new repository overrides nothing.
+        pullRequests: null,
+        issues: null,
+        gate: null,
         advice
     };
 }

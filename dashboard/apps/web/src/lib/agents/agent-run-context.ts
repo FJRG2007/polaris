@@ -17,7 +17,8 @@
 
 import { runSecrets } from "@/lib/agents/agent-providers";
 import { EFFORT_ALIASES } from "@polaris/agent-runtime/shared";
-import { parseAgentTriggers, type AgentTrigger } from "@polaris/core";
+import { ENIGMA_VERSION, gateScript } from "@/lib/agents/agent-gate";
+import { parseAgentTriggers, type AgentGateMode, type AgentTrigger } from "@polaris/core";
 
 /** One rule, as the runtime reads it. */
 interface RunContextMode {
@@ -36,6 +37,10 @@ export interface RunContextPayload {
         postCheckoutScript: string | null;
         prepushScript: string | null;
         stopScript: string | null;
+        /** What Enigma the run installs into the agent's home, or null when the
+         *  operator turned it off. A Polaris field: the vendored runtime gained
+         *  it here rather than upstream. */
+        enigma: { version: string } | null;
         push: string;
         shell: string;
         prApproveEnabled: boolean;
@@ -84,6 +89,16 @@ export interface BuildRunContextInput {
     instructions: string;
     /** Which mode the automation forces, if it forces one. */
     mode: string | null;
+    /** What the quality gate does once the agent has committed. */
+    gate: AgentGateMode;
+    /** The run the gate reports its steps against. */
+    runId: string;
+    /** Where those reports go. Stripped of a trailing slash. */
+    apiUrl: string;
+    /** What this run set out to accomplish, which is what the gate's review pass
+     *  uses to tell a deliberate choice from a mistake. Operator prose and the
+     *  automation's instructions, never text from an issue or a comment. */
+    intent: string;
 }
 
 /**
@@ -107,8 +122,18 @@ export async function buildRunContext(input: BuildRunContextInput): Promise<RunC
             modes: [],
             setupScript: null,
             postCheckoutScript: null,
-            prepushScript: null,
+            // The gate runs here rather than as a stop hook: at this point the
+            // agent's work is committed and nothing has left the machine, so a
+            // refusal is still cheap and the agent is still there to act on it.
+            prepushScript: gateScript({
+                mode: input.gate,
+                apiUrl: input.apiUrl,
+                runId: input.runId,
+                runToken: input.runToken,
+                intent: input.intent
+            }),
             stopScript: null,
+            enigma: { version: ENIGMA_VERSION },
             push: input.push,
             shell: input.shell,
             // Approving and auto-merging its own work is not something an agent

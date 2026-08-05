@@ -14,16 +14,17 @@ import { normalizeRoot } from "@polaris/deploy";
 import { requirePermission } from "@/lib/session";
 import { recordAudit } from "@/lib/audit-service";
 import * as deployService from "@/lib/deploy-service";
-import { parseGithubRepo } from "@/lib/repo-reference";
 import { getNetworkStatus } from "@/lib/network-service";
+import { githubTokenForUser } from "@/lib/github-access";
 import { setDomainCertificate } from "@/lib/domain-cert-service";
 import { listConnections, getDriver } from "@/lib/storage-service";
 import { getDomainZones, listDeployZones } from "@/lib/domain-zones";
 import { getFlagsForEnvironment } from "@/lib/deploy-project-service";
 import { ensurePublicIp, getDomainConfig } from "@/lib/domain-service";
+import { pickerRepoList, pickerRepoSearch } from "@/lib/github-repo-picker";
 import { provisionHostnameDns, type HostnameDnsResult } from "@/lib/domain-dns";
 import { getOrCreateLocalTarget, getOrCreateHostTarget } from "@/lib/deploy-target-service";
-import { githubCredentialsForUser, githubTokenForUser, listReposForUser } from "@/lib/github-access";
+import { inspectGithubRepo, type GithubRepo, type RepoInspection } from "@/lib/github-service";
 import { listVolumes, createVolume, updateVolume, deleteVolume, type VolumeView } from "@/lib/deploy-volume-service";
 import {
     getCloudflareAccountStatus,
@@ -41,13 +42,6 @@ import {
     stopNgrokTunnel,
     type NgrokTunnelStatus
 } from "@/lib/deploy/ngrok-tunnel-service";
-import {
-    inspectGithubRepo,
-    resolveGithubRepo,
-    searchGithubRepos,
-    type GithubRepo,
-    type RepoInspection
-} from "@/lib/github-service";
 import {
     deleteRegistryCredential,
     listRegistryCredentials,
@@ -1056,18 +1050,8 @@ export async function deleteVolumeAction(input: { id: string; applicationId: str
  */
 export async function githubReposAction(): Promise<{ connected: boolean; login: string | null; repos: GithubRepo[] }> {
     const user = await requirePermission("deploy.manage");
-    const accounts = await githubCredentialsForUser(user.id);
-    if (accounts.length === 0) return { connected: false, login: null, repos: [] };
-    // Named only when there is one: two accounts have no single login to show.
-    const login = accounts.length === 1 ? (accounts[0]?.login ?? null) : null;
-    try {
-        return { connected: true, login, repos: await listReposForUser(user.id) };
-    } catch {
-        return { connected: true, login, repos: [] };
-    }
+    return pickerRepoList(user.id);
 }
-
-const repoQuerySchema = z.string().trim().min(2).max(200);
 
 /**
  * Repositories matching what was typed in the Deploy picker, beyond the connected
@@ -1081,17 +1065,5 @@ const repoQuerySchema = z.string().trim().min(2).max(200);
  */
 export async function searchGithubReposAction(query: string): Promise<{ repos: GithubRepo[] }> {
     const user = await requirePermission("deploy.manage");
-    const parsed = repoQuerySchema.safeParse(query);
-    if (!parsed.success) return { repos: [] };
-    try {
-        const reference = parseGithubRepo(parsed.data);
-        if (reference) {
-            const token = await githubTokenForUser(user.id, reference.owner);
-            const repo = await resolveGithubRepo(reference.owner, reference.repo, token);
-            if (repo) return { repos: [repo] };
-        }
-        return { repos: await searchGithubRepos(parsed.data, await githubTokenForUser(user.id)) };
-    } catch {
-        return { repos: [] };
-    }
+    return { repos: await pickerRepoSearch(user.id, query) };
 }

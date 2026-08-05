@@ -12,6 +12,7 @@
 
 import { prisma } from "@polaris/db";
 import { generateToken, hashToken } from "@polaris/core/tokens";
+import { parseGateSteps, type GateStepReport } from "@/lib/agents/agent-gate";
 import {
     isTerminalRunState,
     type AgentExecution,
@@ -42,6 +43,9 @@ export interface AgentRunView {
     tokensIn: number | null;
     tokensOut: number | null;
     error: string | null;
+    /** What the Enigma quality gate reported, in the order it worked through the
+     *  steps. Empty until a run reaches its push. */
+    gateSteps: GateStepReport[];
     createdAt: Date;
 }
 
@@ -62,6 +66,7 @@ interface RunRow {
     tokensIn: number | null;
     tokensOut: number | null;
     error: string | null;
+    gateSteps: string | null;
     createdAt: Date;
     repo: { repoFullName: string };
 }
@@ -85,6 +90,7 @@ function toView(row: RunRow): AgentRunView {
         tokensIn: row.tokensIn,
         tokensOut: row.tokensOut,
         error: row.error,
+        gateSteps: parseGateSteps(row.gateSteps),
         createdAt: row.createdAt
     };
 }

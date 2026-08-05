@@ -17,9 +17,15 @@
 import { prisma } from "@polaris/db";
 import { dispatchRun } from "@/lib/agents/agent-dispatch";
 import { githubAppInstallationToken } from "@/lib/github-service";
-import { ALWAYS_ON_TRIGGER, type AgentTrigger } from "@polaris/core";
+import { policyForRepo } from "@/lib/agents/agent-defaults-service";
 import { agentRepoByFullName } from "@/lib/agents/agent-repo-service";
 import { finishAgentRun, sweepStaleRuns } from "@/lib/agents/agent-run-service";
+import {
+    ALWAYS_ON_TRIGGER,
+    policyAllowsTrigger,
+    policyAllowsVisibility,
+    type AgentTrigger
+} from "@polaris/core";
 
 /** What a webhook boils down to, once the event's shape is out of the way. */
 interface Incident {
@@ -219,6 +225,15 @@ export async function handleAgentWebhook(params: {
     // warns about, and it is refused here rather than left to a per-repository
     // setting nobody would find.
     if (incident.fromFork) return [];
+
+    // What the operator decided above this repository. The visibility switch is
+    // checked on every event rather than only when the repository is added: a
+    // repository that goes public is exactly the one somebody turned public
+    // repositories off for, and it must stop running without anybody having to
+    // notice and disable it by hand.
+    const policy = await policyForRepo(repo.ownerId, repo);
+    if (!policyAllowsVisibility(policy, repo.isPrivate)) return [];
+    if (!policyAllowsTrigger(policy, incident.trigger)) return [];
 
     // A mention needs no rule: it is somebody addressing the app directly, and a
     // repository where that did nothing would look installed and be inert. On a

@@ -7,16 +7,14 @@
  * been open since before a permission was revoked or a container engine removed.
  */
 
-import { z } from "zod";
 import { prisma } from "@polaris/db";
 import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/session";
-import { parseGithubRepo } from "@/lib/repo-reference";
+import type { GithubRepo } from "@/lib/github-service";
 import { resolveScope } from "@/lib/runners/runner-targets";
 import { listConnectedAccounts } from "@/lib/connections/store";
 import { reconcileRunnerPools } from "@/lib/runners/runner-reconciler";
-import { resolveGithubRepo, searchGithubRepos, type GithubRepo } from "@/lib/github-service";
-import { githubCredentialsForUser, githubTokenForUser, listReposForUser } from "@/lib/github-access";
+import { pickerRepoList, pickerRepoSearch } from "@/lib/github-repo-picker";
 import { createRunnerPoolSchema, runnerScopeSchema, serverIdSchema, updateRunnerPoolSchema } from "@polaris/core";
 import {
     createRunnerPool,
@@ -133,18 +131,8 @@ export async function previewScopeAction(
  *  instance's, so the picker offers what this person can actually reach. */
 export async function githubReposAction(): Promise<{ connected: boolean; login: string | null; repos: GithubRepo[] }> {
     const user = await requirePermission("system.manage");
-    const accounts = await githubCredentialsForUser(user.id);
-    if (accounts.length === 0) return { connected: false, login: null, repos: [] };
-    // Named only when there is one: two accounts have no single login to show.
-    const login = accounts.length === 1 ? (accounts[0]?.login ?? null) : null;
-    try {
-        return { connected: true, login, repos: await listReposForUser(user.id) };
-    } catch {
-        return { connected: true, login, repos: [] };
-    }
+    return pickerRepoList(user.id);
 }
-
-const repoQuerySchema = z.string().trim().min(2).max(200);
 
 /**
  * Repositories matching what was typed, beyond the connected account's own list.
@@ -153,19 +141,7 @@ const repoQuerySchema = z.string().trim().min(2).max(200);
  */
 export async function searchGithubReposAction(query: string): Promise<{ repos: GithubRepo[] }> {
     const user = await requirePermission("system.manage");
-    const parsed = repoQuerySchema.safeParse(query);
-    if (!parsed.success) return { repos: [] };
-    try {
-        const reference = parseGithubRepo(parsed.data);
-        if (reference) {
-            const token = await githubTokenForUser(user.id, reference.owner);
-            const repo = await resolveGithubRepo(reference.owner, reference.repo, token);
-            if (repo) return { repos: [repo] };
-        }
-        return { repos: await searchGithubRepos(parsed.data, await githubTokenForUser(user.id)) };
-    } catch {
-        return { repos: [] };
-    }
+    return { repos: await pickerRepoSearch(user.id, query) };
 }
 
 /**

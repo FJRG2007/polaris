@@ -65,6 +65,18 @@ Everything below is a deliberate departure, not drift.
   the hotlinked progress GIF and every documentation link were removed. The
   footer carries what a reader of the pull request can act on: where the run
   happened, what wrote it, which model.
+- **Enigma.** `utils/enigma.ts` is ours, and `agents/claude.ts` and
+  `agents/opencode.ts` each call `installEnigma` beside `installBundledSkills`.
+  It installs the operator's policy skills, operating contract, slash commands
+  and post-edit guardrails into the same fake HOME the bundled skills use, so a
+  run works to the operator's standards whatever model is driving it. Gated on
+  `settings.enigma` in the run context, which is a Polaris field: `RepoSettings`
+  and `AgentRunContext` each gained one property for it, defaulting to null so an
+  older control plane changes nothing. The install deliberately deletes Enigma's
+  own `Stop` hook afterwards - this runtime's Stop hook owns the whole
+  end-of-turn decision, and two hooks each deciding whether the agent may stop is
+  a loop neither can see. Everything else Enigma writes composes: the skills are
+  read-only guidance and the post-edit hooks run per edit and exit.
 - **Typography.** Em and en dashes were replaced with plain hyphens throughout
   (1208 occurrences), because this package writes prose into other people's
   repositories and that is the house rule for user-facing text.

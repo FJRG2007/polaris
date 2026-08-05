@@ -77,6 +77,7 @@ import { formatJsonValue, log } from "../utils/cli.ts";
 import { installCodexAuth } from "../utils/codexHome.ts";
 import { findProviderErrorMatch } from "../utils/providerErrors.ts";
 import { resolveRunEffort } from "../utils/runEffort.ts";
+import { exposeAgentOnPath, installEnigma } from "../utils/enigma.ts";
 import { addSkill, installBundledSkills } from "../utils/skills.ts";
 import { trackChild, untrackChild } from "../utils/subprocess.ts";
 import type { TodoTracker } from "../utils/todoTracking.ts";
@@ -1124,6 +1125,13 @@ export const opencode = agent({
       agent: "opencode",
     });
     installBundledSkills({ home: homeEnv.HOME });
+
+    // Polaris departure: the operator's own standards, whatever model is driving
+    // this run, plus the agent on PATH so the pre-push quality gate can find one.
+    if (ctx.enigma) {
+      installEnigma({ home: homeEnv.HOME, version: ctx.enigma.version, env: homeEnv });
+      exposeAgentOnPath({ name: "opencode", cliPath, tmpdir: ctx.tmpdir });
+    }
 
     // materialize CODEX_AUTH_JSON into the runner's real $HOME/.local/share/
     // opencode/auth.json so OpenCode's CodexAuthPlugin picks it up. see

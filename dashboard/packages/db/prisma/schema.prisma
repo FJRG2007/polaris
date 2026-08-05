@@ -109,6 +109,7 @@ model User {
     enrollments         Enrollment[]
     runnerPools         RunnerPool[]
     agentRepos          AgentRepo[]
+    agentDefaults       AgentDefaults[]
     linkedAccounts      UserConnection[]
     taskSpaces          TaskSpace[]
     taskSpaceMemberships TaskSpaceMember[]
@@ -1226,6 +1227,7 @@ model RunnerPool {
     secrets RunnerSecret[]
     repos   RunnerRepoConfig[]
     agentRepos AgentRepo[]
+    agentDefaults AgentDefaults[]
 
     @@index([ownerId])
     @@index([hostId])
@@ -3651,6 +3653,14 @@ model AgentRepo {
     // secrets are filtered out of the environment when it does.
     shell         String
     enabled       Boolean  @default(true)
+    // Whether pull-request and issue events start runs here. Null inherits from
+    // the organization's defaults, and then from the instance's. Storing the
+    // inherited value would freeze it the moment the tier above changed.
+    pullRequests  Boolean?
+    issues        Boolean?
+    // off | checks | full - what the Enigma quality gate does once the agent has
+    // committed, before anything is pushed. Null inherits, same as above.
+    gate          String?
     // When the workflow file was last written into the repository. Null for
     // `server` execution, which needs no workflow at all, and for a repository
     // enabled before the write succeeded.
@@ -3668,6 +3678,51 @@ model AgentRepo {
 
     @@unique([ownerId, repoFullName])
     @@index([repoFullName])
+    @@index([ownerId])
+    @@index([poolId])
+}
+
+// What repositories inherit, decided once instead of on every repository.
+//
+// Two tiers share this table and are told apart by `scope`: the empty string is
+// the instance-wide row, and a GitHub account or organization login is that
+// account's row. A repository reads its own columns first, then the row for its
+// owner login, then the empty-scope row. Every column is nullable because null
+// means "inherit" - a tier that stored its inherited value would freeze it the
+// moment the tier above it changed, which is exactly what the tiers exist to
+// avoid.
+model AgentDefaults {
+    id           String   @id @default(uuid(7)) @db.Uuid
+    ownerId      String   @db.Uuid
+    // "" for the instance-wide row, a GitHub login otherwise.
+    scope        String   @default("")
+    // actions | runners | server, and the pool that goes with `runners`.
+    execution    String?
+    poolId       String?  @db.Uuid
+    model        String?
+    effort       String?
+    // disabled | restricted | enabled, for git and for the shell.
+    push         String?
+    shell        String?
+    // Whether the agent may run on a repository of that visibility at all. A
+    // public repository is the one a stranger can open a pull request on, which
+    // is why it is a switch of its own.
+    publicRepos  Boolean?
+    privateRepos Boolean?
+    // Whether pull-request and issue events start runs. A direct mention is not
+    // covered by either: that is somebody addressing the app, not Polaris
+    // starting a run on its own.
+    pullRequests Boolean?
+    issues       Boolean?
+    // off | checks | full.
+    gate         String?
+    createdAt    DateTime @default(now())
+    updatedAt    DateTime @updatedAt
+
+    owner User        @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+    pool  RunnerPool? @relation(fields: [poolId], references: [id], onDelete: SetNull)
+
+    @@unique([ownerId, scope])
     @@index([ownerId])
     @@index([poolId])
 }
@@ -3747,6 +3802,11 @@ model AgentRun {
     error       String?
     // The structured result a run was asked to produce, as stringified JSON.
     result      String?
+    // What the Enigma quality gate has reported so far, as stringified JSON:
+    // one entry per step, appended as the pre-push hook works through them. Kept
+    // on the run rather than in the log so the screen can show the pipeline
+    // without reading a container's output.
+    gateSteps   String?
     createdAt   DateTime @default(now())
     updatedAt   DateTime @updatedAt
 

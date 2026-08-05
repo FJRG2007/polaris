@@ -14,56 +14,119 @@ import { z } from "zod";
 import { prisma } from "@polaris/db";
 import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/session";
+import type { GithubRepo } from "@/lib/github-service";
 import { listReposForUser } from "@/lib/github-access";
 import { dispatchRun } from "@/lib/agents/agent-dispatch";
+import { MODEL_INTEGRATIONS } from "@/lib/integrations/registry";
 import { stopServerRun } from "@/lib/agents/agent-server-executor";
+import { pickerRepoList, pickerRepoSearch } from "@/lib/github-repo-picker";
 import { finishAgentRun, getAgentRun } from "@/lib/agents/agent-run-service";
 import { connectedProviders, providerForModel } from "@/lib/agents/agent-providers";
 import {
-    agentAutomationSchema,
-    agentRepoConfigSchema,
-    enableAgentRepoSchema,
-    manualAgentRunSchema
-} from "@polaris/core";
+    listAgentDefaults,
+    policyForNewRepo,
+    saveAgentDefaults,
+    scopeOf,
+    type AgentDefaultsView
+} from "@/lib/agents/agent-defaults-service";
 import {
-    adviseExecution,
+    defaultConfigFor,
     getAgentRepo,
     poolsServing,
     removeAgentRepo,
     setAgentRepoEnabled,
     upsertAgentRepo
 } from "@/lib/agents/agent-repo-service";
+import {
+    agentAutomationSchema,
+    agentDefaultsSchema,
+    agentRepoConfigSchema,
+    enableAgentRepoSchema,
+    manualAgentRunSchema,
+    policyAllowsVisibility,
+    repoFullNameSchema,
+    type AgentPolicy,
+    type AgentRepoConfigInput,
+    type ExecutionAdvice
+} from "@polaris/core";
 
 const AGENTS_PATH = "/apps/agents";
 
+/** The model each connected provider offers, from the same catalog the AI
+ *  providers screen is built from. Used only to seed a form: an operator naming
+ *  another model is accepted, and an unknown one fails at dispatch naming
+ *  itself. */
+const MODEL_DEFAULTS: Record<string, string> = Object.fromEntries(
+    MODEL_INTEGRATIONS.flatMap((entry) => (entry.defaultModel ? [[entry.slug, entry.defaultModel.slug] as const] : []))
+);
+
 /** Repositories this person can reach, for the picker. Asked as them, never with
  *  the instance's credentials: a repository list is personal. */
-export async function listAgentRepoChoices(): Promise<{ repos: Array<{ fullName: string; private: boolean }>; error?: string }> {
+export async function listAgentRepoChoices(): Promise<{ connected: boolean; login: string | null; repos: GithubRepo[] }> {
     const user = await requirePermission("agents.manage");
-    try {
-        const repos = await listReposForUser(user.id);
-        return { repos: repos.map((repo) => ({ fullName: repo.fullName, private: repo.private })) };
-    } catch (caught) {
-        return { repos: [], error: caught instanceof Error ? caught.message : "Could not read your repositories" };
-    }
+    return pickerRepoList(user.id);
 }
 
-/** What Polaris advises for a repository, and which pools could serve it. */
+/** Anything the account's own list does not hold, looked up on GitHub as the
+ *  operator types. */
+export async function searchAgentRepoChoices(query: string): Promise<{ repos: GithubRepo[] }> {
+    const user = await requirePermission("agents.manage");
+    return { repos: await pickerRepoSearch(user.id, query) };
+}
+
+/**
+ * Everything the repository form needs once a repository is picked.
+ *
+ * One call rather than four, because none of it is answerable before the
+ * repository is known and all of it is needed the moment it is: what Polaris
+ * advises, which pools could serve it, which model providers are connected, what
+ * the tiers above it already decided, and whether those tiers allow a repository
+ * of this visibility at all.
+ */
 export async function adviseRepoAction(input: unknown): Promise<{
-    advice?: Awaited<ReturnType<typeof adviseExecution>>;
+    advice?: ExecutionAdvice;
     pools?: Array<{ id: string; name: string }>;
+    /** Every pool this person has, so a repository no pool covers yet still says
+     *  which machines exist rather than only that none does. */
+    allPools?: Array<{ id: string; name: string }>;
     providers?: string[];
+    defaults?: AgentRepoConfigInput;
+    policy?: AgentPolicy;
     error?: string;
 }> {
     const user = await requirePermission("agents.manage");
-    const parsed = z.object({ repoFullName: z.string().min(3), isPrivate: z.boolean() }).safeParse(input);
+    const parsed = z.object({ repoFullName: repoFullNameSchema, isPrivate: z.boolean() }).safeParse(input);
     if (!parsed.success) return { error: "Pick a repository" };
-    const [advice, pools, providers] = await Promise.all([
-        adviseExecution(user.id, parsed.data.repoFullName, parsed.data.isPrivate),
+
+    const [pools, allPools, providers, policy] = await Promise.all([
         poolsServing(user.id, parsed.data.repoFullName),
-        connectedProviders()
+        prisma.runnerPool.findMany({
+            where: { ownerId: user.id, enabled: true },
+            select: { id: true, name: true },
+            orderBy: { name: "asc" }
+        }),
+        connectedProviders(),
+        policyForNewRepo(user.id, parsed.data.repoFullName)
     ]);
-    return { advice, pools: pools.map((pool) => ({ id: pool.id, name: pool.name })), providers };
+
+    // The first connected provider's model is only a starting point; the tiers
+    // above may name one, and `defaultConfigFor` lets them win.
+    const firstModel = providers.map((slug) => MODEL_DEFAULTS[slug]).find(Boolean) ?? "";
+    const { advice, ...defaults } = await defaultConfigFor(
+        user.id,
+        parsed.data.repoFullName,
+        parsed.data.isPrivate,
+        firstModel
+    );
+
+    return {
+        advice,
+        pools: pools.map((pool) => ({ id: pool.id, name: pool.name })),
+        allPools,
+        providers,
+        defaults,
+        policy
+    };
 }
 
 export async function enableRepoAction(input: unknown): Promise<{ error?: string }> {
@@ -90,6 +153,19 @@ export async function enableRepoAction(input: unknown): Promise<{ error?: string
     const provider = providerForModel(parsed.data.config.model);
     if (provider && !(await connectedProviders()).includes(provider.slug)) {
         return { error: `Connect ${provider.name} under Integrations before using this model.` };
+    }
+
+    // The visibility comes from GitHub rather than from the form, so this is the
+    // real answer to a switch somebody set deliberately. Enabling a repository
+    // the tiers above have turned off would produce one that looks enabled and
+    // never runs.
+    const policy = await policyForNewRepo(user.id, match.fullName);
+    if (!policyAllowsVisibility(policy, match.private)) {
+        return {
+            error: match.private
+                ? "Private repositories are turned off for this account. Change it under Agents settings."
+                : "Public repositories are turned off for this account. Change it under Agents settings."
+        };
     }
 
     try {
@@ -231,5 +307,61 @@ export async function cancelRunAction(input: unknown): Promise<{ error?: string 
     if (run.execution === "server") await stopServerRun(run.id);
     await finishAgentRun(run.id, { state: "cancelled", error: "Cancelled from Polaris." });
     revalidatePath(`${AGENTS_PATH}/runs`);
+    return {};
+}
+
+/**
+ * The tiers above a repository, for the settings screen.
+ *
+ * The general tier is always returned, even when nobody has set it, so the
+ * screen has a row to render rather than an empty state that hides where the
+ * defaults come from.
+ */
+export async function listAgentDefaultsAction(): Promise<{ tiers: AgentDefaultsView[]; owners: string[] }> {
+    const user = await requirePermission("agents.manage");
+    const [tiers, repos] = await Promise.all([
+        listAgentDefaults(user.id),
+        prisma.agentRepo.findMany({ where: { ownerId: user.id }, select: { repoFullName: true } })
+    ]);
+    // The accounts worth offering a tier for are the ones this person actually
+    // has repositories in; anything else would be a list of every organization
+    // on GitHub.
+    const owners = [...new Set(repos.map((repo) => scopeOf(repo.repoFullName)))].filter(Boolean).sort();
+    return { tiers, owners };
+}
+
+/** Store one tier. A tier that decides nothing is removed rather than kept. */
+export async function saveAgentDefaultsAction(input: unknown): Promise<{ error?: string }> {
+    const user = await requirePermission("agents.manage");
+    const parsed = agentDefaultsSchema.safeParse(input);
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the settings" };
+
+    // Same refusal as the repository paths: a model whose provider has no stored
+    // key produces runs that start, ask for one, and fail - and here it would do
+    // that to every repository the tier covers.
+    if (parsed.data.model) {
+        const provider = providerForModel(parsed.data.model);
+        if (provider && !(await connectedProviders()).includes(provider.slug)) {
+            return { error: `Connect ${provider.name} under Integrations before defaulting to this model.` };
+        }
+    }
+
+    // A pool from a form is a claim. Storing one this person does not own would
+    // point every repository under the tier at somebody else's machine.
+    if (parsed.data.poolId) {
+        const pool = await prisma.runnerPool.findFirst({
+            where: { id: parsed.data.poolId, ownerId: user.id },
+            select: { id: true }
+        });
+        if (!pool) return { error: "That runner pool is not one of yours." };
+    }
+
+    try {
+        await saveAgentDefaults(user.id, parsed.data);
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not save the settings" };
+    }
+    revalidatePath(`${AGENTS_PATH}/settings`);
+    revalidatePath(`${AGENTS_PATH}/repos`);
     return {};
 }

@@ -3,6 +3,7 @@
 import { runAction } from "@/lib/run-action";
 import { ExecutionPicker } from "./execution-picker";
 import { useEffect, useState, useTransition } from "react";
+import { RepoSettingsFields } from "./repo-settings-fields";
 import type { AgentRepoView } from "@/lib/agents/agent-repo-service";
 import { adviseRepoAction, updateRepoConfigAction } from "../actions";
 import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, Input, Select } from "@polaris/ui";
@@ -15,6 +16,8 @@ import {
     AGENT_SHELL_POLICY_LABELS,
     AGENT_SHELL_POLICY_NOTES,
     type AgentExecution,
+    type AgentGateMode,
+    type AgentPolicy,
     type AgentPushPolicy,
     type AgentShellPolicy,
     type ExecutionAdvice
@@ -28,8 +31,13 @@ export function RepoDialog({ repo, onClose }: { repo: AgentRepoView; onClose: ()
     const [effort, setEffort] = useState(repo.effort);
     const [push, setPush] = useState<AgentPushPolicy>(repo.push as AgentPushPolicy);
     const [shell, setShell] = useState<AgentShellPolicy>(repo.shell as AgentShellPolicy);
+    const [pullRequests, setPullRequests] = useState<boolean | null>(repo.pullRequests);
+    const [issues, setIssues] = useState<boolean | null>(repo.issues);
+    const [gate, setGate] = useState<AgentGateMode | null>(repo.gate as AgentGateMode | null);
     const [advice, setAdvice] = useState<ExecutionAdvice | null>(null);
     const [pools, setPools] = useState<Array<{ id: string; name: string }>>([]);
+    const [allPools, setAllPools] = useState<Array<{ id: string; name: string }>>([]);
+    const [policy, setPolicy] = useState<AgentPolicy | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
 
@@ -38,6 +46,8 @@ export function RepoDialog({ repo, onClose }: { repo: AgentRepoView; onClose: ()
             const result = await adviseRepoAction({ repoFullName: repo.repoFullName, isPrivate: repo.isPrivate });
             setAdvice(result.advice ?? null);
             setPools(result.pools ?? []);
+            setAllPools(result.allPools ?? []);
+            setPolicy(result.policy ?? null);
         })();
     }, [repo.repoFullName, repo.isPrivate]);
 
@@ -48,7 +58,18 @@ export function RepoDialog({ repo, onClose }: { repo: AgentRepoView; onClose: ()
                     () =>
                         updateRepoConfigAction({
                             repoId: repo.id,
-                            config: { execution, poolId, model, effort, push, shell, enabled: repo.enabled }
+                            config: {
+                                execution,
+                                poolId,
+                                model,
+                                effort,
+                                push,
+                                shell,
+                                enabled: repo.enabled,
+                                pullRequests,
+                                issues,
+                                gate
+                            }
                         }),
                     setError
                 );
@@ -70,6 +91,7 @@ export function RepoDialog({ repo, onClose }: { repo: AgentRepoView; onClose: ()
                         value={execution}
                         advice={advice}
                         pools={pools}
+                        allPools={allPools}
                         poolId={poolId}
                         onChange={setExecution}
                         onPoolChange={setPoolId}
@@ -120,6 +142,16 @@ export function RepoDialog({ repo, onClose }: { repo: AgentRepoView; onClose: ()
                             </p>
                         ) : null}
                     </div>
+
+                    <RepoSettingsFields
+                        policy={policy}
+                        pullRequests={pullRequests}
+                        issues={issues}
+                        gate={gate}
+                        onPullRequests={setPullRequests}
+                        onIssues={setIssues}
+                        onGate={setGate}
+                    />
 
                     {error ? <p className="text-sm text-red-400">{error}</p> : null}
                 </div>

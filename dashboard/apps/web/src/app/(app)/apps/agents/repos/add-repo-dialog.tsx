@@ -1,12 +1,30 @@
 "use client";
 
+import { Lock } from "lucide-react";
 import { runAction } from "@/lib/run-action";
 import { ExecutionPicker } from "./execution-picker";
-import { useEffect, useState, useTransition } from "react";
+import { GitHubMark } from "@/components/brand-icons";
+import { RepoSettingsFields } from "./repo-settings-fields";
+import { useCallback, useState, useTransition } from "react";
 import { MODEL_INTEGRATIONS } from "@/lib/integrations/registry";
-import { adviseRepoAction, enableRepoAction, listAgentRepoChoices } from "../actions";
+import { RepoPicker, type PickerRepo } from "@/components/repo-picker";
 import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, Select } from "@polaris/ui";
-import { AGENT_EFFORTS, defaultShellPolicy, type AgentExecution, type ExecutionAdvice } from "@polaris/core";
+import {
+    adviseRepoAction,
+    enableRepoAction,
+    listAgentRepoChoices,
+    searchAgentRepoChoices
+} from "../actions";
+import {
+    AGENT_EFFORTS,
+    policyAllowsVisibility,
+    type AgentExecution,
+    type AgentGateMode,
+    type AgentPolicy,
+    type AgentPushPolicy,
+    type AgentShellPolicy,
+    type ExecutionAdvice
+} from "@polaris/core";
 
 /** One model offered per connected provider, from the same catalog the AI
  *  providers screen is built from. A slug the runtime gained later still works:
@@ -21,73 +39,85 @@ const MODELS: Record<string, { label: string; slug: string }> = Object.fromEntri
  *
  * The repository is picked first because everything after it depends on what the
  * repository is: a public one gets a different recommendation and a different
- * shell default than a private one, and asking for those before knowing would
- * mean asking twice.
+ * shell default than a private one, its account may carry settings of its own,
+ * and asking for any of that before knowing would mean asking twice.
  */
 export function AddRepoDialog({ onClose }: { onClose: () => void }) {
-    const [repos, setRepos] = useState<Array<{ fullName: string; private: boolean }>>([]);
+    const [repo, setRepo] = useState<PickerRepo | null>(null);
     const [providers, setProviders] = useState<string[]>([]);
     const [pools, setPools] = useState<Array<{ id: string; name: string }>>([]);
+    const [allPools, setAllPools] = useState<Array<{ id: string; name: string }>>([]);
     const [advice, setAdvice] = useState<ExecutionAdvice | null>(null);
+    const [policy, setPolicy] = useState<AgentPolicy | null>(null);
 
-    const [repoFullName, setRepoFullName] = useState("");
     const [execution, setExecution] = useState<AgentExecution>("server");
     const [poolId, setPoolId] = useState<string | null>(null);
     const [model, setModel] = useState("");
     const [effort, setEffort] = useState<string>("medium");
+    const [pullRequests, setPullRequests] = useState<boolean | null>(null);
+    const [issues, setIssues] = useState<boolean | null>(null);
+    const [gate, setGate] = useState<AgentGateMode | null>(null);
+    // Not on the form: both are set from what the tiers decided, and changed
+    // afterwards from the repository's own settings. Kept here so a tier that
+    // answered them is not silently discarded on save.
+    const [push, setPush] = useState<AgentPushPolicy>("restricted");
+    const [shell, setShell] = useState<AgentShellPolicy>("restricted");
     const [error, setError] = useState<string | null>(null);
+    const [loading, setLoading] = useState(false);
     const [pending, startTransition] = useTransition();
 
-    const selected = repos.find((repo) => repo.fullName === repoFullName) ?? null;
+    const listRepos = useCallback(() => listAgentRepoChoices(), []);
 
-    // The repository list is the one slow read here, so it starts immediately and
-    // the dialog renders around it rather than behind it.
-    useEffect(() => {
+    // Picking a repository is what makes everything else answerable, so it is all
+    // asked for then rather than on every keystroke of the search.
+    const pick = (picked: PickerRepo) => {
+        setRepo(picked);
+        setLoading(true);
+        setError(null);
         void (async () => {
-            const result = await listAgentRepoChoices();
-            if (result.error) setError(result.error);
-            setRepos(result.repos);
-        })();
-    }, []);
-
-    // Picking a repository is what makes advice possible, so it is asked for then
-    // rather than on every keystroke.
-    useEffect(() => {
-        if (!selected) return;
-        void (async () => {
-            const result = await adviseRepoAction({ repoFullName: selected.fullName, isPrivate: selected.private });
+            const result = await adviseRepoAction({ repoFullName: picked.fullName, isPrivate: picked.private });
+            setLoading(false);
             if (result.error) {
                 setError(result.error);
                 return;
             }
             setAdvice(result.advice ?? null);
             setPools(result.pools ?? []);
+            setAllPools(result.allPools ?? []);
             setProviders(result.providers ?? []);
-            if (result.advice) setExecution(result.advice.execution);
-            setPoolId(result.pools?.[0]?.id ?? null);
-            const first = (result.providers ?? []).map((slug) => MODELS[slug]).find(Boolean);
-            if (first) setModel(first.slug);
+            setPolicy(result.policy ?? null);
+            if (result.defaults) {
+                setExecution(result.defaults.execution);
+                setPoolId(result.defaults.poolId);
+                setEffort(result.defaults.effort);
+                setModel(result.defaults.model);
+                setPush(result.defaults.push);
+                setShell(result.defaults.shell);
+            }
         })();
-    }, [selected]);
+    };
 
     const save = () => {
-        if (!selected) return;
+        if (!repo) return;
         startTransition(() => {
             void (async () => {
                 const result = await runAction(
                     () =>
                         enableRepoAction({
-                            repoFullName: selected.fullName,
-                            installationId: selected.fullName.split("/")[0] ?? "",
-                            isPrivate: selected.private,
+                            repoFullName: repo.fullName,
+                            installationId: repo.fullName.split("/")[0] ?? "",
+                            isPrivate: repo.private,
                             config: {
                                 execution,
                                 poolId,
                                 model,
                                 effort,
-                                push: "restricted",
-                                shell: defaultShellPolicy(selected.private),
-                                enabled: true
+                                push,
+                                shell,
+                                enabled: true,
+                                pullRequests,
+                                issues,
+                                gate
                             }
                         }),
                     setError
@@ -99,6 +129,10 @@ export function AddRepoDialog({ onClose }: { onClose: () => void }) {
     };
 
     const modelOptions = providers.map((slug) => MODELS[slug]).filter(Boolean) as Array<{ label: string; slug: string }>;
+    // The tiers above can turn a whole visibility off, and enabling a repository
+    // they exclude produces one that looks enabled and never runs. Said here
+    // rather than only on save.
+    const excluded = repo && policy ? !policyAllowsVisibility(policy, repo.private) : false;
 
     return (
         <Dialog open onOpenChange={(open) => !open && onClose()}>
@@ -110,23 +144,40 @@ export function AddRepoDialog({ onClose }: { onClose: () => void }) {
                 <div className="space-y-4">
                     <div className="space-y-1">
                         <label className="text-sm font-medium">Repository</label>
-                        <Select
-                            value={repoFullName}
-                            onValueChange={setRepoFullName}
-                            placeholder={repos.length === 0 ? "Reading your repositories..." : "Pick a repository"}
-                            options={repos.map((repo) => ({
-                                value: repo.fullName,
-                                label: repo.private ? `${repo.fullName} (private)` : repo.fullName
-                            }))}
-                        />
+                        {repo ? (
+                            <div className="flex items-center gap-2 rounded-md border border-border/60 px-3 py-2">
+                                <GitHubMark className="size-4 shrink-0 text-muted-foreground" />
+                                <span className="min-w-0 flex-1 truncate text-sm" title={repo.fullName}>{repo.fullName}</span>
+                                {repo.private && <Lock className="size-3.5 shrink-0 text-muted-foreground" />}
+                                <Button type="button" variant="ghost" size="sm" onClick={() => setRepo(null)}>
+                                    Change
+                                </Button>
+                            </div>
+                        ) : (
+                            <RepoPicker
+                                cacheKey="agents"
+                                autoFocus
+                                list={listRepos}
+                                search={searchAgentRepoChoices}
+                                onPick={pick}
+                            />
+                        )}
                     </div>
 
-                    {selected ? (
+                    {excluded ? (
+                        <p className="text-xs text-amber-400">
+                            {repo?.private ? "Private" : "Public"} repositories are turned off for this account. Turn
+                            them back on under Agents settings, or the agent will never run here.
+                        </p>
+                    ) : null}
+
+                    {repo && !loading ? (
                         <>
                             <ExecutionPicker
                                 value={execution}
                                 advice={advice}
                                 pools={pools}
+                                allPools={allPools}
                                 poolId={poolId}
                                 onChange={setExecution}
                                 onPoolChange={setPoolId}
@@ -156,6 +207,16 @@ export function AddRepoDialog({ onClose }: { onClose: () => void }) {
                                 />
                             </div>
 
+                            <RepoSettingsFields
+                                policy={policy}
+                                pullRequests={pullRequests}
+                                issues={issues}
+                                gate={gate}
+                                onPullRequests={setPullRequests}
+                                onIssues={setIssues}
+                                onGate={setGate}
+                            />
+
                             <p className="text-xs text-muted-foreground">
                                 The agent starts on feature branches only and cannot push to the default branch. Change
                                 that, and the rules that start it, from the repository&apos;s settings afterwards.
@@ -170,7 +231,7 @@ export function AddRepoDialog({ onClose }: { onClose: () => void }) {
                     <Button variant="ghost" onClick={onClose}>
                         Cancel
                     </Button>
-                    <Button onClick={save} disabled={!selected || !model || pending}>
+                    <Button onClick={save} disabled={!repo || !model || loading || pending}>
                         {pending ? "Adding..." : "Add"}
                     </Button>
                 </div>

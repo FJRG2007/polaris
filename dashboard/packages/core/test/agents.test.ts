@@ -1,12 +1,18 @@
 import { describe, expect, it } from "vitest";
 import {
     agentAutomationSchema,
+    agentDefaultsSchema,
     agentRepoConfigSchema,
+    ALWAYS_ON_TRIGGER,
+    DEFAULT_AGENT_POLICY,
     defaultShellPolicy,
     isTerminalRunState,
     manualAgentRunSchema,
     parseAgentTriggers,
+    policyAllowsTrigger,
+    policyAllowsVisibility,
     recommendExecution,
+    resolveAgentPolicy,
     repoFullNameSchema,
     type ExecutionAdviceInput
 } from "../src/index.js";
@@ -194,5 +200,88 @@ describe("manualAgentRunSchema", () => {
     it("accepts a prompt with no issue attached", () => {
         const parsed = manualAgentRunSchema.parse({ repoFullName: "acme/repo", prompt: "Update the readme" });
         expect(parsed.issueNumber).toBeNull();
+    });
+});
+
+describe("resolveAgentPolicy", () => {
+    it("lets the most specific tier that answered win", () => {
+        const policy = resolveAgentPolicy({ gate: "off" }, { gate: "checks", issues: false }, { gate: "full" });
+        expect(policy.gate).toBe("off");
+        // The repository said nothing about issues, so the account's answer stands.
+        expect(policy.issues).toBe(false);
+    });
+
+    it("treats null as inherit rather than as a value", () => {
+        // The whole reason every column is nullable: a tier that stored its
+        // inherited value would freeze it the moment the tier above changed.
+        const policy = resolveAgentPolicy({ pullRequests: null }, { pullRequests: false });
+        expect(policy.pullRequests).toBe(false);
+    });
+
+    it("falls back to the built-in defaults when no tier answered", () => {
+        expect(resolveAgentPolicy(null, undefined, {})).toEqual(DEFAULT_AGENT_POLICY);
+    });
+
+    it("gates by default, because a gate nobody opted into never catches anything", () => {
+        expect(DEFAULT_AGENT_POLICY.gate).toBe("full");
+    });
+});
+
+describe("policyAllowsVisibility", () => {
+    it("reads the switch that matches the repository", () => {
+        const policy = resolveAgentPolicy({ publicRepos: false, privateRepos: true });
+        expect(policyAllowsVisibility(policy, true)).toBe(true);
+        expect(policyAllowsVisibility(policy, false)).toBe(false);
+    });
+});
+
+describe("policyAllowsTrigger", () => {
+    const off = resolveAgentPolicy({ pullRequests: false, issues: false });
+
+    it("stops pull-request and issue triggers when they are turned off", () => {
+        expect(policyAllowsTrigger(off, "pr.opened")).toBe(false);
+        expect(policyAllowsTrigger(off, "issue.labeled")).toBe(false);
+    });
+
+    it("never gates a mention", () => {
+        // A repository where addressing the app directly did nothing would look
+        // installed and be inert.
+        expect(policyAllowsTrigger(off, ALWAYS_ON_TRIGGER)).toBe(true);
+    });
+
+    it("leaves a manual run and a failed check alone", () => {
+        expect(policyAllowsTrigger(off, "manual")).toBe(true);
+        expect(policyAllowsTrigger(off, "ci.failed")).toBe(true);
+    });
+});
+
+describe("agentDefaultsSchema", () => {
+    it("defaults every field to inherit", () => {
+        const parsed = agentDefaultsSchema.parse({});
+        expect(parsed.scope).toBe("");
+        expect(parsed.gate).toBeNull();
+        expect(parsed.publicRepos).toBeNull();
+    });
+
+    it("takes a GitHub login as the account scope", () => {
+        expect(agentDefaultsSchema.parse({ scope: "acme" }).scope).toBe("acme");
+    });
+
+    it("refuses a scope that is not a login", () => {
+        expect(agentDefaultsSchema.safeParse({ scope: "acme/repo" }).success).toBe(false);
+    });
+});
+
+describe("agentRepoConfigSchema", () => {
+    it("leaves the tiered settings inheriting unless the repository answers them", () => {
+        const parsed = agentRepoConfigSchema.parse({
+            execution: "server",
+            model: "anthropic/claude-opus",
+            push: "restricted",
+            shell: "restricted"
+        });
+        expect(parsed.pullRequests).toBeNull();
+        expect(parsed.issues).toBeNull();
+        expect(parsed.gate).toBeNull();
     });
 });

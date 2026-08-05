@@ -296,3 +296,112 @@ export const DEFAULT_AGENT_PUSH_POLICY: AgentPushPolicy = "restricted";
 export function defaultShellPolicy(isPrivate: boolean): AgentShellPolicy {
     return isPrivate ? "enabled" : "restricted";
 }
+
+/**
+ * How hard the Enigma quality gate runs once the agent has committed.
+ *
+ * `checks` is the deterministic half - the commit guard, the convention
+ * guardrails and the unfinished-work check - and costs seconds. `full` adds the
+ * gate's own review, test and document passes, which are agent passes and are
+ * measured in minutes. Both block the push when they fail, and what they say
+ * goes back to the agent to fix rather than to a log.
+ */
+export const AGENT_GATE_MODES = ["off", "checks", "full"] as const;
+export type AgentGateMode = (typeof AGENT_GATE_MODES)[number];
+
+export const AGENT_GATE_MODE_LABELS: Record<AgentGateMode, string> = {
+    off: "Off",
+    checks: "Checks only",
+    full: "Full gate"
+};
+
+export const AGENT_GATE_MODE_NOTES: Record<AgentGateMode, string> = {
+    off: "The agent pushes as soon as it is done. Its skills and guardrails still apply.",
+    checks: "Runs the commit guard, the convention guardrails and the unfinished-work check before the push. Seconds, no model calls.",
+    full: "Adds the gate's review, test and document passes. Minutes rather than seconds, and the steps are reported on the run."
+};
+
+/**
+ * Everything a repository answers that is worth deciding above it.
+ *
+ * The same shape is stored at three levels - the whole instance, one GitHub
+ * account or organization, and one repository - and read back through
+ * `resolveAgentPolicy`. Every field is a decision somebody would otherwise have
+ * to repeat on every repository they add, which is what makes the tiers worth
+ * having at all rather than a second place for the same value to disagree with
+ * itself.
+ */
+export interface AgentPolicy {
+    /** Whether the agent may run on a repository of this visibility at all. A
+     *  public repository is the one a stranger can open a pull request on, so it
+     *  is the switch worth having separately. */
+    readonly publicRepos: boolean;
+    readonly privateRepos: boolean;
+    /** Whether pull-request events start runs. */
+    readonly pullRequests: boolean;
+    /** Whether issue events start runs. */
+    readonly issues: boolean;
+    /** What runs after the agent commits, before anything is pushed. */
+    readonly gate: AgentGateMode;
+}
+
+/**
+ * What every tier inherits from.
+ *
+ * Both visibilities are on: somebody who added a repository meant it to run.
+ * The gate is full because that is the point of having one - a gate nobody
+ * opted into is a gate that never catches anything.
+ */
+export const DEFAULT_AGENT_POLICY: AgentPolicy = {
+    publicRepos: true,
+    privateRepos: true,
+    pullRequests: true,
+    issues: true,
+    gate: "full"
+};
+
+/** One tier's answers. Null is "inherit", which is what every field starts as:
+ *  a tier that stored its inherited value would freeze it the moment somebody
+ *  changed the tier above. */
+export type AgentPolicyOverride = { readonly [K in keyof AgentPolicy]?: AgentPolicy[K] | null };
+
+/**
+ * The policy in force, most specific tier first.
+ *
+ * Pass them in the order they should win - repository, then organization, then
+ * instance. A tier that says nothing about a field does not vote on it.
+ */
+export function resolveAgentPolicy(...tiers: ReadonlyArray<AgentPolicyOverride | null | undefined>): AgentPolicy {
+    const pick = <K extends keyof AgentPolicy>(key: K): AgentPolicy[K] => {
+        for (const tier of tiers) {
+            const value = tier?.[key];
+            if (value !== null && value !== undefined) return value as AgentPolicy[K];
+        }
+        return DEFAULT_AGENT_POLICY[key];
+    };
+    return {
+        publicRepos: pick("publicRepos"),
+        privateRepos: pick("privateRepos"),
+        pullRequests: pick("pullRequests"),
+        issues: pick("issues"),
+        gate: pick("gate")
+    };
+}
+
+/** Whether the policy lets the agent run on a repository of this visibility. */
+export function policyAllowsVisibility(policy: AgentPolicy, isPrivate: boolean): boolean {
+    return isPrivate ? policy.privateRepos : policy.publicRepos;
+}
+
+/**
+ * Whether the policy lets this trigger start a run.
+ *
+ * A mention is never gated here. It is somebody addressing the app directly, and
+ * a repository where that silently did nothing would look installed and be
+ * inert; the switches below are about Polaris starting runs on its own.
+ */
+export function policyAllowsTrigger(policy: AgentPolicy, trigger: AgentTrigger): boolean {
+    if (trigger.startsWith("pr.")) return policy.pullRequests;
+    if (trigger.startsWith("issue.")) return policy.issues;
+    return true;
+}

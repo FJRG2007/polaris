@@ -725,6 +725,7 @@ export async function main(): Promise<MainResult> {
       instructions,
       todoTracker,
       stopScript: runContext.repoSettings.stopScript,
+      enigma: runContext.repoSettings.enigma,
       toolState,
       apiToken: runContext.apiToken,
       onActivityTimeout: onInnerActivityTimeout,

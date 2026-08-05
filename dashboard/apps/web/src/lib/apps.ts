@@ -383,6 +383,21 @@ export const APP_SUBAPPS: AppSubapp[] = [
                 keywords: ["history", "logs", "failed", "what happened"]
             },
             {
+                label: "Settings",
+                href: "/apps/agents/settings",
+                icon: SlidersHorizontal,
+                keywords: [
+                    "defaults",
+                    "organization",
+                    "public",
+                    "private",
+                    "pull requests",
+                    "issues",
+                    "quality gate",
+                    "enigma"
+                ]
+            },
+            {
                 label: "Set up",
                 href: "/apps/agents/setup",
                 icon: BookOpen,
