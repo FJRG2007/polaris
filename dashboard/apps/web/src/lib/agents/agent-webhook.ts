@@ -303,7 +303,9 @@ export async function handleAgentWebhook(params: {
             issueNumber: incident.issueNumber,
             prNumber: incident.prNumber
         });
-        return [result.runId];
+        // A run a usage ceiling refused opened no row, so there is nothing for the
+        // caller to report or follow.
+        return result.runId ? [result.runId] : [];
     }
 
     const rules = repo.automations.filter((row) => row.trigger === incident.trigger);
@@ -323,7 +325,7 @@ export async function handleAgentWebhook(params: {
             issueNumber: incident.issueNumber,
             prNumber: incident.prNumber
         });
-        started.push(result.runId);
+        if (result.runId) started.push(result.runId);
     }
     return started;
 }

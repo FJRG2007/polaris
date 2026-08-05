@@ -3692,6 +3692,42 @@ model AgentRepo {
 // means "inherit" - a tier that stored its inherited value would freeze it the
 // moment the tier above it changed, which is exactly what the tiers exist to
 // avoid.
+// A ceiling on how much agent work something may do.
+//
+// Set by an administrator, because the money being spent is the deployment's
+// (or, once somebody brings their own key, theirs) and neither is a limit the
+// person spending it should be able to raise. Every rule that applies to a run
+// has to be under its ceiling for the run to start; the most restrictive one
+// therefore wins without anything having to rank them.
+//
+// A rule on a role or a group is PER MEMBER, not a pot they share. That is what
+// makes a role a way of setting the same limit for forty people rather than a
+// queue for them - and a shared pot would mean one person's Monday could stop
+// everybody else's Tuesday, which nobody would be able to see coming. Rules on a
+// repository or an account are naturally per that repository or account.
+model AgentUsageLimit {
+    id          String   @id @default(uuid(7)) @db.Uuid
+    // user | role | group | repo | org | everyone. `everyone` carries no subject
+    // and is the deployment-wide floor under all the others.
+    subjectType String
+    // The user, role or group id, the `owner/name` of a repository, or the
+    // GitHub account login. Empty for `everyone`.
+    subjectId   String
+    // runs | tokens. Tokens are what a provider actually bills for; runs are what
+    // an operator can reason about. Both exist because neither answers the other.
+    metric      String
+    // day | week | month, counted as a rolling window back from now rather than
+    // from a calendar boundary - a calendar month would let a month's budget be
+    // spent twice across a month end.
+    period      String
+    amount      Int
+    createdAt   DateTime @default(now())
+    updatedAt   DateTime @updatedAt
+
+    @@unique([subjectType, subjectId, metric, period])
+    @@index([subjectType])
+}
+
 // A provider credential somebody brought themselves.
 //
 // Model keys used to be instance-wide only, which made every run on the

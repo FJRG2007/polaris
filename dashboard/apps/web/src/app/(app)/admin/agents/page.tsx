@@ -7,9 +7,11 @@ import { prisma } from "@polaris/db";
 import { PageHeader } from "@polaris/ui";
 import { requireAdmin } from "@/lib/session";
 import { CatalogCard, KeySharingCard } from "./catalog-card";
+import { UsageLimitsCard } from "./usage-limits-card";
 import { PlatformDefaultsView } from "./platform-defaults-view";
 import { catalogRefreshedAt } from "@/lib/agents/model-catalog";
 import { instanceKeysAreShared } from "@/lib/agents/user-model-keys";
+import { listUsageLimits } from "@/lib/agents/agent-usage-limits";
 import { connectedProviders } from "@/lib/agents/agent-providers";
 import { getPlatformAgentDefaults } from "@/lib/agents/agent-defaults-service";
 
@@ -17,7 +19,7 @@ export const dynamic = "force-dynamic";
 
 export default async function AgentDefaultsAdminPage() {
     await requireAdmin();
-    const [platform, pools, providers, catalogModels, catalogAt, keysShared] = await Promise.all([
+    const [platform, pools, providers, catalogModels, catalogAt, keysShared, limits] = await Promise.all([
         getPlatformAgentDefaults(),
         // Every pool on the deployment, not one person's: a default here applies
         // to everybody.
@@ -29,7 +31,8 @@ export default async function AgentDefaultsAdminPage() {
         connectedProviders(),
         prisma.agentModel.count(),
         catalogRefreshedAt(),
-        instanceKeysAreShared()
+        instanceKeysAreShared(),
+        listUsageLimits()
     ]);
 
     return (
@@ -42,6 +45,7 @@ export default async function AgentDefaultsAdminPage() {
             />
             <div className="space-y-4">
                 <KeySharingCard shared={keysShared} />
+                <UsageLimitsCard limits={limits} />
                 <CatalogCard models={catalogModels} refreshedAt={catalogAt?.toISOString() ?? null} />
                 <PlatformDefaultsView platform={platform} pools={pools} providers={providers} />
             </div>

@@ -13,9 +13,10 @@
 import { prisma } from "@polaris/db";
 import { appBaseUrl } from "@/lib/domain-service";
 import { githubAppInstallationToken } from "@/lib/github-service";
-import { AGENT_WORKFLOW_PATH, type AgentExecution, type AgentTrigger } from "@polaris/core";
 import { startServerRun } from "@/lib/agents/agent-server-executor";
 import { createAgentRun, finishAgentRun } from "@/lib/agents/agent-run-service";
+import { checkUsageLimits } from "@/lib/agents/agent-usage-limits";
+import { AGENT_WORKFLOW_PATH, type AgentExecution, type AgentTrigger } from "@polaris/core";
 import {
     installWorkflow,
     renderWorkflow,
@@ -27,6 +28,9 @@ export interface DispatchInput {
     /** The enabled repository row. */
     repo: {
         id: string;
+        /** Whose it is - the principal a usage ceiling is counted against, and
+         *  whose provider keys the run spends. */
+        ownerId: string;
         repoFullName: string;
         execution: string;
         poolId: string | null;
@@ -49,7 +53,9 @@ export interface DispatchInput {
 }
 
 export interface DispatchResult {
-    runId: string;
+    /** Absent when nothing was opened - a usage ceiling refused the run before
+     *  there was one, which is not the same as a run that failed. */
+    runId?: string;
     error?: string;
 }
 
@@ -63,6 +69,14 @@ export interface DispatchResult {
  */
 export async function dispatchRun(input: DispatchInput): Promise<DispatchResult> {
     const execution = input.repo.execution as AgentExecution;
+
+    // Before the row, not after: a run refused for a usage ceiling never
+    // happened, and opening one to close it out immediately would put a failure
+    // on the screen for something that was correctly prevented. A deployment
+    // with no ceilings set pays one read of an empty table.
+    const verdict = await checkUsageLimits({ ownerId: input.repo.ownerId, repoFullName: input.repo.repoFullName });
+    if (!verdict.allowed) return { error: verdict.reason ?? "A usage limit stopped this run." };
+
     const { id: runId, token } = await createAgentRun({
         repoId: input.repo.id,
         trigger: input.trigger,

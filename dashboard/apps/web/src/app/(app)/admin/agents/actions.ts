@@ -11,12 +11,13 @@ import { prisma } from "@polaris/db";
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/session";
 import { recordAudit } from "@/lib/audit-service";
-import { agentDefaultsSchema } from "@polaris/core";
+import { agentDefaultsSchema, LIMIT_METRICS, LIMIT_PERIODS, LIMIT_SUBJECTS } from "@polaris/core";
 import type { PickerModel } from "@/components/model-picker";
+import { setInstanceKeysShared } from "@/lib/agents/user-model-keys";
 import { savePlatformAgentDefaults } from "@/lib/agents/agent-defaults-service";
 import { connectedProviders, MODEL_PROVIDERS, providerForModel } from "@/lib/agents/agent-providers";
 import { catalogRefreshedAt, listCatalogModels, refreshModelCatalog } from "@/lib/agents/model-catalog";
-import { setInstanceKeysShared } from "@/lib/agents/user-model-keys";
+import { deleteUsageLimit, saveUsageLimit } from "@/lib/agents/agent-usage-limits";
 
 /** The same list the accounts' own screens get, read through the admin gate.
  *  Kept apart rather than imported from the app's actions so /admin never
@@ -60,6 +61,50 @@ export async function setInstanceKeySharingAction(input: unknown): Promise<{ err
         action: "agents.keys.share",
         metadata: { shared: parsed.data.shared }
     });
+    revalidatePath("/admin/agents");
+    return {};
+}
+
+const limitSchema = z.object({
+    subjectType: z.enum(LIMIT_SUBJECTS),
+    // Empty only for `everyone`, which is the deployment-wide floor and names
+    // nothing. The refine below is what stops a half-filled form storing a rule
+    // that matches nobody.
+    subjectId: z.string().trim().max(200).default(""),
+    metric: z.enum(LIMIT_METRICS),
+    period: z.enum(LIMIT_PERIODS),
+    // Zero is a real answer - it stops the subject running at all - so the floor
+    // is zero rather than one.
+    amount: z.number().int().min(0).max(1_000_000_000)
+}).refine((value) => value.subjectType === "everyone" || value.subjectId.length > 0, {
+    message: "Say who or what the limit is for",
+    path: ["subjectId"]
+});
+
+export async function saveUsageLimitAction(input: unknown): Promise<{ error?: string }> {
+    const admin = await requireAdmin();
+    const parsed = limitSchema.safeParse(input);
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the limit" };
+
+    await saveUsageLimit(parsed.data);
+    await recordAudit({
+        actorId: admin.id,
+        action: "agents.limit.save",
+        targetType: parsed.data.subjectType,
+        targetId: parsed.data.subjectId || "everyone",
+        metadata: { metric: parsed.data.metric, period: parsed.data.period, amount: parsed.data.amount }
+    });
+    revalidatePath("/admin/agents");
+    return {};
+}
+
+export async function deleteUsageLimitAction(input: unknown): Promise<{ error?: string }> {
+    const admin = await requireAdmin();
+    const parsed = z.object({ id: z.string().uuid() }).safeParse(input);
+    if (!parsed.success) return { error: "Pick a limit" };
+
+    await deleteUsageLimit(parsed.data.id);
+    await recordAudit({ actorId: admin.id, action: "agents.limit.delete", targetId: parsed.data.id });
     revalidatePath("/admin/agents");
     return {};
 }

@@ -487,3 +487,31 @@ export function resolveModelChain(
     }
     return chain.slice(0, AGENT_FALLBACK_MAX + 1);
 }
+
+/**
+ * Usage ceilings: what a rule can be about, what it counts, and over what.
+ *
+ * Here rather than beside the service that enforces them because the screens
+ * that set them are client components, and a constant imported from a module
+ * that touches the database drags the whole database client into the browser
+ * bundle. These are values, not types, so they cannot be erased on the way.
+ */
+export const LIMIT_SUBJECTS = ["everyone", "user", "role", "group", "repo", "org"] as const;
+export type LimitSubject = (typeof LIMIT_SUBJECTS)[number];
+
+/** Tokens are what a provider bills for; runs are what an operator can reason
+ *  about. Both exist because neither answers the other. */
+export const LIMIT_METRICS = ["runs", "tokens"] as const;
+export type LimitMetric = (typeof LIMIT_METRICS)[number];
+
+export const LIMIT_PERIODS = ["day", "week", "month"] as const;
+export type LimitPeriod = (typeof LIMIT_PERIODS)[number];
+
+/** Written as a duration rather than as a calendar name, because that is what
+ *  they are: the window rolls back from now, so a month's budget cannot be spent
+ *  twice across a month end. */
+export const LIMIT_PERIOD_LABELS: Record<LimitPeriod, string> = {
+    day: "a day",
+    week: "a week",
+    month: "30 days"
+};
