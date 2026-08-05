@@ -9,14 +9,15 @@
 
 import { headers } from "next/headers";
 import { baseName } from "@polaris/core";
-import { getDriverForConnection } from "@/lib/storage-service";
 import { mimeForName } from "@/lib/mime";
+import { pipeThenDispose } from "@/lib/drive-stream";
+import { gateShareRequest } from "@/lib/share-access";
+import { getDriverForConnection } from "@/lib/storage-service";
 import {
     logShareAccess,
     registerDownload,
     resolveWithinShare
 } from "@/lib/share-service";
-import { gateShareRequest } from "@/lib/share-access";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -88,27 +89,4 @@ export async function GET(
     } finally {
         if (!disposed) await driver.dispose();
     }
-}
-
-/** Wrap a body stream so the driver is disposed once the response finishes. */
-function pipeThenDispose(
-    stream: ReadableStream<Uint8Array>,
-    driver: { dispose(): Promise<void> }
-): ReadableStream<Uint8Array> {
-    const reader = stream.getReader();
-    return new ReadableStream<Uint8Array>({
-        async pull(controller) {
-            const { done, value } = await reader.read();
-            if (done) {
-                controller.close();
-                await driver.dispose();
-                return;
-            }
-            controller.enqueue(value);
-        },
-        async cancel(reason) {
-            await reader.cancel(reason);
-            await driver.dispose();
-        }
-    });
 }

@@ -105,6 +105,26 @@ describe("borrowed SMB sessions", () => {
         next.release();
     });
 
+    it("does not hang up on a session another request is still using", async () => {
+        const shared = fakeSession();
+        const fresh = fakeSession();
+        const { pool } = await poolWith([shared, fresh]);
+
+        // One request is midway through a download on this session when another
+        // finds it unresponsive.
+        const downloading = await pool.borrowSmb("conn-a", options);
+        shared.dead = true;
+        const next = await pool.borrowSmb("conn-a", options);
+
+        expect(next.session).toBe(fresh);
+        expect(shared.disconnect).not.toHaveBeenCalled();
+
+        // Once the download is done there is nothing left to protect.
+        downloading.release();
+        expect(shared.disconnect).toHaveBeenCalled();
+        next.release();
+    });
+
     it("keeps a session per connection and drops one on demand", async () => {
         const a = fakeSession();
         const b = fakeSession();

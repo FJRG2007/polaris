@@ -45,6 +45,9 @@ interface PoolEntry<T> {
     value?: T;
     lastUsed: number;
     leases: number;
+    /** Dropped from the pool while borrowers still held it: closed as soon as the
+     *  last one gives it back. */
+    closeWhenIdle?: boolean;
 }
 
 const DEFAULT_IDLE_TTL_MS = 5 * 60_000;
@@ -82,6 +85,29 @@ export class LeasePool<T> {
         const entry = this.entries.get(key);
         if (!entry) return;
         this.entries.delete(key);
+        this.hangUp(entry);
+    }
+
+    /**
+     * Forget a connection a borrower found dead, if it is still the one cached for
+     * `key`.
+     *
+     * Two things separate this from `evict`. The identity check: a borrower whose
+     * check failed may be holding a connection the pool has already replaced, and
+     * hanging up on the replacement would take down the borrower that just opened
+     * it. And the wait: a check can fail for its own reasons - a timeout, one
+     * refused call - while another request is midway through a download on the same
+     * connection, so it is closed only once the last lease comes back rather than
+     * under whoever is still using it.
+     */
+    public discard(key: string, value: T): void {
+        const entry = this.entries.get(key);
+        if (!entry || entry.value !== value) return;
+        this.entries.delete(key);
+        if (entry.leases > 0) {
+            entry.closeWhenIdle = true;
+            return;
+        }
         this.hangUp(entry);
     }
 
@@ -142,6 +168,7 @@ export class LeasePool<T> {
     private giveBack(entry: PoolEntry<T>): void {
         entry.leases = Math.max(0, entry.leases - 1);
         entry.lastUsed = Date.now();
+        if (entry.closeWhenIdle && entry.leases === 0) this.hangUp(entry);
     }
 
     /** Close a pooled connection, tolerating one that never connected or is already

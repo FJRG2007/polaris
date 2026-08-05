@@ -21,12 +21,12 @@ import { useRouter } from "next/navigation";
 import { formatBytes } from "@polaris/core";
 import { keyboardIsBusy } from "@/lib/keyboard";
 import { ArchiveDialog } from "./archive-dialog";
-import { prefetchListing } from "./listing-cache";
 import { useDriveInsights } from "./use-drive-insights";
 import { SelectionZipMenu } from "./selection-zip-menu";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { RelativeTime } from "@/components/relative-time";
 import { matchShortcut, SHORTCUT_HINTS } from "./shortcuts";
+import { activityKey, prefetchListing } from "./listing-cache";
 import { useDisplayFormat } from "@/components/display-format";
 import { matchesStructured, parseSearch } from "./search-query";
 import { readSnapshot, writeSnapshot } from "@/lib/snapshot-cache";
@@ -1113,7 +1113,7 @@ export function FilesView({
         const controller = new AbortController();
         // Clicking back onto a file shows what its history said moments ago rather
         // than an empty panel and another query.
-        const key = `drive.activity:${connectionId}:${singleSelectedPath}`;
+        const key = activityKey(connectionId, singleSelectedPath);
         const cached = readSnapshot<ActivityItem[]>(key, ACTIVITY_CACHE_TTL_MS)?.value;
         if (cached) setActivity(cached);
         setActivityLoading(!cached);

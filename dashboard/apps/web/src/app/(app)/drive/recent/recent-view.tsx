@@ -10,6 +10,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { formatBytes } from "@polaris/core";
+import { recentKey } from "../listing-cache";
 import { Card, CardBody, Select, cn } from "@polaris/ui";
 import { RelativeTime } from "@/components/relative-time";
 import { Clock, File as FileIcon, FolderOpen } from "lucide-react";
@@ -53,7 +54,7 @@ export function RecentView({ connections }: { connections: { id: string; name: s
         const controller = new AbortController();
         // Answering this walks the connection, so a lens switched away from and back
         // paints what it said a moment ago while the walk runs again behind it.
-        const key = `drive.recent:${connectionId}:${lens}`;
+        const key = recentKey(connectionId, lens);
         const cached = readSnapshot<RecentEntry[]>(key, CACHE_TTL_MS)?.value;
         if (cached) setEntries(cached);
         setLoading(!cached);

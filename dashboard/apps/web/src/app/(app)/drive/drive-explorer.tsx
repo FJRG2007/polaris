@@ -22,11 +22,11 @@ import { UnifiConsoleButton } from "./unifi-console-button";
 import { ShareDialog, type ShareTarget } from "./share-dialog";
 import { useLiveResource } from "@/components/use-live-resource";
 import { RemoveConnectionDialog } from "./remove-connection-dialog";
-import { dropListings, prefetchListing, readListing, writeListing } from "./listing-cache";
 import { RequestDialog, type RequestTarget } from "./request-dialog";
 import { ConnectionDialog, EditConnectionDialog } from "./connection-dialog";
 import { AccessDialog, UnlockPanel, type AccessTarget } from "./access-dialog";
 import { useCallback, useEffect, useRef, useState, useTransition, type FormEvent } from "react";
+import { dropDriveSnapshots, prefetchListing, readListing, writeListing } from "./listing-cache";
 import {
     isSavedConnection,
     isServerSource,
@@ -166,9 +166,9 @@ export function DriveExplorer({
             } finally {
                 setOps((prev) => prev.filter((op) => op.id !== id));
                 // A write can change a folder other than the one on screen (a move
-                // or a copy has a destination), so no cached listing is trusted
+                // or a copy has a destination), so no cached read is trusted
                 // after one.
-                dropListings();
+                dropDriveSnapshots();
                 void load();
             }
         });

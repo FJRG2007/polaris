@@ -1,5 +1,13 @@
+import { readSnapshot, writeSnapshot } from "@/lib/snapshot-cache";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { dropListings, prefetchListing, readListing, writeListing } from "@/app/(app)/drive/listing-cache";
+import {
+    activityKey,
+    dropDriveSnapshots,
+    prefetchListing,
+    readListing,
+    recentKey,
+    writeListing
+} from "@/app/(app)/drive/listing-cache";
 
 /** sessionStorage as the cache expects it; jsdom is not loaded for these tests. */
 class MemoryStorage {
@@ -61,9 +69,17 @@ describe("Drive listing cache", () => {
     it("forgets everything after a write, wherever the write landed", () => {
         writeListing("host:a", "", [entry("one")]);
         writeListing("host:b", "docs", [entry("two")]);
-        dropListings();
+        // The other two Drive caches answer for the same files: a deleted file would
+        // keep showing in Recent and keep its history panel long after it went.
+        writeSnapshot(recentKey("host:a", "modified"), [entry("one")]);
+        writeSnapshot(activityKey("host:a", "docs/one"), [{ action: "drive.upload" }]);
+
+        dropDriveSnapshots();
+
         expect(readListing("host:a", "")).toBeNull();
         expect(readListing("host:b", "docs")).toBeNull();
+        expect(readSnapshot(recentKey("host:a", "modified"), 60_000)).toBeNull();
+        expect(readSnapshot(activityKey("host:a", "docs/one"), 30_000)).toBeNull();
     });
 
     it("stops reading a listing once it is too old to trust", () => {

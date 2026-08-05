@@ -4,11 +4,12 @@
  * and media scrubbing work. Node runtime because Prisma and the drivers need it.
  */
 
-import { baseName, normalizeRelPath } from "@polaris/core";
-import { requireUser, sessionCan } from "@/lib/session";
-import { requireDriveDriver, DriveAccessError, DriveLockedError } from "@/lib/drive-authz";
 import { mimeForName } from "@/lib/mime";
 import { recordAudit } from "@/lib/audit-service";
+import { pipeThenDispose } from "@/lib/drive-stream";
+import { requireUser, sessionCan } from "@/lib/session";
+import { baseName, normalizeRelPath } from "@polaris/core";
+import { requireDriveDriver, DriveAccessError, DriveLockedError } from "@/lib/drive-authz";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -41,38 +42,48 @@ export async function GET(request: Request): Promise<Response> {
         if (caught instanceof DriveAccessError) return new Response("Forbidden", { status: 403 });
         throw caught;
     }
-    const stat = await driver.stat(path);
-    if (stat.kind !== "file") return new Response("Not a file", { status: 400 });
+    // The driver holds a pooled session, so every exit from here has to give it
+    // back: on a stream, when the last byte leaves (or the client walks away);
+    // on anything else, now.
+    let streaming = false;
+    try {
+        const stat = await driver.stat(path);
+        if (stat.kind !== "file") return new Response("Not a file", { status: 400 });
 
-    await recordAudit({
-        actorId: user.id,
-        action: "drive.download",
-        targetType: "connection",
-        targetId: connectionId,
-        metadata: { path, size: stat.size.toString() }
-    });
+        await recordAudit({
+            actorId: user.id,
+            action: "drive.download",
+            targetType: "connection",
+            targetId: connectionId,
+            metadata: { path, size: stat.size.toString() }
+        });
 
-    // An inline request feeds an in-dashboard viewer (image/pdf/media); the default
-    // is an attachment download. Both stream the same bytes and honor Range.
-    const inline = url.searchParams.get("disposition") === "inline";
-    const headers = new Headers({
-        "content-type": stat.mime ?? mimeForName(baseName(path)) ?? "application/octet-stream",
-        "accept-ranges": "bytes",
-        "content-disposition": `${inline ? "inline" : "attachment"}; filename*=UTF-8''${encodeURIComponent(baseName(path))}`
-    });
+        // An inline request feeds an in-dashboard viewer (image/pdf/media); the default
+        // is an attachment download. Both stream the same bytes and honor Range.
+        const inline = url.searchParams.get("disposition") === "inline";
+        const headers = new Headers({
+            "content-type": stat.mime ?? mimeForName(baseName(path)) ?? "application/octet-stream",
+            "accept-ranges": "bytes",
+            "content-disposition": `${inline ? "inline" : "attachment"}; filename*=UTF-8''${encodeURIComponent(baseName(path))}`
+        });
 
-    const rangeHeader = request.headers.get("range");
-    const match = rangeHeader ? RANGE.exec(rangeHeader) : null;
-    if (match && driver.capabilities.randomRead) {
-        const start = Number(match[1]);
-        const end = match[2] ? Number(match[2]) : Number(stat.size) - 1;
-        const stream = await driver.readStream(path, { start, end });
-        headers.set("content-range", `bytes ${start}-${end}/${stat.size}`);
-        headers.set("content-length", String(end - start + 1));
-        return new Response(stream, { status: 206, headers });
+        const rangeHeader = request.headers.get("range");
+        const match = rangeHeader ? RANGE.exec(rangeHeader) : null;
+        if (match && driver.capabilities.randomRead) {
+            const start = Number(match[1]);
+            const end = match[2] ? Number(match[2]) : Number(stat.size) - 1;
+            const stream = await driver.readStream(path, { start, end });
+            headers.set("content-range", `bytes ${start}-${end}/${stat.size}`);
+            headers.set("content-length", String(end - start + 1));
+            streaming = true;
+            return new Response(pipeThenDispose(stream, driver), { status: 206, headers });
+        }
+
+        const stream = await driver.readStream(path);
+        headers.set("content-length", stat.size.toString());
+        streaming = true;
+        return new Response(pipeThenDispose(stream, driver), { status: 200, headers });
+    } finally {
+        if (!streaming) await driver.dispose();
     }
-
-    const stream = await driver.readStream(path);
-    headers.set("content-length", stat.size.toString());
-    return new Response(stream, { status: 200, headers });
 }

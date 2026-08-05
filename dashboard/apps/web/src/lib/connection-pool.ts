@@ -110,8 +110,13 @@ export async function borrowSmb(connectionId: string, options: Omit<SmbConnectOp
             await lease.value.stat("");
             return { session: lease.value, release: () => lease.release() };
         } catch (error) {
+            // Only this session is given up on, and only while nothing else is using
+            // it: a check can fail on a session another request is midway through a
+            // download on, and by the time it does the pool may already hold a
+            // replacement that has nothing wrong with it.
+            const dead = lease.value;
             lease.release();
-            smbPool.evict(key);
+            smbPool.discard(key, dead);
             if (attempt === 1) throw error;
         }
     }
