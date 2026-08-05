@@ -56,6 +56,15 @@ describe("paths", () => {
         expect(extName("noext")).toBe("");
         expect(joinUnderRoot("/data/", "a/b.txt")).toBe("/data/a/b.txt");
     });
+
+    it("keeps the filesystem root joinable", () => {
+        // A server browsed over SFTP has root "/": trimming it away produced an
+        // empty path and every listing of the root failed.
+        expect(joinUnderRoot("/", "")).toBe("/");
+        expect(joinUnderRoot("/", "etc")).toBe("/etc");
+        expect(joinUnderRoot("//", "etc/hosts")).toBe("/etc/hosts");
+        expect(joinUnderRoot("/data/", "")).toBe("/data");
+    });
 });
 
 describe("tokens", () => {

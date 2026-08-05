@@ -68,6 +68,12 @@ export function extName(name: string): string {
 /** Join a normalized relative path onto a root, returning a safe POSIX join. */
 export function joinUnderRoot(root: string, relPath: string): string {
     const rel = normalizeRelPath(relPath);
-    const cleanRoot = root.replace(/\\/g, "/").replace(/\/+$/, "");
-    return rel === "" ? cleanRoot : `${cleanRoot}/${rel}`;
+    const posixRoot = root.replace(/\\/g, "/");
+    // Trimming trailing slashes turns a filesystem root ("/") into "", which is
+    // not a path any backend can open - an SFTP readdir of it fails with
+    // "no such file". Keep the single slash for an absolute root.
+    const trimmed = posixRoot.replace(/\/+$/, "");
+    const cleanRoot = trimmed === "" && posixRoot.startsWith("/") ? "/" : trimmed;
+    if (rel === "") return cleanRoot;
+    return cleanRoot === "/" ? `/${rel}` : `${cleanRoot}/${rel}`;
 }

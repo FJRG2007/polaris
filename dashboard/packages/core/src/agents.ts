@@ -29,6 +29,23 @@
 export const AGENT_EXECUTIONS = ["actions", "runners", "server"] as const;
 export type AgentExecution = (typeof AGENT_EXECUTIONS)[number];
 
+/**
+ * Where the workflow file Polaris manages lands in a repository.
+ *
+ * Named for what it is rather than for Polaris, because it sits in somebody
+ * else's repository next to their own workflows. Here rather than beside the
+ * code that writes it so the screens can link to it: that module reads the
+ * database and mints GitHub tokens, and a client component importing a constant
+ * from it would drag all of that into the browser bundle.
+ */
+export const AGENT_WORKFLOW_PATH = ".github/workflows/polaris-agent.yml";
+
+/** Whether this execution needs a workflow file in the repository at all.
+ *  `server` runs are started by Polaris and involve GitHub Actions nowhere. */
+export function needsWorkflowFile(execution: AgentExecution): boolean {
+    return execution !== "server";
+}
+
 /** How each choice reads on the screen that makes it. */
 export const AGENT_EXECUTION_LABELS: Record<AgentExecution, string> = {
     actions: "GitHub Actions",

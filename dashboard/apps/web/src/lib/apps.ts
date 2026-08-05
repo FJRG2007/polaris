@@ -294,6 +294,12 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
         { label: "Email delivery", href: "/admin/email", icon: Mail, keywords: ["smtp", "sender"], hidden: true },
         { label: "Display defaults", href: "/admin/display", icon: SlidersHorizontal, keywords: ["units", "formats"] },
         {
+            label: "Agent defaults",
+            href: "/admin/agents",
+            icon: Bot,
+            keywords: ["agents", "quality gate", "enigma", "public", "private", "pull requests", "issues"]
+        },
+        {
             label: "Uploads",
             href: "/admin/uploads",
             icon: HardDrive,

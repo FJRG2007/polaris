@@ -5,10 +5,15 @@ import { RepoDialog } from "./repo-dialog";
 import { runAction } from "@/lib/run-action";
 import { useState, useTransition } from "react";
 import { AddRepoDialog } from "./add-repo-dialog";
-import { Plus, Settings2, Trash2 } from "lucide-react";
 import { removeRepoAction, setRepoEnabledAction } from "../actions";
 import type { AgentRepoView } from "@/lib/agents/agent-repo-service";
-import { AGENT_EXECUTION_LABELS, AGENT_EXECUTION_NOTES } from "@polaris/core";
+import { Check, Plus, Settings2, TriangleAlert, Trash2 } from "lucide-react";
+import {
+    AGENT_EXECUTION_LABELS,
+    AGENT_EXECUTION_NOTES,
+    AGENT_WORKFLOW_PATH,
+    needsWorkflowFile
+} from "@polaris/core";
 import { Badge, Button, Card, CardBody, ConfirmDeleteDialog, Switch } from "@polaris/ui";
 
 /**
@@ -89,6 +94,30 @@ export function ReposView({ repos, providers }: { repos: AgentRepoView[]; provid
                                             {AGENT_EXECUTION_LABELS[repo.execution]}
                                             {repo.poolName ? (
                                                 <span className="ml-1 text-xs">({repo.poolName})</span>
+                                            ) : null}
+                                            {/* The two GitHub-scheduled executions need a file in the
+                                                repository, and whether it is there is the difference
+                                                between a repository that will run and one that will
+                                                fail at its first dispatch. */}
+                                            {needsWorkflowFile(repo.execution) ? (
+                                                <a
+                                                    href={`https://github.com/${repo.repoFullName}/blob/HEAD/${AGENT_WORKFLOW_PATH}`}
+                                                    target="_blank"
+                                                    rel="noreferrer"
+                                                    className="mt-0.5 flex items-center gap-1 text-xs hover:underline"
+                                                    title={
+                                                        repo.workflowInstalledAt
+                                                            ? "Polaris keeps this workflow file up to date. Open it on GitHub."
+                                                            : "Polaris has not been able to write the workflow file yet."
+                                                    }
+                                                >
+                                                    {repo.workflowInstalledAt ? (
+                                                        <Check className="size-3 shrink-0 text-emerald-400" />
+                                                    ) : (
+                                                        <TriangleAlert className="size-3 shrink-0 text-amber-400" />
+                                                    )}
+                                                    Workflow
+                                                </a>
                                             ) : null}
                                         </td>
                                         <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">{repo.model}</td>

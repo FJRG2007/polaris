@@ -19,13 +19,22 @@
  */
 
 import { Buffer } from "node:buffer";
+import { prisma } from "@polaris/db";
+import { AGENT_WORKFLOW_PATH, needsWorkflowFile, type AgentExecution } from "@polaris/core";
+import { appBaseUrl } from "@/lib/domain-service";
+import { parseLabels } from "@/lib/runners/runner-labels";
+import { githubAppInstallationToken } from "@/lib/github-service";
 
-/** Where the file lands. Named for what it is rather than for Polaris, because it
- *  sits in somebody else's repository next to their own workflows. */
-export const WORKFLOW_PATH = ".github/workflows/polaris-agent.yml";
+/** Where the file lands. Defined in @polaris/core so a screen can link to it
+ *  without importing this module, which reads the database and mints tokens. */
+const WORKFLOW_PATH = AGENT_WORKFLOW_PATH;
 
 /** Node major the runtime is built for. The runner's default is older. */
 const NODE_VERSION = "24";
+
+/** Ceiling on one run. The runtime has its own, lower by default; this is the
+ *  backstop that stops a wedged job holding a runner for a day. */
+export const TIMEOUT_MINUTES = 60;
 
 export interface WorkflowInput {
     /** Where the run reports back to. Baked in rather than passed per dispatch so
@@ -181,6 +190,89 @@ export async function installWorkflow(params: {
         throw new Error(`GitHub returned ${write.status} writing the workflow file`);
     }
     return { changed: true };
+}
+
+/**
+ * Bring the repository's workflow file in line with how it is configured.
+ *
+ * Called when the settings change, not only when a run is dispatched. A
+ * repository somebody added for GitHub Actions has to look configured in GitHub
+ * the moment they add it: with the file written only at dispatch, the operator
+ * sees nothing in their repository, and the first run then races GitHub
+ * registering a file that was committed seconds earlier.
+ *
+ * It also does the other half, which nothing did before: a repository moved to
+ * `server`, disabled, or removed has its workflow taken back out. A file left
+ * behind is a workflow anybody can still start by hand from the Actions tab,
+ * against a repository Polaris no longer considers enabled.
+ *
+ * Returns what went wrong rather than throwing. Saving the settings and writing
+ * the file are two different things, and a GitHub that refused the second must
+ * not roll back the first - the settings are correct, the repository just does
+ * not carry them yet, which is exactly what `AgentRepo.error` is for.
+ */
+export async function syncRepoWorkflow(params: {
+    repoId: string;
+    repoFullName: string;
+    execution: AgentExecution;
+    poolId: string | null;
+    enabled: boolean;
+}): Promise<{ error?: string }> {
+    const owner = params.repoFullName.split("/")[0] ?? "";
+    // `server` runs need no workflow at all, and a disabled repository should not
+    // carry one it could still be started from.
+    const wanted = params.enabled && needsWorkflowFile(params.execution);
+
+    const token = await githubAppInstallationToken(owner).catch(() => null);
+    if (!token) {
+        const error = `Polaris has no GitHub App installation for ${owner}, so it cannot write the workflow file.`;
+        await stamp(params.repoId, { error });
+        return { error };
+    }
+
+    try {
+        if (!wanted) {
+            await removeWorkflow({ token, repoFullName: params.repoFullName });
+            await stamp(params.repoId, { workflowInstalledAt: null, error: null });
+            return {};
+        }
+        const apiUrl = (await appBaseUrl()).replace(/\/+$/, "");
+        const content = renderWorkflow({
+            apiUrl,
+            runsOn: await resolveRunsOn(params.execution, params.poolId),
+            timeoutMinutes: TIMEOUT_MINUTES
+        });
+        const { changed } = await installWorkflow({ token, repoFullName: params.repoFullName, content });
+        // The stamp records when the file last needed writing. An unchanged file
+        // is still installed, so a repository that was already correct keeps the
+        // date it actually got there.
+        await stamp(params.repoId, changed ? { workflowInstalledAt: new Date(), error: null } : { error: null });
+        return {};
+    } catch (caught) {
+        const error = caught instanceof Error ? caught.message : "Could not write the workflow file";
+        await stamp(params.repoId, { error });
+        return { error };
+    }
+}
+
+async function stamp(repoId: string, data: { workflowInstalledAt?: Date | null; error?: string | null }): Promise<void> {
+    await prisma.agentRepo.update({ where: { id: repoId }, data }).catch(() => undefined);
+}
+
+/**
+ * What the job asks to run on.
+ *
+ * GitHub-hosted for `actions`; the pool's own labels for `runners`, which is the
+ * only difference between the two.
+ */
+export async function resolveRunsOn(execution: AgentExecution, poolId: string | null): Promise<string[]> {
+    if (execution !== "runners" || !poolId) return ["ubuntu-latest"];
+    const pool = await prisma.runnerPool.findUnique({ where: { id: poolId }, select: { labels: true } });
+    const labels = pool ? parseLabels(pool.labels) : [];
+    if (labels.length === 0) {
+        throw new Error("The runner pool this repository uses has no labels, so no job could ever land on it.");
+    }
+    return ["self-hosted", ...labels];
 }
 
 /** Remove the workflow when a repository stops using an execution that needs one.

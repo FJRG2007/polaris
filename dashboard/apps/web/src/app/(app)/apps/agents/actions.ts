@@ -19,6 +19,7 @@ import { listReposForUser } from "@/lib/github-access";
 import { dispatchRun } from "@/lib/agents/agent-dispatch";
 import { MODEL_INTEGRATIONS } from "@/lib/integrations/registry";
 import { stopServerRun } from "@/lib/agents/agent-server-executor";
+import { syncRepoWorkflow } from "@/lib/agents/agent-workflow";
 import { pickerRepoList, pickerRepoSearch } from "@/lib/github-repo-picker";
 import { finishAgentRun, getAgentRun } from "@/lib/agents/agent-run-service";
 import { connectedProviders, providerForModel } from "@/lib/agents/agent-providers";
@@ -129,7 +130,7 @@ export async function adviseRepoAction(input: unknown): Promise<{
     };
 }
 
-export async function enableRepoAction(input: unknown): Promise<{ error?: string }> {
+export async function enableRepoAction(input: unknown): Promise<{ error?: string; warning?: string }> {
     const user = await requirePermission("agents.manage");
     const parsed = enableAgentRepoSchema
         .extend({ isPrivate: z.boolean() })
@@ -168,22 +169,38 @@ export async function enableRepoAction(input: unknown): Promise<{ error?: string
         };
     }
 
+    let repoId: string;
     try {
-        await upsertAgentRepo(user.id, {
+        ({ id: repoId } = await upsertAgentRepo(user.id, {
             repoFullName: match.fullName,
             installationId: parsed.data.installationId,
             isPrivate: match.private,
             config: parsed.data.config
-        });
+        }));
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Could not enable the repository" };
     }
+
+    // The workflow file goes in now, not at the first run: a repository somebody
+    // just added for GitHub Actions has to look configured in GitHub the moment
+    // they add it, and writing it at dispatch instead left the first run racing
+    // GitHub registering a file committed seconds earlier.
+    const { error } = await syncRepoWorkflow({
+        repoId,
+        repoFullName: match.fullName,
+        execution: parsed.data.config.execution,
+        poolId: parsed.data.config.poolId,
+        enabled: parsed.data.config.enabled
+    });
+
     revalidatePath(AGENTS_PATH);
     revalidatePath(`${AGENTS_PATH}/repos`);
-    return {};
+    // A warning, not a refusal: the settings are saved and correct, the
+    // repository just does not carry them yet. It is on the row as well.
+    return error ? { warning: error } : {};
 }
 
-export async function updateRepoConfigAction(input: unknown): Promise<{ error?: string }> {
+export async function updateRepoConfigAction(input: unknown): Promise<{ error?: string; warning?: string }> {
     const user = await requirePermission("agents.manage");
     const parsed = z.object({ repoId: z.string().uuid(), config: agentRepoConfigSchema }).safeParse(input);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the settings" };
@@ -208,29 +225,71 @@ export async function updateRepoConfigAction(input: unknown): Promise<{ error?: 
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Could not save the settings" };
     }
+
+    // A change of execution changes the file, and a move to `server` means there
+    // should not be one at all.
+    const { error } = await syncRepoWorkflow({
+        repoId: existing.id,
+        repoFullName: existing.repoFullName,
+        execution: parsed.data.config.execution,
+        poolId: parsed.data.config.poolId,
+        enabled: parsed.data.config.enabled
+    });
+
     revalidatePath(`${AGENTS_PATH}/repos`);
-    return {};
+    return error ? { warning: error } : {};
 }
 
-export async function setRepoEnabledAction(input: unknown): Promise<{ error?: string }> {
+export async function setRepoEnabledAction(input: unknown): Promise<{ error?: string; warning?: string }> {
     const user = await requirePermission("agents.manage");
     const parsed = z.object({ repoId: z.string().uuid(), enabled: z.boolean() }).safeParse(input);
     if (!parsed.success) return { error: "Check the request" };
     if (!(await setAgentRepoEnabled(user.id, parsed.data.repoId, parsed.data.enabled))) {
         return { error: "Repository not found" };
     }
+
+    // Turning a repository off takes its workflow with it. Left behind, it is a
+    // workflow anybody can still start by hand from the Actions tab against a
+    // repository Polaris no longer considers enabled.
+    const repo = await getAgentRepo(user.id, parsed.data.repoId);
+    const { error } = repo
+        ? await syncRepoWorkflow({
+              repoId: repo.id,
+              repoFullName: repo.repoFullName,
+              execution: repo.execution,
+              poolId: repo.poolId,
+              enabled: parsed.data.enabled
+          })
+        : {};
+
     revalidatePath(`${AGENTS_PATH}/repos`);
-    return {};
+    return error ? { warning: error } : {};
 }
 
-export async function removeRepoAction(input: unknown): Promise<{ error?: string }> {
+export async function removeRepoAction(input: unknown): Promise<{ error?: string; warning?: string }> {
     const user = await requirePermission("agents.manage");
     const parsed = z.object({ repoId: z.string().uuid() }).safeParse(input);
     if (!parsed.success) return { error: "Check the request" };
+
+    // Taken out before the row goes, because afterwards there is nothing left to
+    // say which repository the file was in.
+    const repo = await getAgentRepo(user.id, parsed.data.repoId);
+    const warning = repo
+        ? (
+              await syncRepoWorkflow({
+                  repoId: repo.id,
+                  repoFullName: repo.repoFullName,
+                  execution: repo.execution,
+                  poolId: repo.poolId,
+                  enabled: false
+              })
+          ).error
+        : undefined;
+
     if (!(await removeAgentRepo(user.id, parsed.data.repoId))) return { error: "Repository not found" };
     revalidatePath(AGENTS_PATH);
     revalidatePath(`${AGENTS_PATH}/repos`);
-    return {};
+    return warning ? { warning } : {};
 }
 
 export async function saveAutomationAction(input: unknown): Promise<{ error?: string }> {

@@ -12,16 +12,16 @@
 
 import { prisma } from "@polaris/db";
 import { appBaseUrl } from "@/lib/domain-service";
-import { parseLabels } from "@/lib/runners/runner-labels";
 import { githubAppInstallationToken } from "@/lib/github-service";
-import type { AgentExecution, AgentTrigger } from "@polaris/core";
+import { AGENT_WORKFLOW_PATH, type AgentExecution, type AgentTrigger } from "@polaris/core";
 import { startServerRun } from "@/lib/agents/agent-server-executor";
 import { createAgentRun, finishAgentRun } from "@/lib/agents/agent-run-service";
-import { installWorkflow, renderWorkflow, WORKFLOW_PATH } from "@/lib/agents/agent-workflow";
-
-/** Ceiling on one run. The runtime has its own, lower by default; this is the
- *  backstop that stops a wedged job holding a runner for a day. */
-const TIMEOUT_MINUTES = 60;
+import {
+    installWorkflow,
+    renderWorkflow,
+    resolveRunsOn,
+    TIMEOUT_MINUTES
+} from "@/lib/agents/agent-workflow";
 
 export interface DispatchInput {
     /** The enabled repository row. */
@@ -118,7 +118,7 @@ async function dispatchWorkflow(
 
     const response = await fetch(
         `https://api.github.com/repos/${owner}/${repo}/actions/workflows/${encodeURIComponent(
-            WORKFLOW_PATH.split("/").pop() ?? ""
+            AGENT_WORKFLOW_PATH.split("/").pop() ?? ""
         )}/dispatches`,
         {
             method: "POST",
@@ -152,18 +152,6 @@ async function dispatchWorkflow(
         }
         throw new Error(`GitHub returned ${response.status} starting the workflow`);
     }
-}
-
-/** What the job asks to run on. GitHub-hosted for `actions`; the pool's own labels
- *  for `runners`, which is the only difference between the two. */
-async function resolveRunsOn(execution: AgentExecution, poolId: string | null): Promise<string[]> {
-    if (execution !== "runners" || !poolId) return ["ubuntu-latest"];
-    const pool = await prisma.runnerPool.findUnique({ where: { id: poolId }, select: { labels: true } });
-    const labels = pool ? parseLabels(pool.labels) : [];
-    if (labels.length === 0) {
-        throw new Error("The runner pool this repository uses has no labels, so no job could ever land on it.");
-    }
-    return ["self-hosted", ...labels];
 }
 
 async function defaultBranch(owner: string, repo: string, token: string): Promise<string> {

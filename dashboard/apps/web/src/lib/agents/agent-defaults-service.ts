@@ -1,31 +1,42 @@
 /**
  * What repositories inherit, and from where.
  *
- * Three tiers answer the same questions: the instance, one GitHub account or
- * organization, and one repository. A repository reads its own columns first,
- * then its owner login's row, then the instance row, and anything none of them
- * answers falls to the built-in defaults in @polaris/core. The resolution itself
- * is pure and lives there; this module is the reads and writes behind it.
+ * Four tiers answer the same questions, most specific first: one repository, one
+ * GitHub account or organization, everything this person owns, and the whole
+ * deployment. Anything none of them answers falls to the built-in defaults in
+ * @polaris/core. The resolution itself is pure and lives there; this module is
+ * the reads and writes behind it.
  *
- * The two tiers above a repository share one table because they are the same
- * shape and differ only in how widely they apply - `scope` is the empty string
- * for the instance and a GitHub login for an account. One table means one write
- * path, and no chance of the two drifting apart.
+ * Where each tier lives follows who owns the decision. The three a person makes
+ * for their own repositories are rows of `AgentDefaults` keyed by their user id -
+ * same shape, differing only in how widely they apply, so one table means one
+ * write path and no chance of the two drifting apart. The deployment-wide tier
+ * is not theirs to set: it is an administrator's, so it lives in the platform
+ * `Setting` table and is written from /admin, the same split Display defaults
+ * uses.
  */
 
 import { prisma } from "@polaris/db";
+import { getSetting, setSetting } from "@/lib/setting-store";
 import {
+    agentDefaultsSchema,
     resolveAgentPolicy,
     type AgentDefaultsInput,
+    type AgentEffort,
     type AgentExecution,
+    type AgentGateMode,
     type AgentPolicy,
     type AgentPolicyOverride,
     type AgentPushPolicy,
     type AgentShellPolicy
 } from "@polaris/core";
 
-/** The instance-wide tier. Not a login, so it can never collide with one. */
+/** This person's own catch-all tier. Not a login, so it can never collide with
+ *  one. */
 export const GENERAL_SCOPE = "";
+
+/** Where the deployment-wide tier is stored. */
+const PLATFORM_KEY = "agents.defaults";
 
 /** One tier as the screens read and write it. Every field is nullable: null is
  *  "inherit", and the screen renders it as such. */
@@ -35,14 +46,14 @@ export interface AgentDefaultsView {
     poolId: string | null;
     poolName: string | null;
     model: string | null;
-    effort: string | null;
+    effort: AgentEffort | null;
     push: AgentPushPolicy | null;
     shell: AgentShellPolicy | null;
     publicRepos: boolean | null;
     privateRepos: boolean | null;
     pullRequests: boolean | null;
     issues: boolean | null;
-    gate: string | null;
+    gate: AgentGateMode | null;
 }
 
 /** The GitHub account a repository belongs to, which is the scope key its
@@ -91,14 +102,14 @@ function toView(row: Row): AgentDefaultsView {
         poolId: row.poolId,
         poolName: row.pool?.name ?? null,
         model: row.model,
-        effort: row.effort,
+        effort: row.effort as AgentEffort | null,
         push: row.push as AgentPushPolicy | null,
         shell: row.shell as AgentShellPolicy | null,
         publicRepos: row.publicRepos,
         privateRepos: row.privateRepos,
         pullRequests: row.pullRequests,
         issues: row.issues,
-        gate: row.gate
+        gate: row.gate as AgentGateMode | null
     };
 }
 
@@ -147,6 +158,41 @@ export async function removeAgentDefaults(ownerId: string, scope: string): Promi
     await prisma.agentDefaults.deleteMany({ where: { ownerId, scope } });
 }
 
+/**
+ * The deployment-wide tier, under everything anybody sets for themselves.
+ *
+ * Stored as one JSON value rather than a row, because it has no owner to key a
+ * row on and because that is what every other platform default here does. A
+ * value written by a newer Polaris, or by hand, is read through the same schema
+ * as the form - anything it does not understand becomes "inherit" rather than a
+ * setting nobody can see or correct.
+ */
+export async function getPlatformAgentDefaults(): Promise<AgentDefaultsView> {
+    const stored = await getSetting(PLATFORM_KEY);
+    let parsed: unknown = {};
+    try {
+        parsed = stored ? JSON.parse(stored) : {};
+    } catch {
+        parsed = {};
+    }
+    const result = agentDefaultsSchema.safeParse(parsed);
+    const values = result.success ? result.data : agentDefaultsSchema.parse({});
+    return { ...values, scope: GENERAL_SCOPE, poolName: null };
+}
+
+/** Store it, or forget the key when it decides nothing. */
+export async function savePlatformAgentDefaults(input: AgentDefaultsInput): Promise<void> {
+    const { scope: _scope, ...values } = input;
+    const empty = Object.values(values).every((value) => value === null);
+    if (empty) {
+        await setSetting(PLATFORM_KEY, null);
+        return;
+    }
+    // A pool only means anything for `runners`, same as the per-person tiers.
+    const poolId = values.execution === "runners" ? values.poolId : null;
+    await setSetting(PLATFORM_KEY, JSON.stringify({ ...values, poolId }));
+}
+
 /** What a tier contributes to the policy, with the columns that are not part of
  *  it left out. */
 function overrideOf(row: AgentDefaultsView | AgentPolicyOverride | null): AgentPolicyOverride | null {
@@ -170,17 +216,21 @@ export interface RepoPolicyColumns {
 }
 
 /**
- * The policy in force for one repository.
+ * The policy in force for one repository, over all four tiers.
  *
- * Both tiers are read in one query rather than two: they are rows of the same
- * table and the webhook path asks for this on every event it might act on.
+ * The two owned tiers are read in one query rather than two: they are rows of
+ * the same table and the webhook path asks for this on every event it might act
+ * on.
  */
 export async function policyForRepo(ownerId: string, repo: RepoPolicyColumns): Promise<AgentPolicy> {
     const scope = scopeOf(repo.repoFullName);
-    const rows = await prisma.agentDefaults.findMany({
-        where: { ownerId, scope: { in: [scope, GENERAL_SCOPE] } },
-        select: SELECT
-    });
+    const [rows, platform] = await Promise.all([
+        prisma.agentDefaults.findMany({
+            where: { ownerId, scope: { in: [scope, GENERAL_SCOPE] } },
+            select: SELECT
+        }),
+        getPlatformAgentDefaults()
+    ]);
     const org = rows.find((row) => row.scope === scope) ?? null;
     const general = rows.find((row) => row.scope === GENERAL_SCOPE) ?? null;
     return resolveAgentPolicy(
@@ -190,7 +240,8 @@ export async function policyForRepo(ownerId: string, repo: RepoPolicyColumns): P
             gate: (repo.gate as AgentPolicy["gate"] | null) ?? null
         },
         overrideOf(org ? toView(org) : null),
-        overrideOf(general ? toView(general) : null)
+        overrideOf(general ? toView(general) : null),
+        overrideOf(platform)
     );
 }
 
@@ -216,14 +267,17 @@ export async function inheritedConfig(
     repoFullName: string
 ): Promise<Pick<AgentDefaultsView, "execution" | "poolId" | "model" | "effort" | "push" | "shell">> {
     const scope = scopeOf(repoFullName);
-    const rows = await prisma.agentDefaults.findMany({
-        where: { ownerId, scope: { in: [scope, GENERAL_SCOPE] } },
-        select: SELECT
-    });
+    const [rows, platform] = await Promise.all([
+        prisma.agentDefaults.findMany({
+            where: { ownerId, scope: { in: [scope, GENERAL_SCOPE] } },
+            select: SELECT
+        }),
+        getPlatformAgentDefaults()
+    ]);
     const org = rows.find((row) => row.scope === scope);
     const general = rows.find((row) => row.scope === GENERAL_SCOPE);
     const pick = <K extends "execution" | "poolId" | "model" | "effort" | "push" | "shell">(key: K) =>
-        (org?.[key] ?? general?.[key] ?? null) as AgentDefaultsView[K];
+        (org?.[key] ?? general?.[key] ?? platform[key] ?? null) as AgentDefaultsView[K];
     return {
         execution: pick("execution"),
         poolId: pick("poolId"),

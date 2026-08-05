@@ -3,11 +3,13 @@ import {
     agentAutomationSchema,
     agentDefaultsSchema,
     agentRepoConfigSchema,
+    AGENT_WORKFLOW_PATH,
     ALWAYS_ON_TRIGGER,
     DEFAULT_AGENT_POLICY,
     defaultShellPolicy,
     isTerminalRunState,
     manualAgentRunSchema,
+    needsWorkflowFile,
     parseAgentTriggers,
     policyAllowsTrigger,
     policyAllowsVisibility,
@@ -283,5 +285,23 @@ describe("agentRepoConfigSchema", () => {
         expect(parsed.pullRequests).toBeNull();
         expect(parsed.issues).toBeNull();
         expect(parsed.gate).toBeNull();
+    });
+});
+
+describe("needsWorkflowFile", () => {
+    it("wants a file for the two executions GitHub schedules", () => {
+        expect(needsWorkflowFile("actions")).toBe(true);
+        expect(needsWorkflowFile("runners")).toBe(true);
+    });
+
+    it("wants none for a run Polaris starts itself", () => {
+        // `server` involves GitHub Actions nowhere, so a file left in the
+        // repository would only be something anybody could start by hand.
+        expect(needsWorkflowFile("server")).toBe(false);
+    });
+
+    it("puts the file where GitHub looks for workflows", () => {
+        expect(AGENT_WORKFLOW_PATH.startsWith(".github/workflows/")).toBe(true);
+        expect(AGENT_WORKFLOW_PATH.endsWith(".yml")).toBe(true);
     });
 });
