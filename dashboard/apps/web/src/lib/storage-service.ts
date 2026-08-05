@@ -18,8 +18,19 @@ import { fetchUnasMetrics, type UnasMetrics } from "@/lib/unifi-unas";
 import { deleteMetricsForSubject } from "@/lib/metrics-history-service";
 import type { StorageConfig, StorageCredentials, StorageProviderKind } from "@polaris/core";
 import { resolveContainerName, resolveLocalContainer } from "@/lib/container-files-service";
-import { getHostConnection, getHostConnectionUnscoped, listHosts, type HostConnection } from "@/lib/host-service";
-import { borrowSftp, borrowSmb, dropStorageConnection, type SftpLease, type SmbLease } from "@/lib/connection-pool";
+import {
+    getHostConnection,
+    getHostConnectionUnscoped,
+    listHosts,
+    type HostConnection
+} from "@/lib/host-service";
+import {
+    borrowSftp,
+    borrowSmb,
+    dropStorageConnection,
+    type SftpLease,
+    type SmbLease
+} from "@/lib/connection-pool";
 import {
     createDriver,
     decryptCredentials,
@@ -44,9 +55,15 @@ export const HOST_CONNECTION_PREFIX = "host:";
 export const CONTAINER_CONNECTION_PREFIX = "container:";
 
 /** A StorageDriver over a deployed container's filesystem (owner-scoped resolve). */
-async function buildContainerDriver(applicationId: string, ownerId: string): Promise<StorageDriver> {
+async function buildContainerDriver(
+    applicationId: string,
+    ownerId: string
+): Promise<StorageDriver> {
     const container = await resolveLocalContainer(applicationId, ownerId);
-    const driver = new ContainerDriver({ id: `${CONTAINER_CONNECTION_PREFIX}${applicationId}`, container });
+    const driver = new ContainerDriver({
+        id: `${CONTAINER_CONNECTION_PREFIX}${applicationId}`,
+        container
+    });
     await driver.connect();
     return driver;
 }
@@ -55,7 +72,10 @@ async function buildContainerDriver(applicationId: string, ownerId: string): Pro
  *  authorized the container source via `authorizeDrive`. */
 async function buildContainerDriverUnscoped(applicationId: string): Promise<StorageDriver> {
     const container = await resolveContainerName(applicationId);
-    const driver = new ContainerDriver({ id: `${CONTAINER_CONNECTION_PREFIX}${applicationId}`, container });
+    const driver = new ContainerDriver({
+        id: `${CONTAINER_CONNECTION_PREFIX}${applicationId}`,
+        container
+    });
     await driver.connect();
     return driver;
 }
@@ -141,7 +161,8 @@ type ConnectionRow = {
 
 /** Decrypt a row's credentials, whatever kind it is. */
 function credentialsOf(row: ConnectionRow): StorageCredentials {
-    if (!row.encryptedCredential || !row.credentialNonce) return { kind: row.kind } as StorageCredentials;
+    if (!row.encryptedCredential || !row.credentialNonce)
+        return { kind: row.kind } as StorageCredentials;
     return decryptCredentials(
         {
             ciphertext: Buffer.from(row.encryptedCredential),
@@ -224,7 +245,10 @@ function forgetConnection(connectionId: string): void {
 
 /** A local driver onto a mount, or null when the path is not readable from here. */
 async function mountedLocalDriver(connectionId: string): Promise<StorageDriver | null> {
-    const driver = new LocalDriver({ id: connectionId, root: `${HOSTD_MOUNT_ROOT}/${connectionId}` });
+    const driver = new LocalDriver({
+        id: connectionId,
+        root: `${HOSTD_MOUNT_ROOT}/${connectionId}`
+    });
     try {
         await driver.connect();
     } catch (error) {
@@ -243,7 +267,9 @@ async function mountedLocalDriver(connectionId: string): Promise<StorageDriver |
  * id, which is what the pool needs to tell two connections to the same address (a
  * different account, a different root) apart.
  */
-function pooledSftpSession(record: ConnectionRecord): Pick<SftpSessionOptions, "session" | "endSession"> {
+function pooledSftpSession(
+    record: ConnectionRecord
+): Pick<SftpSessionOptions, "session" | "endSession"> {
     const config = record.config as Extract<StorageConfig, { kind: "sftp" }>;
     const creds = record.credentials as Extract<StorageCredentials, { kind: "sftp" }>;
     let lease: SftpLease | undefined;
@@ -331,8 +357,11 @@ async function buildDriver(row: ConnectionRow): Promise<StorageDriver> {
     // is left to fail with the registry's own reason.
     const capabilities = getCapabilities();
     const driver = createDriver(record, {
-        capabilities: requiresHostd(record.kind) ? capabilities : { ...capabilities, nativeMounts: false },
-        hostdFactory: (rec) => new LocalDriver({ id: rec.id, root: `${HOSTD_MOUNT_ROOT}/${rec.id}` }),
+        capabilities: requiresHostd(record.kind)
+            ? capabilities
+            : { ...capabilities, nativeMounts: false },
+        hostdFactory: (rec) =>
+            new LocalDriver({ id: rec.id, root: `${HOSTD_MOUNT_ROOT}/${rec.id}` }),
         sftpSessionFactory: (rec) => pooledSftpSession(rec),
         smbSessionFactory: (rec) => {
             const cfg = rec.config as Extract<StorageConfig, { kind: "smb" }>;
@@ -374,16 +403,35 @@ function mountSpecFor(row: ConnectionRow): MountSpec | null {
         const cfg = config as Extract<StorageConfig, { kind: "unifi-unas" }>;
         if (!cfg.smbShare) return null;
         const creds = credentials as Extract<StorageCredentials, { kind: "unifi-unas" }>;
-        return { id: row.id, kind: "smb", source: `//${cfg.host}/${cfg.smbShare}`, options: SMB_OPTS, username: cfg.username, password: creds.password };
+        return {
+            id: row.id,
+            kind: "smb",
+            source: `//${cfg.host}/${cfg.smbShare}`,
+            options: SMB_OPTS,
+            username: cfg.username,
+            password: creds.password
+        };
     }
     if (row.kind === "smb") {
         const cfg = config as Extract<StorageConfig, { kind: "smb" }>;
         const creds = credentials as Extract<StorageCredentials, { kind: "smb" }>;
-        return { id: row.id, kind: "smb", source: `//${cfg.host}/${cfg.share}`, options: SMB_OPTS, username: cfg.username, password: creds.password };
+        return {
+            id: row.id,
+            kind: "smb",
+            source: `//${cfg.host}/${cfg.share}`,
+            options: SMB_OPTS,
+            username: cfg.username,
+            password: creds.password
+        };
     }
     if (row.kind === "nfs") {
         const cfg = config as Extract<StorageConfig, { kind: "nfs" }>;
-        return { id: row.id, kind: "nfs", source: `${cfg.host}:${cfg.exportPath}`, options: "nfsvers=4" };
+        return {
+            id: row.id,
+            kind: "nfs",
+            source: `${cfg.host}:${cfg.exportPath}`,
+            options: "nfsvers=4"
+        };
     }
     return null;
 }
@@ -392,7 +440,10 @@ function mountSpecFor(row: ConnectionRow): MountSpec | null {
  *  so the deploy pipeline can kernel-mount it at `<mount_root>/<id>` and a bind
  *  volume under it resolves onto the NAS. Returns null for kinds Polaris does not
  *  kernel-mount. Owner-scoped via loadConnection; decrypts SMB credentials. */
-export async function resolveMountTarget(connectionId: string, ownerId: string): Promise<MountSpec | null> {
+export async function resolveMountTarget(
+    connectionId: string,
+    ownerId: string
+): Promise<MountSpec | null> {
     return mountSpecFor(await loadConnection(connectionId, ownerId));
 }
 
@@ -404,7 +455,10 @@ export async function getDriver(connectionId: string, ownerId: string): Promise<
         return buildHostSftpDriver(connectionId.slice(HOST_CONNECTION_PREFIX.length), ownerId);
     }
     if (connectionId.startsWith(CONTAINER_CONNECTION_PREFIX)) {
-        return buildContainerDriver(connectionId.slice(CONTAINER_CONNECTION_PREFIX.length), ownerId);
+        return buildContainerDriver(
+            connectionId.slice(CONTAINER_CONNECTION_PREFIX.length),
+            ownerId
+        );
     }
     return buildDriver(await loadConnection(connectionId, ownerId));
 }
@@ -592,7 +646,8 @@ export function connectionWebUrl(kind: string, configJson: string): string | und
         const config = JSON.parse(configJson) as { host?: string; port?: number; secure?: boolean };
         if (!config.host) return undefined;
         const scheme = config.secure === false ? "http" : "https";
-        const port = config.port && config.port !== 443 && config.port !== 80 ? `:${config.port}` : "";
+        const port =
+            config.port && config.port !== 443 && config.port !== 80 ? `:${config.port}` : "";
         return `${scheme}://${config.host}${port}`;
     } catch {
         return undefined;
@@ -643,14 +698,20 @@ export async function updateConnection(
     const hasSecret = input.credentials
         ? Object.keys(input.credentials).some((key) => key !== "kind")
         : false;
-    const blob = hasSecret ? encryptCredentials(input.credentials as StorageCredentials, env.POLARIS_MASTER_KEY) : null;
+    const blob = hasSecret
+        ? encryptCredentials(input.credentials as StorageCredentials, env.POLARIS_MASTER_KEY)
+        : null;
     await prisma.storageConnection.update({
         where: { id: connectionId },
         data: {
             name: input.name,
             config: JSON.stringify(input.config),
             ...(blob
-                ? { encryptedCredential: blob.ciphertext, credentialNonce: blob.nonce, credentialKeyId: blob.keyId }
+                ? {
+                      encryptedCredential: blob.ciphertext,
+                      credentialNonce: blob.nonce,
+                      credentialKeyId: blob.keyId
+                  }
                 : {})
         }
     });
@@ -687,7 +748,11 @@ export async function discoverUnasShares(ownerId: string, connectionId: string):
 }
 
 /** Set the SMB share used to browse a UniFi UNAS connection's files. */
-export async function setUnasSmbShare(ownerId: string, connectionId: string, share: string): Promise<void> {
+export async function setUnasSmbShare(
+    ownerId: string,
+    connectionId: string,
+    share: string
+): Promise<void> {
     const row = await loadConnection(connectionId, ownerId);
     if (row.kind !== "unifi-unas") throw new Error("Not a UniFi UNAS connection");
     const config = JSON.parse(row.config) as Record<string, unknown>;

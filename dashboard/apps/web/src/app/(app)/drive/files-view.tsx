@@ -21,12 +21,12 @@ import { useRouter } from "next/navigation";
 import { formatBytes } from "@polaris/core";
 import { keyboardIsBusy } from "@/lib/keyboard";
 import { ArchiveDialog } from "./archive-dialog";
-import { prefetchListing } from "./listing-cache";
 import { useDriveInsights } from "./use-drive-insights";
 import { SelectionZipMenu } from "./selection-zip-menu";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { RelativeTime } from "@/components/relative-time";
 import { matchShortcut, SHORTCUT_HINTS } from "./shortcuts";
+import { activityKey, prefetchListing } from "./listing-cache";
 import { useDisplayFormat } from "@/components/display-format";
 import { matchesStructured, parseSearch } from "./search-query";
 import { readSnapshot, writeSnapshot } from "@/lib/snapshot-cache";
@@ -923,7 +923,9 @@ export function FilesView({
                             Download as ZIP
                         </ContextMenuItem>
                         {onRequestFiles ? (
-                            <ContextMenuItem onSelect={() => onRequestFiles(entry.path, entry.name)}>
+                            <ContextMenuItem
+                                onSelect={() => onRequestFiles(entry.path, entry.name)}
+                            >
                                 <Inbox className="size-4" />
                                 Request files here
                             </ContextMenuItem>
@@ -1113,7 +1115,7 @@ export function FilesView({
         const controller = new AbortController();
         // Clicking back onto a file shows what its history said moments ago rather
         // than an empty panel and another query.
-        const key = `drive.activity:${connectionId}:${singleSelectedPath}`;
+        const key = activityKey(connectionId, singleSelectedPath);
         const cached = readSnapshot<ActivityItem[]>(key, ACTIVITY_CACHE_TTL_MS)?.value;
         if (cached) setActivity(cached);
         setActivityLoading(!cached);
@@ -1941,7 +1943,9 @@ export function FilesView({
                                                                             <span
                                                                                 className="inline-block max-w-full cursor-text truncate align-bottom"
                                                                                 title={entry.name}
-                                                                                onDoubleClick={(e) =>
+                                                                                onDoubleClick={(
+                                                                                    e
+                                                                                ) =>
                                                                                     nameDoubleClick(
                                                                                         e,
                                                                                         entry
@@ -2091,7 +2095,9 @@ export function FilesView({
                                                                         <div className="min-w-0 flex-1 truncate px-1">
                                                                             {isRenaming ? (
                                                                                 <Input
-                                                                                    ref={renameField}
+                                                                                    ref={
+                                                                                        renameField
+                                                                                    }
                                                                                     value={
                                                                                         renameValue
                                                                                     }
@@ -2275,7 +2281,9 @@ export function FilesView({
                                                                                     size="icon"
                                                                                     variant="ghost"
                                                                                     onClick={() =>
-                                                                                        onShare(entry)
+                                                                                        onShare(
+                                                                                            entry
+                                                                                        )
                                                                                     }
                                                                                     aria-label={`Share ${entry.name}`}
                                                                                 >

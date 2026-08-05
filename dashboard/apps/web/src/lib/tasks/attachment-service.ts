@@ -11,6 +11,7 @@
 
 import { extname } from "node:path";
 import { prisma } from "@polaris/db";
+import { pipeThenDispose } from "@/lib/drive-stream";
 import { getSetting, setSetting } from "@/lib/setting-store";
 import {
     AUTOMATIC_TARGET,
@@ -72,7 +73,10 @@ export async function uploadSettings(): Promise<UploadSettings> {
     return { choice: choice ?? AUTOMATIC_TARGET, resolved, maxBytes, options };
 }
 
-export async function setUploadSettings(input: { target: string; maxBytes: number }): Promise<void> {
+export async function setUploadSettings(input: {
+    target: string;
+    maxBytes: number;
+}): Promise<void> {
     await setSetting(UPLOAD_TARGET_KEY, input.target);
     await setSetting(UPLOAD_LIMIT_KEY, String(Math.max(1, Math.trunc(input.maxBytes))));
 }
@@ -121,7 +125,14 @@ export async function listAttachments(taskId: string): Promise<AttachmentView[]>
     const rows = await prisma.taskAttachment.findMany({
         where: { taskId },
         orderBy: { createdAt: "asc" },
-        select: { id: true, name: true, mime: true, size: true, uploadedById: true, createdAt: true }
+        select: {
+            id: true,
+            name: true,
+            mime: true,
+            size: true,
+            uploadedById: true,
+            createdAt: true
+        }
     });
     return rows.map(view);
 }
@@ -162,7 +173,14 @@ export async function storeAttachment(input: {
                 path: stored,
                 uploadedById: input.uploadedById
             },
-            select: { id: true, name: true, mime: true, size: true, uploadedById: true, createdAt: true }
+            select: {
+                id: true,
+                name: true,
+                mime: true,
+                size: true,
+                uploadedById: true,
+                createdAt: true
+            }
         });
         return view(row);
     } finally {
@@ -177,15 +195,24 @@ export async function readAttachment(
     const row = await prisma.taskAttachment.findUnique({ where: { id: attachmentId } });
     if (!row) return null;
     const driver = await driverFor(row.connectionId ?? LOCAL_TARGET);
-    // The stream outlives this call, so the driver is disposed by whoever
-    // finishes reading it rather than here.
-    const body = await driver.readStream(row.path);
-    return { name: row.name, mime: row.mime, size: row.size, body };
+    // The stream outlives this call, so the driver comes back when the response
+    // finishes rather than here; a read that never starts gives it back now.
+    let body: ReadableStream<Uint8Array>;
+    try {
+        body = await driver.readStream(row.path);
+    } catch (error) {
+        await driver.dispose().catch(() => undefined);
+        throw error;
+    }
+    return { name: row.name, mime: row.mime, size: row.size, body: pipeThenDispose(body, driver) };
 }
 
 /** The task an attachment belongs to, so the caller can authorize against it. */
 export async function attachmentTaskId(attachmentId: string): Promise<string | null> {
-    const row = await prisma.taskAttachment.findUnique({ where: { id: attachmentId }, select: { taskId: true } });
+    const row = await prisma.taskAttachment.findUnique({
+        where: { id: attachmentId },
+        select: { taskId: true }
+    });
     return row?.taskId ?? null;
 }
 

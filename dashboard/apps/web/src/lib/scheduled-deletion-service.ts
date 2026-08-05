@@ -33,7 +33,9 @@ export async function createScheduledDeletion(entry: {
     deleteAt: Date;
 }): Promise<{ id: string }> {
     const path = normalizeRelPath(entry.path);
-    await prisma.scheduledDeletion.deleteMany({ where: { connectionId: entry.connectionId, path } });
+    await prisma.scheduledDeletion.deleteMany({
+        where: { connectionId: entry.connectionId, path }
+    });
     const row = await prisma.scheduledDeletion.create({
         data: {
             ownerId: entry.ownerId,

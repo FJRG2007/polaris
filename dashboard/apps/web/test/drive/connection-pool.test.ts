@@ -14,7 +14,9 @@ describe("borrowed SFTP channels", () => {
     it("opens one channel per connection and reopens after it ends", async () => {
         const sftp = new EventEmitter();
         const client = Object.assign(new EventEmitter(), {
-            sftp: vi.fn((callback: (error: Error | undefined, channel: unknown) => void) => callback(undefined, sftp)),
+            sftp: vi.fn((callback: (error: Error | undefined, channel: unknown) => void) =>
+                callback(undefined, sftp)
+            ),
             end: vi.fn()
         });
         vi.doMock("@polaris/ssh", async (importOriginal) => {
@@ -22,7 +24,12 @@ describe("borrowed SFTP channels", () => {
             return { ...actual, openSshClient: vi.fn(async () => client) };
         });
         const { borrowSftp } = await import("@/lib/connection-pool");
-        const options = { host: "h", port: 22, username: "u", auth: { method: "password" as const, password: "p" } };
+        const options = {
+            host: "h",
+            port: 22,
+            username: "u",
+            auth: { method: "password" as const, password: "p" }
+        };
 
         const first = await borrowSftp("drive", "host-a", options);
         first.release();
@@ -102,6 +109,26 @@ describe("borrowed SMB sessions", () => {
         expect(openSmbSession).toHaveBeenCalledTimes(2);
         // The dead one is hung up on rather than left in the pool.
         expect(dead.disconnect).toHaveBeenCalled();
+        next.release();
+    });
+
+    it("does not hang up on a session another request is still using", async () => {
+        const shared = fakeSession();
+        const fresh = fakeSession();
+        const { pool } = await poolWith([shared, fresh]);
+
+        // One request is midway through a download on this session when another
+        // finds it unresponsive.
+        const downloading = await pool.borrowSmb("conn-a", options);
+        shared.dead = true;
+        const next = await pool.borrowSmb("conn-a", options);
+
+        expect(next.session).toBe(fresh);
+        expect(shared.disconnect).not.toHaveBeenCalled();
+
+        // Once the download is done there is nothing left to protect.
+        downloading.release();
+        expect(shared.disconnect).toHaveBeenCalled();
         next.release();
     });
 

@@ -34,7 +34,14 @@
 
 import type { Client, SFTPWrapper } from "ssh2";
 import { openSmbSession, type SmbConnectOptions, type SmbSession } from "@polaris/storage";
-import { LeasePool, openSftp, openSshClient, SshPool, type SshConnectOptions, type SshLease } from "@polaris/ssh";
+import {
+    LeasePool,
+    openSftp,
+    openSshClient,
+    SshPool,
+    type SshConnectOptions,
+    type SshLease
+} from "@polaris/ssh";
 
 /**
  * What a connection is being borrowed for. Long-lived channels (a terminal, a
@@ -54,7 +61,11 @@ const smbPool = new LeasePool<SmbSession>((session) => session.disconnect());
 const channels = new WeakMap<Client, Promise<SFTPWrapper>>();
 
 /** Borrow a connection to a machine. Release the lease when the work is done. */
-export function borrowSsh(purpose: SshPurpose, machineId: string, options: SshConnectOptions): Promise<SshLease> {
+export function borrowSsh(
+    purpose: SshPurpose,
+    machineId: string,
+    options: SshConnectOptions
+): Promise<SshLease> {
     return pool.acquire(`${purpose}:${machineId}`, () => openSshClient(options));
 }
 
@@ -95,7 +106,10 @@ export interface SmbLease {
  * without the check a pooled session could stay broken for as long as somebody kept
  * retrying.
  */
-export async function borrowSmb(connectionId: string, options: Omit<SmbConnectOptions, "id">): Promise<SmbLease> {
+export async function borrowSmb(
+    connectionId: string,
+    options: Omit<SmbConnectOptions, "id">
+): Promise<SmbLease> {
     const key = `smb:${connectionId}`;
     for (let attempt = 0; attempt < 2; attempt += 1) {
         let opened = false;
@@ -110,8 +124,13 @@ export async function borrowSmb(connectionId: string, options: Omit<SmbConnectOp
             await lease.value.stat("");
             return { session: lease.value, release: () => lease.release() };
         } catch (error) {
+            // Only this session is given up on, and only while nothing else is using
+            // it: a check can fail on a session another request is midway through a
+            // download on, and by the time it does the pool may already hold a
+            // replacement that has nothing wrong with it.
+            const dead = lease.value;
             lease.release();
-            smbPool.evict(key);
+            smbPool.discard(key, dead);
             if (attempt === 1) throw error;
         }
     }

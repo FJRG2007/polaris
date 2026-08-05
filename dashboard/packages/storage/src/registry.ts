@@ -28,11 +28,15 @@ export type HostdDriverFactory = (record: ConnectionRecord) => StorageDriver;
 
 /** Injected by the app to lend an SFTP connection it pools, instead of letting the
  *  driver open and throw away one of its own per operation. */
-export type SftpSessionFactory = (record: ConnectionRecord) => Pick<SftpSessionOptions, "session" | "endSession">;
+export type SftpSessionFactory = (
+    record: ConnectionRecord
+) => Pick<SftpSessionOptions, "session" | "endSession">;
 
 /** The same for SMB, whose session setup costs more than SSH's - it ends in a
  *  listing of the whole share root. */
-export type SmbSessionFactory = (record: ConnectionRecord) => Pick<SmbSessionOptions, "session" | "endSession">;
+export type SmbSessionFactory = (
+    record: ConnectionRecord
+) => Pick<SmbSessionOptions, "session" | "endSession">;
 
 export interface DriverDeps {
     readonly capabilities: Capabilities;
@@ -69,7 +73,11 @@ export function createDriver(record: ConnectionRecord, deps: DriverDeps): Storag
             // A lent connection when the app pools them, so browsing a NAS over SFTP
             // does not re-authenticate per listing either.
             if (deps.sftpSessionFactory) {
-                return new SftpDriver({ id: record.id, root: config.root, ...deps.sftpSessionFactory(record) });
+                return new SftpDriver({
+                    id: record.id,
+                    root: config.root,
+                    ...deps.sftpSessionFactory(record)
+                });
             }
             return new SftpDriver({
                 id: record.id,

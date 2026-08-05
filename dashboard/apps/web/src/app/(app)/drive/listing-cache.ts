@@ -1,7 +1,8 @@
 "use client";
 
 /**
- * The last listing of a folder, so walking back into it paints at once.
+ * The last answer Drive got for a folder, so walking back into it paints at once,
+ * and the keys every other Drive read caches under.
  *
  * A remote listing is the one thing in Drive that is never free: it crosses SSH or
  * SMB to a machine that has to read a directory. Coming back to a folder you were
@@ -13,6 +14,10 @@
  * painted immediately and then replaced by the answer from the server, and any
  * write to a connection drops the lot rather than trying to work out which folder
  * it changed.
+ *
+ * Every Drive read that caches names its key here, next to the invalidation that
+ * has to cover it - a screen that minted its own key would keep painting a deleted
+ * file after the write that removed it.
  */
 
 import type { DriveEntry } from "./types";
@@ -26,12 +31,27 @@ import { dropSnapshots, readSnapshot, writeSnapshot } from "@/lib/snapshot-cache
 const TTL_MS = 30_000;
 
 const KEY_PREFIX = "drive.list:";
+const ACTIVITY_PREFIX = "drive.activity:";
+const RECENT_PREFIX = "drive.recent:";
+
+/** Every prefix a Drive read caches under, and so everything a write invalidates. */
+const DRIVE_KEY_PREFIXES = [KEY_PREFIX, ACTIVITY_PREFIX, RECENT_PREFIX];
 
 /** Folders whose prefetch is in flight, so a cursor crossing a row twice asks once. */
 const inFlight = new Set<string>();
 
 function key(connectionId: string, path: string): string {
     return `${KEY_PREFIX}${connectionId}:${path}`;
+}
+
+/** Key for a file's cached activity feed. */
+export function activityKey(connectionId: string, path: string): string {
+    return `${ACTIVITY_PREFIX}${connectionId}:${path}`;
+}
+
+/** Key for a connection's cached recent-files answer, one per lens. */
+export function recentKey(connectionId: string, lens: string): string {
+    return `${RECENT_PREFIX}${connectionId}:${lens}`;
 }
 
 /** The cached listing of a folder, or null when there is none worth painting. */
@@ -43,11 +63,12 @@ export function writeListing(connectionId: string, path: string, entries: DriveE
     writeSnapshot(key(connectionId, path), entries);
 }
 
-/** Forget every cached listing. Called after any write, since a move or a copy can
- *  change a folder other than the one being looked at - including on another
- *  connection. */
-export function dropListings(): void {
-    dropSnapshots(KEY_PREFIX);
+/** Forget every cached Drive read - listings, activity feeds and recent files.
+ *  Called after any write, since a move or a copy can change a folder other than
+ *  the one being looked at (including on another connection), and a delete drops a
+ *  file the other two would otherwise keep listing. */
+export function dropDriveSnapshots(): void {
+    for (const prefix of DRIVE_KEY_PREFIXES) dropSnapshots(prefix);
 }
 
 /**
@@ -67,7 +88,8 @@ export function prefetchListing(connectionId: string, path: string): void {
     void fetch(`/api/drive/list?${query.toString()}`)
         .then(async (response) => {
             const body = (await response.json()) as { entries?: DriveEntry[] };
-            if (response.ok && Array.isArray(body.entries)) writeListing(connectionId, path, body.entries);
+            if (response.ok && Array.isArray(body.entries))
+                writeListing(connectionId, path, body.entries);
         })
         .catch(() => {
             // Nothing to report: this listing was never asked for out loud.

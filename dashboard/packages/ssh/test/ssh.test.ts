@@ -1,7 +1,7 @@
-import { EventEmitter } from "node:events";
-import { describe, expect, it } from "vitest";
 import type { Client } from "ssh2";
 import { SshPool } from "../src/pool.js";
+import { EventEmitter } from "node:events";
+import { describe, expect, it } from "vitest";
 import { hostKeyAccepted } from "../src/client.js";
 
 // The security-critical pinning decision, isolated as a pure function. A host's
@@ -127,6 +127,36 @@ describe("SshPool", () => {
         expect(clients[0]!.ended).toBe(1);
         await pool.acquire("host-a", connect);
         expect(clients).toHaveLength(2);
+    });
+
+    it("holds a discarded connection open until its last borrower is done", async () => {
+        const { connect, clients } = factory();
+        const pool = new SshPool();
+        const inUse = await pool.acquire("host-a", connect);
+        // Somebody else decided this connection is dead. It still has a transfer on
+        // it, and closing it here would abort that transfer.
+        pool.discard("host-a", inUse.client);
+        expect(clients[0]!.ended).toBe(0);
+        expect(pool.size).toBe(0);
+
+        inUse.release();
+        expect(clients[0]!.ended).toBe(1);
+    });
+
+    it("ignores a discard of a connection already replaced", async () => {
+        const { connect, clients } = factory();
+        const pool = new SshPool();
+        const stale = await pool.acquire("host-a", connect);
+        stale.release();
+        pool.evict("host-a");
+        const fresh = await pool.acquire("host-a", connect);
+
+        // A late discard naming the connection that died must not take down the one
+        // that replaced it.
+        pool.discard("host-a", stale.client);
+        expect(clients[1]!.ended).toBe(0);
+        expect(pool.size).toBe(1);
+        fresh.release();
     });
 
     it("does not cache a refused connect", async () => {

@@ -14,7 +14,13 @@ import { getHostConnection } from "./host-service";
 import { HostdClient } from "@polaris/hostd-client";
 import { decryptCredentials, encryptCredentials } from "@polaris/storage";
 import type { DockerConfig, DockerCredentials, DockerRpc } from "@polaris/docker";
-import { createDockerDriver, DockerDriver, sshTransport, streamRpc, type DockerConnectionRecord } from "@polaris/docker";
+import {
+    createDockerDriver,
+    DockerDriver,
+    sshTransport,
+    streamRpc,
+    type DockerConnectionRecord
+} from "@polaris/docker";
 
 /**
  * Reserved id of the auto-provisioned local host. It is not a stored row: it is
@@ -37,7 +43,11 @@ export function localDockerDriver(): DockerDriver {
         // is what the local console and file browser use instead.
         request: async (method, path) => {
             const response = await client.dockerRequest(method, path);
-            return { status: response.status, body: response.body, bytes: Buffer.from(response.body, "utf8") };
+            return {
+                status: response.status,
+                body: response.body,
+                bytes: Buffer.from(response.body, "utf8")
+            };
         },
         dispose: async () => undefined
     };
@@ -77,7 +87,9 @@ async function loadDockerConnection(
 
 export async function getDockerDriver(connectionId: string, ownerId: string) {
     const record: DockerConnectionRecord = await loadDockerConnection(connectionId, ownerId);
-    return createDockerDriver(record, { borrowSsh: (key, options) => borrowSsh("docker", key, options) });
+    return createDockerDriver(record, {
+        borrowSsh: (key, options) => borrowSsh("docker", key, options)
+    });
 }
 
 export async function createDockerConnection(
@@ -117,7 +129,9 @@ export async function hostDockerDriver(hostId: string, ownerId: string): Promise
     // Borrowed from the pool: listing containers, reading stats and following logs
     // are separate calls to the same machine, and each one opening its own SSH
     // connection is most of what they cost.
-    return new DockerDriver(streamRpc(sshTransport({ ...options, borrow: () => borrowSsh("docker", conn.id, options) })));
+    return new DockerDriver(
+        streamRpc(sshTransport({ ...options, borrow: () => borrowSsh("docker", conn.id, options) }))
+    );
 }
 
 function hostSshTransportOptions(conn: Awaited<ReturnType<typeof getHostConnection>>) {
@@ -139,8 +153,23 @@ function hostSshTransportOptions(conn: Awaited<ReturnType<typeof getHostConnecti
  */
 export type DockerTransportTarget =
     | { transport: "socket"; socketPath: string }
-    | { transport: "tcp"; host: string; port: number; tls: boolean; ca?: string; cert?: string; key?: string }
-    | { transport: "ssh"; host: string; port: number; username: string; auth: SshAuth; pinnedHostKey: string[] };
+    | {
+          transport: "tcp";
+          host: string;
+          port: number;
+          tls: boolean;
+          ca?: string;
+          cert?: string;
+          key?: string;
+      }
+    | {
+          transport: "ssh";
+          host: string;
+          port: number;
+          username: string;
+          auth: SshAuth;
+          pinnedHostKey: string[];
+      };
 
 /**
  * Resolve a Containers connection id to that target. The local host has no
@@ -153,10 +182,15 @@ export async function resolveDockerTransport(
     ownerId: string
 ): Promise<DockerTransportTarget> {
     if (connectionId === LOCAL_DOCKER_CONNECTION_ID) {
-        throw new Error("The local host is reached through the host daemon, not a Docker transport");
+        throw new Error(
+            "The local host is reached through the host daemon, not a Docker transport"
+        );
     }
     if (connectionId.startsWith(HOST_DOCKER_PREFIX)) {
-        const conn = await getHostConnection(connectionId.slice(HOST_DOCKER_PREFIX.length), ownerId);
+        const conn = await getHostConnection(
+            connectionId.slice(HOST_DOCKER_PREFIX.length),
+            ownerId
+        );
         // An empty pin list is what the SSH client refuses outright. A registered
         // server always has its key captured at enrollment, so this is a broken
         // row rather than a case to connect blind for.
@@ -190,14 +224,17 @@ export async function resolveDockerTransport(
         case "ssh": {
             const env = loadEnv();
             const creds = credentials as Extract<DockerCredentials, { transport: "ssh" }>;
-            const privateKey = config.useInstallKey ? readFileSync(env.POLARIS_SSH_KEY, "utf8") : (creds.privateKey ?? "");
+            const privateKey = config.useInstallKey
+                ? readFileSync(env.POLARIS_SSH_KEY, "utf8")
+                : (creds.privateKey ?? "");
             if (!privateKey) throw new Error("SSH connection has no private key");
             const pinnedHostKey = pinnedKeysFor(
                 readFileSync(env.POLARIS_SSH_KNOWN_HOSTS, "utf8"),
                 config.host,
                 config.port
             );
-            if (pinnedHostKey.length === 0) throw new Error("This host has no pinned key to verify it with");
+            if (pinnedHostKey.length === 0)
+                throw new Error("This host has no pinned key to verify it with");
             return {
                 transport: "ssh",
                 host: config.host,

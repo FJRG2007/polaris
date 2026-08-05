@@ -7,13 +7,21 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const CONNECTION = "018f2b7a-0000-7000-8000-0000000000e1";
+// The throttle remembers connections for the life of the module, so each test uses
+// its own id and primes what it needs: one that leant on another's leftovers would
+// pass or fail on the order they happened to run in.
+const BROWSED = "018f2b7a-0000-7000-8000-0000000000e1";
+const REBROWSED = "018f2b7a-0000-7000-8000-0000000000e2";
 
 const findMany = vi.fn(async () => [] as unknown[]);
 
 vi.mock("@polaris/db", () => ({
     prisma: {
-        scheduledDeletion: { findMany, deleteMany: vi.fn(async () => ({ count: 0 })), create: vi.fn() }
+        scheduledDeletion: {
+            findMany,
+            deleteMany: vi.fn(async () => ({ count: 0 })),
+            create: vi.fn()
+        }
     }
 }));
 vi.mock("@/lib/storage-service", () => ({ getDriver: vi.fn() }));
@@ -29,16 +37,18 @@ describe("scheduled deletion sweep", () => {
     });
 
     it("queries once for a connection however often it is browsed", async () => {
-        await sweepDueDeletions(CONNECTION);
-        await sweepDueDeletions(CONNECTION);
-        await sweepDueDeletions(CONNECTION);
+        await sweepDueDeletions(BROWSED);
+        await sweepDueDeletions(BROWSED);
+        await sweepDueDeletions(BROWSED);
         expect(findMany).toHaveBeenCalledTimes(1);
     });
 
     it("queries again once the interval has passed", async () => {
-        vi.spyOn(Date, "now").mockReturnValue(Date.now() + 61_000);
-        await sweepDueDeletions(CONNECTION);
-        expect(findMany).toHaveBeenCalledTimes(1);
+        const browsedAt = Date.now();
+        await sweepDueDeletions(REBROWSED);
+        vi.spyOn(Date, "now").mockReturnValue(browsedAt + 61_000);
+        await sweepDueDeletions(REBROWSED);
+        expect(findMany).toHaveBeenCalledTimes(2);
     });
 
     it("never throttles the sweep that covers every connection", async () => {
