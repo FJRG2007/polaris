@@ -22,6 +22,11 @@ const STRING_KEYS = [
   "planCommentNodeId",
   "summarySnapshot",
   "model",
+  // Polaris-only. Why the run failed, in the words already written for the job
+  // summary and the comment. Without it the dashboard can say a run failed but
+  // not why, and the reason lives only in a GitHub log the operator has to go
+  // and find.
+  "failure",
 ] as const;
 
 /**

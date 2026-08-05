@@ -31,7 +31,14 @@
  *      provider declines to route it on this account's plan (OpenCode Zen's
  *      own refusal string). Same "pick another model" CTA, different reason.
  *
- *   4b. Context-window overflow (#1116) - terminal `Prompt is too long` /
+ *   4b. Plan rate ceiling - the provider refused the request for exceeding an
+ *      allowance the ACCOUNT has (`Request too large ... on tokens per minute
+ *      (TPM): Limit 8000, Requested 53681`), which the agent harness cannot
+ *      tell from overflow and therefore reports as the give-up in 4c. Checked
+ *      first, because the harness folds both messages into one string and this
+ *      is the limit that was binding.
+ *
+ *   4c. Context-window overflow (#1116) - terminal `Prompt is too long` /
  *      `maximum context length is N tokens`. Actionable, so it renders on
  *      both surfaces rather than collapsing to the one-line comment.
  *
@@ -52,7 +59,7 @@
  *      the hang case, since the raw internal string helps nobody on the PR.
  *
  * Net: the actionable classifications (billing, API-key, model-not-found,
- * no-provider-available, context-overflow) render identical bodies on both
+ * no-provider-available, rate-ceiling, context-overflow) render identical bodies on both
  * surfaces; the non-actionable ones (hang,
  * generic) keep the forensics in the Actions job summary and show a calm
  * one-liner in the PR comment, whose footer already carries Polaris
@@ -73,6 +80,8 @@ import {
   extractProviderId,
   isProviderBillingExhausted,
   isRouterKeylimitExhaustedError,
+  parseRequestTooLargeRefusal,
+  type RequestTooLargeRefusal,
 } from "./providerErrors.ts";
 
 export type RenderedRunError = {
@@ -131,7 +140,38 @@ function formatNoProviderAvailableSummary(input: {
 function formatContextOverflowSummary(input: { owner: string; name: string; raw: string }): string {  return [
     "**This run exceeded the model's context window.** Polaris read more than the model could hold, so it stopped before finishing.",
     "",
-    `Pick a model with a larger context window, or split this PR into smaller ones and re-trigger.`,
+    "Pick a model with a larger context window, or give the run less to read - a narrower task, or a smaller diff to review - and re-trigger.",
+    "",
+    settingsLink("Model settings", input.owner, input.name),
+    "",
+    `\`\`\`\n${input.raw}\n\`\`\``,
+  ].join("\n");
+}
+
+/**
+ * A per-minute (or per-day) allowance on the account, which is a different
+ * failure from the one above and must not be described as one.
+ *
+ * The remedy is the whole difference. A context window belongs to the model, so
+ * a smaller job or a bigger model answers it. An allowance belongs to the plan,
+ * and no job is small enough: an agent re-sends its instructions and its tool
+ * definitions on every request, so the first turn of the shortest possible run
+ * is already tens of thousands of tokens. Telling somebody in that position to
+ * split their work sends them somewhere with nothing at the end of it.
+ */
+function formatRateCeilingSummary(input: {
+  owner: string;
+  name: string;
+  raw: string;
+  refusal: RequestTooLargeRefusal;
+}): string {
+  const { limit, requested, unit } = input.refusal;
+  return [
+    `**Your provider plan is capped below what a single request needs.** The cap is ${limit.toLocaleString("en-US")} ${unit}; this run asked for ${requested.toLocaleString("en-US")}.`,
+    "",
+    "That is a limit on the account, not on the model - the model had room. A shorter task will not get under it either: an agent sends its instructions and its tools with every request, so even the first one is bigger than the cap.",
+    "",
+    "Raise the limit with the provider (a paid tier usually does it), or point this repository at a provider whose allowance fits. The provider's own message below names the plan that was in effect.",
     "",
     settingsLink("Model settings", input.owner, input.name),
     "",
@@ -353,6 +393,23 @@ export function renderRunError(input: {
       owner: input.repo.owner,
       name: input.repo.name,
       raw: input.errorMessage,
+    });
+    return { summary: `### ❌ Polaris failed\n\n${body}`, comment: body };
+  }
+
+  // BEFORE context overflow, and this order is the point of the branch: a
+  // provider refusing a request for exceeding the account's allowance reads to
+  // the agent harness as overflow, so it compacts, is refused again, and stops
+  // with a give-up that says the session was too large. Both messages then
+  // arrive as one string, and the plan cap is the limit that was actually
+  // binding - the model's window was never reached.
+  const rateCeiling = parseRequestTooLargeRefusal(input.errorMessage);
+  if (rateCeiling) {
+    const body = formatRateCeilingSummary({
+      owner: input.repo.owner,
+      name: input.repo.name,
+      raw: input.errorMessage,
+      refusal: rateCeiling,
     });
     return { summary: `### ❌ Polaris failed\n\n${body}`, comment: body };
   }

@@ -386,7 +386,7 @@ async function closeOutWorkflowRun(payload: Payload): Promise<string[]> {
     const run =
         (await prisma.agentRun.findFirst({
             where: { ...open, githubRunId: String(githubRunId) },
-            select: { id: true }
+            select: { id: true, error: true }
         })) ??
         (repoFullName
             ? await prisma.agentRun.findFirst({
@@ -395,19 +395,24 @@ async function closeOutWorkflowRun(payload: Payload): Promise<string[]> {
                   // else's job.
                   where: { ...open, githubRunId: null, execution: { not: "server" }, repo: { repoFullName } },
                   orderBy: { createdAt: "asc" },
-                  select: { id: true }
+                  select: { id: true, error: true }
               })
             : null);
     if (!run) return [];
 
     const conclusion = payload.workflow_run?.conclusion;
     const state = conclusion === "success" ? "succeeded" : conclusion === "cancelled" ? "cancelled" : "failed";
+    // A run that got far enough to work out why it failed has already reported
+    // it, and that is the reason worth keeping. This webhook only ever knows
+    // that the job ended badly, so it fills in for the failures that never got
+    // to say anything - a cancelled runner, an image that would not start.
     await finishAgentRun(run.id, {
         state,
         error:
-            state === "failed"
-                ? `The workflow finished as ${conclusion ?? "failed"}. Its log is on the run in GitHub Actions.`
-                : null
+            state !== "failed"
+                ? null
+                : (run.error ??
+                  `The workflow finished as ${conclusion ?? "failed"}. Its log is on the run in GitHub Actions.`)
     });
     return [run.id];
 }

@@ -34,10 +34,28 @@ export const dynamic = "force-dynamic";
  * so they are accepted and ignored rather than stored under a column that would
  * only ever be written.
  */
+/** Long enough for the classified body with the provider's own message quoted
+ *  under it; short enough that a run cannot write a novel into the row. */
+const FAILURE_MAX = 4000;
+
 const patchSchema = z.object({
     model: z.string().trim().max(120).optional(),
     inputTokens: z.number().int().min(0).max(2_000_000_000).optional(),
-    outputTokens: z.number().int().min(0).max(2_000_000_000).optional()
+    outputTokens: z.number().int().min(0).max(2_000_000_000).optional(),
+    // Why it failed, as the run itself explained it - the same words the job
+    // summary and the pull request comment carry. It is markdown a person is
+    // meant to read, so it is stored as sent and bounded rather than parsed.
+    //
+    // Trimmed to length rather than rejected for it: a body that ran long would
+    // otherwise fail the whole request and take the token counts down with it,
+    // which is a lot to lose over a verbose provider message.
+    failure: z
+        .string()
+        .trim()
+        .min(1)
+        .max(200_000)
+        .transform((body) => body.slice(0, FAILURE_MAX))
+        .optional()
 });
 
 export async function PATCH(
@@ -69,7 +87,8 @@ export async function PATCH(
     const data = {
         ...(parsed.data.model ? { model: parsed.data.model } : {}),
         ...(parsed.data.inputTokens === undefined ? {} : { tokensIn: parsed.data.inputTokens }),
-        ...(parsed.data.outputTokens === undefined ? {} : { tokensOut: parsed.data.outputTokens })
+        ...(parsed.data.outputTokens === undefined ? {} : { tokensOut: parsed.data.outputTokens }),
+        ...(parsed.data.failure ? { error: parsed.data.failure } : {})
     };
     // The caller's own row, never the path's: the path may legitimately carry
     // GitHub's id, which is not what this table is keyed on.

@@ -108,6 +108,8 @@ export async function finalizeSuccessRun(input: {
   // users never open. `reportErrorToComment` no-ops when both progress
   // comment AND issue context are absent. see #835.
   if (rendered) {
+    // Same body the comment gets, kept for the run row - see ToolState.
+    input.toolState.failureBody = rendered.comment;
     await reportErrorToComment({
       toolState: input.toolState,
       error: rendered.comment,
@@ -207,6 +209,7 @@ export async function writeRunErrorOutputs(input: {
   rendered: RenderedRunError;
   toolState: ToolState;
 }): Promise<void> {
+  input.toolState.failureBody = input.rendered.comment;
   try {
     const usageSummary = formatUsageSummary(input.toolState.usageEntries);
     const parts = [input.rendered.summary, input.toolState.lastProgressBody, usageSummary].filter(

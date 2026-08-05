@@ -181,6 +181,11 @@ export interface ToolState {
   // survives deleteProgressComment so handleAgentResult can still detect "expected but never reported".
   hadProgressComment: boolean;
   lastProgressBody?: string;
+  // Why the run failed, already classified and written for a person to read.
+  // Polaris-only: the same body goes to the job summary and the comment, and
+  // this is what carries it back to the run row so the dashboard stops saying
+  // only that the workflow finished as a failure.
+  failureBody?: string;
   wasUpdated?: boolean;
   // set after a non-plan report_progress successfully writes the final summary.
   // decoupled from todoTracker.enabled so cleanup detection survives API failures.

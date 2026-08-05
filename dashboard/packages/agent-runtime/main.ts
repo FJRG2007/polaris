@@ -874,6 +874,10 @@ export async function main(): Promise<MainResult> {
       // persist the resolved/effective model (what actually ran) so per-model
       // cost analytics don't have to parse the audit-only payload.
       if (toolState.model) patch.model = toolState.model;
+      // Both failure paths (the catch above and the harness returning
+      // `{success: false}`) render the same body and leave it here, so the run
+      // row carries the reason the reader of the job summary got.
+      if (toolState.failureBody) patch.failure = toolState.failureBody;
       if (Object.keys(patch).length > 0) {
         await patchWorkflowRunFields(toolContext, patch);
       }

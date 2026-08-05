@@ -77,6 +77,21 @@ Everything below is a deliberate departure, not drift.
   end-of-turn decision, and two hooks each deciding whether the agent may stop is
   a loop neither can see. Everything else Enigma writes composes: the skills are
   read-only guidance and the post-edit hooks run per edit and exit.
+- **Why a run stopped.** Upstream treats a `session.error` as recoverable and
+  reports only the harness's own terminal verdict. For one class that loses the
+  reason: a provider refusing a request for exceeding the ACCOUNT's allowance is
+  indistinguishable to the harness from one refused for size, so it compacts,
+  is refused again, and stops saying the session was too large to compact. True,
+  and it sends the reader after a bigger model for a limit the model never hit.
+  `agents/opencode.ts` now keeps the last session error and folds it into that
+  one verdict, and `utils/providerErrors.ts` grew
+  `parseRequestTooLargeRefusal` so `utils/runErrorRenderer.ts` can quote the cap
+  and say it belongs to the plan. Its context-overflow copy also stopped telling
+  every run to split its pull request, since most are triggered by an issue.
+  The rendered reason is then kept on `ToolState.failureBody` and PATCHed to the
+  run row as `failure`, so the dashboard shows what the job summary shows -
+  upstream reports the artefacts and the token counts, and Polaris is the side
+  with a run row that would otherwise only be able to say that something failed.
 - **Typography.** Em and en dashes were replaced with plain hyphens throughout
   (1208 occurrences), because this package writes prose into other people's
   repositories and that is the house rule for user-facing text.

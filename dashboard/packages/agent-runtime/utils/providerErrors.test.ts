@@ -4,6 +4,8 @@ import {
   findProviderErrorMatch,
   isProviderBillingExhausted,
   isRouterKeylimitExhaustedError,
+  parseRequestTooLargeRefusal,
+  withRefusalCause,
 } from "./providerErrors.ts";
 
 describe("detectProviderError", () => {
@@ -316,5 +318,105 @@ describe("isRouterKeylimitExhaustedError", () => {
     expect(
       isRouterKeylimitExhaustedError("You requested up to 32000 tokens,\nbut can only afford 22800")
     ).toBe(true);
+  });
+});
+
+/**
+ * Four runs against FJRG2007/experiments were reported as "this run exceeded the
+ * model's context window - pick a model with a larger context window, or split
+ * this PR into smaller ones". The model was gpt-oss-120b on Groq, whose window
+ * is 131,072 tokens and was never approached: Groq refused at 8,000 tokens per
+ * minute, the free tier's allowance. Every sentence of that advice was wrong,
+ * and none of it could have worked. The wire text is copied from run 31023872155.
+ */
+describe("parseRequestTooLargeRefusal", () => {
+  const groq =
+    "Request too large for model `openai/gpt-oss-120b` in organization " +
+    "`org_01hyb8rsnafp08sekzaqm5kh76` service tier `on_demand` on tokens per minute (TPM): " +
+    "Limit 8000, Requested 53681, please reduce your message size and try again. " +
+    "Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing";
+
+  it("reads the cap and the request out of the provider's own words", () => {
+    expect(parseRequestTooLargeRefusal(groq)).toEqual({
+      unit: "tokens per minute (TPM)",
+      limit: 8000,
+      requested: 53681,
+    });
+  });
+
+  it("still finds it once the harness has wrapped its own verdict around it", () => {
+    // The reason the cause is folded into the terminal message at all: this
+    // joined string is the only thing `renderRunError` is ever given.
+    const joined =
+      "provider error: Session too large to compact - context exceeds model limit " +
+      `even after stripping media\n\nThe provider refused the request: ${groq}`;
+    expect(parseRequestTooLargeRefusal(joined)?.limit).toBe(8000);
+  });
+
+  it("survives the message being re-wrapped onto several lines", () => {
+    expect(parseRequestTooLargeRefusal(groq.replace(/ /g, "\n"))?.requested).toBe(53681);
+  });
+
+  it("does not fire on a real context-window rejection", () => {
+    // The other side of the distinction - that one really is the model's limit
+    // and really should say so.
+    expect(
+      parseRequestTooLargeRefusal("This model's maximum context length is 8192 tokens")
+    ).toBeNull();
+    expect(parseRequestTooLargeRefusal("Prompt is too long")).toBeNull();
+  });
+
+  it("does not fire on a bare compaction give-up", () => {
+    // Nothing quotable, so nothing claimed: the run falls through to the
+    // context-overflow copy, which is right when no provider said otherwise.
+    expect(
+      parseRequestTooLargeRefusal(
+        "Session too large to compact - context exceeds model limit even after stripping media"
+      )
+    ).toBeNull();
+  });
+
+  it("is not classified as an exhausted balance", () => {
+    // The refusal carries a billing URL and the word "Limit". The plan is
+    // capped, not empty, and a top-up CTA would be the wrong instruction.
+    expect(isProviderBillingExhausted(groq)).toBe(false);
+    expect(isRouterKeylimitExhaustedError(groq)).toBe(false);
+  });
+});
+
+/**
+ * The step that makes the classification above reachable at all: the refusal
+ * arrives on a session event opencode recovers from, and the run then ends on
+ * opencode's own verdict. Nothing downstream ever sees the two together unless
+ * they are joined here.
+ */
+describe("withRefusalCause", () => {
+  const groq =
+    "Request too large for model `openai/gpt-oss-120b` in organization `org_01hyb8` " +
+    "service tier `on_demand` on tokens per minute (TPM): Limit 8000, Requested 53681";
+  const giveUp =
+    "Session too large to compact - context exceeds model limit even after stripping media";
+
+  it("joins the refusal to the give-up it caused", () => {
+    const joined = withRefusalCause(giveUp, groq);
+    expect(joined).toContain(giveUp);
+    expect(joined).toContain("The provider refused the request:");
+    expect(parseRequestTooLargeRefusal(joined)?.limit).toBe(8000);
+  });
+
+  it("leaves the verdict alone when nothing was refused", () => {
+    expect(withRefusalCause(giveUp, undefined)).toBe(giveUp);
+  });
+
+  it("does not attach a recovered-from refusal to an unrelated failure", () => {
+    // The fault being fixed is a wrong reason, so a second wrong reason is not
+    // an improvement: only the give-up is known to be caused by the refusal.
+    const unrelated = "AI_APICallError: fetch failed";
+    expect(withRefusalCause(unrelated, groq)).toBe(unrelated);
+  });
+
+  it("does not repeat a cause the verdict already carries", () => {
+    const already = `${giveUp} - ${groq}`;
+    expect(withRefusalCause(already, groq)).toBe(already);
   });
 });

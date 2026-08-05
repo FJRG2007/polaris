@@ -49,57 +49,41 @@
  *   - skills install
  *   - todo tracker / onToolUse forwarding
  */
-import { type ChildProcess, spawn as nodeSpawn } from "node:child_process";
-import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { performance } from "node:perf_hooks";
 import * as core from "@actions/core";
-import {
-  type AssistantMessage,
-  createOpencodeClient,
-  type EventSubscribeResponse,
-  type OpencodeClient,
-  type Part,
-  type TextPartInput,
-} from "@opencode-ai/sdk/v2";
-import { Agent, fetch as undiciFetch } from "undici";
+import { performance } from "node:perf_hooks";
 import { polarisMcpName } from "../external.ts";
-import { BEDROCK_MODEL_ID_ENV } from "../models.ts";
 import type { ToolState } from "../toolState.ts";
-import {
-  AGENT_ACTIVITY_TIMEOUT_MS,
-  AGENT_FIRST_EVENT_TIMEOUT_MS,
-  isDebugEnabled,
-  markActivity,
-} from "../utils/activity.ts";
-import type { AgentDiagnostic } from "../utils/agentHangReport.ts";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { BEDROCK_MODEL_ID_ENV } from "../models.ts";
+import { REVIEWER_AGENT_NAME } from "./reviewer.ts";
+import { Agent, fetch as undiciFetch } from "undici";
 import { formatJsonValue, log } from "../utils/cli.ts";
 import { installCodexAuth } from "../utils/codexHome.ts";
-import { findProviderErrorMatch } from "../utils/providerErrors.ts";
 import { resolveRunEffort } from "../utils/runEffort.ts";
-import { exposeAgentOnPath, installEnigma } from "../utils/enigma.ts";
-import { addSkill, installBundledSkills } from "../utils/skills.ts";
-import { trackChild, untrackChild } from "../utils/subprocess.ts";
 import type { TodoTracker } from "../utils/todoTracking.ts";
 import { getDevDependencyVersion } from "../utils/version.ts";
 import { resolveVertexOpenCodeModel } from "../utils/vertex.ts";
+import { trackChild, untrackChild } from "../utils/subprocess.ts";
+import type { AgentDiagnostic } from "../utils/agentHangReport.ts";
+import { addSkill, installBundledSkills } from "../utils/skills.ts";
+import { exposeAgentOnPath, installEnigma } from "../utils/enigma.ts";
+import { buildReflectionPrompt, runPostRunRetryLoop } from "./postRun.ts";
+import { type ChildProcess, spawn as nodeSpawn } from "node:child_process";
 import { dirtyTrackedPaths, restoreDirtiedSince } from "../utils/worktree.ts";
+import { findProviderErrorMatch, withRefusalCause } from "../utils/providerErrors.ts";
+import { formatWithLabel, ORCHESTRATOR_LABEL, SessionLabeler } from "./sessionLabeler.ts";
 import { GIT_NATIVE_READ_DENY_OPENCODE, GIT_NATIVE_WRITE_DENY_OPENCODE } from "./nativeFsDenies.ts";
 import {
   buildOpencodeSubagentGateSource,
   POLARIS_OPENCODE_GATE_PLUGIN_FILENAME,
 } from "./opencodePlugin.ts";
 import {
-  autoSelectModel,
-  buildReviewerAgentConfig,
-  installOpencodeCli,
-  kimiOpenRouterProviderOverrides,
-  type OpenCodeConfig,
-  openAICompatibleProvider,
-} from "./opencodeShared.ts";
-import { buildReflectionPrompt, runPostRunRetryLoop } from "./postRun.ts";
-import { REVIEWER_AGENT_NAME } from "./reviewer.ts";
-import { formatWithLabel, ORCHESTRATOR_LABEL, SessionLabeler } from "./sessionLabeler.ts";
+  AGENT_ACTIVITY_TIMEOUT_MS,
+  AGENT_FIRST_EVENT_TIMEOUT_MS,
+  isDebugEnabled,
+  markActivity,
+} from "../utils/activity.ts";
 import {
   type AgentResult,
   type AgentRunContext,
@@ -108,6 +92,22 @@ import {
   logTokenTable,
   MAX_STDERR_LINES,
 } from "./shared.ts";
+import {
+  type AssistantMessage,
+  createOpencodeClient,
+  type EventSubscribeResponse,
+  type OpencodeClient,
+  type Part,
+  type TextPartInput,
+} from "@opencode-ai/sdk/v2";
+import {
+  autoSelectModel,
+  buildReviewerAgentConfig,
+  installOpencodeCli,
+  kimiOpenRouterProviderOverrides,
+  type OpenCodeConfig,
+  openAICompatibleProvider,
+} from "./opencodeShared.ts";
 
 const installCli = () => installOpencodeCli({ binPath: "bin/opencode.exe" });
 
@@ -415,6 +415,16 @@ interface RunnerContext {
   loggedToolCallIDs: Set<string>;
   /** rolling stderr tail from the server process (for diagnostics). */
   recentStderr: string[];
+  /**
+   * the provider's last refusal on this session, in the provider's own words.
+   *
+   * opencode publishes a refusal it can retry on `session.error` and then
+   * reports its OWN verdict on the terminal assistant message. for the
+   * refusals it reads as overflow that verdict is a consequence, not a reason,
+   * so this is the only surviving copy of why the run actually stopped - see
+   * `terminalError`.
+   */
+  lastSessionError: string | undefined;
   diagnostic: AgentDiagnostic;
 }
 
@@ -498,6 +508,7 @@ async function dispatchEvent(ctx: RunnerContext, event: EventSubscribeResponse):
     if (sessionID !== ctx.orchestratorSessionID) return;
     const err = event.properties.error;
     const message = err ? extractErrorMessage(err) : "(no error payload)";
+    ctx.lastSessionError = message;
     log.info(`» ${ctx.label} session error: ${message}`);
     return;
   }
@@ -513,6 +524,18 @@ function extractErrorMessage(err: {
   if (err.data?.message) return err.data.message;
   if (err.name) return err.name;
   return JSON.stringify(err);
+}
+
+/**
+ * The terminal message a run reports. `withRefusalCause` folds in the provider's
+ * own refusal when opencode's verdict describes only the consequence of it -
+ * see `utils/providerErrors.ts` for which case that is and why.
+ */
+function terminalError(
+  ctx: RunnerContext,
+  error: { name?: string; data?: { message?: string; [key: string]: unknown } }
+): string {
+  return withRefusalCause(extractErrorMessage(error), ctx.lastSessionError);
 }
 
 async function onPartUpdated(ctx: RunnerContext, part: Part): Promise<void> {
@@ -846,7 +869,7 @@ async function runPromptTurn(
     return {
       success: false,
       output: finalText,
-      error: `provider error: ${extractErrorMessage(assistant.error)}`,
+      error: `provider error: ${terminalError(ctx, assistant.error)}`,
       usage,
     };
   }
@@ -1286,6 +1309,7 @@ export const opencode = agent({
         taskDispatchByCallID: new Map(),
         loggedToolCallIDs: new Set(),
         recentStderr: server.recentStderr,
+        lastSessionError: undefined,
         diagnostic: {
           label: "Polaris",
           recentStderr: server.recentStderr,

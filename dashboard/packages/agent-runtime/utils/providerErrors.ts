@@ -182,6 +182,85 @@ export function isProviderBillingExhausted(text: string): boolean {
 }
 
 /**
+ * A ceiling the ACCOUNT has, reported by a provider that was asked for a
+ * request the model itself could have held.
+ *
+ * Groq answers an ordinary agent turn - well inside the 131k window its models
+ * publish - with `Request too large for model X in organization Y service tier
+ * "on_demand" on tokens per minute (TPM): Limit 8000, Requested 53681`. Every
+ * layer above reads that as "too large" and concludes context, which is the one
+ * thing it is not: an agent sends its instructions and its tools with every
+ * request, so the smallest possible run is already tens of thousands of tokens
+ * and no amount of narrowing the task gets under a per-minute allowance of
+ * 8,000. Naming the ceiling is what separates "use a smaller model" (wrong,
+ * and the user will try it) from "raise the limit" (the only thing that works).
+ *
+ * Matched on the wire text rather than a provider id because the shape is the
+ * conventional one for this refusal and the numbers are the whole point - a
+ * classification with no `Limit`/`Requested` to quote would be a guess.
+ */
+export type RequestTooLargeRefusal = {
+  /** What the account is allowed. */
+  limit: number;
+  /** What this request needed. */
+  requested: number;
+  /** The provider's own name for the ceiling, e.g. `tokens per minute (TPM)`. */
+  unit: string;
+};
+
+// Every gap is `\s+` rather than a literal space, and the span between the two
+// halves is dot-all: a layer that re-wraps the message puts its newline
+// wherever the column falls, and a pattern that assumed spaces would go quiet
+// on exactly the messages that had been reformatted for being long. Same
+// defence, and the same reason, as ROUTER_KEYLIMIT_EXHAUSTED_PATTERN.
+const REQUEST_TOO_LARGE_PATTERN =
+  /Request\s+too\s+large\b.*?\bon\s+([^:]+):\s*Limit\s+(\d+),\s*Requested\s+(\d+)/is;
+
+export function parseRequestTooLargeRefusal(text: string): RequestTooLargeRefusal | null {
+  const match = REQUEST_TOO_LARGE_PATTERN.exec(text);
+  if (!match) return null;
+  return {
+    // The unit is quoted straight back to the reader, so a newline the wrapping
+    // left inside it would be quoted too.
+    unit: match[1].trim().replace(/\s+/g, " "),
+    limit: Number(match[2]),
+    requested: Number(match[3]),
+  };
+}
+
+/**
+ * The harness's own give-up on a session it could not shrink.
+ *
+ * Singled out from every other terminal error because it is the one whose
+ * verdict is a consequence: the harness cannot tell a refusal for size from a
+ * refusal for rate, so it treats both as overflow, compacts, is refused again,
+ * and stops. What it then reports is true and useless - the session did not
+ * fit, but nothing about the session was the problem.
+ */
+function isCompactionGiveUp(message: string): boolean {
+  return /too large to compact/i.test(message);
+}
+
+/**
+ * A terminal message carrying the cause behind it, when the harness's verdict
+ * only describes the consequence.
+ *
+ * Without this a run stopped by a per-minute allowance is reported as a context
+ * window too small for the work, and everything that follows from that - a
+ * bigger model, a smaller task - is advice that cannot work. The refusal itself
+ * arrives on a session event the harness recovers from, so it is not a failure
+ * mode of its own; it is folded in here, where there is a failure to explain.
+ *
+ * Scoped to the give-up above rather than applied to every terminal error: a
+ * recovered-from refusal that had nothing to do with how the run ended would be
+ * a second wrong reason, which is the fault being fixed.
+ */
+export function withRefusalCause(verdict: string, cause: string | undefined): string {
+  if (!cause || !isCompactionGiveUp(verdict) || verdict.includes(cause)) return verdict;
+  return `${verdict}\n\nThe provider refused the request: ${cause}`;
+}
+
+/**
  * Extract `providerID=foo` from agent error logs (OpenCode emits this on
  * `provider error detected (...)` lines). Returns the lowercase provider
  * slug, or null when absent. Used to render a provider-specific dashboard
