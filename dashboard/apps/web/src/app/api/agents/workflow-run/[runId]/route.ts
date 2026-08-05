@@ -42,6 +42,12 @@ const patchSchema = z.object({
     model: z.string().trim().max(120).optional(),
     inputTokens: z.number().int().min(0).max(2_000_000_000).optional(),
     outputTokens: z.number().int().min(0).max(2_000_000_000).optional(),
+    // Which classification the failure landed on, as a value rather than as the
+    // prose below - what decides whether the next model in the fallback chain is
+    // tried. Kept as sent even when unrecognised: this Polaris does not have to
+    // know every kind a newer runtime reports, and a stored value it cannot act
+    // on is still the truth about what happened.
+    failureKind: z.string().trim().min(1).max(40).optional(),
     // Why it failed, as the run itself explained it - the same words the job
     // summary and the pull request comment carry. It is markdown a person is
     // meant to read, so it is stored as sent and bounded rather than parsed.
@@ -88,7 +94,8 @@ export async function PATCH(
         ...(parsed.data.model ? { model: parsed.data.model } : {}),
         ...(parsed.data.inputTokens === undefined ? {} : { tokensIn: parsed.data.inputTokens }),
         ...(parsed.data.outputTokens === undefined ? {} : { tokensOut: parsed.data.outputTokens }),
-        ...(parsed.data.failure ? { error: parsed.data.failure } : {})
+        ...(parsed.data.failure ? { error: parsed.data.failure } : {}),
+        ...(parsed.data.failureKind ? { failureKind: parsed.data.failureKind } : {})
     };
     // The caller's own row, never the path's: the path may legitimately carry
     // GitHub's id, which is not what this table is keyed on.

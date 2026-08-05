@@ -189,7 +189,9 @@ export async function main(): Promise<MainResult> {
       reason: runContext.commercialRefused,
       ownerLogin: runContext.repo.owner,
     });
-    await writeRunErrorOutputs({ rendered: { summary: body, comment: body }, toolState });
+    // A refusal by the control plane, not by a provider: no other model would be
+    // served either, so it is not a fallback candidate.
+    await writeRunErrorOutputs({ rendered: { summary: body, comment: body, kind: "model-access" }, toolState });
     return { success: false, error: errorMessage };
   }
 
@@ -878,6 +880,7 @@ export async function main(): Promise<MainResult> {
       // `{success: false}`) render the same body and leave it here, so the run
       // row carries the reason the reader of the job summary got.
       if (toolState.failureBody) patch.failure = toolState.failureBody;
+      if (toolState.failureKind) patch.failureKind = toolState.failureKind;
       if (Object.keys(patch).length > 0) {
         await patchWorkflowRunFields(toolContext, patch);
       }

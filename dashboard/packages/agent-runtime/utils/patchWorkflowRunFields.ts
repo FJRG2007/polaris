@@ -23,10 +23,12 @@ const STRING_KEYS = [
   "summarySnapshot",
   "model",
   // Polaris-only. Why the run failed, in the words already written for the job
-  // summary and the comment. Without it the dashboard can say a run failed but
-  // not why, and the reason lives only in a GitHub log the operator has to go
-  // and find.
+  // summary and the comment, and which classification it landed on. Without the
+  // first the dashboard can say a run failed but not why; without the second it
+  // cannot decide whether trying the next model in a fallback chain is worth a
+  // runner, and would have to read the prose for phrases to find out.
   "failure",
+  "failureKind",
 ] as const;
 
 /**

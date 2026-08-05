@@ -19,6 +19,7 @@ import { z } from "zod";
 import { githubLoginSchema, githubRepoSchema } from "./runners.js";
 import {
     AGENT_EXECUTIONS,
+    AGENT_FALLBACK_MAX,
     AGENT_GATE_MODES,
     AGENT_PUSH_POLICIES,
     AGENT_RUN_STATES,
@@ -116,6 +117,10 @@ export const agentDefaultsSchema = z.object({
     execution: agentExecutionSchema.nullable().default(null),
     poolId: z.string().uuid().nullable().default(null),
     model: agentModelSchema.nullable().default(null),
+    /** Where to go when the chosen model's provider will not serve the run,
+     *  most preferred first. Null inherits; an empty list is a deliberate
+     *  "nowhere", which is a different answer and has to survive being saved. */
+    fallback: z.array(agentModelSchema).max(AGENT_FALLBACK_MAX).nullable().default(null),
     effort: agentEffortSchema.nullable().default(null),
     push: agentPushPolicySchema.nullable().default(null),
     shell: agentShellPolicySchema.nullable().default(null),

@@ -110,6 +110,7 @@ export async function finalizeSuccessRun(input: {
   if (rendered) {
     // Same body the comment gets, kept for the run row - see ToolState.
     input.toolState.failureBody = rendered.comment;
+    input.toolState.failureKind = rendered.kind;
     await reportErrorToComment({
       toolState: input.toolState,
       error: rendered.comment,
@@ -210,6 +211,7 @@ export async function writeRunErrorOutputs(input: {
   toolState: ToolState;
 }): Promise<void> {
   input.toolState.failureBody = input.rendered.comment;
+  input.toolState.failureKind = input.rendered.kind;
   try {
     const usageSummary = formatUsageSummary(input.toolState.usageEntries);
     const parts = [input.rendered.summary, input.toolState.lastProgressBody, usageSummary].filter(

@@ -422,3 +422,68 @@ export function policyAllowsTrigger(policy: AgentPolicy, trigger: AgentTrigger):
     if (trigger.startsWith("issue.")) return policy.issues;
     return true;
 }
+
+/**
+ * How many models a fallback chain may name.
+ *
+ * A ceiling rather than a preference. Each attempt is a whole job - a checkout,
+ * an install, a model asked and refused - so a chain long enough to be worth
+ * bounding is one that turns a misconfiguration into ten minutes of runners
+ * before anybody is told anything.
+ */
+export const AGENT_FALLBACK_MAX = 5;
+
+/**
+ * The classifications that mean the provider would not serve the run, and that
+ * somewhere else is therefore worth trying.
+ *
+ * Every one of them happens BEFORE the agent does any work: a rate ceiling, an
+ * empty balance, a refused key, a model that no longer exists, a plan the model
+ * is not on, and a window the run could not fit in. Nothing was written and
+ * nothing was pushed, so starting again elsewhere costs a runner and repeats no
+ * side effect.
+ *
+ * Deliberately not here: a hang, and anything unclassified. Those are failures
+ * at the work rather than at reaching a provider - the agent may already have
+ * committed - and re-running one on a different model is a guess that spends
+ * somebody's money to make it.
+ */
+export const AGENT_FALLBACK_KINDS: readonly string[] = [
+    "rate-ceiling",
+    "provider-billing",
+    "router-billing",
+    "api-key",
+    "model-not-found",
+    "no-provider",
+    "context"
+];
+
+export function failureIsWorthRetrying(kind: string | null | undefined): boolean {
+    return kind !== null && kind !== undefined && AGENT_FALLBACK_KINDS.includes(kind);
+}
+
+/**
+ * The models to try, in order, for a run that is about to start.
+ *
+ * The repository's own model is always first: it is the choice somebody made,
+ * and a chain that could reorder it would make the setting advisory. The rest
+ * comes from the most specific tier that named one - the same most-specific-wins
+ * rule as every other setting here, rather than concatenating the tiers, so
+ * reading one screen tells you what will happen.
+ *
+ * Duplicates are dropped, keeping the earliest mention, because a chain that
+ * tried the same refused model twice would spend a second runner learning
+ * nothing.
+ */
+export function resolveModelChain(
+    model: string,
+    ...tiers: ReadonlyArray<readonly string[] | null | undefined>
+): string[] {
+    const fallback = tiers.find((tier) => tier !== null && tier !== undefined) ?? [];
+    const chain: string[] = [];
+    for (const candidate of [model, ...fallback]) {
+        const trimmed = candidate.trim();
+        if (trimmed && !chain.includes(trimmed)) chain.push(trimmed);
+    }
+    return chain.slice(0, AGENT_FALLBACK_MAX + 1);
+}

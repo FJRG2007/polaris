@@ -3779,6 +3779,10 @@ model AgentDefaults {
     poolId       String?  @db.Uuid
     model        String?
     effort       String?
+    // Models to try when the one above will not serve the run, most preferred
+    // first, as a JSON string array. Null is "inherit"; an empty array is a
+    // deliberate "do not fall back anywhere", which is not the same thing.
+    fallback     String?
     // disabled | restricted | enabled, for git and for the shell.
     push         String?
     shell        String?
@@ -3863,6 +3867,20 @@ model AgentRun {
     // The container `server` runs happen in, so the log can be streamed and the
     // run can be cancelled.
     containerId String?
+    // What the agent was asked to do, so a retry on the next model asks the same
+    // thing. A webhook run cannot rebuild it - the event is gone - and a retry
+    // that invented its own prompt would be a different piece of work wearing the
+    // first one's name.
+    prompt      String?
+    // Which try this is on the fallback chain, and the run it followed. A run
+    // started because the one before it could not be served is a second attempt at
+    // ONE piece of work, and a screen that showed them as unrelated failures would
+    // be describing the chain as breakage.
+    attempt     Int      @default(1)
+    parentRunId String?  @db.Uuid
+    // Which classification the failure landed on, as a value rather than as the
+    // prose in `error` - what decides whether the next candidate is tried.
+    failureKind String?
     // SHA-256 of the token this run authenticates its callbacks with. The raw
     // value is handed to the runtime once, at dispatch, and never stored: a
     // database dump therefore cannot be replayed as a live run credential. The
@@ -3894,4 +3912,5 @@ model AgentRun {
     @@unique([tokenHash])
     @@index([state])
     @@index([githubRunId])
+    @@index([parentRunId])
 }

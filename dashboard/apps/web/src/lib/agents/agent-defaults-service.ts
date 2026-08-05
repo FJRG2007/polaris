@@ -46,6 +46,9 @@ export interface AgentDefaultsView {
     poolId: string | null;
     poolName: string | null;
     model: string | null;
+    /** Models to try when the one above will not serve the run, most preferred
+     *  first. Null is inherit; an empty list is a deliberate "nowhere". */
+    fallback: string[] | null;
     effort: AgentEffort | null;
     push: AgentPushPolicy | null;
     shell: AgentShellPolicy | null;
@@ -68,6 +71,7 @@ const SELECT = {
     execution: true,
     poolId: true,
     model: true,
+    fallback: true,
     effort: true,
     push: true,
     shell: true,
@@ -84,6 +88,7 @@ type Row = {
     execution: string | null;
     poolId: string | null;
     model: string | null;
+    fallback: string | null;
     effort: string | null;
     push: string | null;
     shell: string | null;
@@ -102,6 +107,7 @@ function toView(row: Row): AgentDefaultsView {
         poolId: row.poolId,
         poolName: row.pool?.name ?? null,
         model: row.model,
+        fallback: parseFallback(row.fallback),
         effort: row.effort as AgentEffort | null,
         push: row.push as AgentPushPolicy | null,
         shell: row.shell as AgentShellPolicy | null,
@@ -146,7 +152,10 @@ export async function saveAgentDefaults(ownerId: string, input: AgentDefaultsInp
     // A pool only means anything for `runners`; storing one beside another
     // execution would leave the screen showing a machine nothing runs on.
     const poolId = values.execution === "runners" ? values.poolId : null;
-    const data = { ...values, poolId };
+    // The chain is a list everywhere except in the column, which is text - the
+    // schema carries no scalar arrays, so every JSON value here is stored as a
+    // string and read back through `parseFallback`.
+    const data = { ...values, poolId, fallback: values.fallback === null ? null : JSON.stringify(values.fallback) };
     await prisma.agentDefaults.upsert({
         where: { ownerId_scope: { ownerId, scope } },
         create: { ownerId, scope, ...data },
@@ -286,4 +295,44 @@ export async function inheritedConfig(
         push: pick("push"),
         shell: pick("shell")
     };
+}
+
+/**
+ * The fallback lists the three tiers hold, most specific first.
+ *
+ * Returned as tiers rather than already resolved because the resolution rule
+ * lives in @polaris/core with every other one, and because "this tier said
+ * nothing" and "this tier said nowhere" are different answers that a merged
+ * result could not tell apart.
+ */
+export async function inheritedFallback(
+    ownerId: string,
+    repoFullName: string
+): Promise<Array<string[] | null>> {
+    const scope = scopeOf(repoFullName);
+    const [rows, platform] = await Promise.all([
+        prisma.agentDefaults.findMany({
+            where: { ownerId, scope: { in: [scope, GENERAL_SCOPE] } },
+            select: { scope: true, fallback: true }
+        }),
+        getPlatformAgentDefaults()
+    ]);
+    return [
+        parseFallback(rows.find((row) => row.scope === scope)?.fallback),
+        parseFallback(rows.find((row) => row.scope === GENERAL_SCOPE)?.fallback),
+        platform.fallback
+    ];
+}
+
+/** A stored list, or null for a tier that never set one. A row that will not
+ *  parse is read as "said nothing" rather than as an empty list: guessing the
+ *  second would silently turn a configured chain off. */
+export function parseFallback(value: string | null | undefined): string[] | null {
+    if (!value) return null;
+    try {
+        const parsed: unknown = JSON.parse(value);
+        return Array.isArray(parsed) ? parsed.filter((entry): entry is string => typeof entry === "string") : null;
+    } catch {
+        return null;
+    }
 }

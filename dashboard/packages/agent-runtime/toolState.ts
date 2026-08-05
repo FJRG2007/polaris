@@ -186,6 +186,9 @@ export interface ToolState {
   // this is what carries it back to the run row so the dashboard stops saying
   // only that the workflow finished as a failure.
   failureBody?: string;
+  // The same verdict as a value rather than as prose, for the control plane
+  // deciding whether to try the next model in a fallback chain.
+  failureKind?: string;
   wasUpdated?: boolean;
   // set after a non-plan report_progress successfully writes the final summary.
   // decoupled from todoTracker.enabled so cleanup detection survives API failures.

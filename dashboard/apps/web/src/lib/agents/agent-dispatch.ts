@@ -42,6 +42,10 @@ export interface DispatchInput {
     issueNumber?: number | null;
     prNumber?: number | null;
     startedById?: string | null;
+    /** Which try this is on the fallback chain, and the run it followed. Absent
+     *  on a first attempt, which is every run somebody asks for directly. */
+    attempt?: number;
+    parentRunId?: string | null;
 }
 
 export interface DispatchResult {
@@ -65,6 +69,9 @@ export async function dispatchRun(input: DispatchInput): Promise<DispatchResult>
         execution,
         model: input.repo.model,
         mode: input.mode ?? null,
+        prompt: input.prompt,
+        attempt: input.attempt ?? 1,
+        parentRunId: input.parentRunId ?? null,
         issueNumber: input.issueNumber ?? null,
         prNumber: input.prNumber ?? null,
         startedById: input.startedById ?? null

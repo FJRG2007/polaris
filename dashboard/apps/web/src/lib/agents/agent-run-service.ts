@@ -133,6 +133,12 @@ export interface CreateRunInput {
     issueNumber?: number | null;
     prNumber?: number | null;
     startedById?: string | null;
+    /** What the agent is being asked to do, kept so a retry on the next model in
+     *  the fallback chain asks the same thing. */
+    prompt?: string | null;
+    /** Which try this is on that chain, and the run it followed. */
+    attempt?: number;
+    parentRunId?: string | null;
 }
 
 /**
@@ -154,6 +160,9 @@ export async function createAgentRun(input: CreateRunInput): Promise<{ id: strin
             issueNumber: input.issueNumber ?? null,
             prNumber: input.prNumber ?? null,
             startedById: input.startedById ?? null,
+            prompt: input.prompt ?? null,
+            attempt: input.attempt ?? 1,
+            parentRunId: input.parentRunId ?? null,
             tokenHash: hashToken(token),
             state: "queued"
         },
@@ -201,6 +210,9 @@ export interface FinishRunInput {
     result?: string | null;
     tokensIn?: number | null;
     tokensOut?: number | null;
+    /** Which classification the failure landed on, as a value. What decides
+     *  whether the next model in the fallback chain is worth trying. */
+    failureKind?: string | null;
 }
 
 /**
@@ -225,7 +237,8 @@ export async function finishAgentRun(runId: string, input: FinishRunInput): Prom
             error: input.error ?? null,
             result: input.result ?? null,
             tokensIn: input.tokensIn ?? null,
-            tokensOut: input.tokensOut ?? null
+            tokensOut: input.tokensOut ?? null,
+            failureKind: input.failureKind ?? null
         }
     });
     return count > 0;

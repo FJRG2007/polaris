@@ -17,8 +17,9 @@
 import { Trash2 } from "lucide-react";
 import { runAction } from "@/lib/run-action";
 import { useState, useTransition } from "react";
-import { ModelPicker, type PickerModel } from "@/components/model-picker";
 import { Badge, Button, Card, CardBody, Select } from "@polaris/ui";
+import { ModelFallbackList } from "@/components/model-fallback-list";
+import { ModelPicker, type PickerModel } from "@/components/model-picker";
 import type { AgentDefaultsView } from "@/lib/agents/agent-defaults-service";
 import {
     AGENT_EFFORTS,
@@ -53,6 +54,7 @@ export function emptyTier(scope: string): AgentDefaultsView {
         poolId: null,
         poolName: null,
         model: null,
+        fallback: null,
         effort: null,
         push: null,
         shell: null,
@@ -120,6 +122,7 @@ export function AgentDefaultsCard({
                             execution: tier.execution,
                             poolId: tier.poolId,
                             model: tier.model,
+                            fallback: tier.fallback,
                             effort: tier.effort,
                             push: tier.push,
                             shell: tier.shell,
@@ -243,6 +246,17 @@ export function AgentDefaultsCard({
                             inheritLabel={`Inherit (${inheritedFrom})`}
                         />
                     </Field>
+                    <Field
+                        wide
+                        label="If that provider refuses"
+                        hint="Tried in order when a run is turned away for the account's rate limit, an empty balance, a rejected key, or a window it did not fit in. Drag to reorder."
+                    >
+                        <ModelFallbackList
+                            value={tier.fallback}
+                            onChange={(next) => set("fallback", next)}
+                            loadModels={loadModels}
+                        />
+                    </Field>
                     <Field label="Reasoning effort">
                         <Select
                             value={tier.effort ?? INHERIT}
@@ -292,9 +306,21 @@ export function AgentDefaultsCard({
     );
 }
 
-function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+function Field({
+    label,
+    hint,
+    wide,
+    children
+}: {
+    label: string;
+    hint?: string;
+    /** Spans the pair of columns the grid lays the rest out in - for a control
+     *  that is a list rather than one value. */
+    wide?: boolean;
+    children: React.ReactNode;
+}) {
     return (
-        <div className="space-y-1">
+        <div className={wide ? "space-y-1 sm:col-span-2" : "space-y-1"}>
             <label className="text-sm font-medium">{label}</label>
             {children}
             {hint ? <p className="text-xs text-muted-foreground">{hint}</p> : null}

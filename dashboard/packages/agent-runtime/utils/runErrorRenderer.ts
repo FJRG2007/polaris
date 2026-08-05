@@ -84,9 +84,32 @@ import {
   type RequestTooLargeRefusal,
 } from "./providerErrors.ts";
 
+/**
+ * Which classification a failure landed on, as a value rather than as prose.
+ *
+ * The bodies below are written for a person and are free to be reworded; a
+ * control plane deciding whether to try the next model in a fallback chain
+ * cannot be reading them for phrases. The first five all mean the same thing to
+ * that decision - this provider will not serve this run - and the rest mean
+ * trying somewhere else is a guess.
+ */
+export type RunErrorKind =
+  | "router-billing"
+  | "provider-billing"
+  | "api-key"
+  | "model-not-found"
+  | "no-provider"
+  | "rate-ceiling"
+  | "context"
+  | "model-access"
+  | "secrets-unavailable"
+  | "hang"
+  | "unknown";
+
 export type RenderedRunError = {
   summary: string;
   comment: string;
+  kind: RunErrorKind;
 };
 
 function isProviderModelNotFoundError(message: string): boolean {
@@ -317,14 +340,14 @@ export function renderRunError(input: {
 
   if (billingError) {
     const body = formatBillingErrorSummary(billingError, input.repo.owner);
-    return { summary: body, comment: body };
+    return { summary: body, comment: body, kind: "router-billing" };
   }
 
   // model-access gate (explicit `--model`/family flag the run can't serve):
   // the thrown message already IS the rendered markdown body (built by
   // `buildModelAccessError`), so surface it verbatim on both surfaces.
   if (input.errorMessage.includes(MODEL_ACCESS_MARKER)) {
-    return { summary: input.errorMessage, comment: input.errorMessage };
+    return { summary: input.errorMessage, comment: input.errorMessage, kind: "model-access" };
   }
 
   // run-context couldn't hand over Polaris-stored secrets. same verbatim
@@ -332,7 +355,7 @@ export function renderRunError(input: {
   // branch below so it can't be rewritten into a "go add a key" CTA - the key
   // is already there.
   if (input.errorMessage.includes(SECRETS_UNAVAILABLE_MARKER)) {
-    return { summary: input.errorMessage, comment: input.errorMessage };
+    return { summary: input.errorMessage, comment: input.errorMessage, kind: "secrets-unavailable" };
   }
 
   // gated on isHang because the harness sets `agentDiagnostic` on entry, so
@@ -363,7 +386,7 @@ export function renderRunError(input: {
   // a "rotate your key" CTA when the actual fix is "top up credits".
   if (isProviderBillingExhausted(input.errorMessage)) {
     const body = formatProviderBillingExhausted({ errorMessage: input.errorMessage });
-    return { summary: `### ❌ Polaris failed\n\n${body}`, comment: body };
+    return { summary: `### ❌ Polaris failed\n\n${body}`, comment: body, kind: "provider-billing" };
   }
 
   const apiKeySource = hangBody ?? input.errorMessage;
@@ -376,7 +399,7 @@ export function renderRunError(input: {
     : null;
 
   if (apiKeyErrorSummary) {
-    return { summary: apiKeyErrorSummary, comment: apiKeyErrorSummary };
+    return { summary: apiKeyErrorSummary, comment: apiKeyErrorSummary, kind: "api-key" };
   }
 
   if (isProviderModelNotFoundError(input.errorMessage)) {
@@ -385,7 +408,7 @@ export function renderRunError(input: {
       name: input.repo.name,
       raw: input.errorMessage,
     });
-    return { summary: body, comment: body };
+    return { summary: body, comment: body, kind: "model-not-found" };
   }
 
   if (isNoProviderAvailableError(input.errorMessage)) {
@@ -394,7 +417,7 @@ export function renderRunError(input: {
       name: input.repo.name,
       raw: input.errorMessage,
     });
-    return { summary: `### ❌ Polaris failed\n\n${body}`, comment: body };
+    return { summary: `### ❌ Polaris failed\n\n${body}`, comment: body, kind: "no-provider" };
   }
 
   // BEFORE context overflow, and this order is the point of the branch: a
@@ -411,7 +434,7 @@ export function renderRunError(input: {
       raw: input.errorMessage,
       refusal: rateCeiling,
     });
-    return { summary: `### ❌ Polaris failed\n\n${body}`, comment: body };
+    return { summary: `### ❌ Polaris failed\n\n${body}`, comment: body, kind: "rate-ceiling" };
   }
 
   // actionable, so it renders identically on both surfaces rather than
@@ -422,7 +445,7 @@ export function renderRunError(input: {
       name: input.repo.name,
       raw: input.errorMessage,
     });
-    return { summary: `### ❌ Polaris failed\n\n${body}`, comment: body };
+    return { summary: `### ❌ Polaris failed\n\n${body}`, comment: body, kind: "context" };
   }
 
   if (hangBody) {
@@ -435,6 +458,7 @@ export function renderRunError(input: {
     return {
       summary: `### ❌ Polaris failed\n\n${hangBody}`,
       comment: isBillingExhausted ? hangBody : formatMinimalFailureComment(input.repo),
+      kind: "hang",
     };
   }
 
@@ -442,5 +466,6 @@ export function renderRunError(input: {
   return {
     summary: `### ❌ Polaris failed\n\n${genericBody}`,
     comment: formatMinimalFailureComment(input.repo),
+    kind: "unknown",
   };
 }

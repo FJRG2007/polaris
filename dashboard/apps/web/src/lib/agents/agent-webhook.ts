@@ -16,6 +16,7 @@
 
 import { prisma } from "@polaris/db";
 import { dispatchRun } from "@/lib/agents/agent-dispatch";
+import { considerFallback } from "@/lib/agents/agent-fallback";
 import { githubAppInstallationToken } from "@/lib/github-service";
 import { policyForRepo } from "@/lib/agents/agent-defaults-service";
 import { agentRepoByFullName } from "@/lib/agents/agent-repo-service";
@@ -386,7 +387,7 @@ async function closeOutWorkflowRun(payload: Payload): Promise<string[]> {
     const run =
         (await prisma.agentRun.findFirst({
             where: { ...open, githubRunId: String(githubRunId) },
-            select: { id: true, error: true }
+            select: { id: true, error: true, failureKind: true }
         })) ??
         (repoFullName
             ? await prisma.agentRun.findFirst({
@@ -395,7 +396,7 @@ async function closeOutWorkflowRun(payload: Payload): Promise<string[]> {
                   // else's job.
                   where: { ...open, githubRunId: null, execution: { not: "server" }, repo: { repoFullName } },
                   orderBy: { createdAt: "asc" },
-                  select: { id: true, error: true }
+                  select: { id: true, error: true, failureKind: true }
               })
             : null);
     if (!run) return [];
@@ -412,7 +413,21 @@ async function closeOutWorkflowRun(payload: Payload): Promise<string[]> {
             state !== "failed"
                 ? null
                 : (run.error ??
-                  `The workflow finished as ${conclusion ?? "failed"}. Its log is on the run in GitHub Actions.`)
+                  `The workflow finished as ${conclusion ?? "failed"}. Its log is on the run in GitHub Actions.`),
+        // Already recorded by the run's own report, where there was one. Passing
+        // it back keeps `finishAgentRun` from clearing it, which would leave the
+        // fallback with nothing to decide on.
+        failureKind: state === "failed" ? run.failureKind : null
     });
+
+    // Only when the provider refused - `considerFallback` reads the kind and
+    // returns immediately for everything else. Best-effort: this is a webhook,
+    // and a retry that could not be dispatched must not make GitHub think the
+    // delivery failed and send it again.
+    if (state === "failed") {
+        await considerFallback(run.id).catch((error) =>
+            console.error("polaris: fallback dispatch failed:", error)
+        );
+    }
     return [run.id];
 }
