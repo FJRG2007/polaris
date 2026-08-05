@@ -317,21 +317,46 @@ async function canWriteToRepo(repoFullName: string, actor: string): Promise<bool
  * never started reports nothing at all. This is the webhook that covers those,
  * and it is why a run does not sit at "running" until the sweep notices it hours
  * later.
+ *
+ * The id is only recorded once the runtime asks for its run context, which is
+ * the *second* thing a job does - it downloads the runtime first. A job that
+ * died before that has no id recorded and used to match nothing here, so the run
+ * sat at "queued" for the six hours until the stale sweep, while the Actions tab
+ * had said "failed" within a minute. The fallback below claims the oldest run on
+ * that repository that no job has identified itself as, which is the same rule
+ * `runForRepository` uses to hand a job its context.
  */
 async function closeOutWorkflowRun(payload: Payload): Promise<string[]> {
     const githubRunId = payload.workflow_run?.id;
     if (!githubRunId || payload.workflow_run?.status !== "completed") return [];
-    const run = await prisma.agentRun.findFirst({
-        where: { githubRunId: String(githubRunId), state: { in: ["queued", "running"] } },
-        select: { id: true }
-    });
+
+    const open = { state: { in: ["queued", "running"] } };
+    const repoFullName = payload.repository?.full_name;
+    const run =
+        (await prisma.agentRun.findFirst({
+            where: { ...open, githubRunId: String(githubRunId) },
+            select: { id: true }
+        })) ??
+        (repoFullName
+            ? await prisma.agentRun.findFirst({
+                  // Only a run that never said which job it was. One that did is
+                  // matched above, and claiming it here would close out somebody
+                  // else's job.
+                  where: { ...open, githubRunId: null, execution: { not: "server" }, repo: { repoFullName } },
+                  orderBy: { createdAt: "asc" },
+                  select: { id: true }
+              })
+            : null);
     if (!run) return [];
 
     const conclusion = payload.workflow_run?.conclusion;
     const state = conclusion === "success" ? "succeeded" : conclusion === "cancelled" ? "cancelled" : "failed";
     await finishAgentRun(run.id, {
         state,
-        error: state === "failed" ? `The workflow finished as ${conclusion ?? "failed"}.` : null
+        error:
+            state === "failed"
+                ? `The workflow finished as ${conclusion ?? "failed"}. Its log is on the run in GitHub Actions.`
+                : null
     });
     return [run.id];
 }

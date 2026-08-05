@@ -16,6 +16,7 @@
 import { createHash } from "node:crypto";
 import { dirname, join } from "node:path";
 import { createRequire } from "node:module";
+import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 
 export const runtime = "nodejs";
@@ -25,10 +26,33 @@ export const dynamic = "force-dynamic";
  *  cancelled or timed-out run would otherwise lose. */
 const FILES: Record<string, string> = { main: "runtime.mjs", post: "post.mjs" };
 
-function bundlePath(name: string): string {
-    const require = createRequire(import.meta.url);
-    const packageRoot = dirname(require.resolve("@polaris/agent-runtime/package.json"));
-    return join(packageRoot, "dist", name);
+/**
+ * Where the built runtime is, in a way that survives being packaged.
+ *
+ * Resolving the package by name is the obvious way and the one that does not
+ * work in the image. Next's standalone tracer copies what it can see, and what
+ * it can see are the imports it rewrites - it lays the package down under its
+ * real path and reproduces no `node_modules/@polaris/agent-runtime` entry, so
+ * `require.resolve` throws and every run fails at its first step downloading a
+ * 503. In development the resolve works and the deployed instance is the only
+ * place it does not, which is exactly the failure nobody catches locally.
+ *
+ * So: ask the resolver first, because it is right whenever it answers, and fall
+ * back to where the standalone layout actually puts it.
+ */
+function bundleDir(): string | null {
+    const candidates: string[] = [];
+    try {
+        const require = createRequire(import.meta.url);
+        candidates.push(join(dirname(require.resolve("@polaris/agent-runtime/package.json")), "dist"));
+    } catch {
+        // Packaged, not installed. The paths below are the answer.
+    }
+    // The standalone tree is rooted at the workspace root and the server runs
+    // from it, so the package sits beside the app rather than under it.
+    candidates.push(join(process.cwd(), "packages", "agent-runtime", "dist"));
+    candidates.push(join(process.cwd(), "..", "..", "packages", "agent-runtime", "dist"));
+    return candidates.find((dir) => existsSync(join(dir, FILES.main as string))) ?? null;
 }
 
 export async function GET(request: Request): Promise<Response> {
@@ -36,10 +60,14 @@ export async function GET(request: Request): Promise<Response> {
     const file = FILES[part];
     if (!file) return new Response("unknown bundle", { status: 404 });
 
-    let contents: Buffer;
+    const dir = bundleDir();
+    let contents: Buffer | null = null;
     try {
-        contents = await readFile(bundlePath(file));
+        if (dir) contents = await readFile(join(dir, file));
     } catch {
+        contents = null;
+    }
+    if (!contents) {
         // The package was not built, or the build did not reach the image. Say so:
         // the alternative is a runner that downloads an error page and runs it.
         return new Response("the agent runtime has not been built on this instance", { status: 503 });
