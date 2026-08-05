@@ -534,11 +534,35 @@ export async function listGithubInstallations(): Promise<
 }
 
 export interface GithubPermissionGap {
-    /** Installations that have not accepted everything the App now asks for. */
-    installations: Array<{ login: string; missing: string[] }>;
-    /** Where the owner reviews and accepts them, or null when the App page is
-     *  unknown (the PAT method, or a row written before the URL was recorded). */
+    /** Installations that have not accepted everything the App now asks for,
+     *  each with the page its owner accepts them on. */
+    installations: Array<{ login: string; missing: string[]; reviewUrl: string }>;
+    /** Where to send somebody when there is no single installation to point at.
+     *  Re-running the install prompts for the current permission set, which is
+     *  the same acceptance by another route. */
     reviewUrl: string | null;
+}
+
+/**
+ * Where an installation's owner accepts a pending permission request.
+ *
+ * Not on the App's own page: `https://github.com/apps/<slug>` is the public
+ * listing and has no `/permissions/update` under it, so linking there was a 404
+ * for everybody who followed it. The request is held against the *installation*,
+ * and the installation lives in the account's settings - which is a different
+ * path for a user and for an organization.
+ */
+function installationSettingsUrl(installation: Installation, htmlUrl: string | null): string | null {
+    if (installation.accountType === "Organization") {
+        return `https://github.com/organizations/${installation.login}/settings/installations/${installation.id}`;
+    }
+    if (installation.accountType === "User") {
+        return `https://github.com/settings/installations/${installation.id}`;
+    }
+    // Written before the type was recorded, so which of the two paths applies is
+    // unknown. Guessing produces another 404; re-running the install prompts for
+    // the same acceptance and is right either way.
+    return htmlUrl ? `${htmlUrl}/installations/new` : null;
 }
 
 /**
@@ -555,12 +579,29 @@ export async function githubPermissionGap(): Promise<GithubPermissionGap> {
     if (state?.config.method !== "app") return { installations: [], reviewUrl: null };
     const installs = Array.isArray(state.config.installations) ? (state.config.installations as Installation[]) : [];
     const htmlUrl = typeof state.config.htmlUrl === "string" ? state.config.htmlUrl : null;
+    const gaps = installs
+        .map((install) => ({
+            login: install.login,
+            missing: missingAppPermissions(install.permissions ?? {}),
+            reviewUrl: installationSettingsUrl(install, htmlUrl)
+        }))
+        .filter((row) => row.missing.length > 0 && row.reviewUrl !== null) as Array<{
+        login: string;
+        missing: string[];
+        reviewUrl: string;
+    }>;
+
     return {
-        installations: installs
-            .map((install) => ({ login: install.login, missing: missingAppPermissions(install.permissions ?? {}) }))
-            .filter((row) => row.missing.length > 0),
-        // The App's own page is where the owner is shown the pending request.
-        reviewUrl: htmlUrl ? `${htmlUrl}/permissions/update` : null
+        installations: gaps,
+        // One installation has a page of its own; several have no single page, so
+        // the install flow stands in - it prompts for the current permission set,
+        // which accepts the same request.
+        reviewUrl:
+            gaps.length === 1
+                ? (gaps[0] as { reviewUrl: string }).reviewUrl
+                : htmlUrl
+                  ? `${htmlUrl}/installations/new`
+                  : null
     };
 }
 

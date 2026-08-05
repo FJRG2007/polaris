@@ -14,9 +14,9 @@
  * gap that widens does.
  */
 
-import { githubPermissionGap } from "@/lib/github-service";
 import { getSetting, setSetting } from "@/lib/setting-store";
 import { notifyOperators } from "@/lib/notifications/operators";
+import { githubPermissionGap, refreshInstallations } from "@/lib/github-service";
 
 /** What was last announced, so the same gap is not announced twice. */
 const SEEN_KEY = "integrations.github.permission-gap";
@@ -38,6 +38,13 @@ function fingerprint(gap: Array<{ login: string; missing: readonly string[] }>):
  */
 export async function notifyGithubPermissionGap(): Promise<void> {
     try {
+        // What GitHub granted is read from a stored copy, and that copy was only
+        // ever refreshed by a button on the Integrations screen. So somebody who
+        // went and accepted the request stayed warned about it until they
+        // happened to open that screen and press it - told to do a thing they had
+        // already done. Re-read first; it is one call every few minutes.
+        await refreshInstallations().catch(() => undefined);
+
         const gap = await githubPermissionGap();
         const current = fingerprint(gap.installations);
         const seen = await getSetting(SEEN_KEY);
