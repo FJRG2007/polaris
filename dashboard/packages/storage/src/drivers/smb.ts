@@ -154,7 +154,9 @@ export class SmbDriver implements StorageDriver {
     public async connect(): Promise<void> {
         // A lent session is already negotiated and authenticated, and its lender
         // checked it - there is nothing to do here but take it.
-        this.client = isBorrowed(this.options) ? await this.options.session() : await openSmbSession(this.options);
+        this.client = isBorrowed(this.options)
+            ? await this.options.session()
+            : await openSmbSession(this.options);
     }
 
     public async dispose(): Promise<void> {
@@ -184,14 +186,21 @@ export class SmbDriver implements StorageDriver {
         try {
             raw = await this.c().readdir(this.smbPath(rel), { stats: true });
         } catch (error) {
-            throw new StorageError("io_error", `Cannot list ${path || "the share root"}: ${message(error)}`);
+            throw new StorageError(
+                "io_error",
+                `Cannot list ${path || "the share root"}: ${message(error)}`
+            );
         }
         // The client may return either a flat list or an array of batches.
-        const items = (Array.isArray(raw[0]) ? (raw as SmbStat[][]).flat() : (raw as SmbStat[])).filter(
-            (item) => item.name && item.name !== "." && item.name !== ".."
-        );
+        const items = (
+            Array.isArray(raw[0]) ? (raw as SmbStat[][]).flat() : (raw as SmbStat[])
+        ).filter((item) => item.name && item.name !== "." && item.name !== "..");
         const entries: StatEntry[] = items.map((item) =>
-            toEntry(item.name as string, rel === "" ? (item.name as string) : `${rel}/${item.name}`, item)
+            toEntry(
+                item.name as string,
+                rel === "" ? (item.name as string) : `${rel}/${item.name}`,
+                item
+            )
         );
         entries.sort((a, b) => {
             if (a.kind !== b.kind) return a.kind === "dir" ? -1 : 1;
@@ -269,14 +278,16 @@ export class SmbDriver implements StorageDriver {
             try {
                 await this.c().rmdir(this.smbPath(rel));
             } catch (caught) {
-                const detail = caught instanceof Error && caught.message ? `: ${caught.message}` : "";
+                const detail =
+                    caught instanceof Error && caught.message ? `: ${caught.message}` : "";
                 throw new StorageError("io_error", `Failed to delete ${rel}${detail}`);
             }
         } else {
             try {
                 await this.c().unlink(this.smbPath(rel));
             } catch (caught) {
-                const detail = caught instanceof Error && caught.message ? `: ${caught.message}` : "";
+                const detail =
+                    caught instanceof Error && caught.message ? `: ${caught.message}` : "";
                 throw new StorageError("io_error", `Failed to delete ${rel}${detail}`);
             }
         }
@@ -310,7 +321,12 @@ function toEntry(name: string, path: string, stat: SmbStat): StatEntry {
         kind: stat.isDirectory() ? "dir" : "file",
         size: BigInt(Math.max(0, Math.trunc(Number(stat.size ?? 0)) || 0)),
         modifiedAt: stat.mtime instanceof Date ? stat.mtime : new Date(Number(stat.mtime ?? 0)),
-        createdAt: stat.btime instanceof Date ? stat.btime : stat.birthtime instanceof Date ? stat.birthtime : undefined
+        createdAt:
+            stat.btime instanceof Date
+                ? stat.btime
+                : stat.birthtime instanceof Date
+                  ? stat.birthtime
+                  : undefined
     };
 }
 

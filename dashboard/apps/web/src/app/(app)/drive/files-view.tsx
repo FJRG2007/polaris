@@ -923,7 +923,9 @@ export function FilesView({
                             Download as ZIP
                         </ContextMenuItem>
                         {onRequestFiles ? (
-                            <ContextMenuItem onSelect={() => onRequestFiles(entry.path, entry.name)}>
+                            <ContextMenuItem
+                                onSelect={() => onRequestFiles(entry.path, entry.name)}
+                            >
                                 <Inbox className="size-4" />
                                 Request files here
                             </ContextMenuItem>
@@ -1941,7 +1943,9 @@ export function FilesView({
                                                                             <span
                                                                                 className="inline-block max-w-full cursor-text truncate align-bottom"
                                                                                 title={entry.name}
-                                                                                onDoubleClick={(e) =>
+                                                                                onDoubleClick={(
+                                                                                    e
+                                                                                ) =>
                                                                                     nameDoubleClick(
                                                                                         e,
                                                                                         entry
@@ -2091,7 +2095,9 @@ export function FilesView({
                                                                         <div className="min-w-0 flex-1 truncate px-1">
                                                                             {isRenaming ? (
                                                                                 <Input
-                                                                                    ref={renameField}
+                                                                                    ref={
+                                                                                        renameField
+                                                                                    }
                                                                                     value={
                                                                                         renameValue
                                                                                     }
@@ -2275,7 +2281,9 @@ export function FilesView({
                                                                                     size="icon"
                                                                                     variant="ghost"
                                                                                     onClick={() =>
-                                                                                        onShare(entry)
+                                                                                        onShare(
+                                                                                            entry
+                                                                                        )
                                                                                     }
                                                                                     aria-label={`Share ${entry.name}`}
                                                                                 >

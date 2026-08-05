@@ -376,12 +376,16 @@ export function DriveExplorer({
         // or its own parent would otherwise flash the row out and back).
         if (to === entry.path) return;
         setEntries((prev) => prev.filter((row) => row.path !== entry.path));
-        runOp(`Moving ${entry.name}`, () => driveActions.renameAction(connectionId, entry.path, to));
+        runOp(`Moving ${entry.name}`, () =>
+            driveActions.renameAction(connectionId, entry.path, to)
+        );
     }
 
     function onCopy(entry: DriveEntry, destFolderPath: string) {
         if (!connectionId) return;
-        runOp(`Copying ${entry.name}`, () => driveActions.copyAction(connectionId, entry.path, destFolderPath));
+        runOp(`Copying ${entry.name}`, () =>
+            driveActions.copyAction(connectionId, entry.path, destFolderPath)
+        );
     }
 
     function confirmDelete() {
@@ -445,10 +449,12 @@ export function DriveExplorer({
                                     // fetched while they are still reaching. A source
                                     // that is not answering is not asked.
                                     onPointerEnter={() =>
-                                        !downReason(connection.id) && prefetchListing(connection.id, "")
+                                        !downReason(connection.id) &&
+                                        prefetchListing(connection.id, "")
                                     }
                                     onFocus={() =>
-                                        !downReason(connection.id) && prefetchListing(connection.id, "")
+                                        !downReason(connection.id) &&
+                                        prefetchListing(connection.id, "")
                                     }
                                     className={cn(
                                         "flex flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-muted",
@@ -935,7 +941,12 @@ function ScheduleDeleteDialog({
         const iso = new Date(when).toISOString();
         let failure: string | null = null;
         for (const entry of targets) {
-            const result = await driveActions.scheduleDeleteAction(connectionId, entry.path, iso, permanent);
+            const result = await driveActions.scheduleDeleteAction(
+                connectionId,
+                entry.path,
+                iso,
+                permanent
+            );
             if (result.error) {
                 failure = result.error;
                 break;

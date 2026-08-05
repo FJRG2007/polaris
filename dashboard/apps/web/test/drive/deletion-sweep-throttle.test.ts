@@ -17,7 +17,11 @@ const findMany = vi.fn(async () => [] as unknown[]);
 
 vi.mock("@polaris/db", () => ({
     prisma: {
-        scheduledDeletion: { findMany, deleteMany: vi.fn(async () => ({ count: 0 })), create: vi.fn() }
+        scheduledDeletion: {
+            findMany,
+            deleteMany: vi.fn(async () => ({ count: 0 })),
+            create: vi.fn()
+        }
     }
 }));
 vi.mock("@/lib/storage-service", () => ({ getDriver: vi.fn() }));

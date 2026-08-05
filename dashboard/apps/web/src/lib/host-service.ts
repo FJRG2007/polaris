@@ -13,7 +13,12 @@ import { dropSshConnections } from "@/lib/connection-pool";
 import { testAndCaptureHostKey, type SshAuth } from "@polaris/ssh";
 import { isBaseDomain, normalizeBaseDomain } from "@polaris/deploy";
 import { decryptSecret, encryptCredentials, type EncryptedBlob } from "@polaris/storage";
-import { hostCredentialsSchema, type CreateHostInput, type HostCredentials, type ServerEnvironment } from "@polaris/core";
+import {
+    hostCredentialsSchema,
+    type CreateHostInput,
+    type HostCredentials,
+    type ServerEnvironment
+} from "@polaris/core";
 
 /** Non-secret fields safe to show in listings. */
 export async function listHosts(ownerId: string) {
@@ -123,7 +128,10 @@ export async function createHost(ownerId: string, input: CreateHostInput): Promi
 /** Rename a host. Owner-scoped: false when no host of this owner matched, so a
  *  caller never reports a change that did not happen. */
 export async function renameHost(ownerId: string, hostId: string, name: string): Promise<boolean> {
-    const { count } = await prisma.host.updateMany({ where: { id: hostId, ownerId }, data: { name } });
+    const { count } = await prisma.host.updateMany({
+        where: { id: hostId, ownerId },
+        data: { name }
+    });
     return count > 0;
 }
 
@@ -135,7 +143,10 @@ export async function setHostEnvironment(
     hostId: string,
     environment: ServerEnvironment
 ): Promise<boolean> {
-    const { count } = await prisma.host.updateMany({ where: { id: hostId, ownerId }, data: { environment } });
+    const { count } = await prisma.host.updateMany({
+        where: { id: hostId, ownerId },
+        data: { environment }
+    });
     return count > 0;
 }
 
@@ -147,7 +158,11 @@ export async function setHostEnvironment(
  * wildcard prefix would otherwise end up inside every hostname built from it.
  * Owner-scoped; false when no host of this owner matched.
  */
-export async function setHostWildcardDomain(ownerId: string, hostId: string, domain: string): Promise<boolean> {
+export async function setHostWildcardDomain(
+    ownerId: string,
+    hostId: string,
+    domain: string
+): Promise<boolean> {
     const clean = normalizeBaseDomain(domain);
     if (clean && !isBaseDomain(clean)) throw new Error("Enter a domain like apps.example.com");
     const { count } = await prisma.host.updateMany({

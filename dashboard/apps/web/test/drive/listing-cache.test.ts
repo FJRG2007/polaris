@@ -90,7 +90,10 @@ describe("Drive listing cache", () => {
     });
 
     it("prefetches a folder once and caches what comes back", async () => {
-        const fetchMock = vi.fn(async () => ({ ok: true, json: async () => ({ entries: [entry("one")] }) }));
+        const fetchMock = vi.fn(async () => ({
+            ok: true,
+            json: async () => ({ entries: [entry("one")] })
+        }));
         vi.stubGlobal("fetch", fetchMock);
 
         prefetchListing("host:a", "docs");
@@ -106,7 +109,10 @@ describe("Drive listing cache", () => {
     });
 
     it("caches nothing when a prefetch is refused", async () => {
-        const fetchMock = vi.fn(async () => ({ ok: false, json: async () => ({ error: "Forbidden" }) }));
+        const fetchMock = vi.fn(async () => ({
+            ok: false,
+            json: async () => ({ error: "Forbidden" })
+        }));
         vi.stubGlobal("fetch", fetchMock);
         prefetchListing("host:a", "secret");
         await vi.waitFor(() => expect(fetchMock).toHaveBeenCalled());

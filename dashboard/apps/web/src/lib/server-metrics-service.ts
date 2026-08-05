@@ -37,7 +37,11 @@ const cache = new Map<string, { at: number; metrics: ServerMetrics }>();
  * Owner-scoped through `getHostConnection`, so this cannot be used to read a
  * machine the caller does not have.
  */
-export async function getServerMetrics(hostId: string, ownerId: string, force = false): Promise<ServerMetrics> {
+export async function getServerMetrics(
+    hostId: string,
+    ownerId: string,
+    force = false
+): Promise<ServerMetrics> {
     const hit = cache.get(hostId);
     if (!force && hit && Date.now() - hit.at < CACHE_TTL_MS) return hit.metrics;
 

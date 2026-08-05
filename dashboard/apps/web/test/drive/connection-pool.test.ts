@@ -14,7 +14,9 @@ describe("borrowed SFTP channels", () => {
     it("opens one channel per connection and reopens after it ends", async () => {
         const sftp = new EventEmitter();
         const client = Object.assign(new EventEmitter(), {
-            sftp: vi.fn((callback: (error: Error | undefined, channel: unknown) => void) => callback(undefined, sftp)),
+            sftp: vi.fn((callback: (error: Error | undefined, channel: unknown) => void) =>
+                callback(undefined, sftp)
+            ),
             end: vi.fn()
         });
         vi.doMock("@polaris/ssh", async (importOriginal) => {
@@ -22,7 +24,12 @@ describe("borrowed SFTP channels", () => {
             return { ...actual, openSshClient: vi.fn(async () => client) };
         });
         const { borrowSftp } = await import("@/lib/connection-pool");
-        const options = { host: "h", port: 22, username: "u", auth: { method: "password" as const, password: "p" } };
+        const options = {
+            host: "h",
+            port: 22,
+            username: "u",
+            auth: { method: "password" as const, password: "p" }
+        };
 
         const first = await borrowSftp("drive", "host-a", options);
         first.release();

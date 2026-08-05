@@ -13,11 +13,7 @@ import { mimeForName } from "@/lib/mime";
 import { pipeThenDispose } from "@/lib/drive-stream";
 import { gateShareRequest } from "@/lib/share-access";
 import { getDriverForConnection } from "@/lib/storage-service";
-import {
-    logShareAccess,
-    registerDownload,
-    resolveWithinShare
-} from "@/lib/share-service";
+import { logShareAccess, registerDownload, resolveWithinShare } from "@/lib/share-service";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -34,7 +30,14 @@ export async function GET(
 
     const { share, ip, ipHash, userAgentHash } = gate;
     const deny = (status: number, reason: string) => {
-        void logShareAccess({ shareId: share.id, action: "download", reason, ip, ipHash, userAgentHash });
+        void logShareAccess({
+            shareId: share.id,
+            action: "download",
+            reason,
+            ip,
+            ipHash,
+            userAgentHash
+        });
         return new Response(reason, { status });
     };
 
@@ -62,7 +65,8 @@ export async function GET(
 
         const headerStore = await headers();
         const responseHeaders = new Headers({
-            "content-type": stat.mime ?? mimeForName(baseName(target)) ?? "application/octet-stream",
+            "content-type":
+                stat.mime ?? mimeForName(baseName(target)) ?? "application/octet-stream",
             "accept-ranges": "bytes",
             "content-disposition": `${inline ? "inline" : "attachment"}; filename*=UTF-8''${encodeURIComponent(baseName(target))}`
         });
@@ -77,13 +81,19 @@ export async function GET(
             responseHeaders.set("content-length", String(end - start + 1));
             // The stream owns the driver's lifetime now; dispose when it ends.
             disposed = true;
-            return new Response(pipeThenDispose(stream, driver), { status: 206, headers: responseHeaders });
+            return new Response(pipeThenDispose(stream, driver), {
+                status: 206,
+                headers: responseHeaders
+            });
         }
 
         const stream = await driver.readStream(target);
         responseHeaders.set("content-length", stat.size.toString());
         disposed = true;
-        return new Response(pipeThenDispose(stream, driver), { status: 200, headers: responseHeaders });
+        return new Response(pipeThenDispose(stream, driver), {
+            status: 200,
+            headers: responseHeaders
+        });
     } catch {
         return deny(500, "read_failed");
     } finally {

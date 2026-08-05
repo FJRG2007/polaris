@@ -88,7 +88,8 @@ export function prefetchListing(connectionId: string, path: string): void {
     void fetch(`/api/drive/list?${query.toString()}`)
         .then(async (response) => {
             const body = (await response.json()) as { entries?: DriveEntry[] };
-            if (response.ok && Array.isArray(body.entries)) writeListing(connectionId, path, body.entries);
+            if (response.ok && Array.isArray(body.entries))
+                writeListing(connectionId, path, body.entries);
         })
         .catch(() => {
             // Nothing to report: this listing was never asked for out loud.

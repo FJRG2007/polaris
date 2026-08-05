@@ -14,7 +14,10 @@ const readStream = vi.fn(async () => sourceOf(["one", "two"]));
 const driverForTarget = vi.fn(async () => ({ readStream, dispose }));
 
 vi.mock("@polaris/db", () => ({ prisma: { taskAttachment: { findUnique } } }));
-vi.mock("@/lib/setting-store", () => ({ getSetting: vi.fn(async () => null), setSetting: vi.fn(async () => undefined) }));
+vi.mock("@/lib/setting-store", () => ({
+    getSetting: vi.fn(async () => null),
+    setSetting: vi.fn(async () => undefined)
+}));
 vi.mock("@/lib/storage-target", () => ({
     AUTOMATIC_TARGET: "auto",
     LOCAL_TARGET: "local",

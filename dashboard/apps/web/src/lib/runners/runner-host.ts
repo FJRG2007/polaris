@@ -40,7 +40,7 @@ import {
 
 /** Everything Polaris puts on a machine lives under one directory, so removing a
  *  server from Polaris leaves one thing to delete. */
-const ROOT = "\"$HOME\"/.polaris/runners";
+const ROOT = '"$HOME"/.polaris/runners';
 
 /** Stamped on every container a runner pool starts. The sweep matches on this
  *  rather than on the name: the machines Polaris runs jobs on are frequently the
@@ -138,7 +138,8 @@ MEM=$(awk '/^MemTotal:/ {print $2 * 1024}' /proc/meminfo 2>/dev/null || true)
 echo "memory=$MEM"
 echo "disk=$(df -Pk "$HOME" 2>/dev/null | awk 'NR == 2 {print $4 * 1024}')"`);
 
-        const read = (key: string): string => new RegExp(`^${key}=(.*)$`, "m").exec(result.stdout)?.[1]?.trim() ?? "";
+        const read = (key: string): string =>
+            new RegExp(`^${key}=(.*)$`, "m").exec(result.stdout)?.[1]?.trim() ?? "";
         const count = (key: string): number => {
             const value = Number(read(key));
             return Number.isFinite(value) && value > 0 ? value : 0;
@@ -162,12 +163,17 @@ echo "disk=$(df -Pk "$HOME" 2>/dev/null | awk 'NR == 2 {print $4 * 1024}')"`);
      */
     public async prepare(release: RunnerRelease, isolation: RunnerIsolation): Promise<void> {
         const result =
-            isolation === "container" ? await this.pullImage(release) : await this.cacheTarball(release);
+            isolation === "container"
+                ? await this.pullImage(release)
+                : await this.cacheTarball(release);
         if (result.code !== 0) throw new Error(prepareError(result, isolation));
     }
 
     private async pullImage(release: RunnerRelease): Promise<RunResult> {
-        return this.runWithTimeout(`docker pull ${quoteArg(release.image)} >/dev/null`, PREPARE_TIMEOUT_MS);
+        return this.runWithTimeout(
+            `docker pull ${quoteArg(release.image)} >/dev/null`,
+            PREPARE_TIMEOUT_MS
+        );
     }
 
     /**
@@ -213,12 +219,19 @@ mv "$FILE".part "$FILE"`;
      */
     public async start(input: RunnerStart): Promise<RunnerHandle> {
         const result =
-            input.isolation === "container" ? await this.startContainer(input) : await this.startOnMachine(input);
+            input.isolation === "container"
+                ? await this.startContainer(input)
+                : await this.startOnMachine(input);
 
         if (result.code !== 0 || !result.stdout) {
-            throw new Error(result.stderr || result.stdout || "The machine did not start the runner");
+            throw new Error(
+                result.stderr || result.stdout || "The machine did not start the runner"
+            );
         }
-        return { isolation: input.isolation, handle: input.isolation === "container" ? input.name : result.stdout };
+        return {
+            isolation: input.isolation,
+            handle: input.isolation === "container" ? input.name : result.stdout
+        };
     }
 
     /**
@@ -393,7 +406,10 @@ rm -rf ${dirs}`);
             return await Promise.race([
                 this.run(script),
                 new Promise<RunResult>((_resolve, reject) => {
-                    timer = setTimeout(() => reject(new Error("The machine took too long to answer")), timeoutMs);
+                    timer = setTimeout(
+                        () => reject(new Error("The machine took too long to answer")),
+                        timeoutMs
+                    );
                 })
             ]);
         } finally {
@@ -445,7 +461,10 @@ const FACTS_BOUNDARY = "--polaris-facts--";
 function splitRemains(output: string): RunnerRemains {
     const parts = output.split(FACTS_BOUNDARY);
     if (parts.length < 3) return { log: tailLines(output), facts: null };
-    return { log: tailLines(`${parts[0] ?? ""}${parts.slice(2).join(FACTS_BOUNDARY)}`), facts: parseJobFacts(parts[1] ?? "") };
+    return {
+        log: tailLines(`${parts[0] ?? ""}${parts.slice(2).join(FACTS_BOUNDARY)}`),
+        facts: parseJobFacts(parts[1] ?? "")
+    };
 }
 
 /** The last of a log, which is the part that says why. */
@@ -456,7 +475,10 @@ function tailLines(output: string): string {
 /** Turn a failed preparation into something that names what to fix. */
 function prepareError(result: RunResult, isolation: RunnerIsolation): string {
     const detail = result.stderr || result.stdout;
-    if (isolation === "container" && /permission denied|cannot connect to the docker daemon/i.test(detail)) {
+    if (
+        isolation === "container" &&
+        /permission denied|cannot connect to the docker daemon/i.test(detail)
+    ) {
         return "The Polaris login on this machine cannot reach the container engine. Re-run the enrollment command with --docker.";
     }
     if (/checksum/i.test(detail)) return detail;
