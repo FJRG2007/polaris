@@ -192,6 +192,74 @@ export const manualAgentRunSchema = z.object({
 
 export type ManualAgentRunInput = z.infer<typeof manualAgentRunSchema>;
 
+/**
+ * A provider key somebody stores under their own account.
+ *
+ * The name is the whole reason these are nameable: an account with three OpenAI
+ * keys needs to tell them apart in a table, and "the second one" is not a name.
+ * It is bounded to what fits a column and restricted to characters that survive
+ * being read aloud, pasted into a shell, and shown in a log.
+ */
+export const MODEL_KEY_NAME_HINT = "3-20 characters. Letters, numbers, hyphens, and underscores.";
+
+export const modelKeyNameSchema = z
+    .string()
+    .trim()
+    .min(3, MODEL_KEY_NAME_HINT)
+    .max(20, MODEL_KEY_NAME_HINT)
+    .regex(/^[A-Za-z0-9][A-Za-z0-9_-]*$/, MODEL_KEY_NAME_HINT);
+
+/** A provider's integration slug. Which slugs are real is settled where the
+ *  registry is, not here - this only rules out the shapes that never are. */
+export const modelProviderSlugSchema = z
+    .string()
+    .trim()
+    .min(2)
+    .max(60)
+    .regex(/^[a-z0-9][a-z0-9-]*$/, "Pick a provider");
+
+/**
+ * The secret itself.
+ *
+ * Providers do not agree on a shape, so this checks that something was pasted
+ * rather than what it is. What proves a key works is the provider being asked,
+ * which happens before it is stored, and after that a run.
+ */
+export const modelKeySecretSchema = z.string().trim().min(8, "Paste the key").max(500);
+
+/** A gateway needs more than a key: an endpoint, a model, and the two limits an
+ *  OpenAI-compatible endpoint publishes no catalogue for. */
+export const gatewayKeyConfigSchema = z.object({
+    baseUrl: z.string().trim().url("Not a URL").max(500),
+    model: z.string().trim().min(1, "Name the model your endpoint serves").max(200),
+    context: z.number().int().min(0).max(100_000_000),
+    maxOutput: z.number().int().min(0).max(100_000_000)
+});
+
+export const createModelKeySchema = z.object({
+    provider: modelProviderSlugSchema,
+    name: modelKeyNameSchema,
+    secret: modelKeySecretSchema,
+    config: gatewayKeyConfigSchema.optional()
+});
+
+export type CreateModelKeyInput = z.infer<typeof createModelKeySchema>;
+
+/** Renaming one, replacing its key, or both. An absent secret leaves the stored
+ *  one alone - the field is write-only, so blank has to mean "unchanged" rather
+ *  than "erase it". */
+export const updateModelKeySchema = z.object({
+    id: z.string().uuid(),
+    name: modelKeyNameSchema,
+    secret: modelKeySecretSchema.optional(),
+    config: gatewayKeyConfigSchema.optional()
+});
+
+/** The whole list, in the order it should now be tried. */
+export const reorderModelKeysSchema = z.object({
+    ids: z.array(z.string().uuid()).max(200)
+});
+
 /** Narrowing the run list. Every field is optional: no filter is the common case. */
 export const agentRunFilterSchema = z.object({
     repoFullName: repoFullNameSchema.optional(),

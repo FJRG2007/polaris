@@ -7,7 +7,7 @@
  * up. Whose money a run spends is settled here, once, so every screen and the
  * dispatch path agree:
  *
- *   1. The repository owner's own key for that provider, if they have one.
+ *   1. The repository owner's own keys, in the order they put them in.
  *   2. The deployment's key, if the administrator allows it to be shared.
  *
  * That order is what makes bringing your own key mean anything - a personal key
@@ -15,6 +15,12 @@
  * effect. The fallback is a switch rather than an assumption because handing
  * every account an administrator's billing is a decision somebody has to make on
  * purpose. It defaults to on, which is what deployments already do today.
+ *
+ * An account may hold several keys for one provider - a work account and a
+ * personal one, two spend caps, a spare for when the first is rate limited. They
+ * are a list, not a set: `priority` is the order, the first key of a provider
+ * that can be decrypted is the one a run is handed, and the order the providers
+ * themselves appear in is the same list read from the top.
  */
 
 import { prisma } from "@polaris/db";
@@ -49,11 +55,19 @@ export async function setInstanceKeysShared(shared: boolean): Promise<void> {
 
 /** A stored key as a screen sees it - never the key. */
 export interface UserModelKeyView {
+    id: string;
     provider: string;
+    name: string;
+    priority: number;
     config: Record<string, unknown>;
     lastUsedAt: string | null;
     updatedAt: string;
 }
+
+/** The order every read of somebody's keys uses. Creation breaks a tie so a list
+ *  with removed rows, whose positions are then no longer contiguous, still reads
+ *  the same on every screen. */
+const BY_PRIORITY = [{ priority: "asc" }, { createdAt: "asc" }] as const;
 
 function parseConfig(json: string): Record<string, unknown> {
     try {
@@ -66,56 +80,177 @@ function parseConfig(json: string): Record<string, unknown> {
     }
 }
 
-/** What this account has brought. */
+/** What this account has brought, in the order it wants them tried. */
 export async function listUserModelKeys(userId: string): Promise<UserModelKeyView[]> {
     const rows = await prisma.userModelKey.findMany({
         where: { userId },
-        select: { provider: true, config: true, lastUsedAt: true, updatedAt: true },
-        orderBy: { provider: "asc" }
+        select: {
+            id: true,
+            provider: true,
+            name: true,
+            priority: true,
+            config: true,
+            lastUsedAt: true,
+            updatedAt: true
+        },
+        orderBy: [...BY_PRIORITY]
     });
     return rows.map((row) => ({
+        id: row.id,
         provider: row.provider,
+        name: row.name,
+        priority: row.priority,
         config: parseConfig(row.config),
         lastUsedAt: row.lastUsedAt?.toISOString() ?? null,
         updatedAt: row.updatedAt.toISOString()
     }));
 }
 
-/** Store or replace one. The key is trimmed and encrypted; nothing keeps a
- *  plaintext copy, including this function's caller. */
-export async function saveUserModelKey(
-    userId: string,
-    provider: string,
-    secret: string,
-    config?: Record<string, unknown>
-): Promise<void> {
+/** Which provider one of this account's keys belongs to, or null when it holds no
+ *  such key. Never returns the credential - only what to check it against. */
+export async function providerOfUserModelKey(userId: string, id: string): Promise<string | null> {
+    const row = await prisma.userModelKey.findFirst({ where: { id, userId }, select: { provider: true } });
+    return row?.provider ?? null;
+}
+
+function envelope(secret: string): { encryptedSecret: Buffer; secretNonce: Buffer; secretKeyId: string } {
     const blob = encryptSecret(secret.trim(), loadEnv().POLARIS_MASTER_KEY);
-    const fields = {
-        encryptedSecret: blob.ciphertext,
-        secretNonce: blob.nonce,
-        secretKeyId: blob.keyId,
-        ...(config === undefined ? {} : { config: JSON.stringify(config) })
+    return { encryptedSecret: blob.ciphertext, secretNonce: blob.nonce, secretKeyId: blob.keyId };
+}
+
+/**
+ * Store a new one, at the end of the list.
+ *
+ * The end rather than the front because a key somebody just added is the one
+ * they know least about: putting it in front would silently re-point every run
+ * at it. Moving it up is one drag, and it is theirs to make.
+ *
+ * The key is encrypted here; nothing keeps a plaintext copy, including the
+ * caller.
+ */
+export async function createUserModelKey(
+    userId: string,
+    input: { provider: string; name: string; secret: string; config?: Record<string, unknown> }
+): Promise<UserModelKeyView> {
+    const last = await prisma.userModelKey.findFirst({
+        where: { userId },
+        orderBy: { priority: "desc" },
+        select: { priority: true }
+    });
+    const row = await prisma.userModelKey.create({
+        data: {
+            userId,
+            provider: input.provider,
+            name: input.name,
+            priority: (last?.priority ?? -1) + 1,
+            config: JSON.stringify(input.config ?? {}),
+            ...envelope(input.secret)
+        },
+        select: {
+            id: true,
+            provider: true,
+            name: true,
+            priority: true,
+            config: true,
+            lastUsedAt: true,
+            updatedAt: true
+        }
+    });
+    return {
+        id: row.id,
+        provider: row.provider,
+        name: row.name,
+        priority: row.priority,
+        config: parseConfig(row.config),
+        lastUsedAt: null,
+        updatedAt: row.updatedAt.toISOString()
     };
-    await prisma.userModelKey.upsert({
-        where: { userId_provider: { userId, provider } },
-        create: { userId, provider, config: "{}", ...fields },
-        update: fields
+}
+
+/**
+ * Rename one, replace its key, or both.
+ *
+ * A secret of undefined leaves the stored one alone - that is what makes a
+ * rename a rename, rather than a form that quietly wipes the credential because
+ * the write-only field was left empty.
+ */
+export async function updateUserModelKey(
+    userId: string,
+    id: string,
+    input: { name?: string; secret?: string; config?: Record<string, unknown> }
+): Promise<boolean> {
+    const result = await prisma.userModelKey.updateMany({
+        where: { id, userId },
+        data: {
+            ...(input.name === undefined ? {} : { name: input.name }),
+            ...(input.secret === undefined ? {} : envelope(input.secret)),
+            ...(input.config === undefined ? {} : { config: JSON.stringify(input.config) })
+        }
+    });
+    return result.count > 0;
+}
+
+/** Remove one. Scoped by owner, so an id from somewhere else deletes nothing. */
+export async function deleteUserModelKey(userId: string, id: string): Promise<boolean> {
+    const result = await prisma.userModelKey.deleteMany({ where: { id, userId } });
+    return result.count > 0;
+}
+
+/**
+ * Write a new order.
+ *
+ * Ids this account does not own are ignored rather than refused: the list is
+ * rewritten from what it does own, so a stale row a screen still remembers
+ * cannot renumber somebody else's keys or wedge the whole save. Anything left
+ * out keeps its place after the ones named, in the order it already had.
+ */
+export async function reorderUserModelKeys(userId: string, ids: string[]): Promise<void> {
+    const rows = await prisma.userModelKey.findMany({
+        where: { userId },
+        select: { id: true },
+        orderBy: [...BY_PRIORITY]
+    });
+    const owned = new Set(rows.map((row) => row.id));
+    const named = ids.filter((id) => owned.has(id));
+    const ordered = [...new Set([...named, ...rows.map((row) => row.id)])];
+
+    await prisma.$transaction(
+        ordered.map((id, index) =>
+            prisma.userModelKey.update({ where: { id }, data: { priority: index } })
+        )
+    );
+}
+
+/** One stored credential, as the resolution path reads it. */
+interface StoredKey {
+    id: string;
+    provider: string;
+    config: string;
+    encryptedSecret: Uint8Array;
+    secretNonce: Uint8Array;
+    secretKeyId: string;
+}
+
+/** Every key this account holds, in its own order. */
+async function storedKeys(userId: string): Promise<StoredKey[]> {
+    return prisma.userModelKey.findMany({
+        where: { userId },
+        select: {
+            id: true,
+            provider: true,
+            config: true,
+            encryptedSecret: true,
+            secretNonce: true,
+            secretKeyId: true
+        },
+        orderBy: [...BY_PRIORITY]
     });
 }
 
-export async function deleteUserModelKey(userId: string, provider: string): Promise<void> {
-    await prisma.userModelKey.deleteMany({ where: { userId, provider } });
-}
-
-/** Decrypt one, or null when there is none or it cannot be read. A key written
- *  under a master key this deployment no longer has is not an error to raise at
- *  a run: it is simply a credential this instance does not hold. */
-async function readUserSecret(userId: string, provider: string): Promise<string | null> {
-    const row = await prisma.userModelKey.findUnique({
-        where: { userId_provider: { userId, provider } },
-        select: { encryptedSecret: true, secretNonce: true, secretKeyId: true }
-    });
-    if (!row) return null;
+/** Decrypt one, or null when it cannot be read. A key written under a master key
+ *  this deployment no longer has is not an error to raise at a run: it is simply
+ *  a credential this instance does not hold. */
+function readSecret(row: StoredKey): string | null {
     try {
         return decryptSecret(
             {
@@ -131,10 +266,22 @@ async function readUserSecret(userId: string, provider: string): Promise<string 
     }
 }
 
+/** The first key of this provider that can actually be read, with the row it came
+ *  from so the caller can note that it was used. */
+function firstUsable(keys: StoredKey[], provider: string): { row: StoredKey; secret: string } | null {
+    for (const row of keys) {
+        if (row.provider !== provider) continue;
+        const secret = readSecret(row);
+        if (secret) return { row, secret };
+    }
+    return null;
+}
+
 /** Which providers can serve a run for this person - their own keys and, where
  *  the deployment shares them, its own. This is what every screen belonging to a
  *  person should offer models from; `connectedProviders` answers the narrower
- *  question of what the deployment itself holds. */
+ *  question of what the deployment itself holds. Ordered: the account's own
+ *  preference first, then whatever the deployment adds under it. */
 export async function providersFor(userId: string): Promise<string[]> {
     return [...(await keySourcesFor(userId)).keys()];
 }
@@ -143,27 +290,36 @@ export async function providersFor(userId: string): Promise<string[]> {
 export type KeySource = "own" | "instance";
 
 /** Where each provider's credential comes from for this person, provider slug to
- *  source. A provider absent from the map has no credential at all. */
+ *  source, in the order the account would have them tried. A provider absent from
+ *  the map has no credential at all. */
 export async function keySourcesFor(userId: string): Promise<Map<string, KeySource>> {
     const [own, states, shared] = await Promise.all([
-        prisma.userModelKey.findMany({ where: { userId }, select: { provider: true } }),
+        prisma.userModelKey.findMany({
+            where: { userId },
+            select: { provider: true },
+            orderBy: [...BY_PRIORITY]
+        }),
         listIntegrationStates(),
         instanceKeysAreShared()
     ]);
 
+    // Written first, so the account's own order is the map's order and a personal
+    // key always wins the entry.
     const sources = new Map<string, KeySource>();
+    for (const row of own) if (!sources.has(row.provider)) sources.set(row.provider, "own");
+
     if (shared) {
         for (const provider of MODEL_PROVIDERS) {
-            if (states.get(provider.slug)?.hasSecret) sources.set(provider.slug, "instance");
+            if (!sources.has(provider.slug) && states.get(provider.slug)?.hasSecret) {
+                sources.set(provider.slug, "instance");
+            }
         }
         const gateway = states.get(GATEWAY_SLUG);
-        if (gateway?.enabled) {
+        if (!sources.has(GATEWAY_SLUG) && gateway?.enabled) {
             const config = readGatewayConfig(gateway.config);
             if (config.baseUrl && config.model) sources.set(GATEWAY_SLUG, "instance");
         }
     }
-    // Written after, so a personal key always wins the entry.
-    for (const row of own) sources.set(row.provider, "own");
     return sources;
 }
 
@@ -173,7 +329,9 @@ export async function keySourcesFor(userId: string): Promise<Map<string, KeySour
  * Every provider that resolves is included rather than only the one the chosen
  * model needs: the agent CLIs pick a substitute themselves when a model is
  * unreachable, and handing over one key would turn a recoverable substitution
- * into a failed run.
+ * into a failed run. A provider the account holds several keys for contributes
+ * one - the first that reads - because the variable the CLIs look at holds one
+ * value, and which one is the order the account set.
  *
  * Returns null - distinct from an empty object - when the store could not be
  * read at all, so a run can tell "nobody has stored one" from "the store blinked"
@@ -182,42 +340,36 @@ export async function keySourcesFor(userId: string): Promise<Map<string, KeySour
 export async function runSecretsFor(userId: string | null): Promise<Record<string, string> | null> {
     try {
         const shared = await instanceKeysAreShared();
-        const own = userId
-            ? new Set(
-                  (await prisma.userModelKey.findMany({ where: { userId }, select: { provider: true } })).map(
-                      (row) => row.provider
-                  )
-              )
-            : new Set<string>();
+        const own = userId ? await storedKeys(userId) : [];
         const states = await listIntegrationStates();
 
         const secrets: Record<string, string> = {};
         const used: string[] = [];
         for (const provider of MODEL_PROVIDERS) {
-            let key: string | null = null;
-            if (userId && own.has(provider.slug)) {
-                key = await readUserSecret(userId, provider.slug);
-                if (key) used.push(provider.slug);
-            }
+            const mine = firstUsable(own, provider.slug);
+            let key = mine?.secret ?? null;
+            if (mine) used.push(mine.row.id);
             if (!key && shared && states.get(provider.slug)?.hasSecret) {
                 key = await getIntegrationSecret(provider.slug);
             }
             if (key) secrets[provider.envVar] = key;
         }
 
-        await applyGateway({ secrets, userId, own, states, shared, used });
-
-        // Best-effort, and after the fact: it is a note on a screen, not
-        // something a run should fail over.
-        if (userId && used.length > 0) {
-            await prisma.userModelKey
-                .updateMany({ where: { userId, provider: { in: used } }, data: { lastUsedAt: new Date() } })
-                .catch(() => undefined);
-        }
+        await applyGateway({ secrets, own, states, shared, used });
+        await noteUsed(used);
         return secrets;
     } catch {
         return null;
     }
+}
+
+/** Best-effort, and after the fact: it is a note on a screen, not something a run
+ *  should fail over. */
+async function noteUsed(ids: string[]): Promise<void> {
+    if (ids.length === 0) return;
+    await prisma.userModelKey
+        .updateMany({ where: { id: { in: ids } }, data: { lastUsedAt: new Date() } })
+        .catch(() => undefined);
 }
 
 /**
@@ -231,27 +383,17 @@ export async function runSecretsFor(userId: string | null): Promise<Record<strin
  */
 async function applyGateway(input: {
     secrets: Record<string, string>;
-    userId: string | null;
-    own: Set<string>;
+    own: StoredKey[];
     states: Awaited<ReturnType<typeof listIntegrationStates>>;
     shared: boolean;
     used: string[];
 }): Promise<void> {
-    const personal = input.userId && input.own.has(GATEWAY_SLUG);
-    if (personal) {
-        const row = await prisma.userModelKey.findUnique({
-            where: { userId_provider: { userId: input.userId as string, provider: GATEWAY_SLUG } },
-            select: { config: true }
-        });
-        const config = readGatewayConfig(parseConfig(row?.config ?? "{}"));
+    const mine = firstUsable(input.own, GATEWAY_SLUG);
+    if (mine) {
+        const config = readGatewayConfig(parseConfig(mine.row.config));
         if (config.baseUrl) {
-            input.secrets.OPENAI_COMPATIBLE_BASE_URL = config.baseUrl.replace(/\/+$/, "");
-            input.secrets.OPENAI_COMPATIBLE_API_KEY =
-                (await readUserSecret(input.userId as string, GATEWAY_SLUG)) ?? "unused";
-            if (config.model) input.secrets.OPENAI_COMPATIBLE_MODEL = config.model;
-            if (config.context > 0) input.secrets.OPENAI_COMPATIBLE_CONTEXT = String(config.context);
-            if (config.maxOutput > 0) input.secrets.OPENAI_COMPATIBLE_MAX_OUTPUT = String(config.maxOutput);
-            input.used.push(GATEWAY_SLUG);
+            writeGateway(input.secrets, config, mine.secret);
+            input.used.push(mine.row.id);
             return;
         }
     }
@@ -261,10 +403,20 @@ async function applyGateway(input: {
     if (!gateway?.enabled) return;
     const config = readGatewayConfig(gateway.config);
     if (!config.baseUrl) return;
-    input.secrets.OPENAI_COMPATIBLE_BASE_URL = config.baseUrl.replace(/\/+$/, "");
-    const key = gateway.hasSecret ? await getIntegrationSecret(GATEWAY_SLUG) : null;
-    input.secrets.OPENAI_COMPATIBLE_API_KEY = key ?? "unused";
-    if (config.model) input.secrets.OPENAI_COMPATIBLE_MODEL = config.model;
-    if (config.context > 0) input.secrets.OPENAI_COMPATIBLE_CONTEXT = String(config.context);
-    if (config.maxOutput > 0) input.secrets.OPENAI_COMPATIBLE_MAX_OUTPUT = String(config.maxOutput);
+    // The token is frequently nothing: plenty of gateways accept unauthenticated
+    // calls from inside the network, and the runtime still needs the variable.
+    writeGateway(input.secrets, config, gateway.hasSecret ? await getIntegrationSecret(GATEWAY_SLUG) : null);
+}
+
+/** The five variables a gateway contributes, from one config. */
+function writeGateway(
+    secrets: Record<string, string>,
+    config: ReturnType<typeof readGatewayConfig>,
+    key: string | null
+): void {
+    secrets.OPENAI_COMPATIBLE_BASE_URL = config.baseUrl.replace(/\/+$/, "");
+    secrets.OPENAI_COMPATIBLE_API_KEY = key ?? "unused";
+    if (config.model) secrets.OPENAI_COMPATIBLE_MODEL = config.model;
+    if (config.context > 0) secrets.OPENAI_COMPATIBLE_CONTEXT = String(config.context);
+    if (config.maxOutput > 0) secrets.OPENAI_COMPATIBLE_MAX_OUTPUT = String(config.maxOutput);
 }

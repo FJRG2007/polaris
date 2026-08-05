@@ -3740,11 +3740,22 @@ model AgentUsageLimit {
 // Encrypted with the same envelope as every other stored credential, so a
 // database dump yields no usable keys. Deleted with the account: a key nobody
 // owns is a charge nobody can stop.
+//
+// One account holds as many of these as it likes, including several for the same
+// provider - a work key and a personal one, or one per spend limit. They are an
+// ordered list rather than a set: `priority` is the order they are tried in, and
+// it is the only place that order is recorded.
 model UserModelKey {
     id              String   @id @default(uuid(7)) @db.Uuid
     userId          String   @db.Uuid
     // The provider's integration slug, e.g. `anthropic`, `groq`.
     provider        String
+    // What its owner calls it. Unique within the provider so a row is
+    // addressable by something a person recognises rather than by an id.
+    name            String
+    // Position in the owner's list, ascending, lowest tried first. Ties break on
+    // creation order, so a list that has had rows removed still reads the same.
+    priority        Int      @default(0)
     encryptedSecret Bytes
     secretNonce     Bytes
     secretKeyId     String
@@ -3760,8 +3771,8 @@ model UserModelKey {
 
     user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-    @@unique([userId, provider])
-    @@index([userId])
+    @@unique([userId, provider, name])
+    @@index([userId, priority])
 }
 
 // One model a provider serves, as its public catalogue describes it.

@@ -2,9 +2,9 @@ import Link from "next/link";
 import { Check } from "lucide-react";
 import { requirePermission } from "@/lib/session";
 import { getGithubStatus } from "@/lib/github-service";
+import { providersFor } from "@/lib/agents/user-model-keys";
 import { listAgentRepos } from "@/lib/agents/agent-repo-service";
 import { Button, Card, CardBody, PageHeader } from "@polaris/ui";
-import { providersFor } from "@/lib/agents/user-model-keys";
 
 export const dynamic = "force-dynamic";
 
@@ -46,9 +46,9 @@ export default async function AgentSetupPage() {
                 <Step
                     done={modelReady}
                     title="Connect a model provider"
-                    body="Your own key with Anthropic, OpenAI, Google, xAI, DeepSeek, Moonshot, Groq, Cerebras or OpenRouter, or an OpenAI-compatible gateway. Polaris hands it to a run over an authenticated call and never writes a copy into your repositories, so rotating it here takes effect everywhere."
-                    href="/integrations/models"
-                    action="Open AI providers"
+                    body="Your own key with Anthropic, OpenAI, Google, xAI, DeepSeek, Moonshot, Groq, Cerebras or OpenRouter, or an OpenAI-compatible gateway. Polaris hands it to a run over an authenticated call and never writes a copy into your repositories, so rotating it takes effect everywhere."
+                    href="/account/ai-keys"
+                    action="Add a provider key"
                 />
                 <Step
                     done={repoReady}

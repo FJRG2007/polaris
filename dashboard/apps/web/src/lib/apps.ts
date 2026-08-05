@@ -239,6 +239,29 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             icon: Link2,
             keywords: ["github", "google", "link", "oauth", "repositories", "calendar"]
         },
+        {
+            label: "AI provider keys",
+            href: "/account/ai-keys",
+            icon: Sparkles,
+            keywords: [
+                "byok",
+                "bring your own key",
+                "models",
+                "anthropic",
+                "claude",
+                "openai",
+                "gemini",
+                "grok",
+                "deepseek",
+                "kimi",
+                "groq",
+                "cerebras",
+                "openrouter",
+                "provider",
+                "billing",
+                "agents"
+            ]
+        },
         // Everything that decides who reaches this account is one subject, and it
         // is half the rail: six screens people go looking for together.
         {
@@ -387,22 +410,6 @@ export const APP_SUBAPPS: AppSubapp[] = [
                 href: "/apps/agents/runs",
                 icon: History,
                 keywords: ["history", "logs", "failed", "what happened"]
-            },
-            {
-                label: "Model keys",
-                href: "/apps/agents/keys",
-                icon: KeyRound,
-                keywords: [
-                    "api key",
-                    "byok",
-                    "bring your own key",
-                    "anthropic",
-                    "openai",
-                    "groq",
-                    "provider",
-                    "billing",
-                    "fallback"
-                ]
             },
             {
                 label: "Settings",

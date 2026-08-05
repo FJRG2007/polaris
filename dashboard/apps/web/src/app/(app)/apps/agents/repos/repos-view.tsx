@@ -8,13 +8,13 @@ import { AddRepoDialog } from "./add-repo-dialog";
 import { removeRepoAction, setRepoEnabledAction } from "../actions";
 import type { AgentRepoView } from "@/lib/agents/agent-repo-service";
 import { Check, Plus, Settings2, TriangleAlert, Trash2 } from "lucide-react";
+import { Badge, Button, Card, CardBody, ConfirmDeleteDialog, Switch } from "@polaris/ui";
 import {
     AGENT_EXECUTION_LABELS,
     AGENT_EXECUTION_NOTES,
     AGENT_WORKFLOW_PATH,
     needsWorkflowFile
 } from "@polaris/core";
-import { Badge, Button, Card, CardBody, ConfirmDeleteDialog, Switch } from "@polaris/ui";
 
 /**
  * The repositories the agent is on.
@@ -159,8 +159,8 @@ export function ReposView({ repos, providers }: { repos: AgentRepoView[]; provid
             {providers.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
                     No model provider is connected yet, so runs will fail asking for a key.{" "}
-                    <Link href="/integrations/models" className="underline">
-                        Connect one
+                    <Link href="/account/ai-keys" className="underline">
+                        Add one
                     </Link>
                     .
                 </p>

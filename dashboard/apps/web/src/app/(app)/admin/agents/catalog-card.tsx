@@ -24,7 +24,7 @@ import { refreshModelCatalogAction, setInstanceKeySharingAction } from "./action
  * different ends: which models can be picked, and whose account pays when one
  * is. Turning it off does not break a deployment quietly - accounts that have
  * brought their own keys keep working, and the ones that have not are told on
- * their own Model keys screen.
+ * their own AI provider keys screen.
  */
 export function KeySharingCard({ shared }: { shared: boolean }) {
     const [on, setOn] = useState(shared);
@@ -52,7 +52,7 @@ export function KeySharingCard({ shared }: { shared: boolean }) {
                         <p className="text-muted-foreground text-xs">
                             {on
                                 ? "Anybody without a key of their own runs on the keys stored under Integrations, and those accounts are billed to you."
-                                : "Runs only use keys people add themselves, under Apps > Agents > Model keys. Nobody spends this deployment's providers."}
+                                : "Runs only use keys people add themselves, under Account > AI provider keys. Nobody spends this deployment's providers."}
                         </p>
                     </div>
                     <Switch checked={on} onChange={toggle} disabled={pending} aria-label="Share provider keys" />
