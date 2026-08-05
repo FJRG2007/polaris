@@ -13,6 +13,7 @@
 
 import { z } from "zod";
 import { getSetting, setSetting } from "./setting-store";
+import { usableOwnerDomains, type DomainOwner } from "./owner-domains";
 import {
     pickZone,
     zoneHost,
@@ -28,8 +29,6 @@ import {
     type DomainZone,
     type ZoneScope
 } from "@polaris/deploy";
-import { getSetting, setSetting } from "./setting-store";
-import { usableOwnerDomains, type DomainOwner } from "./owner-domains";
 
 const KEY = "domain.zones";
 /** Set once the zones' names have been seen resolving to this server. */
