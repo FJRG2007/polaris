@@ -17,12 +17,14 @@ import { requirePermission } from "@/lib/session";
 import type { GithubRepo } from "@/lib/github-service";
 import { listReposForUser } from "@/lib/github-access";
 import { dispatchRun } from "@/lib/agents/agent-dispatch";
+import type { PickerModel } from "@/components/model-picker";
+import { syncRepoWorkflow } from "@/lib/agents/agent-workflow";
+import { listCatalogModels } from "@/lib/agents/model-catalog";
 import { MODEL_INTEGRATIONS } from "@/lib/integrations/registry";
 import { stopServerRun } from "@/lib/agents/agent-server-executor";
-import { syncRepoWorkflow } from "@/lib/agents/agent-workflow";
 import { pickerRepoList, pickerRepoSearch } from "@/lib/github-repo-picker";
 import { finishAgentRun, getAgentRun } from "@/lib/agents/agent-run-service";
-import { connectedProviders, providerForModel } from "@/lib/agents/agent-providers";
+import { connectedProviders, MODEL_PROVIDERS, providerForModel } from "@/lib/agents/agent-providers";
 import {
     listAgentDefaults,
     policyForNewRepo,
@@ -61,6 +63,32 @@ const AGENTS_PATH = "/apps/agents";
 const MODEL_DEFAULTS: Record<string, string> = Object.fromEntries(
     MODEL_INTEGRATIONS.flatMap((entry) => (entry.defaultModel ? [[entry.slug, entry.defaultModel.slug] as const] : []))
 );
+
+/**
+ * Every model a connected provider serves, for the picker.
+ *
+ * Narrowed to the connected providers rather than served whole: offering a model
+ * nothing here holds a key for is offering a run that cannot start. An empty
+ * result is normal - no provider connected, or a deployment that has not reached
+ * the catalogue yet - and the picker takes free text in that case.
+ */
+export async function agentModelChoices(): Promise<PickerModel[]> {
+    await requirePermission("agents.manage");
+    const providers = await connectedProviders();
+    const prefixes = MODEL_PROVIDERS.filter((provider) => providers.includes(provider.slug)).map(
+        (provider) => provider.modelPrefix
+    );
+    if (prefixes.length === 0) return [];
+    const models = await listCatalogModels(prefixes);
+    return models.map((model) => ({
+        slug: model.slug,
+        provider: model.provider,
+        name: model.name,
+        contextTokens: model.contextTokens,
+        reasoning: model.reasoning,
+        costInput: model.costInput
+    }));
+}
 
 /** Repositories this person can reach, for the picker. Asked as them, never with
  *  the instance's credentials: a repository list is personal. */

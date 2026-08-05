@@ -6,7 +6,9 @@
 import { prisma } from "@polaris/db";
 import { PageHeader } from "@polaris/ui";
 import { requireAdmin } from "@/lib/session";
+import { CatalogCard } from "./catalog-card";
 import { PlatformDefaultsView } from "./platform-defaults-view";
+import { catalogRefreshedAt } from "@/lib/agents/model-catalog";
 import { connectedProviders } from "@/lib/agents/agent-providers";
 import { getPlatformAgentDefaults } from "@/lib/agents/agent-defaults-service";
 
@@ -14,7 +16,7 @@ export const dynamic = "force-dynamic";
 
 export default async function AgentDefaultsAdminPage() {
     await requireAdmin();
-    const [platform, pools, providers] = await Promise.all([
+    const [platform, pools, providers, catalogModels, catalogAt] = await Promise.all([
         getPlatformAgentDefaults(),
         // Every pool on the deployment, not one person's: a default here applies
         // to everybody.
@@ -23,7 +25,9 @@ export default async function AgentDefaultsAdminPage() {
             select: { id: true, name: true },
             orderBy: { name: "asc" }
         }),
-        connectedProviders()
+        connectedProviders(),
+        prisma.agentModel.count(),
+        catalogRefreshedAt()
     ]);
 
     return (
@@ -34,7 +38,10 @@ export default async function AgentDefaultsAdminPage() {
                 title="Agent defaults"
                 description="What agent runs do across the whole deployment. Each account can narrow it under Apps > Agents, and a repository can override it again."
             />
-            <PlatformDefaultsView platform={platform} pools={pools} providers={providers} />
+            <div className="space-y-4">
+                <CatalogCard models={catalogModels} refreshedAt={catalogAt?.toISOString() ?? null} />
+                <PlatformDefaultsView platform={platform} pools={pools} providers={providers} />
+            </div>
         </div>
     );
 }

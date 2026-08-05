@@ -3691,6 +3691,47 @@ model AgentRepo {
 // means "inherit" - a tier that stored its inherited value would freeze it the
 // moment the tier above it changed, which is exactly what the tiers exist to
 // avoid.
+// One model a provider serves, as its public catalogue describes it.
+//
+// Downloaded rather than written down. Providers add and retire models
+// constantly, and the hand-kept list this replaced offered exactly one model per
+// provider - so somebody with a Groq key could pick `gpt-oss-120b` and nothing
+// else, with no way to see that the account it ran on could not afford a single
+// request of that size. The numbers here are what let a screen say what a model
+// holds before a run finds out the hard way.
+//
+// Nothing depends on this being present. A deployment that has never reached the
+// catalogue, or is offline, falls back to the one default each provider carries
+// in the integrations registry, so the pickers are never empty.
+model AgentModel {
+    // `provider/model-id` exactly as it is handed to the runtime, e.g.
+    // `groq/openai/gpt-oss-120b`. The provider's own id can itself contain a
+    // slash, which is why the two are also stored apart.
+    slug          String   @id
+    provider      String
+    modelId       String
+    name          String
+    // What it can hold, and the most it will write. Zero means the catalogue did
+    // not say - which is not the same as none, and callers have to tell them
+    // apart before doing arithmetic on it.
+    contextTokens Int      @default(0)
+    outputTokens  Int      @default(0)
+    // Reasoning-effort rungs the model accepts, ascending, as a JSON string
+    // array. Empty when it has no effort control and the setting is a no-op.
+    effortRungs   String   @default("[]")
+    reasoning     Boolean  @default(false)
+    attachment    Boolean  @default(false)
+    // USD per million tokens as published. Display only - what an operator is
+    // actually billed is settled by the provider, so this is never summed into
+    // anything Polaris presents as a charge.
+    costInput     Float?
+    costOutput    Float?
+    releaseDate   String?
+    refreshedAt   DateTime @updatedAt
+
+    @@index([provider])
+}
+
 model AgentDefaults {
     id           String   @id @default(uuid(7)) @db.Uuid
     ownerId      String   @db.Uuid

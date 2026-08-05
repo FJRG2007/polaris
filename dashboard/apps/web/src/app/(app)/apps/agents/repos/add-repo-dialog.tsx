@@ -4,13 +4,14 @@ import { Lock } from "lucide-react";
 import { runAction } from "@/lib/run-action";
 import { ExecutionPicker } from "./execution-picker";
 import { GitHubMark } from "@/components/brand-icons";
+import { ModelPicker } from "@/components/model-picker";
 import { RepoSettingsFields } from "./repo-settings-fields";
 import { useCallback, useState, useTransition } from "react";
-import { MODEL_INTEGRATIONS } from "@/lib/integrations/registry";
 import { RepoPicker, type PickerRepo } from "@/components/repo-picker";
 import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, Select } from "@polaris/ui";
 import {
     adviseRepoAction,
+    agentModelChoices,
     enableRepoAction,
     listAgentRepoChoices,
     searchAgentRepoChoices
@@ -25,14 +26,6 @@ import {
     type AgentShellPolicy,
     type ExecutionAdvice
 } from "@polaris/core";
-
-/** One model offered per connected provider, from the same catalog the AI
- *  providers screen is built from. A slug the runtime gained later still works:
- *  the field accepts any well-formed one, and an unknown model fails at dispatch
- *  naming itself. */
-const MODELS: Record<string, { label: string; slug: string }> = Object.fromEntries(
-    MODEL_INTEGRATIONS.flatMap((entry) => (entry.defaultModel ? [[entry.slug, entry.defaultModel] as const] : []))
-);
 
 /**
  * Turning the agent on for a repository.
@@ -128,7 +121,6 @@ export function AddRepoDialog({ onClose }: { onClose: () => void }) {
         });
     };
 
-    const modelOptions = providers.map((slug) => MODELS[slug]).filter(Boolean) as Array<{ label: string; slug: string }>;
     // The tiers above can turn a whole visibility off, and enabling a repository
     // they exclude produces one that looks enabled and never runs. Said here
     // rather than only on save.
@@ -185,13 +177,14 @@ export function AddRepoDialog({ onClose }: { onClose: () => void }) {
 
                             <div className="space-y-1">
                                 <label className="text-sm font-medium">Model</label>
-                                <Select
-                                    value={model}
-                                    onValueChange={setModel}
-                                    placeholder={modelOptions.length === 0 ? "No provider connected" : "Pick a model"}
-                                    options={modelOptions.map((entry) => ({ value: entry.slug, label: entry.label }))}
+                                <ModelPicker
+                                    value={model || null}
+                                    onChange={(next) => setModel(next ?? "")}
+                                    load={agentModelChoices}
+                                    inheritLabel={null}
+                                    placeholder={providers.length === 0 ? "No provider connected" : "Pick a model"}
                                 />
-                                {modelOptions.length === 0 ? (
+                                {providers.length === 0 ? (
                                     <p className="text-xs text-amber-400">
                                         Connect a model provider under Integrations first.
                                     </p>

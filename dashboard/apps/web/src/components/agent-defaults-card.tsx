@@ -16,9 +16,9 @@
 
 import { Trash2 } from "lucide-react";
 import { runAction } from "@/lib/run-action";
-import { useMemo, useState, useTransition } from "react";
-import { MODEL_INTEGRATIONS } from "@/lib/integrations/registry";
-import { Badge, Button, Card, CardBody, Input, Select } from "@polaris/ui";
+import { useState, useTransition } from "react";
+import { ModelPicker, type PickerModel } from "@/components/model-picker";
+import { Badge, Button, Card, CardBody, Select } from "@polaris/ui";
 import type { AgentDefaultsView } from "@/lib/agents/agent-defaults-service";
 import {
     AGENT_EFFORTS,
@@ -75,6 +75,9 @@ export interface AgentDefaultsCardProps {
     inheritedFrom: string;
     pools: Array<{ id: string; name: string }>;
     providers: string[];
+    /** The catalogue, read through this screen's own permission - the same
+     *  reason `save` is a prop. */
+    loadModels: () => Promise<PickerModel[]>;
     /** Stores it. Different screens store to different places, and this is the
      *  only difference between them. */
     save: (input: AgentDefaultsInput) => Promise<{ error?: string }>;
@@ -92,6 +95,7 @@ export function AgentDefaultsCard({
     inheritedFrom,
     pools,
     providers,
+    loadModels,
     save: store,
     onChange,
     onRemoved,
@@ -99,14 +103,6 @@ export function AgentDefaultsCard({
 }: AgentDefaultsCardProps) {
     const [pending, startTransition] = useTransition();
     const [saved, setSaved] = useState(false);
-
-    const models = useMemo(
-        () =>
-            providers
-                .map((slug) => MODEL_INTEGRATIONS.find((entry) => entry.slug === slug)?.defaultModel)
-                .filter((entry): entry is { label: string; slug: string } => Boolean(entry)),
-        [providers]
-    );
 
     const set = <K extends keyof AgentDefaultsView>(key: K, value: AgentDefaultsView[K]) => {
         setSaved(false);
@@ -238,24 +234,14 @@ export function AgentDefaultsCard({
                     ) : null}
                     <Field
                         label="Model"
-                        hint={models.length === 0 ? "Connect a model provider under Integrations first." : undefined}
+                        hint={providers.length === 0 ? "Connect a model provider under Integrations first." : undefined}
                     >
-                        {models.length === 0 ? (
-                            <Input
-                                value={tier.model ?? ""}
-                                onChange={(event) => set("model", event.target.value || null)}
-                                placeholder="Inherit"
-                            />
-                        ) : (
-                            <Select
-                                value={tier.model ?? INHERIT}
-                                onValueChange={(next) => set("model", next === INHERIT ? null : next)}
-                                options={[
-                                    { value: INHERIT, label: "Inherit" },
-                                    ...models.map((entry) => ({ value: entry.slug, label: entry.label }))
-                                ]}
-                            />
-                        )}
+                        <ModelPicker
+                            value={tier.model}
+                            onChange={(next) => set("model", next)}
+                            load={loadModels}
+                            inheritLabel={`Inherit (${inheritedFrom})`}
+                        />
                     </Field>
                     <Field label="Reasoning effort">
                         <Select

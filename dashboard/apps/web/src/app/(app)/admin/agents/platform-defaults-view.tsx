@@ -10,7 +10,7 @@
 import { useState } from "react";
 import { DEFAULT_AGENT_POLICY } from "@polaris/core";
 import { AgentDefaultsCard } from "@/components/agent-defaults-card";
-import { savePlatformAgentDefaultsAction } from "./actions";
+import { platformModelChoices, savePlatformAgentDefaultsAction } from "./actions";
 import type { AgentDefaultsView } from "@/lib/agents/agent-defaults-service";
 
 export function PlatformDefaultsView({
@@ -35,6 +35,7 @@ export function PlatformDefaultsView({
                 inheritedFrom="the built-in defaults"
                 pools={pools}
                 providers={providers}
+                loadModels={platformModelChoices}
                 save={savePlatformAgentDefaultsAction}
                 onChange={setTier}
                 onError={setError}

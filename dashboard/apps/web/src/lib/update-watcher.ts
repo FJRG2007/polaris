@@ -25,8 +25,9 @@ import { getUpdateSource } from "@/lib/update-source";
 import { getUpdateStatus } from "@/lib/update-service";
 import { getSetting, setSetting } from "@/lib/setting-store";
 import { notifyOperators } from "@/lib/notifications/operators";
-import { notifyGithubPermissionGap } from "@/lib/integrations/github-permission-notice";
+import { refreshModelCatalogIfStale } from "@/lib/agents/model-catalog";
 import { markNotificationsReadByType } from "@/lib/notification-service";
+import { notifyGithubPermissionGap } from "@/lib/integrations/github-permission-notice";
 import { lastUpdateOutcome, publishUpdateSource, startHostUpdate, updateTriggerReason, type UpdateTrigger } from "@/lib/update-runner";
 import {
     autoUpdateRunsAt,
@@ -257,6 +258,11 @@ export function startUpdateWatcher(): void {
         // and one interval is one thing to reason about. An update that widened
         // the App's permissions is also exactly when a new gap appears.
         void notifyGithubPermissionGap();
+        // Same reasoning, and the same shape: an indexed read on almost every
+        // tick, one download a day. Nothing waits on it - the model pickers cope
+        // with an empty catalogue - so a failure is logged at debug and retried
+        // on the next tick rather than reported to anybody.
+        void refreshModelCatalogIfStale().catch(() => undefined);
     };
     setTimeout(tick, FIRST_PASS_MS).unref();
     setInterval(tick, INTERVAL_MS).unref();

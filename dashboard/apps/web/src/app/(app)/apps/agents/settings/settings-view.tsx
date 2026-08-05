@@ -14,7 +14,7 @@
 
 import { Plus } from "lucide-react";
 import { useState } from "react";
-import { saveAgentDefaultsAction } from "../actions";
+import { agentModelChoices, saveAgentDefaultsAction } from "../actions";
 import { Button, Card, CardBody, Select } from "@polaris/ui";
 import { resolveAgentPolicy, type AgentPolicy } from "@polaris/core";
 import type { AgentDefaultsView } from "@/lib/agents/agent-defaults-service";
@@ -84,6 +84,7 @@ export function SettingsView({
                     }
                     pools={pools}
                     providers={providers}
+                    loadModels={agentModelChoices}
                     save={saveAgentDefaultsAction}
                     onChange={(next) => update(row.scope, next)}
                     onRemoved={

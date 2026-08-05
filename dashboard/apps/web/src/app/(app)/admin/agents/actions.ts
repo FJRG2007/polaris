@@ -11,8 +11,51 @@ import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/session";
 import { recordAudit } from "@/lib/audit-service";
 import { agentDefaultsSchema } from "@polaris/core";
+import type { PickerModel } from "@/components/model-picker";
 import { savePlatformAgentDefaults } from "@/lib/agents/agent-defaults-service";
-import { connectedProviders, providerForModel } from "@/lib/agents/agent-providers";
+import { connectedProviders, MODEL_PROVIDERS, providerForModel } from "@/lib/agents/agent-providers";
+import { catalogRefreshedAt, listCatalogModels, refreshModelCatalog } from "@/lib/agents/model-catalog";
+
+/** The same list the accounts' own screens get, read through the admin gate.
+ *  Kept apart rather than imported from the app's actions so /admin never
+ *  borrows a permission it does not have. */
+export async function platformModelChoices(): Promise<PickerModel[]> {
+    await requireAdmin();
+    const providers = await connectedProviders();
+    const prefixes = MODEL_PROVIDERS.filter((provider) => providers.includes(provider.slug)).map(
+        (provider) => provider.modelPrefix
+    );
+    if (prefixes.length === 0) return [];
+    const models = await listCatalogModels(prefixes);
+    return models.map((model) => ({
+        slug: model.slug,
+        provider: model.provider,
+        name: model.name,
+        contextTokens: model.contextTokens,
+        reasoning: model.reasoning,
+        costInput: model.costInput
+    }));
+}
+
+/**
+ * Fetch the model catalogue now.
+ *
+ * It refreshes itself daily, so this is for the two cases where waiting is the
+ * wrong answer: a deployment that has just come online and has an empty
+ * catalogue, and a model released today that somebody wants to pick.
+ */
+export async function refreshModelCatalogAction(): Promise<{ models?: number; at?: string; error?: string }> {
+    const admin = await requireAdmin();
+    const result = await refreshModelCatalog();
+    if (!result.ok) return { error: result.error ?? "The catalogue could not be read." };
+    await recordAudit({
+        actorId: admin.id,
+        action: "agents.catalog.refresh",
+        metadata: { models: result.models }
+    });
+    revalidatePath("/admin/agents");
+    return { models: result.models, at: (await catalogRefreshedAt())?.toISOString() };
+}
 
 export async function savePlatformAgentDefaultsAction(input: unknown): Promise<{ error?: string }> {
     const admin = await requireAdmin();
