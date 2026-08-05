@@ -3,7 +3,7 @@
 import { Plus, Trash2 } from "lucide-react";
 import { runAction } from "@/lib/run-action";
 import { useState, useTransition } from "react";
-import { removeAutomationAction, saveAutomationAction } from "../actions";
+import { addDefaultAutomationsAction, removeAutomationAction, saveAutomationAction } from "../actions";
 import { AGENT_TRIGGERS, AGENT_TRIGGER_LABELS, AGENT_TRIGGER_NOTES, type AgentTrigger } from "@polaris/core";
 import {
     Badge,
@@ -53,7 +53,13 @@ export function AutomationsView({
     const [editing, setEditing] = useState<Rule | null>(null);
     const [adding, setAdding] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [, startTransition] = useTransition();
+    const [pending, startTransition] = useTransition();
+
+    const addDefaults = (repoId: string) => {
+        startTransition(() => {
+            void runAction(() => addDefaultAutomationsAction({ repoId }), setError);
+        });
+    };
 
     if (repos.length === 0) {
         return (
@@ -85,10 +91,28 @@ export function AutomationsView({
             <Card>
                 <CardBody className="p-0">
                     {rules.length === 0 ? (
-                        <p className="px-4 py-10 text-sm text-muted-foreground">
-                            No rules yet. Every enabled repository already answers when the app is mentioned; a rule is
-                            for the things you want it to do without being asked.
-                        </p>
+                        <div className="space-y-3 px-4 py-10">
+                            <p className="text-sm text-muted-foreground">
+                                No rules yet, so these repositories only answer when the app is mentioned. A rule is
+                                what makes one act on its own - reply to a new issue, review a new pull request.
+                            </p>
+                            {/* Repositories added from now on get these already. This is
+                                for the ones added before, and for anybody who cleared
+                                them and wants them back. */}
+                            <div className="flex flex-wrap gap-2">
+                                {repos.map((repo) => (
+                                    <Button
+                                        key={repo.id}
+                                        variant="secondary"
+                                        size="sm"
+                                        disabled={pending}
+                                        onClick={() => addDefaults(repo.id)}
+                                    >
+                                        Add the usual rules to {repo.name}
+                                    </Button>
+                                ))}
+                            </div>
+                        </div>
                     ) : (
                         <ul className="divide-y divide-white/5">
                             {rules.map((rule) => {

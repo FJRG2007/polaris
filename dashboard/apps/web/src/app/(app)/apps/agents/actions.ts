@@ -35,6 +35,7 @@ import {
     getAgentRepo,
     poolsServing,
     removeAgentRepo,
+    seedDefaultAutomations,
     setAgentRepoEnabled,
     upsertAgentRepo
 } from "@/lib/agents/agent-repo-service";
@@ -171,12 +172,18 @@ export async function enableRepoAction(input: unknown): Promise<{ error?: string
 
     let repoId: string;
     try {
-        ({ id: repoId } = await upsertAgentRepo(user.id, {
+        const saved = await upsertAgentRepo(user.id, {
             repoFullName: match.fullName,
             installationId: parsed.data.installationId,
             isPrivate: match.private,
             config: parsed.data.config
-        }));
+        });
+        repoId = saved.id;
+        // A repository with no rules answers a mention and nothing else, so
+        // somebody who just added one and opened an issue would wait for a run
+        // that was never going to happen. Only on the first save: rules somebody
+        // deleted stay deleted.
+        if (saved.created) await seedDefaultAutomations(saved.id);
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Could not enable the repository" };
     }
@@ -422,5 +429,30 @@ export async function saveAgentDefaultsAction(input: unknown): Promise<{ error?:
     }
     revalidatePath(`${AGENTS_PATH}/settings`);
     revalidatePath(`${AGENTS_PATH}/repos`);
+    return {};
+}
+
+/**
+ * Give a repository the rules a new one is created with.
+ *
+ * For repositories added before Polaris seeded any, and for anybody who cleared
+ * them and wants them back. Deliberately a button rather than something that
+ * happens on its own: a repository with no rules is a legitimate choice - it
+ * still answers a mention - and putting rules back under somebody who removed
+ * them would be Polaris overruling them.
+ */
+export async function addDefaultAutomationsAction(input: unknown): Promise<{ error?: string }> {
+    const user = await requirePermission("agents.manage");
+    const parsed = z.object({ repoId: z.string().uuid() }).safeParse(input);
+    if (!parsed.success) return { error: "Check the request" };
+    if (!(await getAgentRepo(user.id, parsed.data.repoId))) return { error: "Repository not found" };
+
+    // Only onto an empty one. Running it twice would leave two rules for the same
+    // event, which is two runs and two comments on one issue.
+    const existing = await prisma.agentAutomation.count({ where: { repoId: parsed.data.repoId } });
+    if (existing > 0) return { error: "That repository already has rules." };
+
+    await seedDefaultAutomations(parsed.data.repoId);
+    revalidatePath(`${AGENTS_PATH}/automations`);
     return {};
 }

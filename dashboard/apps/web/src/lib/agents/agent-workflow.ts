@@ -20,7 +20,7 @@
 
 import { Buffer } from "node:buffer";
 import { prisma } from "@polaris/db";
-import { AGENT_WORKFLOW_PATH, needsWorkflowFile, type AgentExecution } from "@polaris/core";
+import { AGENT_EXECUTIONS, AGENT_WORKFLOW_PATH, needsWorkflowFile, type AgentExecution } from "@polaris/core";
 import { appBaseUrl } from "@/lib/domain-service";
 import { parseLabels } from "@/lib/runners/runner-labels";
 import { githubAppInstallationToken } from "@/lib/github-service";
@@ -242,11 +242,13 @@ export async function syncRepoWorkflow(params: {
             runsOn: await resolveRunsOn(params.execution, params.poolId),
             timeoutMinutes: TIMEOUT_MINUTES
         });
-        const { changed } = await installWorkflow({ token, repoFullName: params.repoFullName, content });
-        // The stamp records when the file last needed writing. An unchanged file
-        // is still installed, so a repository that was already correct keeps the
-        // date it actually got there.
-        await stamp(params.repoId, changed ? { workflowInstalledAt: new Date(), error: null } : { error: null });
+        await installWorkflow({ token, repoFullName: params.repoFullName, content });
+        // Stamped whether or not the file needed writing: this records when
+        // Polaris last confirmed it is in place, which is the question the screen
+        // asks. Stamping only on a write would leave a repository whose file was
+        // already correct looking permanently uninstalled, and the reconcile
+        // below would re-check it on every page load forever.
+        await stamp(params.repoId, { workflowInstalledAt: new Date(), error: null });
         return {};
     } catch (caught) {
         const error = caught instanceof Error ? caught.message : "Could not write the workflow file";
@@ -257,6 +259,52 @@ export async function syncRepoWorkflow(params: {
 
 async function stamp(repoId: string, data: { workflowInstalledAt?: Date | null; error?: string | null }): Promise<void> {
     await prisma.agentRepo.update({ where: { id: repoId }, data }).catch(() => undefined);
+}
+
+/**
+ * Put right any repository whose workflow file is not where its settings say it
+ * should be.
+ *
+ * Every path that changes the settings writes the file itself, so on a healthy
+ * instance this matches nothing and costs one indexed query. It exists for the
+ * two cases that path cannot cover: a repository configured before Polaris wrote
+ * the file at all, and one whose write failed at the time - GitHub was down, the
+ * App had not been granted `workflows`, the permission was accepted afterwards.
+ * Both leave a repository that looks configured and would fail at its first run,
+ * and neither is something an operator should have to notice and fix by hand.
+ *
+ * Reconciled where the repositories are listed, because that is the screen that
+ * shows the discrepancy. Bounded so a long list of broken repositories cannot
+ * turn one page render into a hundred GitHub calls; the rest are picked up on
+ * the next visit.
+ */
+const RECONCILE_LIMIT = 5;
+
+export async function reconcileRepoWorkflows(ownerId: string): Promise<number> {
+    const stale = await prisma.agentRepo.findMany({
+        where: {
+            ownerId,
+            enabled: true,
+            workflowInstalledAt: null,
+            execution: { in: AGENT_EXECUTIONS.filter(needsWorkflowFile) }
+        },
+        select: { id: true, repoFullName: true, execution: true, poolId: true },
+        take: RECONCILE_LIMIT
+    });
+    if (stale.length === 0) return 0;
+
+    const results = await Promise.all(
+        stale.map((repo) =>
+            syncRepoWorkflow({
+                repoId: repo.id,
+                repoFullName: repo.repoFullName,
+                execution: repo.execution as AgentExecution,
+                poolId: repo.poolId,
+                enabled: true
+            })
+        )
+    );
+    return results.filter((result) => !result.error).length;
 }
 
 /**

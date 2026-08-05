@@ -185,7 +185,10 @@ export interface EnableAgentRepoInput {
  * same decision restated, and refusing it would mean somebody who re-ran the
  * wizard sees an error instead of their settings.
  */
-export async function upsertAgentRepo(ownerId: string, input: EnableAgentRepoInput): Promise<{ id: string }> {
+export async function upsertAgentRepo(
+    ownerId: string,
+    input: EnableAgentRepoInput
+): Promise<{ id: string; created: boolean }> {
     const shared = {
         installationId: input.installationId,
         isPrivate: input.isPrivate,
@@ -203,13 +206,60 @@ export async function upsertAgentRepo(ownerId: string, input: EnableAgentRepoInp
         // so the installer runs again rather than trusting the stamp.
         error: null
     };
+    // Whether this is the first time is worth knowing: a repository being added
+    // gets the rules that make it answer anything, and one being re-saved must
+    // not have rules somebody deleted put back.
+    const before = await prisma.agentRepo.findUnique({
+        where: { ownerId_repoFullName: { ownerId, repoFullName: input.repoFullName } },
+        select: { id: true }
+    });
     const row = await prisma.agentRepo.upsert({
         where: { ownerId_repoFullName: { ownerId, repoFullName: input.repoFullName } },
         create: { ownerId, repoFullName: input.repoFullName, ...shared },
         update: shared,
         select: { id: true }
     });
-    return { id: row.id };
+    return { id: row.id, created: before === null };
+}
+
+/**
+ * The rules a repository starts with.
+ *
+ * A repository with none answers a direct mention and nothing else, which is not
+ * what somebody who just turned the agent on expects: they opened an issue and
+ * waited. The two seeded here are the ones the settings already have switches
+ * for, so a repository does out of the box exactly what its own settings say it
+ * will - the switch and the rule can no longer disagree by one being absent.
+ *
+ * Seeded rather than implied, so they show up under Automations as rules
+ * somebody can read, narrow with a label, give instructions to, or delete. A
+ * deleted rule stays deleted: this only ever runs when the row is new.
+ */
+export async function seedDefaultAutomations(repoId: string): Promise<void> {
+    const empty = JSON.stringify({ labels: [], branches: [], authors: [] });
+    await prisma.agentAutomation.createMany({
+        data: [
+            {
+                repoId,
+                trigger: "issue.opened",
+                condition: empty,
+                mode: null,
+                instructions: "",
+                enabled: true
+            },
+            {
+                repoId,
+                trigger: "pr.opened",
+                condition: empty,
+                // Reviewing is what a new pull request wants, and leaving the mode
+                // unset would let the agent decide to implement something instead.
+                // Spelled as the runtime's own catalogue spells it.
+                mode: "Review",
+                instructions: "",
+                enabled: true
+            }
+        ]
+    });
 }
 
 /** Stop running agents here. The row stays: the automations and the run history on
