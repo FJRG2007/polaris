@@ -15,7 +15,7 @@
  * the default in place.
  */
 
-import { runSecrets } from "@/lib/agents/agent-providers";
+import { runSecretsFor } from "@/lib/agents/user-model-keys";
 import { EFFORT_ALIASES } from "@polaris/agent-runtime/shared";
 import { ENIGMA_VERSION, gateScript } from "@/lib/agents/agent-gate";
 import { parseAgentTriggers, type AgentGateMode, type AgentTrigger } from "@polaris/core";
@@ -75,6 +75,10 @@ export interface RunContextPayload {
 }
 
 export interface BuildRunContextInput {
+    /** Whose repository this is, and therefore whose provider keys the run
+     *  spends. Their own come first; the deployment's are the fallback, and only
+     *  where an administrator allows it. */
+    ownerId: string;
     /** The run this context is for. Its token is what the runtime authenticates
      *  every later call with. */
     runToken: string;
@@ -112,7 +116,10 @@ export interface BuildRunContextInput {
  * guidance.
  */
 export async function buildRunContext(input: BuildRunContextInput): Promise<RunContextPayload> {
-    const secrets = await runSecrets();
+    // Resolved for whoever owns the repository, not for the deployment: their own
+    // provider keys come first and the instance's are the fallback, so a run
+    // spends the money of the person whose repository it is.
+    const secrets = await runSecretsFor(input.ownerId);
     const instructions = input.instructions.trim();
 
     return {

@@ -4,7 +4,7 @@ import { requirePermission } from "@/lib/session";
 import { getGithubStatus } from "@/lib/github-service";
 import { listAgentRepos } from "@/lib/agents/agent-repo-service";
 import { Button, Card, CardBody, PageHeader } from "@polaris/ui";
-import { connectedProviders } from "@/lib/agents/agent-providers";
+import { providersFor } from "@/lib/agents/user-model-keys";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +21,7 @@ export default async function AgentSetupPage() {
     const user = await requirePermission("agents.read");
     const [github, providers, repos] = await Promise.all([
         getGithubStatus().catch(() => null),
-        connectedProviders().catch(() => []),
+        providersFor(user.id).catch(() => []),
         listAgentRepos(user.id)
     ]);
 

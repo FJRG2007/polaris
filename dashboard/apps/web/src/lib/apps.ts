@@ -389,6 +389,22 @@ export const APP_SUBAPPS: AppSubapp[] = [
                 keywords: ["history", "logs", "failed", "what happened"]
             },
             {
+                label: "Model keys",
+                href: "/apps/agents/keys",
+                icon: KeyRound,
+                keywords: [
+                    "api key",
+                    "byok",
+                    "bring your own key",
+                    "anthropic",
+                    "openai",
+                    "groq",
+                    "provider",
+                    "billing",
+                    "fallback"
+                ]
+            },
+            {
                 label: "Settings",
                 href: "/apps/agents/settings",
                 icon: SlidersHorizontal,

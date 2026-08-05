@@ -58,8 +58,14 @@ export function providerForModel(model: string): ModelProvider | null {
 }
 
 /**
- * Which providers can currently serve a run. Read for the setup wizard and for
- * the model picker, which offers only what can run.
+ * Which providers the DEPLOYMENT can serve a run with.
+ *
+ * Not the same question as which ones a given person can. Somebody may hold
+ * their own key for a provider this has never heard of, and may be barred from
+ * spending the deployment's - `providersFor` in `user-model-keys.ts` answers for
+ * a person, and is what every screen belonging to one should call. This one is
+ * for the places with nobody to resolve for: the setup wizard, and the
+ * deployment-wide defaults under /admin.
  *
  * The gateway joins the list on different terms: it holds no provider key, so
  * what makes it usable is an endpoint and a model to ask it for. A token is

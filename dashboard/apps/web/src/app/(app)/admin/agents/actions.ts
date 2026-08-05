@@ -6,6 +6,7 @@
  * setting.
  */
 
+import { z } from "zod";
 import { prisma } from "@polaris/db";
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/session";
@@ -15,6 +16,7 @@ import type { PickerModel } from "@/components/model-picker";
 import { savePlatformAgentDefaults } from "@/lib/agents/agent-defaults-service";
 import { connectedProviders, MODEL_PROVIDERS, providerForModel } from "@/lib/agents/agent-providers";
 import { catalogRefreshedAt, listCatalogModels, refreshModelCatalog } from "@/lib/agents/model-catalog";
+import { setInstanceKeysShared } from "@/lib/agents/user-model-keys";
 
 /** The same list the accounts' own screens get, read through the admin gate.
  *  Kept apart rather than imported from the app's actions so /admin never
@@ -35,6 +37,31 @@ export async function platformModelChoices(): Promise<PickerModel[]> {
         reasoning: model.reasoning,
         costInput: model.costInput
     }));
+}
+
+/**
+ * Whether an account with no provider key of its own may run on the
+ * deployment's.
+ *
+ * A decision rather than an assumption: with it on, everybody's runs are billed
+ * to the administrator's provider accounts, which is the right answer for a
+ * deployment that bought the keys for exactly that and the wrong one for a
+ * deployment where each person brings their own. On is the default because it is
+ * what every deployment did before there was a choice.
+ */
+export async function setInstanceKeySharingAction(input: unknown): Promise<{ error?: string }> {
+    const admin = await requireAdmin();
+    const parsed = z.object({ shared: z.boolean() }).safeParse(input);
+    if (!parsed.success) return { error: "Pick a setting" };
+
+    await setInstanceKeysShared(parsed.data.shared);
+    await recordAudit({
+        actorId: admin.id,
+        action: "agents.keys.share",
+        metadata: { shared: parsed.data.shared }
+    });
+    revalidatePath("/admin/agents");
+    return {};
 }
 
 /**

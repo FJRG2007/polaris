@@ -17,6 +17,7 @@ import { requirePermission } from "@/lib/session";
 import type { GithubRepo } from "@/lib/github-service";
 import { listReposForUser } from "@/lib/github-access";
 import { dispatchRun } from "@/lib/agents/agent-dispatch";
+import { providersFor } from "@/lib/agents/user-model-keys";
 import type { PickerModel } from "@/components/model-picker";
 import { syncRepoWorkflow } from "@/lib/agents/agent-workflow";
 import { listCatalogModels } from "@/lib/agents/model-catalog";
@@ -24,7 +25,7 @@ import { MODEL_INTEGRATIONS } from "@/lib/integrations/registry";
 import { stopServerRun } from "@/lib/agents/agent-server-executor";
 import { pickerRepoList, pickerRepoSearch } from "@/lib/github-repo-picker";
 import { finishAgentRun, getAgentRun } from "@/lib/agents/agent-run-service";
-import { connectedProviders, MODEL_PROVIDERS, providerForModel } from "@/lib/agents/agent-providers";
+import { MODEL_PROVIDERS, providerForModel } from "@/lib/agents/agent-providers";
 import {
     listAgentDefaults,
     policyForNewRepo,
@@ -73,8 +74,8 @@ const MODEL_DEFAULTS: Record<string, string> = Object.fromEntries(
  * the catalogue yet - and the picker takes free text in that case.
  */
 export async function agentModelChoices(): Promise<PickerModel[]> {
-    await requirePermission("agents.manage");
-    const providers = await connectedProviders();
+    const user = await requirePermission("agents.manage");
+    const providers = await providersFor(user.id);
     const prefixes = MODEL_PROVIDERS.filter((provider) => providers.includes(provider.slug)).map(
         (provider) => provider.modelPrefix
     );
@@ -135,7 +136,7 @@ export async function adviseRepoAction(input: unknown): Promise<{
             select: { id: true, name: true },
             orderBy: { name: "asc" }
         }),
-        connectedProviders(),
+        providersFor(user.id),
         policyForNewRepo(user.id, parsed.data.repoFullName)
     ]);
 
@@ -181,7 +182,7 @@ export async function enableRepoAction(input: unknown): Promise<{ error?: string
     // A model whose provider is not connected produces a run that starts, asks for
     // a key, and fails. Refusing here costs a sentence instead of a failed run.
     const provider = providerForModel(parsed.data.config.model);
-    if (provider && !(await connectedProviders()).includes(provider.slug)) {
+    if (provider && !(await providersFor(user.id)).includes(provider.slug)) {
         return { error: `Connect ${provider.name} under Integrations before using this model.` };
     }
 
@@ -246,7 +247,7 @@ export async function updateRepoConfigAction(input: unknown): Promise<{ error?: 
     // Same refusal as the enable path: a model whose provider has no stored key
     // produces a run that starts, asks for one, and fails.
     const provider = providerForModel(parsed.data.config.model);
-    if (provider && !(await connectedProviders()).includes(provider.slug)) {
+    if (provider && !(await providersFor(user.id)).includes(provider.slug)) {
         return { error: `Connect ${provider.name} under Integrations before using this model.` };
     }
 
@@ -435,7 +436,7 @@ export async function saveAgentDefaultsAction(input: unknown): Promise<{ error?:
     // that to every repository the tier covers.
     if (parsed.data.model) {
         const provider = providerForModel(parsed.data.model);
-        if (provider && !(await connectedProviders()).includes(provider.slug)) {
+        if (provider && !(await providersFor(user.id)).includes(provider.slug)) {
             return { error: `Connect ${provider.name} under Integrations before defaulting to this model.` };
         }
     }

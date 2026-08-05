@@ -110,6 +110,7 @@ model User {
     runnerPools         RunnerPool[]
     agentRepos          AgentRepo[]
     agentDefaults       AgentDefaults[]
+    modelKeys           UserModelKey[]
     linkedAccounts      UserConnection[]
     taskSpaces          TaskSpace[]
     taskSpaceMemberships TaskSpaceMember[]
@@ -3691,6 +3692,42 @@ model AgentRepo {
 // means "inherit" - a tier that stored its inherited value would freeze it the
 // moment the tier above it changed, which is exactly what the tiers exist to
 // avoid.
+// A provider credential somebody brought themselves.
+//
+// Model keys used to be instance-wide only, which made every run on the
+// deployment spend one account's money and put the choice of provider in the
+// administrator's hands alone. Somebody with their own Anthropic account should
+// be able to use it, the way they would bring their own credentials anywhere
+// else, and an administrator should be able to hand out theirs without that
+// being the only way anything runs.
+//
+// Encrypted with the same envelope as every other stored credential, so a
+// database dump yields no usable keys. Deleted with the account: a key nobody
+// owns is a charge nobody can stop.
+model UserModelKey {
+    id              String   @id @default(uuid(7)) @db.Uuid
+    userId          String   @db.Uuid
+    // The provider's integration slug, e.g. `anthropic`, `groq`.
+    provider        String
+    encryptedSecret Bytes
+    secretNonce     Bytes
+    secretKeyId     String
+    // Non-secret settings this credential needs, as stringified JSON. Only the
+    // gateway shape uses it - a base URL, a model, and the two token limits an
+    // endpoint publishes no catalogue for.
+    config          String   @default("{}")
+    // When a run last used it, so somebody can tell a key that is working from
+    // one they pasted and forgot. Null until the first run reads it.
+    lastUsedAt      DateTime?
+    createdAt       DateTime @default(now())
+    updatedAt       DateTime @updatedAt
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@unique([userId, provider])
+    @@index([userId])
+}
+
 // One model a provider serves, as its public catalogue describes it.
 //
 // Downloaded rather than written down. Providers add and retire models

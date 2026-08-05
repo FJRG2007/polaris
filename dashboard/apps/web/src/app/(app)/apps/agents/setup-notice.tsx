@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { connectedProviders } from "@/lib/agents/agent-providers";
+import { requirePermission } from "@/lib/session";
+import { providersFor } from "@/lib/agents/user-model-keys";
 import { getGithubStatus, githubPermissionGap } from "@/lib/github-service";
 
 /**
@@ -10,10 +11,11 @@ import { getGithubStatus, githubPermissionGap } from "@/lib/github-service";
  * while one sentence with one link reads as the next step.
  */
 export async function SetupNotice() {
+    const user = await requirePermission("agents.read");
     const [github, gap, providers] = await Promise.all([
         getGithubStatus().catch(() => null),
         githubPermissionGap().catch(() => ({ installations: [], reviewUrl: null })),
-        connectedProviders().catch(() => [])
+        providersFor(user.id).catch(() => [])
     ]);
 
     if (github?.method !== "app") {

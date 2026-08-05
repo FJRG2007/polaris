@@ -87,6 +87,7 @@ export async function GET(
     await markRunStarted(caller.runId, caller.githubRunId ? { githubRunId: caller.githubRunId } : {});
 
     const context = await buildRunContext({
+        ownerId: row.ownerId,
         // Issued here rather than read back off the request. The caller may have
         // authenticated with an OIDC assertion, which is not a credential this
         // instance can accept on later calls, so the run collects a real one in

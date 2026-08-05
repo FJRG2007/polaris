@@ -3,7 +3,7 @@ import { ReposView } from "./repos-view";
 import { requirePermission } from "@/lib/session";
 import { listAgentRepos } from "@/lib/agents/agent-repo-service";
 import { reconcileRepoWorkflows } from "@/lib/agents/agent-workflow";
-import { connectedProviders } from "@/lib/agents/agent-providers";
+import { providersFor } from "@/lib/agents/user-model-keys";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +15,7 @@ export default async function AgentReposPage() {
     // there too. A healthy instance matches nothing and pays one query.
     await reconcileRepoWorkflows(user.id).catch(() => undefined);
 
-    const [repos, providers] = await Promise.all([listAgentRepos(user.id), connectedProviders()]);
+    const [repos, providers] = await Promise.all([listAgentRepos(user.id), providersFor(user.id)]);
 
     return (
         <>
