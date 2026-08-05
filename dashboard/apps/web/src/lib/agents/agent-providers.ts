@@ -13,6 +13,7 @@
  * run reuses an existing agent subscription instead of a raw provider key.
  */
 
+import { readGatewayConfig } from "@/lib/integrations/registry";
 import { getIntegrationSecret, listIntegrationStates } from "@/lib/integration-service";
 
 /** One provider Polaris can hand a run. */
@@ -31,6 +32,11 @@ export const MODEL_PROVIDERS: readonly ModelProvider[] = [
     { slug: "anthropic", name: "Anthropic", envVar: "ANTHROPIC_API_KEY", modelPrefix: "anthropic" },
     { slug: "openai", name: "OpenAI", envVar: "OPENAI_API_KEY", modelPrefix: "openai" },
     { slug: "google-ai", name: "Google AI", envVar: "GEMINI_API_KEY", modelPrefix: "google" },
+    { slug: "xai", name: "xAI", envVar: "XAI_API_KEY", modelPrefix: "xai" },
+    { slug: "deepseek", name: "DeepSeek", envVar: "DEEPSEEK_API_KEY", modelPrefix: "deepseek" },
+    { slug: "moonshot", name: "Moonshot AI", envVar: "MOONSHOT_API_KEY", modelPrefix: "moonshotai" },
+    { slug: "groq", name: "Groq", envVar: "GROQ_API_KEY", modelPrefix: "groq" },
+    { slug: "cerebras", name: "Cerebras", envVar: "CEREBRAS_API_KEY", modelPrefix: "cerebras" },
     { slug: "openrouter", name: "OpenRouter", envVar: "OPENROUTER_API_KEY", modelPrefix: "openrouter" }
 ];
 
@@ -51,11 +57,27 @@ export function providerForModel(model: string): ModelProvider | null {
     return MODEL_PROVIDERS.find((provider) => provider.modelPrefix === prefix) ?? null;
 }
 
-/** Which providers currently hold a usable credential. Read for the setup wizard
- *  and for the model picker, which greys out what cannot run. */
+/**
+ * Which providers can currently serve a run. Read for the setup wizard and for
+ * the model picker, which offers only what can run.
+ *
+ * The gateway joins the list on different terms: it holds no provider key, so
+ * what makes it usable is an endpoint and a model to ask it for. A token is
+ * optional there - plenty of them accept unauthenticated calls from inside the
+ * network - so requiring one would hide a gateway that works.
+ */
 export async function connectedProviders(): Promise<string[]> {
     const states = await listIntegrationStates();
-    return MODEL_PROVIDERS.filter((provider) => states.get(provider.slug)?.hasSecret).map((provider) => provider.slug);
+    const connected = MODEL_PROVIDERS.filter((provider) => states.get(provider.slug)?.hasSecret).map(
+        (provider) => provider.slug
+    );
+
+    const gateway = states.get(GATEWAY_SLUG);
+    if (gateway?.enabled) {
+        const config = readGatewayConfig(gateway.config);
+        if (config.baseUrl && config.model) connected.push(GATEWAY_SLUG);
+    }
+    return connected;
 }
 
 /**
@@ -83,13 +105,19 @@ export async function runSecrets(): Promise<Record<string, string> | null> {
         // The gateway speaks the OpenAI protocol, so a run uses it by pointing the
         // OpenAI-compatible client at its base URL. The key is whatever the
         // gateway asks for, which on a loopback install is frequently nothing.
+        // The model and its two limits ride along because an endpoint publishes
+        // no catalog: without them a run answers in 32000-token slices and never
+        // compacts.
         const gateway = states.get(GATEWAY_SLUG);
         if (gateway?.enabled) {
-            const baseUrl = typeof gateway.config.baseUrl === "string" ? gateway.config.baseUrl : "";
-            if (baseUrl) {
-                secrets.OPENAI_COMPATIBLE_BASE_URL = baseUrl.replace(/\/+$/, "");
+            const config = readGatewayConfig(gateway.config);
+            if (config.baseUrl) {
+                secrets.OPENAI_COMPATIBLE_BASE_URL = config.baseUrl.replace(/\/+$/, "");
                 const key = gateway.hasSecret ? await getIntegrationSecret(GATEWAY_SLUG) : null;
                 secrets.OPENAI_COMPATIBLE_API_KEY = key ?? "unused";
+                if (config.model) secrets.OPENAI_COMPATIBLE_MODEL = config.model;
+                if (config.context > 0) secrets.OPENAI_COMPATIBLE_CONTEXT = String(config.context);
+                if (config.maxOutput > 0) secrets.OPENAI_COMPATIBLE_MAX_OUTPUT = String(config.maxOutput);
             }
         }
     } catch {

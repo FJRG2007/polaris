@@ -14,6 +14,8 @@ import { recordAudit } from "@/lib/audit-service";
 import { verifyIp } from "@/lib/integrations/dymo";
 import { applyTunnel } from "@/lib/tunnel-service";
 import { verifyKey } from "@/lib/integrations/virustotal";
+import { GATEWAY_SLUG } from "@/lib/agents/agent-providers";
+import { CRIMINALIP_RULES } from "@/lib/integrations/criminalip";
 import type { CfAccount } from "@/lib/integrations/cloudflare-api";
 import { setDomainConfig, syncDuckDns } from "@/lib/domain-service";
 import { isTunnelToken, tunnelTokenHint } from "@/lib/integrations/tunnel-token";
@@ -373,11 +375,173 @@ export async function saveDymoAction(input: {
     return {};
 }
 
+/**
+ * Save Criminal IP's settings (enabled flag, the verdicts that block, and the key).
+ *
+ * The key is not test-called first, unlike Dymo's: their summary endpoint spends a
+ * lookup from the operator's own quota, and the firewall already treats a provider
+ * error as "not blocking", so a wrong key costs nothing but a log line.
+ */
+export async function saveCriminalIpAction(input: {
+    enabled: boolean;
+    deny: string[];
+    apiKey?: string;
+}): Promise<{ error?: string }> {
+    const user = await requireAdmin();
+    const provider = "criminalip";
+    const newKey = input.apiKey?.trim() ? input.apiKey.trim() : undefined;
+
+    try {
+        const existing = await getIntegrationState(provider);
+        if (input.enabled && !newKey && !existing?.hasSecret) {
+            return { error: "Add a Criminal IP API key before enabling it" };
+        }
+
+        const known = new Set<string>(CRIMINALIP_RULES.map((rule) => rule.value));
+        const deny = input.deny.filter((value) => known.has(value));
+        if (input.enabled && deny.length === 0) return { error: "Pick at least one verdict to block on" };
+
+        await upsertIntegration(provider, {
+            enabled: input.enabled,
+            config: { ...existing?.config, deny },
+            secret: newKey,
+            installedById: user.id
+        });
+        await recordAudit({
+            actorId: user.id,
+            action: "integration.configure",
+            targetType: "integration",
+            targetId: provider,
+            metadata: { enabled: input.enabled }
+        });
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "The Criminal IP settings could not be saved" };
+    }
+
+    revalidatePath("/integrations");
+    return {};
+}
+
 /** Verify a Dymo API key without saving it (the configure dialog's Test button). */
 export async function testDymoKeyAction(apiKey: string): Promise<{ ok: boolean; error?: string }> {
     await requireAdmin();
     if (!apiKey.trim()) return { ok: false, error: "Enter an API key first" };
     return testDymoKey(apiKey.trim());
+}
+
+/**
+ * Connect a model provider - one of the operator's own provider accounts, stored
+ * as a key and handed to a run over its authenticated call.
+ *
+ * Nothing is verified against the provider: a request that proves a key works
+ * costs tokens on somebody's account, and these keys fail loudly at the start of
+ * a run naming themselves. The key is tri-state as everywhere else here, so the
+ * switch can be flipped without re-typing it.
+ */
+export async function saveModelProviderAction(input: {
+    slug: string;
+    enabled: boolean;
+    apiKey?: string;
+}): Promise<{ error?: string }> {
+    const user = await requireAdmin();
+    const entry = findIntegration(input.slug);
+    if (!entry || entry.category !== "Models" || entry.slug === GATEWAY_SLUG) return { error: "Unknown model provider" };
+
+    try {
+        const existing = await getIntegrationState(entry.slug);
+        const newKey = input.apiKey?.trim() ? input.apiKey.trim() : undefined;
+        if (input.enabled && !newKey && !existing?.hasSecret) return { error: "Add the API key before enabling it" };
+
+        await upsertIntegration(entry.slug, {
+            enabled: input.enabled,
+            secret: newKey,
+            installedById: user.id
+        });
+        await recordAudit({
+            actorId: user.id,
+            action: "integration.configure",
+            targetType: "integration",
+            targetId: entry.slug,
+            metadata: { enabled: input.enabled }
+        });
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : `The ${entry.name} key could not be saved` };
+    }
+
+    revalidatePath("/integrations/models");
+    return {};
+}
+
+/** Forget a model provider's key. Rotating one is a paste over the old value;
+ *  this is for the account that is going away, where leaving the key stored
+ *  would keep handing a dead credential to every run. */
+export async function disconnectModelProviderAction(slug: string): Promise<{ error?: string }> {
+    const user = await requireAdmin();
+    const entry = findIntegration(slug);
+    if (!entry || entry.category !== "Models") return { error: "Unknown model provider" };
+
+    await upsertIntegration(entry.slug, { enabled: false, secret: null });
+    await recordAudit({
+        actorId: user.id,
+        action: "integration.disable",
+        targetType: "integration",
+        targetId: entry.slug
+    });
+    revalidatePath("/integrations/models");
+    return {};
+}
+
+/**
+ * Point runs at an OpenAI-compatible endpoint instead of a provider key.
+ *
+ * The two limits are asked for rather than guessed: an endpoint publishes no
+ * catalog, and a run that assumes one answers in 32000-token slices and never
+ * compacts. The token is optional - an endpoint on this network frequently
+ * accepts unauthenticated calls - which is why it is the one credential here
+ * that does not gate the switch.
+ */
+export async function saveGatewayAction(input: {
+    enabled: boolean;
+    baseUrl: string;
+    model: string;
+    context: number;
+    maxOutput: number;
+    token?: string;
+}): Promise<{ error?: string }> {
+    const user = await requireAdmin();
+    const baseUrl = input.baseUrl.trim().replace(/\/+$/, "");
+    const model = input.model.trim();
+    const context = Math.floor(input.context);
+    const maxOutput = Math.floor(input.maxOutput);
+
+    if (baseUrl && !/^https?:\/\/\S+$/.test(baseUrl)) return { error: "The base URL has to start with http:// or https://" };
+    if (input.enabled) {
+        if (!baseUrl) return { error: "Add the base URL before enabling it" };
+        if (!model) return { error: "Add the model id the endpoint serves" };
+        if (!(context > 0) || !(maxOutput > 0)) return { error: "Set both token limits to a number above zero" };
+        if (maxOutput > context) return { error: "The largest answer cannot exceed the context window" };
+    }
+
+    try {
+        await upsertIntegration(GATEWAY_SLUG, {
+            enabled: input.enabled,
+            config: { baseUrl, model, context, maxOutput },
+            secret: input.token?.trim() ? input.token.trim() : undefined,
+            installedById: user.id
+        });
+        await recordAudit({
+            actorId: user.id,
+            action: "integration.configure",
+            targetType: "integration",
+            targetId: GATEWAY_SLUG,
+            metadata: { enabled: input.enabled }
+        });
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "The gateway settings could not be saved" };
+    }
+
+    revalidatePath("/integrations/models");
+    return {};
 }
 
 /** Turn an integration off without forgetting its configuration. */

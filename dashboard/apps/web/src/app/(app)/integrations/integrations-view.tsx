@@ -1,30 +1,33 @@
 "use client";
 
 /**
- * The integrations marketplace grid and the per-integration configure dialog.
- * Only VirusTotal exists today, so the dialog renders its scan settings directly;
- * a second integration would branch on the slug. Toggling and saving go through
- * the admin-gated server actions.
+ * The integrations grid and the configure dialog behind each card. Shared by the
+ * marketplace and the AI providers screen, which pass different cards to the same
+ * component. What a card opens is decided in one place (`dialogFor`) because a
+ * card whose button opens nothing looks exactly like a broken page. Saving goes
+ * through the admin-gated server actions.
  */
 
 import { runAction } from "@/lib/run-action";
-import { useState, useTransition } from "react";
 import * as integrationActions from "./actions";
 import { IntegrationLogo } from "@/components/logos";
 import { CopyButton } from "@/components/copy-button";
+import { CRIMINALIP_RULES } from "@/lib/integrations/criminalip";
+import { useState, useTransition, type ComponentType } from "react";
 import { isTunnelToken, tunnelTokenHint, type TunnelProviderSlug } from "@/lib/integrations/tunnel-token";
 import { CheckCircle2, Circle, ExternalLink, Loader2, RefreshCw, ShieldAlert, ShieldCheck } from "lucide-react";
-import {
-    DYMO_IP_RULES,
-    SCAN_ACTIONS,
-    type IntegrationSetupLink,
-    type ScanAction
-} from "@/lib/integrations/registry";
 import {
     CLOUDFLARE_TOKEN_LINKS,
     CLOUDFLARE_TOKEN_PERMISSIONS,
     type CloudflareTokenScope
 } from "@/lib/integrations/cloudflare-token-link";
+import {
+    DYMO_IP_RULES,
+    SCAN_ACTIONS,
+    type GatewayConfig,
+    type IntegrationSetupLink,
+    type ScanAction
+} from "@/lib/integrations/registry";
 import {
     cn,
     Card,
@@ -41,6 +44,12 @@ import {
     DialogContent,
     DialogDescription
 } from "@polaris/ui";
+
+/** What every configure dialog takes: the card it is for, and how to close it. */
+export interface IntegrationDialogProps {
+    card: IntegrationCard;
+    onClose: () => void;
+}
 
 export interface IntegrationCard {
     slug: string;
@@ -91,6 +100,8 @@ export interface IntegrationCard {
     accountLimit?: number;
     /** Where the vendor makes the credential this dialog is asking for. */
     setupLinks?: readonly IntegrationSetupLink[];
+    /** The gateway's endpoint settings. Set for that card only. */
+    gateway?: GatewayConfig;
     /** Whether a linked account of this service may sign anybody in here, for the
      *  services people link an account of. Undefined for the rest. */
     signInAllowed?: boolean;
@@ -98,8 +109,30 @@ export interface IntegrationCard {
     signInWarning?: string;
 }
 
+/** What a card's button opens. Every card in the catalog has to resolve to
+ *  something here: one that resolves to nothing has a button that does nothing,
+ *  which is indistinguishable from a broken page. */
+export function dialogFor(card: IntegrationCard): ComponentType<IntegrationDialogProps> | null {
+    if (card.slug === "virustotal") return VirusTotalDialog;
+    if (card.slug === "dymo") return DymoDialog;
+    if (card.slug === "criminalip") return CriminalIpDialog;
+    if (card.slug === "github") return GitHubDialog;
+    if (card.slug === "cloudflare" || card.slug === "ngrok") return TunnelDialog;
+    if (card.slug === "duckdns") return DuckDnsDialog;
+    if (card.slug === "google") return GoogleDialog;
+    // The gateway asks for an endpoint rather than a provider key, so it is told
+    // apart by carrying those settings and not by its slug.
+    if (card.gateway) return GatewayDialog;
+    if (card.category === "Models") return ModelProviderDialog;
+    return null;
+}
+
 export function IntegrationsView({ cards }: { cards: IntegrationCard[] }) {
     const [configuring, setConfiguring] = useState<IntegrationCard | null>(null);
+    const ConfigureDialog = configuring ? dialogFor(configuring) : null;
+    // The category badge sorts a mixed grid. On a screen that is all one category
+    // it repeats the page title on every card, so it is left off there.
+    const mixed = new Set(cards.map((card) => card.category)).size > 1;
 
     return (
         <>
@@ -114,7 +147,7 @@ export function IntegrationsView({ cards }: { cards: IntegrationCard[] }) {
                                 <div className="min-w-0 flex-1">
                                     <div className="flex items-center gap-2">
                                         <h2 className="truncate text-sm font-medium">{card.name}</h2>
-                                        <Badge variant="neutral">{card.category}</Badge>
+                                        {mixed ? <Badge variant="neutral">{card.category}</Badge> : null}
                                     </div>
                                     <p className="mt-0.5 text-xs text-muted-foreground">{card.summary}</p>
                                 </div>
@@ -143,18 +176,8 @@ export function IntegrationsView({ cards }: { cards: IntegrationCard[] }) {
                 ))}
             </div>
 
-            {configuring?.slug === "virustotal" ? (
-                <VirusTotalDialog card={configuring} onClose={() => setConfiguring(null)} />
-            ) : configuring?.slug === "dymo" ? (
-                <DymoDialog card={configuring} onClose={() => setConfiguring(null)} />
-            ) : configuring?.slug === "github" ? (
-                <GitHubDialog card={configuring} onClose={() => setConfiguring(null)} />
-            ) : configuring?.slug === "cloudflare" || configuring?.slug === "ngrok" ? (
-                <TunnelDialog card={configuring} onClose={() => setConfiguring(null)} />
-            ) : configuring?.slug === "duckdns" ? (
-                <DuckDnsDialog card={configuring} onClose={() => setConfiguring(null)} />
-            ) : configuring?.slug === "google" ? (
-                <GoogleDialog card={configuring} onClose={() => setConfiguring(null)} />
+            {configuring && ConfigureDialog ? (
+                <ConfigureDialog card={configuring} onClose={() => setConfiguring(null)} />
             ) : null}
         </>
     );
@@ -308,6 +331,363 @@ function SignInSwitch({
             ) : null}
             {error ? <p className="text-xs text-danger">{error}</p> : null}
         </div>
+    );
+}
+
+/**
+ * Connect Criminal IP: a key, and which of their verdicts count as a block.
+ *
+ * The rules are here rather than defaulted quietly because two of them - hosting
+ * and VPN - refuse a great many ordinary people, and an operator who turns this
+ * on without seeing that list would find out from a support message. The key is
+ * not test-called on save: their summary endpoint spends a lookup from the
+ * operator's own quota, and a wrong key surfaces in the firewall log instead.
+ */
+function CriminalIpDialog({ card, onClose }: IntegrationDialogProps) {
+    const [enabled, setEnabled] = useState(card.hasSecret ? card.enabled : true);
+    const [deny, setDeny] = useState<Set<string>>(new Set(card.deny));
+    const [apiKey, setApiKey] = useState("");
+    const [error, setError] = useState<string | null>(null);
+    const [saving, startSave] = useTransition();
+
+    function toggleRule(value: string) {
+        setDeny((prev) => {
+            const next = new Set(prev);
+            if (next.has(value)) next.delete(value);
+            else next.add(value);
+            return next;
+        });
+    }
+
+    function onSave() {
+        setError(null);
+        startSave(async () => {
+            const result = await runAction(
+                () => integrationActions.saveCriminalIpAction({ enabled, deny: [...deny], apiKey }),
+                setError
+            );
+            if (!result) return;
+            if (result.error) setError(result.error);
+            else onClose();
+        });
+    }
+
+    return (
+        <Dialog open onOpenChange={(open) => !open && onClose()}>
+            <DialogContent className="max-w-md">
+                <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2">
+                        <IntegrationLogo slug={card.slug} className="size-5" />
+                        {card.name}
+                    </DialogTitle>
+                    <DialogDescription>{card.description}</DialogDescription>
+                </DialogHeader>
+
+                <div className="flex flex-col gap-4">
+                    <SetupSteps links={card.setupLinks} />
+
+                    <label className="flex flex-col gap-1 text-sm">
+                        <span className="font-medium">{card.apiKeyLabel ?? "API key"}</span>
+                        <Input
+                            type="password"
+                            autoComplete="off"
+                            value={apiKey}
+                            onChange={(event) => setApiKey(event.target.value)}
+                            placeholder={card.hasSecret ? "Saved - enter a new key to replace it" : "Paste your key"}
+                        />
+                        {card.apiKeyHelp ? <span className="text-xs text-muted-foreground">{card.apiKeyHelp}</span> : null}
+                    </label>
+
+                    <div className="flex flex-col gap-1.5">
+                        <span className="text-sm font-medium">Block addresses reported as</span>
+                        <div className="flex flex-wrap gap-1.5">
+                            {CRIMINALIP_RULES.map((rule) => (
+                                <button
+                                    key={rule.value}
+                                    type="button"
+                                    onClick={() => toggleRule(rule.value)}
+                                    className={cn(
+                                        "rounded-full border px-3 py-1 text-xs transition-colors",
+                                        deny.has(rule.value)
+                                            ? "border-primary bg-primary/10 text-primary"
+                                            : "border-border text-muted-foreground hover:bg-muted"
+                                    )}
+                                >
+                                    {rule.label}
+                                </button>
+                            ))}
+                        </div>
+                        <span className="text-xs text-muted-foreground">
+                            Hosting and VPN cover a lot of ordinary traffic. Lookups happen in the background and the
+                            answer is cached as an ordinary ban, so nothing here slows a request down.
+                        </span>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-3 rounded-md border border-border p-2.5 text-sm">
+                        <span className="flex items-center gap-1.5 font-medium">
+                            <ShieldCheck className="size-4 text-primary" />
+                            Enable {card.name}
+                        </span>
+                        <Switch checked={enabled} onChange={setEnabled} aria-label={`Enable ${card.name}`} />
+                    </div>
+
+                    {error ? <p className="text-sm text-danger">{error}</p> : null}
+
+                    <div className="flex justify-end gap-2">
+                        <Button type="button" variant="ghost" onClick={onClose}>
+                            Cancel
+                        </Button>
+                        <Button type="button" onClick={onSave} disabled={saving}>
+                            {saving ? <Loader2 className="size-4 animate-spin" /> : "Save"}
+                        </Button>
+                    </div>
+                </div>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+/**
+ * Connect one model provider: a key, and whether runs may use it.
+ *
+ * One dialog for every provider in the Models category, because that is all
+ * connecting one is - the key goes in, and a run is handed it. Nothing is
+ * verified against the provider on save: every check costs tokens on the
+ * operator's own account, and a wrong key fails at the start of the first run
+ * naming itself.
+ */
+function ModelProviderDialog({ card, onClose }: { card: IntegrationCard; onClose: () => void }) {
+    // A first-time setup defaults to on: nobody pastes a key meaning to leave it unused.
+    const [enabled, setEnabled] = useState(card.hasSecret ? card.enabled : true);
+    const [apiKey, setApiKey] = useState("");
+    const [error, setError] = useState<string | null>(null);
+    const [saving, startSave] = useTransition();
+    const [removing, startRemove] = useTransition();
+
+    function onSave() {
+        setError(null);
+        startSave(async () => {
+            const result = await runAction(
+                () => integrationActions.saveModelProviderAction({ slug: card.slug, enabled, apiKey }),
+                setError
+            );
+            if (!result) return;
+            if (result.error) setError(result.error);
+            else onClose();
+        });
+    }
+
+    function onDisconnect() {
+        setError(null);
+        startRemove(async () => {
+            const result = await runAction(() => integrationActions.disconnectModelProviderAction(card.slug), setError);
+            if (!result) return;
+            if (result.error) setError(result.error);
+            else onClose();
+        });
+    }
+
+    return (
+        <Dialog open onOpenChange={(open) => !open && onClose()}>
+            <DialogContent className="max-w-md">
+                <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2">
+                        <IntegrationLogo slug={card.slug} className="size-5" />
+                        {card.name}
+                    </DialogTitle>
+                    <DialogDescription>{card.description}</DialogDescription>
+                </DialogHeader>
+
+                <div className="flex flex-col gap-4">
+                    <SetupSteps links={card.setupLinks} />
+
+                    <label className="flex flex-col gap-1 text-sm">
+                        <span className="font-medium">{card.apiKeyLabel ?? "API key"}</span>
+                        <Input
+                            type="password"
+                            autoComplete="off"
+                            value={apiKey}
+                            onChange={(event) => setApiKey(event.target.value)}
+                            placeholder={card.hasSecret ? "Saved - enter a new key to replace it" : "Paste your key"}
+                        />
+                        {card.apiKeyHelp ? <span className="text-xs text-muted-foreground">{card.apiKeyHelp}</span> : null}
+                    </label>
+
+                    <div className="flex items-start justify-between gap-3 rounded-md border border-border p-3 text-sm">
+                        <span>
+                            <span className="font-medium">Let agents use it</span>
+                            <span className="block text-xs text-muted-foreground">
+                                Runs are handed this key over an authenticated call. It is never written into a
+                                repository, so rotating it here takes effect everywhere at once.
+                            </span>
+                        </span>
+                        <Switch checked={enabled} onChange={setEnabled} aria-label={`Let agents use ${card.name}`} />
+                    </div>
+
+                    {error ? <p className="text-sm text-danger">{error}</p> : null}
+
+                    <div className="flex justify-end gap-2">
+                        {card.hasSecret ? (
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                className="mr-auto text-danger"
+                                onClick={onDisconnect}
+                                disabled={saving || removing}
+                            >
+                                {removing ? <Loader2 className="size-4 animate-spin" /> : "Forget key"}
+                            </Button>
+                        ) : null}
+                        <Button type="button" variant="ghost" onClick={onClose}>
+                            Cancel
+                        </Button>
+                        <Button type="button" onClick={onSave} disabled={saving || removing}>
+                            {saving ? <Loader2 className="size-4 animate-spin" /> : "Save"}
+                        </Button>
+                    </div>
+                </div>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+/**
+ * Point runs at an OpenAI-compatible endpoint instead of a provider key.
+ *
+ * The two token limits are fields rather than assumptions: an endpoint publishes
+ * no catalog, and a run that has to guess caps its answers at 32000 tokens and
+ * stops compacting - which looks like the agent quitting halfway through, not
+ * like a setting nobody filled in.
+ */
+function GatewayDialog({ card, onClose }: { card: IntegrationCard; onClose: () => void }) {
+    const saved = card.gateway ?? { baseUrl: "", model: "", context: 0, maxOutput: 0 };
+    const [enabled, setEnabled] = useState(card.hasSecret || saved.baseUrl ? card.enabled : true);
+    const [baseUrl, setBaseUrl] = useState(saved.baseUrl);
+    const [model, setModel] = useState(saved.model);
+    const [context, setContext] = useState(saved.context > 0 ? String(saved.context) : "");
+    const [maxOutput, setMaxOutput] = useState(saved.maxOutput > 0 ? String(saved.maxOutput) : "");
+    const [token, setToken] = useState("");
+    const [error, setError] = useState<string | null>(null);
+    const [saving, startSave] = useTransition();
+
+    function onSave() {
+        setError(null);
+        startSave(async () => {
+            const result = await runAction(
+                () =>
+                    integrationActions.saveGatewayAction({
+                        enabled,
+                        baseUrl,
+                        model,
+                        context: Number.parseInt(context, 10) || 0,
+                        maxOutput: Number.parseInt(maxOutput, 10) || 0,
+                        token
+                    }),
+                setError
+            );
+            if (!result) return;
+            if (result.error) setError(result.error);
+            else onClose();
+        });
+    }
+
+    return (
+        <Dialog open onOpenChange={(open) => !open && onClose()}>
+            <DialogContent className="max-w-md">
+                <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2">
+                        <IntegrationLogo slug={card.slug} className="size-5" />
+                        {card.name}
+                    </DialogTitle>
+                    <DialogDescription>{card.description}</DialogDescription>
+                </DialogHeader>
+
+                <div className="flex flex-col gap-4">
+                    <label className="flex flex-col gap-1 text-sm">
+                        <span className="font-medium">Base URL</span>
+                        <Input
+                            value={baseUrl}
+                            onChange={(event) => setBaseUrl(event.target.value)}
+                            placeholder="https://gateway.example.com/v1"
+                            autoComplete="off"
+                            spellCheck={false}
+                        />
+                        <span className="text-xs text-muted-foreground">
+                            Reachable from wherever runs happen. A loopback address works for runs on this server and
+                            not for runs on GitHub-hosted machines.
+                        </span>
+                    </label>
+
+                    <label className="flex flex-col gap-1 text-sm">
+                        <span className="font-medium">Model id</span>
+                        <Input
+                            value={model}
+                            onChange={(event) => setModel(event.target.value)}
+                            placeholder="The id the endpoint serves"
+                            autoComplete="off"
+                            spellCheck={false}
+                        />
+                    </label>
+
+                    <div className="grid grid-cols-2 gap-3">
+                        <label className="flex flex-col gap-1 text-sm">
+                            <span className="font-medium">Context window</span>
+                            <Input
+                                type="number"
+                                min={1}
+                                inputMode="numeric"
+                                value={context}
+                                onChange={(event) => setContext(event.target.value)}
+                                placeholder="200000"
+                            />
+                        </label>
+                        <label className="flex flex-col gap-1 text-sm">
+                            <span className="font-medium">Largest answer</span>
+                            <Input
+                                type="number"
+                                min={1}
+                                inputMode="numeric"
+                                value={maxOutput}
+                                onChange={(event) => setMaxOutput(event.target.value)}
+                                placeholder="64000"
+                            />
+                        </label>
+                    </div>
+                    <span className="-mt-2 text-xs text-muted-foreground">
+                        Both in tokens, from whatever the endpoint serves. Left unset, a run answers in 32000-token
+                        slices and never compacts.
+                    </span>
+
+                    <label className="flex flex-col gap-1 text-sm">
+                        <span className="font-medium">{card.apiKeyLabel ?? "Token"}</span>
+                        <Input
+                            type="password"
+                            autoComplete="off"
+                            value={token}
+                            onChange={(event) => setToken(event.target.value)}
+                            placeholder={card.hasSecret ? "Saved - enter a new token to replace it" : "Optional"}
+                        />
+                        {card.apiKeyHelp ? <span className="text-xs text-muted-foreground">{card.apiKeyHelp}</span> : null}
+                    </label>
+
+                    <div className="flex items-center justify-between gap-3 rounded-md border border-border p-3 text-sm">
+                        <span className="font-medium">Let agents use it</span>
+                        <Switch checked={enabled} onChange={setEnabled} aria-label={`Let agents use ${card.name}`} />
+                    </div>
+
+                    {error ? <p className="text-sm text-danger">{error}</p> : null}
+
+                    <div className="flex justify-end gap-2">
+                        <Button type="button" variant="ghost" onClick={onClose}>
+                            Cancel
+                        </Button>
+                        <Button type="button" onClick={onSave} disabled={saving}>
+                            {saving ? <Loader2 className="size-4 animate-spin" /> : "Save"}
+                        </Button>
+                    </div>
+                </div>
+            </DialogContent>
+        </Dialog>
     );
 }
 

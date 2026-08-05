@@ -3,17 +3,19 @@
  * installed state. Admin-only: configuring one stores an instance-wide secret.
  */
 
+import Link from "next/link";
 import { requireAdmin } from "@/lib/session";
 import { getGithubStatus } from "@/lib/github-service";
 import { getRunnerAccess } from "@/lib/github-runners";
 import { connectionCallbackUrl } from "@/lib/connections/oauth";
+import { readCriminalIpConfig } from "@/lib/integrations/criminalip";
 import { listIntegrationStates } from "@/lib/integration-service";
 import { CONNECTION_PROVIDERS, findConnectionProvider } from "@polaris/core";
 import { IntegrationsView, type IntegrationCard } from "./integrations-view";
 import { appBaseUrl, getDomainConfig, publicAppUrl } from "@/lib/domain-service";
 import { connectionLimit, connectionSignInAllowed } from "@/lib/connections/store";
 import { getCloudflareAccountStatus } from "@/lib/integrations/cloudflare-account-service";
-import { INTEGRATIONS, readDymoConfig, readVirusTotalConfig } from "@/lib/integrations/registry";
+import { SERVICE_INTEGRATIONS, readDymoConfig, readVirusTotalConfig } from "@/lib/integrations/registry";
 
 export const dynamic = "force-dynamic";
 
@@ -60,13 +62,16 @@ export default async function IntegrationsPage() {
     // above, so it is the one call that cannot join the batch.
     const runners = github.connected ? await getRunnerAccess() : null;
 
-    const cards: IntegrationCard[] = INTEGRATIONS.map((entry) => {
+    const cards: IntegrationCard[] = SERVICE_INTEGRATIONS.map((entry) => {
         const state = states.get(entry.slug);
         // Set only for the services somebody can link an account of; the rest
         // have nothing to sign in with, so the switch is left out entirely.
         const connection = findConnectionProvider(entry.slug);
         const virustotal = entry.slug === "virustotal" ? readVirusTotalConfig(state?.config) : undefined;
         const dymo = entry.slug === "dymo" ? readDymoConfig(state?.config) : undefined;
+        // Criminal IP carries the same shape - which verdicts block - read through
+        // its own module because the rule names are theirs, not Dymo's.
+        const criminalIp = entry.slug === "criminalip" ? readCriminalIpConfig(state?.config) : undefined;
         const isDuck = entry.slug === "duckdns";
         const duckConfigured = isDuck && domains.hasDuckdnsToken && Boolean(domains.duckdnsSubdomain);
         return {
@@ -88,7 +93,7 @@ export default async function IntegrationsPage() {
             scanDropPoints: virustotal?.scanDropPoints ?? true,
             onDetection: virustotal?.onDetection ?? "block",
             verifyAccessIp: dymo?.verifyAccessIp ?? true,
-            deny: dymo?.deny ?? ["FRAUD"],
+            deny: dymo?.deny ?? criminalIp?.deny ?? ["FRAUD"],
             githubMethod: entry.slug === "github" ? github.method : undefined,
             githubLogin: entry.slug === "github" ? github.login ?? undefined : undefined,
             githubInstallations: entry.slug === "github" ? github.installations : undefined,
@@ -114,7 +119,12 @@ export default async function IntegrationsPage() {
             <div>
                 <h1 className="text-lg font-medium">Integrations</h1>
                 <p className="text-sm text-muted-foreground">
-                    Connect Polaris to outside services. Enabled integrations run across the platform.
+                    Connect Polaris to outside services. Enabled integrations run across the platform. The model
+                    providers agents run on are under{" "}
+                    <Link href="/integrations/models" className="text-primary hover:underline">
+                        AI providers
+                    </Link>
+                    .
                 </p>
             </div>
             <IntegrationsView cards={cards} />

@@ -43,6 +43,7 @@ import {
     Settings,
     ShieldCheck,
     SlidersHorizontal,
+    Sparkles,
     SquareCheckBig,
     Star,
     Store,
@@ -299,6 +300,26 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             keywords: ["attachments", "files", "storage", "nas", "size limit", "avatars", "profile photos", "gravatar"]
         },
         { label: "Integrations", href: "/integrations", icon: Blocks, keywords: ["github", "cloudflare", "connect"] },
+        {
+            label: "AI providers",
+            href: "/integrations/models",
+            icon: Sparkles,
+            keywords: [
+                "models",
+                "anthropic",
+                "claude",
+                "openai",
+                "gemini",
+                "grok",
+                "deepseek",
+                "kimi",
+                "groq",
+                "cerebras",
+                "openrouter",
+                "api key",
+                "agents"
+            ]
+        },
         { label: "Updates & settings", href: "/settings", icon: Settings, keywords: ["version", "upgrade"] }
     ]
 };

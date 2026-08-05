@@ -130,7 +130,7 @@ export function ReposView({ repos, providers }: { repos: AgentRepoView[]; provid
             {providers.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
                     No model provider is connected yet, so runs will fail asking for a key.{" "}
-                    <Link href="/integrations" className="underline">
+                    <Link href="/integrations/models" className="underline">
                         Connect one
                     </Link>
                     .

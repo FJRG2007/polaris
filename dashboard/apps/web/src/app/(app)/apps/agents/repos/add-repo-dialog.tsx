@@ -3,19 +3,18 @@
 import { runAction } from "@/lib/run-action";
 import { ExecutionPicker } from "./execution-picker";
 import { useEffect, useState, useTransition } from "react";
+import { MODEL_INTEGRATIONS } from "@/lib/integrations/registry";
 import { adviseRepoAction, enableRepoAction, listAgentRepoChoices } from "../actions";
-import { AGENT_EFFORTS, defaultShellPolicy, type AgentExecution, type ExecutionAdvice } from "@polaris/core";
 import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, Select } from "@polaris/ui";
+import { AGENT_EFFORTS, defaultShellPolicy, type AgentExecution, type ExecutionAdvice } from "@polaris/core";
 
-/** Models offered by default, one per provider Polaris carries a credential for.
- *  A slug the runtime gained later still works: the field accepts any well-formed
- *  one, and an unknown model fails at dispatch naming itself. */
-const MODELS: Record<string, { label: string; slug: string }> = {
-    anthropic: { label: "Claude (Anthropic)", slug: "anthropic/claude-opus" },
-    openai: { label: "GPT (OpenAI)", slug: "openai/gpt-luna" },
-    "google-ai": { label: "Gemini (Google)", slug: "google/gemini-3.1-flash-lite" },
-    openrouter: { label: "OpenRouter", slug: "openrouter/minimax-m2.5" }
-};
+/** One model offered per connected provider, from the same catalog the AI
+ *  providers screen is built from. A slug the runtime gained later still works:
+ *  the field accepts any well-formed one, and an unknown model fails at dispatch
+ *  naming itself. */
+const MODELS: Record<string, { label: string; slug: string }> = Object.fromEntries(
+    MODEL_INTEGRATIONS.flatMap((entry) => (entry.defaultModel ? [[entry.slug, entry.defaultModel] as const] : []))
+);
 
 /**
  * Turning the agent on for a repository.

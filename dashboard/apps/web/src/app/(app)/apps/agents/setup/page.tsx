@@ -46,9 +46,9 @@ export default async function AgentSetupPage() {
                 <Step
                     done={modelReady}
                     title="Connect a model provider"
-                    body="Your own key with Anthropic, OpenAI, Google or OpenRouter, or an OpenAI-compatible gateway. Polaris hands it to a run over an authenticated call and never writes a copy into your repositories, so rotating it here takes effect everywhere."
-                    href="/integrations"
-                    action="Open Integrations"
+                    body="Your own key with Anthropic, OpenAI, Google, xAI, DeepSeek, Moonshot, Groq, Cerebras or OpenRouter, or an OpenAI-compatible gateway. Polaris hands it to a run over an authenticated call and never writes a copy into your repositories, so rotating it here takes effect everywhere."
+                    href="/integrations/models"
+                    action="Open AI providers"
                 />
                 <Step
                     done={repoReady}

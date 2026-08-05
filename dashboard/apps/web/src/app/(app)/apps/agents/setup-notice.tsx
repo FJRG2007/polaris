@@ -54,8 +54,8 @@ export async function SetupNotice() {
         return (
             <Notice>
                 No model provider is connected, so a run has nothing to think with. Add one under{" "}
-                <Link href="/integrations" className="underline">
-                    Integrations
+                <Link href="/integrations/models" className="underline">
+                    AI providers
                 </Link>
                 . The key stays here and is never copied into your repositories.
             </Notice>

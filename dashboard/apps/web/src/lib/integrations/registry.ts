@@ -48,6 +48,10 @@ export interface IntegrationCatalogEntry {
     requiresApiKey: boolean;
     apiKeyLabel?: string;
     apiKeyHelp?: string;
+    /** Models only: what a repository runs on when this is the provider picked.
+     *  One sensible default each, so connecting a key is the whole setup - the
+     *  field still accepts any specifier the runtime understands. */
+    defaultModel?: { label: string; slug: string };
 }
 
 /** What to do when a scan integration flags an uploaded file. */
@@ -115,6 +119,39 @@ export function readDymoConfig(config: Record<string, unknown> | undefined): Dym
     return {
         verifyAccessIp: config?.verifyAccessIp !== false,
         deny: deny.length > 0 ? deny : DYMO_DEFAULTS.deny
+    };
+}
+
+/**
+ * The gateway's non-secret settings.
+ *
+ * An OpenAI-compatible endpoint brings no catalog with it, so everything a
+ * provider would normally publish has to be stated here: which model to ask for
+ * and how much it can hold. The two limits are not optional - a run that does
+ * not know them caps its answers at 32000 tokens and turns compaction off for
+ * the whole run, which reads as the agent giving up halfway.
+ */
+export interface GatewayConfig {
+    /** The endpoint's OpenAI-compatible base URL, e.g. https://host/v1. */
+    baseUrl: string;
+    /** The model id the endpoint serves. */
+    model: string;
+    /** Context window, in tokens. */
+    context: number;
+    /** Largest answer, in tokens. */
+    maxOutput: number;
+}
+
+/** Read a stored gateway config. Missing numbers come back as 0, which is what
+ *  the dialog and the save action both treat as "not set yet". */
+export function readGatewayConfig(config: Record<string, unknown> | undefined): GatewayConfig {
+    const text = (value: unknown): string => (typeof value === "string" ? value : "");
+    const count = (value: unknown): number => (typeof value === "number" && value > 0 ? Math.floor(value) : 0);
+    return {
+        baseUrl: text(config?.baseUrl),
+        model: text(config?.model),
+        context: count(config?.context),
+        maxOutput: count(config?.maxOutput)
     };
 }
 
@@ -248,7 +285,8 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         setupLinks: [{ label: "Create an API key", url: "https://console.anthropic.com/settings/keys" }],
         requiresApiKey: true,
         apiKeyLabel: "API key",
-        apiKeyHelp: "Starts with sk-ant-. Needs no particular scope."
+        apiKeyHelp: "Starts with sk-ant-. Needs no particular scope.",
+        defaultModel: { label: "Claude (Anthropic)", slug: "anthropic/claude-opus" }
     },
     {
         slug: "openai",
@@ -261,7 +299,8 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         setupLinks: [{ label: "Create an API key", url: "https://platform.openai.com/api-keys" }],
         requiresApiKey: true,
         apiKeyLabel: "API key",
-        apiKeyHelp: "A project key works. Give it access to the models you want agents to use."
+        apiKeyHelp: "A project key works. Give it access to the models you want agents to use.",
+        defaultModel: { label: "GPT (OpenAI)", slug: "openai/gpt-luna" }
     },
     {
         slug: "google-ai",
@@ -274,7 +313,73 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         setupLinks: [{ label: "Create an API key", url: "https://aistudio.google.com/apikey" }],
         requiresApiKey: true,
         apiKeyLabel: "API key",
-        apiKeyHelp: "From AI Studio, not a Google Cloud service account."
+        apiKeyHelp: "From AI Studio, not a Google Cloud service account.",
+        defaultModel: { label: "Gemini (Google)", slug: "google/gemini-3.1-flash-lite" }
+    },
+    {
+        slug: "xai",
+        name: "xAI",
+        category: "Models",
+        summary: "Run agents on Grok models.",
+        description:
+            "Connects your xAI account so agents can run on Grok. The key is held here and handed to a run over an authenticated call, never copied into your repositories. Usage is billed by xAI directly.",
+        docsUrl: "https://docs.x.ai/",
+        setupLinks: [{ label: "Create an API key", url: "https://console.x.ai/" }],
+        requiresApiKey: true,
+        apiKeyLabel: "API key",
+        defaultModel: { label: "Grok (xAI)", slug: "xai/grok" }
+    },
+    {
+        slug: "deepseek",
+        name: "DeepSeek",
+        category: "Models",
+        summary: "Run agents on DeepSeek models.",
+        description:
+            "Connects your DeepSeek account so agents can run on its coding and reasoning models, which cost a fraction of the frontier ones. The key is held here and handed to a run over an authenticated call, never copied into your repositories.",
+        docsUrl: "https://api-docs.deepseek.com/",
+        setupLinks: [{ label: "Create an API key", url: "https://platform.deepseek.com/api_keys" }],
+        requiresApiKey: true,
+        apiKeyLabel: "API key",
+        defaultModel: { label: "DeepSeek Pro", slug: "deepseek/deepseek-pro" }
+    },
+    {
+        slug: "moonshot",
+        name: "Moonshot AI",
+        category: "Models",
+        summary: "Run agents on Kimi models.",
+        description:
+            "Connects your Moonshot AI account so agents can run on Kimi. The key is held here and handed to a run over an authenticated call, never copied into your repositories. Usage is billed by Moonshot directly.",
+        docsUrl: "https://platform.moonshot.ai/docs",
+        setupLinks: [{ label: "Create an API key", url: "https://platform.moonshot.ai/console/api-keys" }],
+        requiresApiKey: true,
+        apiKeyLabel: "API key",
+        defaultModel: { label: "Kimi K3 (Moonshot AI)", slug: "moonshotai/kimi-k3" }
+    },
+    {
+        slug: "groq",
+        name: "Groq",
+        category: "Models",
+        summary: "Open models, answered in a fraction of the time.",
+        description:
+            "Connects your Groq account so agents can run on the open models it serves (GPT OSS, Qwen, Llama) at speeds no other provider matches. Good for the runs where waiting costs more than the tokens do. Usage is billed by Groq directly.",
+        docsUrl: "https://console.groq.com/docs/overview",
+        setupLinks: [{ label: "Create an API key", url: "https://console.groq.com/keys" }],
+        requiresApiKey: true,
+        apiKeyLabel: "API key",
+        defaultModel: { label: "GPT OSS 120B (Groq)", slug: "groq/openai/gpt-oss-120b" }
+    },
+    {
+        slug: "cerebras",
+        name: "Cerebras",
+        category: "Models",
+        summary: "Open models on wafer-scale hardware.",
+        description:
+            "Connects your Cerebras account so agents can run on the open models it serves (GLM, GPT OSS, Gemma). Like Groq, it trades the frontier models for speed. Usage is billed by Cerebras directly.",
+        docsUrl: "https://inference-docs.cerebras.ai/",
+        setupLinks: [{ label: "Create an API key", url: "https://cloud.cerebras.ai/platform/" }],
+        requiresApiKey: true,
+        apiKeyLabel: "API key",
+        defaultModel: { label: "GLM 4.7 (Cerebras)", slug: "cerebras/zai-glm-4.7" }
     },
     {
         slug: "openrouter",
@@ -287,7 +392,8 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         setupLinks: [{ label: "Create an API key", url: "https://openrouter.ai/settings/keys" }],
         requiresApiKey: true,
         apiKeyLabel: "API key",
-        apiKeyHelp: "Starts with sk-or-. Set a spend limit on it if you want a ceiling."
+        apiKeyHelp: "Starts with sk-or-. Set a spend limit on it if you want a ceiling.",
+        defaultModel: { label: "MiniMax M2.5 (OpenRouter)", slug: "openrouter/minimax-m2.5" }
     },
     {
         slug: "enigma",
@@ -299,7 +405,8 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         docsUrl: "https://github.com/FJRG2007/enigma",
         requiresApiKey: true,
         apiKeyLabel: "Token",
-        apiKeyHelp: "Whatever the endpoint expects. Leave it blank if it accepts unauthenticated calls from this network."
+        apiKeyHelp: "Whatever the endpoint expects. Leave it blank if it accepts unauthenticated calls from this network.",
+        defaultModel: { label: "Your gateway's model", slug: "openai-compatible/byok" }
     }
 ];
 
@@ -307,3 +414,11 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
 export function findIntegration(slug: string): IntegrationCatalogEntry | undefined {
     return INTEGRATIONS.find((entry) => entry.slug === slug);
 }
+
+/** The model providers agents run on. Their own screen, because they are a
+ *  different job from connecting a service and there are more of them than of
+ *  everything else put together. */
+export const MODEL_INTEGRATIONS = INTEGRATIONS.filter((entry) => entry.category === "Models");
+
+/** The rest of the marketplace. */
+export const SERVICE_INTEGRATIONS = INTEGRATIONS.filter((entry) => entry.category !== "Models");

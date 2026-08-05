@@ -11,6 +11,7 @@ import {
     Mail,
     Settings,
     ShieldCheck,
+    Sparkles,
     Users,
     UsersRound
 } from "lucide-react";
@@ -54,6 +55,12 @@ const SECTIONS = [
         icon: Blocks,
         title: "Integrations",
         description: "Third-party services (label printing, file scanning)."
+    },
+    {
+        href: "/integrations/models",
+        icon: Sparkles,
+        title: "AI providers",
+        description: "The model providers agents run on, and your key with each."
     },
     {
         href: "/settings",

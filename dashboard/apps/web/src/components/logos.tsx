@@ -1,13 +1,39 @@
 /**
- * Brand logos for integrations, as inline single-path SVGs (official marks from
- * the Simple Icons set) so they inherit color via `currentColor` and ship with no
- * external requests. Add a new mark here when adding an integration.
+ * Brand logos for integrations, as inline SVG (each vendor's official mark) so
+ * they inherit color via `currentColor` and ship with no external requests. Add
+ * a new mark here when adding an integration.
  */
 
 import { cn } from "@polaris/ui";
 import { Blocks } from "lucide-react";
 import { DymoMark } from "./dymo-mark";
+import type { ComponentType } from "react";
 import { CloudflareMark, GitHubMark, GoogleMark, NgrokMark } from "./brand-icons";
+import {
+    AnthropicMark,
+    CerebrasMark,
+    DeepSeekMark,
+    GeminiMark,
+    GroqMark,
+    MoonshotMark,
+    OpenAiMark,
+    OpenRouterMark,
+    XaiMark
+} from "./model-marks";
+
+/** The Models catalog, keyed by its integration slug. Kept as a map because that
+ *  list grows with every provider a run can be handed a key for. */
+const MODEL_MARKS: Record<string, ComponentType<{ className?: string }>> = {
+    anthropic: AnthropicMark,
+    openai: OpenAiMark,
+    "google-ai": GeminiMark,
+    xai: XaiMark,
+    deepseek: DeepSeekMark,
+    moonshot: MoonshotMark,
+    groq: GroqMark,
+    cerebras: CerebrasMark,
+    openrouter: OpenRouterMark
+};
 
 interface LogoProps {
     className?: string;
@@ -40,5 +66,7 @@ export function IntegrationLogo({ slug, className }: { slug: string; className?:
     if (slug === "dymo") return <DymoMark className={className} />;
     // DuckDNS ships only an official raster mark; served from public/ as a static asset.
     if (slug === "duckdns") return <img src="/logos/duckdns.webp" alt="" className={cn("shrink-0", className)} />;
+    const ModelMark = MODEL_MARKS[slug];
+    if (ModelMark) return <ModelMark className={className} />;
     return <Blocks className={className} />;
 }
