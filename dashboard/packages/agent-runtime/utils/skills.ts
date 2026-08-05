@@ -27,16 +27,41 @@ const BUNDLED_SKILL_NAMES = ["git-archaeology"] as const;
  * the bundled-mode copy is produced by an esbuild post-build step in
  * `esbuild.config.js`.
  */
-function resolveSkillPath(name: string): string {
+function resolveSkillPath(name: string): string | null {
   const here = dirname(fileURLToPath(import.meta.url));
   const candidates = [
     join(here, "..", "skills", name, "SKILL.md"),
     join(here, "skills", name, "SKILL.md"),
   ];
-  for (const candidate of candidates) {
-    if (existsSync(candidate)) return candidate;
+  return candidates.find((candidate) => existsSync(candidate)) ?? null;
+}
+
+/**
+ * Polaris departure: the skills, as esbuild inlined them.
+ *
+ * Polaris serves the runtime as two `.mjs` files over HTTP, so nothing is ever
+ * on disk beside it and the paths above resolve to nothing. `typeof` on an
+ * undeclared identifier is safe in JS, so the source path - where `define` never
+ * ran - falls through to reading the directory exactly as it did.
+ */
+declare const __POLARIS_BUNDLED_SKILLS__: string | undefined;
+
+function inlinedSkill(name: string): string | null {
+  try {
+    if (typeof __POLARIS_BUNDLED_SKILLS__ !== "string") return null;
+    const all = JSON.parse(__POLARIS_BUNDLED_SKILLS__) as Record<string, string>;
+    return all[name] ?? null;
+  } catch {
+    return null;
   }
-  throw new Error(`bundled skill not found: ${name} (looked in ${candidates.join(", ")})`);
+}
+
+/** A skill's text, from the bundle first and then from disk. */
+function readSkill(name: string): string | null {
+  const inlined = inlinedSkill(name);
+  if (inlined !== null) return inlined;
+  const path = resolveSkillPath(name);
+  return path === null ? null : readFileSync(path, "utf8");
 }
 
 /**
@@ -60,15 +85,24 @@ const SKILL_TARGET_DIRS = [".opencode/skills", ".claude/skills", ".agents/skills
  * writes), no network, idempotent.
  */
 export function installBundledSkills(params: { home: string }): void {
+  const installed: string[] = [];
   for (const name of BUNDLED_SKILL_NAMES) {
-    const content = readFileSync(resolveSkillPath(name), "utf8");
+    const content = readSkill(name);
+    if (content === null) {
+      // Polaris departure: a warning, not a throw. This used to end the run, so
+      // a guidance file the packaging failed to carry took down every run in the
+      // deployment - the agent works without it, worse but not at all.
+      log.warning(`skill not found, continuing without it: ${name}`);
+      continue;
+    }
     for (const targetDir of SKILL_TARGET_DIRS) {
       const skillDir = join(params.home, targetDir, name);
       mkdirSync(skillDir, { recursive: true });
       writeFileSync(join(skillDir, "SKILL.md"), content);
     }
+    installed.push(name);
   }
-  log.success(`installed bundled skills: ${BUNDLED_SKILL_NAMES.join(", ")}`);
+  if (installed.length > 0) log.success(`installed bundled skills: ${installed.join(", ")}`);
 }
 
 /**

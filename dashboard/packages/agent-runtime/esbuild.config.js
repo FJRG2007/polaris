@@ -15,7 +15,28 @@
  */
 
 import { build } from "esbuild";
-import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { cpSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+
+/**
+ * The skills, inlined into the bundle.
+ *
+ * Polaris departure. Upstream ships these as files beside the bundle and the
+ * runtime reads them off disk, which works when the runtime is an npm package
+ * on the runner. Polaris serves the bundle as two `.mjs` files over HTTP, so
+ * nothing is ever beside it - every run died with "bundled skill not found" and
+ * the paths it had looked in. Anything the runtime needs has to be inside the
+ * file, not next to it.
+ *
+ * Read at build time and handed to the bundle as one JSON string, which the
+ * source path ignores: `skills.ts` still falls back to reading the directory, so
+ * running from source behaves exactly as it did.
+ */
+const bundledSkills = Object.fromEntries(
+    readdirSync("./skills", { withFileTypes: true })
+        .filter((entry) => entry.isDirectory())
+        .map((entry) => [entry.name, readFileSync(join("skills", entry.name, "SKILL.md"), "utf8")])
+);
 
 rmSync("./dist/runtime.mjs", { force: true });
 rmSync("./dist/post.mjs", { force: true });
@@ -53,6 +74,10 @@ const shared = {
     // Optional peer dependencies of the schema libraries. Nothing imports them,
     // and marking them external is what stops esbuild failing on the absence.
     external: ["@valibot/to-json-schema", "effect", "sury"],
+    // Doubly stringified on purpose: `define` substitutes source text, so the
+    // value has to be a JS expression - here, a string literal the runtime
+    // parses.
+    define: { __POLARIS_BUNDLED_SKILLS__: JSON.stringify(JSON.stringify(bundledSkills)) },
     // CommonJS dependencies get bundled into an ESM output, so they need these
     // three globals to exist. The names are prefixed to avoid colliding with
     // anything the bundle itself declares.
