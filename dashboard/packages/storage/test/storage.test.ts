@@ -7,6 +7,7 @@ import { LIMITED_CAPABILITIES, type Capabilities } from "@polaris/config";
 import { decryptCredentials, encryptCredentials } from "../src/crypto.js";
 import { createDriver } from "../src/registry.js";
 import { LocalDriver } from "../src/drivers/local.js";
+import { SftpDriver } from "../src/drivers/sftp.js";
 
 /** A 32-byte key, base64-encoded, for the crypto tests. */
 const MASTER_KEY = Buffer.alloc(32, 7).toString("base64");
@@ -69,6 +70,39 @@ describe("local driver", () => {
 
         await driver.delete("docs", { recursive: true });
         await expect(driver.stat("docs")).rejects.toThrow();
+    });
+});
+
+describe("sftp driver paths", () => {
+    /** Stand in for the ssh2 SFTP channel, recording the paths it is asked for. */
+    function driverOnFakeChannel(root: string, seen: string[]): SftpDriver {
+        const driver = new SftpDriver({ id: "test", host: "h", port: 22, username: "u", root });
+        const channel = {
+            readdir(path: string, callback: (error: Error | null, list: unknown[]) => void) {
+                seen.push(path);
+                callback(null, []);
+            }
+        };
+        (driver as unknown as { sftp: unknown }).sftp = channel;
+        return driver;
+    }
+
+    it("lists a server's filesystem root as / rather than an empty path", async () => {
+        // A server browsed over SFTP has root "/". Sending "" made every listing
+        // of the root fail with "no such file", so Drive never opened a server.
+        const seen: string[] = [];
+        const driver = driverOnFakeChannel("/", seen);
+        await driver.list("");
+        await driver.list("etc");
+        expect(seen).toEqual(["/", "/etc"]);
+    });
+
+    it("keeps a rooted connection under its root", async () => {
+        const seen: string[] = [];
+        const driver = driverOnFakeChannel("/volume1/share/", seen);
+        await driver.list("");
+        await driver.list("docs");
+        expect(seen).toEqual(["/volume1/share", "/volume1/share/docs"]);
     });
 });
 
