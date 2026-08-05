@@ -9,6 +9,7 @@ import { prisma } from "@polaris/db";
 import { readFileSync } from "node:fs";
 import { loadEnv } from "@polaris/config";
 import type { SshAuth } from "@polaris/ssh";
+import { borrowSsh } from "@/lib/ssh-pool";
 import { getHostConnection } from "./host-service";
 import { HostdClient } from "@polaris/hostd-client";
 import { decryptCredentials, encryptCredentials } from "@polaris/storage";
@@ -76,7 +77,7 @@ async function loadDockerConnection(
 
 export async function getDockerDriver(connectionId: string, ownerId: string) {
     const record: DockerConnectionRecord = await loadDockerConnection(connectionId, ownerId);
-    return createDockerDriver(record);
+    return createDockerDriver(record, { borrowSsh: (key, options) => borrowSsh("docker", key, options) });
 }
 
 export async function createDockerConnection(
@@ -112,7 +113,11 @@ export const HOST_DOCKER_PREFIX = "host:";
 /** Docker driver for a global Host, over SSH via the shared, pinned primitive. */
 export async function hostDockerDriver(hostId: string, ownerId: string): Promise<DockerDriver> {
     const conn = await getHostConnection(hostId, ownerId);
-    return new DockerDriver(streamRpc(sshTransport(hostSshTransportOptions(conn))));
+    const options = hostSshTransportOptions(conn);
+    // Borrowed from the pool: listing containers, reading stats and following logs
+    // are separate calls to the same machine, and each one opening its own SSH
+    // connection is most of what they cost.
+    return new DockerDriver(streamRpc(sshTransport({ ...options, borrow: () => borrowSsh("docker", conn.id, options) })));
 }
 
 function hostSshTransportOptions(conn: Awaited<ReturnType<typeof getHostConnection>>) {

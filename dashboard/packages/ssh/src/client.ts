@@ -15,6 +15,19 @@ import type { ConnectConfig } from "ssh2";
 
 const DEFAULT_READY_TIMEOUT_MS = 15_000;
 
+/**
+ * How often a connection with nothing to say proves it is still there, and how
+ * many unanswered probes it takes to call it dead.
+ *
+ * A pooled connection spends most of its life idle between operations, which is
+ * exactly what a NAT table or a firewall silently forgets. Without a keepalive the
+ * next borrow inherits a socket that looks open and answers nothing until the
+ * operation times out; with one, the connection either stays warm or dies and is
+ * evicted, and the borrow reconnects.
+ */
+const KEEPALIVE_INTERVAL_MS = 20_000;
+const KEEPALIVE_COUNT_MAX = 3;
+
 /** Auth material. `password` uses a password; `key` uses a private key with an
  *  optional passphrase for an encrypted key. */
 export interface SshAuth {
@@ -96,6 +109,8 @@ function buildConnectConfig(options: SshConnectOptions): ConnectConfig {
         port: options.port,
         username: options.username,
         readyTimeout: options.readyTimeoutMs ?? DEFAULT_READY_TIMEOUT_MS,
+        keepaliveInterval: KEEPALIVE_INTERVAL_MS,
+        keepaliveCountMax: KEEPALIVE_COUNT_MAX,
         hostVerifier: (key: Buffer): boolean => {
             const presented = key.toString("base64");
             options.onHostKey?.(presented);

@@ -21,6 +21,7 @@ import { useRouter } from "next/navigation";
 import { formatBytes } from "@polaris/core";
 import { keyboardIsBusy } from "@/lib/keyboard";
 import { ArchiveDialog } from "./archive-dialog";
+import { prefetchListing } from "./listing-cache";
 import { useDriveInsights } from "./use-drive-insights";
 import { SelectionZipMenu } from "./selection-zip-menu";
 import { useVirtualizer } from "@tanstack/react-virtual";
@@ -837,6 +838,8 @@ export function FilesView({
     /** Drag-and-drop handlers that turn a breadcrumb segment into a move target. */
     function segmentDropProps(targetPath: string) {
         return {
+            // Walking back up is the most predictable navigation there is.
+            onPointerEnter: () => prefetchListing(connectionId, targetPath),
             onDragOver: (event: React.DragEvent) => {
                 if (dragPath.current === null) return;
                 event.preventDefault();
@@ -861,6 +864,11 @@ export function FilesView({
             !entry.path.startsWith(`${source}/`);
         return {
             draggable: !isRenaming,
+            // The cursor settling on a folder is the cheapest warning that it is
+            // about to be opened, and a listing fetched now is a listing nobody
+            // waits for. Files have nothing to prefetch.
+            onPointerEnter:
+                entry.kind === "dir" ? () => prefetchListing(connectionId, entry.path) : undefined,
             onDragStart: (event: React.DragEvent) => {
                 dragPath.current = entry.path;
                 event.dataTransfer.setData("application/x-polaris-path", entry.path);

@@ -9,6 +9,7 @@
 
 import { prisma } from "@polaris/db";
 import { loadEnv } from "@polaris/config";
+import { dropSshConnections } from "@/lib/ssh-pool";
 import { testAndCaptureHostKey, type SshAuth } from "@polaris/ssh";
 import { isBaseDomain, normalizeBaseDomain } from "@polaris/deploy";
 import { decryptSecret, encryptCredentials, type EncryptedBlob } from "@polaris/storage";
@@ -158,6 +159,10 @@ export async function setHostWildcardDomain(ownerId: string, hostId: string, dom
 
 export async function deleteHost(ownerId: string, hostId: string): Promise<void> {
     await prisma.host.deleteMany({ where: { id: hostId, ownerId } });
+    // Connections are pooled and outlive a single request, so a machine that is no
+    // longer Polaris's must have its open sessions closed here rather than waiting
+    // for an idle sweep to notice.
+    dropSshConnections(hostId);
 }
 
 /**

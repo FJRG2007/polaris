@@ -1,14 +1,21 @@
 /**
  * SFTP driver. Serves a remote filesystem over SSH - the practical way to connect
  * a NAS (UniFi UNAS, Synology, etc.) in the limited edition, since it needs no
- * kernel mount and no host daemon, just SSH access. One ssh2 connection backs the
- * driver; reads and writes stream through the SFTP channel without buffering, and
- * every user path is confined under the connection root before it is used.
+ * kernel mount and no host daemon, just SSH access. Reads and writes stream
+ * through the SFTP channel without buffering, and every user path is confined
+ * under the connection root before it is used.
+ *
+ * The connection is either the driver's own (`SftpConnectOptions`, which opens and
+ * closes it) or borrowed (`SftpSessionOptions`, where a caller with a connection
+ * pool lends a channel and gets it back on `dispose`). Borrowing is what the
+ * control plane does: a handshake costs far more than the listing that follows it,
+ * so paying one per request is the difference between browsing a server and
+ * waiting on it.
  */
 
 import { Readable } from "node:stream";
 import type { Client, SFTPWrapper } from "ssh2";
-import { openSshClient } from "@polaris/ssh";
+import { openSftp, openSshClient } from "@polaris/ssh";
 import { baseName, joinUnderRoot, normalizeRelPath } from "@polaris/core";
 import {
     StorageError,
@@ -30,12 +37,17 @@ const SFTP_CAPABILITIES: StorageDriverCapabilities = {
     requiresHostd: false
 };
 
-export interface SftpDriverOptions {
+interface SftpDriverBase {
     readonly id: string;
+    readonly root: string;
+}
+
+/** Options for a driver that owns its connection: it opens one on `connect` and
+ *  ends it on `dispose`. */
+export interface SftpConnectOptions extends SftpDriverBase {
     readonly host: string;
     readonly port: number;
     readonly username: string;
-    readonly root: string;
     readonly password?: string;
     readonly privateKey?: string;
     readonly passphrase?: string;
@@ -44,6 +56,21 @@ export interface SftpDriverOptions {
     readonly pinnedHostKey?: string;
     /** Receives the server key (base64) on connect, for trust-on-add capture. */
     readonly onHostKey?: (hostKey: string) => void;
+}
+
+/** Options for a driver over somebody else's connection. `session` lends a channel
+ *  and `endSession` takes it back, so `dispose` leaves the connection open for the
+ *  next operation instead of paying a handshake per request. */
+export interface SftpSessionOptions extends SftpDriverBase {
+    readonly session: () => Promise<SFTPWrapper>;
+    readonly endSession?: () => void;
+}
+
+export type SftpDriverOptions = SftpConnectOptions | SftpSessionOptions;
+
+/** Whether these options lend a session rather than describe a connection. */
+function isBorrowed(options: SftpDriverOptions): options is SftpSessionOptions {
+    return "session" in options;
 }
 
 export class SftpDriver implements StorageDriver {
@@ -64,6 +91,12 @@ export class SftpDriver implements StorageDriver {
     }
 
     public async connect(): Promise<void> {
+        // A lent session is already authenticated; opening a channel on it is one
+        // round trip against the handshake this skips.
+        if (isBorrowed(this.options)) {
+            this.sftp = await this.options.session();
+            return;
+        }
         // Auth method follows the material provided: a private key when present,
         // otherwise a password. Host-key pinning + auth live in @polaris/ssh.
         const auth = this.options.privateKey
@@ -88,13 +121,14 @@ export class SftpDriver implements StorageDriver {
             throw new StorageError("connection_failed", `SSH connection failed: ${message}`);
         }
         this.client = client;
-        this.sftp = await new Promise<SFTPWrapper>((resolve, reject) => {
-            client.sftp((error, sftp) => (error ? reject(error) : resolve(sftp)));
-        });
+        this.sftp = await openSftp(client);
     }
 
     public async dispose(): Promise<void> {
-        this.client?.end();
+        // A borrowed session goes back to its lender, which decides when the
+        // connection closes; only a connection this driver opened is ended here.
+        if (isBorrowed(this.options)) this.options.endSession?.();
+        else this.client?.end();
         this.client = undefined;
         this.sftp = undefined;
     }

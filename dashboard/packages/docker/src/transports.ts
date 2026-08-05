@@ -52,6 +52,12 @@ export function tcpTransport(options: TcpTransportOptions): DockerTransportConn 
     };
 }
 
+/** A connection somebody else owns, lent for the life of this transport. */
+export interface SshTransportLease {
+    readonly client: Client;
+    release(): void;
+}
+
 export interface SshTransportOptions {
     readonly host: string;
     readonly port: number;
@@ -59,16 +65,29 @@ export interface SshTransportOptions {
     readonly auth: SshAuth;
     /** Pinned server public key(s), base64. SSH is refused without at least one. */
     readonly pinnedHostKey?: string | string[];
+    /**
+     * Injected by a caller that pools connections. A Docker call is one channel on
+     * a connection whose handshake costs more than the call, and a screen full of
+     * containers makes several - so `close` gives the connection back instead of
+     * ending it, and the next call finds it open.
+     */
+    readonly borrow?: () => Promise<SshTransportLease>;
 }
 
 export function sshTransport(options: SshTransportOptions): DockerTransportConn {
     let client: Client | undefined;
+    let lease: SshTransportLease | undefined;
 
     async function ensureClient(): Promise<Client> {
         if (client) return client;
         const pins = options.pinnedHostKey;
         if (!pins || (Array.isArray(pins) && pins.length === 0)) {
             throw new Error("Refusing SSH: no pinned host key");
+        }
+        if (options.borrow) {
+            lease = await options.borrow();
+            client = lease.client;
+            return client;
         }
         client = await openSshClient({
             host: options.host,
@@ -93,7 +112,9 @@ export function sshTransport(options: SshTransportOptions): DockerTransportConn 
             });
         },
         close: async () => {
-            client?.end();
+            if (lease) lease.release();
+            else client?.end();
+            lease = undefined;
             client = undefined;
         }
     };

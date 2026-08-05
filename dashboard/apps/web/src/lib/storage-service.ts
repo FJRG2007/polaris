@@ -14,6 +14,7 @@ import { getCapabilities, loadEnv } from "@polaris/config";
 import { canHostMount, requiresHostd } from "@polaris/core";
 import { grantedConnectionIds } from "@/lib/drive-acl-service";
 import { ContainerDriver } from "@/lib/deploy/container-driver";
+import { borrowSftp, type SftpLease } from "@/lib/ssh-pool";
 import { fetchUnasMetrics, type UnasMetrics } from "@/lib/unifi-unas";
 import { deleteMetricsForSubject } from "@/lib/metrics-history-service";
 import type { StorageConfig, StorageCredentials, StorageProviderKind } from "@polaris/core";
@@ -28,6 +29,7 @@ import {
     SftpDriver,
     SmbDriver,
     type ConnectionRecord,
+    type SftpSessionOptions,
     type StorageDriver
 } from "@polaris/storage";
 
@@ -68,16 +70,27 @@ async function buildHostSftpDriverUnscoped(hostId: string): Promise<StorageDrive
 }
 
 async function sftpDriverFor(conn: HostConnection): Promise<StorageDriver> {
+    // The connection is borrowed, not opened: the handshake costs far more than the
+    // listing that follows it, and a server is usually browsed several folders at a
+    // time. `dispose` gives the lease back; the pool decides when to close.
+    let lease: SftpLease | undefined;
     const driver = new SftpDriver({
         id: `${HOST_CONNECTION_PREFIX}${conn.id}`,
-        host: conn.address,
-        port: conn.port,
-        username: conn.username,
         root: "/",
-        password: conn.auth.method === "password" ? conn.auth.password : undefined,
-        privateKey: conn.auth.method === "key" ? conn.auth.privateKey : undefined,
-        passphrase: conn.auth.method === "key" ? conn.auth.passphrase : undefined,
-        pinnedHostKey: conn.hostKey
+        session: async () => {
+            lease = await borrowSftp("drive", conn.id, {
+                host: conn.address,
+                port: conn.port,
+                username: conn.username,
+                auth: conn.auth,
+                // As before: a server with a key on file is pinned to it, one
+                // without (added by a path that captured none) is trusted on first
+                // use. Tightening that is a separate change, not a side effect here.
+                pinnedHostKey: conn.hostKey
+            });
+            return lease.sftp;
+        },
+        endSession: () => lease?.release()
     });
     await driver.connect();
     return driver;
@@ -185,6 +198,32 @@ async function hostMountedDriver(row: ConnectionRow): Promise<StorageDriver | nu
     return driver;
 }
 
+/**
+ * Lend the registry a pooled SFTP session for a stored `sftp` connection, so a NAS
+ * reached over SSH re-authenticates as rarely as a server does. Keyed by connection
+ * id, which is what the pool needs to tell two connections to the same address (a
+ * different account, a different root) apart.
+ */
+function pooledSftpSession(record: ConnectionRecord): Pick<SftpSessionOptions, "session" | "endSession"> {
+    const config = record.config as Extract<StorageConfig, { kind: "sftp" }>;
+    const creds = record.credentials as Extract<StorageCredentials, { kind: "sftp" }>;
+    let lease: SftpLease | undefined;
+    return {
+        session: async () => {
+            lease = await borrowSftp("drive", record.id, {
+                host: config.host,
+                port: config.port ?? 22,
+                username: config.username,
+                auth: creds.privateKey
+                    ? { method: "key", privateKey: creds.privateKey, passphrase: creds.passphrase }
+                    : { method: "password", password: creds.password ?? "" }
+            });
+            return lease.sftp;
+        },
+        endSession: () => lease?.release()
+    };
+}
+
 /** Decrypt a row's credentials and build a connected driver for it. */
 async function buildDriver(row: ConnectionRow): Promise<StorageDriver> {
     const config = JSON.parse(row.config) as StorageConfig;
@@ -233,7 +272,8 @@ async function buildDriver(row: ConnectionRow): Promise<StorageDriver> {
     const capabilities = getCapabilities();
     const driver = createDriver(record, {
         capabilities: requiresHostd(record.kind) ? capabilities : { ...capabilities, nativeMounts: false },
-        hostdFactory: (rec) => new LocalDriver({ id: rec.id, root: `${HOSTD_MOUNT_ROOT}/${rec.id}` })
+        hostdFactory: (rec) => new LocalDriver({ id: rec.id, root: `${HOSTD_MOUNT_ROOT}/${rec.id}` }),
+        sftpSessionFactory: (rec) => pooledSftpSession(rec)
     });
     await driver.connect();
     return driver;

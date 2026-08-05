@@ -6,11 +6,17 @@
  * cached for the life of the dialog, so browsing a deep tree never re-hits the NAS
  * for a folder that was already opened. Only directories are shown - the picker
  * exists to choose a location, never a file.
+ *
+ * Branches come from the same listing cache the file view fills, so a folder just
+ * browsed opens here without a request - and one opened here is already paid for if
+ * the move lands in it.
  */
 
+import { cn } from "@polaris/ui";
+import type { DriveEntry } from "./types";
+import { readListing, writeListing } from "./listing-cache";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronRight, Folder, FolderOpen, Loader2, Lock } from "lucide-react";
-import { cn } from "@polaris/ui";
 
 interface FolderNode {
     name: string;
@@ -50,10 +56,25 @@ export function FolderTree({
     // Folders already requested, so an expand/collapse cycle does not refetch.
     const requested = useRef<Set<string>>(new Set());
 
+    /** The directories of a listing, as the tree shows them. */
+    const branchOf = useCallback(
+        (entries: DriveEntry[]): FolderNode[] =>
+            entries
+                .filter((entry) => entry.kind === "dir")
+                .map((entry) => ({ name: entry.name, path: entry.path, locked: Boolean(entry.locked) }))
+                .sort((a, b) => a.name.localeCompare(b.name)),
+        []
+    );
+
     const load = useCallback(
         async (path: string) => {
             if (requested.current.has(path)) return;
             requested.current.add(path);
+            const cached = readListing(connectionId, path);
+            if (cached) {
+                setChildren((prev) => ({ ...prev, [path]: branchOf(cached) }));
+                return;
+            }
             setLoading((prev) => new Set(prev).add(path));
             try {
                 const query = new URLSearchParams({ c: connectionId });
@@ -67,18 +88,9 @@ export function FolderTree({
                     setChildren((prev) => ({ ...prev, [path]: [] }));
                     return;
                 }
-                const entries = Array.isArray(body.entries) ? body.entries : [];
-                setChildren((prev) => ({
-                    ...prev,
-                    [path]: entries
-                        .filter((entry: { kind: string }) => entry.kind === "dir")
-                        .map((entry: { name: string; path: string; locked?: boolean }) => ({
-                            name: entry.name,
-                            path: entry.path,
-                            locked: Boolean(entry.locked)
-                        }))
-                        .sort((a: FolderNode, b: FolderNode) => a.name.localeCompare(b.name))
-                }));
+                const entries: DriveEntry[] = Array.isArray(body.entries) ? body.entries : [];
+                writeListing(connectionId, path, entries);
+                setChildren((prev) => ({ ...prev, [path]: branchOf(entries) }));
             } catch {
                 setChildren((prev) => ({ ...prev, [path]: [] }));
                 if (path === "") setError("Could not list this connection");
@@ -90,7 +102,7 @@ export function FolderTree({
                 });
             }
         },
-        [connectionId]
+        [connectionId, branchOf]
     );
 
     // Open the tree down to the pre-selected folder so the picker starts where the

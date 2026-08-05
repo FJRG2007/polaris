@@ -11,7 +11,7 @@ import { prefersHostd, requiresHostd } from "@polaris/core";
 import type { StorageConfig, StorageCredentials, StorageProviderKind } from "@polaris/core";
 import type { Capabilities } from "@polaris/config";
 import { LocalDriver } from "./drivers/local.js";
-import { SftpDriver } from "./drivers/sftp.js";
+import { SftpDriver, type SftpSessionOptions } from "./drivers/sftp.js";
 import { SmbDriver } from "./drivers/smb.js";
 import { StorageError, type StorageDriver } from "./driver.js";
 
@@ -26,9 +26,14 @@ export interface ConnectionRecord {
 /** Injected by the app to build a driver that forwards operations to the daemon. */
 export type HostdDriverFactory = (record: ConnectionRecord) => StorageDriver;
 
+/** Injected by the app to lend an SFTP connection it pools, instead of letting the
+ *  driver open and throw away one of its own per operation. */
+export type SftpSessionFactory = (record: ConnectionRecord) => Pick<SftpSessionOptions, "session" | "endSession">;
+
 export interface DriverDeps {
     readonly capabilities: Capabilities;
     readonly hostdFactory?: HostdDriverFactory;
+    readonly sftpSessionFactory?: SftpSessionFactory;
 }
 
 /**
@@ -56,6 +61,11 @@ export function createDriver(record: ConnectionRecord, deps: DriverDeps): Storag
         case "sftp": {
             const config = record.config as Extract<StorageConfig, { kind: "sftp" }>;
             const creds = record.credentials as Extract<StorageCredentials, { kind: "sftp" }>;
+            // A lent connection when the app pools them, so browsing a NAS over SFTP
+            // does not re-authenticate per listing either.
+            if (deps.sftpSessionFactory) {
+                return new SftpDriver({ id: record.id, root: config.root, ...deps.sftpSessionFactory(record) });
+            }
             return new SftpDriver({
                 id: record.id,
                 host: config.host,

@@ -14,8 +14,9 @@
  */
 
 import { prisma } from "@polaris/db";
+import { execCommand } from "@polaris/ssh";
+import { borrowSsh } from "@/lib/ssh-pool";
 import { getHostConnection } from "@/lib/host-service";
-import { execCommand, openSshClient } from "@polaris/ssh";
 import { parseProbe, PROBE, type ServerMetrics } from "@/lib/server-probe";
 
 /** Long enough that clicking between servers does not re-probe, short enough that
@@ -41,7 +42,9 @@ export async function getServerMetrics(hostId: string, ownerId: string, force = 
     if (!force && hit && Date.now() - hit.at < CACHE_TTL_MS) return hit.metrics;
 
     const connection = await getHostConnection(hostId, ownerId);
-    const client = await openSshClient({
+    // Borrowed rather than opened: a probe is one short command, and paying a
+    // handshake for it is most of what the probe costs.
+    const lease = await borrowSsh("exec", hostId, {
         host: connection.address,
         port: connection.port,
         username: connection.username,
@@ -54,14 +57,14 @@ export async function getServerMetrics(hostId: string, ownerId: string, force = 
 
     let output = "";
     try {
-        await execCommand(client, "sh -s", {
+        await execCommand(lease.client, "sh -s", {
             input: PROBE,
             onStdout: (chunk) => {
                 output += chunk.toString("utf8");
             }
         });
     } finally {
-        client.end();
+        lease.release();
     }
 
     const metrics = parseProbe(output);

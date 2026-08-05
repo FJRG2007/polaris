@@ -22,9 +22,11 @@
  */
 
 import type { Client } from "ssh2";
+import { execCommand } from "@polaris/ssh";
 import { quoteArg } from "@polaris/deploy";
+import { borrowSsh } from "@/lib/ssh-pool";
+import type { SshLease } from "@polaris/ssh";
 import type { RunnerRelease } from "./runner-release";
-import { execCommand, openSshClient } from "@polaris/ssh";
 import { getHostConnection, type HostConnection } from "@/lib/host-service";
 import { factsFromLog, JOB_FACTS_FILE, parseJobFacts, type RunnerIsolation } from "@polaris/core";
 import {
@@ -60,15 +62,21 @@ export interface RunResult {
 }
 
 /**
- * An open session on a machine that runs jobs. Held for the length of one
- * reconcile pass over a pool, so filling four slots costs one SSH handshake.
+ * A session on a machine that runs jobs, borrowed from the connection pool. Held
+ * for the length of one reconcile pass over a pool, so filling four slots costs one
+ * SSH handshake - and often not even that, since the pass after it reuses the same
+ * connection while the machine is still warm.
  */
 export class RunnerHost implements RunnerMachine {
     /** A registered server is driven through a login, which is what makes a
      *  workspace job - a directory on the machine itself - possible at all. */
     public readonly reach = "login" as const;
 
-    private constructor(private readonly client: Client) {}
+    private constructor(private readonly lease: SshLease) {}
+
+    private get client(): Client {
+        return this.lease.client;
+    }
 
     /** Connect to a registered server. Fails closed on the host key, like every
      *  other connection Polaris makes. */
@@ -79,18 +87,19 @@ export class RunnerHost implements RunnerMachine {
     /** Connect with credentials already in hand, so where they came from stays the
      *  caller's business and this class only ever deals in what to do once there. */
     public static async connect(host: HostConnection): Promise<RunnerHost> {
-        const client = await openSshClient({
-            host: host.address,
-            port: host.port,
-            username: host.username,
-            auth: host.auth,
-            pinnedHostKey: host.hostKey
-        });
-        return new RunnerHost(client);
+        return new RunnerHost(
+            await borrowSsh("exec", host.id, {
+                host: host.address,
+                port: host.port,
+                username: host.username,
+                auth: host.auth,
+                pinnedHostKey: host.hostKey
+            })
+        );
     }
 
     public close(): void {
-        this.client.end();
+        this.lease.release();
     }
 
     /** Run a POSIX script, optionally feeding it a secret on stdin. */

@@ -11,7 +11,13 @@ import { loadEnv } from "@polaris/config";
 import { DockerDriver } from "./driver.js";
 import { streamRpc } from "./rpc.js";
 import type { DockerConfig, DockerCredentials } from "./schema.js";
-import { socketTransport, sshTransport, tcpTransport } from "./transports.js";
+import {
+    socketTransport,
+    sshTransport,
+    tcpTransport,
+    type SshTransportLease,
+    type SshTransportOptions
+} from "./transports.js";
 
 export interface DockerConnectionRecord {
     readonly id: string;
@@ -19,7 +25,15 @@ export interface DockerConnectionRecord {
     readonly credentials: DockerCredentials;
 }
 
-export function createDockerDriver(record: DockerConnectionRecord): DockerDriver {
+export interface DockerDriverDeps {
+    /** Injected by a caller that pools SSH connections, so a Docker call over SSH
+     *  reuses the machine's open connection instead of handshaking for one channel.
+     *  The key identifies the connection; the options are what to open if there is
+     *  none yet. */
+    readonly borrowSsh?: (key: string, options: SshTransportOptions) => Promise<SshTransportLease>;
+}
+
+export function createDockerDriver(record: DockerConnectionRecord, deps: DockerDriverDeps = {}): DockerDriver {
     const config = record.config;
     switch (config.transport) {
         case "socket":
@@ -51,16 +65,16 @@ export function createDockerDriver(record: DockerConnectionRecord): DockerDriver
                 config.host,
                 config.port
             );
+            const options: SshTransportOptions = {
+                host: config.host,
+                port: config.port,
+                username: config.username,
+                auth: { method: "key", privateKey, passphrase: creds.passphrase },
+                pinnedHostKey
+            };
+            const borrow = deps.borrowSsh;
             return new DockerDriver(
-                streamRpc(
-                    sshTransport({
-                        host: config.host,
-                        port: config.port,
-                        username: config.username,
-                        auth: { method: "key", privateKey, passphrase: creds.passphrase },
-                        pinnedHostKey
-                    })
-                )
+                streamRpc(sshTransport({ ...options, borrow: borrow && (() => borrow(record.id, options)) }))
             );
         }
     }

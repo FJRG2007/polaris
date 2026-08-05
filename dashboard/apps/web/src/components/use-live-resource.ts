@@ -15,42 +15,14 @@
 
 import { mergeUnchanged } from "@/lib/structural-merge";
 import { useCallback, useEffect, useRef, useState } from "react";
-
-/** Cached snapshots are namespaced so one key cannot read another's shape. */
-const PREFIX = "polaris.live.";
+import { readSnapshot, writeSnapshot } from "@/lib/snapshot-cache";
 
 /** How stale a cached snapshot may be and still be worth painting. Past this it
  *  is more likely to mislead than to help, so the skeleton is shown instead. */
 const MAX_AGE_MS = 24 * 3_600_000;
 
-interface Cached<T> {
-    at: number;
-    value: T;
-}
-
-function read<T>(key: string): Cached<T> | null {
-    if (typeof sessionStorage === "undefined") return null;
-    try {
-        const raw = sessionStorage.getItem(`${PREFIX}${key}`);
-        if (!raw) return null;
-        const parsed = JSON.parse(raw) as Cached<T>;
-        if (typeof parsed?.at !== "number" || Date.now() - parsed.at > MAX_AGE_MS) return null;
-        return parsed;
-    } catch {
-        // A snapshot that will not parse is not worth recovering; the fetch below
-        // replaces it either way.
-        return null;
-    }
-}
-
-function write<T>(key: string, value: T): void {
-    if (typeof sessionStorage === "undefined") return;
-    try {
-        sessionStorage.setItem(`${PREFIX}${key}`, JSON.stringify({ at: Date.now(), value }));
-    } catch {
-        // Storage full or blocked: the panel still works, it just will not paint
-        // from cache next time.
-    }
+function read<T>(key: string): { at: number; value: T } | null {
+    return readSnapshot<T>(key, MAX_AGE_MS);
 }
 
 export interface LiveResource<T> {
@@ -137,7 +109,7 @@ export function useLiveResource<T>({
                 setData(merged);
                 setUpdatedAt(Date.now());
                 setError(null);
-                write(cacheKey, merged);
+                writeSnapshot(cacheKey, merged);
             })
             .catch((caught: unknown) => {
                 if (controller.signal.aborted) return;

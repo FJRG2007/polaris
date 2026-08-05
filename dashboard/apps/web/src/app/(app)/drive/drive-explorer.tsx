@@ -22,6 +22,7 @@ import { UnifiConsoleButton } from "./unifi-console-button";
 import { ShareDialog, type ShareTarget } from "./share-dialog";
 import { useLiveResource } from "@/components/use-live-resource";
 import { RemoveConnectionDialog } from "./remove-connection-dialog";
+import { dropListings, prefetchListing, readListing, writeListing } from "./listing-cache";
 import { RequestDialog, type RequestTarget } from "./request-dialog";
 import { ConnectionDialog, EditConnectionDialog } from "./connection-dialog";
 import { AccessDialog, UnlockPanel, type AccessTarget } from "./access-dialog";
@@ -164,6 +165,10 @@ export function DriveExplorer({
                 );
             } finally {
                 setOps((prev) => prev.filter((op) => op.id !== id));
+                // A write can change a folder other than the one on screen (a move
+                // or a copy has a destination), so no cached listing is trusted
+                // after one.
+                dropListings();
                 void load();
             }
         });
@@ -207,6 +212,14 @@ export function DriveExplorer({
                 setEntries([]);
                 return;
             }
+            // A folder visited moments ago (or prefetched on the way to it) paints
+            // now and is corrected by the answer below, so a navigation costs a
+            // remote listing but does not wait for one.
+            const cached = showSkeleton ? readListing(connectionId, path) : null;
+            if (cached) {
+                setEntries(cached);
+                showSkeleton = false;
+            }
             // A server that is not answering would take the connect timeout to
             // fail and come back as a generic error. The panel already says what
             // is wrong, so the request is not made at all.
@@ -239,6 +252,7 @@ export function DriveExplorer({
                     // or delete that already brought the list to this exact state.
                     const next = body.entries as DriveEntry[];
                     setEntries((prev) => (listingsEqual(prev, next) ? prev : next));
+                    writeListing(connectionId, path, next);
                 }
             } catch {
                 if (!signal?.aborted) setError("Unable to list this location");
@@ -427,6 +441,15 @@ export function DriveExplorer({
                             <div key={connection.id} className="group flex items-center gap-1">
                                 <Link
                                     href={href(connection.id, "")}
+                                    // The root of a source somebody is reaching for,
+                                    // fetched while they are still reaching. A source
+                                    // that is not answering is not asked.
+                                    onPointerEnter={() =>
+                                        !downReason(connection.id) && prefetchListing(connection.id, "")
+                                    }
+                                    onFocus={() =>
+                                        !downReason(connection.id) && prefetchListing(connection.id, "")
+                                    }
                                     className={cn(
                                         "flex flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-muted",
                                         connection.id === connectionId && "bg-muted font-medium"
