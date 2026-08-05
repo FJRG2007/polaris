@@ -857,7 +857,11 @@ export const spaceSchema = z.object({
     name: containerName,
     description: z.string().trim().max(500).default(""),
     color: hexColor.default("#7c5cff"),
-    visibility: z.enum(SPACE_VISIBILITIES).default("private")
+    visibility: z.enum(SPACE_VISIBILITIES).default("private"),
+    /** The organization the space belongs to, or null for a personal one. Only
+     *  read when the space is created: moving work between an organization and a
+     *  person is a transfer, not an edit, and has its own action. */
+    orgId: uuid.nullable().default(null)
 });
 
 export type SpaceInput = z.infer<typeof spaceSchema>;

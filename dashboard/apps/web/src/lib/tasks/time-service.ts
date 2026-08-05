@@ -50,22 +50,28 @@ export async function startTimer(userId: string, taskId: string): Promise<void> 
 }
 
 /** Stop the running timer and write the seconds it accounted for. An entry that
- *  rounds to nothing is discarded rather than stored as a zero-length row. */
-export async function stopTimer(userId: string, now = new Date()): Promise<number> {
+ *  rounds to nothing is discarded rather than stored as a zero-length row. The
+ *  space rides back so the caller can say where the change landed without
+ *  looking the task up again. */
+export async function stopTimer(
+    userId: string,
+    now = new Date()
+): Promise<{ seconds: number; spaceId: string | null }> {
     const entry = await prisma.taskTimeEntry.findFirst({
         where: { userId, endedAt: null },
         orderBy: { startedAt: "desc" },
-        select: { id: true, startedAt: true }
+        select: { id: true, startedAt: true, task: { select: { spaceId: true } } }
     });
-    if (!entry) return 0;
+    if (!entry) return { seconds: 0, spaceId: null };
 
+    const spaceId = entry.task.spaceId;
     const seconds = Math.max(0, Math.floor((now.getTime() - entry.startedAt.getTime()) / 1000));
     if (seconds < 1) {
         await prisma.taskTimeEntry.delete({ where: { id: entry.id } });
-        return 0;
+        return { seconds: 0, spaceId };
     }
     await prisma.taskTimeEntry.update({ where: { id: entry.id }, data: { endedAt: now, seconds } });
-    return seconds;
+    return { seconds, spaceId };
 }
 
 export async function addTimeEntry(userId: string, input: core.TimeEntryInput): Promise<void> {

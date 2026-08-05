@@ -11,13 +11,13 @@
  */
 
 import Link from "next/link";
-import { useState } from "react";
 import * as actions from "./actions";
 import * as core from "@polaris/core";
 import { runAction } from "@/lib/run-action";
 import { Hash, Plus, Trash2 } from "lucide-react";
 import { ProgressBar, StatusDot } from "./pickers";
 import type { PersonRef } from "@/lib/tasks/facts";
+import { useCallback, useEffect, useState } from "react";
 import type { FormView } from "@/lib/tasks/form-service";
 import { AutomationsPanel, FormsPanel } from "./automations-panel";
 import type { AutomationView } from "@/lib/tasks/automation-service";
@@ -33,6 +33,9 @@ export interface SpaceScreenProps {
     readonly prefix: string;
     readonly description: string;
     readonly visibility: core.SpaceVisibility;
+    /** The organization this space belongs to, or null when it is somebody's
+     *  own. It changes what "internal" means, so the header reads it. */
+    readonly orgName: string | null;
     readonly lists: readonly ListSummary[];
     readonly statuses: readonly StatusView[];
     readonly fields: readonly CustomFieldView[];
@@ -46,6 +49,22 @@ export interface SpaceScreenProps {
     /** Which tab to open on, from the URL. Anything unrecognised opens the
      *  overview rather than a blank screen. */
     readonly initialTab?: string;
+}
+
+/**
+ * Who can see this space, in one line.
+ *
+ * Four answers rather than two, because an organization changes what both
+ * settings mean: `internal` is that roster and not the instance, and even a
+ * private space is reachable by whoever runs the organization.
+ */
+function visibilityLine(props: Pick<SpaceScreenProps, "visibility" | "orgName">): string {
+    if (!props.orgName) {
+        return props.visibility === "internal" ? "Anyone on this Polaris can see it" : "Private to its members";
+    }
+    return props.visibility === "internal"
+        ? `Anyone in ${props.orgName} can see it`
+        : `${props.orgName} - its teams and members`;
 }
 
 export function SpaceScreen(props: SpaceScreenProps) {
@@ -71,9 +90,7 @@ export function SpaceScreen(props: SpaceScreenProps) {
                 <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">
                     {props.prefix}
                 </span>
-                <span className="text-xs text-muted-foreground">
-                    {props.visibility === "internal" ? "Anyone on this Polaris can see it" : "Private to its members"}
-                </span>
+                <span className="text-muted-foreground text-xs">{visibilityLine(props)}</span>
             </header>
             {props.description && <p className="max-w-2xl text-sm text-muted-foreground">{props.description}</p>}
 
@@ -582,6 +599,160 @@ function PeopleTab({
                         <Plus className="size-3.5" /> Add
                     </Button>
                     <p className="w-full text-xs text-muted-foreground">{core.SPACE_ROLE_HINTS[role]}</p>
+                </div>
+            )}
+
+            <SpaceTeams spaceId={spaceId} canManage={canManage} onError={onError} />
+        </section>
+    );
+}
+
+/**
+ * The teams that hold this space.
+ *
+ * Loaded when the tab opens rather than sent with the page, because a personal
+ * space has no teams to show and most spaces are personal. When there are none
+ * to offer it says why instead of rendering an empty picker somebody has to
+ * work out the meaning of.
+ */
+function SpaceTeams({
+    spaceId,
+    canManage,
+    onError
+}: {
+    spaceId: string;
+    canManage: boolean;
+    onError: (message: string) => void;
+}) {
+    const [granted, setGranted] = useState<{ teamId: string; teamName: string; role: core.SpaceRole }[]>([]);
+    const [available, setAvailable] = useState<{ id: string; name: string }[]>([]);
+    const [loaded, setLoaded] = useState(false);
+    const [pick, setPick] = useState("");
+    const [role, setRole] = useState<core.SpaceRole>("member");
+
+    const reload = useCallback(async () => {
+        const result = await runAction(() => actions.spaceTeamsAction(spaceId), onError);
+        if (result?.error) onError(result.error);
+        setGranted(result?.granted ?? []);
+        setAvailable(result?.available ?? []);
+        setLoaded(true);
+    }, [spaceId, onError]);
+
+    useEffect(() => {
+        void reload();
+    }, [reload]);
+
+    // Nothing to say on a personal space: no teams exist to give it to, and an
+    // empty section would only raise a question the screen cannot answer.
+    if (!loaded || (available.length === 0 && granted.length === 0)) return null;
+
+    const ungranted = available.filter((team) => !granted.some((grant) => grant.teamId === team.id));
+
+    return (
+        <section className="flex flex-col gap-3 border-t border-border pt-4">
+            <div>
+                <h2 className="text-sm font-medium">Teams</h2>
+                <p className="text-xs text-muted-foreground">
+                    A team from the organization that owns this space. Everybody on it reaches the space at the role
+                    given here, and joining the team later is enough.
+                </p>
+            </div>
+
+            {granted.length === 0 ? (
+                <p className="rounded-lg border border-dashed border-border px-3 py-4 text-center text-xs text-muted-foreground">
+                    No team has been given this space yet.
+                </p>
+            ) : (
+                <ul className="divide-y divide-border rounded-lg border border-border">
+                    {granted.map((grant) => (
+                        <li key={grant.teamId} className="flex flex-wrap items-center gap-3 px-3 py-2">
+                            <p className="min-w-0 flex-1 truncate text-sm" title={grant.teamName}>{grant.teamName}</p>
+                            {canManage ? (
+                                <>
+                                    <Select
+                                        value={grant.role}
+                                        onValueChange={async (next) => {
+                                            const result = await runAction(
+                                                () =>
+                                                    actions.grantSpaceTeamAction(
+                                                        spaceId,
+                                                        grant.teamId,
+                                                        next as core.SpaceRole
+                                                    ),
+                                                onError
+                                            );
+                                            if (result?.error) onError(result.error);
+                                            await reload();
+                                        }}
+                                        options={core.SPACE_ROLES.map((entry) => ({
+                                            value: entry,
+                                            label: core.SPACE_ROLE_LABELS[entry]
+                                        }))}
+                                        aria-label={`Role for ${grant.teamName}`}
+                                        className="h-8 w-32 text-xs"
+                                    />
+                                    <button
+                                        type="button"
+                                        aria-label={`Remove ${grant.teamName}`}
+                                        title="Remove from space"
+                                        onClick={async () => {
+                                            const result = await runAction(
+                                                () => actions.revokeSpaceTeamAction(spaceId, grant.teamId),
+                                                onError
+                                            );
+                                            if (result?.error) onError(result.error);
+                                            await reload();
+                                        }}
+                                        className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-destructive"
+                                    >
+                                        <Trash2 className="size-3.5" />
+                                    </button>
+                                </>
+                            ) : (
+                                <span className="text-xs text-muted-foreground">
+                                    {core.SPACE_ROLE_LABELS[grant.role]}
+                                </span>
+                            )}
+                        </li>
+                    ))}
+                </ul>
+            )}
+
+            {canManage && ungranted.length > 0 && (
+                <div className="flex flex-wrap items-center gap-2">
+                    <Select
+                        value={pick}
+                        onValueChange={setPick}
+                        placeholder="Choose a team"
+                        options={ungranted.map((team) => ({ value: team.id, label: team.name }))}
+                        aria-label="Team to add"
+                        className="h-8 w-56 text-sm"
+                    />
+                    <Select
+                        value={role}
+                        onValueChange={(value) => setRole(value as core.SpaceRole)}
+                        options={core.SPACE_ROLES.map((entry) => ({
+                            value: entry,
+                            label: core.SPACE_ROLE_LABELS[entry]
+                        }))}
+                        aria-label="Role for the team"
+                        className="h-8 w-32 text-xs"
+                    />
+                    <Button
+                        size="sm"
+                        disabled={!pick}
+                        onClick={async () => {
+                            const result = await runAction(
+                                () => actions.grantSpaceTeamAction(spaceId, pick, role),
+                                onError
+                            );
+                            if (result?.error) onError(result.error);
+                            else setPick("");
+                            await reload();
+                        }}
+                    >
+                        <Plus className="size-3.5" /> Give access
+                    </Button>
                 </div>
             )}
         </section>

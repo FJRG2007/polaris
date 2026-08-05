@@ -12,6 +12,7 @@ import {
     Bot,
     Blocks,
     BookOpen,
+    Building2,
     CalendarRange,
     ChartColumn,
     Clock,
@@ -262,6 +263,12 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
                 "agents"
             ]
         },
+        {
+            label: "Organizations",
+            href: "/account/organizations",
+            icon: Building2,
+            keywords: ["org", "orgs", "teams", "company", "members", "roster", "group"]
+        },
         // Everything that decides who reaches this account is one subject, and it
         // is half the rail: six screens people go looking for together.
         {
@@ -305,6 +312,12 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
         { label: "Overview", href: "/admin", icon: LayoutDashboard },
         { label: "Users", href: "/admin/users", icon: Users, keywords: ["accounts", "invites"] },
         { label: "Groups", href: "/admin/groups", icon: UsersRound, keywords: ["teams"] },
+        {
+            label: "Organizations",
+            href: "/admin/organizations",
+            icon: Building2,
+            keywords: ["org", "orgs", "teams", "company", "limits", "turn off"]
+        },
         {
             label: "Roles",
             href: "/admin/roles",

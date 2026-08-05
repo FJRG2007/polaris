@@ -35,23 +35,36 @@ export function FolderAccessDialog({
     const [role, setRole] = useState<core.SpaceRole>("member");
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
+    // Teams of the organization that owns the space around this folder. Both
+    // lists are empty on a personal space, which is what hides the section.
+    const [granted, setGranted] = useState<{ teamId: string; teamName: string; role: core.SpaceRole }[]>([]);
+    const [available, setAvailable] = useState<{ id: string; name: string }[]>([]);
+    const [teamPick, setTeamPick] = useState("");
+    const [teamRole, setTeamRole] = useState<core.SpaceRole>("member");
 
     useEffect(() => {
         if (!folderId) {
             setFolder(null);
             setMembers([]);
+            setGranted([]);
+            setAvailable([]);
             return;
         }
         let live = true;
         setLoading(true);
         setError("");
         void (async () => {
-            const result = await runAction(() => actions.listFolderMembersAction(folderId), setError);
+            const [result, teams] = await Promise.all([
+                runAction(() => actions.listFolderMembersAction(folderId), setError),
+                runAction(() => actions.folderTeamsAction(folderId), setError)
+            ]);
             if (!live) return;
             setLoading(false);
             if (result?.error) setError(result.error);
             setFolder(result?.folder ?? null);
             setMembers(result?.members ?? []);
+            setGranted(teams?.granted ?? []);
+            setAvailable(teams?.available ?? []);
         })();
         return () => {
             live = false;
@@ -62,6 +75,13 @@ export function FolderAccessDialog({
         if (!folderId) return;
         const result = await runAction(() => actions.listFolderMembersAction(folderId), setError);
         if (result?.members) setMembers(result.members);
+    };
+
+    const reloadTeams = async () => {
+        if (!folderId) return;
+        const result = await runAction(() => actions.folderTeamsAction(folderId), setError);
+        setGranted(result?.granted ?? []);
+        setAvailable(result?.available ?? []);
     };
 
     const path = folder?.path.map((entry) => entry.name).join(" / ") ?? "";
@@ -200,6 +220,121 @@ export function FolderAccessDialog({
                             {core.SPACE_ROLE_HINTS[role]}
                         </p>
                     </form>
+                )}
+
+                {!loading && (granted.length > 0 || available.length > 0) && (
+                    <div className="flex flex-col gap-2 border-t border-border pt-3">
+                        <p className="text-xs font-medium">Teams</p>
+                        {granted.length === 0 ? (
+                            <p className="text-xs text-muted-foreground">
+                                No team has this folder on its own yet.
+                            </p>
+                        ) : (
+                            <ul className="flex flex-col gap-1">
+                                {granted.map((grant) => (
+                                    <li
+                                        key={grant.teamId}
+                                        className="flex items-center gap-3 rounded-md px-2 py-1.5 hover:bg-muted"
+                                    >
+                                        <p className="min-w-0 flex-1 truncate text-sm" title={grant.teamName}>{grant.teamName}</p>
+                                        {canManage ? (
+                                            <>
+                                                <Select
+                                                    value={grant.role}
+                                                    options={ROLE_OPTIONS}
+                                                    aria-label={`Role for ${grant.teamName}`}
+                                                    className="h-8 w-28 text-xs"
+                                                    onValueChange={async (next) => {
+                                                        if (!folderId) return;
+                                                        await runAction(
+                                                            () =>
+                                                                actions.grantFolderTeamAction(
+                                                                    folderId,
+                                                                    grant.teamId,
+                                                                    next as core.SpaceRole
+                                                                ),
+                                                            setError
+                                                        );
+                                                        await reloadTeams();
+                                                    }}
+                                                />
+                                                <button
+                                                    type="button"
+                                                    aria-label={`Remove ${grant.teamName}`}
+                                                    title="Remove"
+                                                    onClick={async () => {
+                                                        if (!folderId) return;
+                                                        await runAction(
+                                                            () =>
+                                                                actions.revokeFolderTeamAction(
+                                                                    folderId,
+                                                                    grant.teamId
+                                                                ),
+                                                            setError
+                                                        );
+                                                        await reloadTeams();
+                                                    }}
+                                                    className="rounded p-1 text-muted-foreground transition-colors hover:bg-danger/10 hover:text-danger"
+                                                >
+                                                    <Trash2 className="size-4 shrink-0" />
+                                                </button>
+                                            </>
+                                        ) : (
+                                            <span className="text-xs text-muted-foreground">
+                                                {core.SPACE_ROLE_LABELS[grant.role]}
+                                            </span>
+                                        )}
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+
+                        {canManage &&
+                            available.some((team) => !granted.some((grant) => grant.teamId === team.id)) && (
+                                <div className="flex flex-wrap items-end gap-2">
+                                    <Select
+                                        value={teamPick}
+                                        placeholder="Choose a team"
+                                        aria-label="Team to add"
+                                        className="h-9 min-w-48 flex-1"
+                                        options={available
+                                            .filter(
+                                                (team) => !granted.some((grant) => grant.teamId === team.id)
+                                            )
+                                            .map((team) => ({ value: team.id, label: team.name }))}
+                                        onValueChange={setTeamPick}
+                                    />
+                                    <Select
+                                        value={teamRole}
+                                        options={ROLE_OPTIONS}
+                                        aria-label="Role for the team"
+                                        className="h-9 w-32"
+                                        onValueChange={(next) => setTeamRole(next as core.SpaceRole)}
+                                    />
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        disabled={!teamPick}
+                                        onClick={async () => {
+                                            if (!folderId || !teamPick) return;
+                                            const result = await runAction(
+                                                () =>
+                                                    actions.grantFolderTeamAction(folderId, teamPick, teamRole),
+                                                setError
+                                            );
+                                            if (result?.error) {
+                                                setError(result.error);
+                                                return;
+                                            }
+                                            setTeamPick("");
+                                            await reloadTeams();
+                                        }}
+                                    >
+                                        <UserPlus className="size-4 shrink-0" /> Give access
+                                    </Button>
+                                </div>
+                            )}
+                    </div>
                 )}
             </DialogContent>
         </Dialog>

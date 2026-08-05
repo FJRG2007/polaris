@@ -1,17 +1,25 @@
 /**
  * Who may reach which work, and how far in.
  *
- * Three gates stack. The instance permission (`tasks.read` / `tasks.manage`)
- * says whether the app is available to this account at all and is checked by the
- * action layer. The space role says what they may do across a whole space. The
- * folder grant says what they may do inside one branch of a space and nothing
- * beside it - that is what lets a client be invited to their own folder, or a
- * contractor to a single project, without being shown every other client in the
- * same space.
+ * Gates stack, and they only ever add up. The instance permission
+ * (`tasks.read` / `tasks.manage`) says whether the app is available to this
+ * account at all and is checked by the action layer. The space role says what
+ * they may do across a whole space. The folder grant says what they may do
+ * inside one branch of a space and nothing beside it - that is what lets a
+ * client be invited to their own folder, or a contractor to a single project,
+ * without being shown every other client in the same space.
  *
- * The three never substitute for each other: holding `tasks.manage` does not put
+ * A space owned by an organization has two more ways in, and they read exactly
+ * like the two above: a team can be granted a whole space or one folder of it,
+ * and whoever runs the organization reaches everything it owns. A team grant is
+ * resolved to the same `guest | member | admin` vocabulary a personal membership
+ * uses, so nothing downstream has to know whether somebody arrived as a person
+ * or as part of a team.
+ *
+ * None of them substitute for each other: holding `tasks.manage` does not put
  * you on somebody else's private space, a folder grant never reaches the space's
- * own settings, and a space role is never reduced by a grant sitting under it.
+ * own settings, being on an organization's roster reaches no work by itself, and
+ * a space role is never reduced by a grant sitting under it.
  *
  * Every other module in lib/tasks assumes authorization already happened and
  * takes the resolved ids, so there is exactly one place that answers "may they".
@@ -19,6 +27,7 @@
 
 import * as core from "@polaris/core";
 import { prisma, type Prisma } from "@polaris/db";
+import { administeredOrgIds, memberOrgIds } from "@/lib/orgs/org-service";
 
 /** The caller, as the action layer resolved them. */
 export interface TaskActor {
@@ -45,24 +54,58 @@ function atLeast(role: SpaceAccess, minimum: core.SpaceRole): boolean {
 // Space-level access
 // ---------------------------------------------------------------------------
 
-/** What this actor may do across this whole space, or null when the space is not
- *  theirs to see. A folder grant deliberately does not answer here. */
+/**
+ * What this actor may do across this whole space, or null when the space is not
+ * theirs to see. A folder grant deliberately does not answer here.
+ *
+ * Four ways in are considered together and the strongest wins, because they are
+ * additive by design: somebody can be a guest on a space through its
+ * organization and a member of it through a team, and the answer has to be
+ * member. One query, with the memberships and grants filtered to this actor, so
+ * a screen resolving several spaces does not pay a round trip per way in.
+ */
 export async function resolveSpaceRole(actor: TaskActor, spaceId: string): Promise<SpaceAccess | null> {
     const space = await prisma.taskSpace.findUnique({
         where: { id: spaceId },
         select: {
             ownerId: true,
             visibility: true,
-            members: { where: { userId: actor.id }, select: { role: true } }
+            orgId: true,
+            members: { where: { userId: actor.id }, select: { role: true } },
+            teamGrants: {
+                where: { team: { members: { some: { userId: actor.id } } } },
+                select: { role: true }
+            },
+            org: {
+                select: {
+                    ownerId: true,
+                    members: { where: { userId: actor.id }, select: { role: true } }
+                }
+            }
         }
     });
     if (!space) return null;
     if (space.ownerId === actor.id || actor.isAdmin) return "owner";
-    const membership = space.members[0];
-    if (membership) return membership.role as core.SpaceRole;
-    // An internal space is readable by anyone the instance already trusts with
-    // the app, which is what a single household or team usually wants.
-    return space.visibility === "internal" ? "guest" : null;
+    // Whoever owns the organization owns what it owns, and an organization admin
+    // administers it. Below that, being on the roster is not itself a way in.
+    if (space.org) {
+        if (space.org.ownerId === actor.id) return "owner";
+        if (space.org.members[0]?.role === "admin") return "admin";
+    }
+
+    let role: core.SpaceRole | null = (space.members[0]?.role as core.SpaceRole | undefined) ?? null;
+    for (const grant of space.teamGrants) {
+        const granted = grant.role as core.SpaceRole;
+        role = role ? core.strongerRole(role, granted) : granted;
+    }
+    if (role) return role;
+
+    // An internal space is readable by anyone already trusted with the app -
+    // which on an organization's space means that organization's people, not
+    // everybody on the instance.
+    if (space.visibility !== "internal") return null;
+    if (!space.orgId) return "guest";
+    return space.org && space.org.members.length > 0 ? "guest" : null;
 }
 
 /** Resolve the space role or refuse. Returns the role so the caller can branch
@@ -90,15 +133,21 @@ export async function requireSpace(actor: TaskActor, spaceId: string, minimum: c
  * project they are actually working.
  */
 async function grantedFolders(actor: TaskActor, spaceId: string): Promise<Map<string, core.SpaceRole>> {
-    const [folders, grants] = await Promise.all([
+    const [folders, personal, team] = await Promise.all([
         prisma.taskFolder.findMany({ where: { spaceId }, select: { id: true, parentId: true } }),
         prisma.taskFolderMember.findMany({
             where: { userId: actor.id, folder: { spaceId } },
             select: { folderId: true, role: true }
+        }),
+        // A branch handed to a team reads exactly like one handed to a person,
+        // including the inheritance and the strongest-wins rule below.
+        prisma.taskFolderTeam.findMany({
+            where: { team: { members: { some: { userId: actor.id } } }, folder: { spaceId } },
+            select: { folderId: true, role: true }
         })
     ]);
     const reachable = new Map<string, core.SpaceRole>();
-    for (const grant of grants) {
+    for (const grant of [...personal, ...team]) {
         const role = grant.role as core.SpaceRole;
         for (const id of core.folderBranch(folders, grant.folderId)) {
             const existing = reachable.get(id);
@@ -283,20 +332,46 @@ export async function visibleScope(actor: TaskActor): Promise<TaskScope> {
         return { ...EMPTY_SCOPE, spaceIds: all.map((space) => space.id) };
     }
 
-    const [full, grants] = await Promise.all([
+    // Which organizations this account runs, and which it merely belongs to.
+    // The first opens every space they own; the second only opens the ones the
+    // organization marked internal.
+    const [administered, onRoster] = await Promise.all([
+        administeredOrgIds(actor),
+        memberOrgIds(actor.id)
+    ]);
+
+    const [full, personalGrants, teamGrants] = await Promise.all([
         prisma.taskSpace.findMany({
             where: {
                 archived: false,
-                OR: [{ ownerId: actor.id }, { members: { some: { userId: actor.id } } }, { visibility: "internal" }]
+                OR: [
+                    { ownerId: actor.id },
+                    { members: { some: { userId: actor.id } } },
+                    { teamGrants: { some: { team: { members: { some: { userId: actor.id } } } } } },
+                    { orgId: { in: administered } },
+                    // An internal space with no organization is the instance-wide
+                    // case this had before organizations existed; one with an
+                    // organization is internal to that roster only.
+                    { visibility: "internal", orgId: null },
+                    { visibility: "internal", orgId: { in: onRoster } }
+                ]
             },
             select: { id: true }
         }),
         prisma.taskFolderMember.findMany({
             where: { userId: actor.id, folder: { space: { archived: false } } },
             select: { folderId: true, role: true, folder: { select: { spaceId: true } } }
+        }),
+        prisma.taskFolderTeam.findMany({
+            where: {
+                team: { members: { some: { userId: actor.id } } },
+                folder: { space: { archived: false } }
+            },
+            select: { folderId: true, role: true, folder: { select: { spaceId: true } } }
         })
     ]);
 
+    const grants = [...personalGrants, ...teamGrants];
     const spaceIds = full.map((space) => space.id);
     // A grant inside a space the actor already reaches in full adds nothing, and
     // listing it as partial would narrow them instead of widening them.

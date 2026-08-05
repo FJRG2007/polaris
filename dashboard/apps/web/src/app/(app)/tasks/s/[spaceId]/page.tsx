@@ -39,7 +39,15 @@ export default async function SpacePage({
 
     const space = await prisma.taskSpace.findUnique({
         where: { id: spaceId },
-        select: { name: true, prefix: true, description: true, visibility: true }
+        select: {
+            name: true,
+            prefix: true,
+            description: true,
+            visibility: true,
+            // Named rather than a flag, because "internal" means this
+            // organization's people and the header has to say which one.
+            org: { select: { name: true } }
+        }
     });
     if (!space) redirect("/tasks");
 
@@ -69,6 +77,7 @@ export default async function SpacePage({
                 prefix={space.prefix}
                 description={space.description}
                 visibility={space.visibility as SpaceVisibility}
+                orgName={space.org?.name ?? null}
                 lists={allLists}
                 statuses={statuses}
                 fields={fields}

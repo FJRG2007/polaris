@@ -19,6 +19,9 @@ const folderFindMany = vi.fn(async () => [] as { id: string; parentId: string | 
 const folderMemberFindMany = vi.fn(
     async () => [] as { folderId: string; role: string; folder?: { spaceId: string } }[]
 );
+const folderTeamFindMany = vi.fn(
+    async () => [] as { folderId: string; role: string; folder?: { spaceId: string } }[]
+);
 
 vi.mock("@polaris/db", () => ({
     prisma: {
@@ -26,7 +29,8 @@ vi.mock("@polaris/db", () => ({
         taskList: { findMany: listFindMany },
         taskSpace: { findUnique: spaceFindUnique },
         taskFolder: { findMany: folderFindMany },
-        taskFolderMember: { findMany: folderMemberFindMany }
+        taskFolderMember: { findMany: folderMemberFindMany },
+        taskFolderTeam: { findMany: folderTeamFindMany }
     }
 }));
 
@@ -40,8 +44,10 @@ function showing(lists: { id: string; spaceId: string; folderId?: string | null 
     listFindMany.mockResolvedValueOnce(lists.map((list) => ({ ...list, folderId: list.folderId ?? null })));
 }
 
+/** A personal space, which is what these cases are about: no organization, and
+ *  no team holding it. The two empty lists are what the query selects. */
 function space(visibility: string, members: { role: string }[], ownerId = "someone-else") {
-    return { ownerId, visibility, members };
+    return { ownerId, visibility, members, orgId: null, teamGrants: [], org: null };
 }
 
 describe("the tasks in a set somebody may write", () => {
@@ -49,6 +55,7 @@ describe("the tasks in a set somebody may write", () => {
         vi.clearAllMocks();
         folderFindMany.mockResolvedValue([]);
         folderMemberFindMany.mockResolvedValue([]);
+        folderTeamFindMany.mockResolvedValue([]);
     });
 
     it("refuses a reader who only reaches the space because it is internal", async () => {

@@ -16,6 +16,7 @@
 import * as core from "@polaris/core";
 import { revalidatePath } from "next/cache";
 import * as access from "@/lib/tasks/access";
+import * as orgs from "@/lib/orgs/org-service";
 import * as docs from "@/lib/tasks/doc-service";
 import * as time from "@/lib/tasks/time-service";
 import { recordAudit } from "@/lib/audit-service";
@@ -25,6 +26,7 @@ import * as views from "@/lib/tasks/view-service";
 import * as forms from "@/lib/tasks/form-service";
 import * as spaces from "@/lib/tasks/space-service";
 import * as shares from "@/lib/tasks/share-service";
+import { publishTaskChange } from "@/lib/tasks/live";
 import * as commits from "@/lib/tasks/commit-service";
 import * as files from "@/lib/tasks/attachment-service";
 import * as planning from "@/lib/tasks/planning-service";
@@ -49,10 +51,28 @@ function failure(caught: unknown, fallback: string): { error: string } {
     return { error: fallback };
 }
 
-/** Refresh the screens a change can be visible on. The app is small enough that
- *  refreshing its subtree beats trying to guess which page the user is on. */
-function refresh(): void {
+/**
+ * Refresh the screens a change can be visible on, for the person who made it and
+ * for everyone else looking at the same work.
+ *
+ * The first half is this tab: revalidating the subtree beats trying to guess
+ * which page the user is on, and the app is small enough for that to be cheap.
+ * The second half is the team's tabs, which are holding /api/tasks/stream open
+ * and are told the space moved - so a task assigned in one browser lands in the
+ * assignee's without them reloading.
+ *
+ * `where` names the space or spaces the write touched, and it is what keeps a
+ * change in one team's space from re-rendering another team's screen. A write
+ * with no space is a write nothing else can see - a goal or a page somebody
+ * keeps to themselves, a timer that was not running - so it announces nothing
+ * rather than waking the whole instance to look at something private.
+ */
+function refresh(caller: access.TaskActor, where?: string | readonly (string | null)[] | null): void {
     revalidatePath(TASKS_PATH, "layout");
+    const named = typeof where === "string" ? [where] : (where ?? []);
+    for (const spaceId of new Set(named.filter((id): id is string => Boolean(id)))) {
+        publishTaskChange({ spaceId, actorId: caller.id });
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -64,9 +84,12 @@ export async function createSpaceAction(input: unknown): Promise<{ id?: string; 
     const parsed = core.spaceSchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
     try {
+        // Creating work on an organization's behalf takes an admin of it, so a
+        // member cannot put a space nobody asked for on the roster's shelf.
+        if (parsed.data.orgId) await orgs.requireOrg(caller, parsed.data.orgId, "admin");
         const created = await spaces.createSpace(caller.id, parsed.data);
         await recordAudit({ actorId: caller.id, action: "tasks.space.create", targetType: "space", targetId: created.id });
-        refresh();
+        refresh(caller, created.id);
         return { id: created.id };
     } catch (caught) {
         return failure(caught, "Could not create the space");
@@ -80,7 +103,7 @@ export async function updateSpaceAction(spaceId: string, input: unknown): Promis
     try {
         await access.requireSpace(caller, spaceId, "admin");
         await spaces.updateSpace(spaceId, parsed.data);
-        refresh();
+        refresh(caller, spaceId);
         return {};
     } catch (caught) {
         return failure(caught, "Could not save the space");
@@ -94,7 +117,7 @@ export async function deleteSpaceAction(spaceId: string): Promise<{ error?: stri
         if (role !== "owner") return { error: "Only the space owner can delete it" };
         await spaces.deleteSpace(spaceId);
         await recordAudit({ actorId: caller.id, action: "tasks.space.delete", targetType: "space", targetId: spaceId });
-        refresh();
+        refresh(caller, spaceId);
         return {};
     } catch (caught) {
         return failure(caught, "Could not delete the space");
@@ -110,7 +133,7 @@ export async function addSpaceMemberAction(
     try {
         await access.requireSpace(caller, spaceId, "admin");
         await spaces.addSpaceMember(spaceId, identifier, role);
-        refresh();
+        refresh(caller, spaceId);
         return {};
     } catch (caught) {
         return failure(caught, "Could not add that person");
@@ -126,7 +149,7 @@ export async function setSpaceMemberRoleAction(
     try {
         await access.requireSpace(caller, spaceId, "admin");
         await spaces.setSpaceMemberRole(spaceId, userId, role);
-        refresh();
+        refresh(caller, spaceId);
         return {};
     } catch (caught) {
         return failure(caught, "Could not change that role");
@@ -138,7 +161,7 @@ export async function removeSpaceMemberAction(spaceId: string, userId: string): 
     try {
         await access.requireSpace(caller, spaceId, "admin");
         await spaces.removeSpaceMember(spaceId, userId);
-        refresh();
+        refresh(caller, spaceId);
         return {};
     } catch (caught) {
         return failure(caught, "Could not remove that person");
@@ -155,7 +178,7 @@ export async function createFolderAction(input: unknown): Promise<{ id?: string;
         if (parsed.data.parentId) await access.requireFolder(caller, parsed.data.parentId, "member");
         else await access.requireSpace(caller, parsed.data.spaceId, "member");
         const id = await spaces.createFolder(parsed.data);
-        refresh();
+        refresh(caller, parsed.data.spaceId);
         return { id };
     } catch (caught) {
         return failure(caught, "Could not create the folder");
@@ -167,9 +190,9 @@ export async function renameFolderAction(folderId: string, name: string): Promis
     const parsed = core.containerName.safeParse(name);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Enter a name" };
     try {
-        await access.requireFolder(caller, folderId, "member");
+        const { spaceId } = await access.requireFolder(caller, folderId, "member");
         await spaces.renameFolder(folderId, parsed.data);
-        refresh();
+        refresh(caller, spaceId);
         return {};
     } catch (caught) {
         return failure(caught, "Could not rename the folder");
@@ -179,9 +202,9 @@ export async function renameFolderAction(folderId: string, name: string): Promis
 export async function deleteFolderAction(folderId: string): Promise<{ error?: string }> {
     const caller = await actor();
     try {
-        await access.requireFolder(caller, folderId, "admin");
+        const { spaceId } = await access.requireFolder(caller, folderId, "admin");
         await spaces.deleteFolder(folderId);
-        refresh();
+        refresh(caller, spaceId);
         return {};
     } catch (caught) {
         return failure(caught, "Could not delete the folder");
@@ -200,7 +223,7 @@ export async function moveFolderAction(folderId: string, move: unknown): Promise
         if (parsed.data.parentId) await access.requireFolder(caller, parsed.data.parentId, "member");
         else await access.requireSpace(caller, spaceId, "member");
         await spaces.moveFolder(spaceId, folderId, parsed.data);
-        refresh();
+        refresh(caller, spaceId);
         return {};
     } catch (caught) {
         return failure(caught, "Could not move the folder");
@@ -218,7 +241,7 @@ export async function moveListAction(listId: string, move: unknown): Promise<{ e
         if (parsed.data.parentId) await access.requireFolder(caller, parsed.data.parentId, "member");
         else await access.requireSpace(caller, spaceId, "member");
         await spaces.moveList(spaceId, listId, parsed.data);
-        refresh();
+        refresh(caller, spaceId);
         return {};
     } catch (caught) {
         return failure(caught, "Could not move the list");
@@ -254,7 +277,7 @@ export async function addFolderMemberAction(
 ): Promise<{ error?: string }> {
     const caller = await actor();
     try {
-        await access.requireFolder(caller, folderId, "admin");
+        const { spaceId } = await access.requireFolder(caller, folderId, "admin");
         await spaces.addFolderMember(folderId, identifier, role);
         await recordAudit({
             actorId: caller.id,
@@ -262,7 +285,7 @@ export async function addFolderMemberAction(
             targetType: "folder",
             targetId: folderId
         });
-        refresh();
+        refresh(caller, spaceId);
         return {};
     } catch (caught) {
         return failure(caught, "Could not add that person");
@@ -276,9 +299,9 @@ export async function setFolderMemberRoleAction(
 ): Promise<{ error?: string }> {
     const caller = await actor();
     try {
-        await access.requireFolder(caller, folderId, "admin");
+        const { spaceId } = await access.requireFolder(caller, folderId, "admin");
         await spaces.setFolderMemberRole(folderId, userId, role);
-        refresh();
+        refresh(caller, spaceId);
         return {};
     } catch (caught) {
         return failure(caught, "Could not change that role");
@@ -288,12 +311,144 @@ export async function setFolderMemberRoleAction(
 export async function removeFolderMemberAction(folderId: string, userId: string): Promise<{ error?: string }> {
     const caller = await actor();
     try {
-        await access.requireFolder(caller, folderId, "admin");
+        const { spaceId } = await access.requireFolder(caller, folderId, "admin");
         await spaces.removeFolderMember(folderId, userId);
-        refresh();
+        refresh(caller, spaceId);
         return {};
     } catch (caught) {
         return failure(caught, "Could not remove that person");
+    }
+}
+
+/** Who a new space could belong to besides the person making it. Fetched when
+ *  the create form opens rather than sent with every page, because most people
+ *  are in no organization at all and the form then asks nothing extra. */
+export async function spaceOwnerOptionsAction(): Promise<{ orgs?: { id: string; name: string }[]; error?: string }> {
+    const caller = await actor();
+    try {
+        return { orgs: await orgs.listAdministeredOrgs(caller) };
+    } catch (caught) {
+        return failure(caught, "Could not read your organizations");
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Team grants
+// ---------------------------------------------------------------------------
+
+/**
+ * Hand a whole space to a team, or change the role it carries there.
+ *
+ * Both ends are checked. Administering the space is what lets somebody give it
+ * away, and the team has to belong to the organization that owns the space -
+ * otherwise a space admin could grant their work to a team on somebody else's
+ * roster, which is an invitation nobody in that organization agreed to.
+ */
+export async function grantSpaceTeamAction(
+    spaceId: string,
+    teamId: string,
+    role: core.SpaceRole
+): Promise<{ error?: string }> {
+    const caller = await actor();
+    if (!(core.SPACE_ROLES as readonly string[]).includes(role)) return { error: "Pick a role" };
+    try {
+        await access.requireSpace(caller, spaceId, "admin");
+        const eligible = await orgs.teamsForSpace(spaceId);
+        if (!eligible.some((team) => team.id === teamId)) {
+            return { error: "That team is not part of the organization this space belongs to" };
+        }
+        await orgs.grantTeamSpace(teamId, spaceId, role);
+        refresh(caller, spaceId);
+        return {};
+    } catch (caught) {
+        return failure(caught, "Could not give the team access");
+    }
+}
+
+export async function revokeSpaceTeamAction(spaceId: string, teamId: string): Promise<{ error?: string }> {
+    const caller = await actor();
+    try {
+        await access.requireSpace(caller, spaceId, "admin");
+        await orgs.revokeTeamSpace(teamId, spaceId);
+        refresh(caller, spaceId);
+        return {};
+    } catch (caught) {
+        return failure(caught, "Could not take the team's access away");
+    }
+}
+
+/** The same for one branch, so a project inside a shared space goes to the team
+ *  that works it without opening the rest. */
+export async function grantFolderTeamAction(
+    folderId: string,
+    teamId: string,
+    role: core.SpaceRole
+): Promise<{ error?: string }> {
+    const caller = await actor();
+    if (!(core.SPACE_ROLES as readonly string[]).includes(role)) return { error: "Pick a role" };
+    try {
+        const { spaceId } = await access.requireFolder(caller, folderId, "admin");
+        const eligible = await orgs.teamsForSpace(spaceId);
+        if (!eligible.some((team) => team.id === teamId)) {
+            return { error: "That team is not part of the organization this space belongs to" };
+        }
+        await orgs.grantTeamFolder(teamId, folderId, role);
+        refresh(caller, spaceId);
+        return {};
+    } catch (caught) {
+        return failure(caught, "Could not give the team access");
+    }
+}
+
+export async function revokeFolderTeamAction(folderId: string, teamId: string): Promise<{ error?: string }> {
+    const caller = await actor();
+    try {
+        const { spaceId } = await access.requireFolder(caller, folderId, "admin");
+        await orgs.revokeTeamFolder(teamId, folderId);
+        refresh(caller, spaceId);
+        return {};
+    } catch (caught) {
+        return failure(caught, "Could not take the team's access away");
+    }
+}
+
+/** Which teams hold this space and which could, so the access panel can be
+ *  drawn in one round trip. Empty for a personal space, which is what makes the
+ *  panel explain itself rather than show an empty picker. */
+export async function spaceTeamsAction(spaceId: string): Promise<{
+    granted?: { teamId: string; teamName: string; role: core.SpaceRole }[];
+    available?: { id: string; name: string }[];
+    error?: string;
+}> {
+    const caller = await actor("tasks.read");
+    try {
+        await access.requireSpace(caller, spaceId, "guest");
+        const [granted, available] = await Promise.all([
+            orgs.spaceTeamGrants(spaceId),
+            orgs.teamsForSpace(spaceId)
+        ]);
+        return { granted, available };
+    } catch (caught) {
+        return failure(caught, "Could not read the teams");
+    }
+}
+
+/** The same, for one folder's access dialog. */
+export async function folderTeamsAction(folderId: string): Promise<{
+    granted?: { teamId: string; teamName: string; role: core.SpaceRole }[];
+    available?: { id: string; name: string }[];
+    error?: string;
+}> {
+    const caller = await actor("tasks.read");
+    try {
+        const { spaceId } = await access.requireFolder(caller, folderId, "guest");
+        const [granted, available] = await Promise.all([
+            orgs.folderTeamGrants(folderId),
+            orgs.teamsForSpace(spaceId)
+        ]);
+        return { granted, available };
+    } catch (caught) {
+        return failure(caught, "Could not read the teams");
     }
 }
 
@@ -332,7 +487,7 @@ export async function createListAction(input: unknown): Promise<{ id?: string; e
         if (parsed.data.folderId) await access.requireFolder(caller, parsed.data.folderId, "member");
         else await access.requireSpace(caller, parsed.data.spaceId, "member");
         const id = await spaces.createList(parsed.data);
-        refresh();
+        refresh(caller, parsed.data.spaceId);
         return { id };
     } catch (caught) {
         return failure(caught, "Could not create the list");
@@ -355,7 +510,7 @@ export async function ensureListAction(
         if (parsed.data.folderId) await access.requireFolder(caller, parsed.data.folderId, "member");
         else await access.requireSpace(caller, parsed.data.spaceId, "member");
         const list = await spaces.ensureList(parsed.data);
-        refresh();
+        refresh(caller, parsed.data.spaceId);
         return { list };
     } catch (caught) {
         return failure(caught, "Could not make a list for the task");
@@ -369,7 +524,7 @@ export async function updateListAction(listId: string, input: unknown): Promise<
         const parsed = core.listSchema.safeParse({ ...(input as object), spaceId });
         if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
         await spaces.updateList(listId, parsed.data);
-        refresh();
+        refresh(caller, spaceId);
         return {};
     } catch (caught) {
         return failure(caught, "Could not save the list");
@@ -383,9 +538,9 @@ export async function renameListAction(listId: string, name: string): Promise<{ 
     const parsed = core.containerName.safeParse(name);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Enter a name" };
     try {
-        await access.requireList(caller, listId, "member");
+        const { spaceId } = await access.requireList(caller, listId, "member");
         await spaces.renameList(listId, parsed.data);
-        refresh();
+        refresh(caller, spaceId);
         return {};
     } catch (caught) {
         return failure(caught, "Could not rename the list");
@@ -399,7 +554,7 @@ export async function renameSpaceAction(spaceId: string, name: string): Promise<
     try {
         await access.requireSpace(caller, spaceId, "admin");
         await spaces.renameSpace(spaceId, parsed.data);
-        refresh();
+        refresh(caller, spaceId);
         return {};
     } catch (caught) {
         return failure(caught, "Could not rename the space");
@@ -409,9 +564,9 @@ export async function renameSpaceAction(spaceId: string, name: string): Promise<
 export async function deleteListAction(listId: string): Promise<{ error?: string }> {
     const caller = await actor();
     try {
-        await access.requireList(caller, listId, "admin");
+        const { spaceId } = await access.requireList(caller, listId, "admin");
         await spaces.deleteList(listId);
-        refresh();
+        refresh(caller, spaceId);
         return {};
     } catch (caught) {
         return failure(caught, "Could not delete the list");
@@ -432,7 +587,7 @@ export async function createStatusAction(
     try {
         await access.requireSpace(caller, spaceId, "admin");
         const id = await spaces.createStatus(spaceId, parsed.data.name, parsed.data.type, parsed.data.color);
-        refresh();
+        refresh(caller, spaceId);
         return { id };
     } catch (caught) {
         return failure(caught, "Could not add the status");
@@ -450,7 +605,7 @@ export async function updateStatusAction(
     try {
         await access.requireSpace(caller, spaceId, "admin");
         await spaces.updateStatus(statusId, parsed.data);
-        refresh();
+        refresh(caller, spaceId);
         return {};
     } catch (caught) {
         return failure(caught, "Could not save the status");
@@ -466,7 +621,7 @@ export async function deleteStatusAction(
     try {
         await access.requireSpace(caller, spaceId, "admin");
         await spaces.deleteStatus(spaceId, statusId, replacementId);
-        refresh();
+        refresh(caller, spaceId);
         return {};
     } catch (caught) {
         return failure(caught, "Could not remove the status");
@@ -478,7 +633,7 @@ export async function reorderStatusesAction(spaceId: string, orderedIds: string[
     try {
         await access.requireSpace(caller, spaceId, "admin");
         await spaces.reorderStatuses(spaceId, orderedIds);
-        refresh();
+        refresh(caller, spaceId);
         return {};
     } catch (caught) {
         return failure(caught, "Could not reorder the statuses");
@@ -492,7 +647,7 @@ export async function createTagAction(spaceId: string, name: string, color: stri
     try {
         await access.requireSpace(caller, spaceId, "member");
         const id = await spaces.createTag(spaceId, parsed.data.name, parsed.data.color);
-        refresh();
+        refresh(caller, spaceId);
         return { id };
     } catch (caught) {
         return failure(caught, "Could not add the tag");
@@ -511,7 +666,7 @@ export async function updateTagAction(
     try {
         await access.requireSpace(caller, spaceId, "member");
         await spaces.updateTag(tagId, parsed.data.name, parsed.data.color);
-        refresh();
+        refresh(caller, spaceId);
         return {};
     } catch (caught) {
         return failure(caught, "Could not save the tag");
@@ -523,7 +678,7 @@ export async function deleteTagAction(spaceId: string, tagId: string): Promise<{
     try {
         await access.requireSpace(caller, spaceId, "admin");
         await spaces.deleteTag(tagId);
-        refresh();
+        refresh(caller, spaceId);
         return {};
     } catch (caught) {
         return failure(caught, "Could not remove the tag");
@@ -537,7 +692,7 @@ export async function createCustomFieldAction(input: unknown): Promise<{ error?:
     try {
         await access.requireSpace(caller, parsed.data.spaceId, "admin");
         await spaces.createCustomField(parsed.data);
-        refresh();
+        refresh(caller, parsed.data.spaceId);
         return {};
     } catch (caught) {
         return failure(caught, "Could not add the field");
@@ -555,7 +710,7 @@ export async function updateCustomFieldAction(
     try {
         await access.requireSpace(caller, spaceId, "admin");
         await spaces.updateCustomField(fieldId, parsed.data);
-        refresh();
+        refresh(caller, spaceId);
         return {};
     } catch (caught) {
         return failure(caught, "Could not save the field");
@@ -567,7 +722,7 @@ export async function deleteCustomFieldAction(spaceId: string, fieldId: string):
     try {
         await access.requireSpace(caller, spaceId, "admin");
         await spaces.deleteCustomField(fieldId);
-        refresh();
+        refresh(caller, spaceId);
         return {};
     } catch (caught) {
         return failure(caught, "Could not remove the field");
@@ -585,7 +740,7 @@ export async function createTaskAction(input: unknown): Promise<{ id?: string; r
     try {
         const { spaceId } = await access.requireList(caller, parsed.data.listId, "member");
         const created = await tasks.createTask(caller.id, spaceId, parsed.data);
-        refresh();
+        refresh(caller, spaceId);
         return created;
     } catch (caught) {
         return failure(caught, "Could not create the task");
@@ -597,9 +752,9 @@ export async function updateTaskAction(input: unknown): Promise<{ error?: string
     const parsed = core.taskUpdateSchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the task and try again" };
     try {
-        await access.requireTask(caller, parsed.data.taskId, "member");
+        const { spaceId } = await access.requireTask(caller, parsed.data.taskId, "member");
         await tasks.updateTask(caller.id, parsed.data);
-        refresh();
+        refresh(caller, spaceId);
         return {};
     } catch (caught) {
         return failure(caught, "Could not save the task");
@@ -611,9 +766,9 @@ export async function moveTaskAction(input: unknown): Promise<{ error?: string }
     const parsed = core.taskMoveSchema.safeParse(input);
     if (!parsed.success) return { error: "Could not work out where that was dropped" };
     try {
-        await access.requireTask(caller, parsed.data.taskId, "member");
+        const { spaceId } = await access.requireTask(caller, parsed.data.taskId, "member");
         await tasks.moveTask(caller.id, parsed.data);
-        refresh();
+        refresh(caller, spaceId);
         return {};
     } catch (caught) {
         return failure(caught, "Could not move the task");
@@ -632,7 +787,7 @@ export async function arrangeTasksAction(input: unknown): Promise<{ error?: stri
         const cleared = await access.writableTasks(caller, parsed.data.taskIds, "member");
         const writable = new Set(cleared.map((task) => task.id));
         await tasks.arrangeTasks(parsed.data.taskIds.filter((id) => writable.has(id)));
-        refresh();
+        refresh(caller, cleared.map((task) => task.spaceId));
         return {};
     } catch (caught) {
         return failure(caught, "Could not keep that order");
@@ -649,7 +804,7 @@ export async function bulkUpdateAction(input: unknown): Promise<{ count?: number
         // destination arrives from the browser like the rest of it.
         if (parsed.data.listId) await access.requireList(caller, parsed.data.listId, "member");
         const count = await tasks.bulkUpdate(caller.id, writable, parsed.data);
-        refresh();
+        refresh(caller, writable.map((task) => task.spaceId));
         return { count };
     } catch (caught) {
         return failure(caught, "Could not apply that change");
@@ -666,7 +821,7 @@ export async function deleteTasksAction(input: unknown): Promise<{ count?: numbe
     try {
         const writable = await access.writableTasks(caller, parsed.data.taskIds, "member");
         const count = await tasks.deleteTasks(writable.map((task) => task.id));
-        refresh();
+        refresh(caller, writable.map((task) => task.spaceId));
         return { count };
     } catch (caught) {
         return failure(caught, "Could not delete those tasks");
@@ -676,9 +831,9 @@ export async function deleteTasksAction(input: unknown): Promise<{ count?: numbe
 export async function deleteTaskAction(taskId: string): Promise<{ error?: string }> {
     const caller = await actor();
     try {
-        await access.requireTask(caller, taskId, "member");
+        const { spaceId } = await access.requireTask(caller, taskId, "member");
         await tasks.deleteTask(taskId);
-        refresh();
+        refresh(caller, spaceId);
         return {};
     } catch (caught) {
         return failure(caught, "Could not delete the task");
@@ -688,9 +843,9 @@ export async function deleteTaskAction(taskId: string): Promise<{ error?: string
 export async function duplicateTaskAction(taskId: string): Promise<{ id?: string; error?: string }> {
     const caller = await actor();
     try {
-        await access.requireTask(caller, taskId, "member");
+        const { spaceId } = await access.requireTask(caller, taskId, "member");
         const id = await tasks.duplicateTask(caller.id, taskId);
-        refresh();
+        refresh(caller, spaceId);
         return { id: id ?? undefined };
     } catch (caught) {
         return failure(caught, "Could not duplicate the task");
@@ -732,9 +887,9 @@ export async function addCommentAction(input: unknown): Promise<{ error?: string
     const parsed = core.commentSchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Write something first" };
     try {
-        await access.requireTask(caller, parsed.data.taskId, "guest");
+        const { spaceId } = await access.requireTask(caller, parsed.data.taskId, "guest");
         await details.addComment(caller.id, parsed.data);
-        refresh();
+        refresh(caller, spaceId);
         return {};
     } catch (caught) {
         return failure(caught, "Could not post the comment");
@@ -746,9 +901,9 @@ export async function editCommentAction(taskId: string, commentId: string, body:
     const parsed = core.commentSchema.shape.body.safeParse(body);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Write something first" };
     try {
-        await access.requireTask(caller, taskId, "guest");
+        const { spaceId } = await access.requireTask(caller, taskId, "guest");
         await details.editComment(caller.id, commentId, parsed.data);
-        refresh();
+        refresh(caller, spaceId);
         return {};
     } catch (caught) {
         return failure(caught, "Could not save the comment");
@@ -758,9 +913,9 @@ export async function editCommentAction(taskId: string, commentId: string, body:
 export async function deleteCommentAction(taskId: string, commentId: string): Promise<{ error?: string }> {
     const caller = await actor("tasks.read");
     try {
-        const { role } = await access.requireTask(caller, taskId, "guest");
+        const { role, spaceId } = await access.requireTask(caller, taskId, "guest");
         await details.deleteComment(caller.id, commentId, role === "owner" || role === "admin");
-        refresh();
+        refresh(caller, spaceId);
         return {};
     } catch (caught) {
         return failure(caught, "Could not delete the comment");
@@ -774,9 +929,9 @@ export async function resolveCommentAction(
 ): Promise<{ error?: string }> {
     const caller = await actor("tasks.read");
     try {
-        await access.requireTask(caller, taskId, "guest");
+        const { spaceId } = await access.requireTask(caller, taskId, "guest");
         await details.setCommentResolved(caller.id, commentId, resolved);
-        refresh();
+        refresh(caller, spaceId);
         return {};
     } catch (caught) {
         return failure(caught, "Could not update the comment");
@@ -788,9 +943,9 @@ export async function createChecklistAction(taskId: string, name: string): Promi
     const parsed = core.checklistSchema.safeParse({ taskId, name });
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Enter a name" };
     try {
-        await access.requireTask(caller, taskId, "member");
+        const { spaceId } = await access.requireTask(caller, taskId, "member");
         await details.createChecklist(taskId, parsed.data.name);
-        refresh();
+        refresh(caller, spaceId);
         return {};
     } catch (caught) {
         return failure(caught, "Could not add the checklist");
@@ -807,9 +962,9 @@ export async function moveChecklistAction(
     const parsed = core.checklistMoveSchema.safeParse(move);
     if (!parsed.success) return { error: "Could not work out where that was dropped" };
     try {
-        await access.requireTask(caller, taskId, "member");
+        const { spaceId } = await access.requireTask(caller, taskId, "member");
         await details.moveChecklist(taskId, checklistId, parsed.data);
-        refresh();
+        refresh(caller, spaceId);
         return {};
     } catch (caught) {
         return failure(caught, "Could not move the checklist");
@@ -826,9 +981,9 @@ export async function moveChecklistItemAction(
     const parsed = core.checklistItemMoveSchema.safeParse(move);
     if (!parsed.success) return { error: "Could not work out where that was dropped" };
     try {
-        await access.requireTask(caller, taskId, "member");
+        const { spaceId } = await access.requireTask(caller, taskId, "member");
         await details.moveChecklistItem(taskId, itemId, parsed.data);
-        refresh();
+        refresh(caller, spaceId);
         return {};
     } catch (caught) {
         return failure(caught, "Could not move the step");
@@ -838,9 +993,9 @@ export async function moveChecklistItemAction(
 export async function deleteChecklistAction(taskId: string, checklistId: string): Promise<{ error?: string }> {
     const caller = await actor();
     try {
-        await access.requireTask(caller, taskId, "member");
+        const { spaceId } = await access.requireTask(caller, taskId, "member");
         await details.deleteChecklist(checklistId);
-        refresh();
+        refresh(caller, spaceId);
         return {};
     } catch (caught) {
         return failure(caught, "Could not remove the checklist");
@@ -856,9 +1011,9 @@ export async function addChecklistItemAction(
     const parsed = core.taskName.safeParse(name);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Enter a step" };
     try {
-        await access.requireTask(caller, taskId, "member");
+        const { spaceId } = await access.requireTask(caller, taskId, "member");
         await details.addChecklistItem(checklistId, parsed.data);
-        refresh();
+        refresh(caller, spaceId);
         return {};
     } catch (caught) {
         return failure(caught, "Could not add the step");
@@ -874,9 +1029,9 @@ export async function setChecklistItemDoneAction(
 ): Promise<{ error?: string }> {
     const caller = await actor("tasks.read");
     try {
-        await access.requireTask(caller, taskId, "guest");
+        const { spaceId } = await access.requireTask(caller, taskId, "guest");
         await details.setChecklistItemDone(itemId, done);
-        refresh();
+        refresh(caller, spaceId);
         return {};
     } catch (caught) {
         return failure(caught, "Could not update the step");
@@ -886,9 +1041,9 @@ export async function setChecklistItemDoneAction(
 export async function deleteChecklistItemAction(taskId: string, itemId: string): Promise<{ error?: string }> {
     const caller = await actor();
     try {
-        await access.requireTask(caller, taskId, "member");
+        const { spaceId } = await access.requireTask(caller, taskId, "member");
         await details.deleteChecklistItem(itemId);
-        refresh();
+        refresh(caller, spaceId);
         return {};
     } catch (caught) {
         return failure(caught, "Could not remove the step");
@@ -920,7 +1075,7 @@ export async function promoteChecklistItemAction(taskId: string, itemId: string)
                 recurrence: null
             })
         );
-        refresh();
+        refresh(caller, spaceId);
         return { id: id ?? undefined };
     } catch (caught) {
         return failure(caught, "Could not turn that step into a task");
@@ -934,7 +1089,7 @@ export async function addDependencyAction(input: unknown): Promise<{ error?: str
     try {
         const { spaceId } = await access.requireTask(caller, parsed.data.taskId, "member");
         await details.addDependency(spaceId, parsed.data);
-        refresh();
+        refresh(caller, spaceId);
         return {};
     } catch (caught) {
         return failure(caught, "Could not link those tasks");
@@ -944,9 +1099,9 @@ export async function addDependencyAction(input: unknown): Promise<{ error?: str
 export async function removeDependencyAction(taskId: string, dependencyId: string): Promise<{ error?: string }> {
     const caller = await actor();
     try {
-        await access.requireTask(caller, taskId, "member");
+        const { spaceId } = await access.requireTask(caller, taskId, "member");
         await details.removeDependency(dependencyId);
-        refresh();
+        refresh(caller, spaceId);
         return {};
     } catch (caught) {
         return failure(caught, "Could not remove the link");
@@ -962,7 +1117,7 @@ export async function setCustomValueAction(
     try {
         const { spaceId } = await access.requireTask(caller, taskId, "member");
         await details.setCustomValue(spaceId, taskId, fieldId, value.slice(0, 5000));
-        refresh();
+        refresh(caller, spaceId);
         return {};
     } catch (caught) {
         return failure(caught, "Could not save that value");
@@ -1060,13 +1215,13 @@ export async function sendTaskShareAction(input: unknown): Promise<{
 export async function deleteAttachmentAction(taskId: string, attachmentId: string): Promise<{ error?: string }> {
     const caller = await actor();
     try {
-        await access.requireTask(caller, taskId, "member");
+        const { spaceId } = await access.requireTask(caller, taskId, "member");
         const owner = await files.attachmentTaskId(attachmentId);
         // The id came from the client, so it is checked against the task the
         // caller was actually cleared for.
         if (owner !== taskId) return { error: "That file is not on this task" };
         await files.deleteAttachment(attachmentId);
-        refresh();
+        refresh(caller, spaceId);
         return {};
     } catch (caught) {
         return failure(caught, "Could not remove that file");
@@ -1076,9 +1231,9 @@ export async function deleteAttachmentAction(taskId: string, attachmentId: strin
 export async function linkCommitAction(taskId: string, reference: string): Promise<{ error?: string }> {
     const caller = await actor();
     try {
-        await access.requireTask(caller, taskId, "member");
+        const { spaceId } = await access.requireTask(caller, taskId, "member");
         await commits.linkCommit(taskId, caller.id, reference.slice(0, 500));
-        refresh();
+        refresh(caller, spaceId);
         return {};
     } catch (caught) {
         if (caught instanceof commits.CommitLinkError) return { error: caught.message };
@@ -1089,9 +1244,9 @@ export async function linkCommitAction(taskId: string, reference: string): Promi
 export async function unlinkCommitAction(taskId: string, commitId: string): Promise<{ error?: string }> {
     const caller = await actor();
     try {
-        await access.requireTask(caller, taskId, "member");
+        const { spaceId } = await access.requireTask(caller, taskId, "member");
         await commits.unlinkCommit(taskId, commitId);
-        refresh();
+        refresh(caller, spaceId);
         return {};
     } catch (caught) {
         return failure(caught, "Could not unlink that commit");
@@ -1105,9 +1260,9 @@ export async function unlinkCommitAction(taskId: string, commitId: string): Prom
 export async function startTimerAction(taskId: string): Promise<{ error?: string }> {
     const caller = await actor("tasks.read");
     try {
-        await access.requireTask(caller, taskId, "guest");
+        const { spaceId } = await access.requireTask(caller, taskId, "guest");
         await time.startTimer(caller.id, taskId);
-        refresh();
+        refresh(caller, spaceId);
         return {};
     } catch (caught) {
         return failure(caught, "Could not start the timer");
@@ -1117,8 +1272,8 @@ export async function startTimerAction(taskId: string): Promise<{ error?: string
 export async function stopTimerAction(): Promise<{ seconds?: number; error?: string }> {
     const caller = await actor("tasks.read");
     try {
-        const seconds = await time.stopTimer(caller.id);
-        refresh();
+        const { seconds, spaceId } = await time.stopTimer(caller.id);
+        refresh(caller, spaceId);
         return { seconds };
     } catch (caught) {
         return failure(caught, "Could not stop the timer");
@@ -1132,9 +1287,9 @@ export async function addTimeEntryAction(taskId: string, duration: string, note:
     const parsed = core.timeEntrySchema.safeParse({ taskId, duration: minutes * 60, note, billable });
     if (!parsed.success) return { error: "Check the entry and try again" };
     try {
-        await access.requireTask(caller, taskId, "guest");
+        const { spaceId } = await access.requireTask(caller, taskId, "guest");
         await time.addTimeEntry(caller.id, parsed.data);
-        refresh();
+        refresh(caller, spaceId);
         return {};
     } catch (caught) {
         return failure(caught, "Could not log that time");
@@ -1144,9 +1299,9 @@ export async function addTimeEntryAction(taskId: string, duration: string, note:
 export async function deleteTimeEntryAction(taskId: string, entryId: string): Promise<{ error?: string }> {
     const caller = await actor("tasks.read");
     try {
-        const { role } = await access.requireTask(caller, taskId, "guest");
+        const { role, spaceId } = await access.requireTask(caller, taskId, "guest");
         await time.deleteTimeEntry(caller.id, entryId, role === "owner" || role === "admin");
-        refresh();
+        refresh(caller, spaceId);
         return {};
     } catch (caught) {
         return failure(caught, "Could not remove that entry");
@@ -1162,11 +1317,15 @@ export async function createViewAction(input: unknown): Promise<{ id?: string; e
     const parsed = core.taskViewSchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the view and try again" };
     try {
-        if (parsed.data.listId) await access.requireList(caller, parsed.data.listId, "member");
-        else if (parsed.data.spaceId) await access.requireSpace(caller, parsed.data.spaceId, "member");
-        else return { error: "A view has to belong to a list or a space" };
+        let spaceId: string;
+        if (parsed.data.listId) {
+            spaceId = (await access.requireList(caller, parsed.data.listId, "member")).spaceId;
+        } else if (parsed.data.spaceId) {
+            await access.requireSpace(caller, parsed.data.spaceId, "member");
+            spaceId = parsed.data.spaceId;
+        } else return { error: "A view has to belong to a list or a space" };
         const id = await views.createView(caller.id, parsed.data);
-        refresh();
+        refresh(caller, spaceId);
         return { id };
     } catch (caught) {
         return failure(caught, "Could not save the view");
@@ -1180,11 +1339,14 @@ export async function updateViewAction(viewId: string, input: unknown): Promise<
     try {
         const existing = await views.getView(viewId);
         if (!existing) return { error: "That view no longer exists" };
-        const role = existing.listId
-            ? (await access.requireList(caller, existing.listId, "member")).role
-            : await access.requireSpace(caller, existing.spaceId as string, "member");
-        await views.updateView(caller.id, viewId, parsed.data, role === "owner" || role === "admin");
-        refresh();
+        const cleared = existing.listId
+            ? await access.requireList(caller, existing.listId, "member")
+            : {
+                  spaceId: existing.spaceId as string,
+                  role: await access.requireSpace(caller, existing.spaceId as string, "member")
+              };
+        await views.updateView(caller.id, viewId, parsed.data, cleared.role === "owner" || cleared.role === "admin");
+        refresh(caller, cleared.spaceId);
         return {};
     } catch (caught) {
         return failure(caught, "Could not save the view");
@@ -1196,11 +1358,14 @@ export async function deleteViewAction(viewId: string): Promise<{ error?: string
     try {
         const existing = await views.getView(viewId);
         if (!existing) return {};
-        const role = existing.listId
-            ? (await access.requireList(caller, existing.listId, "member")).role
-            : await access.requireSpace(caller, existing.spaceId as string, "member");
-        await views.deleteView(caller.id, viewId, role === "owner" || role === "admin");
-        refresh();
+        const cleared = existing.listId
+            ? await access.requireList(caller, existing.listId, "member")
+            : {
+                  spaceId: existing.spaceId as string,
+                  role: await access.requireSpace(caller, existing.spaceId as string, "member")
+              };
+        await views.deleteView(caller.id, viewId, cleared.role === "owner" || cleared.role === "admin");
+        refresh(caller, cleared.spaceId);
         return {};
     } catch (caught) {
         return failure(caught, "Could not remove the view");
@@ -1221,7 +1386,7 @@ export async function createSprintAction(input: unknown): Promise<{ error?: stri
         if (parsed.data.folderId) await access.requireFolder(caller, parsed.data.folderId, "member");
         else await access.requireSpace(caller, parsed.data.spaceId, "member");
         await planning.createSprint(parsed.data);
-        refresh();
+        refresh(caller, parsed.data.spaceId);
         return {};
     } catch (caught) {
         return failure(caught, "Could not create the sprint");
@@ -1235,7 +1400,7 @@ export async function updateSprintAction(spaceId: string, sprintId: string, inpu
     try {
         await access.requireSpace(caller, spaceId, "member");
         await planning.updateSprint(sprintId, parsed.data);
-        refresh();
+        refresh(caller, spaceId);
         return {};
     } catch (caught) {
         return failure(caught, "Could not save the sprint");
@@ -1251,7 +1416,7 @@ export async function setSprintStatusAction(
     try {
         await access.requireSpace(caller, spaceId, "member");
         await planning.setSprintStatus(spaceId, sprintId, status);
-        refresh();
+        refresh(caller, spaceId);
         return {};
     } catch (caught) {
         return failure(caught, "Could not change the sprint");
@@ -1263,7 +1428,7 @@ export async function deleteSprintAction(spaceId: string, sprintId: string): Pro
     try {
         await access.requireSpace(caller, spaceId, "admin");
         await planning.deleteSprint(sprintId);
-        refresh();
+        refresh(caller, spaceId);
         return {};
     } catch (caught) {
         return failure(caught, "Could not delete the sprint");
@@ -1273,13 +1438,40 @@ export async function deleteSprintAction(spaceId: string, sprintId: string): Pro
 export async function setTaskSprintAction(taskId: string, sprintId: string | null): Promise<{ error?: string }> {
     const caller = await actor();
     try {
-        await access.requireTask(caller, taskId, "member");
+        const { spaceId } = await access.requireTask(caller, taskId, "member");
         await planning.setTaskSprint(taskId, sprintId);
-        refresh();
+        refresh(caller, spaceId);
         return {};
     } catch (caught) {
         return failure(caught, "Could not move that task");
     }
+}
+
+/**
+ * Clear the caller for a goal they named by id, and answer where it lives.
+ *
+ * A goal either plans for a space, and then membership of that space is what
+ * says who may move it, or it is somebody's own and only they may. The id
+ * arrives from the browser like every other, so it is resolved here rather than
+ * trusted - holding the instance permission says the app is available, never
+ * that a particular goal is.
+ */
+async function requireGoal(caller: access.TaskActor, goalId: string): Promise<string | null> {
+    const goal = await planning.goalOwner(goalId);
+    if (!goal) throw new access.TaskAccessError("That goal no longer exists");
+    if (goal.spaceId) {
+        await access.requireSpace(caller, goal.spaceId, "member");
+        return goal.spaceId;
+    }
+    if (goal.ownerId !== caller.id && !caller.isAdmin) throw new access.TaskAccessError();
+    return null;
+}
+
+/** The same, for one of a goal's targets. */
+async function requireGoalTarget(caller: access.TaskActor, targetId: string): Promise<string | null> {
+    const target = await planning.goalTargetOwner(targetId);
+    if (!target) throw new access.TaskAccessError("That target no longer exists");
+    return requireGoal(caller, target.goalId);
 }
 
 export async function createGoalAction(input: unknown): Promise<{ id?: string; error?: string }> {
@@ -1289,7 +1481,7 @@ export async function createGoalAction(input: unknown): Promise<{ id?: string; e
     try {
         if (parsed.data.spaceId) await access.requireSpace(caller, parsed.data.spaceId, "member");
         const id = await planning.createGoal(caller.id, parsed.data);
-        refresh();
+        refresh(caller, parsed.data.spaceId);
         return { id };
     } catch (caught) {
         return failure(caught, "Could not create the goal");
@@ -1301,9 +1493,15 @@ export async function updateGoalAction(goalId: string, input: unknown): Promise<
     const parsed = core.goalSchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the goal and try again" };
     try {
-        if (parsed.data.spaceId) await access.requireSpace(caller, parsed.data.spaceId, "member");
+        // Both ends: the space the goal is in now, and the one the edit would
+        // move it to. Checking only the destination would let anybody adopt a
+        // goal out of a space they cannot see.
+        const from = await requireGoal(caller, goalId);
+        if (parsed.data.spaceId && parsed.data.spaceId !== from) {
+            await access.requireSpace(caller, parsed.data.spaceId, "member");
+        }
         await planning.updateGoal(goalId, parsed.data);
-        refresh();
+        refresh(caller, [from, parsed.data.spaceId]);
         return {};
     } catch (caught) {
         return failure(caught, "Could not save the goal");
@@ -1311,10 +1509,11 @@ export async function updateGoalAction(goalId: string, input: unknown): Promise<
 }
 
 export async function setGoalCompletedAction(goalId: string, completed: boolean): Promise<{ error?: string }> {
-    await actor();
+    const caller = await actor();
     try {
+        const spaceId = await requireGoal(caller, goalId);
         await planning.setGoalCompleted(goalId, completed);
-        refresh();
+        refresh(caller, spaceId);
         return {};
     } catch (caught) {
         return failure(caught, "Could not update the goal");
@@ -1322,10 +1521,11 @@ export async function setGoalCompletedAction(goalId: string, completed: boolean)
 }
 
 export async function deleteGoalAction(goalId: string): Promise<{ error?: string }> {
-    await actor();
+    const caller = await actor();
     try {
+        const spaceId = await requireGoal(caller, goalId);
         await planning.deleteGoal(goalId);
-        refresh();
+        refresh(caller, spaceId);
         return {};
     } catch (caught) {
         return failure(caught, "Could not delete the goal");
@@ -1333,12 +1533,16 @@ export async function deleteGoalAction(goalId: string): Promise<{ error?: string
 }
 
 export async function addGoalTargetAction(goalId: string, input: unknown): Promise<{ error?: string }> {
-    await actor();
+    const caller = await actor();
     const parsed = core.goalTargetSchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the target and try again" };
     try {
+        const spaceId = await requireGoal(caller, goalId);
+        // A `tasks` target counts a list's finished work, so naming one is a read
+        // of that list and takes the same clearance as looking at it.
+        if (parsed.data.listId) await access.requireList(caller, parsed.data.listId, "guest");
         await planning.addGoalTarget(goalId, parsed.data);
-        refresh();
+        refresh(caller, spaceId);
         return {};
     } catch (caught) {
         return failure(caught, "Could not add the target");
@@ -1346,11 +1550,12 @@ export async function addGoalTargetAction(goalId: string, input: unknown): Promi
 }
 
 export async function setGoalTargetValueAction(targetId: string, value: number): Promise<{ error?: string }> {
-    await actor();
+    const caller = await actor();
     if (!Number.isFinite(value)) return { error: "Enter a number" };
     try {
+        const spaceId = await requireGoalTarget(caller, targetId);
         await planning.setGoalTargetValue(targetId, value);
-        refresh();
+        refresh(caller, spaceId);
         return {};
     } catch (caught) {
         return failure(caught, "Could not update the target");
@@ -1358,10 +1563,11 @@ export async function setGoalTargetValueAction(targetId: string, value: number):
 }
 
 export async function deleteGoalTargetAction(targetId: string): Promise<{ error?: string }> {
-    await actor();
+    const caller = await actor();
     try {
+        const spaceId = await requireGoalTarget(caller, targetId);
         await planning.deleteGoalTarget(targetId);
-        refresh();
+        refresh(caller, spaceId);
         return {};
     } catch (caught) {
         return failure(caught, "Could not remove the target");
@@ -1380,7 +1586,7 @@ export async function createAutomationAction(input: unknown): Promise<{ error?: 
     try {
         await access.requireSpace(caller, parsed.data.spaceId, "admin");
         await automations.createAutomation(parsed.data.spaceId, caller.id, parsed.data);
-        refresh();
+        refresh(caller, parsed.data.spaceId);
         return {};
     } catch (caught) {
         return failure(caught, "Could not save the rule");
@@ -1398,7 +1604,7 @@ export async function updateAutomationAction(
     try {
         await access.requireSpace(caller, spaceId, "admin");
         await automations.updateAutomation(automationId, parsed.data);
-        refresh();
+        refresh(caller, spaceId);
         return {};
     } catch (caught) {
         return failure(caught, "Could not save the rule");
@@ -1414,7 +1620,7 @@ export async function setAutomationEnabledAction(
     try {
         await access.requireSpace(caller, spaceId, "admin");
         await automations.setAutomationEnabled(automationId, enabled);
-        refresh();
+        refresh(caller, spaceId);
         return {};
     } catch (caught) {
         return failure(caught, "Could not change the rule");
@@ -1426,7 +1632,7 @@ export async function deleteAutomationAction(spaceId: string, automationId: stri
     try {
         await access.requireSpace(caller, spaceId, "admin");
         await automations.deleteAutomation(automationId);
-        refresh();
+        refresh(caller, spaceId);
         return {};
     } catch (caught) {
         return failure(caught, "Could not remove the rule");
@@ -1447,11 +1653,31 @@ export async function createDocAction(input: unknown): Promise<{ id?: string; er
         if (parsed.data.folderId) await access.requireFolder(caller, parsed.data.folderId, "member");
         else if (parsed.data.spaceId) await access.requireSpace(caller, parsed.data.spaceId, "member");
         const id = await docs.createDoc(caller.id, parsed.data);
-        refresh();
+        refresh(caller, parsed.data.spaceId);
         return { id };
     } catch (caught) {
         return failure(caught, "Could not create the page");
     }
+}
+
+/**
+ * Clear the caller for a page they named by id, and answer which space it is in.
+ *
+ * Where the page already sits is what decides this, not where the request says
+ * it should go: a page inside a folder takes that folder, one the space shares
+ * takes the space, and a page belonging to neither is the writer's own. Checking
+ * only the payload would let anybody edit any page by describing it as theirs.
+ */
+async function requireDoc(caller: access.TaskActor, docId: string): Promise<string | null> {
+    const doc = await docs.docOwner(docId);
+    if (!doc) throw new access.TaskAccessError("That page no longer exists");
+    if (doc.folderId) return (await access.requireFolder(caller, doc.folderId, "member")).spaceId;
+    if (doc.spaceId) {
+        await access.requireSpace(caller, doc.spaceId, "member");
+        return doc.spaceId;
+    }
+    if (doc.createdById !== caller.id && !caller.isAdmin) throw new access.TaskAccessError();
+    return null;
 }
 
 export async function updateDocAction(docId: string, input: unknown): Promise<{ error?: string }> {
@@ -1459,10 +1685,13 @@ export async function updateDocAction(docId: string, input: unknown): Promise<{ 
     const parsed = core.docSchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the page and try again" };
     try {
+        // Both ends, because an edit can also move the page: where it is now, and
+        // the folder or space it would land in.
+        const from = await requireDoc(caller, docId);
         if (parsed.data.folderId) await access.requireFolder(caller, parsed.data.folderId, "member");
         else if (parsed.data.spaceId) await access.requireSpace(caller, parsed.data.spaceId, "member");
         await docs.updateDoc(caller.id, docId, parsed.data);
-        refresh();
+        refresh(caller, [from, parsed.data.spaceId]);
         return {};
     } catch (caught) {
         return failure(caught, "Could not save the page");
@@ -1470,10 +1699,11 @@ export async function updateDocAction(docId: string, input: unknown): Promise<{ 
 }
 
 export async function deleteDocAction(docId: string): Promise<{ error?: string }> {
-    await actor();
+    const caller = await actor();
     try {
+        const spaceId = await requireDoc(caller, docId);
         await docs.deleteDoc(docId);
-        refresh();
+        refresh(caller, spaceId);
         return {};
     } catch (caught) {
         return failure(caught, "Could not delete the page");
@@ -1487,7 +1717,7 @@ export async function createFormAction(spaceId: string, input: unknown): Promise
     try {
         await access.requireSpace(caller, spaceId, "admin");
         await forms.createForm(spaceId, caller.id, parsed.data);
-        refresh();
+        refresh(caller, spaceId);
         return {};
     } catch (caught) {
         return failure(caught, "Could not create the form");
@@ -1501,7 +1731,7 @@ export async function updateFormAction(spaceId: string, formId: string, input: u
     try {
         await access.requireSpace(caller, spaceId, "admin");
         await forms.updateForm(formId, parsed.data);
-        refresh();
+        refresh(caller, spaceId);
         return {};
     } catch (caught) {
         return failure(caught, "Could not save the form");
@@ -1513,7 +1743,7 @@ export async function deleteFormAction(spaceId: string, formId: string): Promise
     try {
         await access.requireSpace(caller, spaceId, "admin");
         await forms.deleteForm(formId);
-        refresh();
+        refresh(caller, spaceId);
         return {};
     } catch (caught) {
         return failure(caught, "Could not remove the form");

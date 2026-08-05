@@ -325,6 +325,28 @@ export async function updateGoal(goalId: string, input: core.GoalInput): Promise
     });
 }
 
+/**
+ * Who a goal answers to: the space it plans for, and the account that created
+ * it. An action handed nothing but a goal id has no other way to authorize the
+ * write, and a goal with no space is somebody's own rather than a space's.
+ */
+export async function goalOwner(goalId: string): Promise<{ ownerId: string; spaceId: string | null } | null> {
+    return prisma.taskGoal.findUnique({ where: { id: goalId }, select: { ownerId: true, spaceId: true } });
+}
+
+/** The same answer for one of a goal's targets, since a target is only ever
+ *  written through the goal that holds it. */
+export async function goalTargetOwner(
+    targetId: string
+): Promise<{ goalId: string; ownerId: string; spaceId: string | null } | null> {
+    const target = await prisma.taskGoalTarget.findUnique({
+        where: { id: targetId },
+        select: { goalId: true, goal: { select: { ownerId: true, spaceId: true } } }
+    });
+    if (!target) return null;
+    return { goalId: target.goalId, ownerId: target.goal.ownerId, spaceId: target.goal.spaceId };
+}
+
 export async function setGoalCompleted(goalId: string, completed: boolean): Promise<void> {
     await prisma.taskGoal.update({
         where: { id: goalId },

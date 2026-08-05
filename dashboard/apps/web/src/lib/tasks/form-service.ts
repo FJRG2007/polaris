@@ -152,7 +152,7 @@ export async function submitForm(
     token: string,
     answers: Record<string, string>,
     submittedById: string | null
-): Promise<{ ok: true; confirmation: string } | { ok: false; error: string }> {
+): Promise<{ ok: true; confirmation: string; spaceId: string } | { ok: false; error: string }> {
     const form = await prisma.taskForm.findUnique({
         where: { token },
         select: {
@@ -251,5 +251,11 @@ export async function submitForm(
         }
     });
 
-    return { ok: true, confirmation: form.confirmation || "Thanks. Your request has been received." };
+    // The space rides back so the caller can tell the team a request arrived
+    // without looking the form up again.
+    return {
+        ok: true,
+        confirmation: form.confirmation || "Thanks. Your request has been received.",
+        spaceId: form.spaceId
+    };
 }

@@ -13,6 +13,7 @@
 import { getSession } from "@/lib/session";
 import { clientIp } from "@/lib/request-context";
 import { rateLimit } from "@/lib/rate-limit-service";
+import { publishTaskChange } from "@/lib/tasks/live";
 import { submitForm } from "@/lib/tasks/form-service";
 
 /** How many submissions one address may send per hour. High enough that a real
@@ -34,7 +35,12 @@ export async function submitFormAction(
 
     try {
         const result = await submitForm(token, answers, submittedById);
-        return result.ok ? { confirmation: result.confirmation } : { error: result.error };
+        if (!result.ok) return { error: result.error };
+        // A request filed from outside lands on the team's board while they are
+        // looking at it. Nobody here is a reader of that board - an anonymous
+        // submitter has no id at all - so this wakes everyone who can see it.
+        publishTaskChange({ spaceId: result.spaceId, actorId: submittedById ?? "" });
+        return { confirmation: result.confirmation };
     } catch (caught) {
         console.error(caught);
         return { error: "The form could not be sent. Try again in a moment." };

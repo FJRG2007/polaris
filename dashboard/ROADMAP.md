@@ -138,6 +138,13 @@ Tasks (work management):
 - [x] Reporting: status/priority mix, 30-day completion, workload, tracked time
 - [x] Sharing one task: send it to people (in Polaris, or by email), the private
       link, and a read-only public link that is off until somebody turns it on
+- [x] Live: a task created, assigned, moved, commented on or deleted appears on
+      every other screen showing that space without a reload, scoped server-side
+      so a signal only ever reaches somebody who could already read the work
+- [x] Organizations and teams: work owned by a group rather than a person, with
+      a roster, teams inside it, and a team granted a whole space or one folder
+      of it; an administrator can turn organizations off, restrict who may start
+      one, and cap organizations per account, members and teams
 - [ ] Attachments on a task (Drive file picker)
 - [ ] Whiteboards, mind maps, clips, AI, email-in, proofing, map and workload
       views, portfolios - out of scope for this pillar
@@ -170,6 +177,24 @@ Tasks (work management):
   goals or wiki - those belong to the whole space. Cross-space screens read a
   resolved scope (spaces held outright, plus the exact lists granted elsewhere)
   rather than asking per row, so an aggregate cannot leak the client next door.
+- The Tasks live channel carries the fact that a space changed and never what
+  changed in it. The browser answers by re-rendering the route it is on, which
+  re-runs the same server components and the same access checks that drew it, so
+  being told "something moved" can never turn into being shown a row you may not
+  read - and every view follows along without one of them needing its own
+  payload format. The bus behind it is in-process: every writer is in the same
+  server, so a broker would be a dependency to keep working forever for nothing.
+- An organization is not a second kind of account. Nobody signs in as one - no
+  password, no session, no permission set - so the authentication surface never
+  learns about it. It owns spaces and holds a roster, and that is all.
+- Being on an organization's roster reaches no work, exactly as being in a
+  GitHub organization hands you no repositories. Access comes from a team grant,
+  a direct space membership, or administering the organization that owns the
+  space. A team grant resolves to the same guest/member/admin vocabulary a
+  personal membership uses, so nothing downstream has to know whether somebody
+  arrived as a person or as part of a team - and where both apply, the stronger
+  wins. On an organization's space, `internal` means that roster rather than
+  everybody on the instance.
 - Accepted dependency risk: two moderate advisories remain against `postcss@8.4.31`
   bundled inside Next.js's private build toolchain (an XSS-in-CSS-stringify path
   that our app never exercises - build-time only, no untrusted CSS). The direct

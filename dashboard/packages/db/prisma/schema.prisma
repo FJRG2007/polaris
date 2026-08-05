@@ -122,6 +122,9 @@ model User {
     taskReminders       TaskReminder[]
     taskViews           TaskView[]
     taskGoals           TaskGoal[]
+    ownedOrgs           Organization[]       @relation("OrganizationOwner")
+    orgMemberships      OrganizationMember[]
+    teamMemberships     TeamMember[]
 }
 
 // Addresses a user owns besides the one they sign in with. The primary stays on
@@ -2716,6 +2719,142 @@ model AlarmEvent {
     @@index([alarmId, createdAt])
 }
 // ---------------------------------------------------------------------------
+// Organizations and teams
+// ---------------------------------------------------------------------------
+
+// An account that belongs to a group of people rather than to one person, in the
+// shape GitHub made familiar: it has a handle, it has members, and the work it
+// owns outlives whoever created it.
+//
+// It is deliberately not a second kind of `User`. Nobody signs in as an
+// organization - there is no password, no session and no permission set on it -
+// so none of the authentication surface has to learn about it. It owns things
+// and it holds a roster, and that is all.
+//
+// Whether an instance offers organizations at all, who may create one, and how
+// large they may get are administrator settings rather than schema (see
+// ORGANIZATION_POLICY in @polaris/core).
+model Organization {
+    id          String   @id @default(uuid(7)) @db.Uuid
+    // The handle in URLs. Unique across the instance and refused when it collides
+    // with an account username, so /o/acme can never be ambiguous with a person.
+    slug        String   @unique
+    name        String
+    description String   @default("")
+    // Uploaded avatar, resolved the same way an account's is.
+    image       String?
+    // The account that answers for it. Never also a member row, so removing every
+    // member cannot leave an organization nobody can administer. Ownership moves
+    // by writing this column, which is what a transfer does.
+    ownerId     String   @db.Uuid
+    createdAt   DateTime @default(now())
+    updatedAt   DateTime @updatedAt
+
+    owner   User                 @relation("OrganizationOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+    members OrganizationMember[]
+    teams   Team[]
+    spaces  TaskSpace[]
+
+    @@index([ownerId])
+}
+
+// Somebody other than the owner on an organization's roster.
+//
+// Membership on its own reaches no work, exactly as being in a GitHub
+// organization hands you no repositories: it puts somebody on the roster and
+// makes them available to teams. What opens a space is a team grant, a direct
+// space membership, or running the organization that owns it.
+model OrganizationMember {
+    id        String   @id @default(uuid(7)) @db.Uuid
+    orgId     String   @db.Uuid
+    userId    String   @db.Uuid
+    // member | admin - see ORG_ROLES in @polaris/core. An admin runs the roster,
+    // the teams and the organization's spaces; only the owner can rename it,
+    // transfer it, or delete it.
+    role      String   @default("member")
+    createdAt DateTime @default(now())
+
+    org  Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+    user User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@unique([orgId, userId])
+    @@index([userId])
+}
+
+// A named subset of an organization's members, so access is granted to "the
+// design team" rather than to seven people who then drift apart from one
+// another. Adding somebody to the team is what gives them everything it reaches.
+model Team {
+    id           String   @id @default(uuid(7)) @db.Uuid
+    orgId        String   @db.Uuid
+    // Unique within its organization, so two organizations may both have `core`.
+    slug         String
+    name         String
+    description  String   @default("")
+    createdAt    DateTime @default(now())
+    updatedAt    DateTime @updatedAt
+
+    org          Organization     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+    members      TeamMember[]
+    spaceGrants  TaskSpaceTeam[]
+    folderGrants TaskFolderTeam[]
+
+    @@unique([orgId, slug])
+    @@index([orgId])
+}
+
+// Somebody on a team. A maintainer may add and remove that team's own people
+// without administering the whole organization, which is what lets a team lead
+// run their team.
+model TeamMember {
+    teamId String @db.Uuid
+    userId String @db.Uuid
+    // member | maintainer - see TEAM_ROLES in @polaris/core.
+    role   String @default("member")
+
+    team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@id([teamId, userId])
+    @@index([userId])
+}
+
+// A team's access to a whole space, and the role everybody on it gets there.
+// Read exactly as a personal space membership is, and where somebody has both
+// the stronger one wins.
+model TaskSpaceTeam {
+    id        String   @id @default(uuid(7)) @db.Uuid
+    spaceId   String   @db.Uuid
+    teamId    String   @db.Uuid
+    // guest | member | admin - the same vocabulary a personal membership uses.
+    role      String   @default("member")
+    createdAt DateTime @default(now())
+
+    space TaskSpace @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+    team  Team      @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+    @@unique([spaceId, teamId])
+    @@index([teamId])
+}
+
+// A team's access to one branch of a space, inherited downwards the way a
+// personal folder grant is. This is how one project inside a shared space is
+// handed to the team that works it, without opening the rest of the space.
+model TaskFolderTeam {
+    id        String   @id @default(uuid(7)) @db.Uuid
+    folderId  String   @db.Uuid
+    teamId    String   @db.Uuid
+    role      String   @default("member")
+    createdAt DateTime @default(now())
+
+    folder TaskFolder @relation(fields: [folderId], references: [id], onDelete: Cascade)
+    team   Team       @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+    @@unique([folderId, teamId])
+    @@index([teamId])
+}
+
+// ---------------------------------------------------------------------------
 // Tasks (work management)
 // ---------------------------------------------------------------------------
 
@@ -2730,11 +2869,18 @@ model AlarmEvent {
 model TaskSpace {
     id          String   @id @default(uuid(7)) @db.Uuid
     ownerId     String   @db.Uuid
+    // The organization this space belongs to, or null for a personal one. An
+    // organization's space is reachable by whoever runs that organization and by
+    // the teams granted it, and outlives its creator leaving; a personal space is
+    // its owner's and whoever they added.
+    orgId       String?  @db.Uuid
     name        String
     prefix      String   @unique
     description String   @default("")
     color       String   @default("#7c5cff")
-    // private | internal - see SPACE_VISIBILITIES in @polaris/core.
+    // private | internal - see SPACE_VISIBILITIES in @polaris/core. On an
+    // organization's space `internal` means everybody on that roster rather than
+    // everybody on the instance.
     visibility  String   @default("private")
     archived    Boolean  @default(false)
     order       Float    @default(1024)
@@ -2745,7 +2891,9 @@ model TaskSpace {
     updatedAt   DateTime @updatedAt
 
     owner       User              @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+    org         Organization?     @relation(fields: [orgId], references: [id], onDelete: Cascade)
     members     TaskSpaceMember[]
+    teamGrants  TaskSpaceTeam[]
     folders     TaskFolder[]
     lists       TaskList[]
     statuses    TaskStatus[]
@@ -2761,6 +2909,7 @@ model TaskSpace {
     forms       TaskForm[]
 
     @@index([ownerId])
+    @@index([orgId])
 }
 
 // Somebody other than the owner who may reach a space. The owner is never a row
@@ -2799,10 +2948,11 @@ model TaskFolder {
     space    TaskSpace          @relation(fields: [spaceId], references: [id], onDelete: Cascade)
     parent   TaskFolder?        @relation("TaskFolderNesting", fields: [parentId], references: [id], onDelete: Cascade)
     children TaskFolder[]       @relation("TaskFolderNesting")
-    lists    TaskList[]
-    docs     TaskDoc[]
-    sprints  TaskSprint[]
-    members  TaskFolderMember[]
+    lists      TaskList[]
+    docs       TaskDoc[]
+    sprints    TaskSprint[]
+    members    TaskFolderMember[]
+    teamGrants TaskFolderTeam[]
 
     @@index([spaceId])
     @@index([parentId])
@@ -3750,8 +3900,9 @@ model UserModelKey {
     userId          String   @db.Uuid
     // The provider's integration slug, e.g. `anthropic`, `groq`.
     provider        String
-    // What its owner calls it. Unique within the provider so a row is
-    // addressable by something a person recognises rather than by an id.
+    // What its owner calls it. Unique across the whole account, not per provider:
+    // it is how a person names one key in a sentence, and two rows answering to
+    // "prod-main" makes that sentence ambiguous wherever it is read.
     name            String
     // Position in the owner's list, ascending, lowest tried first. Ties break on
     // creation order, so a list that has had rows removed still reads the same.
@@ -3759,6 +3910,22 @@ model UserModelKey {
     encryptedSecret Bytes
     secretNonce     Bytes
     secretKeyId     String
+    // A keyed hash of the secret, which is the only way to notice the same key
+    // being stored twice: the envelope uses a fresh nonce every time, so two rows
+    // holding one credential have nothing in common to compare. Keyed rather than
+    // plain so a database dump cannot be tested against a list of known keys.
+    // Null on rows written before this existed - the store cannot compute one
+    // without decrypting, and Postgres counts nulls as distinct, so they simply
+    // do not participate.
+    secretFingerprint String?
+    // When the key stops being offered to a run, if its owner said. Polaris does
+    // not learn this from the provider - most of them will not say - so it is
+    // what the person entered when they set an expiry on their side.
+    expiresAt       DateTime?
+    // Which expiry warning has already been sent: "" | "soon" | "expired". Held
+    // so a daily sweep announces each step once, and pushing the date out starts
+    // the announcements over.
+    expiryNotice    String   @default("")
     // Non-secret settings this credential needs, as stringified JSON. Only the
     // gateway shape uses it - a base URL, a model, and the two token limits an
     // endpoint publishes no catalogue for.
@@ -3771,8 +3938,11 @@ model UserModelKey {
 
     user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-    @@unique([userId, provider, name])
+    @@unique([userId, name])
+    @@unique([userId, provider, secretFingerprint])
     @@index([userId, priority])
+    // The daily expiry sweep reads by date across every account.
+    @@index([expiresAt])
 }
 
 // One model a provider serves, as its public catalogue describes it.

@@ -58,6 +58,7 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
     Input,
+    Select,
     cn,
     keepFocusOnClose,
     useDeferredFocus
@@ -409,6 +410,11 @@ export function SpaceTree({ spaces, canCreate }: { spaces: readonly SpaceTreeVie
     const [create, setCreate] = useState<{ kind: CreateKind; at: CreateAt } | null>(null);
     const [newSpace, setNewSpace] = useState(false);
     const [spaceName, setSpaceName] = useState("");
+    // Who the new space would belong to. Empty until the form is opened, and
+    // usually empty afterwards too - most people are in no organization, and the
+    // picker is not drawn when there is only one answer.
+    const [spaceOrgs, setSpaceOrgs] = useState<{ id: string; name: string }[]>([]);
+    const [spaceOwner, setSpaceOwner] = useState("");
     const [error, setError] = useState("");
 
     useEffect(() => {
@@ -494,7 +500,15 @@ export function SpaceTree({ spaces, canCreate }: { spaces: readonly SpaceTreeVie
                         type="button"
                         aria-label="Create a space"
                         title="Create a space"
-                        onClick={() => setNewSpace(!newSpace)}
+                        onClick={() => {
+                            const opening = !newSpace;
+                            setNewSpace(opening);
+                            if (!opening) return;
+                            void (async () => {
+                                const result = await runAction(() => actions.spaceOwnerOptionsAction(), setError);
+                                setSpaceOrgs(result?.orgs ?? []);
+                            })();
+                        }}
                         className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                     >
                         <Plus className="size-3.5" />
@@ -511,13 +525,31 @@ export function SpaceTree({ spaces, canCreate }: { spaces: readonly SpaceTreeVie
                         onChange={(event) => setSpaceName(event.target.value)}
                         className="h-8 text-sm"
                     />
+                    {spaceOrgs.length > 0 && (
+                        <Select
+                            value={spaceOwner}
+                            aria-label="Who this space belongs to"
+                            className="h-8 text-sm"
+                            options={[
+                                { value: "", label: "Your own space" },
+                                ...spaceOrgs.map((org) => ({ value: org.id, label: org.name }))
+                            ]}
+                            onValueChange={setSpaceOwner}
+                        />
+                    )}
                     <div className="flex gap-2">
                         <Button
                             size="sm"
                             disabled={!spaceName.trim()}
                             onClick={async () => {
-                                await run(() => actions.createSpaceAction({ name: spaceName.trim() }));
+                                await run(() =>
+                                    actions.createSpaceAction({
+                                        name: spaceName.trim(),
+                                        orgId: spaceOwner || null
+                                    })
+                                );
                                 setSpaceName("");
+                                setSpaceOwner("");
                                 setNewSpace(false);
                             }}
                         >

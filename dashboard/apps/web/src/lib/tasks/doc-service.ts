@@ -161,6 +161,18 @@ export async function updateDoc(actorId: string, docId: string, input: core.DocI
     });
 }
 
+/** Where a page sits, so an action handed only its id can authorize the write
+ *  against the same folder or space the page was created under. A page with
+ *  neither belongs to whoever wrote it. */
+export async function docOwner(
+    docId: string
+): Promise<{ spaceId: string | null; folderId: string | null; createdById: string | null } | null> {
+    return prisma.taskDoc.findUnique({
+        where: { id: docId },
+        select: { spaceId: true, folderId: true, createdById: true }
+    });
+}
+
 export async function deleteDoc(docId: string): Promise<void> {
     await prisma.taskDoc.delete({ where: { id: docId } });
 }

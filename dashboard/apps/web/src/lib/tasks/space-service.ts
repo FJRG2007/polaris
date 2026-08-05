@@ -219,6 +219,10 @@ export async function createSpace(
         const space = await tx.taskSpace.create({
             data: {
                 ownerId,
+                // Null for a personal space. An organization's space still records
+                // who made it, which is what keeps that person reaching it if they
+                // later step down from running the organization.
+                orgId: input.orgId,
                 name: input.name,
                 prefix,
                 description: input.description,
@@ -361,20 +365,39 @@ export async function removeSpaceMember(spaceId: string, userId: string): Promis
     await prisma.taskSpaceMember.deleteMany({ where: { spaceId, userId } });
 }
 
-/** The people a picker can offer for a space: its owner, its members, and anyone
- *  invited to a folder inside it - a task in a client's folder has to be
- *  assignable to that client. */
+/**
+ * The people a picker can offer for a space.
+ *
+ * Everyone who can reach it, however they reach it: its owner and members,
+ * anyone invited to a folder inside it - a task in a client's folder has to be
+ * assignable to that client - and everybody on a team the space or one of its
+ * folders was given, since a team grant is exactly as real a way in as a
+ * personal one and work nobody can be assigned is work the team cannot run.
+ */
 export async function spacePeople(spaceId: string): Promise<{ id: string; name: string; image: string | null }[]> {
-    const [members, grantees] = await Promise.all([
+    const [members, grantees, spaceTeams, folderTeams] = await Promise.all([
         listSpaceMembers(spaceId),
         prisma.taskFolderMember.findMany({
             where: { folder: { spaceId } },
             select: { user: { select: { id: true, name: true, image: true } } }
+        }),
+        prisma.taskSpaceTeam.findMany({
+            where: { spaceId },
+            select: { team: { select: { members: { select: { user: { select: { id: true, name: true, image: true } } } } } } }
+        }),
+        prisma.taskFolderTeam.findMany({
+            where: { folder: { spaceId } },
+            select: { team: { select: { members: { select: { user: { select: { id: true, name: true, image: true } } } } } } }
         })
     ]);
     const people = new Map(members.map((member) => [member.userId, { id: member.userId, name: member.name, image: member.image }]));
     for (const grant of grantees) {
         if (!people.has(grant.user.id)) people.set(grant.user.id, grant.user);
+    }
+    for (const grant of [...spaceTeams, ...folderTeams]) {
+        for (const member of grant.team.members) {
+            if (!people.has(member.user.id)) people.set(member.user.id, member.user);
+        }
     }
     return [...people.values()];
 }

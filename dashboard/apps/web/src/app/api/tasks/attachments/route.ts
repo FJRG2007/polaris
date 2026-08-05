@@ -10,6 +10,7 @@
 import { requireTask } from "@/lib/tasks/access";
 import { requirePermission } from "@/lib/session";
 import { TaskAccessError } from "@/lib/tasks/access";
+import { publishTaskChange } from "@/lib/tasks/live";
 import { storeAttachment, uploadLimit } from "@/lib/tasks/attachment-service";
 
 export const runtime = "nodejs";
@@ -24,8 +25,9 @@ export async function POST(request: Request): Promise<Response> {
     if (!taskId || !name) return new Response("Missing parameters", { status: 400 });
     if (!request.body) return new Response("Empty body", { status: 400 });
 
+    let spaceId: string;
     try {
-        await requireTask({ id: user.id, isAdmin: user.isAdmin }, taskId, "member");
+        ({ spaceId } = await requireTask({ id: user.id, isAdmin: user.isAdmin }, taskId, "member"));
     } catch (caught) {
         if (caught instanceof TaskAccessError) return new Response("Forbidden", { status: 403 });
         throw caught;
@@ -49,6 +51,9 @@ export async function POST(request: Request): Promise<Response> {
             size: declared,
             body: request.body
         });
+        // The uploader's own screen already redraws from the response; this is
+        // for everybody else looking at the same task.
+        publishTaskChange({ spaceId, actorId: user.id });
         return Response.json({ attachment });
     } catch (error) {
         // The reason is for the operator's log; the uploader gets a sentence they
