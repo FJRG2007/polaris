@@ -235,7 +235,15 @@ export const APP_PERMISSIONS: Readonly<Record<string, string>> = {
     // Post the run-status check a pull request shows while a run is in flight.
     checks: "write",
     // Write the workflow file itself. GitHub gates this separately from contents.
-    workflows: "write"
+    workflows: "write",
+    // Register self-hosted runners on a repository, which is what a runner pool
+    // is. Asked for here rather than left to the operator because the alternative
+    // was an instruction nobody could follow: the screen said "grant
+    // Administration: Read and write", and GitHub never offers a permission the
+    // App does not request - it would have to be added to the App first. The
+    // narrower `organization_self_hosted_runners` covers organizations only, and
+    // most installs are on a user account where it does not apply.
+    administration: "write"
 };
 
 // Deliberately absent: `secrets`. A run gets its provider key from this instance

@@ -25,6 +25,7 @@ import { getUpdateSource } from "@/lib/update-source";
 import { getUpdateStatus } from "@/lib/update-service";
 import { getSetting, setSetting } from "@/lib/setting-store";
 import { notifyOperators } from "@/lib/notifications/operators";
+import { notifyGithubPermissionGap } from "@/lib/integrations/github-permission-notice";
 import { markNotificationsReadByType } from "@/lib/notification-service";
 import { lastUpdateOutcome, publishUpdateSource, startHostUpdate, updateTriggerReason, type UpdateTrigger } from "@/lib/update-runner";
 import {
@@ -251,6 +252,11 @@ export function startUpdateWatcher(): void {
     started = true;
     const tick = (): void => {
         void checkForUpdate().catch((error) => console.error("polaris: update watcher tick failed:", error));
+        // Rides along rather than starting a timer of its own: both ask "is this
+        // deployment waiting on somebody", both are cheap when the answer is no,
+        // and one interval is one thing to reason about. An update that widened
+        // the App's permissions is also exactly when a new gap appears.
+        void notifyGithubPermissionGap();
     };
     setTimeout(tick, FIRST_PASS_MS).unref();
     setInterval(tick, INTERVAL_MS).unref();

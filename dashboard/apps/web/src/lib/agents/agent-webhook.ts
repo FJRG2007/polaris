@@ -21,6 +21,7 @@ import { policyForRepo } from "@/lib/agents/agent-defaults-service";
 import { agentRepoByFullName } from "@/lib/agents/agent-repo-service";
 import { finishAgentRun, sweepStaleRuns } from "@/lib/agents/agent-run-service";
 import {
+    AGENT_TRIGGER_LABELS,
     ALWAYS_ON_TRIGGER,
     policyAllowsTrigger,
     policyAllowsVisibility,
@@ -28,7 +29,7 @@ import {
 } from "@polaris/core";
 
 /** What a webhook boils down to, once the event's shape is out of the way. */
-interface Incident {
+export interface Incident {
     trigger: AgentTrigger;
     /** The issue or pull request this concerns, when it concerns one. */
     issueNumber: number | null;
@@ -156,6 +157,50 @@ function mentions(text: string, appHandle: string): boolean {
     return new RegExp(`@${escaped}(?![A-Za-z0-9-])`, "i").test(text);
 }
 
+/** How much of a body is worth sending. Enough for any issue somebody actually
+ *  wrote; the agent reads the rest with its own tools if it needs to. */
+const MAX_BODY = 4000;
+
+/**
+ * What the agent is told happened.
+ *
+ * The whole webhook payload used to be the prompt, on the belief that the
+ * runtime parsed it as a GitHub event. It does not: without an internal marker
+ * it treats the prompt as plain text, so every run fed the model eight kilobytes
+ * of JSON - the repository object, every API URL on it, the same user three
+ * times - to say "somebody opened an issue called X". A two-line issue exceeded
+ * a small model's context and the run died before doing anything.
+ *
+ * So it is a sentence and the text somebody wrote. Nothing is lost: the run is
+ * pointed at the issue or pull request it concerns, and the agent has tools to
+ * read the rest of it. This also holds for large models, which were paying for
+ * those kilobytes on every run without them ever saying anything.
+ */
+export function describe(incident: Incident, repoFullName: string): string {
+    const at =
+        incident.prNumber !== null
+            ? `pull request #${incident.prNumber}`
+            : incident.issueNumber !== null
+              ? `issue #${incident.issueNumber}`
+              : "the repository";
+    const lines = [
+        `${AGENT_TRIGGER_LABELS[incident.trigger]} on ${at} in ${repoFullName}.`,
+        incident.actor ? `Opened by @${incident.actor}.` : "",
+        incident.branch ? `Targets branch ${incident.branch}.` : "",
+        incident.labels.length > 0 ? `Labels: ${incident.labels.join(", ")}.` : ""
+    ].filter(Boolean);
+
+    // Untrusted text, and deliberately so: this is the thing the agent is being
+    // asked about. It is fenced and labelled rather than blended into the
+    // sentences above, so a body claiming to be an instruction reads as what it
+    // is - somebody's issue text.
+    const body = incident.body.trim();
+    if (body) {
+        lines.push("", "What it says:", "```", body.slice(0, MAX_BODY), "```");
+    }
+    return lines.join("\n");
+}
+
 /** Whether the operator's conditions let this incident through. */
 function matches(condition: { labels: string[]; branches: string[]; authors: string[] }, incident: Incident): boolean {
     // Every list is a narrowing, and an empty one does not narrow. That is what an
@@ -252,7 +297,7 @@ export async function handleAgentWebhook(params: {
         const result = await dispatchRun({
             repo,
             trigger: incident.trigger,
-            prompt: JSON.stringify(params.payload),
+            prompt: describe(incident, repoFullName),
             mode: null,
             issueNumber: incident.issueNumber,
             prNumber: incident.prNumber
@@ -269,10 +314,10 @@ export async function handleAgentWebhook(params: {
         const result = await dispatchRun({
             repo,
             trigger: incident.trigger,
-            // The runtime reads a GitHub event payload directly and works out what
-            // is being asked from it, so the payload is the prompt. The operator's
-            // instructions reach it separately, through run-context.
-            prompt: JSON.stringify(params.payload),
+            // What happened, in a sentence, plus what somebody wrote. The
+            // operator's instructions reach the run separately, through
+            // run-context.
+            prompt: describe(incident, repoFullName),
             mode: rule.mode,
             issueNumber: incident.issueNumber,
             prNumber: incident.prNumber
