@@ -195,17 +195,35 @@ describe("the upstream header", () => {
 });
 
 describe("the firewall still applies", () => {
-    it("blocks a denied address before reaching the upstream", async () => {
+    /** A request from an address the route denies, as a browser would send it. */
+    async function denied(accept: string) {
         respond = () => ({ body: "<html>should not be served</html>" });
 
-        const response = await fetch(`${proxyUrl}/`, {
+        return await fetch(`${proxyUrl}/`, {
             headers: {
                 [ORIGIN_HEADER]: signEdgeOrigin(originUrl, SECRET),
                 "x-forwarded-for": "203.0.113.5",
+                "x-forwarded-host": "app.example.com",
+                accept,
                 "x-polaris-waf": encodeGuardRule({ deny: ["203.0.113.0/24"], requireLogin: false, rules: [] })
             }
         });
+    }
+
+    it("blocks a denied address before reaching the upstream", async () => {
+        const response = await denied("*/*");
 
         expect(response.status).toBe(403);
+        expect(await response.text()).not.toContain("should not be served");
+    });
+
+    it("serves a browser the block page rather than a bare status", async () => {
+        const response = await denied("text/html,*/*;q=0.8");
+        const body = await response.text();
+
+        expect(response.headers.get("content-type")).toContain("text/html");
+        expect(body).toContain("you have been blocked");
+        expect(body).toContain("app.example.com");
+        expect(body).toContain("203.0.113.5");
     });
 });

@@ -15,9 +15,12 @@
  * it offline afterwards.
  */
 
+import { randomUUID } from "node:crypto";
 import { loadEnv } from "@polaris/config";
 import { getSession } from "@/lib/session";
+import { wafBlockPage } from "@polaris/core";
 import { resolveWaf } from "@/lib/waf-service";
+import { clientIp } from "@/lib/request-context";
 import { principalsOfUser } from "@polaris/auth";
 import { deployAppIdForHost } from "@/lib/deploy-service";
 import { EDGE_TOKEN_TTL_SECONDS, principalVerdict, signEdgeToken } from "@polaris/core/waf";
@@ -72,12 +75,22 @@ export async function GET(request: Request): Promise<Response> {
         now
     );
     if (verdict !== "admitted") {
-        return new Response(
-            verdict === "refused"
-                ? "Your account has been blocked from this service."
-                : "Your account does not have access to this service.",
-            { status: 403, headers: { "content-type": "text/plain; charset=utf-8" } }
-        );
+        // The same page the guard serves, because it is the same visitor and the same
+        // refusal - only this one can say what it was about, since the account is signed
+        // in and already knows who it is.
+        const page = wafBlockPage({
+            reference: randomUUID(),
+            host: appOrigin.host,
+            ip: await clientIp(),
+            explanation:
+                verdict === "refused"
+                    ? "Your account has been blocked from this service."
+                    : "Your account does not have access to this service."
+        });
+        return new Response(page, {
+            status: 403,
+            headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" }
+        });
     }
 
     const secret = loadEnv().POLARIS_AUTH_SECRET;

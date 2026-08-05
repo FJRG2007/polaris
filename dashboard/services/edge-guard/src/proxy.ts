@@ -27,10 +27,11 @@
  * with its `compress` middleware, exactly as it would be without the proxy.
  */
 
-import { request as httpsRequest } from "node:https";
-import { evaluate, type GuardConfig } from "./authz.js";
-import { connect as netConnect } from "node:net";
 import type { Duplex } from "node:stream";
+import { sendBlocked } from "./block-page.js";
+import { connect as netConnect } from "node:net";
+import { request as httpsRequest } from "node:https";
+import { clientIp, evaluate, type GuardConfig } from "./authz.js";
 import { decodeGuardRule, verifyEdgeOrigin } from "@polaris/core/waf";
 import {
     EMAIL_DECODE_PATH,
@@ -193,8 +194,11 @@ export function createProxyServer(config: () => GuardConfig): Server {
             cfg
         );
         if (decision.status === 403) {
-            res.writeHead(403, { "content-type": "text/plain" });
-            res.end("Forbidden");
+            sendBlocked(res, {
+                host: header(req, "x-forwarded-host") ?? header(req, "host"),
+                ip: clientIp(header(req, "x-forwarded-for")),
+                accept: header(req, "accept")
+            });
             return;
         }
         if (decision.status === 302) {

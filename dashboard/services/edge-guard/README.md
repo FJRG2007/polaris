@@ -70,6 +70,19 @@ next deploy, and bouncing the visitor back would loop. The exception is a token 
 before this existed, which carries no principals at all and is sent back for one that
 does - that cannot loop, because what it returns with is precisely the field it lacked.
 
+## What a blocked visitor sees
+
+A block answers with a page rather than a bare status: what happened, what to do about
+it, the address the rules were judged against, and a reference to quote. Traefik serves
+a non-2xx forwardAuth response to the client as it stands, so the page is written here.
+
+The page never names the rule that matched - the reason stays with the decision, for the
+operator, because wording that changes with the rule is a ruleset anyone can map by
+probing. A client that did not ask for `text/html` gets the same facts as plain text.
+
+The reference is generated per response and stored nowhere, so it currently identifies
+nothing. It becomes the recorded block id once blocks are recorded.
+
 ## Fail-closed behavior
 
 - A denylist with an unresolvable client IP -> **403**.

@@ -1,11 +1,13 @@
 /**
  * HTTP wrapper for the edge guard. A thin marshaller: it turns Traefik's forwarded
  * request headers into a GuardRequest, calls the pure `evaluate`, and writes the
- * status back. `/health` is a liveness probe; every other path is treated as the
+ * status back - with the block page as the body of a 403, which is what the visitor
+ * ends up reading. `/health` is a liveness probe; every other path is treated as the
  * forwardAuth check, so Traefik can point at `/authz` (or any path) uniformly.
  */
 
-import { evaluate, type GuardConfig } from "./authz.js";
+import { sendBlocked } from "./block-page.js";
+import { clientIp, evaluate, type GuardConfig } from "./authz.js";
 import { createServer, type IncomingMessage, type Server } from "node:http";
 
 /** First value of a request header (Node lower-cases header names). */
@@ -52,8 +54,14 @@ export function createGuardServer(config: () => GuardConfig): Server {
             return;
         }
         if (decision.status === 403) {
-            res.writeHead(403, { "content-type": "text/plain" });
-            res.end("Forbidden");
+            // Traefik serves a non-2xx forwardAuth response to the client as it stands,
+            // body included, so the block page is written here rather than by whatever
+            // the request was headed for - which never sees the request at all.
+            sendBlocked(res, {
+                host: header(req, "x-forwarded-host"),
+                ip: clientIp(header(req, "x-forwarded-for")),
+                accept: header(req, "accept")
+            });
             return;
         }
         res.writeHead(200);

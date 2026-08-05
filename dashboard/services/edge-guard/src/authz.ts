@@ -97,8 +97,10 @@ export type GuardDecision =
     | { readonly status: 403; readonly reason: string }
     | { readonly status: 302; readonly location: string; readonly setCookie?: string };
 
-/** The originating client IP as Traefik forwarded it (leftmost X-Forwarded-For). */
-function clientIp(forwardedFor: string | undefined): string | null {
+/** The originating client IP as Traefik forwarded it (leftmost X-Forwarded-For).
+ *  Exported because the block page shows the visitor the same address the rules were
+ *  judged against, and it has to be the same one. */
+export function clientIp(forwardedFor: string | undefined): string | null {
     if (!forwardedFor) return null;
     const first = forwardedFor.split(",")[0]?.trim();
     return first && first.length > 0 ? first : null;
