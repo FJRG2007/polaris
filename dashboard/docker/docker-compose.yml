@@ -54,9 +54,21 @@ services:
       # Trust the local-network names for auth; kept in sync with the mdns service.
       POLARIS_LOCAL_HOSTNAME: ${POLARIS_MDNS_HOSTNAME:-polaris}
     # Traefik routes the dashboard by these labels (discovered on the default
-    # network). The dashboard answers only on its own names - the local names, the
-    # server IP, and an optional public domain - so an unknown host (e.g. a random
-    # sslip.io subdomain) 404s at the edge instead of leaking the control plane.
+    # network). The dashboard answers only on its own names - the local names, an
+    # optional public domain, and any address of the machine itself - so an unknown
+    # *name* (e.g. a random sslip.io subdomain) still 404s at the edge instead of
+    # leaking the control plane.
+    #
+    # Addresses are matched by shape rather than listed, because listing them was
+    # wrong the moment the machine had two. POLARIS_PUBLIC_IP is captured once at
+    # install, so a box that also answers on a second interface - a bridge beside
+    # the wifi, a VPN, a new lease - 404s the whole dashboard on that address with
+    # nothing to say why. A bare IPv4 literal in the Host header means somebody
+    # reached this machine directly on a network they are already on, which is the
+    # case the named list was meant to cover and kept missing. It is not the case
+    # the list exists to refuse: a hostname that resolves here is still refused
+    # unless it is named, so `1.2.3.4.sslip.io` does not match this.
+    #
     # TLS on :443 (Traefik's default self-signed cert for the local names, or a
     # Let's Encrypt cert for a public domain), with :80 redirected to https.
     labels:
@@ -64,14 +76,14 @@ services:
       - "polaris.role=edge"
       - "traefik.enable=true"
       - "traefik.docker.network=polaris_default"
-      - "traefik.http.routers.polaris-web.rule=Host(`polaris`) || Host(`polaris.local`) || Host(`${POLARIS_PUBLIC_IP:-127.0.0.1}`) || Host(`${POLARIS_PUBLIC_DOMAIN:-polaris.internal}`)"
+      - "traefik.http.routers.polaris-web.rule=Host(`polaris`) || Host(`polaris.local`) || Host(`${POLARIS_PUBLIC_IP:-127.0.0.1}`) || Host(`${POLARIS_PUBLIC_DOMAIN:-polaris.internal}`) || HostRegexp(`^[0-9]{1,3}(\\.[0-9]{1,3}){3}$$`)"
       - "traefik.http.routers.polaris-web.entrypoints=websecure"
       - "traefik.http.routers.polaris-web.tls=true"
       # The container exposes two services (dashboard + WS sidecar), so every
       # router must name its service explicitly - Traefik will not auto-link.
       - "traefik.http.routers.polaris-web.service=polaris-web"
       - "traefik.http.services.polaris-web.loadbalancer.server.port=3000"
-      - "traefik.http.routers.polaris-web-http.rule=Host(`polaris`) || Host(`polaris.local`) || Host(`${POLARIS_PUBLIC_IP:-127.0.0.1}`) || Host(`${POLARIS_PUBLIC_DOMAIN:-polaris.internal}`)"
+      - "traefik.http.routers.polaris-web-http.rule=Host(`polaris`) || Host(`polaris.local`) || Host(`${POLARIS_PUBLIC_IP:-127.0.0.1}`) || Host(`${POLARIS_PUBLIC_DOMAIN:-polaris.internal}`) || HostRegexp(`^[0-9]{1,3}(\\.[0-9]{1,3}){3}$$`)"
       - "traefik.http.routers.polaris-web-http.entrypoints=web"
       - "traefik.http.routers.polaris-web-http.service=polaris-web"
       - "traefik.http.routers.polaris-web-http.middlewares=polaris-redirect-https"
