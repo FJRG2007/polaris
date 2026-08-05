@@ -208,11 +208,17 @@ export async function handleAgentWebhook(params: {
     const repoFullName = payload.repository?.full_name;
     if (!repoFullName) return [];
 
+    // A workflow finishing is the one event we send to ourselves that we must
+    // read. It is how a run whose job failed, was cancelled or was killed stops
+    // saying "running", and its sender is our own App because our own dispatch
+    // started it - so it has to be handled before the self-ignore below, which
+    // used to swallow it and leave every failed run running until the six-hour
+    // sweep while the Actions tab had said "failed" within the minute.
+    if (params.event === "workflow_run") return closeOutWorkflowRun(payload);
+
     // A run's own comments and pushes come back as webhooks. Answering them is how
     // an agent ends up in a conversation with itself.
     if (payload.sender?.type === "Bot" && payload.sender.login?.startsWith(params.appHandle)) return [];
-
-    if (params.event === "workflow_run") return closeOutWorkflowRun(payload);
 
     const repo = await agentRepoByFullName(repoFullName);
     if (!repo) return [];

@@ -7,10 +7,16 @@
  * the runs screen stayed empty - the numbers an operator is paying their
  * provider for, never recorded.
  *
- * Authenticated as the run itself, and it may only speak for itself: the path is
- * the caller's claim, the authenticated run is the fact. Everything is optional
- * and anything unrecognised is dropped, because the runtime sends what it has at
- * the moment it has it and gains fields faster than this does.
+ * The id in the path is **GitHub's** run id, not Polaris's - the runtime knows
+ * itself by `GITHUB_RUN_ID` and has no reason to learn a second identifier. So
+ * the path is a claim to cross-check, and the authenticated caller is what
+ * decides which row is written. Comparing the path against the Polaris run id
+ * instead is a 404 on every call, which is what this route did when it was
+ * first written.
+ *
+ * Everything is optional and anything unrecognised is dropped, because the
+ * runtime sends what it has at the moment it has it and gains fields faster than
+ * this does.
  */
 
 import { z } from "zod";
@@ -42,7 +48,18 @@ export async function PATCH(
 
     const caller = await authenticateRun(request.headers);
     if (!caller) return Response.json({ error: "not a recognised run" }, { status: 401 });
-    if (caller.runId !== runId) return Response.json({ error: "not that run" }, { status: 404 });
+
+    // Either identifier is accepted, and both have to be about the caller. A
+    // path naming somebody else's job is refused rather than quietly writing to
+    // the caller's own row, which would let a job report another's numbers.
+    const row = await prisma.agentRun.findUnique({
+        where: { id: caller.runId },
+        select: { githubRunId: true }
+    });
+    if (!row) return Response.json({ error: "not that run" }, { status: 404 });
+    if (runId !== caller.runId && runId !== row.githubRunId) {
+        return Response.json({ error: "not that run" }, { status: 404 });
+    }
 
     const parsed = patchSchema.safeParse(await request.json().catch(() => null));
     // A body this does not understand is not an error the run should act on: it
@@ -54,8 +71,10 @@ export async function PATCH(
         ...(parsed.data.inputTokens === undefined ? {} : { tokensIn: parsed.data.inputTokens }),
         ...(parsed.data.outputTokens === undefined ? {} : { tokensOut: parsed.data.outputTokens })
     };
+    // The caller's own row, never the path's: the path may legitimately carry
+    // GitHub's id, which is not what this table is keyed on.
     if (Object.keys(data).length > 0) {
-        await prisma.agentRun.updateMany({ where: { id: runId }, data });
+        await prisma.agentRun.updateMany({ where: { id: caller.runId }, data });
     }
 
     return Response.json({ ok: true }, { headers: { "cache-control": "no-store" } });

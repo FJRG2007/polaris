@@ -6,7 +6,7 @@ import { runAction } from "@/lib/run-action";
 import { useEffect, useState, useTransition } from "react";
 import { cancelRunAction, startRunAction } from "../actions";
 import type { AgentRunView } from "@/lib/agents/agent-run-service";
-import { Check, Loader2, Play, Square, TriangleAlert } from "lucide-react";
+import { Check, ExternalLink, Loader2, Play, Square, TriangleAlert } from "lucide-react";
 import { GATE_STEP_LABELS, type GateStepReport } from "@/lib/agents/agent-gate";
 import { AGENT_EXECUTION_LABELS, AGENT_TRIGGER_LABELS, isTerminalRunState } from "@polaris/core";
 import {
@@ -108,7 +108,24 @@ export function RunsView({ runs, repos }: { runs: AgentRunView[]; repos: string[
                                             {AGENT_TRIGGER_LABELS[run.trigger]}
                                         </td>
                                         <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">
-                                            {AGENT_EXECUTION_LABELS[run.execution]}
+                                            {/* The job itself, which is where the log is. Without
+                                                this, working out why a run failed meant finding the
+                                                repository, opening Actions and guessing which run
+                                                was ours. */}
+                                            {jobUrl(run) ? (
+                                                <a
+                                                    href={jobUrl(run) as string}
+                                                    target="_blank"
+                                                    rel="noreferrer"
+                                                    className="inline-flex items-center gap-1 hover:underline"
+                                                    title="Open the job that ran this"
+                                                >
+                                                    {AGENT_EXECUTION_LABELS[run.execution]}
+                                                    <ExternalLink className="size-3 shrink-0" />
+                                                </a>
+                                            ) : (
+                                                AGENT_EXECUTION_LABELS[run.execution]
+                                            )}
                                         </td>
                                         <td className="whitespace-nowrap px-4 py-3">
                                             <RunState state={run.state} />
@@ -171,6 +188,19 @@ function GateSteps({ steps }: { steps: GateStepReport[] }) {
             ))}
         </ul>
     );
+}
+
+/**
+ * The job that ran it, when there is one to open.
+ *
+ * Null until GitHub's own run id is recorded, which happens on the run's first
+ * call home - a job that died before that has nothing to link to, and a run on
+ * the Polaris box has no GitHub job at all; both then read as plain text rather
+ * than a link that goes nowhere.
+ */
+function jobUrl(run: AgentRunView): string | null {
+    if (!run.githubRunId) return null;
+    return `https://github.com/${run.repoFullName}/actions/runs/${run.githubRunId}`;
 }
 
 /** Where a run's work ended up. The pull request when there is one, else the
