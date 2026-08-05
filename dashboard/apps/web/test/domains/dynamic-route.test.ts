@@ -11,7 +11,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { verifyEdgeOrigin } from "@polaris/core/waf";
+import { decodeGuardRule, verifyEdgeOrigin } from "@polaris/core/waf";
 import { renderDynamicConfig, type AppRoute } from "@/lib/deploy/router";
 
 const SECRET = "test-secret-at-least-16-chars";
@@ -189,6 +189,30 @@ describe("names in a deploy zone with nothing on them", () => {
         expect(config).toContain('rule: "Host(`app.example.com`)"');
     });
 
+    it("puts the guard in front, so a ban the sweep jail issues is actually enforced", () => {
+        // The jail watches exactly this surface. Without the guard here it would ban an
+        // address and then carry on serving that address every name it asked for.
+        const config = zoned();
+        const vacant = config.slice(config.indexOf("    polaris-vacant:")).split("\n").slice(0, 8).join("\n");
+
+        expect(vacant).toContain("polaris-vacant-waf-ctx");
+        expect(vacant).toContain("polaris-waf-guard");
+        expect(config).toContain("forwardAuth");
+    });
+
+    it("carries an empty rule, so the guard checks the ban and nothing else", () => {
+        // A missing rule header is read as require-login, which would send every visitor
+        // to a name with nothing on it round a login handoff.
+        const config = zoned();
+        const encoded = /polaris-vacant-waf-ctx:[\s\S]*?X-Polaris-Waf: "([^"]*)"/.exec(config)?.[1] ?? "";
+        const rule = decodeGuardRule(encoded);
+
+        expect(encoded).not.toBe("");
+        expect(rule.requireLogin).toBe(false);
+        expect(rule.deny).toEqual([]);
+        expect(rule.sqlInjectionProtection).toBe(false);
+    });
+
     it("orders no certificate for a name nobody deployed", () => {
         // A resolver here would let anyone walking the zone spend the instance's ACME
         // quota one unclaimed name at a time.
@@ -219,14 +243,19 @@ describe("an app whose container is not answering", () => {
         const config = renderDynamicConfig([route()], { vacantAvailable: true });
 
         expect(config).toContain("polaris-vacant-errors");
-        expect(config).toContain('status: ["502", "503", "504"]');
+        expect(config).toContain('status: ["502", "504"]');
         expect(config).toContain('query: "/__polaris/vacant/down"');
     });
 
     it("leaves the app's own errors alone", () => {
-        // A 500 is the app answering. Replacing its error page would be wrong about
-        // what happened and would throw away whatever it was trying to say.
-        expect(renderDynamicConfig([route()], { vacantAvailable: true })).not.toContain('"500"');
+        // A 500 is the app answering, and a 503 is it saying it is in maintenance -
+        // usually with a Retry-After a client is meant to read. The middleware matches
+        // the status the service returned and cannot tell those from Traefik's own, so
+        // the only safe list is the one that does not include them.
+        const config = renderDynamicConfig([route()], { vacantAvailable: true });
+
+        expect(config).not.toContain('"500"');
+        expect(config).not.toContain('"503"');
     });
 
     it("wraps the rest of the chain rather than sitting inside it", () => {

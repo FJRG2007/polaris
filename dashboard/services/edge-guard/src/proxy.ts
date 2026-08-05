@@ -167,7 +167,17 @@ export function createProxyServer(config: () => GuardConfig): Server {
         }
         // Ahead of the origin check, because a vacant name has no origin to be signed:
         // this is the one thing the proxy answers on its own account.
-        if (url === VACANT_PATH || url.startsWith(`${VACANT_PATH}/`) || url.startsWith(`${VACANT_PATH}?`)) {
+        //
+        // And ONLY when there is no origin header at all. A route whose responses this
+        // proxy rewrites reaches the same listener carrying one, and without this test a
+        // visitor to that live app could ask for these paths by hand: the answer would be
+        // this page instead of the app, served from above the firewall - no denylist, no
+        // require-login, no browser integrity, no ban. Neither way the edge legitimately
+        // reaches this page carries the header. The catch-all router has no app to stamp
+        // one for, and the error page is a sub-request copied from the request as it
+        // entered the errors middleware, which runs ahead of the one that stamps it.
+        const routed = header(req, ORIGIN_HEADER) !== undefined;
+        if (!routed && (url === VACANT_PATH || url.startsWith(`${VACANT_PATH}/`) || url.startsWith(`${VACANT_PATH}?`))) {
             sendVacant(res, {
                 host: header(req, "x-forwarded-host") ?? header(req, "host"),
                 accept: header(req, "accept"),

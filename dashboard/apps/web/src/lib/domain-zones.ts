@@ -208,18 +208,25 @@ export async function deployZoneBase(label?: string): Promise<string | null> {
 }
 
 /**
- * Every zone deployed services get hostnames under, deduplicated.
+ * Every zone deployed services get hostnames under that Polaris may answer for as a
+ * whole, deduplicated.
  *
  * All of them rather than the primary, because a name in any deploy zone is a name
  * Polaris minted and then stopped serving; and unlike the picker, this is not gated on
  * the zone's DNS being verified - a zone whose records were never checked can still be
  * the one a stale link points at.
+ *
+ * A zone on the empty label is left out, and that is the whole reason this is not just
+ * a map over the deploy zones. Its host is the operator's bare domain, so claiming
+ * everything one label under it would claim their mail, their VPN and every other
+ * machine on that domain - names Polaris never handed out and has no business
+ * answering for. It stays a valid zone to MINT in; it is not one to speak for.
  */
 export async function deployZoneHosts(): Promise<string[]> {
     const config = await getDomainZones();
     if (!config.baseDomain) return [];
     const hosts = config.zones
-        .filter((zone) => zone.scope === "deploy")
+        .filter((zone) => zone.scope === "deploy" && zone.label !== "")
         .map((zone) => zoneHost(zone, config.baseDomain));
     return [...new Set(hosts)];
 }

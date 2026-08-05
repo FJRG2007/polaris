@@ -234,6 +234,21 @@ describe("a hostname with nothing behind it", () => {
 
         expect((await get("/dashboard")).body).toContain("the app");
     });
+
+    it("is not reachable on a live route, whatever the visitor asks for", async () => {
+        // The bypass this guards: on a route whose responses this proxy rewrites, a
+        // visitor asking for these paths by hand would otherwise be answered from above
+        // the firewall - no denylist, no login, no ban - and told a healthy app was down.
+        respond = () => ({ body: "<html>the app</html>" });
+
+        for (const path of [VACANT_PATH, VACANT_DOWN_PATH, `${VACANT_PATH}?x=1`]) {
+            const response = await get(path);
+
+            expect(response.body).toContain("the app");
+            expect(response.body).not.toContain("not running");
+            expect(response.headers.get(VACANT_HEADER)).toBeNull();
+        }
+    });
 });
 
 describe("the firewall still applies", () => {

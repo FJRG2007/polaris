@@ -156,7 +156,14 @@ export async function guardVacantReachable(now: number = Date.now()): Promise<bo
     } catch {
         reachable = false;
     }
-    vacantProbe = { at: now, reachable };
+    // Only a yes is remembered. The sidecar and this process start together with nothing
+    // sequencing them, so the first probe after a host reboot can be a no that means
+    // "not up yet" rather than "too old to serve it" - and caching that would leave the
+    // next sync a few seconds later believing it too. A no is cheap to ask again;
+    // remembering it is what turns a startup race into a feature that is silently off
+    // until someone happens to edit a domain.
+    if (reachable) vacantProbe = { at: now, reachable };
+    else vacantProbe = null;
     return reachable;
 }
 
@@ -264,6 +271,7 @@ function routeMiddlewares(
 const VACANT = "polaris-vacant";
 const VACANT_ERRORS = `${VACANT}-errors`;
 const VACANT_REWRITE = `${VACANT}-rewrite`;
+const VACANT_CTX = `${VACANT}-waf-ctx`;
 
 /** A zone host as a regex fragment that matches it literally. Dots are the only
  *  metacharacter a hostname can contain, and `[.]` avoids a backslash - which YAML
@@ -288,20 +296,52 @@ function usableZone(zone: string): boolean {
  * name never resolves, so answering for it would be answering for nothing.
  *
  * `tls: {}` rather than a resolver, deliberately: ordering a certificate per unclaimed
- * name would hand anyone walking the zone the ability to burn the instance's ACME
- * quota. The wildcard certificate the zone already has covers these names anyway.
+ * name would hand anyone walking the zone the ability to burn the instance's ACME quota
+ * one name at a time. Where the zone has a wildcard certificate the edge presents it
+ * here; where it does not - the shipped resolver answers an HTTP challenge and cannot
+ * issue a wildcard, so that needs the DNS credential - a browser gets the edge's default
+ * certificate and warns before showing the page. The plain HTTP router below is what
+ * makes that recoverable, and it is why this one does not redirect onto https.
+ *
+ * The guard sits in front of both. Not for a rule of its own - there is no app here to
+ * have one - but because this is the surface the subdomain sweep jail watches, and a ban
+ * it issues is applied inside the guard. Without this, the jail would ban an address and
+ * that address would carry on being served every unclaimed name it asked for.
  */
-function vacantRouters(zones: readonly string[]): string[] {
+function vacantRouters(zones: readonly string[], defs: Map<string, string>): string[] {
     const rule = zones
         .map((zone) => `HostRegexp(\`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?[.]${hostPattern(zone)}$\`)`)
         .join(" || ");
+    // An empty rule: no denylist, no login, no inspection. It exists so the guard runs
+    // at all, and what it does when it runs is the ban check every request gets.
+    const empty = encodeGuardRule({
+        deny: [],
+        requireLogin: false,
+        loginAllowLists: [],
+        loginDeny: [],
+        browserIntegrity: false,
+        sqlInjectionProtection: false,
+        xssProtection: false,
+        emailObfuscation: false,
+        presets: [],
+        rules: []
+    });
+    defs.set(
+        VACANT_CTX,
+        `    ${VACANT_CTX}:\n      headers:\n        customRequestHeaders:\n          X-Polaris-Waf: "${empty}"`
+    );
+    defs.set(
+        "polaris-waf-guard",
+        `    polaris-waf-guard:\n      forwardAuth:\n        address: "${guardUrl()}/authz"`
+    );
+    const mw = `${VACANT_CTX}, polaris-waf-guard, ${VACANT_REWRITE}`;
     return [
-        `    ${VACANT}:\n      rule: "${rule}"\n      entryPoints: [websecure]\n      priority: 1\n      service: ${VACANT}\n      middlewares: [${VACANT_REWRITE}]\n      tls: {}`,
+        `    ${VACANT}:\n      rule: "${rule}"\n      entryPoints: [websecure]\n      priority: 1\n      service: ${VACANT}\n      middlewares: [${mw}]\n      tls: {}`,
         // Served over plain HTTP as well, rather than redirected onto https: a name
         // nothing has deployed on may have no certificate a browser trusts, and a
         // warning interstitial in front of "there is nothing here" tells the visitor
         // less than the page does.
-        `    ${VACANT}-http:\n      rule: "${rule}"\n      entryPoints: [web]\n      priority: 1\n      service: ${VACANT}\n      middlewares: [${VACANT_REWRITE}]`
+        `    ${VACANT}-http:\n      rule: "${rule}"\n      entryPoints: [web]\n      priority: 1\n      service: ${VACANT}\n      middlewares: [${mw}]`
     ];
 }
 
@@ -319,13 +359,22 @@ export function renderDynamicConfig(routes: readonly AppRoute[], options: Render
     const vacant = zones.length > 0 || (options.vacantAvailable === true && routes.length > 0);
     if (vacant) {
         defs.set(VACANT_REWRITE, `    ${VACANT_REWRITE}:\n      replacePath:\n        path: "${VACANT_PATH}"`);
-        // 502/503/504 only: those are the statuses Traefik itself produces when it
-        // cannot reach the app. A 500 is the app answering, and replacing its own error
-        // page with "not running" would be wrong about what happened and lose whatever
-        // it was trying to say.
+        // 502 and 504 only, and this list is narrower than it looks like it should be.
+        //
+        // The middleware matches the status the service RESPONDED with; it cannot tell
+        // one Traefik produced from one the app chose. 503 is the status an app returns
+        // to say it is in maintenance, usually with a `Retry-After` a client is meant to
+        // read - so catching it would replace a deliberate answer, and its headers, with
+        // a page claiming the app is not running. That is a worse lie than the bare
+        // gateway error this feature exists to replace.
+        //
+        // 502 and 504 keep a residual version of the same problem: an app that is itself
+        // a proxy can return them about ITS upstream. That is rarer than a maintenance
+        // page, and in that case the two readings agree closely enough - something behind
+        // this address is not answering - that the page is still true.
         defs.set(
             VACANT_ERRORS,
-            `    ${VACANT_ERRORS}:\n      errors:\n        status: ["502", "503", "504"]\n        service: ${VACANT}\n        query: "${VACANT_DOWN_PATH}"`
+            `    ${VACANT_ERRORS}:\n      errors:\n        status: ["502", "504"]\n        service: ${VACANT}\n        query: "${VACANT_DOWN_PATH}"`
         );
         services.push(`    ${VACANT}:\n      loadBalancer:\n        servers:\n          - url: "${guardProxyUrl()}"`);
     }
@@ -365,7 +414,7 @@ export function renderDynamicConfig(routes: readonly AppRoute[], options: Render
         services.push(`    ${name}:\n      loadBalancer:\n        servers:\n          - url: "${upstream}"`);
     }
     // Last, so it loses the length-ranked tie to every app router above it.
-    if (zones.length > 0) routers.push(...vacantRouters(zones));
+    if (zones.length > 0) routers.push(...vacantRouters(zones, defs));
     if (routers.length === 0) return "http: {}\n";
     const middlewares = [...defs.values()].join("\n");
     return `http:\n  routers:\n${routers.join("\n")}\n  services:\n${services.join("\n")}\n  middlewares:\n${middlewares}\n`;

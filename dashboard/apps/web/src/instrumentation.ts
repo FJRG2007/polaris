@@ -30,7 +30,24 @@ export async function register(): Promise<void> {
     // Write the Traefik dynamic routes for deployed-app domains on startup, so the
     // edge self-heals after a restart or a fresh dynamic volume. Best-effort.
     const { syncAppRoutes, reconcileNasMounts, recoverAbandonedDeployments } = await import("./lib/deploy-service");
-    void syncAppRoutes().catch((error) => console.error("polaris: initial route sync failed:", error));
+    const { guardVacantReachable } = await import("./lib/deploy/router");
+    void syncAppRoutes()
+        .then(async () => {
+            // The edge guard container starts alongside this one and nothing sequences
+            // the two, so this first sync can easily run before it answers. What that
+            // writes is a valid config missing only the routers for a hostname with
+            // nothing on it - and since routes are otherwise resynced by deploys and
+            // domain edits, on a host that is simply left running it would stay missing.
+            // So the sync is repeated once the guard has had time to come up. It is
+            // idempotent; a repeat that was not needed costs one file write.
+            if (await guardVacantReachable()) return;
+            setTimeout(() => {
+                void syncAppRoutes().catch((error) =>
+                    console.error("polaris: the route resync for the edge guard failed:", error)
+                );
+            }, 30_000).unref();
+        })
+        .catch((error) => console.error("polaris: initial route sync failed:", error));
 
     // Close out deploys this process cannot possibly be running: the deploy queue is
     // in memory, so anything left mid-flight by the previous process is abandoned, and
