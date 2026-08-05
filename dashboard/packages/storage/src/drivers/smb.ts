@@ -2,11 +2,17 @@
  * SMB / CIFS driver (userspace). Talks SMB2 directly with a pure-JS client, so it
  * works in the limited edition without a kernel mount or the host daemon - the
  * practical way to browse a NAS that exposes a Windows/Samba share (a UniFi UNAS,
- * Synology, TrueNAS, ...) using the same account credentials. One connection per
- * share backs the driver; reads and writes stream without buffering, and every
- * user path is confined under the share root. The native (kernel-mount) path via
- * polaris-hostd remains preferred when the full edition is available - it is
- * faster - but this keeps SMB usable everywhere.
+ * Synology, TrueNAS, ...) using the same account credentials. Reads and writes
+ * stream without buffering, and every user path is confined under the share root.
+ * The native (kernel-mount) path via polaris-hostd remains preferred when the full
+ * edition is available - it is faster - but this keeps SMB usable everywhere.
+ *
+ * The session is either the driver's own (`SmbConnectOptions`, which opens it and
+ * closes it) or borrowed (`SmbSessionOptions`, where a caller that pools sessions
+ * lends one). Opening one is a TCP connect, a negotiate, an NTLM session setup, a
+ * tree connect and - because that is how this client proves it works - a listing of
+ * the whole share root. Paying that per request is what made a NAS feel slower than
+ * it is.
  */
 
 import SMB2 from "v9u-smb2";
@@ -36,7 +42,8 @@ const SMB_CAPABILITIES: StorageDriverCapabilities = {
     requiresHostd: false
 };
 
-export interface SmbDriverOptions {
+/** Options for a driver that opens its own session and closes it on `dispose`. */
+export interface SmbConnectOptions {
     readonly id: string;
     readonly host: string;
     readonly port: number;
@@ -44,6 +51,22 @@ export interface SmbDriverOptions {
     readonly domain?: string;
     readonly username?: string;
     readonly password?: string;
+}
+
+/** Options for a driver over a session somebody else owns and keeps open. Same
+ *  reason as the SFTP driver's: negotiate, session setup and tree connect cost far
+ *  more than the call that follows them, and a NAS is browsed a folder at a time. */
+export interface SmbSessionOptions {
+    readonly id: string;
+    readonly session: () => Promise<SmbSession>;
+    readonly endSession?: () => void;
+}
+
+export type SmbDriverOptions = SmbConnectOptions | SmbSessionOptions;
+
+/** Whether these options lend a session rather than describe one to open. */
+function isBorrowed(options: SmbDriverOptions): options is SmbSessionOptions {
+    return "session" in options;
 }
 
 /** The stat shape the SMB client returns for readdir({stats:true}) and stat(). */
@@ -57,7 +80,8 @@ interface SmbStat {
     isDirectory(): boolean;
 }
 
-interface SmbClient {
+/** A connected SMB2 session. Exported so a caller that pools sessions can hold one. */
+export interface SmbSession {
     readdir(path: string, options: { stats: true }): Promise<SmbStat[] | SmbStat[][]>;
     stat(path: string): Promise<SmbStat>;
     createReadStream(path: string): Promise<Readable>;
@@ -69,12 +93,53 @@ interface SmbClient {
     disconnect(): void;
 }
 
+/**
+ * Open an SMB session and prove it works, or throw with the reason.
+ *
+ * Exported because a caller that pools sessions needs to open one without a driver
+ * around it - and must open it exactly the way the driver does, credential check
+ * included, or a pooled session would be one nobody ever verified.
+ */
+export async function openSmbSession(options: Omit<SmbConnectOptions, "id">): Promise<SmbSession> {
+    const Ctor = SMB2 as unknown as new (options: Record<string, unknown>) => SmbSession;
+    const client = new Ctor({
+        share: `\\\\${options.host}\\${options.share}`,
+        domain: options.domain || "WORKGROUP",
+        username: options.username || "guest",
+        password: options.password ?? "",
+        port: options.port || 445,
+        // Keep the connection open; whoever opened it decides when it closes.
+        autoCloseTimeout: 0
+    });
+    try {
+        // A listing of the root doubles as a connection/credential check, with a
+        // timeout so a filtered port or a hung negotiation fails fast rather than
+        // leaving the request hanging.
+        await withTimeout(
+            client.readdir("", { stats: true }),
+            12_000,
+            "timed out reaching SMB on port 445 (is SMB enabled and the host reachable?)"
+        );
+    } catch (error) {
+        try {
+            client.disconnect();
+        } catch {
+            // ignore
+        }
+        // Surface the real cause so the user can act: STATUS_LOGON_FAILURE -> wrong
+        // account, STATUS_BAD_NETWORK_NAME -> wrong share, ECONNREFUSED -> SMB off
+        // or port closed.
+        throw new StorageError("connection_failed", `SMB connection failed: ${message(error)}`);
+    }
+    return client;
+}
+
 export class SmbDriver implements StorageDriver {
     public readonly id: string;
     public readonly kind = "smb" as const;
     public readonly capabilities = SMB_CAPABILITIES;
     private readonly options: SmbDriverOptions;
-    private client?: SmbClient;
+    private client?: SmbSession;
 
     public constructor(options: SmbDriverOptions) {
         this.id = options.id;
@@ -87,40 +152,19 @@ export class SmbDriver implements StorageDriver {
     }
 
     public async connect(): Promise<void> {
-        const Ctor = SMB2 as unknown as new (options: Record<string, unknown>) => SmbClient;
-        const client = new Ctor({
-            share: `\\\\${this.options.host}\\${this.options.share}`,
-            domain: this.options.domain || "WORKGROUP",
-            username: this.options.username || "guest",
-            password: this.options.password ?? "",
-            port: this.options.port || 445,
-            // Keep the connection open; the driver closes it in dispose().
-            autoCloseTimeout: 0
-        });
-        try {
-            // A listing of the root doubles as a connection/credential check, with
-            // a timeout so a filtered port or a hung negotiation fails fast rather
-            // than leaving the request hanging.
-            await withTimeout(
-                client.readdir("", { stats: true }),
-                12_000,
-                "timed out reaching SMB on port 445 (is SMB enabled and the host reachable?)"
-            );
-        } catch (error) {
-            try {
-                client.disconnect();
-            } catch {
-                // ignore
-            }
-            // Surface the real cause so the user can act: STATUS_LOGON_FAILURE ->
-            // wrong account, STATUS_BAD_NETWORK_NAME -> wrong share, ECONNREFUSED
-            // -> SMB off / port closed.
-            throw new StorageError("connection_failed", `SMB connection failed: ${message(error)}`);
-        }
-        this.client = client;
+        // A lent session is already negotiated and authenticated, and its lender
+        // checked it - there is nothing to do here but take it.
+        this.client = isBorrowed(this.options) ? await this.options.session() : await openSmbSession(this.options);
     }
 
     public async dispose(): Promise<void> {
+        // A borrowed session goes back to its lender, which decides when it closes;
+        // hanging up on it here would take the next operation's session with it.
+        if (isBorrowed(this.options)) {
+            this.options.endSession?.();
+            this.client = undefined;
+            return;
+        }
         try {
             this.client?.disconnect();
         } catch {
@@ -129,7 +173,7 @@ export class SmbDriver implements StorageDriver {
         this.client = undefined;
     }
 
-    private c(): SmbClient {
+    private c(): SmbSession {
         if (!this.client) throw new StorageError("connection_failed", "SMB not connected");
         return this.client;
     }

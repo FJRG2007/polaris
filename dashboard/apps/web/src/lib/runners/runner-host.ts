@@ -24,7 +24,7 @@
 import type { Client } from "ssh2";
 import { execCommand } from "@polaris/ssh";
 import { quoteArg } from "@polaris/deploy";
-import { borrowSsh } from "@/lib/ssh-pool";
+import { borrowSsh } from "@/lib/connection-pool";
 import type { SshLease } from "@polaris/ssh";
 import type { RunnerRelease } from "./runner-release";
 import { getHostConnection, type HostConnection } from "@/lib/host-service";

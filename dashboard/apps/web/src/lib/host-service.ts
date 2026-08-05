@@ -9,7 +9,7 @@
 
 import { prisma } from "@polaris/db";
 import { loadEnv } from "@polaris/config";
-import { dropSshConnections } from "@/lib/ssh-pool";
+import { dropSshConnections } from "@/lib/connection-pool";
 import { testAndCaptureHostKey, type SshAuth } from "@polaris/ssh";
 import { isBaseDomain, normalizeBaseDomain } from "@polaris/deploy";
 import { decryptSecret, encryptCredentials, type EncryptedBlob } from "@polaris/storage";

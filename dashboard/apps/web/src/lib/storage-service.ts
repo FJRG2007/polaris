@@ -14,12 +14,12 @@ import { getCapabilities, loadEnv } from "@polaris/config";
 import { canHostMount, requiresHostd } from "@polaris/core";
 import { grantedConnectionIds } from "@/lib/drive-acl-service";
 import { ContainerDriver } from "@/lib/deploy/container-driver";
-import { borrowSftp, type SftpLease } from "@/lib/ssh-pool";
 import { fetchUnasMetrics, type UnasMetrics } from "@/lib/unifi-unas";
 import { deleteMetricsForSubject } from "@/lib/metrics-history-service";
 import type { StorageConfig, StorageCredentials, StorageProviderKind } from "@polaris/core";
 import { resolveContainerName, resolveLocalContainer } from "@/lib/container-files-service";
 import { getHostConnection, getHostConnectionUnscoped, listHosts, type HostConnection } from "@/lib/host-service";
+import { borrowSftp, borrowSmb, dropStorageConnection, type SftpLease, type SmbLease } from "@/lib/connection-pool";
 import {
     createDriver,
     decryptCredentials,
@@ -30,6 +30,8 @@ import {
     SmbDriver,
     type ConnectionRecord,
     type SftpSessionOptions,
+    type SmbConnectOptions,
+    type SmbSessionOptions,
     type StorageDriver
 } from "@polaris/storage";
 
@@ -99,6 +101,15 @@ async function sftpDriverFor(conn: HostConnection): Promise<StorageDriver> {
 /** Base path under which the host daemon mounts SMB/NFS shares. */
 const HOSTD_MOUNT_ROOT = "/mnt/polaris";
 
+/** How long a mount that answered is taken on trust before the daemon is asked to
+ *  establish it again. Short enough that a mount removed behind Polaris's back is
+ *  re-established within the minute, long enough that a burst of browsing costs one
+ *  daemon call instead of one per request. */
+const MOUNT_TRUSTED_MS = 60_000;
+
+/** When each connection's mount was last seen readable from this process. */
+const mountsSeenLive = new Map<string, number>();
+
 /**
  * Raised when a UniFi UNAS connection is asked to browse files but has no SMB
  * share configured yet. The Drive UI catches this to prompt for the share name
@@ -155,14 +166,24 @@ function credentialsOf(row: ConnectionRow): StorageCredentials {
  * The mount is established here rather than assumed, because assuming it is how
  * a share silently reads as an empty folder: the deploy pipeline and the boot
  * reconcile both mount it, but neither has necessarily run when Drive or the
- * volume form asks. `ensureMount` is idempotent and costs a mount-table read
- * when the mount is already live, so paying it per driver is free in the case
- * that matters.
+ * volume form asks.
+ *
+ * Asking the daemon is a request over the wire, though, and browsing is not rare -
+ * every listing, download and upload came through here. A mount this process has
+ * already seen live is taken on trust for a minute, guarded by the local `stat` the
+ * driver does anyway: if the mount has died in the meantime that stat fails, the
+ * memory is dropped and the daemon is asked properly.
  */
 async function hostMountedDriver(row: ConnectionRow): Promise<StorageDriver | null> {
     if (!getCapabilities().nativeMounts) return null;
     const spec = mountSpecFor(row);
     if (!spec) return null;
+    const seenAt = mountsSeenLive.get(row.id);
+    if (seenAt !== undefined && Date.now() - seenAt < MOUNT_TRUSTED_MS) {
+        const driver = await mountedLocalDriver(row.id);
+        if (driver) return driver;
+        mountsSeenLive.delete(row.id);
+    }
     try {
         await new HostdClient().createMount({
             id: spec.id,
@@ -188,11 +209,29 @@ async function hostMountedDriver(row: ConnectionRow): Promise<StorageDriver | nu
     // back keeps Drive working instead of failing the whole connection, which is
     // the difference between "a bit slower" and "Could not connect to this
     // location".
-    const driver = new LocalDriver({ id: row.id, root: `${HOSTD_MOUNT_ROOT}/${row.id}` });
+    const driver = await mountedLocalDriver(row.id);
+    if (driver) mountsSeenLive.set(row.id, Date.now());
+    return driver;
+}
+
+/** Forget everything this process is holding for a connection: its pooled sessions
+ *  and its mount. Called whenever the row behind them changes or goes away, since
+ *  both outlive the request that opened them. */
+function forgetConnection(connectionId: string): void {
+    dropStorageConnection(connectionId);
+    mountsSeenLive.delete(connectionId);
+}
+
+/** A local driver onto a mount, or null when the path is not readable from here. */
+async function mountedLocalDriver(connectionId: string): Promise<StorageDriver | null> {
+    const driver = new LocalDriver({ id: connectionId, root: `${HOSTD_MOUNT_ROOT}/${connectionId}` });
     try {
         await driver.connect();
     } catch (error) {
-        console.error(`storage: host mount for ${row.id} is not readable here, falling back to userspace:`, error);
+        console.error(
+            `storage: host mount for ${connectionId} is not readable here, falling back to userspace:`,
+            error
+        );
         return null;
     }
     return driver;
@@ -224,6 +263,25 @@ function pooledSftpSession(record: ConnectionRecord): Pick<SftpSessionOptions, "
     };
 }
 
+/**
+ * The same for an SMB share. This is the userspace path - a share Polaris can
+ * kernel-mount is read through the mount instead - and it is the one that pays most
+ * for a session, since this client proves a new one by listing the whole share root.
+ */
+function pooledSmbSession(
+    connectionId: string,
+    options: Omit<SmbConnectOptions, "id">
+): Pick<SmbSessionOptions, "session" | "endSession"> {
+    let lease: SmbLease | undefined;
+    return {
+        session: async () => {
+            lease = await borrowSmb(connectionId, options);
+            return lease.session;
+        },
+        endSession: () => lease?.release()
+    };
+}
+
 /** Decrypt a row's credentials and build a connected driver for it. */
 async function buildDriver(row: ConnectionRow): Promise<StorageDriver> {
     const config = JSON.parse(row.config) as StorageConfig;
@@ -241,11 +299,13 @@ async function buildDriver(row: ConnectionRow): Promise<StorageDriver> {
         const creds = credentials as Extract<StorageCredentials, { kind: "unifi-unas" }>;
         const driver = new SmbDriver({
             id: row.id,
-            host: cfg.host,
-            port: 445,
-            share: cfg.smbShare,
-            username: cfg.username,
-            password: creds.password
+            ...pooledSmbSession(row.id, {
+                host: cfg.host,
+                port: 445,
+                share: cfg.smbShare,
+                username: cfg.username,
+                password: creds.password
+            })
         });
         await driver.connect();
         return driver;
@@ -273,7 +333,19 @@ async function buildDriver(row: ConnectionRow): Promise<StorageDriver> {
     const driver = createDriver(record, {
         capabilities: requiresHostd(record.kind) ? capabilities : { ...capabilities, nativeMounts: false },
         hostdFactory: (rec) => new LocalDriver({ id: rec.id, root: `${HOSTD_MOUNT_ROOT}/${rec.id}` }),
-        sftpSessionFactory: (rec) => pooledSftpSession(rec)
+        sftpSessionFactory: (rec) => pooledSftpSession(rec),
+        smbSessionFactory: (rec) => {
+            const cfg = rec.config as Extract<StorageConfig, { kind: "smb" }>;
+            const creds = rec.credentials as Extract<StorageCredentials, { kind: "smb" }>;
+            return pooledSmbSession(rec.id, {
+                host: cfg.host,
+                port: cfg.port ?? 445,
+                share: cfg.share,
+                domain: cfg.domain,
+                username: cfg.username,
+                password: creds.password
+            });
+        }
     });
     await driver.connect();
     return driver;
@@ -582,12 +654,16 @@ export async function updateConnection(
                 : {})
         }
     });
+    // Sessions outlive a request, so an edited address, share or credential would
+    // otherwise keep being browsed through the session opened with the old one.
+    forgetConnection(connectionId);
 }
 
 /** Delete a connection owned by the user, and drop its metrics history. */
 export async function deleteConnection(ownerId: string, connectionId: string) {
     await prisma.storageConnection.deleteMany({ where: { id: connectionId, ownerId } });
     await deleteMetricsForSubject("storage", connectionId);
+    forgetConnection(connectionId);
 }
 
 /** Discover the SMB shares a UNAS exposes, reusing its stored UniFi account. */
@@ -620,4 +696,7 @@ export async function setUnasSmbShare(ownerId: string, connectionId: string, sha
         where: { id: connectionId },
         data: { config: JSON.stringify(config) }
     });
+    // The share is half of what an SMB session is bound to (the other half is the
+    // account), so a session opened against the previous one is no longer the answer.
+    forgetConnection(connectionId);
 }

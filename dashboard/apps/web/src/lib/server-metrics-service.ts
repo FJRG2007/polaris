@@ -15,7 +15,7 @@
 
 import { prisma } from "@polaris/db";
 import { execCommand } from "@polaris/ssh";
-import { borrowSsh } from "@/lib/ssh-pool";
+import { borrowSsh } from "@/lib/connection-pool";
 import { getHostConnection } from "@/lib/host-service";
 import { parseProbe, PROBE, type ServerMetrics } from "@/lib/server-probe";
 

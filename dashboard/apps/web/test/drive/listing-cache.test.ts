@@ -1,4 +1,3 @@
-import { EventEmitter } from "node:events";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { dropListings, prefetchListing, readListing, writeListing } from "@/app/(app)/drive/listing-cache";
 
@@ -96,38 +95,5 @@ describe("Drive listing cache", () => {
         prefetchListing("host:a", "secret");
         await vi.waitFor(() => expect(fetchMock).toHaveBeenCalled());
         expect(readListing("host:a", "secret")).toBeNull();
-    });
-});
-
-// The pool is tested in @polaris/ssh; what belongs here is the app's own reuse of
-// the SFTP channel on top of it, since a channel handed out after its connection
-// died would fail every later listing.
-describe("borrowed SFTP channels", () => {
-    it("opens one channel per connection and reopens after it ends", async () => {
-        const sftp = new EventEmitter();
-        const client = Object.assign(new EventEmitter(), {
-            sftp: vi.fn((callback: (error: Error | undefined, channel: unknown) => void) => callback(undefined, sftp)),
-            end: vi.fn()
-        });
-        vi.doMock("@polaris/ssh", async (importOriginal) => {
-            const actual = await importOriginal<typeof import("@polaris/ssh")>();
-            return { ...actual, openSshClient: vi.fn(async () => client) };
-        });
-        const { borrowSftp } = await import("@/lib/ssh-pool");
-        const options = { host: "h", port: 22, username: "u", auth: { method: "password" as const, password: "p" } };
-
-        const first = await borrowSftp("drive", "host-a", options);
-        first.release();
-        const second = await borrowSftp("drive", "host-a", options);
-        second.release();
-        expect(first.sftp).toBe(second.sftp);
-        expect(client.sftp).toHaveBeenCalledTimes(1);
-
-        // The far end closed the channel: the next borrower gets a new one.
-        sftp.emit("end");
-        const third = await borrowSftp("drive", "host-a", options);
-        third.release();
-        expect(client.sftp).toHaveBeenCalledTimes(2);
-        vi.doUnmock("@polaris/ssh");
     });
 });

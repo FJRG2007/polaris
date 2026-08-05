@@ -9,7 +9,7 @@ import { prisma } from "@polaris/db";
 import { readFileSync } from "node:fs";
 import { loadEnv } from "@polaris/config";
 import type { SshAuth } from "@polaris/ssh";
-import { borrowSsh } from "@/lib/ssh-pool";
+import { borrowSsh } from "@/lib/connection-pool";
 import { getHostConnection } from "./host-service";
 import { HostdClient } from "@polaris/hostd-client";
 import { decryptCredentials, encryptCredentials } from "@polaris/storage";

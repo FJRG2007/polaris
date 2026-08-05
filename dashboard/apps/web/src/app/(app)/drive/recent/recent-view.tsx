@@ -7,12 +7,16 @@
  * /api/drive/recent so switching lens or connection never blocks a navigation.
  */
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Clock, File as FileIcon, FolderOpen } from "lucide-react";
+import { useEffect, useState } from "react";
 import { formatBytes } from "@polaris/core";
 import { Card, CardBody, Select, cn } from "@polaris/ui";
 import { RelativeTime } from "@/components/relative-time";
+import { Clock, File as FileIcon, FolderOpen } from "lucide-react";
+import { readSnapshot, writeSnapshot } from "@/lib/snapshot-cache";
+
+/** How old a remembered answer may be and still be shown while the walk reruns. */
+const CACHE_TTL_MS = 60_000;
 
 interface RecentEntry {
     name: string;
@@ -47,7 +51,12 @@ export function RecentView({ connections }: { connections: { id: string; name: s
     useEffect(() => {
         if (!connectionId) return;
         const controller = new AbortController();
-        setLoading(true);
+        // Answering this walks the connection, so a lens switched away from and back
+        // paints what it said a moment ago while the walk runs again behind it.
+        const key = `drive.recent:${connectionId}:${lens}`;
+        const cached = readSnapshot<RecentEntry[]>(key, CACHE_TTL_MS)?.value;
+        if (cached) setEntries(cached);
+        setLoading(!cached);
         setError(null);
         const params = new URLSearchParams({ c: connectionId, by: lens });
         fetch(`/api/drive/recent?${params.toString()}`, { signal: controller.signal })
@@ -59,7 +68,11 @@ export function RecentView({ connections }: { connections: { id: string; name: s
                     setError("This connection is locked. Unlock it in Files first.");
                 else if (body.needsSmbShare)
                     setError("Finish setting up this connection in Files first.");
-                else setEntries(Array.isArray(body.entries) ? body.entries : []);
+                else {
+                    const next = Array.isArray(body.entries) ? (body.entries as RecentEntry[]) : [];
+                    setEntries(next);
+                    writeSnapshot(key, next);
+                }
             })
             .catch(() => {
                 if (!controller.signal.aborted) setError("Could not load recent files.");

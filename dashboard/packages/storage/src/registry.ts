@@ -7,13 +7,13 @@
  * unit-tested without a running daemon.
  */
 
-import { prefersHostd, requiresHostd } from "@polaris/core";
-import type { StorageConfig, StorageCredentials, StorageProviderKind } from "@polaris/core";
-import type { Capabilities } from "@polaris/config";
 import { LocalDriver } from "./drivers/local.js";
-import { SftpDriver, type SftpSessionOptions } from "./drivers/sftp.js";
-import { SmbDriver } from "./drivers/smb.js";
+import type { Capabilities } from "@polaris/config";
+import { prefersHostd, requiresHostd } from "@polaris/core";
 import { StorageError, type StorageDriver } from "./driver.js";
+import { SmbDriver, type SmbSessionOptions } from "./drivers/smb.js";
+import { SftpDriver, type SftpSessionOptions } from "./drivers/sftp.js";
+import type { StorageConfig, StorageCredentials, StorageProviderKind } from "@polaris/core";
 
 /** A decrypted connection ready to drive. Credentials are already plaintext here. */
 export interface ConnectionRecord {
@@ -30,10 +30,15 @@ export type HostdDriverFactory = (record: ConnectionRecord) => StorageDriver;
  *  driver open and throw away one of its own per operation. */
 export type SftpSessionFactory = (record: ConnectionRecord) => Pick<SftpSessionOptions, "session" | "endSession">;
 
+/** The same for SMB, whose session setup costs more than SSH's - it ends in a
+ *  listing of the whole share root. */
+export type SmbSessionFactory = (record: ConnectionRecord) => Pick<SmbSessionOptions, "session" | "endSession">;
+
 export interface DriverDeps {
     readonly capabilities: Capabilities;
     readonly hostdFactory?: HostdDriverFactory;
     readonly sftpSessionFactory?: SftpSessionFactory;
+    readonly smbSessionFactory?: SmbSessionFactory;
 }
 
 /**
@@ -83,6 +88,11 @@ export function createDriver(record: ConnectionRecord, deps: DriverDeps): Storag
             // limited edition too.
             if (prefersHostd(record.kind) && deps.capabilities.nativeMounts && deps.hostdFactory) {
                 return deps.hostdFactory(record);
+            }
+            // A lent session when the app pools them, so a share browsed folder by
+            // folder negotiates and logs in once instead of per request.
+            if (deps.smbSessionFactory) {
+                return new SmbDriver({ id: record.id, ...deps.smbSessionFactory(record) });
             }
             const config = record.config as Extract<StorageConfig, { kind: "smb" }>;
             const creds = record.credentials as Extract<StorageCredentials, { kind: "smb" }>;

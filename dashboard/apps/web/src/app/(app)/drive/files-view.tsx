@@ -29,6 +29,7 @@ import { RelativeTime } from "@/components/relative-time";
 import { matchShortcut, SHORTCUT_HINTS } from "./shortcuts";
 import { useDisplayFormat } from "@/components/display-format";
 import { matchesStructured, parseSearch } from "./search-query";
+import { readSnapshot, writeSnapshot } from "@/lib/snapshot-cache";
 import { UserProfileDialog } from "@/components/user-profile-dialog";
 import { FilePreview, isViewable, type ViewerTarget } from "./file-viewer";
 import { ITEM_ICONS, ITEM_ICON_COLORS, iconColorClass, iconComponent } from "./item-icons";
@@ -128,6 +129,9 @@ interface ActivityItem {
     actor: string | null;
     at: string;
 }
+
+/** How old a remembered activity feed may be and still be shown while it refreshes. */
+const ACTIVITY_CACHE_TTL_MS = 30_000;
 
 /** Human label for an audit action shown in the activity feed. */
 const ACTIVITY_LABELS: Record<string, string> = {
@@ -1107,13 +1111,20 @@ export function FilesView({
             return;
         }
         const controller = new AbortController();
-        setActivityLoading(true);
+        // Clicking back onto a file shows what its history said moments ago rather
+        // than an empty panel and another query.
+        const key = `drive.activity:${connectionId}:${singleSelectedPath}`;
+        const cached = readSnapshot<ActivityItem[]>(key, ACTIVITY_CACHE_TTL_MS)?.value;
+        if (cached) setActivity(cached);
+        setActivityLoading(!cached);
         const params = new URLSearchParams({ c: connectionId, p: singleSelectedPath });
         fetch(`/api/drive/activity?${params.toString()}`, { signal: controller.signal })
             .then((res) => res.json())
             .then((body) => {
-                if (!controller.signal.aborted)
-                    setActivity(Array.isArray(body.items) ? body.items : []);
+                if (controller.signal.aborted) return;
+                const items = Array.isArray(body.items) ? (body.items as ActivityItem[]) : [];
+                setActivity(items);
+                writeSnapshot(key, items);
             })
             .catch(() => {
                 if (!controller.signal.aborted) setActivity([]);

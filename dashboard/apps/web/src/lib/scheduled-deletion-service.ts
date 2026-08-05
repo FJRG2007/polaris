@@ -7,16 +7,22 @@
  * chooses a real delete over the recycle bin.
  */
 
-import { baseName, normalizeRelPath } from "@polaris/core";
-import { prisma } from "@polaris/db";
 import { isUuid } from "@/lib/uuid";
+import { prisma } from "@polaris/db";
 import { getDriver } from "@/lib/storage-service";
-import { invalidateFolderSizes } from "@/lib/drive-folder-size";
 import { moveToTrash } from "@/lib/trash-service";
 import { recordAudit } from "@/lib/audit-service";
+import { baseName, normalizeRelPath } from "@polaris/core";
+import { invalidateFolderSizes } from "@/lib/drive-folder-size";
 
 /** Rows processed per sweep, so a large backlog cannot hang a listing. */
 const SWEEP_BATCH = 50;
+
+/** How often browsing one connection may trigger a sweep of it. */
+const BROWSE_SWEEP_INTERVAL_MS = 60_000;
+
+/** When each connection was last swept because somebody browsed it. */
+const lastBrowseSweep = new Map<string, number>();
 
 /** Schedule a deletion, replacing any existing schedule for the same path. */
 export async function createScheduledDeletion(entry: {
@@ -56,6 +62,16 @@ export async function cancelScheduledDeletion(ownerId: string, id: string): Prom
 export async function sweepDueDeletions(connectionId?: string): Promise<number> {
     // A non-UUID source (an ephemeral `container:<id>` connection) schedules nothing.
     if (connectionId && !isUuid(connectionId)) return 0;
+    // Browsing drives this sweep, and browsing is frequent: every folder somebody
+    // opens asked the database for due deletions again. A minute between passes over
+    // the same connection is far below the granularity anybody schedules a deletion
+    // at. The cron path (no connection) is never throttled - it is the one that must
+    // catch what nobody browsed.
+    if (connectionId) {
+        const sweptAt = lastBrowseSweep.get(connectionId);
+        if (sweptAt !== undefined && Date.now() - sweptAt < BROWSE_SWEEP_INTERVAL_MS) return 0;
+        lastBrowseSweep.set(connectionId, Date.now());
+    }
     const due = await prisma.scheduledDeletion.findMany({
         where: { deleteAt: { lte: new Date() }, ...(connectionId ? { connectionId } : {}) },
         orderBy: { deleteAt: "asc" },

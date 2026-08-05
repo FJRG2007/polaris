@@ -15,4 +15,11 @@ export {
     type SftpDriverOptions,
     type SftpSessionOptions
 } from "./drivers/sftp.js";
-export { SmbDriver, type SmbDriverOptions } from "./drivers/smb.js";
+export {
+    openSmbSession,
+    SmbDriver,
+    type SmbConnectOptions,
+    type SmbDriverOptions,
+    type SmbSession,
+    type SmbSessionOptions
+} from "./drivers/smb.js";
