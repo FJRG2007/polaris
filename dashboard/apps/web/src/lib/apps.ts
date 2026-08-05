@@ -5,7 +5,7 @@
  * Everything installable lives under Apps rather than sprawling the switcher.
  */
 
-import type { Permission } from "@polaris/core";
+import type { OrgPermission, Permission } from "@polaris/core";
 import {
     Activity,
     Bell,
@@ -164,6 +164,10 @@ export interface AppSection {
      *  app's own heading, so a flat rail needs no groups at all; once one screen
      *  names a group, everything sharing that name is drawn together under it. */
     group?: string;
+    /** For a rail whose entries are not all reachable by everybody looking at it:
+     *  the organization permission this screen needs. Sections with none are open
+     *  to anybody who can see the subject at all. */
+    permission?: OrgPermission;
 }
 
 /**
@@ -268,6 +272,12 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             href: "/account/organizations",
             icon: Building2,
             keywords: ["org", "orgs", "teams", "company", "members", "roster", "group"]
+        },
+        {
+            label: "Domains",
+            href: "/account/domains",
+            icon: Globe,
+            keywords: ["dns", "custom domain", "deploys", "hostnames", "wildcard", "own domain"]
         },
         // Everything that decides who reaches this account is one subject, and it
         // is half the rail: six screens people go looking for together.
@@ -489,8 +499,96 @@ export const APP_SUBAPPS: AppSubapp[] = [
     }
 ];
 
+/** Where an organization's own screens live. */
+export const ORG_BASE = "/account/organizations";
+
+/**
+ * The organization's rail, built for one handle.
+ *
+ * Not in APP_SUBAPPS because there is no fixed list of them: every organization
+ * somebody belongs to is one, and its base is only known once a path names it.
+ * Otherwise it behaves exactly like the others - it replaces the rail while you
+ * are inside it, and the way back out is the list you came from.
+ *
+ * `permission` is what the rail hides an entry on. A member who cannot define
+ * roles or add domains should not be shown two screens that will turn them away;
+ * the entries with none are the ones everybody on the roster can open.
+ */
+export function orgSubapp(slug: string): AppSubapp {
+    const base = `${ORG_BASE}/${slug}`;
+    return {
+        id: `org:${slug}`,
+        // The handle rather than the name: the rail is drawn from the path alone,
+        // and the organization's name is on the page it opens.
+        label: `@${slug}`,
+        icon: Building2,
+        base,
+        parent: { label: "Organizations", href: ORG_BASE },
+        sections: [
+            { label: "Overview", href: base, icon: LayoutDashboard, keywords: ["organization", "summary"] },
+            {
+                label: "People",
+                href: `${base}/people`,
+                icon: Users,
+                keywords: ["members", "roster", "who", "invite", "add somebody"]
+            },
+            {
+                label: "Teams",
+                href: `${base}/teams`,
+                icon: UsersRound,
+                keywords: ["groups", "squads", "access", "grants"]
+            },
+            {
+                label: "Roles",
+                href: `${base}/roles`,
+                icon: IdCard,
+                permission: "roles.manage",
+                keywords: ["permissions", "what they can do", "admin", "member"]
+            },
+            {
+                label: "Spaces",
+                href: `${base}/spaces`,
+                icon: SquareCheckBig,
+                keywords: ["tasks", "work", "boards", "lists", "projects"]
+            },
+            {
+                label: "Domains",
+                href: `${base}/domains`,
+                icon: Globe,
+                permission: "domains.manage",
+                keywords: ["dns", "deploys", "hostnames", "custom domain", "wildcard"]
+            },
+            {
+                label: "Activity",
+                href: `${base}/activity`,
+                icon: History,
+                permission: "activity.read",
+                keywords: ["audit", "history", "logs", "what happened", "who did"]
+            },
+            {
+                label: "Settings",
+                href: `${base}/settings`,
+                icon: SlidersHorizontal,
+                permission: "settings.manage",
+                keywords: ["name", "photo", "handle", "transfer", "delete", "hand over"]
+            }
+        ]
+    };
+}
+
+/** The handle in an organization path, or null when the path is not inside one.
+ *  The list itself is not: it is the way back out, so it must keep the account
+ *  rail rather than swap to an organization's. */
+export function orgSlugForPath(pathname: string): string | null {
+    if (!pathname.startsWith(`${ORG_BASE}/`)) return null;
+    const slug = pathname.slice(ORG_BASE.length + 1).split("/")[0] ?? "";
+    return slug ? decodeURIComponent(slug) : null;
+}
+
 /** The subject a path is inside, or null when it is not inside one. */
 export function resolveSubapp(pathname: string): AppSubapp | null {
+    const slug = orgSlugForPath(pathname);
+    if (slug) return orgSubapp(slug);
     return APP_SUBAPPS.find((sub) => pathname === sub.base || pathname.startsWith(`${sub.base}/`)) ?? null;
 }
 

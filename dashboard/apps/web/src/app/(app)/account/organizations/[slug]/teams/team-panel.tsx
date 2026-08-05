@@ -17,12 +17,6 @@ import { runAction } from "@/lib/run-action";
 import { Loader2, Trash2, UserPlus } from "lucide-react";
 import type { TeamGrantView, TeamMemberView, TeamView } from "@/lib/orgs/org-service";
 import {
-    addTeamMemberAction,
-    removeTeamMemberAction,
-    setTeamMemberRoleAction,
-    teamDetailAction
-} from "../actions";
-import {
     Button,
     Dialog,
     DialogContent,
@@ -32,6 +26,12 @@ import {
     Input,
     Select
 } from "@polaris/ui";
+import {
+    addTeamMemberAction,
+    removeTeamMemberAction,
+    setTeamMemberRoleAction,
+    teamDetailAction
+} from "@/app/(app)/account/organizations/actions";
 
 const ROLE_OPTIONS = core.TEAM_ROLES.map((role) => ({ value: role, label: core.TEAM_ROLE_LABELS[role] }));
 

@@ -123,23 +123,47 @@ export async function setAvatarSettings(input: { target: string; gravatar: boole
 // ---------------------------------------------------------------------------
 
 /**
- * Replace an account's photo.
+ * Who a photo belongs to.
+ *
+ * An organization has a face for the same reasons a person does - it appears in
+ * a switcher, a list and a header - and gets it the same way, through the same
+ * storage target and the same size and format rules. Only the row differs, so
+ * that is the only thing this discriminates.
+ */
+export type AvatarOwner = { readonly kind: "user"; readonly id: string } | { readonly kind: "org"; readonly id: string };
+
+interface AvatarRow {
+    readonly connectionId: string | null;
+    readonly path: string;
+    readonly updatedAt: Date;
+    readonly mime: string;
+}
+
+async function readRow(owner: AvatarOwner): Promise<AvatarRow | null> {
+    return owner.kind === "user"
+        ? prisma.userAvatar.findUnique({ where: { userId: owner.id } })
+        : prisma.organizationAvatar.findUnique({ where: { orgId: owner.id } });
+}
+
+/**
+ * Replace a photo.
  *
  * The old file is removed after the new row is written rather than before: a
- * failed upload that has already deleted the previous photo leaves the person
- * worse off than when they started.
+ * failed upload that has already deleted the previous photo leaves whoever
+ * uploaded it worse off than when they started.
  */
-export async function storeAvatar(userId: string, bytes: Uint8Array, mime: string): Promise<void> {
+export async function storeAvatar(owner: AvatarOwner, bytes: Uint8Array, mime: string): Promise<void> {
     const extension = ALLOWED_MIME.get(mime);
     if (!extension) throw new Error("That kind of image is not accepted");
 
-    const previous = await prisma.userAvatar.findUnique({ where: { userId } });
+    const previous = await readRow(owner);
     const target = await resolveStorageTarget(AVATAR_TARGET_KEY);
     const driver = await driverForTarget(target.id, LOCAL_FOLDER);
-    // A name of its own rather than the user id: a photo replaced while another
-    // browser still has the old one cached must not be served the new bytes
-    // under the old name, and a name cannot escape the folder this way either.
-    const path = `${AVATAR_ROOT}/${safeName(userId)}-${crypto.randomUUID()}${extension}`;
+    // A name of its own rather than the owner's id: a photo replaced while
+    // another browser still has the old one cached must not be served the new
+    // bytes under the old name, and a name cannot escape the folder this way
+    // either. The kind is in the name so the two never collide on one disk.
+    const path = `${AVATAR_ROOT}/${owner.kind}-${safeName(owner.id)}-${crypto.randomUUID()}${extension}`;
 
     try {
         await driver.mkdir(AVATAR_ROOT).catch(() => undefined);
@@ -148,20 +172,36 @@ export async function storeAvatar(userId: string, bytes: Uint8Array, mime: strin
         await driver.dispose().catch(() => undefined);
     }
 
-    await prisma.userAvatar.upsert({
-        where: { userId },
-        create: { userId, connectionId: target.id === LOCAL_TARGET ? null : target.id, path, mime, size: bytes.length },
-        update: { connectionId: target.id === LOCAL_TARGET ? null : target.id, path, mime, size: bytes.length }
-    });
+    const stored = {
+        connectionId: target.id === LOCAL_TARGET ? null : target.id,
+        path,
+        mime,
+        size: bytes.length
+    };
+    if (owner.kind === "user") {
+        await prisma.userAvatar.upsert({
+            where: { userId: owner.id },
+            create: { userId: owner.id, ...stored },
+            update: stored
+        });
+    } else {
+        await prisma.organizationAvatar.upsert({
+            where: { orgId: owner.id },
+            create: { orgId: owner.id, ...stored },
+            update: stored
+        });
+    }
 
     if (previous) await removeFile(previous.connectionId, previous.path);
 }
 
-/** Go back to initials, or to Gravatar if this instance uses it. */
-export async function deleteAvatar(userId: string): Promise<void> {
-    const existing = await prisma.userAvatar.findUnique({ where: { userId } });
+/** Go back to initials - or, for an account, to Gravatar if this instance uses
+ *  it. An organization has no Gravatar to fall back to. */
+export async function deleteAvatar(owner: AvatarOwner): Promise<void> {
+    const existing = await readRow(owner);
     if (!existing) return;
-    await prisma.userAvatar.delete({ where: { userId } });
+    if (owner.kind === "user") await prisma.userAvatar.delete({ where: { userId: owner.id } });
+    else await prisma.organizationAvatar.delete({ where: { orgId: owner.id } });
     await removeFile(existing.connectionId, existing.path);
 }
 
@@ -211,8 +251,8 @@ export interface AvatarRef {
 }
 
 /** The photo somebody uploaded, or null when they have not. */
-async function uploadedAvatar(userId: string): Promise<AvatarRef | null> {
-    const row = await prisma.userAvatar.findUnique({ where: { userId } });
+async function uploadedAvatar(owner: AvatarOwner): Promise<AvatarRef | null> {
+    const row = await readRow(owner);
     if (!row) return null;
     return {
         etag: `"u${row.updatedAt.getTime()}"`,
@@ -350,13 +390,25 @@ export function forgetGravatar(email: string): void {
  * lookup rather than a request nearly every time.
  */
 export async function resolveAvatar(userId: string): Promise<AvatarRef | null> {
-    const uploaded = await uploadedAvatar(userId);
+    const uploaded = await uploadedAvatar({ kind: "user", id: userId });
     if (uploaded) return uploaded;
     if (!(await gravatarEnabled())) return null;
     const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true } });
     if (!user) return null;
     const image = await gravatarImage(user.email);
     return image ? { etag: image.etag, mime: image.mime, load: async () => image.bytes } : null;
+}
+
+/**
+ * The picture for an organization, or null when it has none.
+ *
+ * One answer rather than three: an organization has no email address, so there
+ * is no Gravatar to fall through to and nothing to look up on a third party. It
+ * is the uploaded photo or its initials, which is also why this cannot leak an
+ * organization's existence - a 404 here is the same 404 as for one with no photo.
+ */
+export async function resolveOrgAvatar(orgId: string): Promise<AvatarRef | null> {
+    return uploadedAvatar({ kind: "org", id: orgId });
 }
 
 /** The drivers speak in streams, because most of what they carry is far too big

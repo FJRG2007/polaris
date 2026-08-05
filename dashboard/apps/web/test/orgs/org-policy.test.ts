@@ -9,9 +9,15 @@
 
 import { describe, expect, it } from "vitest";
 import {
+    ALL_ORG_PERMISSIONS,
+    hasOrgPermission,
+    ORG_PERMISSION_META,
+    ORG_PERMISSIONS,
+    ORG_SYSTEM_ROLES,
     ORGANIZATION_POLICY_DEFAULTS,
     organizationPolicySchema,
-    orgRoleAtLeast,
+    orgRoleSchema,
+    orgRoleSlugField,
     orgSlugField,
     suggestSlug,
     withinLimit
@@ -57,11 +63,39 @@ describe("organization limits", () => {
 });
 
 describe("organization roles", () => {
-    it("puts the owner above every role", () => {
-        expect(orgRoleAtLeast("owner", "admin")).toBe(true);
-        expect(orgRoleAtLeast("admin", "admin")).toBe(true);
-        expect(orgRoleAtLeast("member", "admin")).toBe(false);
-        expect(orgRoleAtLeast("member", "member")).toBe(true);
+    it("answers the wildcard to everything, including permissions added later", () => {
+        for (const permission of ORG_PERMISSIONS) {
+            expect(hasOrgPermission([ALL_ORG_PERMISSIONS], permission)).toBe(true);
+        }
+        expect(hasOrgPermission(["org.read"], "org.read")).toBe(true);
+        expect(hasOrgPermission(["org.read"], "people.manage")).toBe(false);
+        expect(hasOrgPermission([], "org.read")).toBe(false);
+    });
+
+    it("seeds an admin that is unrestricted and a member that only looks", () => {
+        expect(ORG_SYSTEM_ROLES.admin?.permissions).toEqual([ALL_ORG_PERMISSIONS]);
+        expect(ORG_SYSTEM_ROLES.member?.permissions).toEqual(["org.read"]);
+    });
+
+    it("describes every permission, so none can go missing from the editor", () => {
+        for (const permission of ORG_PERMISSIONS) {
+            expect(ORG_PERMISSION_META[permission]?.label).toBeTruthy();
+            expect(ORG_PERMISSION_META[permission]?.area).toBeTruthy();
+        }
+    });
+
+    it("refuses a written role that grants the wildcard", () => {
+        // Only the seeded admin holds it. A role anybody writes must not quietly
+        // inherit whatever a later version of Polaris adds.
+        expect(orgRoleSchema.safeParse({ name: "Ops", slug: "ops", permissions: ["*"] }).success).toBe(false);
+        expect(orgRoleSchema.safeParse({ name: "Ops", slug: "ops", permissions: ["teams.manage"] }).success).toBe(true);
+    });
+
+    it("keeps role handles short and typeable", () => {
+        expect(orgRoleSlugField.safeParse("qa").success).toBe(true);
+        expect(orgRoleSlugField.safeParse("Q").success).toBe(false);
+        expect(orgRoleSlugField.safeParse("head of ops").success).toBe(false);
+        expect(orgRoleSlugField.safeParse("-ops").success).toBe(false);
     });
 });
 

@@ -125,6 +125,7 @@ model User {
     ownedOrgs           Organization[]       @relation("OrganizationOwner")
     orgMemberships      OrganizationMember[]
     teamMemberships     TeamMember[]
+    ownedDomains        OwnerDomain[]
 }
 
 // Addresses a user owns besides the one they sign in with. The primary stays on
@@ -1754,11 +1755,19 @@ model AuditLog {
     // one device at a time. Deliberately not a foreign key: ending a session
     // must not erase what was done from it.
     sessionId  String?  @db.Uuid
+    // The organization the action was about, when it was about one. This is what
+    // separates "what Ana did in Acme" from "what Ana did on her own account":
+    // an organization's history is the actions taken on its roster, its teams,
+    // its roles, its domains and its work, and nothing else about the person.
+    // Not a foreign key either, for the same reason as the session - an
+    // organization being deleted must not quietly erase the record of it.
+    orgId      String?  @db.Uuid
     at         DateTime @default(now())
 
     @@index([actorId])
     @@index([action])
     @@index([sessionId])
+    @@index([orgId])
     // The firewall asks this table what an address did, by hashing the address and
     // matching. Without the index that is a scan of every action ever taken.
     @@index([ipHash])
@@ -2132,6 +2141,11 @@ model DeployTarget {
 model Project {
     id          String   @id @default(uuid(7)) @db.Uuid
     ownerId     String   @db.Uuid
+    // The organization this project belongs to, or null for a personal one. Set
+    // from whichever shelf was open when it was created, and never changed by a
+    // deploy: the person switching to their own scope must stop seeing a client's
+    // services, and the services must not follow them there.
+    orgId       String?  @db.Uuid
     name        String
     slug        String
     description String?
@@ -2147,6 +2161,7 @@ model Project {
     updatedAt   DateTime @updatedAt
 
     owner        User             @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+    org          Organization?    @relation(fields: [orgId], references: [id], onDelete: Cascade)
     environments Environment[]
     members      ProjectMember[]
     webhooks     ProjectWebhook[]
@@ -2154,6 +2169,7 @@ model Project {
 
     @@unique([ownerId, slug])
     @@index([ownerId])
+    @@index([orgId])
 }
 
 // Somebody other than the owner who may reach a project. The owner is never a
@@ -2750,12 +2766,105 @@ model Organization {
     createdAt   DateTime @default(now())
     updatedAt   DateTime @updatedAt
 
-    owner   User                 @relation("OrganizationOwner", fields: [ownerId], references: [id], onDelete: Cascade)
-    members OrganizationMember[]
-    teams   Team[]
-    spaces  TaskSpace[]
+    owner    User                 @relation("OrganizationOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+    members  OrganizationMember[]
+    teams    Team[]
+    roles    OrgRole[]
+    spaces   TaskSpace[]
+    projects Project[]
+    domains  OwnerDomain[]
+    avatar   OrganizationAvatar?
 
     @@index([ownerId])
+}
+
+// One organization's photo, kept exactly as an account's is: the bytes live on
+// whichever storage the instance sends uploads to, and this row says where.
+//
+// Separate from Organization.image, which holds a URL somewhere else if one was
+// ever set. An upload always wins over it, so the two never disagree about what
+// is on screen.
+model OrganizationAvatar {
+    orgId        String   @id @db.Uuid
+    // Null when the bytes are on the disk Polaris runs on.
+    connectionId String?
+    path         String
+    mime         String
+    size         Int      @default(0)
+    updatedAt    DateTime @updatedAt
+
+    org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+}
+
+// What one of an organization's roles may do.
+//
+// Rows rather than a fixed ladder because "admin" means something different in a
+// studio, a company and a household, and the people running one should not have
+// to bend their vocabulary to ours. Every organization is seeded with `admin` and
+// `member` so it works before anybody opens the roles screen; both are marked
+// system, so neither can be deleted while a membership may still name it.
+//
+// A membership stores the slug, not the id: an organization that renames a role
+// keeps its roster intact, and the two seeded slugs are exactly the values every
+// row written before this table existed already holds.
+model OrgRole {
+    id          String   @id @default(uuid(7)) @db.Uuid
+    orgId       String   @db.Uuid
+    slug        String
+    name        String
+    description String   @default("")
+    // JSON array of org permission keys, or ["*"] on the seeded admin. Stored as
+    // a string like the instance's own roles; validated by @polaris/core on read.
+    permissions String   @default("[]")
+    // Seeded by Polaris. Cannot be deleted, and `admin` cannot be edited either.
+    system      Boolean  @default(false)
+    createdAt   DateTime @default(now())
+    updatedAt   DateTime @updatedAt
+
+    org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+    @@unique([orgId, slug])
+    @@index([orgId])
+}
+
+// A domain somebody brought themselves, for their own deployed services.
+//
+// Exactly one of userId and orgId is set: a domain belongs to one person or to
+// one organization, never to both and never to the instance - the operator's own
+// zones are configuration, live in Settings, and are what the dashboard itself is
+// reached on. Nothing here can move that.
+//
+// Verified in two independent steps, and both matter. The TXT record proves the
+// person adding it controls the domain, which is what stops somebody claiming a
+// name they do not own and being handed certificates for it. The wildcard record
+// proves traffic for it arrives here, which is what makes a minted hostname
+// actually answer. A domain with the first and not the second is understood but
+// not yet usable, and the screen says which is missing.
+model OwnerDomain {
+    id           String    @id @default(uuid(7)) @db.Uuid
+    userId       String?   @db.Uuid
+    orgId        String?   @db.Uuid
+    // The registrable domain or the subdomain it is delegated to, normalized:
+    // no scheme, no wildcard prefix, no port, lowercase.
+    domain       String    @unique
+    // Published by the owner as a TXT record at _polaris.<domain>. Random, and
+    // regenerated when the domain is re-added, so an old record cannot re-verify.
+    verifyToken  String
+    verifiedAt   DateTime?
+    // Whether *.domain was last seen resolving to this instance. Kept apart from
+    // verifiedAt: ownership is proven once, reachability is a live fact.
+    wildcardOk   Boolean   @default(false)
+    checkedAt    DateTime?
+    // Why the last check said what it did, in a sentence the owner can act on.
+    checkDetail  String?
+    createdAt    DateTime  @default(now())
+    updatedAt    DateTime  @updatedAt
+
+    user User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
+    org  Organization? @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+    @@index([userId])
+    @@index([orgId])
 }
 
 // Somebody other than the owner on an organization's roster.

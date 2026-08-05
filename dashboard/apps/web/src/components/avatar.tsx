@@ -17,7 +17,7 @@
 
 import { cn } from "@polaris/ui";
 import { useState } from "react";
-import { avatarUrl } from "@/lib/avatar-url";
+import { avatarUrl, orgAvatarUrl } from "@/lib/avatar-url";
 
 export interface AvatarPerson {
     readonly id: string;
@@ -66,22 +66,29 @@ export function preloadAvatars(people: readonly AvatarPerson[]): void {
 export function Avatar({
     person,
     size = 24,
-    className
+    className,
+    square = false
 }: {
     person: AvatarPerson;
     size?: number;
     className?: string;
+    /** A rounded square instead of a circle. What an organization gets: a group
+     *  and a person appear side by side in the same lists, and the shape is what
+     *  tells them apart before either name is read. */
+    square?: boolean;
 }) {
     const source = person.image ?? avatarUrl(person.id);
     // A 404 is the ordinary answer for somebody with no picture anywhere, so it
     // is not an error state - it just means the initials underneath stay.
     const [failed, setFailed] = useState(false);
+    const shape = square ? "rounded-md" : "rounded-full";
 
     return (
         <span
             title={person.name}
             className={cn(
-                "relative inline-flex shrink-0 select-none items-center justify-center overflow-hidden rounded-full bg-muted font-medium text-muted-foreground ring-1 ring-border",
+                "relative inline-flex shrink-0 select-none items-center justify-center overflow-hidden bg-muted font-medium text-muted-foreground ring-1 ring-border",
+                shape,
                 className
             )}
             style={{ width: size, height: size, fontSize: Math.max(9, Math.round(size * 0.4)) }}
@@ -93,10 +100,31 @@ export function Avatar({
                     src={source}
                     alt=""
                     onError={() => setFailed(true)}
-                    className="absolute inset-0 size-full rounded-full object-cover"
+                    className={cn("absolute inset-0 size-full object-cover", shape)}
                 />
             )}
         </span>
+    );
+}
+
+/** An organization's face, wherever one is drawn. The same component underneath,
+ *  pointed at the organization's own picture and drawn as a square. */
+export function OrgAvatar({
+    org,
+    size = 24,
+    className
+}: {
+    org: { readonly id: string; readonly name: string };
+    size?: number;
+    className?: string;
+}) {
+    return (
+        <Avatar
+            square
+            size={size}
+            className={className}
+            person={{ id: org.id, name: org.name, image: orgAvatarUrl(org.id) }}
+        />
     );
 }
 

@@ -179,9 +179,11 @@ describe("hostnames minted from the layout", () => {
     });
 
     it("lists the deploy zones for a picker, flagging the default", async () => {
+        // `owned` says whose domain it is. Every entry here is the operator's;
+        // asked without an owner, nothing brought by anybody is offered at all.
         expect(await listDeployZones()).toEqual([
-            { label: "plr", host: "plr.example.com", primary: true },
-            { label: "", host: "example.com", primary: false }
+            { label: "plr", host: "plr.example.com", primary: true, owned: false },
+            { label: "", host: "example.com", primary: false, owned: false }
         ]);
     });
 

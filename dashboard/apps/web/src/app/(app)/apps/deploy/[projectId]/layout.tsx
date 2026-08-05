@@ -30,8 +30,11 @@ export default async function ProjectLayout({
     const project = await getProject(projectId, user.id);
     if (!project) notFound();
 
+    // The switcher in this shell lists the shelf the project itself is on, not
+    // whichever one happens to be open: a project reached by link must not offer
+    // to jump to services from somewhere else entirely.
     const [projects, staged] = await Promise.all([
-        listProjects(user.id),
+        listProjects(user.id, project.orgId),
         listProjectStagedChanges(projectId)
     ]);
 

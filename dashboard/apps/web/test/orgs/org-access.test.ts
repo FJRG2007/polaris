@@ -34,7 +34,7 @@ function space(options: {
     orgId?: string | null;
     members?: { role: string }[];
     teamGrants?: { role: string }[];
-    org?: { ownerId: string; members: { role: string }[] } | null;
+    org?: { ownerId: string; members: { role: string }[]; roles?: { slug: string; permissions: string }[] } | null;
 }) {
     return {
         ownerId: options.ownerId ?? "someone-else",
@@ -42,7 +42,9 @@ function space(options: {
         orgId: options.orgId ?? null,
         members: options.members ?? [],
         teamGrants: options.teamGrants ?? [],
-        org: options.org ?? null
+        // An organization with no role rows is the migrated case: the slugs on
+        // its memberships still mean what Polaris seeds them as.
+        org: options.org ? { roles: [], ...options.org } : null
     };
 }
 
@@ -65,6 +67,37 @@ describe("what an organization's space gives somebody", () => {
 
         spaceFindUnique.mockResolvedValue(space({ orgId: "o1", org: { ownerId: READER.id, members: [] } }));
         expect(await resolveSpaceRole(READER, "s1")).toBe("owner");
+    });
+
+    it("reads the organization's own role rather than matching on the name 'admin'", async () => {
+        // An organization names its own roles. Matching the slug would list this
+        // space to somebody the roster says runs the work, then refuse them when
+        // they opened it.
+        spaceFindUnique.mockResolvedValue(
+            space({
+                orgId: "o1",
+                org: {
+                    ownerId: "someone-else",
+                    members: [{ role: "ops" }],
+                    roles: [{ slug: "ops", permissions: JSON.stringify(["spaces.manage"]) }]
+                }
+            })
+        );
+        expect(await resolveSpaceRole(READER, "s1")).toBe("admin");
+
+        // And a role called "admin" that was narrowed to not run the work does
+        // not administer it either.
+        spaceFindUnique.mockResolvedValue(
+            space({
+                orgId: "o1",
+                org: {
+                    ownerId: "someone-else",
+                    members: [{ role: "desk" }],
+                    roles: [{ slug: "desk", permissions: JSON.stringify(["people.manage"]) }]
+                }
+            })
+        );
+        expect(await resolveSpaceRole(READER, "s1")).toBeNull();
     });
 
     it("gives a team's people the role the team was granted", async () => {

@@ -16,6 +16,9 @@ import {
     APP_SECTIONS,
     APP_SUBAPPS,
     isSectionActive,
+    ORG_BASE,
+    orgSlugForPath,
+    orgSubapp,
     POLARIS_APPS,
     resolveActiveApp,
     resolveSubapp
@@ -85,6 +88,58 @@ describe("every subject with its own rail", () => {
                 `${subapp.id} is not in the ${app.id} rail`
             ).toBe(true);
         }
+    });
+});
+
+describe("one organization's own rail", () => {
+    const subapp = orgSubapp("acme");
+
+    it("claims the organization and everything under it", () => {
+        expect(resolveSubapp("/account/organizations/acme")?.id).toBe("org:acme");
+        expect(resolveSubapp("/account/organizations/acme/people")?.id).toBe("org:acme");
+        expect(resolveSubapp("/account/organizations/acme/teams/anything")?.id).toBe("org:acme");
+    });
+
+    it("leaves the list it came from alone, so the way back out is not itself", () => {
+        expect(resolveSubapp(ORG_BASE)).toBeNull();
+        expect(resolveSubapp("/account")).toBeNull();
+        expect(resolveSubapp("/account/security")).toBeNull();
+        expect(resolveSubapp(subapp.parent.href)).toBeNull();
+    });
+
+    it("still belongs to the account app, so the switcher does not move", () => {
+        expect(resolveActiveApp("/account/organizations/acme/people").id).toBe("account");
+    });
+
+    it("reads the handle off the path and nothing else", () => {
+        expect(orgSlugForPath("/account/organizations/acme/roles")).toBe("acme");
+        expect(orgSlugForPath(ORG_BASE)).toBeNull();
+        expect(orgSlugForPath("/account/organizations/")).toBeNull();
+        // A handle that arrived percent-encoded has to come back as the handle,
+        // or the rail asks the server about a name that does not exist.
+        expect(orgSlugForPath("/account/organizations/a%2Db")).toBe("a-b");
+    });
+
+    it("has a section on its own base, so the rail marks where you are on arrival", () => {
+        expect(subapp.sections.map((section) => section.href)).toContain(subapp.base);
+    });
+
+    it("keeps every screen inside the organization it belongs to", () => {
+        for (const section of subapp.sections) {
+            expect(resolveSubapp(section.href)?.id, section.href).toBe(subapp.id);
+        }
+    });
+
+    it("leaves at most one of its sections lit on any of its own paths", () => {
+        for (const section of subapp.sections) {
+            const lit = subapp.sections.filter((entry) => isSectionActive(section.href, entry.href, subapp.sections));
+            expect(lit.map((entry) => entry.href), `at ${section.href}`).toEqual([section.href]);
+        }
+    });
+
+    it("gates exactly the screens that turn a plain member away", () => {
+        const gated = subapp.sections.filter((section) => section.permission).map((section) => section.label);
+        expect(gated).toEqual(["Roles", "Domains", "Activity", "Settings"]);
     });
 });
 

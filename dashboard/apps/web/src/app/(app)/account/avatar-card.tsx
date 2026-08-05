@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Your profile photo.
+ * A photo card: yours, or an organization's.
  *
  * The picture is resized and re-encoded here, in the browser, before it is sent.
  * It costs nothing, it means a phone photo does not arrive as eight megabytes of
@@ -10,13 +10,17 @@
  * which nobody setting a profile picture means to publish. The server checks the
  * bytes again regardless: this runs on the uploader's machine, so it is a
  * courtesy rather than a control.
+ *
+ * One component for both because everything that matters is the same - the size
+ * limit, the formats, the crop, the cache dance after a replace. Only the
+ * endpoint, the face being drawn and the sentence under the heading differ.
  */
 
-import { useRef, useState } from "react";
-import { avatarUrl } from "@/lib/avatar-url";
-import { Avatar } from "@/components/avatar";
 import { Button, Card, CardBody } from "@polaris/ui";
 import { Loader2, Trash2, Upload } from "lucide-react";
+import { Avatar, OrgAvatar } from "@/components/avatar";
+import { useRef, useState, type ReactNode } from "react";
+import { avatarUrl, orgAvatarUrl } from "@/lib/avatar-url";
 
 /** Big enough for the largest place a face is drawn, small enough to be free. */
 const MAX_EDGE = 512;
@@ -26,8 +30,8 @@ const ACCEPTED = "image/png,image/jpeg,image/webp,image/gif";
 /**
  * The picture as a square of at most MAX_EDGE, centred on the middle.
  *
- * Cropped rather than squashed: every avatar in Polaris is a circle, so a
- * portrait that was letterboxed to fit would be drawn squashed anyway.
+ * Cropped rather than squashed: every face in Polaris is drawn in a square box,
+ * so a portrait that was letterboxed to fit would be drawn squashed anyway.
  */
 async function toSquare(file: File): Promise<Blob> {
     const bitmap = await createImageBitmap(file);
@@ -48,7 +52,24 @@ async function toSquare(file: File): Promise<Blob> {
     }
 }
 
-export function AvatarCard({ userId, name, hasPhoto }: { userId: string; name: string; hasPhoto: boolean }) {
+function PhotoCard({
+    title,
+    hint,
+    preview,
+    endpoint,
+    pictureUrl,
+    hasPhoto
+}: {
+    title: string;
+    hint: string;
+    preview: ReactNode;
+    /** Where the bytes are posted and deleted. */
+    endpoint: string;
+    /** The URL the picture is served from, so a replacement can be pulled into
+     *  the browser's cache before the page is drawn again from it. */
+    pictureUrl: string;
+    hasPhoto: boolean;
+}) {
     const input = useRef<HTMLInputElement>(null);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState("");
@@ -63,13 +84,13 @@ export function AvatarCard({ userId, name, hasPhoto }: { userId: string; name: s
                 setBusy(false);
                 return;
             }
-            // Your face is drawn on this page, in the header, and in whatever
-            // list is behind it. They all point at the one URL, which the
-            // browser was told it could keep for five minutes - so the cached
-            // copy is replaced first, and then the page is drawn again from it.
-            // Anything less and you change your photo and nothing appears to
-            // happen except here.
-            await fetch(avatarUrl(userId), { cache: "reload" }).catch(() => undefined);
+            // The face is drawn on this page, in the header, and in whatever list
+            // is behind it. They all point at the one URL, which the browser was
+            // told it could keep for five minutes - so the cached copy is
+            // replaced first, and then the page is drawn again from it. Anything
+            // less and you change the photo and nothing appears to happen except
+            // here.
+            await fetch(pictureUrl, { cache: "reload" }).catch(() => undefined);
             window.location.reload();
         } catch {
             setError("Could not reach the server");
@@ -85,21 +106,18 @@ export function AvatarCard({ userId, name, hasPhoto }: { userId: string; name: s
             setError("That file could not be read as an image");
             return;
         }
-        await run(() => fetch("/api/avatar", { method: "POST", headers: { "Content-Type": body.type }, body }));
+        await run(() => fetch(endpoint, { method: "POST", headers: { "Content-Type": body.type }, body }));
     };
 
     return (
         <Card>
             <CardBody className="flex flex-col gap-3">
                 <div>
-                    <h2 className="text-sm font-medium">Photo</h2>
-                    <p className="text-xs text-muted-foreground">
-                        Shown wherever your name appears. Without one, Polaris uses the picture your email address has
-                        on Gravatar, and your initials if it has none.
-                    </p>
+                    <h2 className="text-sm font-medium">{title}</h2>
+                    <p className="text-xs text-muted-foreground">{hint}</p>
                 </div>
                 <div className="flex items-center gap-4">
-                    <Avatar person={{ id: userId, name }} size={64} />
+                    {preview}
                     <div className="flex flex-wrap items-center gap-2">
                         <input
                             ref={input}
@@ -122,7 +140,7 @@ export function AvatarCard({ userId, name, hasPhoto }: { userId: string; name: s
                             <Button
                                 variant="ghost"
                                 disabled={busy}
-                                onClick={() => void run(() => fetch("/api/avatar", { method: "DELETE" }))}
+                                onClick={() => void run(() => fetch(endpoint, { method: "DELETE" }))}
                             >
                                 <Trash2 className="size-4" />
                                 Remove
@@ -133,5 +151,31 @@ export function AvatarCard({ userId, name, hasPhoto }: { userId: string; name: s
                 {error && <p className="text-sm text-danger">{error}</p>}
             </CardBody>
         </Card>
+    );
+}
+
+export function AvatarCard({ userId, name, hasPhoto }: { userId: string; name: string; hasPhoto: boolean }) {
+    return (
+        <PhotoCard
+            title="Photo"
+            hint="Shown wherever your name appears. Without one, Polaris uses the picture your email address has on Gravatar, and your initials if it has none."
+            preview={<Avatar person={{ id: userId, name }} size={64} />}
+            endpoint="/api/avatar"
+            pictureUrl={avatarUrl(userId)}
+            hasPhoto={hasPhoto}
+        />
+    );
+}
+
+export function OrgPhotoCard({ orgId, name, hasPhoto }: { orgId: string; name: string; hasPhoto: boolean }) {
+    return (
+        <PhotoCard
+            title="Photo"
+            hint="Shown wherever this organization appears - the switcher, its people's rosters, and any list it is in. Without one, Polaris draws its initials."
+            preview={<OrgAvatar org={{ id: orgId, name }} size={64} />}
+            endpoint={`/api/avatar/org/${orgId}`}
+            pictureUrl={orgAvatarUrl(orgId)}
+            hasPhoto={hasPhoto}
+        />
     );
 }

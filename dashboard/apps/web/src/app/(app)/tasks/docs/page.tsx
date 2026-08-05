@@ -7,7 +7,7 @@ import { prisma } from "@polaris/db";
 import { requirePermission } from "@/lib/session";
 import { DocsView } from "@/app/(app)/tasks/docs-view";
 import { docTree, getDoc } from "@/lib/tasks/doc-service";
-import { visibleScope, type TaskActor } from "@/lib/tasks/access";
+import { shelfScope, type TaskActor } from "@/lib/tasks/access";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +17,7 @@ export default async function DocsPage({ searchParams }: { searchParams: Promise
     const actor: TaskActor = { id: user.id, isAdmin: user.isAdmin };
     // A page the space shares needs the space. A page written inside a folder
     // belongs to that branch, so a folder grant reaches it and nothing beside it.
-    const scope = await visibleScope(actor);
+    const scope = await shelfScope(actor);
     const { spaceIds } = scope;
     const grantedFolderIds = Object.keys(scope.folderRoles);
 

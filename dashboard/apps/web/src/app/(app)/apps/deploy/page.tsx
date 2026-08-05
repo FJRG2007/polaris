@@ -1,5 +1,6 @@
 import type { ServiceKind } from "./deploy-view";
 import { listProjects } from "@/lib/deploy-service";
+import { scopeOrgIdFor } from "@/lib/workspace-scope";
 import { refreshCapabilities } from "@polaris/hostd-client";
 import { requirePermission, userHasManage } from "@/lib/session";
 import { getOrCreateLocalTarget } from "@/lib/deploy-target-service";
@@ -19,7 +20,9 @@ export default async function DeployPage() {
     const caps = canManage ? await refreshCapabilities() : null;
     const localReady = Boolean(caps?.deploy);
 
-    const projects = await listProjects(user.id);
+    // The shelf that is open decides what is listed: your own services, or the
+    // organization's. A project never appears on both.
+    const projects = await listProjects(user.id, await scopeOrgIdFor(user.id));
     const cards: ProjectCardData[] = projects.map((project) => {
         const env = project.environments.find((environment) => environment.isDefault) ?? project.environments[0];
         const apps = env?.applications ?? [];

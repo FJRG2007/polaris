@@ -10,6 +10,7 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/session";
 import { recordAudit } from "@/lib/audit-service";
+import { setOwnerDomainPolicy, type OwnerDomainPolicy } from "@/lib/owner-domains";
 import { checkedAddresses, removeAddress, type CheckedAddress } from "@/lib/address-health";
 import {
     clearDuckdnsToken,
@@ -112,6 +113,32 @@ export async function removeAddressAction(host: unknown): Promise<{ addresses: C
         revalidatePath("/admin/domains");
     }
     return { addresses: await checkedAddresses(), error: REMOVAL_ERRORS[result] };
+}
+
+/**
+ * Whether accounts and organizations may bring domains of their own, and how
+ * many.
+ *
+ * Admin-gated like everything else on this page, and for a sharper reason than
+ * most: turning it on means strangers with accounts can point domains at this box
+ * and have Polaris ask Let's Encrypt to certify hostnames under them. Whoever runs
+ * the instance decides that, and nobody else can.
+ */
+export async function saveOwnerDomainPolicyAction(input: unknown): Promise<{ policy?: OwnerDomainPolicy; error?: string }> {
+    const user = await requireAdmin();
+    try {
+        const policy = await setOwnerDomainPolicy(input);
+        await recordAudit({
+            actorId: user.id,
+            action: "domain.owner.policy",
+            targetType: "setting",
+            metadata: { mode: policy.mode, maxPerOwner: policy.maxPerOwner }
+        });
+        revalidatePath("/admin/domains");
+        return { policy };
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not save that" };
+    }
 }
 
 export async function clearDuckdnsTokenAction(): Promise<{ config: DomainConfig }> {

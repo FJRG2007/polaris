@@ -56,30 +56,130 @@ export function suggestSlug(name: string): string {
 // ---------------------------------------------------------------------------
 
 /**
- * What somebody may do across a whole organization. Ordered least to most and
- * compared by index, so a check reads as "at least an admin". The owner is never
- * a member row and outranks both.
+ * What somebody may do across a whole organization.
+ *
+ * Permissions rather than a ladder of role names, for the same reason the
+ * instance itself works that way: an organization is a company, a studio or a
+ * household, and none of them agree on what "admin" should mean. So a call site
+ * asks whether this person may run the roster, and each organization decides for
+ * itself which of its roles carries that.
+ *
+ * Two things are deliberately absent. Handing the organization on and deleting it
+ * are not permissions and never will be - they belong to the owner alone, so no
+ * role anybody writes can end up able to give the organization away. And there is
+ * nothing here about the instance: an organization runs its own work, not the
+ * Polaris it happens to live on.
  */
-export const ORG_ROLES = ["member", "admin"] as const;
-export type OrgRole = (typeof ORG_ROLES)[number];
+export const ORG_PERMISSIONS = [
+    "org.read",
+    "people.manage",
+    "teams.manage",
+    "roles.manage",
+    "spaces.manage",
+    "deploy.manage",
+    "domains.manage",
+    "activity.read",
+    "settings.manage"
+] as const;
 
-/** The owner sits above every role, exactly as a space owner does. */
-export type OrgAccess = OrgRole | "owner";
+export type OrgPermission = (typeof ORG_PERMISSIONS)[number];
 
-export const ORG_ROLE_LABELS: Record<OrgRole, string> = {
-    member: "Member",
-    admin: "Admin"
+/** Held by the seeded admin role, and by nothing a person writes: it means every
+ *  permission, including ones a later version of Polaris adds. */
+export const ALL_ORG_PERMISSIONS = "*" as const;
+
+export type GrantedOrgPermission = OrgPermission | typeof ALL_ORG_PERMISSIONS;
+
+/** What each permission is called and where it belongs, so the role editor is
+ *  grouped the way the organization's own screens are rather than listing keys. */
+export const ORG_PERMISSION_META: Readonly<Record<OrgPermission, { area: string; label: string }>> = {
+    "org.read": { area: "General", label: "See the organization, its people and its teams" },
+    "settings.manage": { area: "General", label: "Change the name, handle, description and photo" },
+    "activity.read": { area: "General", label: "Read what has been done here" },
+    "people.manage": { area: "People", label: "Add and remove people, and set their role" },
+    "teams.manage": { area: "People", label: "Create teams and run their rosters" },
+    "roles.manage": { area: "People", label: "Define what the organization's roles may do" },
+    "spaces.manage": { area: "Work", label: "Create and administer the organization's spaces" },
+    "deploy.manage": { area: "Work", label: "Deploy and configure the organization's services" },
+    "domains.manage": { area: "Work", label: "Add and verify the organization's domains" }
 };
 
-export const ORG_ROLE_HINTS: Record<OrgRole, string> = {
-    member: "See the organization and the teams they are on.",
-    admin: "Run the roster, the teams and the organization's spaces."
+/** The areas in the order the editor draws them. Read off the meta rather than
+ *  written twice, so a permission added above cannot go missing from the screen. */
+export const ORG_PERMISSION_AREAS: readonly string[] = [
+    ...new Set(ORG_PERMISSIONS.map((permission) => ORG_PERMISSION_META[permission].area))
+];
+
+/**
+ * The roles every organization starts with.
+ *
+ * They exist because a brand-new organization has to be usable before anybody
+ * opens the roles screen, and they are seeded rather than hardcoded so an
+ * organization that wants "Member" to reach its spaces can simply say so. What
+ * cannot be edited is `admin` - it holds the wildcard, so editing it could only
+ * ever narrow the one role that exists to be unrestricted - and neither can be
+ * deleted, because a membership row may still name it.
+ */
+export const ORG_SYSTEM_ROLES: Readonly<
+    Record<string, { name: string; description: string; permissions: readonly GrantedOrgPermission[] }>
+> = {
+    admin: {
+        name: "Admin",
+        description: "Runs the roster, the teams, the work and the settings.",
+        permissions: [ALL_ORG_PERMISSIONS]
+    },
+    member: {
+        name: "Member",
+        description: "Sees the organization and reaches whatever their teams reach.",
+        permissions: ["org.read"]
+    }
 };
 
-export function orgRoleAtLeast(role: OrgAccess, minimum: OrgRole): boolean {
-    if (role === "owner") return true;
-    return ORG_ROLES.indexOf(role) >= ORG_ROLES.indexOf(minimum);
+/** The seeded slugs, in the order a picker should offer them. */
+export const ORG_SYSTEM_ROLE_SLUGS: readonly string[] = Object.keys(ORG_SYSTEM_ROLES);
+
+/** The role whose grants are fixed, for the reason above. */
+export const UNEDITABLE_ORG_ROLE = "admin";
+
+/** The role somebody falls to when the one they held is deleted, and what a new
+ *  membership takes unless the person adding them says otherwise. */
+export const DEFAULT_ORG_ROLE = "member";
+
+/** Role names are typed by hand and read back in a roster, a picker and an audit
+ *  entry, so they stay short. */
+export const ORG_ROLE_NAME_MAX = 32;
+
+/** A role's handle within its organization. Shorter than an organization handle
+ *  on purpose: "qa" and "ops" are the names people actually use. */
+export const orgRoleSlugField = z
+    .string()
+    .trim()
+    .toLowerCase()
+    .min(2, "At least 2 characters")
+    .max(30, "At most 30 characters")
+    .regex(/^[a-z0-9-]+$/, "Use letters, numbers or -")
+    .refine((value) => !value.startsWith("-") && !value.endsWith("-"), "Cannot start or end with -");
+
+/**
+ * Whether a set of grants carries a permission. The wildcard answers yes to
+ * everything, which is what makes a permission added in a later version reach the
+ * admin role without a migration.
+ */
+export function hasOrgPermission(granted: readonly string[], permission: OrgPermission): boolean {
+    return granted.includes(ALL_ORG_PERMISSIONS) || granted.includes(permission);
 }
+
+/** A role as it is written. The wildcard is absent from the input on purpose:
+ *  only the seeded admin holds it, so nobody can mint a second unrestricted role
+ *  and then be surprised by what a future version put inside it. */
+export const orgRoleSchema = z.object({
+    name: z.string().trim().min(1, "Enter a name").max(ORG_ROLE_NAME_MAX, `At most ${ORG_ROLE_NAME_MAX} characters`),
+    slug: orgRoleSlugField,
+    description: z.string().trim().max(200).default(""),
+    permissions: z.array(z.enum(ORG_PERMISSIONS)).default([])
+});
+
+export type OrgRoleInput = z.infer<typeof orgRoleSchema>;
 
 /** What somebody may do inside one team. A maintainer runs that team's roster
  *  without administering the organization around it. */

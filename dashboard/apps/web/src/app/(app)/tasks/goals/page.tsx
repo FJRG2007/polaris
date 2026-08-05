@@ -8,7 +8,7 @@ import { listGoals } from "@/lib/tasks/planning-service";
 import { SpaceTree } from "@/app/(app)/tasks/space-tree";
 import { listSpaceTree } from "@/lib/tasks/space-service";
 import { GoalsView } from "@/app/(app)/tasks/planning-view";
-import { visibleScope, type TaskActor } from "@/lib/tasks/access";
+import { shelfScope, type TaskActor } from "@/lib/tasks/access";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +17,7 @@ export default async function GoalsPage() {
     const actor: TaskActor = { id: user.id, isAdmin: user.isAdmin };
     // A goal is a space-level plan, so only the spaces the reader holds
     // outright contribute one - a folder grant reaches work, not planning.
-    const scope = await visibleScope(actor);
+    const scope = await shelfScope(actor);
 
     const [tree, goals, spaces, lists] = await Promise.all([
         listSpaceTree(user.id, scope, user.isAdmin),

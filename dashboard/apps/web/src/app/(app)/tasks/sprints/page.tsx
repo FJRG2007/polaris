@@ -8,7 +8,7 @@ import type { BurndownPoint } from "@polaris/core";
 import { SpaceTree } from "@/app/(app)/tasks/space-tree";
 import { listSpaceTree } from "@/lib/tasks/space-service";
 import { SprintsView } from "@/app/(app)/tasks/planning-view";
-import { visibleScope, type TaskActor } from "@/lib/tasks/access";
+import { shelfScope, type TaskActor } from "@/lib/tasks/access";
 import { listSprints, sprintBurndown } from "@/lib/tasks/planning-service";
 
 export const dynamic = "force-dynamic";
@@ -16,7 +16,7 @@ export const dynamic = "force-dynamic";
 export default async function SprintsPage() {
     const user = await requirePermission("tasks.read");
     const actor: TaskActor = { id: user.id, isAdmin: user.isAdmin };
-    const scope = await visibleScope(actor);
+    const scope = await shelfScope(actor);
     // A space-wide sprint needs the space. A sprint planning one folder is
     // reached by whoever was granted that folder, and by nobody beside them.
     const grantedFolderIds = Object.keys(scope.folderRoles);

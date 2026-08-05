@@ -21,24 +21,42 @@ import Link from "next/link";
 import { cn } from "@polaris/ui";
 import { ChevronLeft } from "lucide-react";
 import { usePathname } from "next/navigation";
-import { APP_SECTIONS, isSectionActive, resolveActiveApp, resolveSubapp, type AppSection } from "@/lib/apps";
+import { hasOrgPermission } from "@polaris/core";
+import { useOrgNav } from "@/components/use-org-nav";
+import {
+    APP_SECTIONS,
+    isSectionActive,
+    orgSlugForPath,
+    resolveActiveApp,
+    resolveSubapp,
+    type AppSection
+} from "@/lib/apps";
 
 export function AppSidebar() {
     const pathname = usePathname();
     const subapp = resolveSubapp(pathname);
     const app = resolveActiveApp(pathname);
+    // Null everywhere except inside an organization, where it says what this
+    // reader may open. Absent until it arrives, which draws the baseline rail.
+    const org = useOrgNav(orgSlugForPath(pathname));
 
     // Hidden sections still nest under a root, so the whole list decides what is
     // an exact match even though only some of it is drawn.
     const sections = subapp ? subapp.sections : (APP_SECTIONS[app.id] ?? []);
-    const items = sections.filter((section) => !section.hidden);
+    const items = sections.filter(
+        (section) => !section.hidden && (!section.permission || hasOrgPermission(org?.permissions ?? [], section.permission))
+    );
     if (items.length === 0) return null;
 
     // The ungrouped screens keep the list's own heading; each named group follows
     // in the order it first appears, so the rail reads in the order it is declared.
+    // Inside an organization the heading is its name once that is known, and its
+    // handle until then - the rail is drawn from the path, and the path only
+    // carries the handle.
+    const heading = subapp ? (org?.name ?? subapp.label) : app.label;
     const groups: { label: string; items: AppSection[] }[] = [];
     for (const item of items) {
-        const label = item.group ?? (subapp ? subapp.label : app.label);
+        const label = item.group ?? heading;
         const existing = groups.find((group) => group.label === label);
         if (existing) existing.items.push(item);
         else groups.push({ label, items: [item] });

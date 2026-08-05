@@ -51,7 +51,12 @@ describe("checkZoneSubdomain", () => {
         findFirst.mockReset();
         count.mockReset();
         zonesConfigured();
-        findFirst.mockResolvedValue({ slug: "invoices" });
+        // The project comes back with the service because it decides whose
+        // domains the hostname may be minted under - a personal one here.
+        findFirst.mockResolvedValue({
+            slug: "invoices",
+            environment: { project: { ownerId: "owner-1", orgId: null } }
+        });
     });
 
     it("proposes the service's own name when it is free", async () => {

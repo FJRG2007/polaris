@@ -12,6 +12,7 @@
 
 import { listHosts } from "@/lib/host-service";
 import { listProjects } from "@/lib/deploy-service";
+import { scopeOrgIdFor } from "@/lib/workspace-scope";
 import type { SearchResource } from "@/lib/search-index";
 import { requireUser, userHasManage } from "@/lib/session";
 import { listInstalledApps } from "@/lib/apps/install-service";
@@ -33,7 +34,9 @@ export async function GET(): Promise<Response> {
     const resources: SearchResource[] = [];
 
     if (canDeploy) {
-        const projects = await listProjects(user.id);
+        // Search follows the shelf too: finding a client's service while working
+        // on your own things is how you open the wrong one.
+        const projects = await listProjects(user.id, await scopeOrgIdFor(user.id));
         for (const project of projects.slice(0, MAX_PER_SOURCE)) {
             const href = `/apps/deploy/${project.id}`;
             resources.push({

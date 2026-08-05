@@ -27,6 +27,7 @@
 
 import * as core from "@polaris/core";
 import { prisma, type Prisma } from "@polaris/db";
+import { scopeOrgIdFor } from "@/lib/workspace-scope";
 import { administeredOrgIds, memberOrgIds } from "@/lib/orgs/org-service";
 
 /** The caller, as the action layer resolved them. */
@@ -79,18 +80,22 @@ export async function resolveSpaceRole(actor: TaskActor, spaceId: string): Promi
             org: {
                 select: {
                     ownerId: true,
-                    members: { where: { userId: actor.id }, select: { role: true } }
+                    members: { where: { userId: actor.id }, select: { role: true } },
+                    roles: { select: { slug: true, permissions: true } }
                 }
             }
         }
     });
     if (!space) return null;
     if (space.ownerId === actor.id || actor.isAdmin) return "owner";
-    // Whoever owns the organization owns what it owns, and an organization admin
-    // administers it. Below that, being on the roster is not itself a way in.
+    // Whoever owns the organization owns what it owns, and whoever it allowed to
+    // run its work administers it. Read off the role's grants rather than its
+    // name: an organization names its own roles, and matching on "admin" would
+    // list a space to somebody the roster says runs the work and then refuse them
+    // when they opened it. Below that, being on the roster is not itself a way in.
     if (space.org) {
         if (space.org.ownerId === actor.id) return "owner";
-        if (space.org.members[0]?.role === "admin") return "admin";
+        if (orgRoleGrants(space.org, "spaces.manage")) return "admin";
     }
 
     let role: core.SpaceRole | null = (space.members[0]?.role as core.SpaceRole | undefined) ?? null;
@@ -106,6 +111,33 @@ export async function resolveSpaceRole(actor: TaskActor, spaceId: string): Promi
     if (space.visibility !== "internal") return null;
     if (!space.orgId) return "guest";
     return space.org && space.org.members.length > 0 ? "guest" : null;
+}
+
+/**
+ * Whether the role this actor holds in an organization carries a permission,
+ * answered from what the space query already fetched.
+ *
+ * Inline rather than a call into the organizations service, because doing it
+ * there would mean a second round trip per space on a screen that resolves one
+ * per row. A membership naming a role no row answers for falls back to what that
+ * slug has always meant, exactly as `resolveOrgAccess` does.
+ */
+function orgRoleGrants(
+    org: { members: { role: string }[]; roles: { slug: string; permissions: string }[] },
+    permission: core.OrgPermission
+): boolean {
+    const slug = org.members[0]?.role;
+    if (!slug) return false;
+    const row = org.roles.find((role) => role.slug === slug);
+    if (!row) return core.hasOrgPermission(core.ORG_SYSTEM_ROLES[slug]?.permissions ?? [], permission);
+    try {
+        const parsed: unknown = JSON.parse(row.permissions);
+        // Anything unreadable grants nothing, which is the safe direction for a
+        // permission list.
+        return Array.isArray(parsed) && core.hasOrgPermission(parsed.filter((v): v is string => typeof v === "string"), permission);
+    } catch {
+        return false;
+    }
 }
 
 /** Resolve the space role or refuse. Returns the role so the caller can branch
@@ -402,6 +434,67 @@ export async function visibleScope(actor: TaskActor): Promise<TaskScope> {
 
     return {
         spaceIds,
+        partialSpaceIds,
+        folderRoles,
+        listIds: lists.map((list) => list.id),
+        partialRoles
+    };
+}
+
+/**
+ * The same, narrowed to the shelf the reader is working from.
+ *
+ * Two functions rather than one because they answer different questions.
+ * `visibleScope` is authorization - what this account may read at all - and it
+ * must never move, or a link to a task would stop opening depending on which
+ * shelf happened to be selected. This one is presentation: it is what the screens
+ * that span everything take, so "My work" on a Tuesday morning is the client's
+ * board rather than the client's board plus the shopping list.
+ *
+ * Narrowed by intersection, never widened: a shelf can only ever take spaces out
+ * of what the reader was already allowed to see.
+ */
+export async function shelfScope(actor: TaskActor): Promise<TaskScope> {
+    const scope = await visibleScope(actor);
+    const orgId = await scopeOrgIdFor(actor.id);
+
+    const ids = [...scope.spaceIds, ...scope.partialSpaceIds];
+    if (ids.length === 0) return scope;
+
+    const onShelf = new Set(
+        (await prisma.taskSpace.findMany({ where: { id: { in: ids }, orgId }, select: { id: true } })).map(
+            (space) => space.id
+        )
+    );
+
+    const partialSpaceIds = scope.partialSpaceIds.filter((id) => onShelf.has(id));
+    // The folders and lists of a space that has just been filtered out have to go
+    // with it, or an aggregate would still read rows from behind the shelf it is
+    // no longer showing.
+    const keptFolders = await prisma.taskFolder.findMany({
+        where: { id: { in: Object.keys(scope.folderRoles) }, spaceId: { in: partialSpaceIds } },
+        select: { id: true }
+    });
+    const folderRoles: Record<string, core.SpaceRole> = {};
+    for (const folder of keptFolders) {
+        const role = scope.folderRoles[folder.id];
+        if (role) folderRoles[folder.id] = role;
+    }
+    const lists =
+        keptFolders.length === 0
+            ? []
+            : await prisma.taskList.findMany({
+                  where: { id: { in: scope.listIds }, folderId: { in: keptFolders.map((folder) => folder.id) } },
+                  select: { id: true }
+              });
+    const partialRoles: Record<string, core.SpaceRole> = {};
+    for (const id of partialSpaceIds) {
+        const role = scope.partialRoles[id];
+        if (role) partialRoles[id] = role;
+    }
+
+    return {
+        spaceIds: scope.spaceIds.filter((id) => onShelf.has(id)),
         partialSpaceIds,
         folderRoles,
         listIds: lists.map((list) => list.id),

@@ -84,11 +84,20 @@ export async function createSpaceAction(input: unknown): Promise<{ id?: string; 
     const parsed = core.spaceSchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
     try {
-        // Creating work on an organization's behalf takes an admin of it, so a
-        // member cannot put a space nobody asked for on the roster's shelf.
-        if (parsed.data.orgId) await orgs.requireOrg(caller, parsed.data.orgId, "admin");
+        // Creating work on an organization's behalf takes being allowed to run
+        // its work, so somebody who merely belongs to it cannot put a space
+        // nobody asked for on the group's shelf.
+        if (parsed.data.orgId) await orgs.requireOrgPermission(caller, parsed.data.orgId, "spaces.manage");
         const created = await spaces.createSpace(caller.id, parsed.data);
-        await recordAudit({ actorId: caller.id, action: "tasks.space.create", targetType: "space", targetId: created.id });
+        // Stamped with the organization when it has one, so the group's own
+        // history records the work being made rather than only the maker's.
+        await recordAudit({
+            actorId: caller.id,
+            orgId: parsed.data.orgId ?? undefined,
+            action: "tasks.space.create",
+            targetType: "space",
+            targetId: created.id
+        });
         refresh(caller, created.id);
         return { id: created.id };
     } catch (caught) {

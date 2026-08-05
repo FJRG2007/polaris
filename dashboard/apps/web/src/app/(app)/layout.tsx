@@ -10,10 +10,12 @@ import { AccountMenu } from "@/components/account-menu";
 import { DeniedNotice } from "@/components/denied-notice";
 import { ViewAsBanner } from "@/components/view-as-banner";
 import { AppNavDrawer } from "@/components/app-nav-drawer";
+import { ScopeSwitcher } from "@/components/scope-switcher";
 import { CommandPalette } from "@/components/command-palette";
 import { listNotifications } from "@/lib/notification-service";
 import { UpdateIndicator } from "@/components/update-indicator";
 import { NotificationBell } from "@/components/notification-bell";
+import { resolveScope, scopeChoices } from "@/lib/workspace-scope";
 import { RouteSkeletonCapture } from "@/components/route-skeleton";
 import { DisplayFormatProvider } from "@/components/display-format";
 import { AppShell, CapabilityProvider, EditionBadge } from "@polaris/ui";
@@ -34,11 +36,13 @@ import { NotificationsProvider } from "@/components/notifications/notifications-
 export default async function AppLayout({ children }: { children: ReactNode }) {
     const user = await requireUser();
     const capabilities = getCapabilities();
-    const [notifications, display, baseUrl, apps] = await Promise.all([
+    const [notifications, display, baseUrl, apps, scope, organizations] = await Promise.all([
         listNotifications(user.id),
         resolveDisplayPreferencesFor(user.id),
         appBaseUrl(),
-        reachableAppIds(accessFor(user))
+        reachableAppIds(accessFor(user)),
+        resolveScope(user.id),
+        scopeChoices(user.id)
     ]);
 
     return (
@@ -48,7 +52,16 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
                     <NotificationsProvider initial={notifications}>
                         <NotificationFavicon />
                         <AppShell
-                            switcher={<AppNav appIds={apps} />}
+                            switcher={
+                                <>
+                                    <AppNav appIds={apps} />
+                                    <ScopeSwitcher
+                                        personalName={user.name}
+                                        organizations={organizations}
+                                        current={scope.org}
+                                    />
+                                </>
+                            }
                             navButton={<AppNavDrawer />}
                             search={<CommandPalette isAdmin={user.isAdmin} appIds={apps} />}
                             sidebar={<AppSidebar />}

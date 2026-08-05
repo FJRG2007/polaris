@@ -10,7 +10,7 @@ import { requirePermission } from "@/lib/session";
 import { SpaceTree } from "@/app/(app)/tasks/space-tree";
 import { listSpaceTree } from "@/lib/tasks/space-service";
 import { TimesheetView } from "@/app/(app)/tasks/timesheet-view";
-import { visibleScope, type TaskActor } from "@/lib/tasks/access";
+import { shelfScope, type TaskActor } from "@/lib/tasks/access";
 import { addDays, startOfWeek, weekStartIndex } from "@polaris/core";
 import { runningTimer, weeklyTimesheet } from "@/lib/tasks/time-service";
 import { resolveDisplayPreferencesFor } from "@/lib/display-prefs-service";
@@ -21,7 +21,7 @@ export default async function TimesheetPage({ searchParams }: { searchParams: Pr
     const { week } = await searchParams;
     const user = await requirePermission("tasks.read");
     const actor: TaskActor = { id: user.id, isAdmin: user.isAdmin };
-    const scope = await visibleScope(actor);
+    const scope = await shelfScope(actor);
 
     const weekStartsOn = weekStartIndex((await resolveDisplayPreferencesFor(user.id)).weekStart);
     const offset = Number(week ?? "0");

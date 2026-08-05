@@ -15,12 +15,14 @@ import { decryptSecret } from "@polaris/storage";
 import { mkdir, readFile } from "node:fs/promises";
 import { ensureLocalCa } from "./local-ca-service";
 import { getLatestCommit } from "./github-service";
+import type { DomainOwner } from "./owner-domains";
 import { wipeVolume } from "./deploy-volume-service";
 import { resolveAutoDomain } from "./network-service";
 import { resolveMountTarget } from "./storage-service";
 import { appBaseUrl, getPublicIp } from "./domain-service";
 import { resolveWaf, resolveWafBatch } from "./waf-service";
 import { LocalRouter, type AppRoute } from "./deploy/router";
+import { memberOrgIds, orgIdsWhere } from "./orgs/org-service";
 import { getFlagsForEnvironment } from "./deploy-project-service";
 import { resolveRegistryLogin } from "./registry-credential-service";
 import { notifyDeployFinished } from "./notifications/deploy-events";
@@ -72,12 +74,44 @@ export async function readDeployment(
 
 /**
  * Every project a user may at least read: their own, the ones they were added
- * to, and the ones the instance shares internally. Read paths take this so a
- * member sees the project at all; write paths still resolve a role first (see
+ * to, the ones the instance shares internally, and the ones belonging to an
+ * organization whose services they run. Read paths take this so a member sees the
+ * project at all; write paths still resolve a role first (see
  * deploy-project-access) and then act as the owner.
+ *
+ * `internal` means two different things and the difference matters. On a personal
+ * project it is "anybody on this instance", which is what a household wants. On an
+ * organization's project it is "anybody on that roster" - an organization sharing
+ * a project internally has said so about its own people, not about every account
+ * the Polaris happens to have, and reading it the loose way would publish a
+ * company's services to strangers on a shared instance.
  */
-function visibleProjectWhere(userId: string) {
-    return { OR: [{ ownerId: userId }, { members: { some: { userId } } }, { visibility: "internal" }] };
+async function visibleProjectWhere(userId: string) {
+    const [belongsTo, runs] = await Promise.all([
+        memberOrgIds(userId),
+        orgIdsWhere({ id: userId, isAdmin: false }, "deploy.manage")
+    ]);
+    return {
+        OR: [
+            { ownerId: userId },
+            { members: { some: { userId } } },
+            { visibility: "internal", orgId: null },
+            ...(belongsTo.length > 0 ? [{ visibility: "internal", orgId: { in: belongsTo } }] : []),
+            ...(runs.length > 0 ? [{ orgId: { in: runs } }] : [])
+        ]
+    };
+}
+
+/**
+ * The same, narrowed to one shelf.
+ *
+ * Two clauses rather than one because they answer different questions: the first
+ * is "may this account see it at all", the second is "is it on the shelf they are
+ * working from". A project of theirs made for a client is still theirs when they
+ * switch back to their own shelf - it is simply not what they are looking at.
+ */
+async function scopedProjectWhere(userId: string, orgId: string | null) {
+    return { AND: [await visibleProjectWhere(userId), { orgId }] };
 }
 
 /**
@@ -91,14 +125,23 @@ export async function visibleApplication(
     userId: string
 ): Promise<{ id: string; name: string; environmentId: string } | null> {
     return prisma.application.findFirst({
-        where: { id: applicationId, environment: { project: visibleProjectWhere(userId) } },
+        where: { id: applicationId, environment: { project: await visibleProjectWhere(userId) } },
         select: { id: true, name: true, environmentId: true }
     });
 }
 
-export async function listProjects(ownerId: string) {
+/**
+ * The projects on one shelf.
+ *
+ * `orgId` is the shelf: null for the reader's own, an id for an organization's.
+ * Deliberately a required argument rather than a defaulted one - a listing that
+ * silently fell back to "everything" would put a client's services in front of
+ * somebody who had switched away from them, and the mistake would look like a
+ * feature until it did not.
+ */
+export async function listProjects(userId: string, orgId: string | null) {
     return prisma.project.findMany({
-        where: visibleProjectWhere(ownerId),
+        where: await scopedProjectWhere(userId, orgId),
         orderBy: { createdAt: "asc" },
         include: {
             environments: {
@@ -114,7 +157,7 @@ export async function listProjects(ownerId: string) {
  *  labels. */
 export async function listProjectScopes(ownerId: string) {
     return prisma.project.findMany({
-        where: visibleProjectWhere(ownerId),
+        where: await visibleProjectWhere(ownerId),
         orderBy: { createdAt: "asc" },
         select: {
             id: true,
@@ -133,7 +176,7 @@ export async function listProjectScopes(ownerId: string) {
 
 export async function getProject(projectId: string, ownerId: string) {
     return prisma.project.findFirst({
-        where: { id: projectId, ...visibleProjectWhere(ownerId) },
+        where: { id: projectId, ...(await visibleProjectWhere(ownerId)) },
         include: {
             environments: {
                 include: { applications: true, databases: true },
@@ -146,7 +189,7 @@ export async function getProject(projectId: string, ownerId: string) {
 /** One project with the full environment/service tree the detail view renders. */
 export async function getProjectFull(projectId: string, ownerId: string) {
     return prisma.project.findFirst({
-        where: { id: projectId, ...visibleProjectWhere(ownerId) },
+        where: { id: projectId, ...(await visibleProjectWhere(ownerId)) },
         include: {
             environments: {
                 include: {
@@ -270,13 +313,21 @@ export async function deleteEnvironment(environmentId: string, ownerId: string) 
     await prisma.environment.delete({ where: { id: environmentId } });
 }
 
-/** Create a project with a default "production" environment. */
-export async function createProject(ownerId: string, name: string) {
+/**
+ * Create a project with a default "production" environment.
+ *
+ * `orgId` is the shelf it lands on, taken from whichever one was open. It is set
+ * once and never moved: a project that could change shelves would take its
+ * services, its domains and its certificates with it, and the people who could
+ * reach it would change underneath a running deployment.
+ */
+export async function createProject(ownerId: string, name: string, orgId: string | null = null) {
     const slug = slugify(name);
     if (!slug) throw new Error("Project name must contain letters or digits");
     return prisma.project.create({
         data: {
             ownerId,
+            orgId,
             name,
             slug,
             environments: { create: { name: "Production", slug: "production", isDefault: true } }
@@ -421,6 +472,18 @@ export interface ZoneSubdomainCheck {
  * (see `releaseDomain`), so per-build URLs follow the service's address rather than
  * competing with it.
  */
+/**
+ * Whose domains a project may take hostnames under.
+ *
+ * The project's shelf, not the person deploying: a service on an organization's
+ * project answers on that organization's domain even when somebody's personal
+ * account pressed deploy, and a personal project never reaches a company's names.
+ * Read from the project row so it cannot drift from what the shelf actually says.
+ */
+function domainOwnerOf(project: { ownerId: string; orgId: string | null }): DomainOwner {
+    return project.orgId ? { kind: "org", id: project.orgId } : { kind: "user", id: project.ownerId };
+}
+
 export async function checkZoneSubdomain(
     applicationId: string,
     ownerId: string,
@@ -428,9 +491,10 @@ export async function checkZoneSubdomain(
 ): Promise<ZoneSubdomainCheck | ZoneMintFailure> {
     const app = await prisma.application.findFirst({
         where: { id: applicationId, environment: { project: { ownerId } } },
-        select: { slug: true }
+        select: { slug: true, environment: { select: { project: { select: { ownerId: true, orgId: true } } } } }
     });
     if (!app) throw new Error("Application not found");
+    const owner = domainOwnerOf(app.environment.project);
     const typed = opts.subdomain?.trim() ?? "";
     const base = slugify(app.slug) || "app";
     // The id suffix, not a counter: two services can slug to the same thing, and the
@@ -438,7 +502,7 @@ export async function checkZoneSubdomain(
     const candidates = typed ? [typed] : [base, `${base}-${shortHash(applicationId, 4)}`];
     let result: ZoneSubdomainCheck = { subdomain: base, hostname: "", available: false };
     for (const candidate of candidates) {
-        const minted = await deployHostname(app.slug, { zoneLabel: opts.zoneLabel, subdomain: candidate });
+        const minted = await deployHostname(app.slug, { zoneLabel: opts.zoneLabel, subdomain: candidate, owner });
         if (minted === "bad-name") return { subdomain: typed, hostname: "", available: false, invalid: true };
         if (typeof minted === "string") return minted;
         const taken = await hostnameTaken(minted.hostname);
@@ -472,9 +536,13 @@ export async function addApplicationDomain(
 ): Promise<string> {
     const app = await prisma.application.findFirst({
         where: { id: applicationId, environment: { project: { ownerId } } },
-        include: { target: { include: { host: true } } }
+        include: {
+            target: { include: { host: true } },
+            environment: { select: { project: { select: { ownerId: true, orgId: true } } } }
+        }
     });
     if (!app) throw new Error("Application not found");
+    const owner = domainOwnerOf(app.environment.project);
     // A remote-server app's auto domain comes from THAT server - its own wildcard
     // domain, or failing that its IP - and is served by its own edge, never from the
     // Polaris host's, which would point the name at the wrong box.
@@ -501,7 +569,8 @@ export async function addApplicationDomain(
         const minted = await deployHostname(app.slug, {
             zoneLabel: opts.zoneLabel,
             random: opts.random,
-            subdomain: opts.subdomain
+            subdomain: opts.subdomain,
+            owner
         });
         if (minted === "bad-name") {
             throw new Error("Use letters, digits and dashes for the subdomain.");

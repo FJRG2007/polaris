@@ -15,6 +15,7 @@
 
 import { prisma } from "@polaris/db";
 import { roleAtLeast, type ProjectRole } from "@polaris/core";
+import { memberOrgIds, orgCan, orgIdsWhere, resolveOrgAccess } from "@/lib/orgs/org-service";
 
 /** The owner outranks every role, and is never a membership row. */
 export type EffectiveRole = ProjectRole | "owner";
@@ -43,6 +44,7 @@ export async function projectAccess(projectId: string, userId: string): Promise<
         select: {
             id: true,
             ownerId: true,
+            orgId: true,
             visibility: true,
             members: { where: { userId }, select: { role: true } }
         }
@@ -61,6 +63,24 @@ export async function projectAccess(projectId: string, userId: string): Promise<
             isOwner: false
         };
     }
+
+    // A project on an organization's shelf answers to that organization first.
+    // Whoever runs its services reaches all of them as an admin, and everybody
+    // else on the roster reaches an internal one as a viewer - which is what
+    // `internal` means there. On a personal project it keeps meaning "anybody on
+    // this instance", which is what a household wants and what was always true.
+    if (project.orgId) {
+        const access = await resolveOrgAccess({ id: userId, isAdmin: false }, project.orgId);
+        if (!access) return null;
+        if (orgCan(access, "deploy.manage")) {
+            return { projectId: project.id, ownerId: project.ownerId, role: "admin", isOwner: false };
+        }
+        if (project.visibility === "internal") {
+            return { projectId: project.id, ownerId: project.ownerId, role: "viewer", isOwner: false };
+        }
+        return null;
+    }
+
     if (project.visibility === "internal") {
         return { projectId: project.id, ownerId: project.ownerId, role: "viewer", isOwner: false };
     }
@@ -115,8 +135,22 @@ export async function requireApplicationAccess(
 /** Ids of every project the user may at least read. Used to widen the Deploy
  *  landing beyond what they own without loading each project to check. */
 export async function visibleProjectIds(userId: string): Promise<string[]> {
+    const [belongsTo, runs] = await Promise.all([
+        memberOrgIds(userId),
+        orgIdsWhere({ id: userId, isAdmin: false }, "deploy.manage")
+    ]);
     const rows = await prisma.project.findMany({
-        where: { OR: [{ ownerId: userId }, { members: { some: { userId } } }, { visibility: "internal" }] },
+        where: {
+            OR: [
+                { ownerId: userId },
+                { members: { some: { userId } } },
+                // Internal on a personal project is the whole instance; on an
+                // organization's it is that roster and no further.
+                { visibility: "internal", orgId: null },
+                ...(belongsTo.length > 0 ? [{ visibility: "internal", orgId: { in: belongsTo } }] : []),
+                ...(runs.length > 0 ? [{ orgId: { in: runs } }] : [])
+            ]
+        },
         select: { id: true },
         orderBy: { createdAt: "asc" }
     });

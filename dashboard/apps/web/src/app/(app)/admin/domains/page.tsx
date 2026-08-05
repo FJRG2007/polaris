@@ -10,7 +10,9 @@ import { PageHeader } from "@polaris/ui";
 import { requireAdmin } from "@/lib/session";
 import { DomainsView } from "./domains-view";
 import { getDomainZones } from "@/lib/domain-zones";
+import { ownerDomainPolicy } from "@/lib/owner-domains";
 import { checkedAddresses } from "@/lib/address-health";
+import { OwnerDomainsCard } from "./owner-domains-card";
 import { appBaseUrl, getDomainConfig } from "@/lib/domain-service";
 
 export const dynamic = "force-dynamic";
@@ -20,11 +22,12 @@ export default async function DomainsPage() {
     // The zone layout is read here as well as by the setup, so the addresses below can
     // propose the configured domain on the first paint instead of after the setup has
     // finished loading and reported it.
-    const [config, effectiveAppUrl, zones, addresses] = await Promise.all([
+    const [config, effectiveAppUrl, zones, addresses, ownerPolicy] = await Promise.all([
         getDomainConfig(),
         appBaseUrl(),
         getDomainZones(),
-        checkedAddresses()
+        checkedAddresses(),
+        ownerDomainPolicy()
     ]);
 
     return (
@@ -40,6 +43,12 @@ export default async function DomainsPage() {
                 initialAddresses={addresses}
                 effectiveAppUrl={effectiveAppUrl}
             />
+            {/* Below the instance's own addresses, because it is a different
+                decision: not what Polaris answers on, but what other people are
+                allowed to point at it. */}
+            <div className="mt-4">
+                <OwnerDomainsCard policy={ownerPolicy} />
+            </div>
         </div>
     );
 }

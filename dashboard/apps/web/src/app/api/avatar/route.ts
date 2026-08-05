@@ -35,7 +35,7 @@ export async function POST(request: Request): Promise<Response> {
     if (!mime) return new Response("That file is not a PNG, JPEG, WebP or GIF image", { status: 415 });
 
     try {
-        await storeAvatar(user.id, bytes, mime);
+        await storeAvatar({ kind: "user", id: user.id }, bytes, mime);
         // Whatever Gravatar last said about this address is now beside the
         // point, and would come back the moment the photo is taken down again.
         forgetGravatar(user.email);
@@ -50,7 +50,7 @@ export async function POST(request: Request): Promise<Response> {
 
 export async function DELETE(): Promise<Response> {
     const user = await requireUser();
-    await deleteAvatar(user.id);
+    await deleteAvatar({ kind: "user", id: user.id });
     forgetGravatar(user.email);
     return Response.json({ ok: true });
 }

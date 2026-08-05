@@ -14,6 +14,10 @@
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { organizationPolicy } from "./policy";
+import { ensureSystemRoles } from "./role-service";
+import { OrgAccessError, OrgError } from "./errors";
+
+export { OrgAccessError, OrgError } from "./errors";
 
 /** The caller, as the action layer resolved them. An instance administrator is
  *  treated as an owner so whoever runs the deployment is never locked out of an
@@ -23,79 +27,144 @@ export interface OrgActor {
     readonly isAdmin: boolean;
 }
 
-export class OrgError extends Error {
-    constructor(message: string) {
-        super(message);
-        this.name = "OrgError";
-    }
-}
-
-export class OrgAccessError extends OrgError {
-    constructor(message = "You do not have access to that organization") {
-        super(message);
-        this.name = "OrgAccessError";
-    }
-}
-
 // ---------------------------------------------------------------------------
 // Access
 // ---------------------------------------------------------------------------
 
+/**
+ * What one account may do inside one organization.
+ *
+ * The role is a slug the organization itself defined, so it means nothing on its
+ * own; `permissions` is what every check is made against. The owner is resolved
+ * to the wildcard rather than to a row, because the owner is not a member row and
+ * never has been - which is what keeps "remove everybody" survivable.
+ */
+export interface OrgMembership {
+    readonly orgId: string;
+    /** The role's slug, or "owner". Shown, never used to decide anything. */
+    readonly role: string;
+    /** What that role is called here, which is the form worth putting on screen. */
+    readonly roleName: string;
+    readonly isOwner: boolean;
+    readonly permissions: readonly string[];
+}
+
 /** What this actor may do across a whole organization, or null when it is not
  *  theirs to see. */
-export async function resolveOrgRole(actor: OrgActor, orgId: string): Promise<core.OrgAccess | null> {
+export async function resolveOrgAccess(actor: OrgActor, orgId: string): Promise<OrgMembership | null> {
     const org = await prisma.organization.findUnique({
         where: { id: orgId },
         select: { ownerId: true, members: { where: { userId: actor.id }, select: { role: true } } }
     });
     if (!org) return null;
-    if (org.ownerId === actor.id || actor.isAdmin) return "owner";
-    const membership = org.members[0];
-    return membership ? (membership.role as core.OrgRole) : null;
+    if (org.ownerId === actor.id || actor.isAdmin) {
+        return {
+            orgId,
+            role: "owner",
+            roleName: "Owner",
+            isOwner: true,
+            permissions: [core.ALL_ORG_PERMISSIONS]
+        };
+    }
+    const slug = org.members[0]?.role;
+    if (!slug) return null;
+    const role = await roleFor(orgId, slug);
+    return { orgId, role: slug, roleName: role.name, isOwner: false, permissions: role.permissions };
 }
 
-export async function requireOrg(actor: OrgActor, orgId: string, minimum: core.OrgRole): Promise<core.OrgAccess> {
-    const role = await resolveOrgRole(actor, orgId);
-    if (!role) throw new OrgAccessError();
-    if (!core.orgRoleAtLeast(role, minimum)) {
+/**
+ * One role slug, as this organization defines it.
+ *
+ * Read from the organization's own roles, and falling back to the seeded
+ * definition when no row answers. The fallback is not decoration: a membership
+ * naming a role that has gone missing must resolve to what that slug has always
+ * meant, never to nothing (which would lock a whole roster out of a place they
+ * belong) and never to everything.
+ */
+async function roleFor(orgId: string, slug: string): Promise<{ name: string; permissions: readonly string[] }> {
+    const role = await prisma.orgRole.findUnique({
+        where: { orgId_slug: { orgId, slug } },
+        select: { name: true, permissions: true }
+    });
+    if (role) return { name: role.name, permissions: withRead(parsePermissions(role.permissions)) };
+    const seeded = core.ORG_SYSTEM_ROLES[slug];
+    return { name: seeded?.name ?? slug, permissions: withRead(seeded?.permissions ?? []) };
+}
+
+/**
+ * Seeing the organization is what being on its roster means.
+ *
+ * Added here rather than made a box in the role editor, because a role that can
+ * run the teams but not open the organization is not a configuration anybody
+ * wants - it is a person who belongs somewhere and gets a 404 for it. So it comes
+ * with every role, and the editor does not offer to take it away.
+ */
+function withRead(permissions: readonly string[]): readonly string[] {
+    return permissions.includes("org.read") ? permissions : [...permissions, "org.read"];
+}
+
+/** Stored as JSON so one column carries the set. Anything unreadable grants
+ *  nothing, which is the safe direction for a permission list. */
+function parsePermissions(raw: string): string[] {
+    try {
+        const parsed: unknown = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed.filter((value): value is string => typeof value === "string") : [];
+    } catch {
+        return [];
+    }
+}
+
+export function orgCan(access: OrgMembership | null, permission: core.OrgPermission): boolean {
+    return access !== null && core.hasOrgPermission(access.permissions, permission);
+}
+
+/** Clear the actor for one thing they are trying to do here. Every write in the
+ *  organization goes through this, and nothing else decides access. */
+export async function requireOrgPermission(
+    actor: OrgActor,
+    orgId: string,
+    permission: core.OrgPermission
+): Promise<OrgMembership> {
+    const access = await resolveOrgAccess(actor, orgId);
+    if (!access) throw new OrgAccessError();
+    if (!orgCan(access, permission)) {
         throw new OrgAccessError("You do not have permission to do that in this organization");
     }
-    return role;
+    return access;
 }
 
-/** Only the owner - renaming the organization, moving its handle, handing it on,
- *  and deleting it. An instance administrator counts, and nobody else does. */
+/** Handing the organization on and deleting it. Never a permission, so no role
+ *  anybody writes can end up able to give the organization away. An instance
+ *  administrator counts, and nobody else does. */
 export async function requireOrgOwner(actor: OrgActor, orgId: string): Promise<void> {
-    if ((await resolveOrgRole(actor, orgId)) !== "owner") {
-        throw new OrgAccessError("Only the organization's owner can do that");
-    }
+    const access = await resolveOrgAccess(actor, orgId);
+    if (!access?.isOwner) throw new OrgAccessError("Only the organization's owner can do that");
 }
 
 /**
  * Clear the actor for one team, and say whether they may change its roster.
  *
- * A team is run by its maintainers as well as by the organization's admins,
- * which is the whole point of the role: a team lead adds and removes their own
- * people without being handed the organization.
+ * A team is run by its maintainers as well as by whoever the organization gave
+ * `teams.manage`, which is the whole point of the team role: a team lead adds and
+ * removes their own people without being handed the organization.
  */
 export async function requireTeam(
     actor: OrgActor,
     teamId: string,
     minimum: "read" | "manage"
-): Promise<{ orgId: string; orgRole: core.OrgAccess; canManage: boolean }> {
+): Promise<{ orgId: string; access: OrgMembership; canManage: boolean }> {
     const team = await prisma.team.findUnique({
         where: { id: teamId },
         select: { orgId: true, members: { where: { userId: actor.id }, select: { role: true } } }
     });
     if (!team) throw new OrgAccessError("That team no longer exists");
-    const orgRole = await resolveOrgRole(actor, team.orgId);
-    if (!orgRole) throw new OrgAccessError();
-    const canManage =
-        core.orgRoleAtLeast(orgRole, "admin") || team.members[0]?.role === "maintainer";
+    const access = await resolveOrgAccess(actor, team.orgId);
+    if (!access) throw new OrgAccessError();
+    const canManage = orgCan(access, "teams.manage") || team.members[0]?.role === "maintainer";
     if (minimum === "manage" && !canManage) {
-        throw new OrgAccessError("Only an organization admin or a maintainer of this team can do that");
+        throw new OrgAccessError("Only somebody who runs the teams here, or a maintainer of this one, can do that");
     }
-    return { orgId: team.orgId, orgRole, canManage };
+    return { orgId: team.orgId, access, canManage };
 }
 
 /** Every team this account is on. The one thing the Tasks access layer needs
@@ -105,32 +174,56 @@ export async function teamIdsFor(userId: string): Promise<string[]> {
     return rows.map((row) => row.teamId);
 }
 
-/** Every organization this account runs - owns, administers, or is an instance
- *  administrator of. Used where a space needs to know whether its organization
- *  opens it to the reader. */
-export async function administeredOrgIds(actor: OrgActor): Promise<string[]> {
+/**
+ * Every organization where this account holds one permission.
+ *
+ * Two queries rather than a check per organization: the memberships come back
+ * with the role rows they name, so a person on forty organizations is answered in
+ * one read of each table. Owned organizations are always in, because the owner
+ * holds everything and is never a member row.
+ */
+export async function orgIdsWhere(actor: OrgActor, permission: core.OrgPermission): Promise<string[]> {
     if (actor.isAdmin) {
         const all = await prisma.organization.findMany({ select: { id: true } });
         return all.map((org) => org.id);
     }
-    const [owned, admin] = await Promise.all([
+    const [owned, memberships] = await Promise.all([
         prisma.organization.findMany({ where: { ownerId: actor.id }, select: { id: true } }),
         prisma.organizationMember.findMany({
-            where: { userId: actor.id, role: "admin" },
-            select: { orgId: true }
+            where: { userId: actor.id },
+            select: { orgId: true, role: true, org: { select: { roles: { select: { slug: true, permissions: true } } } } }
         })
     ]);
-    return [...new Set([...owned.map((org) => org.id), ...admin.map((row) => row.orgId)])];
+
+    const granted = memberships
+        .filter((membership) => {
+            const row = membership.org.roles.find((role) => role.slug === membership.role);
+            const permissions = row ? parsePermissions(row.permissions) : (core.ORG_SYSTEM_ROLES[membership.role]?.permissions ?? []);
+            return core.hasOrgPermission(permissions, permission);
+        })
+        .map((membership) => membership.orgId);
+
+    return [...new Set([...owned.map((org) => org.id), ...granted])];
+}
+
+/** Every organization whose work this account administers. What a space asks when
+ *  it needs to know whether its organization opens it to the reader. */
+export async function administeredOrgIds(actor: OrgActor): Promise<string[]> {
+    return orgIdsWhere(actor, "spaces.manage");
 }
 
 /** The organizations this account can create work for, named. What the "who owns
- *  this space" picker is built from - a member of an organization is not offered
- *  it, because putting a space on somebody's shelf takes administering them. */
+ *  this space" picker is built from - somebody who only belongs to an
+ *  organization is not offered it, because putting a space on the group's shelf
+ *  takes being allowed to run its work. */
 export async function listAdministeredOrgs(actor: OrgActor): Promise<{ id: string; name: string }[]> {
-    const ids = await administeredOrgIds(actor);
+    return listOrgsByIds(await administeredOrgIds(actor));
+}
+
+async function listOrgsByIds(ids: readonly string[]): Promise<{ id: string; name: string }[]> {
     if (ids.length === 0) return [];
     return prisma.organization.findMany({
-        where: { id: { in: ids } },
+        where: { id: { in: [...ids] } },
         orderBy: { name: "asc" },
         select: { id: true, name: true }
     });
@@ -156,7 +249,10 @@ export interface OrgSummary {
     readonly name: string;
     readonly description: string;
     readonly image: string | null;
-    readonly role: core.OrgAccess;
+    /** The role's slug, or "owner". */
+    readonly role: string;
+    /** What that role is called here, which is the only form worth showing. */
+    readonly roleName: string;
     readonly memberCount: number;
     readonly teamCount: number;
     readonly spaceCount: number;
@@ -175,25 +271,37 @@ export async function listMyOrgs(userId: string): Promise<OrgSummary[]> {
             image: true,
             ownerId: true,
             members: { where: { userId }, select: { role: true } },
+            roles: { select: { slug: true, name: true } },
             _count: { select: { members: true, teams: true, spaces: true } }
         }
     });
 
     return orgs
-        .map((org) => ({
-            id: org.id,
-            slug: org.slug,
-            name: org.name,
-            description: org.description,
-            image: org.image,
-            role: (org.ownerId === userId ? "owner" : (org.members[0]?.role as core.OrgRole)) as core.OrgAccess,
-            // The owner is not a member row, so the roster is always one longer
-            // than the table says.
-            memberCount: org._count.members + 1,
-            teamCount: org._count.teams,
-            spaceCount: org._count.spaces
-        }))
+        .map((org) => {
+            const owner = org.ownerId === userId;
+            const slug = owner ? "owner" : (org.members[0]?.role ?? core.DEFAULT_ORG_ROLE);
+            return {
+                id: org.id,
+                slug: org.slug,
+                name: org.name,
+                description: org.description,
+                image: org.image,
+                role: slug,
+                roleName: owner ? "Owner" : roleDisplayName(org.roles, slug),
+                // The owner is not a member row, so the roster is always one
+                // longer than the table says.
+                memberCount: org._count.members + 1,
+                teamCount: org._count.teams,
+                spaceCount: org._count.spaces
+            };
+        })
         .sort((left, right) => Number(right.role === "owner") - Number(left.role === "owner"));
+}
+
+/** What a role slug is called. Falls back to the seeded name, and then to the
+ *  slug itself, so a roster never shows a person with no role at all. */
+function roleDisplayName(roles: readonly { slug: string; name: string }[], slug: string): string {
+    return roles.find((role) => role.slug === slug)?.name ?? core.ORG_SYSTEM_ROLES[slug]?.name ?? slug;
 }
 
 /** How many organizations this account owns, which is what the per-account cap
@@ -216,6 +324,9 @@ export interface OrgDetail {
     readonly ownerId: string;
     readonly ownerName: string;
     readonly createdAt: string;
+    /** Whether a photo has been uploaded, which is what the settings card offers
+     *  to replace rather than to add. */
+    readonly hasPhoto: boolean;
 }
 
 export async function getOrg(orgId: string): Promise<OrgDetail | null> {
@@ -229,7 +340,8 @@ export async function getOrg(orgId: string): Promise<OrgDetail | null> {
             image: true,
             ownerId: true,
             createdAt: true,
-            owner: { select: { name: true } }
+            owner: { select: { name: true } },
+            avatar: { select: { orgId: true } }
         }
     });
     if (!org) return null;
@@ -241,8 +353,35 @@ export async function getOrg(orgId: string): Promise<OrgDetail | null> {
         image: org.image,
         ownerId: org.ownerId,
         ownerName: org.owner.name,
-        createdAt: org.createdAt.toISOString()
+        createdAt: org.createdAt.toISOString(),
+        hasPhoto: org.avatar !== null
     };
+}
+
+/** What an organization holds, for the screen that opens on it. Counted rather
+ *  than listed: the overview says how much there is and every number is a link
+ *  to the screen that shows it. */
+export interface OrgTotals {
+    readonly members: number;
+    readonly teams: number;
+    readonly spaces: number;
+    readonly projects: number;
+    readonly domains: number;
+    readonly roles: number;
+}
+
+export async function orgTotals(orgId: string): Promise<OrgTotals> {
+    const [members, teams, spaces, projects, domains, roles] = await Promise.all([
+        prisma.organizationMember.count({ where: { orgId } }),
+        prisma.team.count({ where: { orgId } }),
+        prisma.taskSpace.count({ where: { orgId } }),
+        prisma.project.count({ where: { orgId } }),
+        prisma.ownerDomain.count({ where: { orgId } }),
+        prisma.orgRole.count({ where: { orgId } })
+    ]);
+    // The owner is not a member row, so the roster is always one longer than the
+    // table says.
+    return { members: members + 1, teams, spaces, projects, domains, roles };
 }
 
 export interface OrgMemberView {
@@ -250,7 +389,12 @@ export interface OrgMemberView {
     readonly name: string;
     readonly email: string;
     readonly image: string | null;
-    readonly role: core.OrgAccess;
+    /** The role's slug, or "owner". */
+    readonly role: string;
+    /** What that role is called here. */
+    readonly roleName: string;
+    /** When they joined, so the roster can say how long somebody has been here. */
+    readonly joinedAt: string | null;
     /** Team names this person is on, so the roster answers "what do they reach"
      *  without a second screen. */
     readonly teams: string[];
@@ -260,11 +404,17 @@ export async function listOrgMembers(orgId: string): Promise<OrgMemberView[]> {
     const org = await prisma.organization.findUnique({
         where: { id: orgId },
         select: {
+            createdAt: true,
             owner: { select: { id: true, name: true, email: true, image: true } },
             members: {
                 orderBy: { createdAt: "asc" },
-                select: { role: true, user: { select: { id: true, name: true, email: true, image: true } } }
+                select: {
+                    role: true,
+                    createdAt: true,
+                    user: { select: { id: true, name: true, email: true, image: true } }
+                }
             },
+            roles: { select: { slug: true, name: true } },
             teams: {
                 select: { name: true, members: { select: { userId: true } } }
             }
@@ -281,18 +431,68 @@ export async function listOrgMembers(orgId: string): Promise<OrgMemberView[]> {
 
     const row = (
         user: { id: string; name: string; email: string; image: string | null },
-        role: core.OrgAccess
+        role: string,
+        joinedAt: Date
     ): OrgMemberView => ({
         userId: user.id,
         name: user.name,
         email: user.email,
         image: user.image,
         role,
+        roleName: role === "owner" ? "Owner" : roleDisplayName(org.roles, role),
+        joinedAt: joinedAt.toISOString(),
         teams: teamsByUser.get(user.id) ?? []
     });
 
-    // The owner leads the roster and is not in the members table.
-    return [row(org.owner, "owner"), ...org.members.map((member) => row(member.user, member.role as core.OrgRole))];
+    // The owner leads the roster and is not in the members table, so their own
+    // joining date is the organization's.
+    return [
+        row(org.owner, "owner", org.createdAt),
+        ...org.members.map((member) => row(member.user, member.role, member.createdAt))
+    ];
+}
+
+export interface OrgSpaceView {
+    readonly id: string;
+    readonly name: string;
+    readonly prefix: string;
+    readonly color: string;
+    readonly visibility: string;
+    readonly archived: boolean;
+    readonly taskCount: number;
+    /** The teams that reach it, named, so the question this screen exists to
+     *  answer - "who can actually see this work" - is answered on the row. */
+    readonly teams: string[];
+}
+
+/** The work this organization owns. Archived spaces are included and marked:
+ *  they are still the organization's, and hiding them here is how somebody
+ *  concludes a space was deleted. */
+export async function listOrgSpaces(orgId: string): Promise<OrgSpaceView[]> {
+    const spaces = await prisma.taskSpace.findMany({
+        where: { orgId },
+        orderBy: [{ archived: "asc" }, { order: "asc" }],
+        select: {
+            id: true,
+            name: true,
+            prefix: true,
+            color: true,
+            visibility: true,
+            archived: true,
+            teamGrants: { select: { team: { select: { name: true } } } },
+            _count: { select: { tasks: true } }
+        }
+    });
+    return spaces.map((space) => ({
+        id: space.id,
+        name: space.name,
+        prefix: space.prefix,
+        color: space.color,
+        visibility: space.visibility,
+        archived: space.archived,
+        taskCount: space._count.tasks,
+        teams: space.teamGrants.map((grant) => grant.team.name).sort((left, right) => left.localeCompare(right))
+    }));
 }
 
 export interface TeamView {
@@ -420,7 +620,24 @@ async function assertSlugFree(slug: string, exceptOrgId?: string): Promise<void>
 export async function createOrg(ownerId: string, input: core.OrganizationInput): Promise<string> {
     await assertSlugFree(input.slug);
     const org = await prisma.organization.create({
-        data: { ownerId, slug: input.slug, name: input.name, description: input.description },
+        data: {
+            ownerId,
+            slug: input.slug,
+            name: input.name,
+            description: input.description,
+            // Seeded with the create so the organization is usable before anybody
+            // opens the roles screen, and so the first person added has something
+            // to be given.
+            roles: {
+                create: Object.entries(core.ORG_SYSTEM_ROLES).map(([slug, role]) => ({
+                    slug,
+                    name: role.name,
+                    description: role.description,
+                    permissions: JSON.stringify(role.permissions),
+                    system: true
+                }))
+            }
+        },
         select: { id: true }
     });
     return org.id;
@@ -487,9 +704,26 @@ export async function orgDeletionImpact(orgId: string): Promise<{ spaces: number
     return { spaces, tasks };
 }
 
+/**
+ * Refuse a role this organization does not have.
+ *
+ * A slug arrives from a form, so it is a claim like any other. Checked against
+ * the organization's own roles rather than a fixed list, because that list is
+ * exactly what an organization is allowed to change - and a membership naming a
+ * role nobody defined would resolve to the seeded fallback, quietly granting
+ * something nobody chose.
+ */
+async function assertRoleExists(orgId: string, slug: string): Promise<void> {
+    const role = await prisma.orgRole.findUnique({ where: { orgId_slug: { orgId, slug } }, select: { id: true } });
+    if (!role) throw new OrgError("This organization has no role by that name");
+}
+
 /** Add somebody by email or username, which is what the person doing it has in
  *  front of them rather than an id. */
-export async function addOrgMember(orgId: string, identifier: string, role: core.OrgRole): Promise<void> {
+export async function addOrgMember(orgId: string, identifier: string, role: string): Promise<void> {
+    await ensureSystemRoles(orgId);
+    await assertRoleExists(orgId, role);
+
     const needle = identifier.trim().toLowerCase();
     const user = await prisma.user.findFirst({
         where: { OR: [{ email: needle }, { username: needle }] },
@@ -521,7 +755,9 @@ export async function addOrgMember(orgId: string, identifier: string, role: core
     });
 }
 
-export async function setOrgMemberRole(orgId: string, userId: string, role: core.OrgRole): Promise<void> {
+export async function setOrgMemberRole(orgId: string, userId: string, role: string): Promise<void> {
+    await ensureSystemRoles(orgId);
+    await assertRoleExists(orgId, role);
     await prisma.organizationMember.update({ where: { orgId_userId: { orgId, userId } }, data: { role } });
 }
 

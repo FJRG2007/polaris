@@ -15,14 +15,14 @@ import { listTasks } from "@/lib/tasks/task-service";
 import type { SpaceContext } from "@/lib/tasks/facts";
 import { ListScreen } from "@/app/(app)/tasks/list-view";
 import { SpaceTree } from "@/app/(app)/tasks/space-tree";
-import { scopeSpaceIds, visibleScope, type TaskActor } from "@/lib/tasks/access";
+import { scopeSpaceIds, shelfScope, type TaskActor } from "@/lib/tasks/access";
 
 export const dynamic = "force-dynamic";
 
 export default async function EverythingPage() {
     const user = await requirePermission("tasks.read");
     const actor: TaskActor = { id: user.id, isAdmin: user.isAdmin };
-    const scope = await visibleScope(actor);
+    const scope = await shelfScope(actor);
     // The vocabulary (statuses, tags, fields) is drawn from every space the
     // reader touches, including one they only reach through a folder - without
     // its statuses the tasks from that branch would have no column to sit in.

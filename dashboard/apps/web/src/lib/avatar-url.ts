@@ -13,3 +13,10 @@
 export function avatarUrl(userId: string): string {
     return `/api/avatar/${userId}`;
 }
+
+/** The same for an organization. A separate path rather than a shared one keyed
+ *  by id: the two are different tables, and a URL that could mean either would
+ *  serve a person's face for an organization's id the day the ids collide. */
+export function orgAvatarUrl(orgId: string): string {
+    return `/api/avatar/org/${orgId}`;
+}

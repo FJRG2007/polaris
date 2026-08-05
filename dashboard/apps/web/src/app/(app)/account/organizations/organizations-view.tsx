@@ -16,6 +16,7 @@ import * as core from "@polaris/core";
 import { useRouter } from "next/navigation";
 import { createOrgAction } from "./actions";
 import { runAction } from "@/lib/run-action";
+import { OrgAvatar } from "@/components/avatar";
 import { Building2, Plus, Users } from "lucide-react";
 import type { OrgSummary } from "@/lib/orgs/org-service";
 import {
@@ -118,14 +119,12 @@ export function OrganizationsView({
                                 href={`/account/organizations/${org.slug}`}
                                 className="border-border hover:bg-muted flex items-center gap-3 rounded-lg border px-3 py-3 transition-colors"
                             >
-                                <span className="bg-muted flex size-9 shrink-0 items-center justify-center rounded-md">
-                                    <Building2 className="text-muted-foreground size-4 shrink-0" />
-                                </span>
+                                <OrgAvatar org={org} size={36} />
                                 <span className="min-w-0 flex-1">
                                     <span className="flex items-center gap-2">
                                         <span className="truncate text-sm font-medium" title={org.name}>{org.name}</span>
                                         <Badge variant={org.role === "owner" ? "primary" : "neutral"}>
-                                            {org.role === "owner" ? "Owner" : core.ORG_ROLE_LABELS[org.role]}
+                                            {org.roleName}
                                         </Badge>
                                     </span>
                                     <span className="text-muted-foreground block truncate text-xs">

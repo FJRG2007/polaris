@@ -28,6 +28,7 @@ import {
     type ZoneScope
 } from "@polaris/deploy";
 import { getSetting, setSetting } from "./setting-store";
+import { usableOwnerDomains, type DomainOwner } from "./owner-domains";
 
 const KEY = "domain.zones";
 /** Set once the zones' names have been seen resolving to this server. */
@@ -213,6 +214,27 @@ export async function polarisZoneHost(): Promise<string | null> {
     return zone ? zoneHost(zone, config.baseDomain) : null;
 }
 
+/**
+ * How a zone belonging to the deployer rather than to the operator is named in a
+ * picker.
+ *
+ * The picker passes one string down the whole chain - the action, the service,
+ * the mint - and an operator zone is identified by its DNS label. A domain
+ * somebody brought has no label under the base domain, so it needs a key of its
+ * own that cannot be mistaken for one: `@` is not legal in a DNS label, so
+ * `@example.com` can never collide with a zone the operator configured.
+ */
+const OWNER_ZONE_PREFIX = "@";
+
+export function ownerZoneKey(domain: string): string {
+    return `${OWNER_ZONE_PREFIX}${domain}`;
+}
+
+/** The domain a picker key names, or null when the key is an operator zone. */
+export function ownerZoneDomain(key: string | undefined): string | null {
+    return key && key.startsWith(OWNER_ZONE_PREFIX) ? key.slice(OWNER_ZONE_PREFIX.length) : null;
+}
+
 /** Why a hostname could not be minted, so the caller can say which of the two it is
  *  instead of sending the operator back to a setup that is actually fine. */
 export type ZoneMintFailure = "no-domain" | "unknown-zone" | "unverified" | "bad-name";
@@ -232,8 +254,31 @@ export interface MintedHostname {
  */
 export async function deployHostname(
     name: string,
-    options: { zoneLabel?: string; random?: boolean; subdomain?: string } = {}
+    options: { zoneLabel?: string; random?: boolean; subdomain?: string; owner?: DomainOwner } = {}
 ): Promise<MintedHostname | ZoneMintFailure> {
+    // A domain the deployer brought themselves is checked against what they
+    // actually hold, not against what the picker offered: the key travels through
+    // a server action, so it is a claim like any other. `usableOwnerDomains` only
+    // returns the ones proven owned AND seen resolving here, which is exactly the
+    // pair that makes a minted hostname work.
+    const owned = ownerZoneDomain(options.zoneLabel);
+    if (owned) {
+        if (!options.owner) return "unknown-zone";
+        const usable = await usableOwnerDomains(options.owner);
+        if (!usable.includes(owned)) return "unverified";
+        const picked = options.random ? "" : normalizeZoneName(options.subdomain ?? "");
+        if (!picked && options.subdomain?.trim() && !options.random) return "bad-name";
+        const zone = { label: "", scope: "deploy" as const, primary: false };
+        return {
+            hostname: options.random
+                ? randomZoneHostname(zone, owned)
+                : picked
+                  ? namedZoneHostname(picked, zone, owned)
+                  : zoneHostname(name, zone, owned),
+            zoneHost: owned
+        };
+    }
+
     const config = await getDomainZones();
     if (!config.baseDomain) return "no-domain";
     // The same gate the picker applies, enforced where the hostname is actually
@@ -257,16 +302,48 @@ export async function deployHostname(
     };
 }
 
-/** The deploy zones offered in a picker. `primary` marks the layout's default, so a
- *  picker preselects the same zone the server would have chosen on its own. */
-export async function listDeployZones(): Promise<Array<{ label: string; host: string; primary: boolean }>> {
+export interface DeployZoneOption {
+    /** What a picker sends back, and what `deployHostname` reads. */
+    readonly label: string;
+    readonly host: string;
+    readonly primary: boolean;
+    /** True when the domain belongs to the deployer rather than to the operator. */
+    readonly owned: boolean;
+}
+
+/**
+ * The deploy zones offered in a picker: the operator's, then any this deployer
+ * brought themselves.
+ *
+ * `primary` marks the layout's default, so a picker preselects the same zone the
+ * server would have chosen on its own. An owner's domain is never the default -
+ * it is offered, not assumed, because which name a service should answer on is a
+ * decision and picking one silently is how a client's service ends up published
+ * on somebody's personal domain.
+ */
+export async function listDeployZones(owner?: DomainOwner): Promise<DeployZoneOption[]> {
     const config = await getDomainZones();
-    if (!config.baseDomain) return [];
     // Unproven zones are not offered: this is the picker's default, so a service added
     // right after the wizard would otherwise take a hostname that resolves nowhere and
     // ask Let's Encrypt to certify it, retrying until the records exist.
-    if (!(await zoneDnsVerified())) return [];
-    return config.zones
-        .filter((zone) => zone.scope === "deploy")
-        .map((zone) => ({ label: zone.label, host: zoneHost(zone, config.baseDomain), primary: zone.primary }));
+    const operator =
+        config.baseDomain && (await zoneDnsVerified())
+            ? config.zones
+                  .filter((zone) => zone.scope === "deploy")
+                  .map((zone) => ({
+                      label: zone.label,
+                      host: zoneHost(zone, config.baseDomain),
+                      primary: zone.primary,
+                      owned: false
+                  }))
+            : [];
+
+    if (!owner) return operator;
+    const brought = (await usableOwnerDomains(owner)).map((domain) => ({
+        label: ownerZoneKey(domain),
+        host: domain,
+        primary: false,
+        owned: true
+    }));
+    return [...operator, ...brought];
 }

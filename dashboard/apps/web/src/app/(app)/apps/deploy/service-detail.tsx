@@ -1996,7 +1996,7 @@ function SettingsTab({
     const exposureTouched = useRef(false);
     const [cfConnected, setCfConnected] = useState(false);
     const [duckSub, setDuckSub] = useState<string | null>(null);
-    const [zones, setZones] = useState<Array<{ label: string; host: string; primary: boolean }>>([]);
+    const [zones, setZones] = useState<Array<{ label: string; host: string; primary: boolean; owned: boolean }>>([]);
     // The operator's own domain, offered as the suggested custom hostname so a name
     // straight on it (app.example.com) is as obvious a choice as one in a zone.
     const [baseDomain, setBaseDomain] = useState("");
@@ -2373,7 +2373,14 @@ function SettingsTab({
                                         setZoneLabel(value === ZONE_ROOT ? "" : value);
                                         setSubdomainCheck(null);
                                     }}
-                                    options={zones.map((zone) => ({ value: zone.label || ZONE_ROOT, label: `*.${zone.host}` }))}
+                                    // A domain brought by whoever owns this shelf is
+                                    // marked: it and one of this Polaris's own zones
+                                    // look identical otherwise, and which of the two a
+                                    // service answers on is the whole decision here.
+                                    options={zones.map((zone) => ({
+                                        value: zone.label || ZONE_ROOT,
+                                        label: zone.owned ? `*.${zone.host} (your own)` : `*.${zone.host}`
+                                    }))}
                                     aria-label="Zone"
                                 />
                                 {!randomName && (

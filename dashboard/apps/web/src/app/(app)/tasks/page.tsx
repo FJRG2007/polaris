@@ -16,14 +16,14 @@ import { runningTimer } from "@/lib/tasks/time-service";
 import { listSpaceTree } from "@/lib/tasks/space-service";
 import { myWorkCounts } from "@/lib/tasks/report-service";
 import { buildSpaceContext } from "@/lib/tasks/screen-context";
-import { scopedSpaceRole, visibleScope, type TaskActor } from "@/lib/tasks/access";
+import { scopedSpaceRole, shelfScope, type TaskActor } from "@/lib/tasks/access";
 
 export const dynamic = "force-dynamic";
 
 export default async function TasksHomePage() {
     const user = await requirePermission("tasks.read");
     const actor: TaskActor = { id: user.id, isAdmin: user.isAdmin };
-    const scope = await visibleScope(actor);
+    const scope = await shelfScope(actor);
 
     const [tree, tasks, counts, timer, lists] = await Promise.all([
         listSpaceTree(user.id, scope, user.isAdmin),

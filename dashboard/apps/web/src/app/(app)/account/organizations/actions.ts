@@ -18,6 +18,7 @@ import * as core from "@polaris/core";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/session";
 import * as orgs from "@/lib/orgs/org-service";
+import * as roles from "@/lib/orgs/role-service";
 import { recordAudit } from "@/lib/audit-service";
 import { canCreateOrganization } from "@/lib/orgs/policy";
 
@@ -41,6 +42,23 @@ function refresh(): void {
     revalidatePath("/tasks", "layout");
 }
 
+/**
+ * Write one line of the organization's own history.
+ *
+ * `orgId` is what separates it from the actor's personal history: the same table
+ * carries both, and an organization's Activity screen is exactly the entries that
+ * name it. Kept to one helper so no write here can forget to stamp it - an entry
+ * without the id is one the organization can never see.
+ */
+async function record(
+    actorId: string,
+    orgId: string,
+    action: string,
+    metadata?: Record<string, unknown>
+): Promise<void> {
+    await recordAudit({ actorId, orgId, action, targetType: "org", targetId: orgId, metadata });
+}
+
 // ---------------------------------------------------------------------------
 // The organization itself
 // ---------------------------------------------------------------------------
@@ -57,7 +75,7 @@ export async function createOrgAction(input: unknown): Promise<{ slug?: string; 
         if (!allowed.ok) return { error: allowed.reason };
 
         const id = await orgs.createOrg(caller.id, parsed.data);
-        await recordAudit({ actorId: caller.id, action: "org.create", targetType: "org", targetId: id });
+        await record(caller.id, id, "org.create", { name: parsed.data.name });
         refresh();
         return { slug: parsed.data.slug };
     } catch (caught) {
@@ -70,8 +88,11 @@ export async function updateOrgAction(orgId: string, input: unknown): Promise<{ 
     const parsed = core.organizationProfileSchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
     try {
-        await orgs.requireOrgOwner(caller, orgId);
+        // The name, the description and the photo are settings, not ownership:
+        // whoever the organization trusted with its settings may change them.
+        await orgs.requireOrgPermission(caller, orgId, "settings.manage");
         await orgs.updateOrg(orgId, parsed.data);
+        await record(caller.id, orgId, "org.update", { name: parsed.data.name });
         refresh();
         return {};
     } catch (caught) {
@@ -84,9 +105,9 @@ export async function changeOrgSlugAction(orgId: string, slug: unknown): Promise
     const parsed = core.orgSlugField.safeParse(slug);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the handle and try again" };
     try {
-        await orgs.requireOrgOwner(caller, orgId);
+        await orgs.requireOrgPermission(caller, orgId, "settings.manage");
         await orgs.changeOrgSlug(orgId, parsed.data);
-        await recordAudit({ actorId: caller.id, action: "org.rename", targetType: "org", targetId: orgId });
+        await record(caller.id, orgId, "org.rename", { slug: parsed.data });
         refresh();
         return { slug: parsed.data };
     } catch (caught) {
@@ -99,7 +120,7 @@ export async function transferOrgAction(orgId: string, toUserId: string): Promis
     try {
         await orgs.requireOrgOwner(caller, orgId);
         await orgs.transferOrg(orgId, toUserId);
-        await recordAudit({ actorId: caller.id, action: "org.transfer", targetType: "org", targetId: orgId });
+        await record(caller.id, orgId, "org.transfer", { toUserId });
         refresh();
         return {};
     } catch (caught) {
@@ -112,7 +133,10 @@ export async function deleteOrgAction(orgId: string): Promise<{ error?: string }
     try {
         await orgs.requireOrgOwner(caller, orgId);
         await orgs.deleteOrg(orgId);
-        await recordAudit({ actorId: caller.id, action: "org.delete", targetType: "org", targetId: orgId });
+        // The organization is gone, so nothing will ever read this through its
+        // own screen. It stays for the instance's history, which is the one place
+        // "where did Acme go" can still be answered.
+        await record(caller.id, orgId, "org.delete");
         refresh();
         return {};
     } catch (caught) {
@@ -127,13 +151,13 @@ export async function deleteOrgAction(orgId: string): Promise<{ error?: string }
 export async function addOrgMemberAction(
     orgId: string,
     identifier: string,
-    role: core.OrgRole
+    role: string
 ): Promise<{ error?: string }> {
     const caller = await actor();
     try {
-        await orgs.requireOrg(caller, orgId, "admin");
+        await orgs.requireOrgPermission(caller, orgId, "people.manage");
         await orgs.addOrgMember(orgId, identifier, role);
-        await recordAudit({ actorId: caller.id, action: "org.member.add", targetType: "org", targetId: orgId });
+        await record(caller.id, orgId, "org.member.add", { identifier, role });
         refresh();
         return {};
     } catch (caught) {
@@ -144,12 +168,13 @@ export async function addOrgMemberAction(
 export async function setOrgMemberRoleAction(
     orgId: string,
     userId: string,
-    role: core.OrgRole
+    role: string
 ): Promise<{ error?: string }> {
     const caller = await actor();
     try {
-        await orgs.requireOrg(caller, orgId, "admin");
+        await orgs.requireOrgPermission(caller, orgId, "people.manage");
         await orgs.setOrgMemberRole(orgId, userId, role);
+        await record(caller.id, orgId, "org.member.role", { userId, role });
         refresh();
         return {};
     } catch (caught) {
@@ -160,11 +185,12 @@ export async function setOrgMemberRoleAction(
 export async function removeOrgMemberAction(orgId: string, userId: string): Promise<{ error?: string }> {
     const caller = await actor();
     try {
-        // Leaving is the one write a plain member may make about themselves; an
-        // admin is what it takes to remove anybody else.
-        if (userId !== caller.id) await orgs.requireOrg(caller, orgId, "admin");
-        else await orgs.requireOrg(caller, orgId, "member");
+        // Leaving is the one write anybody on the roster may make about
+        // themselves; taking somebody else off takes running the people here.
+        if (userId !== caller.id) await orgs.requireOrgPermission(caller, orgId, "people.manage");
+        else await orgs.requireOrgPermission(caller, orgId, "org.read");
         await orgs.removeOrgMember(orgId, userId);
+        await record(caller.id, orgId, userId === caller.id ? "org.member.leave" : "org.member.remove", { userId });
         refresh();
         return {};
     } catch (caught) {
@@ -181,8 +207,9 @@ export async function createTeamAction(orgId: string, input: unknown): Promise<{
     const parsed = core.teamSchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
     try {
-        await orgs.requireOrg(caller, orgId, "admin");
+        await orgs.requireOrgPermission(caller, orgId, "teams.manage");
         const id = await orgs.createTeam(orgId, parsed.data);
+        await record(caller.id, orgId, "org.team.create", { name: parsed.data.name });
         refresh();
         return { id };
     } catch (caught) {
@@ -195,8 +222,9 @@ export async function updateTeamAction(teamId: string, input: unknown): Promise<
     const parsed = core.teamSchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
     try {
-        await orgs.requireTeam(caller, teamId, "manage");
+        const { orgId } = await orgs.requireTeam(caller, teamId, "manage");
         await orgs.updateTeam(teamId, parsed.data);
+        await record(caller.id, orgId, "org.team.update", { teamId, name: parsed.data.name });
         refresh();
         return {};
     } catch (caught) {
@@ -210,8 +238,9 @@ export async function deleteTeamAction(teamId: string): Promise<{ error?: string
         // Deleting a team revokes everything it reached, so it takes the
         // organization rather than the team's own maintainer.
         const { orgId } = await orgs.requireTeam(caller, teamId, "read");
-        await orgs.requireOrg(caller, orgId, "admin");
+        await orgs.requireOrgPermission(caller, orgId, "teams.manage");
         await orgs.deleteTeam(teamId);
+        await record(caller.id, orgId, "org.team.delete", { teamId });
         refresh();
         return {};
     } catch (caught) {
@@ -226,8 +255,9 @@ export async function addTeamMemberAction(
 ): Promise<{ error?: string }> {
     const caller = await actor();
     try {
-        await orgs.requireTeam(caller, teamId, "manage");
+        const { orgId } = await orgs.requireTeam(caller, teamId, "manage");
         await orgs.addTeamMember(teamId, identifier, role);
+        await record(caller.id, orgId, "org.team.member.add", { teamId, identifier, role });
         refresh();
         return {};
     } catch (caught) {
@@ -242,8 +272,9 @@ export async function setTeamMemberRoleAction(
 ): Promise<{ error?: string }> {
     const caller = await actor();
     try {
-        await orgs.requireTeam(caller, teamId, "manage");
+        const { orgId } = await orgs.requireTeam(caller, teamId, "manage");
         await orgs.setTeamMemberRole(teamId, userId, role);
+        await record(caller.id, orgId, "org.team.member.role", { teamId, userId, role });
         refresh();
         return {};
     } catch (caught) {
@@ -254,13 +285,65 @@ export async function setTeamMemberRoleAction(
 export async function removeTeamMemberAction(teamId: string, userId: string): Promise<{ error?: string }> {
     const caller = await actor();
     try {
-        if (userId !== caller.id) await orgs.requireTeam(caller, teamId, "manage");
-        else await orgs.requireTeam(caller, teamId, "read");
+        const { orgId } = await orgs.requireTeam(caller, teamId, userId === caller.id ? "read" : "manage");
         await orgs.removeTeamMember(teamId, userId);
+        await record(caller.id, orgId, "org.team.member.remove", { teamId, userId });
         refresh();
         return {};
     } catch (caught) {
         return failure(caught, "Could not remove that person from the team");
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Roles
+// ---------------------------------------------------------------------------
+
+export async function createOrgRoleAction(orgId: string, input: unknown): Promise<{ error?: string }> {
+    const caller = await actor();
+    const parsed = core.orgRoleSchema.safeParse(input);
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    try {
+        await orgs.requireOrgPermission(caller, orgId, "roles.manage");
+        await roles.createOrgRole(orgId, parsed.data);
+        await record(caller.id, orgId, "org.role.create", {
+            slug: parsed.data.slug,
+            permissions: parsed.data.permissions
+        });
+        refresh();
+        return {};
+    } catch (caught) {
+        return failure(caught, "Could not create the role");
+    }
+}
+
+export async function updateOrgRoleAction(orgId: string, slug: string, input: unknown): Promise<{ error?: string }> {
+    const caller = await actor();
+    const parsed = core.orgRoleSchema.omit({ slug: true }).safeParse(input);
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    try {
+        await orgs.requireOrgPermission(caller, orgId, "roles.manage");
+        await roles.updateOrgRole(orgId, slug, parsed.data);
+        // What a role may do is the one change here that silently moves what
+        // other people can do, so the grants themselves go into the record.
+        await record(caller.id, orgId, "org.role.update", { slug, permissions: parsed.data.permissions });
+        refresh();
+        return {};
+    } catch (caught) {
+        return failure(caught, "Could not save the role");
+    }
+}
+
+export async function deleteOrgRoleAction(orgId: string, slug: string): Promise<{ error?: string }> {
+    const caller = await actor();
+    try {
+        await orgs.requireOrgPermission(caller, orgId, "roles.manage");
+        await roles.deleteOrgRole(orgId, slug);
+        await record(caller.id, orgId, "org.role.delete", { slug });
+        refresh();
+        return {};
+    } catch (caught) {
+        return failure(caught, "Could not delete the role");
     }
 }
 

@@ -11,7 +11,7 @@ import { SpaceTree } from "@/app/(app)/tasks/space-tree";
 import { buildReport } from "@/lib/tasks/report-service";
 import { listSpaceTree } from "@/lib/tasks/space-service";
 import { ReportsView } from "@/app/(app)/tasks/reports-view";
-import { visibleScope, type TaskActor } from "@/lib/tasks/access";
+import { shelfScope, type TaskActor } from "@/lib/tasks/access";
 import { addDays, startOfWeek, weekStartIndex } from "@polaris/core";
 import { resolveDisplayPreferencesFor } from "@/lib/display-prefs-service";
 
@@ -20,7 +20,7 @@ export const dynamic = "force-dynamic";
 export default async function ReportsPage() {
     const user = await requirePermission("tasks.read");
     const actor: TaskActor = { id: user.id, isAdmin: user.isAdmin };
-    const scope = await visibleScope(actor);
+    const scope = await shelfScope(actor);
 
     const now = new Date();
     const weekStartsOn = weekStartIndex((await resolveDisplayPreferencesFor(user.id)).weekStart);

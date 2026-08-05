@@ -14,15 +14,18 @@ import { normalizeRoot } from "@polaris/deploy";
 import { requirePermission } from "@/lib/session";
 import { recordAudit } from "@/lib/audit-service";
 import * as deployService from "@/lib/deploy-service";
+import { scopeOrgIdFor } from "@/lib/workspace-scope";
+import type { DomainOwner } from "@/lib/owner-domains";
 import { getNetworkStatus } from "@/lib/network-service";
 import { githubTokenForUser } from "@/lib/github-access";
+import { requireOrgPermission } from "@/lib/orgs/org-service";
 import { setDomainCertificate } from "@/lib/domain-cert-service";
 import { listConnections, getDriver } from "@/lib/storage-service";
-import { getDomainZones, listDeployZones } from "@/lib/domain-zones";
 import { getFlagsForEnvironment } from "@/lib/deploy-project-service";
 import { ensurePublicIp, getDomainConfig } from "@/lib/domain-service";
 import { pickerRepoList, pickerRepoSearch } from "@/lib/github-repo-picker";
 import { provisionHostnameDns, type HostnameDnsResult } from "@/lib/domain-dns";
+import { getDomainZones, listDeployZones, type DeployZoneOption } from "@/lib/domain-zones";
 import { getOrCreateLocalTarget, getOrCreateHostTarget } from "@/lib/deploy-target-service";
 import { inspectGithubRepo, type GithubRepo, type RepoInspection } from "@/lib/github-service";
 import { listVolumes, createVolume, updateVolume, deleteVolume, type VolumeView } from "@/lib/deploy-volume-service";
@@ -92,8 +95,20 @@ export async function createProjectAction(input: { name: string }): Promise<{ er
     const name = input.name?.trim();
     if (!name) return { error: "A project name is required" };
     try {
-        const project = await deployService.createProject(user.id, name);
-        await recordAudit({ actorId: user.id, action: "deploy.project.create", targetType: "project", targetId: project.id });
+        // The project lands on whichever shelf is open. Working from an
+        // organization takes being allowed to run its services - being on its
+        // roster is not enough to put something on the group's shelf.
+        const orgId = await scopeOrgIdFor(user.id);
+        if (orgId) await requireOrgPermission({ id: user.id, isAdmin: user.isAdmin }, orgId, "deploy.manage");
+
+        const project = await deployService.createProject(user.id, name, orgId);
+        await recordAudit({
+            actorId: user.id,
+            orgId: orgId ?? undefined,
+            action: "deploy.project.create",
+            targetType: "project",
+            targetId: project.id
+        });
         revalidatePath(DEPLOY_PATH);
         return { id: project.id };
     } catch (caught) {
@@ -598,10 +613,15 @@ export async function duckdnsSubdomainAction(): Promise<{ subdomain: string | nu
  */
 export async function deployZonesAction(): Promise<{
     baseDomain: string;
-    zones: Array<{ label: string; host: string; primary: boolean }>;
+    zones: DeployZoneOption[];
 }> {
-    await requirePermission("deploy.manage");
-    const [config, zones] = await Promise.all([getDomainZones(), listDeployZones()]);
+    const user = await requirePermission("deploy.manage");
+    // The shelf that is open decides whose brought domains are offered: an
+    // organization's names belong to its projects, and somebody's own names must
+    // not be on the list while they are deploying for a client.
+    const orgId = await scopeOrgIdFor(user.id);
+    const owner: DomainOwner = orgId ? { kind: "org", id: orgId } : { kind: "user", id: user.id };
+    const [config, zones] = await Promise.all([getDomainZones(), listDeployZones(owner)]);
     return { baseDomain: config.baseDomain, zones };
 }
 

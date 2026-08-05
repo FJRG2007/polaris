@@ -24,6 +24,16 @@ export interface AuditEvent {
     readonly metadata?: Record<string, unknown>;
     /** The session the action came from. Resolved from the request when omitted. */
     readonly sessionId?: string;
+    /**
+     * The organization the action was about, when it was about one.
+     *
+     * This is the whole of what makes an organization's history its own: the same
+     * table carries what somebody did to their account and what they did to a
+     * company's roster, and only this tells the two apart. An action that changes
+     * an organization and does not carry the id is one that organization can
+     * never see happened.
+     */
+    readonly orgId?: string;
 }
 
 /**
@@ -70,7 +80,8 @@ export async function recordAudit(event: AuditEvent): Promise<void> {
                 targetId: event.targetId,
                 metadata: event.metadata ? JSON.stringify(event.metadata) : null,
                 ipHash: await clientIpHash(),
-                sessionId: event.sessionId ?? (await requestSessionId())
+                sessionId: event.sessionId ?? (await requestSessionId()),
+                orgId: event.orgId ?? null
             }
         });
     } catch {
@@ -192,6 +203,84 @@ export async function listUserActivity(
         metadata: row.metadata ?? "",
         sessionId: row.sessionId
     }));
+}
+
+// ---------------------------------------------------------------------------
+// One organization's history
+// ---------------------------------------------------------------------------
+
+/** One row of an organization's history. Unlike a personal entry this names who
+ *  did it, because that is the question a group is actually asking. */
+export interface OrgActivityEntry {
+    id: string;
+    /** ISO 8601; the screen formats it with the reader's own preferences. */
+    at: string;
+    /** The account behind it, or "Polaris" when nothing signed in did it. */
+    actorId: string | null;
+    actorName: string;
+    action: string;
+    /** The raw metadata document, or "" when the entry carried none. */
+    metadata: string;
+}
+
+/**
+ * What has been done to one organization, newest first, optionally narrowed to
+ * one person.
+ *
+ * Scoped by `orgId` and nothing else, which is what keeps this from leaking a
+ * member's personal history into a place their colleagues can read. An entry is
+ * here because the action changed the organization - its roster, its teams, its
+ * roles, its domains, its work - and never because the person who took it happens
+ * to belong to it.
+ */
+export async function listOrgActivity(
+    orgId: string,
+    { actorId, limit = 200 }: { actorId?: string; limit?: number } = {}
+): Promise<OrgActivityEntry[]> {
+    const rows = await prisma.auditLog.findMany({
+        where: { orgId, ...(actorId ? { actorId } : {}) },
+        orderBy: { at: "desc" },
+        take: limit,
+        select: { id: true, actorId: true, action: true, metadata: true, at: true }
+    });
+
+    const actorIds = [...new Set(rows.map((row) => row.actorId).filter((id): id is string => Boolean(id)))];
+    const actors =
+        actorIds.length === 0
+            ? []
+            : await prisma.user.findMany({
+                  where: { id: { in: actorIds } },
+                  select: { id: true, name: true, email: true }
+              });
+    const nameById = new Map(actors.map((actor) => [actor.id, actor.name || actor.email]));
+
+    return rows.map((row) => ({
+        id: row.id,
+        at: row.at.toISOString(),
+        actorId: row.actorId,
+        // Somebody who has since left, or whose account is gone, still has to
+        // read as somebody - dropping the entry is the one thing an audit trail
+        // may never do.
+        actorName: row.actorId ? (nameById.get(row.actorId) ?? "a former member") : "Polaris",
+        action: row.action,
+        metadata: row.metadata ?? ""
+    }));
+}
+
+/** The people who appear in an organization's history, for the filter to offer.
+ *  Grouped in the database because the feed is capped, and somebody whose entries
+ *  have scrolled past the cap is exactly who a reader is looking for. */
+export async function listOrgActivityActors(orgId: string): Promise<{ id: string; name: string }[]> {
+    const groups = await prisma.auditLog.groupBy({ by: ["actorId"], where: { orgId }, _max: { at: true } });
+    const ids = groups.map((group) => group.actorId).filter((id): id is string => Boolean(id));
+    if (ids.length === 0) return [];
+    const actors = await prisma.user.findMany({
+        where: { id: { in: ids } },
+        select: { id: true, name: true, email: true }
+    });
+    return actors
+        .map((actor) => ({ id: actor.id, name: actor.name || actor.email }))
+        .sort((left, right) => left.name.localeCompare(right.name));
 }
 
 /**
