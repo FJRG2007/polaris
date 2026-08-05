@@ -44,6 +44,24 @@ describe("download streams", () => {
         expect(driver.dispose).toHaveBeenCalledTimes(1);
     });
 
+    it("gives it back when the source refuses to be cancelled", async () => {
+        const driver = driverStub();
+        const source = new ReadableStream<Uint8Array>({
+            start(controller) {
+                controller.enqueue(new TextEncoder().encode("one"));
+            },
+            cancel() {
+                throw new Error("ECONNRESET");
+            }
+        });
+
+        const reader = pipeThenDispose(source, driver).getReader();
+        await reader.read();
+        await expect(reader.cancel("navigated away")).rejects.toThrow("ECONNRESET");
+
+        expect(driver.dispose).toHaveBeenCalledTimes(1);
+    });
+
     it("gives it back when the read itself fails", async () => {
         const driver = driverStub();
         const source = new ReadableStream<Uint8Array>({

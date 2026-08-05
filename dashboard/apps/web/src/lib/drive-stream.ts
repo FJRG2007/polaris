@@ -40,8 +40,12 @@ export function pipeThenDispose(
             controller.enqueue(read.value);
         },
         async cancel(reason) {
-            await reader.cancel(reason);
-            await dispose();
+            // The source's own cancel can fail; the session still has to come back.
+            try {
+                await reader.cancel(reason);
+            } finally {
+                await dispose();
+            }
         }
     });
 }

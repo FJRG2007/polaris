@@ -11,6 +11,7 @@
 
 import { extname } from "node:path";
 import { prisma } from "@polaris/db";
+import { pipeThenDispose } from "@/lib/drive-stream";
 import { getSetting, setSetting } from "@/lib/setting-store";
 import {
     AUTOMATIC_TARGET,
@@ -177,10 +178,16 @@ export async function readAttachment(
     const row = await prisma.taskAttachment.findUnique({ where: { id: attachmentId } });
     if (!row) return null;
     const driver = await driverFor(row.connectionId ?? LOCAL_TARGET);
-    // The stream outlives this call, so the driver is disposed by whoever
-    // finishes reading it rather than here.
-    const body = await driver.readStream(row.path);
-    return { name: row.name, mime: row.mime, size: row.size, body };
+    // The stream outlives this call, so the driver comes back when the response
+    // finishes rather than here; a read that never starts gives it back now.
+    let body: ReadableStream<Uint8Array>;
+    try {
+        body = await driver.readStream(row.path);
+    } catch (error) {
+        await driver.dispose().catch(() => undefined);
+        throw error;
+    }
+    return { name: row.name, mime: row.mime, size: row.size, body: pipeThenDispose(body, driver) };
 }
 
 /** The task an attachment belongs to, so the caller can authorize against it. */
