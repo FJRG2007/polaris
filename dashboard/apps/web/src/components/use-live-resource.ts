@@ -13,8 +13,8 @@
  * dashboard left open overnight is not still asking every few seconds.
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
 import { mergeUnchanged } from "@/lib/structural-merge";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 /** Cached snapshots are namespaced so one key cannot read another's shape. */
 const PREFIX = "polaris.live.";
@@ -83,11 +83,16 @@ export function useLiveResource<T>({
     url,
     cacheKey,
     intervalMs,
+    enabled = true,
     select
 }: {
     url: string;
     cacheKey: string;
     intervalMs: number;
+    /** False stops the poll before it starts, for a subject nothing on screen is
+     *  asking about. `data` stays as it was, so a caller that gates on it reads
+     *  the answer as unknown rather than as a value. */
+    enabled?: boolean;
     /** Pull the payload out of the response body. */
     select: (body: unknown) => T;
 }): LiveResource<T> {
@@ -147,6 +152,7 @@ export function useLiveResource<T>({
     }, [url, cacheKey]);
 
     useEffect(() => {
+        if (!enabled) return;
         const abort = refresh();
         let timer: ReturnType<typeof setInterval> | null = null;
         const start = (): void => {
@@ -174,7 +180,7 @@ export function useLiveResource<T>({
             stop();
             document.removeEventListener("visibilitychange", onVisibility);
         };
-    }, [refresh, intervalMs]);
+    }, [refresh, intervalMs, enabled]);
 
     return {
         data,

@@ -11,7 +11,9 @@
  * Whether a server is answering is not part of the page render. It is a TCP
  * handshake per server, so it is polled from the client and folded in as it
  * arrives - the table is on screen either way, and the local machine's own name
- * comes back on the same poll.
+ * comes back on the same poll. Once it says a server is down, the actions that
+ * need the machine - a shell, its files - are disabled rather than left to open
+ * and time out.
  */
 
 import Link from "next/link";
@@ -118,125 +120,154 @@ export function ServersView({ servers }: { servers: ServerRow[] }) {
                         </tr>
                     </thead>
                     <tbody>
-                        {servers.map((server) => (
-                            <tr key={server.id} className="border-t border-border hover:bg-card-hover">
-                                <td className="px-3 py-2">
-                                    <button
-                                        type="button"
-                                        onClick={() => setDetails(server)}
-                                        aria-label={`Open ${server.name}`}
-                                        className="flex items-center gap-2 font-medium hover:underline"
-                                    >
-                                        <Server className="size-4 text-muted-foreground" />
-                                        {server.name}
-                                        {server.kind === "local" ? <Badge variant="primary">This machine</Badge> : null}
-                                    </button>
-                                    <span className="block text-xs text-muted-foreground">
-                                        {server.kind === "host" ? (
-                                            server.detail
-                                        ) : live?.machineName ? (
-                                            live.machineName
-                                        ) : (
-                                            // Its own name is on the way; hold the line's
-                                            // height so the row does not jump when it lands.
-                                            <Skeleton className="mt-0.5 inline-block h-3 w-24 align-middle" />
-                                        )}
-                                        {/* On this line rather than in a column of its own: the
-                                            table already carries six, and a seventh is what makes
-                                            it unreadable on a laptop. */}
-                                        {server.os ? (
-                                            <span className="ml-1.5 border-l border-border pl-1.5">{server.os}</span>
-                                        ) : null}
-                                    </span>
-                                </td>
-                                <td className="px-3 py-2 text-muted-foreground">
-                                    {server.address}
-                                    {server.port ? `:${server.port}` : ""}
-                                </td>
-                                <td className="px-3 py-2">
-                                    <StatusCell kind={server.kind} status={statusOf(server.id)} />
-                                </td>
-                                <td className="px-3 py-2">
-                                    <EnvironmentCell server={server} onPick={() => askEnvironment(server)} />
-                                </td>
-                                <td className="px-3 py-2">
-                                    <div className="flex flex-wrap items-center gap-1">
-                                        {server.authMethod ? (
-                                            <Badge variant="neutral">{server.authMethod}</Badge>
-                                        ) : (
-                                            <span className="text-xs text-muted-foreground">Local</span>
-                                        )}
-                                        {/* Root is worth its own badge: it is the widest thing a
-                                            server can have granted, and a server that has it should
-                                            never be one anybody has to go and check. */}
-                                        {server.sudo ? <Badge variant="warning">Root</Badge> : null}
-                                    </div>
-                                </td>
-                                <td className="px-3 py-2">
-                                    <div className="flex justify-end gap-1">
-                                        {server.hostId ? (
-                                            <>
-                                                <Button
-                                                    size="icon"
-                                                    variant="ghost"
-                                                    aria-label={`Open a shell on ${server.name}`}
-                                                    title="Open a shell"
-                                                    onClick={() => setShell(server)}
-                                                >
-                                                    <SquareTerminal className="size-4" />
-                                                </Button>
-                                                <Button size="icon" variant="ghost" asChild>
-                                                    <Link
-                                                        href={`/drive?c=host:${server.hostId}`}
-                                                        aria-label={`Browse the files on ${server.name}`}
-                                                        title="Browse its files"
-                                                    >
-                                                        <FolderOpen className="size-4" />
-                                                    </Link>
-                                                </Button>
-                                            </>
-                                        ) : server.kind === "local" ? (
-                                            // Polaris reaches its own machine through the container
-                                            // engine only, so a shell there has to be granted the
-                                            // same way any other server grants one.
-                                            <Button size="sm" variant="secondary" onClick={() => setEnrollLocal(true)}>
-                                                <SquareTerminal className="size-3.5" /> Enable shell and files
-                                            </Button>
-                                        ) : null}
-                                        <Button
-                                            size="icon"
-                                            variant="ghost"
-                                            aria-label={`Rename ${server.name} and see how to connect to it`}
-                                            title="Name and connection details"
+                        {servers.map((server) => {
+                            const status = statusOf(server.id);
+                            // Only a machine that answered the probe with a
+                            // refusal or a timeout is treated as down; one that
+                            // has not been probed yet keeps its actions.
+                            const down = status?.state === "down";
+                            return (
+                                <tr key={server.id} className="border-t border-border hover:bg-card-hover">
+                                    <td className="px-3 py-2">
+                                        <button
+                                            type="button"
                                             onClick={() => setDetails(server)}
+                                            aria-label={`Open ${server.name}`}
+                                            className="flex items-center gap-2 font-medium hover:underline"
                                         >
-                                            <Settings2 className="size-4" />
-                                        </Button>
-                                        {/* The local machine is never removed - it is the box
-                                            Polaris runs on - but the login it was reached by can
-                                            be given back. The Host, not the row: the local row's
-                                            own id is a placeholder. */}
-                                        {server.hostId ? (
+                                            <Server className="size-4 text-muted-foreground" />
+                                            {server.name}
+                                            {server.kind === "local" ? <Badge variant="primary">This machine</Badge> : null}
+                                        </button>
+                                        <span className="block text-xs text-muted-foreground">
+                                            {server.kind === "host" ? (
+                                                server.detail
+                                            ) : live?.machineName ? (
+                                                live.machineName
+                                            ) : (
+                                                // Its own name is on the way; hold the line's
+                                                // height so the row does not jump when it lands.
+                                                <Skeleton className="mt-0.5 inline-block h-3 w-24 align-middle" />
+                                            )}
+                                            {/* On this line rather than in a column of its own: the
+                                                table already carries six, and a seventh is what makes
+                                                it unreadable on a laptop. */}
+                                            {server.os ? (
+                                                <span className="ml-1.5 border-l border-border pl-1.5">{server.os}</span>
+                                            ) : null}
+                                        </span>
+                                    </td>
+                                    <td className="px-3 py-2 text-muted-foreground">
+                                        {server.address}
+                                        {server.port ? `:${server.port}` : ""}
+                                    </td>
+                                    <td className="px-3 py-2">
+                                        <StatusCell kind={server.kind} status={status} />
+                                    </td>
+                                    <td className="px-3 py-2">
+                                        <EnvironmentCell server={server} onPick={() => askEnvironment(server)} />
+                                    </td>
+                                    <td className="px-3 py-2">
+                                        <div className="flex flex-wrap items-center gap-1">
+                                            {server.authMethod ? (
+                                                <Badge variant="neutral">{server.authMethod}</Badge>
+                                            ) : (
+                                                <span className="text-xs text-muted-foreground">Local</span>
+                                            )}
+                                            {/* Root is worth its own badge: it is the widest thing a
+                                                server can have granted, and a server that has it should
+                                                never be one anybody has to go and check. */}
+                                            {server.sudo ? <Badge variant="warning">Root</Badge> : null}
+                                        </div>
+                                    </td>
+                                    <td className="px-3 py-2">
+                                        <div className="flex justify-end gap-1">
+                                            {server.hostId ? (
+                                                // A shell and its files both need the
+                                                // machine to answer, so neither is
+                                                // offered while it does not - the
+                                                // alternative is a button that opens a
+                                                // panel to watch it time out.
+                                                <>
+                                                    <Button
+                                                        size="icon"
+                                                        variant="ghost"
+                                                        disabled={down}
+                                                        aria-label={`Open a shell on ${server.name}`}
+                                                        title={
+                                                            down
+                                                                ? "Not answering over SSH"
+                                                                : "Open a shell"
+                                                        }
+                                                        onClick={() => setShell(server)}
+                                                    >
+                                                        <SquareTerminal className="size-4" />
+                                                    </Button>
+                                                    {down ? (
+                                                        <Button
+                                                            size="icon"
+                                                            variant="ghost"
+                                                            disabled
+                                                            aria-label={`Browse the files on ${server.name}`}
+                                                            title="Not answering over SSH"
+                                                        >
+                                                            <FolderOpen className="size-4" />
+                                                        </Button>
+                                                    ) : (
+                                                        <Button size="icon" variant="ghost" asChild>
+                                                            <Link
+                                                                href={`/drive?c=host:${server.hostId}`}
+                                                                aria-label={`Browse the files on ${server.name}`}
+                                                                title="Browse its files"
+                                                            >
+                                                                <FolderOpen className="size-4" />
+                                                            </Link>
+                                                        </Button>
+                                                    )}
+                                                </>
+                                            ) : server.kind === "local" ? (
+                                                // Polaris reaches its own machine through the container
+                                                // engine only, so a shell there has to be granted the
+                                                // same way any other server grants one.
+                                                <Button size="sm" variant="secondary" onClick={() => setEnrollLocal(true)}>
+                                                    <SquareTerminal className="size-3.5" /> Enable shell and files
+                                                </Button>
+                                            ) : null}
                                             <Button
                                                 size="icon"
                                                 variant="ghost"
-                                                aria-label={
-                                                    server.kind === "local"
-                                                        ? `Stop reaching ${server.name} over SSH`
-                                                        : `Remove ${server.name}`
-                                                }
-                                                title={server.kind === "local" ? "Give up the login" : "Remove"}
-                                                onClick={() =>
-                                                    setRemoving({ id: server.hostId ?? server.id, name: server.name })
-                                                }
+                                                aria-label={`Rename ${server.name} and see how to connect to it`}
+                                                title="Name and connection details"
+                                                onClick={() => setDetails(server)}
                                             >
-                                                <Trash2 className="size-4" />
+                                                <Settings2 className="size-4" />
                                             </Button>
-                                        ) : null}
-                                    </div>
-                                </td>
-                            </tr>
-                        ))}
+                                            {/* The local machine is never removed - it is the box
+                                                Polaris runs on - but the login it was reached by can
+                                                be given back. The Host, not the row: the local row's
+                                                own id is a placeholder. */}
+                                            {server.hostId ? (
+                                                <Button
+                                                    size="icon"
+                                                    variant="ghost"
+                                                    aria-label={
+                                                        server.kind === "local"
+                                                            ? `Stop reaching ${server.name} over SSH`
+                                                            : `Remove ${server.name}`
+                                                    }
+                                                    title={server.kind === "local" ? "Give up the login" : "Remove"}
+                                                    onClick={() =>
+                                                        setRemoving({ id: server.hostId ?? server.id, name: server.name })
+                                                    }
+                                                >
+                                                    <Trash2 className="size-4" />
+                                                </Button>
+                                            ) : null}
+                                        </div>
+                                    </td>
+                                </tr>
+                            );
+                        })}
                     </tbody>
                 </table>
             </div>

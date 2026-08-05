@@ -8,6 +8,10 @@
  * skeleton so a slow NAS never stalls the whole navigation. A UNAS browses over
  * SMB, reusing its stored account; if no share is set yet it prompts to pick one,
  * and (being a UniFi device) it also offers a shortcut to its own console.
+ *
+ * Sources that are registered servers are polled for reachability, because a
+ * machine that is off answers a browse with a connect timeout and then a generic
+ * failure: when one is down the rail says so and its files are not requested.
  */
 
 import Link from "next/link";
@@ -16,12 +20,19 @@ import * as driveActions from "./actions";
 import { useRouter } from "next/navigation";
 import { UnifiConsoleButton } from "./unifi-console-button";
 import { ShareDialog, type ShareTarget } from "./share-dialog";
+import { useLiveResource } from "@/components/use-live-resource";
 import { RemoveConnectionDialog } from "./remove-connection-dialog";
 import { RequestDialog, type RequestTarget } from "./request-dialog";
 import { ConnectionDialog, EditConnectionDialog } from "./connection-dialog";
 import { AccessDialog, UnlockPanel, type AccessTarget } from "./access-dialog";
-import { isSavedConnection, type ConnectionSummary, type DriveEntry } from "./types";
 import { useCallback, useEffect, useRef, useState, useTransition, type FormEvent } from "react";
+import {
+    isSavedConnection,
+    isServerSource,
+    type ConnectionSummary,
+    type DriveEntry,
+    type SourceStatus
+} from "./types";
 import {
     AlertTriangle,
     Folder,
@@ -30,6 +41,7 @@ import {
     KeyRound,
     Loader2,
     Pencil,
+    RefreshCw,
     ShieldCheck,
     Trash2,
     X
@@ -49,6 +61,11 @@ import {
     Skeleton,
     cn
 } from "@polaris/ui";
+
+/** How often the servers behind the SFTP sources are re-checked. One short-lived
+ *  socket per server, and a machine going down is worth noticing while the
+ *  browser is open on its files. */
+const SERVER_POLL_MS = 30_000;
 
 /** Parent path of a relative path ("a/b/c" -> "a/b", "a" -> ""). */
 function parentOf(path: string): string {
@@ -156,6 +173,29 @@ export function DriveExplorer({
     const selectedConnection =
         connections.find((connection) => connection.id === connectionId) ?? null;
 
+    // Whether the servers in the rail are answering. Polled only when one is
+    // actually listed: an instance browsing a NAS and nothing else has no server
+    // to ask about, and the poll would be a request that can never say anything.
+    const { data: reachability, refresh: recheckServers } = useLiveResource<SourceStatus[]>({
+        url: "/api/drive/server-status",
+        cacheKey: "drive.server-status",
+        intervalMs: SERVER_POLL_MS,
+        enabled: connections.some((connection) => isServerSource(connection.id)),
+        select: (body) => (body as { sources: SourceStatus[] }).sources
+    });
+
+    /** Why a source cannot be reached right now, or null while it answers - and
+     *  while the answer is still on its way, which is not the same as down. */
+    const downReason = useCallback(
+        (id: string | null): string | null => {
+            if (!id || !reachability) return null;
+            const status = reachability.find((entry) => entry.id === id);
+            return status?.state === "down" ? (status.detail ?? "No answer") : null;
+        },
+        [reachability]
+    );
+    const unreachable = downReason(connectionId);
+
     const load = useCallback(
         // `showSkeleton` blanks the list to a skeleton while fetching - right for a
         // navigation (new location), wrong for a background refresh after a mutation
@@ -165,6 +205,14 @@ export function DriveExplorer({
             setError(null);
             if (!connectionId) {
                 setEntries([]);
+                return;
+            }
+            // A server that is not answering would take the connect timeout to
+            // fail and come back as a generic error. The panel already says what
+            // is wrong, so the request is not made at all.
+            if (unreachable) {
+                setEntries([]);
+                setLoading(false);
                 return;
             }
             setNeedsSmbShare(false);
@@ -198,7 +246,7 @@ export function DriveExplorer({
                 if (!signal?.aborted && showSkeleton) setLoading(false);
             }
         },
-        [connectionId, path]
+        [connectionId, path, unreachable]
     );
 
     useEffect(() => {
@@ -392,6 +440,14 @@ export function DriveExplorer({
                                             key changed
                                         </Badge>
                                     ) : null}
+                                    {downReason(connection.id) ? (
+                                        <Badge
+                                            variant="danger"
+                                            title={downReason(connection.id) ?? undefined}
+                                        >
+                                            no answer
+                                        </Badge>
+                                    ) : null}
                                     {connection.shared ? (
                                         <Badge variant="neutral">shared</Badge>
                                     ) : null}
@@ -441,6 +497,12 @@ export function DriveExplorer({
                     <div className="rounded-md border border-border bg-card p-8 text-center text-sm text-muted-foreground">
                         Add a storage connection to start browsing.
                     </div>
+                ) : unreachable ? (
+                    <UnreachableServer
+                        name={selectedConnection?.name ?? "This server"}
+                        detail={unreachable}
+                        onRecheck={recheckServers}
+                    />
                 ) : selectedConnection?.needsRekey ? (
                     <div className="rounded-md border border-warning/40 bg-warning/10 p-6">
                         <div className="flex items-start gap-3">
@@ -918,6 +980,44 @@ function ScheduleDeleteDialog({
                 </form>
             </DialogContent>
         </Dialog>
+    );
+}
+
+/**
+ * The selected source is a server that is not answering. Browsing it would hang
+ * on the SSH connect and end in a failure that says nothing useful, so the
+ * reason is stated here instead and nothing is offered that needs the machine.
+ */
+function UnreachableServer({
+    name,
+    detail,
+    onRecheck
+}: {
+    name: string;
+    detail: string;
+    onRecheck: () => void;
+}) {
+    return (
+        <div className="rounded-md border border-danger/40 bg-danger/10 p-6">
+            <div className="flex items-start gap-3">
+                <AlertTriangle className="mt-0.5 size-5 shrink-0 text-danger" />
+                <div className="flex flex-col gap-2">
+                    <h3 className="text-sm font-medium">{name} is not answering</h3>
+                    <p className="text-sm text-muted-foreground">
+                        {detail}. Its files are unavailable until it is back.
+                    </p>
+                    <div className="mt-1 flex flex-wrap gap-2">
+                        <Button size="sm" variant="secondary" onClick={onRecheck}>
+                            <RefreshCw className="size-4" />
+                            Check again
+                        </Button>
+                        <Button size="sm" variant="ghost" asChild>
+                            <Link href="/apps/servers">Open Servers</Link>
+                        </Button>
+                    </div>
+                </div>
+            </div>
+        </div>
     );
 }
 

@@ -14,6 +14,23 @@ export function isSavedConnection(connectionId: string): boolean {
     return !connectionId.includes(":");
 }
 
+/** Whether a source is a registered server browsed over SFTP. The prefix mirrors
+ *  HOST_CONNECTION_PREFIX in the storage service, which is server-only and
+ *  cannot be imported here. */
+export function isServerSource(connectionId: string): boolean {
+    return connectionId.startsWith("host:");
+}
+
+/** Reachability of one server source, as answered by /api/drive/server-status.
+ *  Only servers are probed - a saved connection has no machine to be down. */
+export interface SourceStatus {
+    /** The Drive source id, prefix included. */
+    id: string;
+    state: "up" | "down";
+    /** Why it is not answering, in the words the connection used. */
+    detail: string | null;
+}
+
 export interface ConnectionSummary {
     id: string;
     name: string;
