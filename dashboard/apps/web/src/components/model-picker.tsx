@@ -152,8 +152,11 @@ export function ModelPicker({
                 ) : null}
             </button>
 
+            {/* bg-card, not bg-popover: there is no popover colour in the preset,
+                so that class paints nothing and the list comes out see-through
+                over whatever is under it. */}
             {open ? (
-                <div className="bg-popover absolute z-50 mt-1 w-full rounded-md border shadow-md">
+                <div className="bg-card absolute z-50 mt-1 w-full rounded-md border border-border shadow-lg">
                     <div className="flex items-center gap-2 border-b px-3 py-2">
                         <Search className="text-muted-foreground size-4 shrink-0" />
                         <Input

@@ -25,6 +25,7 @@ import { getUpdateSource } from "@/lib/update-source";
 import { getUpdateStatus } from "@/lib/update-service";
 import { getSetting, setSetting } from "@/lib/setting-store";
 import { notifyOperators } from "@/lib/notifications/operators";
+import { sweepExpiringModelKeys } from "@/lib/agents/model-key-expiry";
 import { refreshModelCatalogIfStale } from "@/lib/agents/model-catalog";
 import { markNotificationsReadByType } from "@/lib/notification-service";
 import { notifyGithubPermissionGap } from "@/lib/integrations/github-permission-notice";
@@ -263,6 +264,11 @@ export function startUpdateWatcher(): void {
         // with an empty catalogue - so a failure is logged at debug and retried
         // on the next tick rather than reported to anybody.
         void refreshModelCatalogIfStale().catch(() => undefined);
+        // And again: an indexed read that matches nothing on a deployment where
+        // nobody has given a key an end date. It has to run on a timer rather
+        // than when somebody opens a screen, because the whole point is telling
+        // them before the morning a run stops working.
+        void sweepExpiringModelKeys().catch(() => undefined);
     };
     setTimeout(tick, FIRST_PASS_MS).unref();
     setInterval(tick, INTERVAL_MS).unref();

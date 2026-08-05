@@ -28,8 +28,8 @@ import { loadEnv } from "@polaris/config";
 import { getSetting, setSetting } from "@/lib/setting-store";
 import { readGatewayConfig } from "@/lib/integrations/registry";
 import { GATEWAY_SLUG, MODEL_PROVIDERS } from "@/lib/agents/agent-providers";
-import { encryptSecret, decryptSecret, CredentialDecryptError } from "@polaris/storage";
 import { getIntegrationSecret, listIntegrationStates } from "@/lib/integration-service";
+import { encryptSecret, decryptSecret, secretFingerprint, CredentialDecryptError } from "@polaris/storage";
 
 /** Whether an account with no key of its own may run on the deployment's. */
 const SHARE_KEY = "agents.keys.shareInstance";
@@ -60,8 +60,45 @@ export interface UserModelKeyView {
     name: string;
     priority: number;
     config: Record<string, unknown>;
+    /** When its owner said it stops working, or null for no end. */
+    expiresAt: string | null;
     lastUsedAt: string | null;
     updatedAt: string;
+}
+
+/** The columns a screen may see. Everything absent from here is either the
+ *  credential or bookkeeping nobody reads. */
+const VIEW_SELECT = {
+    id: true,
+    provider: true,
+    name: true,
+    priority: true,
+    config: true,
+    expiresAt: true,
+    lastUsedAt: true,
+    updatedAt: true
+} as const;
+
+function toView(row: {
+    id: string;
+    provider: string;
+    name: string;
+    priority: number;
+    config: string;
+    expiresAt: Date | null;
+    lastUsedAt: Date | null;
+    updatedAt: Date;
+}): UserModelKeyView {
+    return {
+        id: row.id,
+        provider: row.provider,
+        name: row.name,
+        priority: row.priority,
+        config: parseConfig(row.config),
+        expiresAt: row.expiresAt?.toISOString() ?? null,
+        lastUsedAt: row.lastUsedAt?.toISOString() ?? null,
+        updatedAt: row.updatedAt.toISOString()
+    };
 }
 
 /** The order every read of somebody's keys uses. Creation breaks a tie so a list
@@ -80,30 +117,16 @@ function parseConfig(json: string): Record<string, unknown> {
     }
 }
 
-/** What this account has brought, in the order it wants them tried. */
+/** What this account has brought, in the order it wants them tried. Expired keys
+ *  are included: they are still the account's, and a row that vanished on its
+ *  expiry date would look like Polaris lost it. */
 export async function listUserModelKeys(userId: string): Promise<UserModelKeyView[]> {
     const rows = await prisma.userModelKey.findMany({
         where: { userId },
-        select: {
-            id: true,
-            provider: true,
-            name: true,
-            priority: true,
-            config: true,
-            lastUsedAt: true,
-            updatedAt: true
-        },
+        select: VIEW_SELECT,
         orderBy: [...BY_PRIORITY]
     });
-    return rows.map((row) => ({
-        id: row.id,
-        provider: row.provider,
-        name: row.name,
-        priority: row.priority,
-        config: parseConfig(row.config),
-        lastUsedAt: row.lastUsedAt?.toISOString() ?? null,
-        updatedAt: row.updatedAt.toISOString()
-    }));
+    return rows.map(toView);
 }
 
 /** Which provider one of this account's keys belongs to, or null when it holds no
@@ -113,9 +136,79 @@ export async function providerOfUserModelKey(userId: string, id: string): Promis
     return row?.provider ?? null;
 }
 
-function envelope(secret: string): { encryptedSecret: Buffer; secretNonce: Buffer; secretKeyId: string } {
-    const blob = encryptSecret(secret.trim(), loadEnv().POLARIS_MASTER_KEY);
-    return { encryptedSecret: blob.ciphertext, secretNonce: blob.nonce, secretKeyId: blob.keyId };
+/**
+ * What "the same credential" means, per provider.
+ *
+ * For a provider it is the key, and two rows holding one key are a duplicate. For
+ * the gateway it is the key AND the endpoint: the token is frequently nothing at
+ * all, so two gateways on the same network would otherwise collide on the
+ * placeholder and only the first could be added.
+ */
+function fingerprintScope(provider: string, config?: Record<string, unknown>): string {
+    if (provider !== GATEWAY_SLUG) return `model-key:${provider}`;
+    const baseUrl = typeof config?.baseUrl === "string" ? config.baseUrl.replace(/\/+$/, "") : "";
+    return `model-key:${provider}:${baseUrl}`;
+}
+
+/**
+ * The stored form of a secret: the envelope, plus the fingerprint that is the
+ * only way to notice the same credential arriving twice.
+ *
+ * Writing a secret always resets `expiryNotice`, because whatever Polaris last
+ * announced was about the key that is no longer there.
+ */
+function envelope(secret: string, provider: string, config?: Record<string, unknown>) {
+    const master = loadEnv().POLARIS_MASTER_KEY;
+    const blob = encryptSecret(secret.trim(), master);
+    return {
+        encryptedSecret: blob.ciphertext,
+        secretNonce: blob.nonce,
+        secretKeyId: blob.keyId,
+        secretFingerprint: secretFingerprint(secret.trim(), fingerprintScope(provider, config), master),
+        expiryNotice: ""
+    };
+}
+
+/**
+ * Whether this account already calls a key by this name.
+ *
+ * Compared here rather than by the database, because the unique index is exact
+ * and "Prod" beside "prod" is one name to the person reading the table. Done in
+ * memory over the account's own rows - there are a handful - since the
+ * case-insensitive filter Postgres would use is not available on the SQLite the
+ * dev setup runs on, and a rule that only holds in production is not a rule.
+ */
+export async function userHasModelKeyName(userId: string, name: string, exceptId?: string): Promise<boolean> {
+    const rows = await prisma.userModelKey.findMany({ where: { userId }, select: { id: true, name: true } });
+    const wanted = name.trim().toLowerCase();
+    return rows.some((row) => row.id !== exceptId && row.name.toLowerCase() === wanted);
+}
+
+/** Whether this account already holds this exact secret for this provider, other
+ *  than as the row being edited. The same key stored twice is two rows that
+ *  expire together, hit one rate ceiling together, and look like a spare. */
+export async function userHasModelSecret(
+    userId: string,
+    provider: string,
+    secret: string,
+    options: { exceptId?: string; config?: Record<string, unknown> } = {}
+): Promise<boolean> {
+    const { exceptId, config } = options;
+    const fingerprint = secretFingerprint(
+        secret.trim(),
+        fingerprintScope(provider, config),
+        loadEnv().POLARIS_MASTER_KEY
+    );
+    const row = await prisma.userModelKey.findFirst({
+        where: {
+            userId,
+            provider,
+            secretFingerprint: fingerprint,
+            ...(exceptId ? { id: { not: exceptId } } : {})
+        },
+        select: { id: true }
+    });
+    return row !== null;
 }
 
 /**
@@ -130,7 +223,13 @@ function envelope(secret: string): { encryptedSecret: Buffer; secretNonce: Buffe
  */
 export async function createUserModelKey(
     userId: string,
-    input: { provider: string; name: string; secret: string; config?: Record<string, unknown> }
+    input: {
+        provider: string;
+        name: string;
+        secret: string;
+        config?: Record<string, unknown>;
+        expiresAt?: Date | null;
+    }
 ): Promise<UserModelKeyView> {
     const last = await prisma.userModelKey.findFirst({
         where: { userId },
@@ -144,50 +243,54 @@ export async function createUserModelKey(
             name: input.name,
             priority: (last?.priority ?? -1) + 1,
             config: JSON.stringify(input.config ?? {}),
-            ...envelope(input.secret)
+            expiresAt: input.expiresAt ?? null,
+            ...envelope(input.secret, input.provider, input.config)
         },
-        select: {
-            id: true,
-            provider: true,
-            name: true,
-            priority: true,
-            config: true,
-            lastUsedAt: true,
-            updatedAt: true
-        }
+        select: VIEW_SELECT
     });
-    return {
-        id: row.id,
-        provider: row.provider,
-        name: row.name,
-        priority: row.priority,
-        config: parseConfig(row.config),
-        lastUsedAt: null,
-        updatedAt: row.updatedAt.toISOString()
-    };
+    return toView(row);
 }
 
 /**
- * Rename one, replace its key, or both.
+ * Rename one, replace its key, move its expiry, or all three.
  *
  * A secret of undefined leaves the stored one alone - that is what makes a
  * rename a rename, rather than a form that quietly wipes the credential because
- * the write-only field was left empty.
+ * the write-only field was left empty. `expiresAt` is different: it is a plain
+ * field, so null there means "no expiry" and undefined means "not mentioned".
  */
 export async function updateUserModelKey(
     userId: string,
     id: string,
-    input: { name?: string; secret?: string; config?: Record<string, unknown> }
+    input: {
+        name?: string;
+        secret?: string;
+        config?: Record<string, unknown>;
+        expiresAt?: Date | null;
+    }
 ): Promise<boolean> {
-    const result = await prisma.userModelKey.updateMany({
+    const owned = await prisma.userModelKey.findFirst({
         where: { id, userId },
+        select: { provider: true, config: true }
+    });
+    if (!owned) return false;
+
+    // The gateway's fingerprint takes in its endpoint, so a key rewritten
+    // alongside a new endpoint has to be fingerprinted against the new one.
+    const config = input.config ?? parseConfig(owned.config);
+
+    await prisma.userModelKey.update({
+        where: { id },
         data: {
             ...(input.name === undefined ? {} : { name: input.name }),
-            ...(input.secret === undefined ? {} : envelope(input.secret)),
-            ...(input.config === undefined ? {} : { config: JSON.stringify(input.config) })
+            ...(input.secret === undefined ? {} : envelope(input.secret, owned.provider, config)),
+            ...(input.config === undefined ? {} : { config: JSON.stringify(input.config) }),
+            // A date pushed out has to start the warnings over, or the one already
+            // sent would be the last thing said about a key that is fine now.
+            ...(input.expiresAt === undefined ? {} : { expiresAt: input.expiresAt, expiryNotice: "" })
         }
     });
-    return result.count > 0;
+    return true;
 }
 
 /** Remove one. Scoped by owner, so an id from somewhere else deletes nothing. */
@@ -231,10 +334,16 @@ interface StoredKey {
     secretKeyId: string;
 }
 
-/** Every key this account holds, in its own order. */
+/**
+ * Every key this account can actually spend, in its own order.
+ *
+ * An expired one is left out here rather than filtered later, so there is one
+ * place that decides what "usable" means and no path that can forget: the date
+ * its owner set is the date it stops being handed to a run.
+ */
 async function storedKeys(userId: string): Promise<StoredKey[]> {
     return prisma.userModelKey.findMany({
-        where: { userId },
+        where: { userId, OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] },
         select: {
             id: true,
             provider: true,
@@ -295,7 +404,10 @@ export type KeySource = "own" | "instance";
 export async function keySourcesFor(userId: string): Promise<Map<string, KeySource>> {
     const [own, states, shared] = await Promise.all([
         prisma.userModelKey.findMany({
-            where: { userId },
+            // Expired keys are not credentials. Counting one would say a provider
+            // is covered by this account and stop the deployment's key from
+            // stepping in underneath it.
+            where: { userId, OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] },
             select: { provider: true },
             orderBy: [...BY_PRIORITY]
         }),

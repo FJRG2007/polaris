@@ -171,6 +171,24 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         defaults: { inapp: true, email: true }
     },
     {
+        id: "account.aiKey.expiring",
+        group: "security",
+        label: "An AI provider key is about to expire",
+        description: "A key you gave an end date runs out within the week.",
+        level: "warning",
+        // Mail on by default: the whole point of setting the date is being told
+        // before the day it stops working, and nobody watches the bell for that.
+        defaults: { inapp: true, email: true }
+    },
+    {
+        id: "account.aiKey.expired",
+        group: "security",
+        label: "An AI provider key expired",
+        description: "A key reached its end date and is no longer used by anything.",
+        level: "danger",
+        defaults: { inapp: true, email: true }
+    },
+    {
         id: "scan.detection",
         group: "drive",
         label: "Malware in an upload",

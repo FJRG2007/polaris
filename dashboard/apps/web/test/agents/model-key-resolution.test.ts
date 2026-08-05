@@ -20,6 +20,7 @@ interface FakeKey {
     id: string;
     provider: string;
     config: string;
+    expiresAt: Date | null;
 }
 
 const state = {
@@ -38,14 +39,18 @@ vi.mock("@polaris/db", () => ({
         userModelKey: {
             // The fake ignores `orderBy` and `select`: the array is already in
             // priority order, and returning more fields than were asked for is
-            // indistinguishable from returning exactly them.
-            findMany: vi.fn(async () =>
-                state.ownKeys.map((row) => ({
-                    ...row,
-                    encryptedSecret: Buffer.from(row.id),
-                    secretNonce: Buffer.from("n"),
-                    secretKeyId: "k"
-                }))
+            // indistinguishable from returning exactly them. The expiry filter it
+            // does honour, because whether an expired key is handed to a run is
+            // exactly what several of these are about.
+            findMany: vi.fn(async ({ where }: { where?: { OR?: unknown[] } } = {}) =>
+                state.ownKeys
+                    .filter((row) => !where?.OR || row.expiresAt === null || row.expiresAt > new Date())
+                    .map((row) => ({
+                        ...row,
+                        encryptedSecret: Buffer.from(row.id),
+                        secretNonce: Buffer.from("n"),
+                        secretKeyId: "k"
+                    }))
             ),
             findFirst: vi.fn(async () => null),
             updateMany: vi.fn(async ({ where }: { where: { id: { in: string[] } } }) => {
@@ -105,8 +110,19 @@ function instanceHas(slug: string, secret: string): void {
 /** Append a key to the account's list. `secret` of null is a row this deployment
  *  can no longer read. */
 function ownHas(id: string, slug: string, secret: string | null, config: Record<string, unknown> = {}): void {
-    state.ownKeys.push({ id, provider: slug, config: JSON.stringify(config) });
+    state.ownKeys.push({ id, provider: slug, config: JSON.stringify(config), expiresAt: null });
     if (secret !== null) state.ownSecrets.set(id, secret);
+}
+
+/** The same, with an end date. Negative days are already gone. */
+function ownHasUntil(id: string, slug: string, secret: string, days: number): void {
+    state.ownKeys.push({
+        id,
+        provider: slug,
+        config: "{}",
+        expiresAt: new Date(Date.now() + days * 86_400_000)
+    });
+    state.ownSecrets.set(id, secret);
 }
 
 describe("runSecretsFor", () => {
@@ -187,6 +203,32 @@ describe("runSecretsFor", () => {
         expect((await runSecretsFor("user-1"))?.ANTHROPIC_API_KEY).toBe("sk-theirs");
     });
 
+    it("stops handing over a key past its end date", async () => {
+        // The date is the whole reason somebody entered it: on the day, the key
+        // is not offered, whatever else happens.
+        ownHasUntil("k1", "openai", "sk-expired", -1);
+        expect(await runSecretsFor("user-1")).toEqual({});
+    });
+
+    it("still uses a key whose end date has not arrived", async () => {
+        ownHasUntil("k1", "openai", "sk-live", 3);
+        expect((await runSecretsFor("user-1"))?.OPENAI_API_KEY).toBe("sk-live");
+    });
+
+    it("falls to the next key of the provider when the first has expired", async () => {
+        ownHasUntil("k1", "openai", "sk-expired", -1);
+        ownHas("k2", "openai", "sk-spare");
+        expect((await runSecretsFor("user-1"))?.OPENAI_API_KEY).toBe("sk-spare");
+    });
+
+    it("lets the deployment's key take over from an expired one", async () => {
+        // The alternative is a provider that looks covered and is not: the whole
+        // point of the fallback is that somebody's runs keep working.
+        ownHasUntil("k1", "groq", "gsk-expired", -1);
+        instanceHas("groq", "gsk-theirs");
+        expect((await runSecretsFor("user-1"))?.GROQ_API_KEY).toBe("gsk-theirs");
+    });
+
     it("takes the gateway's endpoint and limits from the account's own row", async () => {
         ownHas("k1", "enigma", "gw-token", {
             baseUrl: "https://gateway.example/v1/",
@@ -225,6 +267,12 @@ describe("keySourcesFor", () => {
         ownHas("k1", "openai", "sk-one");
         ownHas("k2", "openai", "sk-two");
         expect([...(await keySourcesFor("user-1")).keys()]).toEqual(["openai"]);
+    });
+
+    it("does not count an expired key as covering its provider", async () => {
+        ownHasUntil("k1", "groq", "gsk-expired", -1);
+        instanceHas("groq", "gsk-theirs");
+        expect((await keySourcesFor("user-1")).get("groq")).toBe("instance");
     });
 
     it("omits a provider nothing holds a key for", async () => {

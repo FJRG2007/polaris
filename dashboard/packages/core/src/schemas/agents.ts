@@ -236,23 +236,39 @@ export const gatewayKeyConfigSchema = z.object({
     maxOutput: z.number().int().min(0).max(100_000_000)
 });
 
+/**
+ * The day the key stops working, as its owner set it at the provider.
+ *
+ * Null is the common case and means no end. A date already gone is refused: a
+ * key somebody wants stopped now is a key they should delete, and accepting it
+ * here would create a row that was dead before the dialog closed.
+ */
+export const modelKeyExpirySchema = z
+    .string()
+    .datetime({ message: "Not a date" })
+    .refine((value) => new Date(value).getTime() > Date.now(), { message: "Pick a date in the future" })
+    .nullable()
+    .default(null);
+
 export const createModelKeySchema = z.object({
     provider: modelProviderSlugSchema,
     name: modelKeyNameSchema,
     secret: modelKeySecretSchema,
-    config: gatewayKeyConfigSchema.optional()
+    config: gatewayKeyConfigSchema.optional(),
+    expiresAt: modelKeyExpirySchema
 });
 
 export type CreateModelKeyInput = z.infer<typeof createModelKeySchema>;
 
-/** Renaming one, replacing its key, or both. An absent secret leaves the stored
- *  one alone - the field is write-only, so blank has to mean "unchanged" rather
- *  than "erase it". */
+/** Renaming one, replacing its key, moving its end date, or all three. An absent
+ *  secret leaves the stored one alone - the field is write-only, so blank has to
+ *  mean "unchanged" rather than "erase it". */
 export const updateModelKeySchema = z.object({
     id: z.string().uuid(),
     name: modelKeyNameSchema,
     secret: modelKeySecretSchema.optional(),
-    config: gatewayKeyConfigSchema.optional()
+    config: gatewayKeyConfigSchema.optional(),
+    expiresAt: modelKeyExpirySchema
 });
 
 /** The whole list, in the order it should now be tried. */

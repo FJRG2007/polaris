@@ -67,6 +67,49 @@ interface GatewayForm {
 
 const EMPTY_GATEWAY: GatewayForm = { baseUrl: "", model: "", context: "", maxOutput: "" };
 
+/** The names already spoken for, lowercased, so the dialog can refuse a repeat
+ *  while it is being typed. Case-insensitive because two keys called "Prod" and
+ *  "prod" are the same name to the person reading the table. */
+function namesTaken(rows: UserModelKeyView[], exceptId: string | null): Set<string> {
+    return new Set(rows.filter((row) => row.id !== exceptId).map((row) => row.name.toLowerCase()));
+}
+
+/**
+ * Where a key stands against its own end date, or null when the date is far
+ * enough off to be nothing but a date. A badge on every dated key would say
+ * "Expires" next to the word "expires", and the ones that matter would read the
+ * same as the ones that do not.
+ */
+function expiryStanding(iso: string | null): { label: string; tone: "warning" | "danger" } | null {
+    if (!iso) return null;
+    const remaining = new Date(iso).getTime() - Date.now();
+    if (remaining <= 0) return { label: "Expired", tone: "danger" };
+    const days = Math.ceil(remaining / 86_400_000);
+    return days <= 7 ? { label: `${days}d left`, tone: "warning" } : null;
+}
+
+/** A picked day ends at the end of it, local time - the day itself still works. */
+function endOfDay(date: string): Date | null {
+    const [year, month, day] = date.split("-").map(Number);
+    if (!year || !month || !day) return null;
+    return new Date(year, month - 1, day, 23, 59, 59, 999);
+}
+
+/** An ISO instant as the date field wants it: the local calendar day it falls on,
+ *  not the UTC one, so a key expiring tonight does not read as tomorrow. */
+function asDateValue(iso: string | null): string {
+    if (!iso) return "";
+    const date = new Date(iso);
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${date.getFullYear()}-${month}-${day}`;
+}
+
+/** Today, local time, as the earliest day a key may be set to stop on. */
+function earliestExpiry(): string {
+    return asDateValue(new Date().toISOString());
+}
+
 export function AiKeysView({
     providers,
     keys,
@@ -191,6 +234,9 @@ export function AiKeysView({
                                         a long one truncates instead of spilling the table
                                         sideways. */}
                                     <th className="w-full max-w-0 px-3 py-2 font-medium">Name</th>
+                                    <th className="hidden whitespace-nowrap px-3 py-2 font-medium md:table-cell">
+                                        Expires
+                                    </th>
                                     <th className="hidden whitespace-nowrap px-3 py-2 font-medium lg:table-cell">
                                         Last used
                                     </th>
@@ -200,7 +246,7 @@ export function AiKeysView({
                             <tbody>
                                 {rows.length === 0 ? (
                                     <tr>
-                                        <td colSpan={5} className="text-muted-foreground px-3 py-8 text-center">
+                                        <td colSpan={6} className="text-muted-foreground px-3 py-8 text-center">
                                             {instanceShared && instanceProviders.length > 0
                                                 ? "No keys of your own. Runs use the deployment's."
                                                 : "No keys yet. A run needs one to reach a provider."}
@@ -259,6 +305,7 @@ export function AiKeysView({
                 <KeyDialog
                     providers={providers}
                     existing={null}
+                    takenNames={namesTaken(rows, null)}
                     onClose={() => setAdding(false)}
                     onSaved={(warning) => {
                         setAdding(false);
@@ -272,6 +319,7 @@ export function AiKeysView({
                     key={editing.id}
                     providers={providers}
                     existing={editing}
+                    takenNames={namesTaken(rows, editing.id)}
                     onClose={() => setEditing(null)}
                     onSaved={(warning) => {
                         setEditing(null);
@@ -304,6 +352,8 @@ function KeyRow({
 }) {
     const [over, setOver] = useState(false);
     const label = provider?.name ?? row.provider;
+    const standing = expiryStanding(row.expiresAt);
+    const expired = standing?.tone === "danger";
 
     return (
         <tr
@@ -322,7 +372,7 @@ function KeyRow({
                 const from = Number(event.dataTransfer.getData("text/plain"));
                 if (Number.isInteger(from)) onMove(from, index);
             }}
-            className={`border-t border-border ${over ? "bg-muted/40" : ""}`}
+            className={`border-t border-border ${over ? "bg-muted/40" : ""} ${expired ? "opacity-60" : ""}`}
         >
             <td className="px-2 py-2">
                 <div className="flex items-center gap-1">
@@ -337,9 +387,31 @@ function KeyRow({
                 </div>
             </td>
             <td className="w-full max-w-0 px-3 py-2">
-                <span className="block truncate font-medium" title={row.name}>
-                    {row.name}
+                <span className="flex min-w-0 items-center gap-2">
+                    <span className="min-w-0 truncate font-medium" title={row.name}>
+                        {row.name}
+                    </span>
+                    {/* The badge rides with the name rather than only in its own
+                        column: that column is the first thing dropped on a narrow
+                        screen, and "this key is dead" is not a detail to hide. */}
+                    {standing ? (
+                        <Badge variant={standing.tone} className="shrink-0 md:hidden">
+                            {standing.label}
+                        </Badge>
+                    ) : null}
                 </span>
+            </td>
+            <td className="hidden whitespace-nowrap px-3 py-2 md:table-cell">
+                {row.expiresAt ? (
+                    <span className="flex items-center gap-2">
+                        <span className="text-muted-foreground">
+                            <RelativeTime iso={row.expiresAt} tense={expired ? "past" : "future"} />
+                        </span>
+                        {standing ? <Badge variant={standing.tone}>{standing.label}</Badge> : null}
+                    </span>
+                ) : (
+                    <span className="text-muted-foreground">Never</span>
+                )}
             </td>
             <td className="text-muted-foreground hidden whitespace-nowrap px-3 py-2 lg:table-cell">
                 {row.lastUsedAt ? <RelativeTime iso={row.lastUsedAt} /> : "Never"}
@@ -400,18 +472,24 @@ function KeyRow({
 function KeyDialog({
     providers,
     existing,
+    takenNames,
     onClose,
     onSaved
 }: {
     providers: ProviderRow[];
     /** The key being edited, or null when this is a new one. */
     existing: UserModelKeyView | null;
+    /** Every name this account already uses, lowercased, minus the row being
+     *  edited. The server holds the same rule; this is so somebody finds out
+     *  while typing rather than after pasting a key and pressing Save. */
+    takenNames: Set<string>;
     onClose: () => void;
     onSaved: (warning?: string) => void;
 }) {
     const [provider, setProvider] = useState(existing?.provider ?? providers[0]?.slug ?? "");
     const [name, setName] = useState(existing?.name ?? "");
     const [secret, setSecret] = useState("");
+    const [expiry, setExpiry] = useState(() => asDateValue(existing?.expiresAt ?? null));
     const [gateway, setGateway] = useState<GatewayForm>(() => readGateway(existing));
     const [touched, setTouched] = useState(false);
     const [busy, setBusy] = useState(false);
@@ -419,13 +497,23 @@ function KeyDialog({
 
     const entry = providers.find((row) => row.slug === provider) ?? null;
     const nameCheck = modelKeyNameSchema.safeParse(name);
-    const nameError = touched && name.length > 0 && !nameCheck.success ? MODEL_KEY_NAME_HINT : null;
+    const taken = takenNames.has(name.trim().toLowerCase());
+    const nameError =
+        touched && name.length > 0
+            ? taken
+                ? "You already have a key by that name."
+                : nameCheck.success
+                  ? null
+                  : MODEL_KEY_NAME_HINT
+            : null;
     // A gateway with no token is a real setup - plenty accept unauthenticated
     // calls from inside the network - so only a provider needs the field filled.
     const secretReady = secret.trim().length >= 8 || (entry?.isGateway ?? false) || existing !== null;
     const gatewayReady =
         !entry?.isGateway || (gateway.baseUrl.trim().length > 0 && gateway.model.trim().length > 0);
-    const ready = provider !== "" && nameCheck.success && secretReady && gatewayReady;
+    const expiresAt = expiry ? endOfDay(expiry) : null;
+    const expiryReady = expiry === "" || (expiresAt !== null && expiresAt.getTime() > Date.now());
+    const ready = provider !== "" && nameCheck.success && !taken && secretReady && gatewayReady && expiryReady;
 
     const submit = async () => {
         setBusy(true);
@@ -439,6 +527,7 @@ function KeyDialog({
               }
             : undefined;
         const typed = secret.trim();
+        const ends = expiresAt?.toISOString() ?? null;
         const result = await runAction(
             () =>
                 existing
@@ -448,7 +537,8 @@ function KeyDialog({
                           // Left blank means "leave the stored one alone". The
                           // field is write-only, so blank cannot mean erase.
                           secret: typed.length > 0 ? typed : undefined,
-                          config
+                          config,
+                          expiresAt: ends
                       })
                     : addModelKeyAction({
                           provider,
@@ -456,7 +546,8 @@ function KeyDialog({
                           // A gateway that wants no token still needs a row, and
                           // the runtime sends a placeholder rather than nothing.
                           secret: entry?.isGateway && typed.length === 0 ? "unused-gateway" : typed,
-                          config
+                          config,
+                          expiresAt: ends
                       }),
             setError
         );
@@ -515,7 +606,7 @@ function KeyDialog({
                             onBlur={() => setTouched(true)}
                         />
                         <span className={`text-xs ${nameError ? "text-danger" : "text-muted-foreground"}`}>
-                            {MODEL_KEY_NAME_HINT}
+                            {nameError ?? MODEL_KEY_NAME_HINT}
                         </span>
                     </label>
 
@@ -593,6 +684,29 @@ function KeyDialog({
                         </span>
                         {entry?.apiKeyHelp ? (
                             <span className="text-muted-foreground text-xs">{entry.apiKeyHelp}</span>
+                        ) : null}
+                    </label>
+
+                    <label className="flex flex-col gap-1 text-sm">
+                        Expires
+                        <Input
+                            type="date"
+                            value={expiry}
+                            min={earliestExpiry()}
+                            onChange={(event) => setExpiry(event.target.value)}
+                        />
+                        <span className="text-muted-foreground text-xs">
+                            Optional. If you gave the key an end date at {entry?.name ?? "the provider"},
+                            put it here: Polaris warns you a week ahead and stops using the key on the day.
+                        </span>
+                        {expiry ? (
+                            <button
+                                type="button"
+                                onClick={() => setExpiry("")}
+                                className="text-muted-foreground hover:text-foreground self-start text-xs underline"
+                            >
+                                Clear the date
+                            </button>
                         ) : null}
                     </label>
 
