@@ -9,6 +9,7 @@ function entry(over: Partial<HttpLogEntry>): HttpLogEntry {
         path: "/",
         status: 200,
         host: null,
+        router: null,
         bytes: null,
         referer: null,
         userAgent: null,
@@ -84,6 +85,52 @@ describe("parseHttpLogs", () => {
     it("drops the client port from an ip:port address", () => {
         const raw = JSON.stringify({ ClientAddr: "198.51.100.2:52344", method: "GET", uri: "/x", status: 404 });
         expect(parseHttpLogs(raw)[0]!.ip).toBe("198.51.100.2");
+    });
+
+    it("names the router that answered, and leaves it null when none did", () => {
+        const routed = JSON.stringify({
+            ClientHost: "203.0.113.9",
+            RequestMethod: "GET",
+            RequestPath: "/",
+            RouterName: "polaris-app-abc@file",
+            DownstreamStatus: 200
+        });
+        expect(parseHttpLogs(routed)[0]!.router).toBe("polaris-app-abc@file");
+
+        const unrouted = JSON.stringify({
+            ClientHost: "203.0.113.9",
+            RequestMethod: "GET",
+            RequestPath: "/",
+            RequestHost: "nothing.plr.example.com",
+            DownstreamStatus: 404
+        });
+        expect(parseHttpLogs(unrouted)[0]!.router).toBeNull();
+    });
+
+    it("reads the edge's own status when there was no origin to have one", () => {
+        // What Traefik writes for a request it answered itself: there is no upstream,
+        // so OriginStatus is zero. Reading that as the status loses the 404 that a
+        // hostname with nothing behind it is only visible as.
+        const raw = JSON.stringify({
+            ClientHost: "203.0.113.9",
+            RequestMethod: "GET",
+            RequestPath: "/",
+            RequestHost: "nothing.plr.example.com",
+            OriginStatus: 0,
+            DownstreamStatus: 404
+        });
+        expect(parseHttpLogs(raw)[0]!.status).toBe(404);
+    });
+
+    it("still prefers the origin's status when there was one", () => {
+        const raw = JSON.stringify({
+            ClientHost: "203.0.113.9",
+            RequestMethod: "GET",
+            RequestPath: "/",
+            OriginStatus: 500,
+            DownstreamStatus: 502
+        });
+        expect(parseHttpLogs(raw)[0]!.status).toBe(500);
     });
 });
 

@@ -23,10 +23,26 @@ export interface HttpLogLike {
     readonly ip: string;
     readonly path: string;
     readonly status: number;
+    /** The hostname asked for, where the log carries one. Optional because the auth
+     *  log feeds this same engine and an SSH login has no hostname. */
+    readonly host?: string | null;
+    /** The edge router that answered, or null/absent when none claimed the request. */
+    readonly router?: string | null;
 }
 
-export const WAF_JAIL_IDS = ["not-found", "rate-limited", "auth-failed", "probes", "ssh-auth"] as const;
+export const WAF_JAIL_IDS = [
+    "not-found",
+    "subdomain-listing",
+    "rate-limited",
+    "auth-failed",
+    "probes",
+    "ssh-auth"
+] as const;
 export type WafJailId = (typeof WAF_JAIL_IDS)[number];
+
+/** What a jail's threshold counts. Requests for almost all of them; hostnames for the
+ *  one whose whole signal is the SPREAD across names rather than the volume. */
+export type WafJailUnit = "requests" | "hostnames";
 
 export interface WafJail {
     readonly id: WafJailId;
@@ -39,7 +55,20 @@ export interface WafJail {
     readonly findTimeSec: number;
     /** How long the ban lasts, in seconds. */
     readonly banTimeSec: number;
+    /** What `maxRetry` counts, so the operator's field is labelled with the thing they
+     *  are actually setting a limit on. */
+    readonly counts: WafJailUnit;
 }
+
+/**
+ * The router the edge points a name with nothing deployed on it at, as it appears in
+ * the access log (Traefik appends its provider, hence the prefix match).
+ *
+ * A 404 it served and a 404 with no router at all are the same event to the sweep
+ * jail - the hostname answers to nothing - and telling them apart from a 404 an app
+ * itself returned is the whole reason this is read at all.
+ */
+const VACANT_ROUTER = "polaris-vacant";
 
 /** Path fragments that are only ever requested by something enumerating exploits.
  *  The probes jail counts these regardless of the status they returned - a scan that
@@ -103,11 +132,34 @@ function credentialProbe(path: string): string | null {
     return CREDENTIAL_MARKERS.find((marker) => lowered.includes(marker)) ?? null;
 }
 
+/** The hostname a request was for, lowercased and without its port, or "" for a log
+ *  entry that carries none. */
+function hostOf(entry: HttpLogLike): string {
+    return (entry.host ?? "").trim().toLowerCase().replace(/:\d+$/, "");
+}
+
+/**
+ * Whether this request found a hostname that answers to nothing at all - either no
+ * router claimed it, or the one that did is the stand-in the edge points unclaimed
+ * names at.
+ *
+ * This is what separates the sweep from ordinary traffic. A 404 an app returned is a
+ * missing page on a site that exists, and counting those would ban the crawler that
+ * asks five real apps for a `robots.txt` none of them has.
+ */
+function hostMiss(entry: HttpLogLike): boolean {
+    if (entry.status !== 404) return false;
+    const router = (entry.router ?? "").trim();
+    return router === "" || router.startsWith(VACANT_ROUTER);
+}
+
 /** Whether a log entry counts as a failure for a jail. */
 function counts(jail: WafJailId, entry: HttpLogLike): boolean {
     switch (jail) {
         case "not-found":
             return entry.status === 404;
+        case "subdomain-listing":
+            return hostMiss(entry) && hostOf(entry) !== "";
         case "rate-limited":
             return entry.status === 429;
         case "auth-failed":
@@ -140,7 +192,22 @@ export const DEFAULT_WAF_JAILS: readonly WafJail[] = [
         enabled: true,
         maxRetry: 8,
         findTimeSec: 300,
-        banTimeSec: 1800
+        banTimeSec: 1800,
+        counts: "requests"
+    },
+    {
+        id: "subdomain-listing",
+        label: "Subdomain sweep",
+        description:
+            "Bans an address that walks your wildcard looking for names that answer - host after host that has nothing deployed on it. Counted in names rather than requests, so hammering one address is not this and quietly trying six is.",
+        enabled: true,
+        // Names, not requests. Five is low because the innocent version of this does
+        // not exist: a visitor reaches a name because something sent them to it, and
+        // nothing sends anyone to five names in a row that were never deployed.
+        maxRetry: 5,
+        findTimeSec: 300,
+        banTimeSec: 1800,
+        counts: "hostnames"
     },
     {
         id: "rate-limited",
@@ -149,7 +216,8 @@ export const DEFAULT_WAF_JAILS: readonly WafJail[] = [
         enabled: true,
         maxRetry: 5,
         findTimeSec: 600,
-        banTimeSec: 3600
+        banTimeSec: 3600,
+        counts: "requests"
     },
     {
         id: "auth-failed",
@@ -158,7 +226,8 @@ export const DEFAULT_WAF_JAILS: readonly WafJail[] = [
         enabled: false,
         maxRetry: 10,
         findTimeSec: 600,
-        banTimeSec: 3600
+        banTimeSec: 3600,
+        counts: "requests"
     },
     {
         id: "probes",
@@ -168,7 +237,8 @@ export const DEFAULT_WAF_JAILS: readonly WafJail[] = [
         enabled: true,
         maxRetry: 3,
         findTimeSec: 60,
-        banTimeSec: 86400
+        banTimeSec: 86400,
+        counts: "requests"
     },
     {
         id: "ssh-auth",
@@ -181,7 +251,8 @@ export const DEFAULT_WAF_JAILS: readonly WafJail[] = [
         // their own, and there is no legitimate client on the other end to inconvenience.
         maxRetry: 5,
         findTimeSec: 600,
-        banTimeSec: 86400
+        banTimeSec: 86400,
+        counts: "requests"
     }
 ];
 
@@ -238,9 +309,16 @@ export function detectWafBans(input: WafJailInput): WafBanVerdict[] {
     // operator who has turned that jail off has turned this off with it.
     const probes = active.find((jail) => jail.id === "probes");
 
-    // One pass over the log per jail window, counting per address.
+    // One pass over the log per jail window, counting per address. A jail that counts
+    // hostnames keeps the names themselves rather than a tally, so a thousand requests
+    // for one name stay worth one - which is the whole difference between a sweep and
+    // someone reloading a page that is not there.
     const counters = new Map<string, Map<string, number>>();
-    for (const jail of active) counters.set(jail.id, new Map());
+    const hostnames = new Map<string, Map<string, Set<string>>>();
+    for (const jail of active) {
+        counters.set(jail.id, new Map());
+        hostnames.set(jail.id, new Map());
+    }
     /** Addresses caught reading for a secret, and the first path that gave them away. */
     const credentials = new Map<string, { marker: string; hits: number }>();
     for (const entry of entries) {
@@ -261,6 +339,13 @@ export function detectWafBans(input: WafJailInput): WafBanVerdict[] {
         for (const jail of active) {
             if (at < now - jail.findTimeSec * 1000) continue;
             if (!counts(jail.id, entry)) continue;
+            if (jail.counts === "hostnames") {
+                const perIp = hostnames.get(jail.id)!;
+                const seen = perIp.get(ip) ?? new Set<string>();
+                seen.add(hostOf(entry));
+                perIp.set(ip, seen);
+                continue;
+            }
             const perIp = counters.get(jail.id)!;
             perIp.set(ip, (perIp.get(ip) ?? 0) + 1);
         }
@@ -268,7 +353,11 @@ export function detectWafBans(input: WafJailInput): WafBanVerdict[] {
 
     const best = new Map<string, WafBanVerdict>();
     for (const jail of active) {
-        for (const [ip, hits] of counters.get(jail.id)!) {
+        const tally =
+            jail.counts === "hostnames"
+                ? new Map([...hostnames.get(jail.id)!].map(([ip, seen]) => [ip, seen.size] as const))
+                : counters.get(jail.id)!;
+        for (const [ip, hits] of tally) {
             if (hits < jail.maxRetry) continue;
             const repeats = Math.min(input.priorBans?.[ip] ?? 0, Math.log2(ESCALATION_CAP));
             const seconds = Math.min(jail.banTimeSec * 2 ** repeats, BAN_SECONDS_MAX);
@@ -276,7 +365,7 @@ export function detectWafBans(input: WafJailInput): WafBanVerdict[] {
                 ip,
                 jail: jail.id,
                 until: now + seconds * 1000,
-                note: `${jail.label}: ${hits} in ${Math.round(jail.findTimeSec / 60)}m`,
+                note: `${jail.label}: ${hits}${jail.counts === "hostnames" ? " names" : ""} in ${Math.round(jail.findTimeSec / 60)}m`,
                 hits
             };
             const existing = best.get(ip);

@@ -20,6 +20,23 @@ function hits(
 
 const NOT_FOUND = DEFAULT_WAF_JAILS.find((jail) => jail.id === "not-found")!;
 const PROBES = DEFAULT_WAF_JAILS.find((jail) => jail.id === "probes")!;
+const SWEEP = DEFAULT_WAF_JAILS.find((jail) => jail.id === "subdomain-listing")!;
+
+/** One request per hostname from the same address, for a name nothing answers on -
+ *  which is a 404 that no router served. */
+function sweep(ip: string, hosts: readonly string[], agoSec = 10): HttpLogLike[] {
+    return hosts.map((host, index) => ({
+        ip,
+        host,
+        router: null,
+        status: 404,
+        path: "/",
+        time: new Date(NOW - agoSec * 1000 - index * 1000).toISOString()
+    }));
+}
+
+/** Five names, which is the sweep jail's threshold. */
+const FIVE_NAMES = ["a", "b", "c", "d", "e"].map((label) => `${label}.plr.example.com`);
 
 describe("jail defaults", () => {
     it("keeps fail2ban's numbers for the two jails it shares", () => {
@@ -160,6 +177,69 @@ describe("detectWafBans", () => {
         expect(third.until! - NOW).toBe(4 * 1800 * 1000);
         expect(many.until! - NOW).toBe(8 * 1800 * 1000);
         expect(first.until!).toBeLessThan(third.until!);
+    });
+});
+
+/**
+ * The sweep jail is the one that counts something other than requests, and the one
+ * whose false positive is a real visitor rather than a slow scanner - so both halves
+ * are pinned here: what makes a name count, and what stops ordinary 404s counting.
+ */
+describe("the subdomain sweep jail", () => {
+    it("bans at its threshold in distinct names, and not before it", () => {
+        const below = detectWafBans({ entries: sweep("203.0.113.7", FIVE_NAMES.slice(0, 4)), jails: [SWEEP], now: NOW });
+        expect(below).toEqual([]);
+
+        const at = detectWafBans({ entries: sweep("203.0.113.7", FIVE_NAMES), jails: [SWEEP], now: NOW });
+        expect(at).toHaveLength(1);
+        expect(at[0]).toMatchObject({ ip: "203.0.113.7", jail: "subdomain-listing", hits: 5 });
+        expect(at[0]!.note).toContain("5 names");
+    });
+
+    it("counts a name once however many times it is asked for", () => {
+        const entries = sweep("203.0.113.7", Array.from({ length: 40 }, () => "one.plr.example.com"));
+        expect(detectWafBans({ entries, jails: [SWEEP], now: NOW })).toEqual([]);
+    });
+
+    it("treats a name the vacant router answered as a name that answers to nothing", () => {
+        const entries = sweep("203.0.113.7", FIVE_NAMES).map((entry) => ({
+            ...entry,
+            router: "polaris-vacant@file"
+        }));
+        expect(detectWafBans({ entries, jails: [SWEEP], now: NOW })).toHaveLength(1);
+    });
+
+    it("leaves alone an address collecting 404s from apps that do exist", () => {
+        // The crawler asking five real apps for a file none of them has. Every one of
+        // these was answered by that app's own router, so none of them is a missing name.
+        const entries = sweep("203.0.113.7", FIVE_NAMES).map((entry, index) => ({
+            ...entry,
+            path: "/robots.txt",
+            router: `polaris-app-${index}@file`
+        }));
+        expect(detectWafBans({ entries, jails: [SWEEP], now: NOW })).toEqual([]);
+    });
+
+    it("ignores a miss that carries no hostname to count", () => {
+        const entries = sweep("203.0.113.7", FIVE_NAMES).map((entry) => ({ ...entry, host: null }));
+        expect(detectWafBans({ entries, jails: [SWEEP], now: NOW })).toEqual([]);
+    });
+
+    it("counts the same name in two cases as one", () => {
+        const mixed = ["A.plr.example.com", "a.plr.example.com:443", "a.PLR.example.com"];
+        const entries = sweep("203.0.113.7", [...mixed, ...FIVE_NAMES.slice(0, 3)]);
+        // Three spellings of one name plus three others is four, one short.
+        expect(detectWafBans({ entries, jails: [SWEEP], now: NOW })).toEqual([]);
+    });
+
+    it("only counts what happened inside the window", () => {
+        const old = sweep("203.0.113.7", FIVE_NAMES, 3600);
+        expect(detectWafBans({ entries: old, jails: [SWEEP], now: NOW })).toEqual([]);
+    });
+
+    it("is on for a fresh instance, counted in names", () => {
+        expect(SWEEP.enabled).toBe(true);
+        expect(SWEEP).toMatchObject({ counts: "hostnames", maxRetry: 5, findTimeSec: 300, banTimeSec: 1800 });
     });
 });
 

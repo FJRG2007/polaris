@@ -18,6 +18,11 @@ export interface HttpLogEntry {
     readonly status: number;
     /** Requested host/authority when the format carries it, else null. */
     readonly host: string | null;
+    /** The edge router that answered, when the format names one (Traefik does). Null
+     *  covers both a format that carries no such field and a request no router
+     *  claimed - and for Traefik that second case is the interesting one, since it is
+     *  what a hostname with nothing behind it looks like in the log. */
+    readonly router: string | null;
     /** Response size in bytes when present, else null. */
     readonly bytes: number | null;
     readonly referer: string | null;
@@ -121,6 +126,7 @@ function fromClf(line: string): HttpLogEntry | null {
         path: match[4]!,
         status: Number(match[6]),
         host: null,
+        router: null,
         bytes: match[7] === "-" ? null : Number(match[7]),
         referer: clean(match[8]),
         userAgent: clean(match[9]),
@@ -137,7 +143,15 @@ function fromJson(line: string): HttpLogEntry | null {
     }
     const method = str(pick(obj, ["RequestMethod", "method", "request_method", "req_method", "verb"]));
     const path = str(pick(obj, ["RequestPath", "path", "uri", "request_uri", "url", "request"]));
-    const status = num(pick(obj, ["OriginStatus", "DownstreamStatus", "status", "status_code", "statusCode"]));
+    // The origin's status first, since that is what the app actually answered - but
+    // only when there was an origin. Traefik writes `OriginStatus: 0` for a request it
+    // answered itself, and reading that as the status turns its 404 for an unrouted
+    // hostname into a line no jail and no chart can recognise.
+    const origin = num(pick(obj, ["OriginStatus"]));
+    const status =
+        origin !== null && origin > 0
+            ? origin
+            : num(pick(obj, ["DownstreamStatus", "status", "status_code", "statusCode"]));
     // Without a method, path, and status the line is not an HTTP access record.
     if (!method || !path || status === null) return null;
     const ip =
@@ -150,6 +164,7 @@ function fromJson(line: string): HttpLogEntry | null {
         path,
         status,
         host: str(pick(obj, ["RequestHost", "host", "http_host", "authority"])),
+        router: clean(str(pick(obj, ["RouterName", "router", "router_name"]))),
         bytes: num(pick(obj, ["DownstreamContentSize", "bytes", "body_bytes_sent", "bytes_sent", "size"])),
         referer: clean(str(pick(obj, ["request_Referer", "http_referer", "referer", "referrer"]))),
         userAgent: clean(str(pick(obj, ["request_User-Agent", "request_User_Agent", "http_user_agent", "user_agent", "userAgent"]))),
