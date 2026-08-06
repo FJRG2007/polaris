@@ -15,6 +15,10 @@ import type { Duplex } from "node:stream";
 import type { DockerRpc } from "./rpc.js";
 
 export interface DockerInfo {
+    /** The daemon's own id, stable across restarts and unique per engine. It is
+     *  what tells two ways of reaching a machine (the local socket and an SSH
+     *  hop) that they landed on the same one. */
+    readonly id: string;
     readonly name: string;
     readonly serverVersion: string;
     readonly containers: number;
@@ -38,6 +42,14 @@ export interface ContainerStats {
     readonly memUsage: number;
     readonly memLimit: number;
     readonly memPercent: number;
+    /** Bytes over the container's interfaces since it started, both directions
+     *  summed across them. Cumulative, not a rate: two samples and the time
+     *  between them are what a rate needs, and that is the reader's to do. */
+    readonly netRx: number;
+    readonly netTx: number;
+    /** Bytes read from and written to block devices since it started. */
+    readonly blockRead: number;
+    readonly blockWrite: number;
 }
 
 /** The parts of a container inspect the details panel shows. */
@@ -57,6 +69,12 @@ export interface ContainerDetail {
     readonly env: readonly string[];
     /** The compose project this container belongs to, when it has one. */
     readonly composeProject: string | null;
+    /** Bytes written to the container's own writable layer, and the whole of what
+     *  it occupies including the image layers under it. Null unless the inspect
+     *  asked for them: the daemon walks the filesystem to answer, which is not
+     *  something to pay for on a screen that refreshes. */
+    readonly sizeRw: number | null;
+    readonly sizeRootFs: number | null;
 }
 
 /** What a one-shot exec reported. `code` is null when the engine did not give
@@ -78,6 +96,17 @@ export interface AttachedExec {
  *  previewed file are both well under this; a runaway command is truncated
  *  rather than buffered without limit. */
 const EXEC_MAX_OUTPUT = 4 * 1024 * 1024;
+
+/**
+ * How many stats reads may be in flight against one engine at a time.
+ *
+ * Over SSH every Docker call is its own exec channel, and sshd caps how many a
+ * connection may carry at once (MaxSessions, 10 by default). Reading a busy
+ * machine's containers all at once would push past that and lose the overflow,
+ * so this stays clear of the ceiling with room for whatever else is borrowing
+ * the same connection.
+ */
+const STATS_CONCURRENCY = 6;
 
 export class DockerDriver {
     public constructor(private readonly rpc: DockerRpc) {}
@@ -117,6 +146,7 @@ export class DockerDriver {
     public async info(): Promise<DockerInfo> {
         const raw = await this.json<Record<string, unknown>>("GET", "/info");
         return {
+            id: String(raw.ID ?? ""),
             name: String(raw.Name ?? "docker"),
             serverVersion: String(raw.ServerVersion ?? ""),
             containers: Number(raw.Containers ?? 0),
@@ -154,6 +184,28 @@ export class DockerDriver {
         return computeStats(raw);
     }
 
+    /**
+     * Live CPU/memory for several containers, read concurrently.
+     *
+     * Reading them one at a time is what makes a list of containers slow: to
+     * report a CPU percentage the daemon holds each one-shot request open for
+     * about a second while it takes the second sample it needs to compare
+     * against, so a dozen containers costs a dozen seconds of waiting rather
+     * than a dozen seconds of work.
+     *
+     * Bounded rather than all at once because of the ceiling below. A container
+     * that stopped mid-pass maps to null instead of failing the whole batch.
+     */
+    public async statsMany(ids: string[]): Promise<Map<string, ContainerStats | null>> {
+        const results = new Map<string, ContainerStats | null>();
+        for (let index = 0; index < ids.length; index += STATS_CONCURRENCY) {
+            const batch = ids.slice(index, index + STATS_CONCURRENCY);
+            const settled = await Promise.all(batch.map((id) => this.stats(id).catch(() => null)));
+            batch.forEach((id, position) => results.set(id, settled[position] ?? null));
+        }
+        return results;
+    }
+
     public async start(id: string): Promise<void> {
         await this.lifecycle(id, "start");
     }
@@ -174,9 +226,17 @@ export class DockerDriver {
         }
     }
 
-    /** Everything a details panel shows about one container. */
-    public async inspect(id: string): Promise<ContainerDetail> {
-        const raw = await this.json<Record<string, any>>("GET", `/containers/${encodeURIComponent(id)}/json`);
+    /**
+     * Everything a details panel shows about one container.
+     *
+     * `size` asks the daemon for what the container occupies on disk, which it
+     * answers by walking the writable layer rather than by reading a counter.
+     * Off by default for that reason: it belongs to a page somebody opened, not
+     * to a listing that refreshes itself.
+     */
+    public async inspect(id: string, options: { size?: boolean } = {}): Promise<ContainerDetail> {
+        const query = options.size ? "?size=true" : "";
+        const raw = await this.json<Record<string, any>>("GET", `/containers/${encodeURIComponent(id)}/json${query}`);
         const state = (raw.State ?? {}) as Record<string, any>;
         const config = (raw.Config ?? {}) as Record<string, any>;
         const networks = ((raw.NetworkSettings?.Networks ?? {}) as Record<string, unknown>);
@@ -204,7 +264,9 @@ export class DockerDriver {
             // Values are dropped: an env list is where secrets live, and the panel
             // only needs to say which knobs a container was given.
             env: ((config.Env ?? []) as string[]).map((entry) => entry.split("=")[0] ?? entry),
-            composeProject: (config.Labels ?? {})["com.docker.compose.project"] ?? null
+            composeProject: (config.Labels ?? {})["com.docker.compose.project"] ?? null,
+            sizeRw: typeof raw.SizeRw === "number" ? raw.SizeRw : null,
+            sizeRootFs: typeof raw.SizeRootFs === "number" ? raw.SizeRootFs : null
         };
     }
 
@@ -368,10 +430,34 @@ function computeStats(raw: Record<string, unknown>): ContainerStats {
     const memLimit = memory.limit ?? 0;
     const memPercent = memLimit > 0 ? (memUsage / memLimit) * 100 : 0;
 
+    const networks = (raw.networks ?? {}) as Record<string, Record<string, number>>;
+    let netRx = 0;
+    let netTx = 0;
+    for (const interfaceStats of Object.values(networks)) {
+        netRx += interfaceStats.rx_bytes ?? 0;
+        netTx += interfaceStats.tx_bytes ?? 0;
+    }
+
+    // One entry per device and operation, so a machine with several disks reports
+    // the same container more than once and the totals are the sum.
+    const blkio = (raw.blkio_stats ?? {}) as { io_service_bytes_recursive?: Array<Record<string, unknown>> | null };
+    let blockRead = 0;
+    let blockWrite = 0;
+    for (const entry of blkio.io_service_bytes_recursive ?? []) {
+        const operation = String(entry.op ?? "").toLowerCase();
+        const value = Number(entry.value ?? 0);
+        if (operation === "read") blockRead += value;
+        else if (operation === "write") blockWrite += value;
+    }
+
     return {
         cpuPercent: Math.round(cpuPercent * 100) / 100,
         memUsage,
         memLimit,
-        memPercent: Math.round(memPercent * 100) / 100
+        memPercent: Math.round(memPercent * 100) / 100,
+        netRx,
+        netTx,
+        blockRead,
+        blockWrite
     };
 }

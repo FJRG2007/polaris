@@ -10,7 +10,7 @@
  */
 
 import Link from "next/link";
-import { cn } from "@polaris/ui";
+import { cn, Skeleton } from "@polaris/ui";
 import { Bell, Container, Rocket, Server } from "lucide-react";
 import type { WatchCard, WatchSubjectKind } from "@/lib/watch-overview-service";
 
@@ -90,6 +90,38 @@ function Sparkline({ points, tone }: { points: { t: number; v: number | null }[]
                 />
             ))}
         </svg>
+    );
+}
+
+/** The grid's own shape, drawn while the cards are still on their way. Sized like
+ *  a real card so the section does not jump when they land. */
+export function WatchCardGridSkeleton({ count = 6 }: { count?: number }) {
+    return (
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {Array.from({ length: count }, (_, index) => (
+                <div
+                    key={index}
+                    className="flex flex-col gap-3 rounded-xl border border-border/60 bg-surface/60 p-4"
+                    aria-hidden="true"
+                >
+                    <div className="flex items-center gap-2.5">
+                        <Skeleton className="size-7 rounded-md" />
+                        <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                            <Skeleton className="h-4 w-2/5" />
+                            <Skeleton className="h-3 w-3/5" />
+                        </div>
+                    </div>
+                    <Skeleton className="h-10 w-full rounded" />
+                    <div className="flex items-end justify-between gap-2">
+                        <div className="flex flex-col gap-1.5">
+                            <Skeleton className="h-5 w-16" />
+                            <Skeleton className="h-3 w-24" />
+                        </div>
+                        <Skeleton className="h-3 w-20" />
+                    </div>
+                </div>
+            ))}
+        </div>
     );
 }
 

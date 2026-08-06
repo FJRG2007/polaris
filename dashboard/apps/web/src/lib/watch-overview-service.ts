@@ -6,11 +6,16 @@
  * subject - opening a monitoring dashboard should not be the most expensive
  * request in the app, and a sparkline needs history anyway. Live figures belong
  * on the detail screen, where there is one subject to pay for.
+ *
+ * Servers and services are therefore a database read and nothing else. Containers
+ * are the exception (see `getWatchContainers`) and are deliberately kept out of
+ * that read: they cost a round trip to every reachable daemon, so they are fetched
+ * separately by the client rather than held in front of a navigation.
  */
 
 import { prisma } from "@polaris/db";
-import { listHosts } from "./host-service";
 import type { DockerDriver } from "@polaris/docker";
+import { isLocalMachine, localDockerId } from "./local-machine";
 import { hostDockerDriver, localDockerDriver } from "./docker-service";
 import { LOCAL_HOST_SUBJECT, type MetricSubjectType } from "./metrics-shared";
 
@@ -51,7 +56,6 @@ export interface WatchCard {
 export interface WatchOverview {
     servers: WatchCard[];
     services: WatchCard[];
-    containers: WatchCard[];
     /** Alarms in the "alarm" state across everything. */
     firing: number;
 }
@@ -126,52 +130,88 @@ async function firingByTarget(ownerId: string): Promise<Map<string, number>> {
  *  reporting, which is worth showing as such rather than as a stale reading. */
 const FRESH_MS = 10 * 60 * 1000;
 
-export async function getWatchOverview(ownerId: string): Promise<WatchOverview> {
-    const now = Date.now();
-    const [hosts, apps, alarms] = await Promise.all([
-        listHosts(ownerId),
-        prisma.application.findMany({
-            where: { environment: { project: { ownerId } } },
-            select: {
-                id: true,
-                name: true,
-                currentDeploymentId: true,
-                environment: { select: { name: true, projectId: true, project: { select: { name: true } } } }
-            },
+/** What Watch needs to know about a registered server, including whether it is
+ *  the machine Polaris runs on. Its own projection rather than the general host
+ *  reader's, because that identity is nobody else's business. */
+async function watchHosts(ownerId: string) {
+    const [hosts, localId] = await Promise.all([
+        prisma.host.findMany({
+            where: { ownerId },
+            select: { id: true, name: true, address: true, username: true, dockerId: true },
             orderBy: { createdAt: "asc" }
         }),
-        firingByTarget(ownerId)
+        localDockerId()
     ]);
+    return {
+        /** The registered server that turned out to BE the local machine, if any. */
+        local: hosts.find((host) => isLocalMachine(host, localId)) ?? null,
+        remote: hosts.filter((host) => !isLocalMachine(host, localId))
+    };
+}
 
-    const hostIds = [LOCAL_HOST_SUBJECT, ...hosts.map((host) => host.id)];
-    const [hostSeries, appSeries] = await Promise.all([
-        sparklines("host", hostIds, now),
-        sparklines("app", apps.map((app) => app.id), now)
-    ]);
+/**
+ * Every server, one card each.
+ *
+ * The machine Polaris runs on always appears, whether or not it was ever enrolled
+ * as a server. When it WAS enrolled it does not appear twice: the two are one box
+ * and are shown as one card, under the name it was given.
+ */
+export async function getWatchServers(ownerId: string): Promise<WatchCard[]> {
+    return buildServers(ownerId, await firingByTarget(ownerId));
+}
 
-    const servers: WatchCard[] = [
+async function buildServers(ownerId: string, alarms: Map<string, number>): Promise<WatchCard[]> {
+    const now = Date.now();
+    const { local, remote } = await watchHosts(ownerId);
+
+    const ids = [LOCAL_HOST_SUBJECT, ...remote.map((host) => host.id)];
+    const series = await sparklines("host", ids, now);
+
+    return [
         {
             id: LOCAL_HOST_SUBJECT,
             kind: "server",
-            name: "Local",
-            detail: "The machine Polaris runs on",
-            ...readingsFor(hostSeries.get(LOCAL_HOST_SUBJECT), now),
-            alarms: 0,
+            name: local?.name ?? "Local",
+            detail: local
+                ? `${local.username}@${local.address} - the machine Polaris runs on`
+                : "The machine Polaris runs on",
+            ...readingsFor(series.get(LOCAL_HOST_SUBJECT), now),
+            alarms: local ? (alarms.get(local.id) ?? 0) : 0,
             href: `/watch/server/${LOCAL_HOST_SUBJECT}`
         },
-        ...hosts.map((host) => ({
+        ...remote.map((host) => ({
             id: host.id,
             kind: "server" as const,
             name: host.name,
             detail: `${host.username}@${host.address}`,
-            ...readingsFor(hostSeries.get(host.id), now),
+            ...readingsFor(series.get(host.id), now),
             alarms: alarms.get(host.id) ?? 0,
             href: `/watch/server/${host.id}`
         }))
     ];
+}
 
-    const services: WatchCard[] = apps.map((app) => {
-        const readings = readingsFor(appSeries.get(app.id), now);
+/** Every deployed service, one card each. */
+export async function getWatchServices(ownerId: string): Promise<WatchCard[]> {
+    return buildServices(ownerId, await firingByTarget(ownerId));
+}
+
+async function buildServices(ownerId: string, alarms: Map<string, number>): Promise<WatchCard[]> {
+    const now = Date.now();
+    const apps = await prisma.application.findMany({
+        where: { environment: { project: { ownerId } } },
+        select: {
+            id: true,
+            name: true,
+            currentDeploymentId: true,
+            environment: { select: { name: true, projectId: true, project: { select: { name: true } } } }
+        },
+        orderBy: { createdAt: "asc" }
+    });
+
+    const series = await sparklines("app", apps.map((app) => app.id), now);
+    return apps.map((app) => {
+        const readings = readingsFor(series.get(app.id), now);
         return {
             id: app.id,
             kind: "service" as const,
@@ -189,11 +229,14 @@ export async function getWatchOverview(ownerId: string): Promise<WatchOverview> 
             href: `/watch/service/${app.id}`
         };
     });
+}
 
+export async function getWatchOverview(ownerId: string): Promise<WatchOverview> {
+    const alarms = await firingByTarget(ownerId);
+    const [servers, services] = await Promise.all([buildServers(ownerId, alarms), buildServices(ownerId, alarms)]);
     return {
         servers,
         services,
-        containers: await getWatchContainers(ownerId),
         firing: [...alarms.values()].reduce((total, count) => total + count, 0)
     };
 }
@@ -206,60 +249,65 @@ export async function getWatchOverview(ownerId: string): Promise<WatchOverview> 
  * by container id would be a graveyard of stubs. What is worth charting over time
  * is the service, which has its own card; a container gets the truth about right
  * now instead, and no sparkline pretending otherwise.
+ *
+ * That truth is not free: it is a listing plus a stats read per container on every
+ * machine, and the daemon holds each stats read open for about a second. So this
+ * is never called while rendering a page - it is served over `/api/watch/containers`
+ * and arrives after the screen does.
  */
 export async function getWatchContainers(ownerId: string): Promise<WatchCard[]> {
-    const hosts = await listHosts(ownerId);
+    const { local, remote } = await watchHosts(ownerId);
     const sources: { id: string; label: string; open: () => Promise<DockerDriver> }[] = [
-        { id: LOCAL_HOST_SUBJECT, label: "Local", open: async () => localDockerDriver() },
-        ...hosts.map((host) => ({
+        // A server that is the local machine is reached through the daemon, not
+        // over SSH to itself, so its containers are listed once.
+        { id: LOCAL_HOST_SUBJECT, label: local?.name ?? "Local", open: async () => localDockerDriver() },
+        ...remote.map((host) => ({
             id: host.id,
             label: host.name,
             open: () => hostDockerDriver(host.id, ownerId)
         }))
     ];
 
-    const cards: WatchCard[] = [];
-    for (const source of sources) {
-        let driver: DockerDriver | null = null;
-        try {
-            driver = await source.open();
-            const containers = await driver.listContainers(true);
-            for (const container of containers) {
-                let cpu: number | null = null;
-                let used: number | null = null;
-                let total: number | null = null;
-                if (container.state === "running") {
-                    try {
-                        const stats = await driver.stats(container.id);
-                        cpu = Math.round(stats.cpuPercent * 10) / 10;
-                        used = stats.memUsage;
-                        total = stats.memLimit;
-                    } catch {
-                        // Stopped between the list and the read.
-                    }
-                }
-                cards.push({
-                    id: `${source.id}:${container.id}`,
-                    kind: "container",
-                    name: container.name,
-                    detail: `${source.label} - ${container.image}`,
-                    state: container.state === "running" ? "up" : "idle",
-                    stateLabel: container.status || container.state,
-                    cpuPercent: cpu,
-                    memUsedBytes: used,
-                    memTotalBytes: total,
-                    spark: [],
-                    alarms: 0,
-                    href: `/apps/containers?connection=${encodeURIComponent(source.id === LOCAL_HOST_SUBJECT ? "local" : `host:${source.id}`)}`
-                });
-            }
-        } catch {
-            // Daemon absent or host unreachable - that server contributes nothing.
-        } finally {
-            if (driver) await driver.dispose().catch(() => undefined);
-        }
+    // Machines in parallel: one unreachable server should cost its own timeout,
+    // not everybody else's turn.
+    const perSource = await Promise.all(sources.map((source) => containersOn(source)));
+    return perSource.flat();
+}
+
+async function containersOn(source: {
+    id: string;
+    label: string;
+    open: () => Promise<DockerDriver>;
+}): Promise<WatchCard[]> {
+    let driver: DockerDriver | null = null;
+    try {
+        driver = await source.open();
+        const containers = await driver.listContainers(true);
+        const running = containers.filter((container) => container.state === "running");
+        const stats = await driver.statsMany(running.map((container) => container.id));
+        return containers.map((container) => {
+            const sample = stats.get(container.id) ?? null;
+            return {
+                id: `${source.id}:${container.id}`,
+                kind: "container" as const,
+                name: container.name,
+                detail: `${source.label} - ${container.image}`,
+                state: container.state === "running" ? ("up" as const) : ("idle" as const),
+                stateLabel: container.status || container.state,
+                cpuPercent: sample == null ? null : Math.round(sample.cpuPercent * 10) / 10,
+                memUsedBytes: sample?.memUsage ?? null,
+                memTotalBytes: sample?.memLimit ?? null,
+                spark: [],
+                alarms: 0,
+                href: `/apps/containers?connection=${encodeURIComponent(source.id === LOCAL_HOST_SUBJECT ? "local" : `host:${source.id}`)}`
+            };
+        });
+    } catch {
+        // Daemon absent or host unreachable - that server contributes nothing.
+        return [];
+    } finally {
+        if (driver) await driver.dispose().catch(() => undefined);
     }
-    return cards;
 }
 
 function readingsFor(

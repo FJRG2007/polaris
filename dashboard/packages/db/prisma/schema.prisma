@@ -1157,6 +1157,11 @@ model Host {
     // what a server is while the server is unreachable.
     os                  String?
     osProbedAt          DateTime?
+    // Id of the Docker daemon reached on this machine, recorded whenever it is
+    // sampled. A server registered by SSH can turn out to be the very machine
+    // Polaris runs on - the same box has one daemon id however it is reached, so
+    // this is what stops it being monitored, charted and listed twice.
+    dockerId            String?
     // Envelope-encrypted credentials (password, or private key + passphrase).
     encryptedCredential Bytes?
     credentialNonce     Bytes?

@@ -17,6 +17,7 @@ import type { DockerDriver } from "@polaris/docker";
 import { currentReleaseRef } from "./deploy/releases";
 import { getPorts, type TargetRow } from "./deploy/runtime";
 import { hostDockerDriver, localDockerDriver } from "./docker-service";
+import { recordHostDockerId, recordLocalDockerId } from "./local-machine";
 import { getDriverForConnection, getUnasMetrics } from "./storage-service";
 import {
     COLLECT_TICK_MS,
@@ -39,34 +40,58 @@ function bigBytes(value: number | null | undefined): bigint | null {
     return BigInt(Math.max(0, Math.round(value)));
 }
 
-/** Sample every deployed application's container (local via the host daemon,
- *  remote via Docker over SSH). Stopped/unreachable containers are skipped. */
+/**
+ * Sample every deployed application's container (local via the host daemon,
+ * remote via Docker over SSH). Stopped/unreachable containers are skipped.
+ *
+ * Grouped by the machine the service runs on, so a server carrying several of
+ * them is opened once and its containers are read together, instead of one
+ * connection and one blocking second per service.
+ */
 async function collectApps(ts: Date): Promise<SampleRow[]> {
     const apps = await prisma.application.findMany({
         where: { currentDeploymentId: { not: null } },
         include: { environment: { include: { project: true } }, target: true }
     });
-    const rows: SampleRow[] = [];
+
+    const byMachine = new Map<string, typeof apps>();
     for (const app of apps) {
-        const container = serviceName(app.environment.project.slug, app.slug, app.id);
-        const ownerId = app.environment.project.ownerId;
+        const key = app.target.kind === "local" || !app.target.hostId ? "local" : `host:${app.target.hostId}`;
+        const group = byMachine.get(key);
+        if (group) group.push(app);
+        else byMachine.set(key, [app]);
+    }
+
+    const rows: SampleRow[] = [];
+    for (const [key, group] of byMachine) {
+        const first = group[0];
+        if (!first) continue;
         let driver: DockerDriver | null = null;
         try {
             driver =
-                app.target.kind === "local" || !app.target.hostId
+                key === "local"
                     ? localDockerDriver()
-                    : await hostDockerDriver(app.target.hostId, ownerId);
-            const stats = await driver.stats(container);
-            rows.push({
-                subjectType: "app",
-                subjectId: app.id,
-                ts,
-                cpuPercent: round2(stats.cpuPercent),
-                memUsedBytes: bigBytes(stats.memUsage),
-                memTotalBytes: bigBytes(stats.memLimit)
-            });
+                    : await hostDockerDriver(key.slice("host:".length), first.environment.project.ownerId);
+            const names = new Map(
+                group.map((app) => [app.id, serviceName(app.environment.project.slug, app.slug, app.id)])
+            );
+            const samples = await driver.statsMany([...names.values()]);
+            for (const app of group) {
+                const stats = samples.get(names.get(app.id) ?? "");
+                // Not running this tick. That is an absent sample rather than a
+                // zero: a gap in the chart reads as "not running", a zero as idle.
+                if (!stats) continue;
+                rows.push({
+                    subjectType: "app",
+                    subjectId: app.id,
+                    ts,
+                    cpuPercent: round2(stats.cpuPercent),
+                    memUsedBytes: bigBytes(stats.memUsage),
+                    memTotalBytes: bigBytes(stats.memLimit)
+                });
+            }
         } catch {
-            // Container not running or host unreachable this tick - skip it.
+            // Host unreachable this tick - its services contribute nothing.
         } finally {
             if (driver) await driver.dispose().catch(() => undefined);
         }
@@ -82,53 +107,78 @@ async function collectApps(ts: Date): Promise<SampleRow[]> {
  * than by shelling in for `/proc` - it needs no extra privilege, works the same
  * for the local box and a remote host, and answers the question Watch is
  * actually asked, which is how hard a server is being worked.
+ *
+ * The local machine is sampled first, because a registered server can turn out to
+ * be that same machine reached over SSH; one that is gets no second series of its
+ * own (see `lib/local-machine`).
  */
 async function collectHosts(ts: Date): Promise<SampleRow[]> {
     const hosts = await prisma.host.findMany({ select: { id: true, ownerId: true } });
-    const subjects: { subjectId: string; ownerId: string | null }[] = [
-        { subjectId: LOCAL_HOST_SUBJECT, ownerId: null },
-        ...hosts.map((host) => ({ subjectId: host.id, ownerId: host.ownerId }))
-    ];
-
     const rows: SampleRow[] = [];
-    for (const subject of subjects) {
-        let driver: DockerDriver | null = null;
-        try {
-            driver =
-                subject.ownerId === null
-                    ? localDockerDriver()
-                    : await hostDockerDriver(subject.subjectId, subject.ownerId);
-            const info = await driver.info();
-            const running = (await driver.listContainers(false)).filter((entry) => entry.state === "running");
 
-            let cpu = 0;
-            let memory = 0;
-            for (const container of running) {
-                try {
-                    const stats = await driver.stats(container.id);
-                    cpu += stats.cpuPercent;
-                    memory += stats.memUsage;
-                } catch {
-                    // A container that stopped between the list and the read.
-                }
-            }
-            rows.push({
+    const local = await sampleHost(LOCAL_HOST_SUBJECT, null, ts);
+    if (local) {
+        rows.push(local.row);
+        await recordLocalDockerId(local.dockerId);
+    }
+
+    for (const host of hosts) {
+        const sample = await sampleHost(host.id, host.ownerId, ts);
+        if (!sample) continue;
+        await recordHostDockerId(host.id, sample.dockerId);
+        // The same box, reached the long way round. Its load is already in this
+        // tick under the local subject, and writing it again would produce a
+        // second server that disagrees with the first about the same CPU.
+        if (local && sample.dockerId && sample.dockerId === local.dockerId) continue;
+        rows.push(sample.row);
+    }
+    return rows;
+}
+
+/** One server's load this tick, plus which daemon answered. Null when the
+ *  machine is unreachable or has no daemon. */
+async function sampleHost(
+    subjectId: string,
+    ownerId: string | null,
+    ts: Date
+): Promise<{ row: SampleRow; dockerId: string } | null> {
+    let driver: DockerDriver | null = null;
+    try {
+        driver = ownerId === null ? localDockerDriver() : await hostDockerDriver(subjectId, ownerId);
+        const info = await driver.info();
+        const running = (await driver.listContainers(false)).filter((entry) => entry.state === "running");
+
+        // Concurrently: a stats read waits a second on the daemon for its second
+        // CPU sample, so a machine with a dozen containers would otherwise spend
+        // most of a tick waiting rather than measuring.
+        const samples = await driver.statsMany(running.map((container) => container.id));
+        let cpu = 0;
+        let memory = 0;
+        for (const stats of samples.values()) {
+            // A container that stopped between the list and the read.
+            if (!stats) continue;
+            cpu += stats.cpuPercent;
+            memory += stats.memUsage;
+        }
+        return {
+            dockerId: info.id,
+            row: {
                 subjectType: "host",
-                subjectId: subject.subjectId,
+                subjectId,
                 ts,
                 // Normalized against the core count, so a 4-core box at 200% of one
                 // core reads as 50% busy rather than "200".
                 cpuPercent: info.ncpu > 0 ? round2(Math.min(100, cpu / info.ncpu)) : round2(cpu),
                 memUsedBytes: bigBytes(memory),
                 memTotalBytes: bigBytes(info.memTotal)
-            });
-        } catch {
-            // Daemon absent or host unreachable this tick.
-        } finally {
-            if (driver) await driver.dispose().catch(() => undefined);
-        }
+            }
+        };
+    } catch {
+        // Daemon absent or host unreachable this tick.
+        return null;
+    } finally {
+        if (driver) await driver.dispose().catch(() => undefined);
     }
-    return rows;
 }
 
 /**

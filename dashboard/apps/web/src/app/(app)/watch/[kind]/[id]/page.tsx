@@ -1,10 +1,11 @@
 import { prisma } from "@polaris/db";
-import { notFound } from "next/navigation";
 import { listHosts } from "@/lib/host-service";
 import { listAlarms } from "@/lib/watch-service";
 import { requirePermission } from "@/lib/session";
+import { notFound, redirect } from "next/navigation";
 import { LOCAL_HOST_SUBJECT } from "@/lib/metrics-shared";
-import { WatchSubjectDetail } from "../../watch-subject-detail";
+import { isLocalMachine, localDockerId } from "@/lib/local-machine";
+import { WatchSubjectDetail } from "@/app/(app)/watch/watch-subject-detail";
 
 export const dynamic = "force-dynamic";
 
@@ -28,19 +29,30 @@ export default async function WatchSubjectPage({
     const alarms = (await listAlarms(user.id)).filter((alarm) => alarm.targetId === id);
 
     if (kind === "server") {
+        const [hosts, localId] = await Promise.all([listHosts(user.id), localDockerId()]);
+        const localHost = hosts.find((entry) => isLocalMachine(entry, localId)) ?? null;
+
         if (id === LOCAL_HOST_SUBJECT) {
             return (
                 <WatchSubjectDetail
                     kind="server"
                     id={id}
-                    name="Local"
-                    detail="The machine Polaris runs on"
+                    name={localHost?.name ?? "Local"}
+                    detail={
+                        localHost
+                            ? `${localHost.username}@${localHost.address} - the machine Polaris runs on`
+                            : "The machine Polaris runs on"
+                    }
                     alarms={alarms}
                 />
             );
         }
-        const host = (await listHosts(user.id)).find((entry) => entry.id === id);
+        const host = hosts.find((entry) => entry.id === id);
         if (!host) notFound();
+        // A server that is the machine Polaris runs on is measured directly rather
+        // than over SSH to itself, so its history lives under the local subject.
+        // Its own id would open a page with nothing on it.
+        if (isLocalMachine(host, localId)) redirect(`/watch/server/${LOCAL_HOST_SUBJECT}`);
         return (
             <WatchSubjectDetail
                 kind="server"

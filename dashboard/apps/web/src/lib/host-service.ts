@@ -33,6 +33,7 @@ export async function listHosts(ownerId: string) {
             authMethod: true,
             sudo: true,
             os: true,
+            dockerId: true,
             environment: true,
             wildcardDomain: true,
             status: true,

@@ -3,14 +3,23 @@ import { Bell } from "lucide-react";
 import { WatchCardGrid } from "./watch-cards";
 import { Button, PageHeader } from "@polaris/ui";
 import { requirePermission } from "@/lib/session";
+import { WatchContainersSection } from "./watch-containers";
 import { getWatchOverview } from "@/lib/watch-overview-service";
 
 export const dynamic = "force-dynamic";
+
+/** How many cards a group shows before it defers to its own screen. An overview
+ *  that scrolls for a minute stops being one. */
+const GROUP_LIMIT = 6;
 
 /**
  * Watch's front page: everything worth monitoring, grouped by what it is, each
  * card carrying the shape of its last hour. The point is to make the one that is
  * misbehaving obvious without opening anything.
+ *
+ * Servers and services come from the collected samples, so they are here with the
+ * page. Containers have to be asked for machine by machine, so they arrive just
+ * after it rather than holding it up.
  */
 export default async function WatchPage() {
     const user = await requirePermission("deploy.read");
@@ -47,13 +56,7 @@ export default async function WatchPage() {
                 cards={overview.services}
                 empty="No deployed services yet."
             />
-            <Group
-                title="Containers"
-                href="/watch/containers"
-                count={overview.containers.length}
-                cards={overview.containers}
-                empty="No containers on any reachable server."
-            />
+            <WatchContainersSection limit={GROUP_LIMIT} />
         </div>
     );
 }
@@ -71,9 +74,7 @@ function Group({
     cards: Awaited<ReturnType<typeof getWatchOverview>>["servers"];
     empty: string;
 }) {
-    // A long group is trimmed here and opened in full on its own screen - an
-    // overview that scrolls for a minute stops being one.
-    const shown = cards.slice(0, 6);
+    const shown = cards.slice(0, GROUP_LIMIT);
     return (
         <section className="flex flex-col gap-3">
             <div className="flex items-center justify-between gap-2">
