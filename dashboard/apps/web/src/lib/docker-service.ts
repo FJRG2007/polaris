@@ -143,7 +143,10 @@ export async function hostDockerDriver(hostId: string, ownerId: string): Promise
  * established here or not at all. The local host is not owned by anyone: it is
  * host-wide, and its caller gates it on system.manage.
  */
-export async function ownsDockerConnection(connectionId: string, ownerId: string): Promise<boolean> {
+export async function ownsDockerConnection(
+    connectionId: string,
+    ownerId: string
+): Promise<boolean> {
     if (connectionId === LOCAL_DOCKER_CONNECTION_ID) return true;
     if (connectionId.startsWith(HOST_DOCKER_PREFIX)) {
         const host = await prisma.host.findFirst({

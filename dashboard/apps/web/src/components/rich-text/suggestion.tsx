@@ -31,7 +31,8 @@ export interface SuggestionHandle {
 }
 
 /** The popup shell, shared with the block menu so the two match. */
-export const POPUP_CLASS = "max-h-64 w-72 overflow-y-auto rounded-lg border border-border bg-card p-1 shadow-lg";
+export const POPUP_CLASS =
+    "max-h-64 w-72 overflow-y-auto rounded-lg border border-border bg-card p-1 shadow-lg";
 
 /**
  * What the plugin's own element is given once it is mounted.
@@ -45,10 +46,14 @@ export const POPUP_CLASS = "max-h-64 w-72 overflow-y-auto rounded-lg border bord
 export const POPUP_LAYER_CLASS = "z-[60] pointer-events-auto";
 
 /** One row of either popup. */
-export const POPUP_ITEM_CLASS = "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm";
+export const POPUP_ITEM_CLASS =
+    "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm";
 
 /** How a caller looks candidates up, so this file needs no server import. */
-export type MentionSearch = (kinds: readonly refs.ReferenceKind[], query: string) => Promise<MentionCandidate[]>;
+export type MentionSearch = (
+    kinds: readonly refs.ReferenceKind[],
+    query: string
+) => Promise<MentionCandidate[]>;
 
 /** The popup's own props on top of the ones the plugin supplies. */
 type ListProps = SuggestionProps<MentionCandidate> & { searching: boolean };
@@ -101,34 +106,42 @@ const List = forwardRef<SuggestionHandle, ListProps>(function List(props, ref) {
     return (
         <ul className={POPUP_CLASS}>
             {items.map((item, index) => (
-                    <li key={`${item.kind}-${item.id}`}>
-                        <button
-                            type="button"
-                            // Pointer down rather than click: the editor takes the
-                            // focus back on mouse up, and a click fired after that
-                            // lands with the caret already moved.
-                            onMouseDown={(event) => {
-                                event.preventDefault();
-                                choose(index);
-                            }}
-                            onMouseEnter={() => setActive(index)}
-                            className={cn(POPUP_ITEM_CLASS, index === active ? "bg-muted" : "hover:bg-muted/60")}
-                        >
-                            {item.kind === "user" ? (
-                                <Avatar person={{ id: item.id, name: item.label, image: item.image }} size={20} />
-                            ) : (
-                                <span className="inline-flex size-5 shrink-0 items-center justify-center rounded bg-muted text-[10px] uppercase text-muted-foreground">
-                                    {item.kind.slice(0, 1)}
-                                </span>
-                            )}
-                            <span className="min-w-0 flex-1 truncate" title={item.label}>{item.label}</span>
-                            {item.detail && (
-                                <span className="max-w-[9rem] shrink-0 truncate text-[11px] text-muted-foreground">
-                                    {item.detail}
-                                </span>
-                            )}
-                        </button>
-                    </li>
+                <li key={`${item.kind}-${item.id}`}>
+                    <button
+                        type="button"
+                        // Pointer down rather than click: the editor takes the
+                        // focus back on mouse up, and a click fired after that
+                        // lands with the caret already moved.
+                        onMouseDown={(event) => {
+                            event.preventDefault();
+                            choose(index);
+                        }}
+                        onMouseEnter={() => setActive(index)}
+                        className={cn(
+                            POPUP_ITEM_CLASS,
+                            index === active ? "bg-muted" : "hover:bg-muted/60"
+                        )}
+                    >
+                        {item.kind === "user" ? (
+                            <Avatar
+                                person={{ id: item.id, name: item.label, image: item.image }}
+                                size={20}
+                            />
+                        ) : (
+                            <span className="inline-flex size-5 shrink-0 items-center justify-center rounded bg-muted text-[10px] uppercase text-muted-foreground">
+                                {item.kind.slice(0, 1)}
+                            </span>
+                        )}
+                        <span className="min-w-0 flex-1 truncate" title={item.label}>
+                            {item.label}
+                        </span>
+                        {item.detail && (
+                            <span className="max-w-[9rem] shrink-0 truncate text-[11px] text-muted-foreground">
+                                {item.detail}
+                            </span>
+                        )}
+                    </button>
+                </li>
             ))}
         </ul>
     );

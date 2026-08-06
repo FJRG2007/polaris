@@ -24,7 +24,13 @@ import { DockerConnectionDialog } from "./docker-connection-dialog";
 import { Badge, Button, Card, CardBody, Skeleton, cn } from "@polaris/ui";
 import { useCallback, useEffect, useState, useTransition, type ReactNode } from "react";
 import { containerAction, deleteDockerConnectionAction, removeContainerAction } from "./actions";
-import type { ContainerRow, DockerConnectionSummary, HostSnapshot, LocalHostDiagnostic, OverviewData } from "./types";
+import type {
+    ContainerRow,
+    DockerConnectionSummary,
+    HostSnapshot,
+    LocalHostDiagnostic,
+    OverviewData
+} from "./types";
 import {
     Boxes,
     Cpu,
@@ -135,14 +141,23 @@ export function ContainersView({
     }
 
     async function onDeleteConnection(id: string) {
-        if (!(await confirm({ title: "Remove this Docker connection?", confirmLabel: "Remove", danger: true }))) return;
+        if (
+            !(await confirm({
+                title: "Remove this Docker connection?",
+                confirmLabel: "Remove",
+                danger: true
+            }))
+        )
+            return;
         startTransition(async () => {
             await deleteDockerConnectionAction(id);
             router.refresh();
         });
     }
 
-    const containers = (snapshot?.containers ?? []).filter((container) => !removing.includes(container.id));
+    const containers = (snapshot?.containers ?? []).filter(
+        (container) => !removing.includes(container.id)
+    );
     // Usage is sampled behind the request, so the listing can be answered without
     // waiting for it. Say when what is shown was taken rather than let a reading
     // that has aged pass for this instant's.
@@ -189,7 +204,9 @@ export function ContainersView({
                                     <span className="flex-1 truncate" title={connection.name}>
                                         {connection.name}
                                     </span>
-                                    <Badge variant="neutral">{connection.local ? "local" : connection.transport}</Badge>
+                                    <Badge variant="neutral">
+                                        {connection.local ? "local" : connection.transport}
+                                    </Badge>
                                 </Link>
                                 {connection.local || connection.host ? null : (
                                     <Button
@@ -224,7 +241,9 @@ export function ContainersView({
                                     : "not detected"}
                             </dd>
                             <dt>Docker socket</dt>
-                            <dd className="font-mono">{localDiagnostic.dockerReported ? "reported" : "not reported"}</dd>
+                            <dd className="font-mono">
+                                {localDiagnostic.dockerReported ? "reported" : "not reported"}
+                            </dd>
                         </dl>
                     </div>
                 ) : null}
@@ -232,13 +251,13 @@ export function ContainersView({
                     <div className="rounded-md border border-border bg-card p-8 text-center text-sm text-muted-foreground">
                         Connect a Docker host to monitor and manage containers.
                         <span className="mt-2 block">
-                            The local host appears here automatically in the full edition. Use Add host for a
-                            remote engine.
+                            The local host appears here automatically in the full edition. Use Add
+                            host for a remote engine.
                         </span>
                     </div>
                 ) : (
                     <>
-                        {actionError ?? error ? (
+                        {(actionError ?? error) ? (
                             <div className="mb-4 rounded-md border border-danger/40 bg-danger/10 p-3 text-sm text-danger">
                                 {actionError ?? error}
                             </div>
@@ -251,19 +270,33 @@ export function ContainersView({
 
                         <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
                             {snapshot ? (
-                                <Overview overview={snapshot.overview} sampled={snapshot.statsAt !== null} />
+                                <Overview
+                                    overview={snapshot.overview}
+                                    sampled={snapshot.statsAt !== null}
+                                />
                             ) : (
-                                [0, 1, 2, 3].map((tile) => <Skeleton key={tile} className="h-[5.5rem] rounded-lg" />)
+                                [0, 1, 2, 3].map((tile) => (
+                                    <Skeleton key={tile} className="h-[5.5rem] rounded-lg" />
+                                ))
                             )}
                         </div>
 
                         <div className="mb-2 flex items-center justify-between">
                             <span className="text-xs text-muted-foreground">{statusLabel}</span>
                             <div className="flex items-center gap-2">
-                                <Button size="sm" variant="ghost" onClick={() => setLive((value) => !value)}>
+                                <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => setLive((value) => !value)}
+                                >
                                     {live ? "Pause" : "Resume"}
                                 </Button>
-                                <Button size="sm" variant="ghost" onClick={refresh} disabled={pending}>
+                                <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={refresh}
+                                    disabled={pending}
+                                >
                                     <RefreshCw className="size-4" />
                                     Refresh
                                 </Button>
@@ -292,13 +325,19 @@ export function ContainersView({
                                         ))
                                     ) : containers.length === 0 ? (
                                         <tr>
-                                            <td colSpan={5} className="px-3 py-8 text-center text-muted-foreground">
+                                            <td
+                                                colSpan={5}
+                                                className="px-3 py-8 text-center text-muted-foreground"
+                                            >
                                                 No containers on this host.
                                             </td>
                                         </tr>
                                     ) : (
                                         containers.map((container) => (
-                                            <tr key={container.id} className="border-t border-border hover:bg-card-hover">
+                                            <tr
+                                                key={container.id}
+                                                className="border-t border-border hover:bg-card-hover"
+                                            >
                                                 <td className="px-3 py-2">
                                                     <Link
                                                         href={containerHref(container, "details")}
@@ -315,7 +354,13 @@ export function ContainersView({
                                                     </span>
                                                 </td>
                                                 <td className="px-3 py-2">
-                                                    <Badge variant={container.state === "running" ? "success" : "neutral"}>
+                                                    <Badge
+                                                        variant={
+                                                            container.state === "running"
+                                                                ? "success"
+                                                                : "neutral"
+                                                        }
+                                                    >
                                                         {container.state}
                                                     </Badge>
                                                 </td>
@@ -337,21 +382,34 @@ export function ContainersView({
                                                 />
                                                 <td className="px-3 py-2">
                                                     <div className="flex justify-end gap-1">
-                                                        <IconLink label="Logs" href={containerHref(container, "logs")}>
+                                                        <IconLink
+                                                            label="Logs"
+                                                            href={containerHref(container, "logs")}
+                                                        >
                                                             <ScrollText className="size-4" />
                                                         </IconLink>
-                                                        <IconLink label="Files" href={containerHref(container, "files")}>
+                                                        <IconLink
+                                                            label="Files"
+                                                            href={containerHref(container, "files")}
+                                                        >
                                                             <FileText className="size-4" />
                                                         </IconLink>
                                                         {container.state === "running" ? (
                                                             <IconLink
                                                                 label="Console"
-                                                                href={containerHref(container, "console")}
+                                                                href={containerHref(
+                                                                    container,
+                                                                    "console"
+                                                                )}
                                                             >
                                                                 <TerminalSquare className="size-4" />
                                                             </IconLink>
                                                         ) : (
-                                                            <IconButton label="Console" onClick={() => undefined} disabled>
+                                                            <IconButton
+                                                                label="Console"
+                                                                onClick={() => undefined}
+                                                                disabled
+                                                            >
                                                                 <TerminalSquare className="size-4" />
                                                             </IconButton>
                                                         )}
@@ -361,14 +419,24 @@ export function ContainersView({
                                                                     <>
                                                                         <IconButton
                                                                             label="Restart"
-                                                                            onClick={() => onAction(container.id, "restart")}
+                                                                            onClick={() =>
+                                                                                onAction(
+                                                                                    container.id,
+                                                                                    "restart"
+                                                                                )
+                                                                            }
                                                                             disabled={pending}
                                                                         >
                                                                             <RotateCw className="size-4" />
                                                                         </IconButton>
                                                                         <IconButton
                                                                             label="Stop"
-                                                                            onClick={() => onAction(container.id, "stop")}
+                                                                            onClick={() =>
+                                                                                onAction(
+                                                                                    container.id,
+                                                                                    "stop"
+                                                                                )
+                                                                            }
                                                                             disabled={pending}
                                                                         >
                                                                             <Square className="size-4" />
@@ -377,7 +445,12 @@ export function ContainersView({
                                                                 ) : (
                                                                     <IconButton
                                                                         label="Start"
-                                                                        onClick={() => onAction(container.id, "start")}
+                                                                        onClick={() =>
+                                                                            onAction(
+                                                                                container.id,
+                                                                                "start"
+                                                                            )
+                                                                        }
                                                                         disabled={pending}
                                                                     >
                                                                         <Play className="size-4" />
@@ -385,7 +458,11 @@ export function ContainersView({
                                                                 )}
                                                                 <IconButton
                                                                     label="Remove"
-                                                                    onClick={() => void onRemoveContainer(container)}
+                                                                    onClick={() =>
+                                                                        void onRemoveContainer(
+                                                                            container
+                                                                        )
+                                                                    }
                                                                     disabled={pending}
                                                                 >
                                                                     <Trash2 className="size-4" />
@@ -443,7 +520,17 @@ function Overview({ overview, sampled }: { overview: OverviewData; sampled: bool
 }
 
 /** One headline number. A null value is one that has not arrived yet. */
-function Stat({ icon, label, value, hint }: { icon: ReactNode; label: string; value: string | null; hint: string }) {
+function Stat({
+    icon,
+    label,
+    value,
+    hint
+}: {
+    icon: ReactNode;
+    label: string;
+    value: string | null;
+    hint: string;
+}) {
     return (
         <Card>
             <CardBody className="p-3">
@@ -488,7 +575,14 @@ function IconButton({
     children: ReactNode;
 }) {
     return (
-        <Button size="icon" variant="ghost" onClick={onClick} disabled={disabled} aria-label={label} title={label}>
+        <Button
+            size="icon"
+            variant="ghost"
+            onClick={onClick}
+            disabled={disabled}
+            aria-label={label}
+            title={label}
+        >
             {children}
         </Button>
     );

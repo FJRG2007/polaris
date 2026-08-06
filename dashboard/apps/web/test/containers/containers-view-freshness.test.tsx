@@ -14,7 +14,11 @@
 
 import { describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
-import type { ContainerRow, HostSnapshot, OverviewData } from "../../src/app/(app)/apps/containers/types";
+import type {
+    ContainerRow,
+    HostSnapshot,
+    OverviewData
+} from "../../src/app/(app)/apps/containers/types";
 
 let snapshot: HostSnapshot | null = null;
 
@@ -74,7 +78,15 @@ function render(value: HostSnapshot): string {
     snapshot = value;
     return renderToStaticMarkup(
         <ContainersView
-            connections={[{ id: "local", name: "Local host", transport: "socket", status: "active", local: true }]}
+            connections={[
+                {
+                    id: "local",
+                    name: "Local host",
+                    transport: "socket",
+                    status: "active",
+                    local: true
+                }
+            ]}
             connectionId="local"
             sshEnabled
             canManage
@@ -111,13 +123,22 @@ describe("containers table freshness", () => {
         // The stopped row has nothing to read and says so; the running one has a
         // reading coming and shows it is waiting for it.
         expect(markup).toContain("-</td>");
-        expect(cells.some((cell) => cell.includes("animate-pulse") || cell.includes("skeleton"))).toBe(true);
+        expect(
+            cells.some((cell) => cell.includes("animate-pulse") || cell.includes("skeleton"))
+        ).toBe(true);
     });
 
     it("reports live when the readings are seconds old", () => {
         const markup = render({
             overview: { ...overview, aggregateCpuPercent: 0.34, aggregateMemUsage: 273_700_000 },
-            containers: [row({ cpuPercent: 0.34, memUsage: 273_700_000, memPercent: 0.87, statsAt: Date.now() })],
+            containers: [
+                row({
+                    cpuPercent: 0.34,
+                    memUsage: 273_700_000,
+                    memPercent: 0.87,
+                    statsAt: Date.now()
+                })
+            ],
             canAttach: true,
             statsAt: Date.now() - 2_000
         });
@@ -130,7 +151,12 @@ describe("containers table freshness", () => {
         const markup = render({
             overview: { ...overview, aggregateCpuPercent: 0.34, aggregateMemUsage: 273_700_000 },
             containers: [
-                row({ cpuPercent: 0.34, memUsage: 273_700_000, memPercent: 0.87, statsAt: Date.now() - 180_000 })
+                row({
+                    cpuPercent: 0.34,
+                    memUsage: 273_700_000,
+                    memPercent: 0.87,
+                    statsAt: Date.now() - 180_000
+                })
             ],
             canAttach: true,
             statsAt: Date.now() - 180_000

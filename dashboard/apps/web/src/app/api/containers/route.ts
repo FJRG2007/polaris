@@ -18,7 +18,12 @@
 import { accessFor, withDockerDriver } from "@/lib/container-service";
 import { authorizeConnection, listQuerySchema, parseQuery } from "./query";
 import type { ContainerRow, OverviewData } from "@/app/(app)/apps/containers/types";
-import { cachedSamples, oldestSampleAt, refreshSamples, STATS_TTL_MS } from "@/lib/container-stats-cache";
+import {
+    cachedSamples,
+    oldestSampleAt,
+    refreshSamples,
+    STATS_TTL_MS
+} from "@/lib/container-stats-cache";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -38,7 +43,8 @@ export async function GET(request: Request): Promise<Response> {
             const running = list.filter((container) => container.state === "running");
             const samples = cachedSamples(parsed.data.c);
             const containers: ContainerRow[] = list.map((container) => {
-                const sample = container.state === "running" ? samples.get(container.id) : undefined;
+                const sample =
+                    container.state === "running" ? samples.get(container.id) : undefined;
                 return {
                     ...container,
                     cpuPercent: sample?.stats.cpuPercent ?? null,
@@ -57,7 +63,9 @@ export async function GET(request: Request): Promise<Response> {
                 ncpu: info.ncpu,
                 memTotal: info.memTotal,
                 aggregateCpuPercent:
-                    Math.round(containers.reduce((sum, row) => sum + (row.cpuPercent ?? 0), 0) * 100) / 100,
+                    Math.round(
+                        containers.reduce((sum, row) => sum + (row.cpuPercent ?? 0), 0) * 100
+                    ) / 100,
                 aggregateMemUsage: containers.reduce((sum, row) => sum + (row.memUsage ?? 0), 0)
             };
             // A console exists either way the engine is reached: over a hijacked
@@ -92,7 +100,11 @@ export async function GET(request: Request): Promise<Response> {
         // running there is nothing to sample and the pass only drops what the
         // engine no longer lists.
         const { statsAt } = payload.snapshot;
-        if (payload.running.length === 0 || statsAt === null || Date.now() - statsAt > STATS_TTL_MS) {
+        if (
+            payload.running.length === 0 ||
+            statsAt === null ||
+            Date.now() - statsAt > STATS_TTL_MS
+        ) {
             refreshSamples(parsed.data.c, caller.userId, payload.running, { prune: true });
         }
 
@@ -102,7 +114,9 @@ export async function GET(request: Request): Promise<Response> {
         // (a refused socket, a pinned host key that changed), so it is passed on
         // rather than replaced with a generic failure.
         return Response.json(
-            { error: caught instanceof Error ? caught.message : "Unable to reach this Docker host" },
+            {
+                error: caught instanceof Error ? caught.message : "Unable to reach this Docker host"
+            },
             { status: 502 }
         );
     }

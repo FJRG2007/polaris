@@ -110,7 +110,8 @@ export function useLiveResource<T>({
                 const value = selectRef.current(body);
                 // Only what differs becomes a new reference, so an unchanged
                 // panel does not re-render and nothing flickers.
-                const merged = latest.current === null ? value : mergeUnchanged(latest.current, value);
+                const merged =
+                    latest.current === null ? value : mergeUnchanged(latest.current, value);
                 latest.current = merged;
                 setData(merged);
                 setUpdatedAt(Date.now());

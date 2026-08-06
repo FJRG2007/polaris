@@ -81,8 +81,11 @@ vi.mock("@/lib/docker-service", () => ({
 
 vi.mock("@/lib/container-service", () => ({
     accessFor: () => "hostd",
-    withDockerDriver: async (_connectionId: string, _userId: string, run: (value: typeof driver) => unknown) =>
-        run(driver),
+    withDockerDriver: async (
+        _connectionId: string,
+        _userId: string,
+        run: (value: typeof driver) => unknown
+    ) => run(driver),
     containerStats: async (_connectionId: string, _userId: string, id: string) => {
         statsCalls.push([id]);
         await new Promise((resolve) => setTimeout(resolve, SAMPLE_MS));
@@ -96,12 +99,16 @@ type HostSnapshot = import("../../src/app/(app)/apps/containers/types").HostSnap
 type ContainerUsageReply = import("../../src/app/(app)/apps/containers/types").ContainerUsageReply;
 
 async function list(connection: string): Promise<HostSnapshot> {
-    const response = await listContainers(new Request(`http://localhost/api/containers?c=${connection}`));
+    const response = await listContainers(
+        new Request(`http://localhost/api/containers?c=${connection}`)
+    );
     return (await response.json()) as HostSnapshot;
 }
 
 async function stats(connection: string, id: string): Promise<ContainerUsageReply> {
-    const response = await readStats(new Request(`http://localhost/api/containers/stats?c=${connection}&id=${id}`));
+    const response = await readStats(
+        new Request(`http://localhost/api/containers/stats?c=${connection}&id=${id}`)
+    );
     return (await response.json()) as ContainerUsageReply;
 }
 
@@ -244,7 +251,9 @@ describe("one container's usage", () => {
         rememberSample("host-of-somebody-else", ["aaa111", "polaris-web"], sample(77));
 
         const response = await readStats(
-            new Request("http://localhost/api/containers/stats?c=host-of-somebody-else&id=polaris-web")
+            new Request(
+                "http://localhost/api/containers/stats?c=host-of-somebody-else&id=polaris-web"
+            )
         );
 
         // Answering from the cache resolves no connection, so the ownership the

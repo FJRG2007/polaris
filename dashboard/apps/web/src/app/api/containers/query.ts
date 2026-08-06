@@ -52,7 +52,8 @@ export function parseQuery<T extends z.ZodTypeAny>(
     schema: T
 ): { ok: true; data: z.infer<T> } | { ok: false; error: string } {
     const parsed = schema.safeParse(Object.fromEntries(new URL(url).searchParams));
-    if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid request" };
+    if (!parsed.success)
+        return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid request" };
     return { ok: true, data: parsed.data };
 }
 

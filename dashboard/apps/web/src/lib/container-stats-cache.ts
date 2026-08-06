@@ -98,7 +98,11 @@ export function cachedSample(connectionId: string, ref: string): StatsSample | n
 }
 
 /** Record a sample under every name the container answers to. */
-export function rememberSample(connectionId: string, aliases: readonly string[], stats: ContainerStats): void {
+export function rememberSample(
+    connectionId: string,
+    aliases: readonly string[],
+    stats: ContainerStats
+): void {
     const entry = hostSamples(connectionId);
     const sample: StatsSample = { stats, at: Date.now() };
     for (const alias of aliases) {
@@ -120,7 +124,10 @@ export function rememberSample(connectionId: string, aliases: readonly string[],
  * An instant rather than an age: a reader may be holding this answer from a
  * previous visit, and only an instant stays true when it does.
  */
-export function oldestSampleAt(samples: ReadonlyMap<string, StatsSample>, refs: readonly string[]): number | null {
+export function oldestSampleAt(
+    samples: ReadonlyMap<string, StatsSample>,
+    refs: readonly string[]
+): number | null {
     let oldest: number | null = null;
     for (const ref of refs) {
         const at = samples.get(ref)?.at;
