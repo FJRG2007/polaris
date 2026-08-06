@@ -60,6 +60,10 @@ export interface ListScreenProps {
     readonly defaultListId: string | null;
     /** Opened straight away, for a deep link to one task. */
     readonly initialTaskId?: string | null;
+    /** Applied instead of the saved view's own filter, for a link that arrives
+     *  already narrowed - one person's work, say. It is an ordinary filter once
+     *  the screen has it, so the bar can widen or clear it. */
+    readonly initialFilter?: core.TaskFilter;
 }
 
 export function ListScreen({
@@ -71,7 +75,8 @@ export function ListScreen({
     context,
     lists,
     defaultListId,
-    initialTaskId = null
+    initialTaskId = null,
+    initialFilter
 }: ListScreenProps) {
     const router = useRouter();
     const format = useDisplayFormat();
@@ -86,7 +91,7 @@ export function ListScreen({
     const [viewType, setViewType] = useState<core.TaskViewType>(initial?.type ?? "board");
     const [groupBy, setGroupBy] = useState<core.TaskGroupField>(initial?.groupBy ?? "status");
     const [sort, setSort] = useState<core.TaskSort>(initial?.sort ?? { field: "priority", direction: "asc" });
-    const [filter, setFilter] = useState<core.TaskFilter>(initial?.filter ?? core.EMPTY_FILTER);
+    const [filter, setFilter] = useState<core.TaskFilter>(initialFilter ?? initial?.filter ?? core.EMPTY_FILTER);
     const [showClosed, setShowClosed] = useState(initial?.showClosed ?? false);
     const [search, setSearch] = useState("");
     const [openTaskId, setOpenTaskId] = useState<string | null>(initialTaskId);

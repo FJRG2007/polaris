@@ -13,7 +13,7 @@
 import { listHosts } from "@/lib/host-service";
 import { listProjects } from "@/lib/deploy-service";
 import { scopeOrgIdFor } from "@/lib/workspace-scope";
-import type { SearchResource } from "@/lib/search-index";
+import type { SearchResource } from "@/lib/search/entries";
 import { requireUser, userHasManage } from "@/lib/session";
 import { listInstalledApps } from "@/lib/apps/install-service";
 import { listRunnerPools } from "@/lib/runners/runner-service";

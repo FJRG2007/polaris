@@ -6,9 +6,15 @@
  * spaces has two sets of statuses, and hiding one of them would silently drop
  * its tasks off the board. Grouping by list is therefore the default: it is the
  * only grouping that stays meaningful when the statuses do not line up.
+ *
+ * `?assignee=` opens it narrowed to one person, which is where picking somebody
+ * out of the global search lands. It is the filter this screen already applies,
+ * not a second kind of query, so the reader can widen or clear it like any other.
  */
 
+import { z } from "zod";
 import { prisma } from "@polaris/db";
+import * as core from "@polaris/core";
 import { requirePermission } from "@/lib/session";
 import * as spaces from "@/lib/tasks/space-service";
 import { listTasks } from "@/lib/tasks/task-service";
@@ -19,8 +25,17 @@ import { scopeSpaceIds, shelfScope, type TaskActor } from "@/lib/tasks/access";
 
 export const dynamic = "force-dynamic";
 
-export default async function EverythingPage() {
+/** Anything else in the address is somebody's hand-edited URL, and is ignored. */
+const assigneeParam = z.string().uuid();
+
+export default async function EverythingPage({
+    searchParams
+}: {
+    searchParams: Promise<{ assignee?: string }>;
+}) {
     const user = await requirePermission("tasks.read");
+    const wanted = assigneeParam.safeParse((await searchParams).assignee);
+    const assigneeId = wanted.success ? wanted.data : null;
     const actor: TaskActor = { id: user.id, isAdmin: user.isAdmin };
     const scope = await shelfScope(actor);
     // The vocabulary (statuses, tags, fields) is drawn from every space the
@@ -71,6 +86,16 @@ export default async function EverythingPage() {
         })
     ]);
 
+    // Whoever already holds work here counts as somebody this screen knows,
+    // even if they are on no space: their name has to be readable in a filter
+    // chip and beside their tasks, and it is already on the rows above.
+    const roster = [...people];
+    for (const task of tasks) {
+        for (const person of task.assignees) {
+            if (!roster.some((known) => known.id === person.id)) roster.push(person);
+        }
+    }
+
     const context: SpaceContext = {
         // No single space owns this screen; writes still resolve the real space
         // from the task they touch, so this id is only ever used for display.
@@ -85,12 +110,21 @@ export default async function EverythingPage() {
             required: field.required,
             showOnCard: field.showOnCard
         })),
-        people,
+        people: roster,
         canEdit: true,
         canModerate: user.isAdmin,
         currentUserId: user.id,
         siblings: tasks
     };
+
+    // The name comes from the roster this screen already has, so saying whose
+    // work this is costs nothing. An id that matches nobody on it still filters,
+    // and the heading stays general rather than naming an account whose name
+    // this reader has not been shown anywhere else.
+    const assignee = assigneeId ? roster.find((person) => person.id === assigneeId) : null;
+    const initialFilter: core.TaskFilter | undefined = assigneeId
+        ? { match: "all", conditions: [{ field: "assignee", operator: "anyOf", values: [assigneeId] }] }
+        : undefined;
 
     return (
         <div className="flex w-full flex-col gap-6 md:flex-row">
@@ -99,11 +133,18 @@ export default async function EverythingPage() {
                 listId={null}
                 defaultListId={null}
                 title="Everything"
-                subtitle="Every task across every space you can see"
+                subtitle={
+                    assignee
+                        ? `Tasks assigned to ${assignee.name}`
+                        : assigneeId
+                          ? "Tasks assigned to one person"
+                          : "Every task across every space you can see"
+                }
                 tasks={tasks}
                 savedViews={[]}
                 context={context}
                 lists={lists}
+                initialFilter={initialFilter}
             />
         </div>
     );

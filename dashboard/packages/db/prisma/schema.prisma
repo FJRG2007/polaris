@@ -129,6 +129,44 @@ model User {
     successor           AccountSuccessor?    @relation("AccountSuccessorHolder")
     successorTo         AccountSuccessor[]   @relation("AccountSuccessorHeir")
     notes               Note[]
+    searches            SearchHistory[]
+}
+
+// What somebody last searched for, so the panel opens on their own work.
+//
+// The browser keeps the same list in local storage, which is what the panel
+// paints from the instant it opens; this copy exists so the list follows the
+// account to another browser or another machine. Both are capped at the same
+// handful, and a repeat is the same row with a newer timestamp rather than a
+// second one - the point is to recognize what you were doing, and a list that
+// says the same task nine times says nothing.
+//
+// It records what was opened or what was run, never every keystroke on the way
+// there, and it is private to the account: nobody else, administrator included,
+// has a reason to read what somebody looked for.
+model SearchHistory {
+    id     String @id @default(uuid(7)) @db.Uuid
+    userId String @db.Uuid
+    // What makes two entries the same search, built by the shared helper in
+    // @polaris/core so the browser's copy and this one collapse identically.
+    key    String
+    // "result" for something that was opened, "query" for words that were run.
+    kind   String
+    // The command it was made under, absent for an unscoped search.
+    scope  String?
+    term   String @default("")
+    // What to show. Held rather than resolved, so a remembered row still reads
+    // as itself after the thing it points at is renamed or removed.
+    label  String
+    // Where it opens, always a path inside Polaris. Null for a remembered query,
+    // which is put back in the field instead.
+    href   String?
+    usedAt DateTime @default(now())
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@unique([userId, key])
+    @@index([userId, usedAt])
 }
 
 // Something somebody wrote down for themselves.

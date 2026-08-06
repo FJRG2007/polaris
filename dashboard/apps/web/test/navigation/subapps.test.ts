@@ -11,7 +11,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { navigationEntries } from "@/lib/search-index";
+import { navigationEntries } from "@/lib/search/entries";
 import {
     APP_SECTIONS,
     APP_SUBAPPS,

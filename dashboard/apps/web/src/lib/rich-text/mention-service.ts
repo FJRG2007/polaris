@@ -30,6 +30,10 @@ export interface MentionCandidate {
     /** A task's own handle, "PLR-42". The global search shows it beside the
      *  name, where the picker folds it into the detail line. */
     readonly reference?: string;
+    /** Where it lives, on its own. The picker's detail line says the handle and
+     *  the space together; a surface drawing the handle as a badge needs the
+     *  other half without it. */
+    readonly place?: string;
     /** Where a task stands, for surfaces that draw it rather than say it. */
     readonly status?: { readonly name: string; readonly color: string } | null;
 }
@@ -265,6 +269,7 @@ async function searchWork(
             detail: `${core.taskReference(task.space.prefix, task.number)} in ${task.space.name}`,
             image: null,
             reference: core.taskReference(task.space.prefix, task.number),
+            place: task.space.name,
             status: task.status ? { name: task.status.name, color: task.status.color } : null
         })),
         ...docs.map((doc) => ({

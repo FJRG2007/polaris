@@ -9,7 +9,7 @@
 
 import { describe, expect, it } from "vitest";
 import { APP_SECTIONS, POLARIS_APPS } from "@/lib/apps";
-import { navigationEntries, resourceEntries } from "@/lib/search-index";
+import { navigationEntries, resourceEntries } from "@/lib/search/entries";
 
 /** Every app, for the cases that are not about which apps are open. */
 const ALL_APPS = POLARIS_APPS.map((app) => app.id);
