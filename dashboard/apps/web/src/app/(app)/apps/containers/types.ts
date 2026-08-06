@@ -34,6 +34,9 @@ export interface ContainerRow {
     cpuPercent: number | null;
     memUsage: number | null;
     memPercent: number | null;
+    /** When the usage on this row was sampled. Null for a container nothing has
+     *  sampled yet, and for one that is not running. */
+    statsAt: number | null;
 }
 
 /** What /api/containers answers with for one host. `canAttach` is whether this
@@ -42,6 +45,17 @@ export interface HostSnapshot {
     overview: OverviewData;
     containers: ContainerRow[];
     canAttach: boolean;
+    /** When the usage figures were sampled. Null when none has been taken yet -
+     *  the listing is on screen and the first sample is on its way. An instant
+     *  rather than an age, so it stays true in a snapshot held between visits. */
+    statsAt: number | null;
+}
+
+/** What /api/containers/stats answers with: one sample and when it was taken.
+ *  Both null for a container that is not running. */
+export interface ContainerUsageReply {
+    stats: ContainerUsage | null;
+    at: number | null;
 }
 
 /** What /api/containers/host answers with: the engine, named, and nothing about

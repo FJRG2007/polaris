@@ -9,22 +9,34 @@
  * were reading after a refresh. The page keeps the same four tabs and puts the
  * things a dialog had nowhere to put - live usage, disk, the host - above them.
  *
- * Three reads, deliberately not one: the details (with the size the daemon has
- * to walk the filesystem for) once, the host once, and a usage sample every five
- * seconds. Only the last one repeats, so watching a container costs one Docker
- * call per tick rather than a sample per container on the machine.
+ * Four reads, deliberately not one: what the container is, what it occupies on
+ * disk, the host it runs on, and a usage sample every five seconds. The disk
+ * figure is its own read because the daemon walks the filesystem to answer it -
+ * seconds, on a big image - and the rest of the page has no reason to wait
+ * behind that. The host and the sample are seeded from what this tab last saw,
+ * so a container opened from the listing paints its numbers at once and replaces
+ * them as fresh ones land.
  */
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { formatBytes } from "@polaris/core";
+import { formatAge, STALE_AFTER_MS } from "../freshness";
 import { useConfirm } from "@/components/confirm-dialog";
 import { useDisplayFormat } from "@/components/display-format";
+import { useLiveResource } from "@/components/use-live-resource";
+import { readSnapshot, writeSnapshot } from "@/lib/snapshot-cache";
 import { containerAction, removeContainerAction } from "../actions";
 import { TerminalPanel } from "@/app/(app)/apps/deploy/terminal-panel";
 import { useCallback, useEffect, useState, useTransition, type ReactNode } from "react";
-import type { ContainerDetailData, ContainerUsage, DockerConnectionSummary, HostInfo } from "../types";
 import { Badge, Button, Card, CardBody, Skeleton, TimeSeriesChart, cn, type TimePoint } from "@polaris/ui";
+import type {
+    ContainerDetailData,
+    ContainerUsage,
+    ContainerUsageReply,
+    DockerConnectionSummary,
+    HostInfo
+} from "../types";
 import {
     ArrowLeft,
     ChevronRight,
@@ -60,9 +72,21 @@ const REFRESH_MS = 5000;
  *  chart that claimed otherwise would be inventing the part you did not watch. */
 const MAX_SAMPLES = 120;
 
+/** A sample older than this is history rather than a reading: it is still worth
+ *  showing with its age on it, but plotting it would draw a chart across a gap
+ *  nobody watched. */
+const CHARTABLE_AGE_MS = 60_000;
+
 interface Sample {
     at: number;
     usage: ContainerUsage;
+}
+
+/** What the container occupies on disk. Read apart from the rest of the details
+ *  because the daemon walks the filesystem to answer it. */
+interface ContainerSizes {
+    sizeRw: number | null;
+    sizeRootFs: number | null;
 }
 
 export function ContainerView({
@@ -83,77 +107,101 @@ export function ContainerView({
     const [confirm, confirmDialog] = useConfirm();
     const [pending, startTransition] = useTransition();
     const [tab, setTab] = useState<ContainerTab>(initialTab);
-    const [detail, setDetail] = useState<ContainerDetailData | null>(null);
-    const [host, setHost] = useState<HostInfo | null>(null);
     const [samples, setSamples] = useState<Sample[]>([]);
-    const [error, setError] = useState<string | null>(null);
+    const [actionError, setActionError] = useState<string | null>(null);
     const [gone, setGone] = useState(false);
 
     const listHref = `/apps/containers?c=${encodeURIComponent(connection.id)}`;
     const query = `c=${encodeURIComponent(connection.id)}&id=${encodeURIComponent(containerRef)}`;
+    const sizeKey = `container.size.${connection.id}.${containerRef}`;
 
-    const loadDetail = useCallback(async () => {
-        // The size is what the details cannot be shown without on this page, and
-        // the daemon walks the filesystem to answer it - so it is asked for here,
-        // once, and never on the refresh below.
-        const result = await fetchJson<{ detail: ContainerDetailData }>(
-            `/api/containers/inspect?${query}&size=1`
-        );
-        if (result.ok) {
-            setDetail(result.data.detail);
-            setError(null);
-        } else {
-            setError(result.error);
-        }
-    }, [query]);
+    // What the container is. Without the size: the daemon walks the filesystem
+    // for that one, and the header, the state and the details tab have no reason
+    // to wait behind it.
+    const {
+        data: detail,
+        error: detailError,
+        stale: detailStale,
+        refresh: reloadDetail
+    } = useLiveResource<ContainerDetailData>({
+        url: `/api/containers/inspect?${query}`,
+        cacheKey: `container.detail.${connection.id}.${containerRef}`,
+        intervalMs: 15_000,
+        enabled: !gone,
+        select: (body) => (body as { detail: ContainerDetailData }).detail
+    });
 
-    useEffect(() => {
-        void loadDetail();
-    }, [loadDetail]);
+    // The machine it runs on. It does not change while a page is open, so this
+    // is slow-polled: what it is really for is painting from the last visit.
+    const { data: host } = useLiveResource<HostInfo>({
+        url: `/api/containers/host?c=${encodeURIComponent(connection.id)}`,
+        cacheKey: `container.host.${connection.id}`,
+        intervalMs: 60_000,
+        select: (body) => body as HostInfo
+    });
 
+    // Usage, while the page is open. The server answers with its last sample and
+    // takes a fresh one behind the reply, so a container opened from the listing
+    // shows its numbers at once instead of a second of skeletons. A stopped
+    // container answers with nothing to sample rather than an error, so the poll
+    // keeps running: start it again and the chart carries on.
+    const { data: usage } = useLiveResource<ContainerUsageReply>({
+        url: `/api/containers/stats?${query}`,
+        cacheKey: `container.usage.${connection.id}.${containerRef}`,
+        intervalMs: REFRESH_MS,
+        enabled: !gone,
+        select: (body) => body as ContainerUsageReply
+    });
+
+    // What it occupies on disk, asked for once. This is the expensive inspect,
+    // so it is neither polled nor in front of anything.
+    const [sizes, setSizes] = useState<ContainerSizes | null>(
+        () => readSnapshot<ContainerSizes>(sizeKey, 24 * 3_600_000)?.value ?? null
+    );
     useEffect(() => {
         let cancelled = false;
+        setSizes(readSnapshot<ContainerSizes>(sizeKey, 24 * 3_600_000)?.value ?? null);
         void (async () => {
-            const result = await fetchJson<HostInfo>(
-                `/api/containers/host?c=${encodeURIComponent(connection.id)}`
+            const result = await fetchJson<{ detail: ContainerDetailData }>(
+                `/api/containers/inspect?${query}&size=1`
             );
-            if (!cancelled && result.ok) setHost(result.data);
+            if (cancelled || !result.ok) return;
+            const measured: ContainerSizes = {
+                sizeRw: result.data.detail.sizeRw,
+                sizeRootFs: result.data.detail.sizeRootFs
+            };
+            setSizes(measured);
+            writeSnapshot(sizeKey, measured);
         })();
         return () => {
             cancelled = true;
         };
-    }, [connection.id]);
+    }, [query, sizeKey]);
 
-    // Usage, while the page is open and the container is up. A stopped container
-    // answers with nothing to sample rather than an error, so the tick keeps
-    // running: start it again and the chart carries on.
+    // The chart holds what this page watched. A seeded sample from a previous
+    // visit still has a number worth showing above, but plotting it would draw a
+    // line across the minutes nobody was here for.
     useEffect(() => {
-        if (gone) return;
-        let cancelled = false;
-        const tick = async (): Promise<void> => {
-            const result = await fetchJson<{ stats: ContainerUsage | null }>(`/api/containers/stats?${query}`);
-            if (cancelled || !result.ok || !result.data.stats) return;
-            const usage = result.data.stats;
-            setSamples((previous) => [...previous, { at: Date.now(), usage }].slice(-MAX_SAMPLES));
-        };
-        void tick();
-        const timer = setInterval(() => void tick(), REFRESH_MS);
-        return () => {
-            cancelled = true;
-            clearInterval(timer);
-        };
-    }, [query, gone]);
+        const stats = usage?.stats ?? null;
+        const at = usage?.at ?? null;
+        if (!stats || at === null || Date.now() - at > CHARTABLE_AGE_MS) return;
+        setSamples((previous) =>
+            previous.at(-1)?.at === at ? previous : [...previous, { at, usage: stats }].slice(-MAX_SAMPLES)
+        );
+    }, [usage]);
 
     const state = detail?.state ?? "";
     const running = state === "running";
-    const latest = samples.at(-1)?.usage ?? null;
+    const latest = usage?.stats ?? null;
+    const latestAge = usage?.at ? Date.now() - usage.at : null;
+    const error = actionError ?? detailError;
 
     function onLifecycle(action: "start" | "stop" | "restart"): void {
-        setError(null);
+        setActionError(null);
         startTransition(async () => {
             const result = await containerAction(connection.id, containerRef, action);
-            if (result.error) setError(result.error);
-            await loadDetail();
+            if (result.error) setActionError(result.error);
+            reloadDetail();
         });
     }
 
@@ -178,7 +226,7 @@ export function ContainerView({
             });
             if (result.error) {
                 setGone(false);
-                setError(result.error);
+                setActionError(result.error);
                 return;
             }
             router.push(listHref);
@@ -214,7 +262,7 @@ export function ContainerView({
                     <Button
                         size="icon"
                         variant="ghost"
-                        onClick={() => void loadDetail()}
+                        onClick={() => reloadDetail()}
                         aria-label="Refresh"
                         title="Refresh"
                     >
@@ -276,6 +324,10 @@ export function ContainerView({
                 <div className="rounded-md border border-danger/40 bg-danger/10 p-3 text-sm text-danger">
                     {error}
                 </div>
+            ) : detailStale ? (
+                <div className="rounded-md border border-warning/40 bg-warning/10 p-3 text-sm">
+                    Showing what was last read. {detailStale}
+                </div>
             ) : null}
 
             <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -284,6 +336,7 @@ export function ContainerView({
                     label="CPU"
                     value={latest ? `${latest.cpuPercent}%` : running ? null : "-"}
                     hint={host ? `${host.overview.ncpu} cores on the host` : "of the host's cores"}
+                    age={latestAge}
                 />
                 <Stat
                     icon={<MemoryStick className="size-4" />}
@@ -294,12 +347,14 @@ export function ContainerView({
                             ? `${latest.memPercent}% of ${formatBytes(latest.memLimit)}`
                             : "no limit set"
                     }
+                    age={latestAge}
                 />
                 <Stat
                     icon={<Network className="size-4" />}
                     label="Network"
                     value={latest ? `${formatBytes(latest.netRx)} in` : running ? null : "-"}
                     hint={latest ? `${formatBytes(latest.netTx)} out, since it started` : "since it started"}
+                    age={latestAge}
                 />
                 <Stat
                     icon={<HardDrive className="size-4" />}
@@ -308,6 +363,7 @@ export function ContainerView({
                     hint={
                         latest ? `${formatBytes(latest.blockWrite)} written, since it started` : "since it started"
                     }
+                    age={latestAge}
                 />
             </div>
 
@@ -315,7 +371,7 @@ export function ContainerView({
 
             <div className="grid gap-4 lg:grid-cols-2">
                 <RunsOn connection={connection} host={host} networks={detail?.networks ?? null} />
-                <Storage detail={detail} />
+                <Storage detail={detail} sizes={sizes} />
             </div>
 
             <Card>
@@ -467,8 +523,10 @@ function RunsOn({
     );
 }
 
-/** What the container occupies, and what it has mounted. */
-function Storage({ detail }: { detail: ContainerDetailData | null }) {
+/** What the container occupies, and what it has mounted. The two sizes arrive
+ *  after the mounts do - the daemon walks the filesystem for them - so they
+ *  carry their own skeleton rather than holding back the card. */
+function Storage({ detail, sizes }: { detail: ContainerDetailData | null; sizes: ContainerSizes | null }) {
     return (
         <Card>
             <CardBody className="space-y-3">
@@ -484,12 +542,22 @@ function Storage({ detail }: { detail: ContainerDetailData | null }) {
                 ) : (
                     <dl className="grid grid-cols-[8rem_1fr] gap-x-4 gap-y-2 text-sm">
                         <Field label="Writable layer">
-                            {detail.sizeRw === null ? "Not reported" : formatBytes(detail.sizeRw)}
+                            {!sizes ? (
+                                <Skeleton className="h-4 w-24" />
+                            ) : sizes.sizeRw === null ? (
+                                "Not reported"
+                            ) : (
+                                formatBytes(sizes.sizeRw)
+                            )}
                         </Field>
                         <Field label="Total on disk">
-                            {detail.sizeRootFs === null
-                                ? "Not reported"
-                                : `${formatBytes(detail.sizeRootFs)} with its image layers`}
+                            {!sizes ? (
+                                <Skeleton className="h-4 w-32" />
+                            ) : sizes.sizeRootFs === null ? (
+                                "Not reported"
+                            ) : (
+                                `${formatBytes(sizes.sizeRootFs)} with its image layers`
+                            )}
                         </Field>
                         <Field label="Mounts">
                             {detail.mounts.length === 0
@@ -756,18 +824,29 @@ function ConsoleTab({
     );
 }
 
-/** One headline number. A null value is one that has not arrived yet. */
+/**
+ * One headline number. A null value is one that has not arrived yet.
+ *
+ * `age` is how old the reading is. Under a few seconds it is what "live" means
+ * and goes unsaid; past that the tile says when it was taken, because a number
+ * from two minutes ago presented as this instant's is the one way a usage panel
+ * can actually mislead.
+ */
 function Stat({
     icon,
     label,
     value,
-    hint
+    hint,
+    age
 }: {
     icon: ReactNode;
     label: string;
     value: string | null;
     hint: string;
+    age?: number | null;
 }) {
+    const stale = value !== null && age !== null && age !== undefined && age > STALE_AFTER_MS;
+    const caption = stale ? `${hint} - ${formatAge(age)} ago` : hint;
     return (
         <Card>
             <CardBody className="p-3">
@@ -780,7 +859,7 @@ function Stat({
                 ) : (
                     <div className="truncate text-lg font-semibold" title={value}>{value}</div>
                 )}
-                <div className="truncate text-xs text-muted-foreground" title={hint}>{hint}</div>
+                <div className="truncate text-xs text-muted-foreground" title={caption}>{caption}</div>
             </CardBody>
         </Card>
     );

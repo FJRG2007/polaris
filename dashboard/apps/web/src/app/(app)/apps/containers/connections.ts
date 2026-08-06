@@ -58,7 +58,15 @@ export async function containerHosts(user: SessionUser): Promise<ContainerHosts>
               }
             : null;
 
-    const stored: DockerConnectionSummary[] = (await listDockerConnections(user.id)).map((row) => ({
+    // Three independent reads, taken together: this runs before the page paints,
+    // and they have no reason to queue behind one another.
+    const [connections, hosts, localId] = await Promise.all([
+        listDockerConnections(user.id),
+        listHosts(user.id),
+        localDockerId()
+    ]);
+
+    const stored: DockerConnectionSummary[] = connections.map((row) => ({
         id: row.id,
         name: row.name,
         transport: row.transport as DockerTransport,
@@ -69,8 +77,6 @@ export async function containerHosts(user: SessionUser): Promise<ContainerHosts>
     // the local host is on the menu, that server is it, under its own name. It
     // still appears on its own when the local host is not offered, which is what
     // keeps an operator who may not manage the system able to reach it.
-    const hosts = await listHosts(user.id);
-    const localId = await localDockerId();
     const sameMachine = localAvailable ? (hosts.find((host) => isLocalMachine(host, localId)) ?? null) : null;
 
     const localHost: DockerConnectionSummary[] = localAvailable

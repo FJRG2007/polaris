@@ -6,12 +6,19 @@
  * and a stats sample per container. It is also the refresh path, so live updates
  * and the first load run the same code.
  *
+ * Two calls to the engine, both cheap: what the host is, and what it is running.
+ * Usage is not one of them - the daemon holds a stats request open for about a
+ * second per container, which is what used to make this answer in seconds. The
+ * last sample taken is attached instead, along with when it was taken, and a
+ * fresh pass is started behind the response once that has aged out.
+ *
  * Node runtime because the Docker transports and Prisma need it.
  */
 
 import { accessFor, withDockerDriver } from "@/lib/container-service";
 import { authorizeConnection, listQuerySchema, parseQuery } from "./query";
 import type { ContainerRow, OverviewData } from "@/app/(app)/apps/containers/types";
+import { cachedSamples, newestSampleAt, refreshSamples, STATS_TTL_MS } from "@/lib/container-stats-cache";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -25,23 +32,19 @@ export async function GET(request: Request): Promise<Response> {
 
     try {
         const payload = await withDockerDriver(parsed.data.c, caller.userId, async (driver) => {
-            const info = await driver.info();
-            const list = await driver.listContainers();
-            // One stats sample per running container - a stopped one has nothing
-            // to sample. Through the driver's batch rather than all at once: over
-            // SSH each sample is its own channel and a server allows a bounded
-            // number of them, so a host with a dozen running containers was
-            // asking for more than it was allowed and losing the overflow.
-            const byId = await driver.statsMany(
-                list.filter((container) => container.state === "running").map((container) => container.id)
-            );
+            const [info, list] = await Promise.all([driver.info(), driver.listContainers()]);
+            // A stopped container has nothing to sample, so it is neither read nor
+            // waited for; the sampler is only ever pointed at the running ones.
+            const running = list.filter((container) => container.state === "running");
+            const samples = cachedSamples(parsed.data.c);
             const containers: ContainerRow[] = list.map((container) => {
-                const stats = byId.get(container.id) ?? null;
+                const sample = container.state === "running" ? samples.get(container.id) : undefined;
                 return {
                     ...container,
-                    cpuPercent: stats?.cpuPercent ?? null,
-                    memUsage: stats?.memUsage ?? null,
-                    memPercent: stats?.memPercent ?? null
+                    cpuPercent: sample?.stats.cpuPercent ?? null,
+                    memUsage: sample?.stats.memUsage ?? null,
+                    memPercent: sample?.stats.memPercent ?? null,
+                    statsAt: sample?.at ?? null
                 };
             });
             const overview: OverviewData = {
@@ -60,9 +63,28 @@ export async function GET(request: Request): Promise<Response> {
             // A console exists either way the engine is reached: over a hijacked
             // Docker connection, or through the daemon's own exec endpoint on the
             // local host, which the driver knows nothing about.
-            return { overview, containers, canAttach: accessFor(parsed.data.c) === "hostd" || driver.canAttach };
+            return {
+                snapshot: {
+                    overview,
+                    containers,
+                    canAttach: accessFor(parsed.data.c) === "hostd" || driver.canAttach,
+                    statsAt: newestSampleAt(
+                        samples,
+                        running.map((container) => container.id)
+                    )
+                },
+                running: running.map((container) => ({ id: container.id, name: container.name }))
+            };
         });
-        return Response.json(payload);
+
+        // Behind the response, never in front of it. A host whose samples are
+        // still warm is left alone, which is what keeps a page open in two tabs
+        // from sampling the same engine twice as often.
+        if (payload.snapshot.statsAt === null || Date.now() - payload.snapshot.statsAt > STATS_TTL_MS) {
+            refreshSamples(parsed.data.c, caller.userId, payload.running, { prune: true });
+        }
+
+        return Response.json(payload.snapshot);
     } catch (caught) {
         // The engine's own reason is what makes an unreachable host diagnosable
         // (a refused socket, a pinned host key that changed), so it is passed on
