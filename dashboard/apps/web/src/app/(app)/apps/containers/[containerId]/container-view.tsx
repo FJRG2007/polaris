@@ -197,14 +197,18 @@ export function ContainerView({
                         <ArrowLeft className="size-3" /> Containers
                     </Link>
                     <div className="flex flex-wrap items-center gap-2">
-                        <h1 className="truncate text-xl font-semibold">{detail?.name || containerRef}</h1>
+                        <h1 className="truncate text-xl font-semibold" title={detail?.name || containerRef}>
+                            {detail?.name || containerRef}
+                        </h1>
                         {detail ? (
                             <Badge variant={running ? "success" : "neutral"}>{state}</Badge>
                         ) : (
                             <Skeleton className="h-5 w-16 rounded-full" />
                         )}
                     </div>
-                    <p className="truncate text-xs text-muted-foreground">{detail?.image ?? ""}</p>
+                    <p className="truncate text-xs text-muted-foreground" title={detail?.image ?? undefined}>
+                        {detail?.image ?? ""}
+                    </p>
                 </div>
                 <div className="flex items-center gap-1">
                     <Button
@@ -687,6 +691,7 @@ function FilesTab({ query }: { query: string }) {
                                             type="button"
                                             className="flex-1 truncate text-left hover:underline"
                                             onClick={() => setPath(full)}
+                                            title={entry.name}
                                         >
                                             {entry.name}
                                         </button>

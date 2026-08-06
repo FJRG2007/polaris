@@ -195,7 +195,9 @@ export function ContainersView({
                                     )}
                                 >
                                     <Server className="size-4 text-muted-foreground" />
-                                    <span className="flex-1 truncate">{connection.name}</span>
+                                    <span className="flex-1 truncate" title={connection.name}>
+                                        {connection.name}
+                                    </span>
                                     <Badge variant="neutral">{connection.local ? "local" : connection.transport}</Badge>
                                 </Link>
                                 {connection.local || connection.host ? null : (
@@ -307,10 +309,14 @@ export function ContainersView({
                                                     <Link
                                                         href={containerHref(container, "details")}
                                                         className="block max-w-full truncate text-left font-medium hover:underline"
+                                                        title={container.name}
                                                     >
                                                         {container.name}
                                                     </Link>
-                                                    <span className="block truncate text-xs text-muted-foreground">
+                                                    <span
+                                                        className="block truncate text-xs text-muted-foreground"
+                                                        title={container.image}
+                                                    >
                                                         {container.image}
                                                     </span>
                                                 </td>
@@ -437,8 +443,12 @@ function Stat({ icon, label, value, hint }: { icon: ReactNode; label: string; va
                     {icon}
                     {label}
                 </div>
-                <div className="truncate text-lg font-semibold">{value}</div>
-                <div className="truncate text-xs text-muted-foreground">{hint}</div>
+                <div className="truncate text-lg font-semibold" title={value}>
+                    {value}
+                </div>
+                <div className="truncate text-xs text-muted-foreground" title={hint}>
+                    {hint}
+                </div>
             </CardBody>
         </Card>
     );

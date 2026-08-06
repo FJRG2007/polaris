@@ -349,7 +349,9 @@ const ProjectCard = forwardRef<HTMLAnchorElement, { project: ProjectCardData } &
                 {...rest}
             >
             <div className="flex items-center justify-between gap-2 px-4 py-3">
-                <h3 className="truncate text-sm font-medium">{project.name}</h3>
+                <h3 className="truncate text-sm font-medium" title={project.name}>
+                    {project.name}
+                </h3>
                 <span className="shrink-0 text-xs text-muted-foreground">
                     {project.total} {project.total === 1 ? "service" : "services"}
                 </span>
@@ -362,7 +364,9 @@ const ProjectCard = forwardRef<HTMLAnchorElement, { project: ProjectCardData } &
                 )}
             </div>
                 <div className="flex items-center justify-between gap-2 px-4 py-3">
-                    <span className="truncate text-xs text-muted-foreground">{project.environmentName}</span>
+                    <span className="truncate text-xs text-muted-foreground" title={project.environmentName}>
+                        {project.environmentName}
+                    </span>
                     <span
                         className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs ${chip}`}
                     >
@@ -388,7 +392,9 @@ const ProjectRow = forwardRef<HTMLAnchorElement, { project: ProjectCardData } & 
                 )}
                 {...rest}
             >
-                <span className="flex-1 truncate text-sm font-medium">{project.name}</span>
+                <span className="flex-1 truncate text-sm font-medium" title={project.name}>
+                    {project.name}
+                </span>
                 <div className="flex items-center gap-1.5">
                     {project.services.slice(0, 5).map((kind, index) => (
                         <ServiceIcon key={index} kind={kind} className="size-4 text-muted-foreground" />
